@@ -30,8 +30,16 @@ from _sdk.managed_service import (
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp._raw_fields import raw_field_conflicts
+from gcp._service_accounts import unlisted_service_account
+from gcp.managed._ownership import (
+    is_marked_for,
+    is_platform_label_key,
+    label_identity_refusal,
+    reserved_label_keys,
+)
 
 KIND = "api_gateway"
+_MISSING_IDENTITY = "API Gateway needs the managed-service id to mark the resources it owns"
 _API_ROOT = "https://apigateway.googleapis.com/v1"
 _ID_RE = re.compile(r"^[a-z](?:[a-z0-9-]{2,61}[a-z0-9])$")
 _OUTPUT_ONLY = {
@@ -77,6 +85,9 @@ class APIGatewayConfig:
     deletion_protection_default: bool = True
     operation_timeout_seconds: float = 1800
     poll_interval_seconds: float = 5
+    # Service accounts an API config may have the gateway call backends as.
+    # Empty refuses every one (#2087).
+    allowed_service_accounts: tuple[str, ...] = ()
 
 
 class APIGatewayRestClient:
@@ -203,14 +214,13 @@ class APIGatewayDriver(ManagedServiceDriver):
         error = self._validate(cfg, update=False)
         if error:
             return ProvisionResult(False, "", error, ["invalid_api_gateway_config"])
+        if not spec.managed_service_id:
+            return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_api_gateway_config"])
         region = str(cfg.get("region") or self._config.region)
         api_id = self._api_id(spec, cfg)
         gateway_id = self._gateway_id(spec, cfg)
         handle = _handle(region, gateway_id)
         labels = self._labels(spec, cfg)
-        service_id = _label_value(spec.managed_service_id or gateway_id)
-        labels.setdefault("astrolift-io-managed-service-id", service_id)
-        labels.setdefault(MANAGED_SERVICE_ID_LABEL, service_id)
         api_name = self._api_name(api_id)
         gateway_name = self._gateway_name(region, gateway_id)
         try:
@@ -224,8 +234,9 @@ class APIGatewayDriver(ManagedServiceDriver):
                 cfg,
                 labels,
                 spec.managed_service_id,
+                record_proves=spec.recorded_handle_exclusive and spec.recorded_handle == handle,
             )
-            self._prune_configs(api_name, config_name, cfg, service_id)
+            self._prune_configs(api_name, config_name, cfg, spec.managed_service_id)
             config_resource = self._api.get(config_name)
         except Exception as exc:
             return ProvisionResult(False, handle, f"provision API Gateway: {exc}", [str(exc)])
@@ -255,7 +266,12 @@ class APIGatewayDriver(ManagedServiceDriver):
         gateway_name = self._gateway_name(region, gateway_id)
         try:
             gateway = self._api.get(gateway_name)
-            self._assert_managed(gateway, "gateway")
+            self._assert_owned(
+                gateway,
+                spec.managed_service_id,
+                "gateway",
+                record_proves=spec.recorded_handle_exclusive,
+            )
             current_api_name = str(gateway.get("apiConfig") or "").split("/configs/", 1)[0]
             if current_api_name and current_api_name != api_name and not cfg.get("allow_api_retarget"):
                 return UpdateResult(
@@ -265,18 +281,21 @@ class APIGatewayDriver(ManagedServiceDriver):
                     ["api_retarget_guard"],
                 )
             api_resource = self._api.get(api_name)
-            self._assert_managed(api_resource, "API")
-            api_labels = dict(api_resource.get("labels") or {})
+            # api_id comes from tenant config, so with allow_api_retarget a
+            # platform-label check alone let an update point this gateway at,
+            # patch and prune another managed service's API (#2074).
+            self._assert_owned(api_resource, spec.managed_service_id, "API", record_proves=False)
+            # The live maps are the base, but the identity comes from the spec:
+            # the service id prune acts for is never read back from a label
+            # (#2098).
+            identity = _identity_labels(spec.managed_service_id)
+            api_labels = {**dict(api_resource.get("labels") or {}), **identity}
             self._patch(api_name, api_resource, self._api_body(cfg, api_labels), immutable={"managedService"})
-            service_id = str(api_labels.get("astrolift-io-managed-service-id") or "")
-            config_name = self._ensure_config(api_name, cfg, api_labels, service_id)
-            gateway_labels = dict(gateway.get("labels") or {})
+            config_name = self._ensure_config(api_name, cfg, api_labels, spec.managed_service_id)
+            gateway_labels = {**dict(gateway.get("labels") or {}), **identity}
             desired = self._gateway_body(config_name, cfg, gateway_labels)
             self._patch(gateway_name, gateway, desired)
-            service_id = service_id or str(
-                gateway_labels.get("astrolift-io-managed-service-id") or _label_value(gateway_id)
-            )
-            self._prune_configs(api_name, config_name, cfg, service_id)
+            self._prune_configs(api_name, config_name, cfg, spec.managed_service_id)
         except APIGatewayNotFound:
             return UpdateResult(False, spec.handle, "API Gateway not found", ["not_found"])
         except Exception as exc:
@@ -317,11 +336,16 @@ class APIGatewayDriver(ManagedServiceDriver):
         api_resource = self._get(api_name)
         if gateway is None and api_resource is None:
             return DeprovisionResult(True, spec.handle, f"API Gateway {gateway_id} already gone")
-        for resource, label in ((gateway, "gateway"), (api_resource, "API")):
+        # ``api_id`` is the stored config, which a tenant writes: the API it
+        # names must be this service's too, not just Astrolift's (#2098).
+        for resource, label, record_proves in (
+            (gateway, "gateway", spec.recorded_handle_exclusive),
+            (api_resource, "API", False),
+        ):
             if resource is None:
                 continue
             try:
-                self._assert_managed(resource, label)
+                self._assert_owned(resource, spec.managed_service_id, label, record_proves=record_proves)
             except Exception as exc:
                 return DeprovisionResult(False, spec.handle, str(exc), ["ownership_guard"], retryable=False)
             if (resource.get("labels") or {}).get("astrolift-io-adopted") == "true" and not cfg.get("delete_adopted"):
@@ -351,12 +375,8 @@ class APIGatewayDriver(ManagedServiceDriver):
                     ["external_gateways_present"],
                     retryable=False,
                 )
-            service_id = str(
-                ((api_resource or {}).get("labels") or {}).get("astrolift-io-managed-service-id")
-                or _label_value(gateway_id)
-            )
             configs = self._list_configs(api_name)
-            external_configs = [item for item in configs if not _is_owned(item, service_id)]
+            external_configs = [item for item in configs if not _is_owned(item, spec.managed_service_id)]
             if external_configs and not (force_destroy and cfg.get("delete_external_configs")):
                 return DeprovisionResult(
                     False,
@@ -422,7 +442,12 @@ class APIGatewayDriver(ManagedServiceDriver):
         del config
         region, gateway_id = _parse_handle(handle.handle)
         gateway = self._api.get(self._gateway_name(region, gateway_id))
-        self._assert_managed(gateway, "gateway")
+        self._assert_owned(
+            gateway,
+            handle.managed_service_id,
+            "gateway",
+            record_proves=handle.recorded_handle_exclusive,
+        )
         hostname = str(gateway.get("defaultHostname") or "")
         url = f"https://{hostname}" if hostname else ""
         return Binding(
@@ -444,7 +469,12 @@ class APIGatewayDriver(ManagedServiceDriver):
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         region, gateway_id = _parse_handle(handle.handle)
         gateway = self._api.get(self._gateway_name(region, gateway_id))
-        self._assert_managed(gateway, "gateway")
+        self._assert_owned(
+            gateway,
+            handle.managed_service_id,
+            "gateway",
+            record_proves=handle.recorded_handle_exclusive,
+        )
         config_name = str(gateway.get("apiConfig") or "")
         if not config_name:
             raise APIGatewayError("gateway has no API config to snapshot")
@@ -533,8 +563,6 @@ class APIGatewayDriver(ManagedServiceDriver):
                 "prune_config_revisions": {"type": "boolean", "default": False},
                 "retain_config_revisions": {"type": "integer", "minimum": 1, "default": 5},
                 "allow_config_revision_delete": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
                 "delete_external_gateways": {"type": "boolean", "default": False},
@@ -598,6 +626,9 @@ class APIGatewayDriver(ManagedServiceDriver):
             return "gRPC API configs require managed_service_configs"
         if cfg.get("openapi_documents") and cfg.get("managed_service_configs"):
             return "managed_service_configs are only valid with grpc_services"
+        account_error = self._unlisted_account_error(cfg.get("gateway_service_account"))
+        if account_error:
+            return account_error
         api_config_ref = str(cfg.get("api_config_ref") or "")
         if api_config_ref:
             expected = f"projects/{self._config.project_id}/locations/global/apis/"
@@ -630,7 +661,10 @@ class APIGatewayDriver(ManagedServiceDriver):
             return "prune_config_revisions requires allow_config_revision_delete=true"
         if int(cfg.get("retain_config_revisions") or 5) < 1:
             return "retain_config_revisions must be at least 1"
-        reserved = sorted(key for key in _normalized_labels(cfg.get("labels") or {}) if key.startswith("astrolift-io-"))
+        # Every spelling of every platform label, not only astrolift-io-*: the
+        # canonical astrolift_io_managed_service_id slipped past a prefix check
+        # (#2098).
+        reserved = reserved_label_keys(cfg.get("labels") or {})
         if reserved:
             return f"labels cannot set Astrolift-reserved keys: {', '.join(reserved)}"
         for key, label in (
@@ -664,8 +698,8 @@ class APIGatewayDriver(ManagedServiceDriver):
                 return self._api.get(name)
             except APIGatewayConflict:
                 current = self._api.get(name)
-        self._assert_adoptable(current, cfg, service_id, "API")
-        desired["labels"] = self._adoption_labels(current, labels, cfg)
+        self._assert_owned(current, service_id, "API", record_proves=False)
+        desired["labels"] = self._merged_labels(current, desired["labels"])
         self._patch(name, current, desired, immutable={"managedService"})
         return self._api.get(name)
 
@@ -679,10 +713,12 @@ class APIGatewayDriver(ManagedServiceDriver):
         if cfg.get("api_config_ref"):
             name = str(cfg["api_config_ref"])
             current = self._api.get(name, params={"view": "FULL"})
-            self._assert_managed(current, "API config")
-            expected = _label_value(service_id) if service_id else ""
-            if expected and not _is_owned(current, expected):
-                raise APIGatewayError("API config belongs to another managed service")
+            self._assert_owned(current, service_id, "API config", record_proves=False)
+            # A reused config (a restore takes this path) keeps the identity it
+            # was created with, which may predate the install policy.
+            account_error = self._unlisted_account_error(current.get("gatewayServiceAccount"))
+            if account_error:
+                raise APIGatewayError(account_error)
             return name
         body = self._config_body(cfg, labels)
         config_id = str(cfg.get("config_id") or self._derived_config_id(body))
@@ -694,12 +730,12 @@ class APIGatewayDriver(ManagedServiceDriver):
                 return name
             except APIGatewayConflict:
                 current = self._api.get(name, params={"view": "FULL"})
-        self._assert_adoptable(current, cfg, service_id, "API config")
+        self._assert_owned(current, service_id, "API config", record_proves=False)
         if _immutable_config(current) != _immutable_config(body):
             raise APIGatewayError(
                 f"API config {config_id} is immutable and differs from the declaration; use a new config_id",
             )
-        desired = {"labels": self._adoption_labels(current, labels, cfg)}
+        desired = {"labels": self._merged_labels(current, body["labels"])}
         if "displayName" in body:
             desired["displayName"] = body["displayName"]
         self._patch(name, current, desired)
@@ -714,6 +750,8 @@ class APIGatewayDriver(ManagedServiceDriver):
         cfg: dict[str, Any],
         labels: dict[str, str],
         service_id: str,
+        *,
+        record_proves: bool,
     ) -> dict[str, Any]:
         desired = self._gateway_body(config_name, cfg, labels)
         current = self._get(name)
@@ -731,8 +769,8 @@ class APIGatewayDriver(ManagedServiceDriver):
                 return self._api.get(name)
             except APIGatewayConflict:
                 current = self._api.get(name)
-        self._assert_adoptable(current, cfg, service_id, "gateway")
-        desired["labels"] = self._adoption_labels(current, labels, cfg)
+        self._assert_owned(current, service_id, "gateway", record_proves=record_proves)
+        desired["labels"] = self._merged_labels(current, desired["labels"])
         self._patch(name, current, desired)
         return self._api.get(name)
 
@@ -756,17 +794,26 @@ class APIGatewayDriver(ManagedServiceDriver):
             self._wait(self._api.delete(str(item["name"])))
 
     def _api_body(self, cfg: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
-        body: dict[str, Any] = {"labels": {**labels, **_normalized_labels(cfg.get("labels") or {})}}
+        body: dict[str, Any] = {}
         if cfg.get("api_display_name"):
             body["displayName"] = str(cfg["api_display_name"])
         if cfg.get("managed_service"):
             body["managedService"] = str(cfg["managed_service"])
         body.update(dict(cfg.get("api_raw_fields") or {}))
-        body["labels"] = {**labels, **_normalized_labels(cfg.get("labels") or {})}
+        body["labels"] = _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
         return body
 
+    def _unlisted_account_error(self, value: Any) -> str:
+        account = unlisted_service_account(value, self._config.allowed_service_accounts)
+        if not account:
+            return ""
+        return (
+            f"gateway_service_account {account!r} is not allowed by the cluster install policy "
+            "api_gateway_allowed_service_accounts"
+        )
+
     def _config_body(self, cfg: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
-        body: dict[str, Any] = {"labels": {**labels, **_normalized_labels(cfg.get("labels") or {})}}
+        body: dict[str, Any] = {}
         if cfg.get("config_display_name"):
             body["displayName"] = str(cfg["config_display_name"])
         if cfg.get("gateway_service_account"):
@@ -785,7 +832,7 @@ class APIGatewayDriver(ManagedServiceDriver):
             ]
             body["managedServiceConfigs"] = [_provider_file(item) for item in cfg.get("managed_service_configs") or []]
         body.update(dict(cfg.get("config_raw_fields") or {}))
-        body["labels"] = {**labels, **_normalized_labels(cfg.get("labels") or {})}
+        body["labels"] = _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
         return body
 
     def _gateway_body(
@@ -794,15 +841,12 @@ class APIGatewayDriver(ManagedServiceDriver):
         cfg: dict[str, Any],
         labels: dict[str, str],
     ) -> dict[str, Any]:
-        body: dict[str, Any] = {
-            "apiConfig": config_name,
-            "labels": {**labels, **_normalized_labels(cfg.get("labels") or {})},
-        }
+        body: dict[str, Any] = {"apiConfig": config_name}
         if cfg.get("gateway_display_name"):
             body["displayName"] = str(cfg["gateway_display_name"])
         body.update(dict(cfg.get("gateway_raw_fields") or {}))
         body["apiConfig"] = config_name
-        body["labels"] = {**labels, **_normalized_labels(cfg.get("labels") or {})}
+        body["labels"] = _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
         return body
 
     def _derived_config_id(self, body: dict[str, Any]) -> str:
@@ -884,53 +928,44 @@ class APIGatewayDriver(ManagedServiceDriver):
             raise APIGatewayError(str(error.get("message") or error))
         return dict(current.get("response") or current)
 
-    def _assert_managed(self, resource: dict[str, Any], label: str) -> None:
-        if (resource.get("labels") or {}).get("astrolift-io-managed-by") != "platform":
-            raise APIGatewayError(f"{label} is not Astrolift-owned")
-
-    def _assert_adoptable(
-        self,
+    @staticmethod
+    def _assert_owned(
         resource: dict[str, Any],
-        cfg: dict[str, Any],
         service_id: str,
         label: str,
+        *,
+        record_proves: bool,
     ) -> None:
+        # Neither a resource Astrolift never provisioned nor another managed
+        # service's may be taken over from here. Adoption of an existing
+        # resource is a separate, operator-authorized operation (#1365) that no
+        # tenant config flag may grant (#2021). One with no managed-service id
+        # is this service's only when the platform's exclusive record of the
+        # handle says so (#2086); only the gateway has a record.
         labels = dict(resource.get("labels") or {})
         if labels.get("astrolift-io-managed-by") != "platform":
-            if not cfg.get("adopt_existing"):
-                raise APIGatewayError(f"existing {label} is not Astrolift-owned; set adopt_existing=true")
-            return
-        owner = str(labels.get("astrolift-io-managed-service-id") or "")
-        expected = _label_value(service_id) if service_id else ""
-        if owner and expected and owner != expected and not cfg.get("reassign_existing"):
-            raise APIGatewayError(f"existing {label} belongs to another managed service")
+            raise APIGatewayError(
+                f"existing {label} is not Astrolift-owned; adoption is a separate, operator-authorized "
+                "operation and cannot be granted by tenant config",
+            )
+        refusal = label_identity_refusal(labels, service_id, record_proves=record_proves, resource=f"existing {label}")
+        if refusal:
+            raise APIGatewayError(refusal)
 
-    def _adoption_labels(
-        self,
-        resource: dict[str, Any],
-        desired: dict[str, str],
-        cfg: dict[str, Any],
-    ) -> dict[str, str]:
-        current = dict(resource.get("labels") or {})
-        result = {**current, **desired}
-        if current.get("astrolift-io-managed-by") != "platform" and cfg.get("adopt_existing"):
-            result["astrolift-io-adopted"] = "true"
-        return result
+    @staticmethod
+    def _merged_labels(resource: dict[str, Any], desired: dict[str, str]) -> dict[str, str]:
+        return {**dict(resource.get("labels") or {}), **desired}
 
     def _labels(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         labels = {
-            "astrolift-io-managed-by": "platform",
             "astrolift-io-organization": _label_value(spec.organization_slug),
             "astrolift-io-app": _label_value(spec.app_slug),
             "astrolift-io-environment": _label_value(spec.environment_name),
+            **_identity_labels(spec.managed_service_id),
         }
         if spec.binding_id:
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
-        if spec.managed_service_id:
-            labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
-            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
-        labels.update(_normalized_labels(cfg.get("labels") or {}))
-        return labels
+        return _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
 
 
 def _handle(region: str, gateway_id: str) -> str:
@@ -983,6 +1018,23 @@ def _normalized_labels(labels: dict[str, Any]) -> dict[str, str]:
     return {_label_key(str(key)): _label_value(str(value)) for key, value in labels.items()}
 
 
+def _identity_labels(managed_service_id: str) -> dict[str, str]:
+    """The labels ownership and prune decide on, from the spec only."""
+    return {
+        "astrolift-io-managed-by": "platform",
+        "astrolift-io-managed-service-id": _label_value(managed_service_id),
+        MANAGED_SERVICE_ID_LABEL: _label_value(managed_service_id),
+    }
+
+
+def _platform_last(base: dict[str, str], tenant: dict[str, str]) -> dict[str, str]:
+    """``base`` with ``tenant`` applied to its tenant keys only: platform labels always win (#2098)."""
+    merged = {key: value for key, value in base.items() if not is_platform_label_key(key)}
+    merged.update({key: value for key, value in tenant.items() if not is_platform_label_key(key)})
+    merged.update({key: value for key, value in base.items() if is_platform_label_key(key)})
+    return merged
+
+
 def _provider_file(file: dict[str, Any]) -> dict[str, str]:
     contents = file.get("contents_base64")
     if not contents:
@@ -998,8 +1050,6 @@ def _immutable_config(resource: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _is_owned(resource: dict[str, Any], service_id: str) -> bool:
+def _is_owned(resource: dict[str, Any], managed_service_id: str) -> bool:
     labels = dict(resource.get("labels") or {})
-    return labels.get("astrolift-io-managed-by") == "platform" and (
-        not service_id or labels.get("astrolift-io-managed-service-id") == service_id
-    )
+    return labels.get("astrolift-io-managed-by") == "platform" and is_marked_for(labels, managed_service_id)

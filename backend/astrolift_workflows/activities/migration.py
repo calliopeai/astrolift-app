@@ -45,7 +45,7 @@ def _validate_migration_target_sync(
 ) -> None:
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment
-    from core.app_deploy import AppDeployError
+    from core.app_deploy import AppDeployError, namespace_for_environment
 
     env = AppEnvironment.all_objects.select_related("tenant_cluster").get(pk=app_environment_id)
     if env.tenant_cluster_id == target_cluster_id:
@@ -59,6 +59,20 @@ def _validate_migration_target_sync(
         )
     if target.deleted_at is not None:
         raise AppDeployError(f"target cluster {target.slug!r} is soft-deleted")
+    # The namespace moves with the environment. Another environment of the
+    # app already rendering into it on the target would have its Deployments,
+    # Services and Secrets overwritten by the ones this migration applies
+    # there (#1922).
+    namespace = namespace_for_environment(env)
+    for other in AppEnvironment.objects.filter(
+        registered_app_id=env.registered_app_id,
+        tenant_cluster_id=target_cluster_id,
+    ).exclude(pk=env.pk):
+        if namespace_for_environment(other) == namespace:
+            raise AppDeployError(
+                f"environment {other.name!r} of this app already renders into namespace {namespace!r} "
+                f"on target cluster {target.slug!r}; migrating {env.name!r} there would overwrite its workloads",
+            )
 
 
 @activity.defn(name="astrolift.migration.validate_target")
@@ -70,18 +84,13 @@ async def validate_migration_target(app_environment_id: int, target_cluster_id: 
     await sync_to_async(_validate_migration_target_sync)(app_environment_id, target_cluster_id)
 
 
-def _ensure_target_namespace(driver, ctx, namespace: str, app) -> None:
-    """Create or update the app's namespace on the target cluster."""
-    driver.ensure_namespace(
-        ctx.slug,
-        namespace,
-        {
-            "astrolift.io/managed-by": "astrolift",
-            "astrolift.io/organization": app.organization.slug,
-            "astrolift.io/app": app.slug,
-        },
-        {"astrolift.io/registered-app-id": str(app.pk)},
-    )
+def _ensure_target_namespace(driver, ctx, namespace: str, app, env) -> None:
+    """Create or update the environment's namespace on the target cluster,
+    labelled the way ``provision_namespace`` labels it on the source."""
+    from astrolift_workflows.activities.app_lifecycle import _environment_namespace_labels
+
+    labels, annotations = _environment_namespace_labels(app, env)
+    driver.ensure_namespace(ctx.slug, namespace, labels, annotations)
 
 
 def _materialize_secrets_on_target_sync(deployment_id: int, target_cluster_id: int) -> int:
@@ -89,11 +98,13 @@ def _materialize_secrets_on_target_sync(deployment_id: int, target_cluster_id: i
     from astrolift_workflows.activities.app_lifecycle import _update_secrets_sync
     from core.app_deploy import driver_for_target_cluster
 
-    d = Deployment.all_objects.select_related("registered_app__organization").get(pk=deployment_id)
+    d = Deployment.all_objects.select_related("registered_app__organization", "app_environment").get(
+        pk=deployment_id
+    )
     driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
     # This runs before apply_to_target_cluster, the step that used to be
     # the first to create the namespace; a Secret needs it to exist.
-    _ensure_target_namespace(driver, ctx, namespace, d.registered_app)
+    _ensure_target_namespace(driver, ctx, namespace, d.registered_app, d.app_environment)
     return _update_secrets_sync(deployment_id, target_cluster_id=target_cluster_id)
 
 
@@ -134,7 +145,7 @@ def _apply_to_target_cluster_sync(deployment_id: int, target_cluster_id: int) ->
     ).get(pk=deployment_id)
     driver, ctx, namespace = driver_for_target_cluster(d, target_cluster_id)
     target_cluster = TenantCluster.all_objects.get(pk=target_cluster_id)
-    _ensure_target_namespace(driver, ctx, namespace, d.registered_app)
+    _ensure_target_namespace(driver, ctx, namespace, d.registered_app, d.app_environment)
     resources = render_resources_for_deployment(d, cluster_override=target_cluster)
     if not resources:
         raise AppDeployError(
@@ -271,6 +282,12 @@ def _drain_source_cluster_sync(
     synthesized separately by ``update_secrets`` and was never part of
     this delete set, so it stayed behind on the source cluster holding
     the last plaintext values indefinitely.
+
+    Leaves the workloads when another environment of the app still renders
+    into the same namespace on the source (#1922): environments that predate
+    per-environment namespaces share the app namespace, so the objects this
+    render names are that environment's too. Only the per-environment
+    literal Secret goes then, and the returned message says why.
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment, Deployment
@@ -278,7 +295,7 @@ def _drain_source_cluster_sync(
     from astrolift_workflows.activities.app_lifecycle import _app_env_secret_name
     from core.app_deploy import (
         AppDeployError,
-        namespace_for_app,
+        namespace_for_environment,
         render_resources_for_deployment,
     )
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
@@ -310,7 +327,29 @@ def _drain_source_cluster_sync(
     except Exception as exc:  # noqa: BLE001 - non-fatal cleanup path
         return [f"could not build source driver: {exc}"]
     ctx = _context_for_cluster(source)
-    namespace = namespace_for_app(app)
+    namespace = namespace_for_environment(env)
+    literal_secret = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": _app_env_secret_name(app.slug, env.name),
+            "namespace": namespace,
+        },
+    }
+    sharing = sorted(
+        other.name
+        for other in AppEnvironment.objects.filter(
+            registered_app=app, tenant_cluster_id=source_cluster_id
+        ).exclude(pk=env.pk)
+        if namespace_for_environment(other) == namespace
+    )
+    if sharing:
+        result = driver.delete_manifests(ctx.slug, namespace, [literal_secret])
+        return [
+            *result.errors,
+            f"left the workloads in {namespace!r} on the source: environment(s) {', '.join(sharing)} "
+            "of this app still render there under the same names",
+        ]
     try:
         # The environment FK already points at the target by this phase. A
         # project filesystem is deliberately cluster-bound, so re-running its
@@ -323,17 +362,7 @@ def _drain_source_cluster_sync(
         )
     except AppDeployError as exc:
         return [str(exc)]
-    resources = [
-        *resources,
-        {
-            "apiVersion": "v1",
-            "kind": "Secret",
-            "metadata": {
-                "name": _app_env_secret_name(app.slug, env.name),
-                "namespace": namespace,
-            },
-        },
-    ]
+    resources = [*resources, literal_secret]
     result = driver.delete_manifests(ctx.slug, namespace, resources)
     return list(result.errors)
 

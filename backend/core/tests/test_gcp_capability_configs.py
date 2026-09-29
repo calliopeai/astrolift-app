@@ -136,6 +136,43 @@ def test_cloud_functions_config_carries_the_install_service_account_allowlist() 
     assert unset.allowed_service_accounts == ()
 
 
+@pytest.mark.parametrize(
+    ("key", "kind", "variant", "field"),
+    [
+        ("workflows_allowed_service_accounts", "workflow_engine", "workflows", "allowed_service_accounts"),
+        ("eventarc_allowed_service_accounts", "event_bus", "eventarc", "allowed_service_accounts"),
+        ("pubsub_allowed_service_accounts", "topic", "pubsub_topic", "allowed_service_accounts"),
+        ("api_gateway_allowed_service_accounts", "api_gateway", "api_gateway", "allowed_service_accounts"),
+        (
+            "cloud_operations_allowed_writer_identities",
+            "observability",
+            "cloud_operations",
+            "allowed_writer_identities",
+        ),
+        ("bigquery_allowed_connections", "warehouse", "bigquery", "allowed_connections"),
+    ],
+)
+def test_managed_configs_carry_the_install_identity_allowlists(
+    key: str,
+    kind: str,
+    variant: str,
+    field: str,
+) -> None:
+    """Each driver refuses a config-supplied identity outside its list (#2087);
+    an install that sets none refuses every one."""
+    from core.cluster_observability import managed_config_for
+
+    allowed = managed_config_for(
+        "gcp", _cluster(**{key: ["listed@acme-prod.iam.gserviceaccount.com"]}), kind=kind, variant=variant
+    )
+    unset = managed_config_for("gcp", _cluster(), kind=kind, variant=variant)
+    nulled = managed_config_for("gcp", _cluster(**{key: None}), kind=kind, variant=variant)
+
+    assert getattr(allowed, field) == ("listed@acme-prod.iam.gserviceaccount.com",)
+    assert getattr(unset, field) == ()
+    assert getattr(nulled, field) == ()
+
+
 def test_alloydb_runtime_config_preserves_operator_controls() -> None:
     from core.cluster_observability import managed_config_for
 
@@ -361,6 +398,9 @@ def test_spanner_graph_runtime_config_preserves_operator_controls() -> None:
             spanner_api_endpoint="https://spanner.example.test/v1",
             spanner_operation_timeout_seconds=900,
             spanner_operation_poll_interval_seconds=1,
+            # A stale install-level switch from before #2074 must not reach
+            # the driver: it would reopen adoption of any unlabeled instance
+            # a tenant names.
             spanner_adopt_existing_instance=True,
         ),
         kind="graph_db",
@@ -380,7 +420,7 @@ def test_spanner_graph_runtime_config_preserves_operator_controls() -> None:
     assert config.api_endpoint == "https://spanner.example.test/v1"
     assert config.operation_timeout_seconds == 900
     assert config.poll_interval_seconds == 1
-    assert config.adopt_existing_instance is True
+    assert not hasattr(config, "adopt_existing_instance")
 
 
 def test_workflows_runtime_config_preserves_operator_controls() -> None:

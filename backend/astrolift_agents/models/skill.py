@@ -46,6 +46,19 @@ class Skill(BaseCoreModel):
     # ["code-review", "infra-ops"].
     scaffolding_tags = models.JSONField(default=list, blank=True)
 
+    class SourceKind(models.TextChoices):
+        # Where the skill came from (#2155), for the catalog's Imported view.
+        # Empty is a skill written in the UI or seeded by the platform.
+        REPO_IMPORT = "repo_import"  # importSkillsFromRepo (an astrolift.toml library)
+        AGENT_REPO = "agent_repo"  # a local skill folder in a registered agent's repo
+        ORG_REPO = "org_repo"  # an org-registered skill repo (spec 39d)
+        CATALOGUE = "catalogue"  # the built-in skill catalogue
+
+    source_kind = models.CharField(max_length=16, choices=SourceKind.choices, blank=True, default="")
+    # The pointer it was imported from, e.g. ``owner/repo@main:skills`` or
+    # ``alias/path@ref``; empty when ``source_kind`` is.
+    source_ref = models.CharField(max_length=512, blank=True, default="")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

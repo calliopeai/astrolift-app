@@ -19,11 +19,13 @@ the only sanctioned way to advance status.
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
 from core.models.base import BaseCoreModel
+from core.run_trigger import RunTrigger
 
 
 class AgentTask(BaseCoreModel):
@@ -125,6 +127,35 @@ class AgentTask(BaseCoreModel):
     # manual/cron/loop dispatch, which carry no ad-hoc input — those launch
     # with no such env var.
     dispatch_input = models.JSONField(null=True, blank=True)
+    # Idempotency key for ``runAstroliftAgent`` (#2072), mirroring
+    # ``AgentTaskInputMessage.client_request_id``. Scoped per requester
+    # (``created_by``), not just per organization: the uniqueness
+    # constraint below is ``(organization, created_by, client_request_id)``,
+    # so a retry presenting the SAME key as the SAME requester returns the
+    # task already created for it, while a different requester presenting
+    # the identical key (collision, not a retry) gets an independent task
+    # rather than someone else's -- ``agentTaskByClientRequestId`` and the
+    # replay check in ``dispatch_registered_agent`` both filter on the
+    # caller's own requester identity. Null for the (still supported)
+    # no-key call, and for every other dispatch path.
+    client_request_id = models.UUIDField(null=True, blank=True)
+    # Who and what started the run (#2152). ``triggered_by_user`` is the
+    # person behind it (the session user, or a token's owner), null for a
+    # schedule, a webhook or a run another run started without one.
+    # ``trigger_kind`` is the shared vocabulary in ``core.run_trigger``;
+    # every creation path sets it, and ``unknown`` marks rows from before.
+    triggered_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="triggered_agent_tasks",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    trigger_kind = models.CharField(
+        max_length=16,
+        choices=RunTrigger.choices,
+        default=RunTrigger.UNKNOWN,
+    )
     # Lifecycle timestamps.
     queued_at = models.DateTimeField(null=True, blank=True)
     provisioning_at = models.DateTimeField(null=True, blank=True)
@@ -213,6 +244,20 @@ class AgentTask(BaseCoreModel):
             models.Index(
                 fields=["agent_definition", "status"],
                 name="agent_task_agentdef_status_idx",
+            ),
+        ]
+        # Keep the key reserved after soft deletion so a retry cannot
+        # re-dispatch under it -- mirrors ``agentinput_task_request_unique``.
+        # Postgres treats every NULL as distinct, so unkeyed dispatches
+        # (the common case) never collide with each other, and so do two
+        # different requesters (``created_by``) who happen to submit the
+        # same key -- scoping by requester as well as org means a key is
+        # only ever a retry of THAT requester's own prior call, never a
+        # cross-user collision that would hand one caller another's task.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "created_by", "client_request_id"],
+                name="agenttask_org_requester_request_unique",
             ),
         ]
 

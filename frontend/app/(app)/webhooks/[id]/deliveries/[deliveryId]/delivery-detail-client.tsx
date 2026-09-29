@@ -1,27 +1,11 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
-import * as React from "react";
-
-import { DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LIST_WEBHOOK_DELIVERIES } from "@/graphql/operations/operations.queries";
-import type { AstroliftWebhookDelivery } from "@/graphql/operations/operations.types";
-
-interface Resp {
-  astroliftWebhookDeliveries: AstroliftWebhookDelivery[];
-}
-
-// Must match the subscription detail's deliveries window so the row we
-// navigated from is already in cache (LIST_WEBHOOK_DELIVERIES is keyed by
-// subscriptionId + limit; a singular delivery query does not exist).
-const DELIVERIES_LIMIT = 50;
+import { DeliveryDetailScreen } from "@/components/screens/webhooks/DeliveryDetailScreen";
+import { useWebhookDelivery } from "@/components/screens/webhooks/use-webhook-detail";
 
 /**
- * Webhook delivery detail (#1106) — the request/response/timeline behind one
- * delivery attempt. Nested under its subscription because the deliveries query
- * requires a subscriptionId.
+ * Webhook delivery detail (#1106). The data lives in useWebhookDelivery;
+ * the screen owns the markup.
  */
 export function DeliveryDetailClient({
   subscriptionId,
@@ -30,92 +14,5 @@ export function DeliveryDetailClient({
   subscriptionId: string;
   deliveryId: string;
 }) {
-  const { data, loading } = useQuery<Resp>(LIST_WEBHOOK_DELIVERIES, {
-    variables: { subscriptionId, limit: DELIVERIES_LIMIT },
-    fetchPolicy: "cache-and-network",
-  });
-
-  const d = React.useMemo(
-    () => (data?.astroliftWebhookDeliveries ?? []).find((row) => row.id === deliveryId) ?? null,
-    [data, deliveryId]
-  );
-
-  return (
-    <EntityDetailShell
-      loading={loading}
-      notFound={!d}
-      breadcrumb={{ label: "Webhook", href: `/webhooks/${subscriptionId}` }}
-      heading={`Delivery ${deliveryId.slice(0, 8)}`}
-      status={d ? (d.success ? "delivered" : "failed") : undefined}
-      statusTone={d ? (d.success ? "ok" : "error") : undefined}
-      createdAt={d?.deliveredAt}
-      notFoundLabel="delivery"
-      overview={
-        d
-          ? [
-              { term: "Event", description: <span className="font-mono text-xs">{d.eventType}</span> },
-              {
-                term: "HTTP status",
-                description: (
-                  <Badge variant={d.success ? "secondary" : "outline"}>{d.statusCode ?? "ERR"}</Badge>
-                ),
-              },
-              { term: "Attempt", description: <span className="font-mono text-xs">{d.retryAttempt}</span> },
-              { term: "Latency", description: `${d.latencyMs}ms` },
-              { term: "Test", description: d.isTest ? "Yes" : "No" },
-              {
-                term: "Delivery ID",
-                description: <span className="font-mono text-xs break-all">{d.deliveryId || "—"}</span>,
-              },
-              { term: "Delivered", description: <DetailTimestamp iso={d.deliveredAt} /> },
-            ]
-          : []
-      }
-    >
-      {d ? (
-        <>
-          {d.error ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Error</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="bg-muted/40 max-h-60 overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
-                  {d.error}
-                </pre>
-              </CardContent>
-            </Card>
-          ) : null}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Request payload</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {d.requestPayloadExcerpt ? (
-                <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
-                  {d.requestPayloadExcerpt}
-                </pre>
-              ) : (
-                <p className="text-muted-foreground text-sm">No request payload recorded.</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Response body</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {d.responseBodyExcerpt ? (
-                <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
-                  {d.responseBodyExcerpt}
-                </pre>
-              ) : (
-                <p className="text-muted-foreground text-sm">No response body recorded.</p>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      ) : null}
-    </EntityDetailShell>
-  );
+  return <DeliveryDetailScreen {...useWebhookDelivery(subscriptionId, deliveryId)} />;
 }

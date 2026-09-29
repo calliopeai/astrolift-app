@@ -114,6 +114,7 @@ from astrolift_workflows.activities.dev_environment import (
     deploy_promoted_app,
     mark_dev_environment_failed,
     provision_dev_environment,
+    record_promoted_app_deployment,
     sync_dev_environment_files,
 )
 from astrolift_workflows.activities.faas import (
@@ -347,6 +348,7 @@ __all__ = [
     "record_cluster_bootstrap_run",
     "record_human_gate_decision",
     "record_nested_workflow_start",
+    "record_promoted_app_deployment",
     "refresh_secret_bundle_in_cluster",
     "register_managed_domain_row",
     "reheal_webhook_subscriptions",

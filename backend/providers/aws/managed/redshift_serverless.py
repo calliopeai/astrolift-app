@@ -396,8 +396,6 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
             kwargs["snapshotArn"] = snapshot.snapshot_id
         else:
             kwargs["snapshotName"] = snapshot.snapshot_id
-        if target.config.get("owner_account"):
-            kwargs["ownerAccount"] = str(target.config["owner_account"])
         if target.config.get("admin_password_secret_kms_key_id"):
             kwargs["adminPasswordSecretKmsKeyId"] = str(
                 target.config["admin_password_secret_kms_key_id"],
@@ -457,7 +455,6 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
                 },
                 "snapshot_retention_days": {"type": "integer", "minimum": 1, "maximum": 3653},
                 "deletion_protection": {"type": "boolean"},
-                "owner_account": {"type": "string"},
             },
         }
 
@@ -608,6 +605,12 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
         )
 
     def _validate_config(self, cfg: dict[str, Any]) -> str:
+        # ownerAccount restored a snapshot another AWS account owns; a restore
+        # takes only the snapshot the platform retained for this app (#2087).
+        if "owner_account" in cfg:
+            return (
+                "owner_account is no longer supported; restore from a snapshot Astrolift retained for this app instead"
+            )
         if cfg.get("manage_admin_password", True) is not True:
             return "Redshift Serverless requires managed admin passwords; plaintext config secrets are not accepted"
         if cfg.get("auth_mode", "iam") not in {"iam", "admin_secret"}:

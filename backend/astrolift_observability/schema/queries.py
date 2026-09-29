@@ -64,7 +64,7 @@ from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models.managed_service import ManagedService
 from astrolift_services.scopes import managed_service_scope_by_guid
-from core.cluster_observability import namespace_for_app
+from core.cluster_observability import namespace_for_app_environment
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
@@ -428,7 +428,7 @@ class GoldenSignalsQuery:
         # cAdvisor / kube-state-metrics series carry namespace/pod/container
         # labels, not the app-instrumentation "app" label. Pass the app's
         # Kubernetes namespace so saturation queries use the correct selector.
-        app_namespace = namespace_for_app(app)
+        app_namespace = namespace_for_app_environment(app, environment_name)
 
         # Edge-sourced RED (#1224, spec 08 §6.1): when the app's cluster
         # ingress variant has an edge-metrics mapping, traffic / errors /
@@ -647,7 +647,7 @@ class GoldenSignalsQuery:
             workload_slug=workload_slug,
             range_seconds=seconds,
             edge=edge,
-            namespace=namespace_for_app(app),
+            namespace=namespace_for_app_environment(app, environment_name),
         )
         try:
             rows = prom_client.query_range_series(
@@ -1160,7 +1160,7 @@ class GoldenSignalsQuery:
 
         # cAdvisor carries no app label, so these have to be namespace-scoped
         # or they match nothing (#1703).
-        pod_namespace = namespace_for_app(app)
+        pod_namespace = namespace_for_app_environment(app, environment_name)
         cpu_plan = prom_queries.build_pod_cpu_usage_query(
             app_slug=app.slug,
             environment_name=environment_name,
@@ -1242,7 +1242,7 @@ class GoldenSignalsQuery:
             if env is not None and env.tenant_cluster is not None:
                 pods = cluster_observability.list_app_pods(
                     cluster=env.tenant_cluster,
-                    namespace=cluster_observability.namespace_for_app(app),
+                    namespace=cluster_observability.namespace_for_environment(env),
                     app_slug=app.slug,
                 )
                 for p in pods:
@@ -1316,7 +1316,7 @@ class GoldenSignalsQuery:
                 ok=False, names=[], truncated=False, limit=limit, error="app not found"
             )
 
-        namespace = namespace_for_app(app)
+        namespace = namespace_for_app_environment(app, environment_name)
         if not namespace:
             return AppMetricNamesResult(
                 ok=False,

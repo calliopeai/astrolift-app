@@ -17,6 +17,10 @@ Wire contract (CLI consumer in
 * ``POST /api/cli/v1/auth/refresh`` body ``{refresh_token}`` →
   - ``200`` + new pair on success
   - ``401`` / ``410`` on replay / expired
+* ``POST /api/cli/v1/auth/signout`` body ``{refresh_token}`` (#2070) →
+  - ``200`` unconditionally: ends the session that owns the token if
+    one exists, a no-op otherwise. Never distinguishes the two, so a
+    caller learns nothing about whether the token was ever live.
 
 Token shape:
 
@@ -44,6 +48,7 @@ from django.utils import timezone
 
 from astrolift_identity.api_tokens import (
     CLI_DEVICE_SCOPES,
+    CLI_OPERATOR_DEVICE_SCOPES,
     DEFAULT_SCOPES,
     with_active_org_member,
 )
@@ -169,7 +174,7 @@ def normalize_client_kind(kind: str | None) -> str:
     if not kind:
         return "cli"
     k = kind.strip().lower()
-    if k in {"cli", "mobile", "browser", "ide"}:
+    if k in {"cli", "cli-operator", "mobile", "browser", "ide"}:
         return k
     return "cli"
 
@@ -182,7 +187,12 @@ def token_scopes_for_client_kind(client_kind: str | None) -> list[str]:
     receives those narrow capabilities. Mobile, IDE, and browser enrollment
     retain the read-only baseline. RBAC remains the second gate in every case.
     """
-    if normalize_client_kind(client_kind) == "cli":
+    kind = normalize_client_kind(client_kind)
+    if kind == "cli-operator":
+        # ``astro auth login --scope clusters`` (#2120). The approval page
+        # lists these scopes, so the approver sees the cluster surface asked for.
+        return list(CLI_OPERATOR_DEVICE_SCOPES)
+    if kind == "cli":
         return list(CLI_DEVICE_SCOPES)
     return list(DEFAULT_SCOPES)
 
@@ -604,7 +614,8 @@ def _end_refresh_chain_locked(row: DeviceFlowSession) -> None:
     """Revoke the chain's current access token and clear its refresh
     hash, so neither the bearer nor the refresh plaintext works again.
 
-    Caller MUST hold the row lock taken in :func:`refresh_credentials`.
+    Caller MUST hold the row lock taken in :func:`refresh_credentials`
+    (or :func:`sign_out`).
     """
     from astrolift_identity.models import ApiToken
 
@@ -620,6 +631,56 @@ def _end_refresh_chain_locked(row: DeviceFlowSession) -> None:
             "version",
         ]
     )
+
+
+# ---- self-service sign-out (#2070) -----------------------------------
+
+
+def sign_out(refresh_plaintext: str) -> str:
+    """End the device-flow session that owns ``refresh_plaintext``.
+
+    Proof of possession of the refresh secret is the only
+    authorization this needs, the same model as
+    :func:`refresh_credentials`. The lookup is by hash alone, with no
+    id parameter anywhere in the path, so a caller can never reach any
+    session but the one its own plaintext resolves to; there is no
+    scope to widen either, since nothing here mints a token.
+
+    Tears the session down exactly the way an expired refresh chain
+    already does (:func:`_end_refresh_chain_locked`): revokes the
+    ``ApiToken`` so the access bearer stops authenticating immediately
+    (``verify_token`` filters ``is_revoked=False``), and clears the
+    refresh hash so the same plaintext can't be replayed.
+
+    Returns ``"ended"`` when a live session's chain was just torn
+    down, ``"not_found"`` for everything else: wrong prefix, hash
+    miss, already-ended (the prior call cleared the hash, so a repeat
+    with the same plaintext hash-misses here too), or a row in a state
+    that should never carry a refresh hash. The view layer responds
+    identically for both so a caller probing refresh tokens learns
+    nothing about which ones are live, and a second sign-out call with
+    the same token is a harmless no-op rather than an error.
+    """
+    from astrolift_identity.models import DeviceFlowSession
+
+    if not refresh_plaintext or not refresh_plaintext.startswith(REFRESH_TOKEN_PREFIX):
+        return "not_found"
+
+    digest = _hash(refresh_plaintext)
+
+    with transaction.atomic():
+        row = DeviceFlowSession.all_objects.select_for_update().filter(refresh_token_hash=digest).first()
+        if row is None:
+            return "not_found"
+        if row.deleted_at is not None:
+            return "not_found"
+        if row.state != DeviceFlowSession.STATE_CONSUMED:
+            # Only a consumed row ever carries a live refresh hash
+            # (see refresh_credentials for the same defensive check);
+            # anything else would be schema drift.
+            return "not_found"
+        _end_refresh_chain_locked(row)
+        return "ended"
 
 
 # ---- URL building ----------------------------------------------------
@@ -990,6 +1051,7 @@ __all__ = [
     "mint_refresh_token",
     "poll_complete",
     "refresh_credentials",
+    "sign_out",
     "token_scopes_for_client_kind",
     "token_scopes_for_session",
 ]

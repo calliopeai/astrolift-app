@@ -10,7 +10,13 @@ Four durable units:
   fresh pod that reads the new file payload.
 * :func:`deploy_promoted_app`: apply the same runtime into the promoted
   app's own namespace (#1858), with its data volume on a PVC when the
-  cluster can provision one.
+  cluster can provision one. Flips the dev env back to ``running`` on
+  success (#1875) -- promoting does not touch the dev env's own workload,
+  so its status should say so, and a stuck ``promoting`` blocked both a
+  files sync and a second promote.
+* :func:`record_promoted_app_deployment`: persist the runtime
+  ``deploy_promoted_app`` just applied as a Workload + Deployment (#1875),
+  so the app's own pages, rollback and observability see it.
 * :func:`mark_dev_environment_failed`: terminal-state writer used by
   the workflows when the provisioning / sync chain raises.
 
@@ -118,6 +124,17 @@ def _data_parts(data: bytes) -> list[bytes]:
     return [data[i : i + _DATA_PART_BYTES] for i in range(0, len(data), _DATA_PART_BYTES)] or [b""]
 
 
+def _data_volume_size_gib(nbytes: int) -> int:
+    """PVC size for a data file of ``nbytes``: room for the app's writes
+    beyond the shipped file, never smaller than the file itself.
+
+    Shared by the renderer (the claim it emits) and the Workload row
+    persisted for a promoted app (#1875), so the two never disagree about
+    what was actually requested.
+    """
+    return max(1, math.ceil(4 * nbytes / 2**30))
+
+
 def _dev_env_names(dev: Any) -> tuple[str, str]:
     """``(namespace, hostname)`` for a dev environment.
 
@@ -208,9 +225,7 @@ def _render_runtime(
         ]
         if data_storage_class:
             claim = f"{name}-data"
-            # Room for the app's writes beyond the shipped file; never
-            # smaller than the file itself.
-            size_gib = max(1, math.ceil(4 * len(data) / 2**30))
+            size_gib = _data_volume_size_gib(len(data))
             data_resources.append(
                 {
                     "apiVersion": "v1",
@@ -603,6 +618,16 @@ def _deploy_promoted_app_sync(dev_environment_id: int, storage_class: str) -> di
     result = driver.apply_manifests(ctx.slug, namespace, resources)
     if not result.ok:
         raise RuntimeError(f"deploy failed for promoted app {app.slug}: " + "; ".join(result.summary()))
+
+    # The dev env's own preview is untouched by also serving its files into
+    # the app namespace, so its status should say so: RUNNING, same as
+    # before promote (#1875). Left at PROMOTING forever, neither a files
+    # sync (which requires RUNNING) nor a second promote (its own
+    # precondition) could ever run again for this dev env.
+    DevEnvironment.objects.filter(pk=dev.pk).update(
+        status=DevEnvironment.Status.RUNNING,
+        error_message="",
+    )
     return {"namespace": namespace, "app_url": f"https://{hostname}"}
 
 
@@ -617,3 +642,115 @@ async def deploy_promoted_app(dev_environment_id: int, storage_class: str) -> di
 
     activity.heartbeat()
     return await sync_to_async(_deploy_promoted_app_sync)(dev_environment_id, storage_class)
+
+
+def _persist_promoted_workload(app: Any, dev: Any, storage_class: str) -> Any:
+    """Create or update the one Workload row a promoted app's runtime
+    renders to (#1875), so the app pages, rollback and observability see
+    it the same way they see a manifest-driven deploy's workloads.
+
+    One workload per promoted app, slug ``"app"``: ``_render_runtime``
+    always renders exactly one Deployment/Service/Ingress set for it
+    (``name="builder-app"``), so there is exactly one row to describe.
+    """
+    from astrolift_registry.models import Workload
+
+    cpu_req, mem_req, cpu_lim, mem_lim = _RESOURCE_PROFILES.get(
+        dev.resource_profile, _RESOURCE_PROFILES["small"]
+    )
+    storage_size = ""
+    if storage_class and dev.data_file_path:
+        storage_size = f"{_data_volume_size_gib(len(bytes(dev.data_file or b'')))}Gi"
+
+    fields = {
+        "kind": Workload.Kind.DEPLOYMENT,
+        "is_public": True,
+        "replicas": 1,
+        "cpu_request": cpu_req,
+        "cpu_limit": cpu_lim,
+        "memory_request": mem_req,
+        "memory_limit": mem_lim,
+        "storage_class": storage_class,
+        "storage_size": storage_size,
+    }
+    workload = Workload.objects.filter(registered_app=app, slug="app", deleted_at__isnull=True).first()
+    if workload is None:
+        return Workload.objects.create(registered_app=app, name="app", slug="app", **fields)
+    if any(getattr(workload, key) != value for key, value in fields.items()):
+        for key, value in fields.items():
+            setattr(workload, key, value)
+        workload.save()
+    return workload
+
+
+def _record_promoted_app_deployment_sync(dev_environment_id: int, storage_class: str) -> dict[str, Any]:
+    """Record the runtime ``deploy_promoted_app`` just applied as a Workload
+    + Deployment (#1875), so the app's own pages, rollback and
+    observability pick it up the same way they do a manifest-driven
+    deploy's.
+
+    A separate activity rather than folded into ``deploy_promoted_app``'s
+    body: the workflow gates *scheduling* it behind ``workflow.patched`` (a
+    determinism concern for a deploy already in flight when this shipped),
+    which only applies to a workflow's own sequence of activity calls, not
+    to what one activity does internally -- so the status flip-back above
+    needed no such gate, but this new call does.
+    """
+    from astrolift_lifecycle.models import AppEnvironment, Deployment, DevEnvironment
+    from astrolift_workflows.activities.app_lifecycle import _mark_running_sync
+
+    dev = DevEnvironment.all_objects.select_related("promoted_app", "tenant_cluster").get(
+        pk=dev_environment_id
+    )
+    app = dev.promoted_app
+    if app is None:
+        raise RuntimeError(f"dev environment {dev.guid} has no promoted app")
+
+    workload = _persist_promoted_workload(app, dev, storage_class)
+
+    # deploy_promoted_app always renders into namespace_for_app(app) (#1858),
+    # which is where the first environment created on the dev's cluster
+    # lives (blank k8s_namespace, #1922) -- the same one every promote of
+    # this dev env has ever targeted.
+    env = (
+        AppEnvironment.objects.filter(
+            registered_app=app, tenant_cluster=dev.tenant_cluster, deleted_at__isnull=True
+        )
+        .order_by("created_at")
+        .first()
+    )
+    if env is None:
+        raise RuntimeError(f"promoted app {app.slug} has no environment to record a deployment against")
+
+    deployment = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env,
+        workload=workload,
+        trigger_kind=Deployment.TriggerKind.MANUAL.value,
+        ci_actor_kind="builder_promote",
+        status=Deployment.Status.PENDING.value,
+    )
+    deployment.transition_to(Deployment.Status.DEPLOYING)
+    # Reused, not reimplemented (rollback_deployment.py's rationale applies
+    # here too): supersedes the app's prior RUNNING deploy in this env under
+    # the same lock a concurrent real deploy would use, so rollback's "most
+    # recent prior running/superseded" lookup keeps working across repeated
+    # promotes exactly as it does for a manifest-driven app.
+    _mark_running_sync(deployment.pk)
+    return {"workload_id": workload.pk, "deployment_id": deployment.pk}
+
+
+@activity.defn(name="astrolift.builder.record_promoted_app_deployment")
+async def record_promoted_app_deployment(dev_environment_id: int, storage_class: str) -> dict:
+    """Persist the Workload + Deployment rows for a promoted app's runtime (#1875).
+
+    Idempotent enough for Temporal's at-least-once activities the same way
+    ``mark_running`` already is for a normal deploy: the Workload is
+    upserted by slug, and a retried Deployment create producing an extra row
+    is the same accepted risk ``create_rollback_deployment`` /
+    ``create_promotion_deployment`` already carry.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    return await sync_to_async(_record_promoted_app_deployment_sync)(dev_environment_id, storage_class)

@@ -18,10 +18,23 @@ import strawberry
 from django.db.models import Q
 from strawberry.types import Info
 
-from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql import (
+    DEFAULT_PAGE_LIMIT,
+    DEFAULT_PAGE_SIZE,
+    GUID,
+    MAX_PAGE_LIMIT,
+    PageType,
+    clamp_limit,
+    filter_q,
+    keyset_page,
+    numbered_page,
+    resolve_list_sort,
+    search_q,
+)
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_identity.models import (
     ApiToken,
+    GroupRoleMapping,
     IdentityProvider,
     Invitation,
     Member,
@@ -33,12 +46,38 @@ from astrolift_identity.models import (
     RoleBinding,
     Team,
 )
+from astrolift_identity.schema import identity_lists as lists
+from astrolift_identity.schema.access_ux import (
+    ConditionCatalogType,
+    GrantPreviewInput,
+    GrantPreviewType,
+    PolicyDraftInput,
+    PolicySimulationType,
+    PrincipalKindCountType,
+    PrincipalPageType,
+    PrincipalSearchFilterInput,
+    PrincipalType,
+    condition_catalog,
+)
+from astrolift_identity.schema.identity_lists import (
+    InvitationsListFilterInput,
+    MembersListFilterInput,
+    PoliciesListFilterInput,
+    RoleBindingsListFilterInput,
+    RolesListFilterInput,
+    TeamsListFilterInput,
+)
 from astrolift_identity.schema.types import (
+    AccessEntryType,
     ActiveSessionType,
+    ApiTokenScopeCatalogType,
+    ApiTokenScopePresetType,
+    ApiTokenScopeType,
     ApiTokenType,
     ApproverUserType,
     AppSummaryType,
     ElevationStatusType,
+    GroupRoleMappingType,
     IdentityProviderType,
     InvitationType,
     MemberType,
@@ -55,6 +94,7 @@ from astrolift_identity.schema.types import (
     RoleType,
     SearchableUserType,
     TeamType,
+    UiPreferencesType,
     _resolve_display_name,
     active_session_to_type,
     api_token_to_type,
@@ -70,6 +110,8 @@ from astrolift_identity.schema.types import (
     role_binding_to_type,
     role_to_type,
     team_to_type,
+    ui_preferences_to_type,
+    user_to_type,
 )
 from astrolift_identity.scope_visibility import visible_projects, visible_teams
 from astrolift_identity.scopes import team_scope_by_guid
@@ -107,9 +149,10 @@ class ModuleEntitlementType:
         description=(
             "Whether the module is switched on for the active organization. "
             "Always true for apps, agents, workflows and admin. For the per-org "
-            "modules (chat_studio_integration, agent_live_attach) it is true only "
-            "when an org admin turned the module on and the install has not "
-            "forced it off. Independent of the can* fields."
+            "modules (chat_studio_integration, agent_live_attach, "
+            "chat_studio_agent_runs) it is true only when an org admin turned "
+            "the module on and the install has not forced it off. Independent "
+            "of the can* fields."
         )
     )
 
@@ -317,7 +360,9 @@ def _roles_qs(*, search: str | None = None):
         return Role.objects.none()
     # System roles carry a null organization; custom roles are bound
     # to the org. Another org's custom roles never surface.
-    qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+    qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True)).select_related(
+        "duplicated_from"
+    )
     term = (search or "").strip()
     if term:
         qs = qs.filter(search_q(term, "slug", "name", "description"))
@@ -494,6 +539,10 @@ class IdentityQuery:
         sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: TeamsListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[TeamType]:
         """Cursor-paginated team list (#1235).
 
@@ -502,10 +551,19 @@ class IdentityQuery:
         ``(-created_at, -guid)``; the list field left the slice
         unordered, so newest-first is the first stable order this
         surface has had. ``search`` matches slug, name, description.
+
+        The list contract (#2153): ``filter.mine`` is the teams the viewer
+        is on; ``sort`` takes name, slug, created (default name). Any of
+        ``sort``, ``page`` or ``pageSize`` selects numbered paging.
         """
+        org_id, viewer_id = _tenant_ids()
+        qs = lists.filter_teams(_teams_qs(search=search), filter, org_id=org_id, viewer_id=viewer_id)
+        if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
+            order_by = resolve_list_sort(sort, lists.TEAMS_SORT_KEYS, default=lists.TEAMS_DEFAULT_SORT)
+            return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(team_to_type)
         order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
-        page = keyset_page(
-            _teams_qs(search=search),
+        result = keyset_page(
+            qs,
             cursor=after,
             limit=limit,
             sort_field=order.sort_field,
@@ -513,7 +571,7 @@ class IdentityQuery:
             descending=order.descending,
             cursor_scope=scope,
         )
-        return page.map(team_to_type)
+        return result.map(team_to_type)
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage."
@@ -883,7 +941,11 @@ class IdentityQuery:
         """
         members = list(_members_qs(search=search).order_by("-created_at")[:500])
         last_active = _last_active_by_user_id(members)
-        return [member_to_type(m, last_active_at=last_active.get(m.user_id)) for m in members]
+        teams, _ = lists.member_teams(members, _tenant_ids()[0])
+        return [
+            member_to_type(m, last_active_at=last_active.get(m.user_id), team=_row_team(m, teams))
+            for m in members
+        ]
 
     @strawberry.field
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
@@ -894,6 +956,10 @@ class IdentityQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: MembersListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[MemberType]:
         """Cursor-paginated org-member listing (#1235).
 
@@ -905,10 +971,36 @@ class IdentityQuery:
         The ``last_active_at`` aggregate runs over the page's rows only
         — resolving it across the whole filtered set would scan the
         org's entire audit stream to render fifty rows.
+
+        The list contract (#2153): ``filter`` takes scopeKind, lifecycle,
+        role, team, mine, admin and active (see AstroliftMembersListFilter);
+        ``filter.scopeKind: [ORG]`` gives one row per person. ``sort`` takes
+        name, email, created, joined, lifecycle, lastActive and roles
+        (default name). Any of ``sort``, ``page`` or ``pageSize`` selects
+        numbered paging. Every row names its team (``teamId`` / ``teamSlug``
+        / ``teamName`` on a TEAM row) and lists the user's teams (``teams``).
         """
-        page = keyset_page(_members_qs(search=search), cursor=after, limit=limit)
-        last_active = _last_active_by_user_id(page.rows)
-        return page.map(lambda m: member_to_type(m, last_active_at=last_active.get(m.user_id)))
+        org_id, viewer_id = _tenant_ids()
+        qs = _members_qs(search=search)
+        if filter is not None:
+            qs = lists.filter_members(qs, filter, org_id=org_id, viewer_id=viewer_id)
+        if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
+            order_by = resolve_list_sort(
+                sort, lists.members_sort_keys(org_id), default=lists.MEMBERS_DEFAULT_SORT
+            )
+            result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        else:
+            result = keyset_page(qs, cursor=after, limit=limit)
+        last_active = _last_active_by_user_id(result.rows)
+        teams, teams_by_user = lists.member_teams(result.rows, org_id)
+        return result.map(
+            lambda m: member_to_type(
+                m,
+                last_active_at=last_active.get(m.user_id),
+                team=_row_team(m, teams),
+                teams=teams_by_user.get(m.user_id, []),
+            )
+        )
 
     @strawberry.field
     @require_permission(Permission.TEAM_READ, scope=team_scope_by_guid("team_id"))
@@ -942,7 +1034,7 @@ class IdentityQuery:
             )
             .order_by("-created_at")[:500]
         )
-        return [member_to_type(m) for m in qs]
+        return [member_to_type(m, team=team) for m in qs]
 
     @strawberry.field
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
@@ -1036,6 +1128,10 @@ class IdentityQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: InvitationsListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[InvitationType]:
         """Cursor-paginated invitation history (#1235).
 
@@ -1049,10 +1145,25 @@ class IdentityQuery:
         The inviter ``UserInfo`` prefetch runs over the page's rows
         only, so it stays one small query per page instead of one over
         every invitation the org has ever sent.
+
+        The list contract (#2153): ``filter`` takes status, role and
+        invitedBy ("me" is the viewer); ``sort`` takes email, created,
+        expires, status and role (default -created). Any of ``sort``,
+        ``page`` or ``pageSize`` selects numbered paging.
         """
-        page = keyset_page(_invitations_qs(status=status, search=search), cursor=after, limit=limit)
-        userinfo_by_user_id = _userinfo_by_inviter_id(page.rows)
-        return page.map(lambda r: invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id))
+        _org_id, viewer_id = _tenant_ids()
+        qs = _invitations_qs(status=status, search=search).filter(
+            filter_q(filter, lists.INVITATIONS_FILTERS, me=viewer_id)
+        )
+        if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
+            order_by = resolve_list_sort(
+                sort, lists.INVITATIONS_SORT_KEYS, default=lists.INVITATIONS_DEFAULT_SORT
+            )
+            result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        else:
+            result = keyset_page(qs, cursor=after, limit=limit)
+        userinfo_by_user_id = _userinfo_by_inviter_id(result.rows)
+        return result.map(lambda r: invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id))
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage."
@@ -1072,6 +1183,10 @@ class IdentityQuery:
         sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: RolesListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[RoleType]:
         """Cursor-paginated role catalog (#1235).
 
@@ -1080,11 +1195,28 @@ class IdentityQuery:
         slug)`` order has no not-null unique tiebreak to hang a cursor
         on, and newest-first surfaces the org's own custom roles above
         the seeded system catalog. ``search`` matches slug, name,
-        description — sort by name client-side if the table wants it.
+        description.
+
+        The list contract (#2153): ``filter`` takes isSystem, scopeLevel and
+        createdBy ("me" is the viewer); ``sort`` takes name, slug, created,
+        scopeLevel and bindings (default name). Any of ``sort``, ``page`` or
+        ``pageSize`` selects numbered paging. Every row carries
+        ``bindingsCount``, the bindings on it inside this organization.
         """
+        org_id, viewer_id = _tenant_ids()
+        qs = lists.annotate_role_bindings_count(
+            _roles_qs(search=search).filter(filter_q(filter, lists.ROLES_FILTERS, me=viewer_id)), org_id
+        )
+
+        def to_type(role):
+            return role_to_type(role, bindings_count=role._bindings_count)
+
+        if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
+            order_by = resolve_list_sort(sort, lists.ROLES_SORT_KEYS, default=lists.ROLES_DEFAULT_SORT)
+            return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(to_type)
         order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
-        page = keyset_page(
-            _roles_qs(search=search),
+        result = keyset_page(
+            qs,
             cursor=after,
             limit=limit,
             sort_field=order.sort_field,
@@ -1092,7 +1224,7 @@ class IdentityQuery:
             descending=order.descending,
             cursor_scope=scope,
         )
-        return page.map(role_to_type)
+        return result.map(to_type)
 
     # ---- Invite-flow polish (#418) -------------------------------------
 
@@ -1292,6 +1424,11 @@ class IdentityQuery:
         app_slug: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        role_id: GUID | None = None,
+        filter: RoleBindingsListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[RoleBindingType]:
         """Cursor-paginated role bindings (#1235).
 
@@ -1307,19 +1444,259 @@ class IdentityQuery:
         The source-scope label batch runs over the page's rows only —
         resolving labels for every binding in the org would defeat the
         pagination it is decorating.
+
+        The list contract (#2153): ``roleId`` narrows to one role's holders
+        (a role the org cannot see matches nothing); ``filter`` takes role,
+        scopeKind, kind and holder (``holder: ["me"]`` is the viewer's own
+        bindings and those on the IdP groups they are in); ``sort`` takes
+        name (the holder), role, scope, created (granted), expires and
+        lastActive (default -created). Any of ``sort``, ``page`` or
+        ``pageSize`` selects numbered paging.
         """
-        page = keyset_page(
-            _role_bindings_qs(search=search, app_slug=app_slug),
-            cursor=after,
-            limit=limit,
-            sort_field="granted_at",
-        )
-        labels = _resolve_source_scope_labels(page.rows)
-        return page.map(
+        org_id, viewer_id = _tenant_ids()
+        qs = _role_bindings_qs(search=search, app_slug=app_slug)
+        if role_id is not None:
+            role = lists.visible_role(org_id, role_id)
+            qs = qs.filter(role_id=role.pk) if role is not None else qs.none()
+        if filter is not None:
+            qs = lists.filter_role_bindings(qs, filter, org_id=org_id, viewer_id=viewer_id)
+        if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
+            order_by = resolve_list_sort(
+                sort, lists.role_bindings_sort_keys(org_id), default=lists.ROLE_BINDINGS_DEFAULT_SORT
+            )
+            result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        else:
+            result = keyset_page(qs, cursor=after, limit=limit, sort_field="granted_at")
+        labels = _resolve_source_scope_labels(result.rows)
+        return result.map(
             lambda rb: role_binding_to_type(
                 rb, source_scope_label=labels.get((rb.scope_kind, rb.scope_id), "")
             )
         )
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_group_role_mappings_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        group_external_id: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> PageType[GroupRoleMappingType]:
+        """The org's IdP group to role mappings (#2157), numbered pages.
+
+        ``search`` matches the group id and the role slug or name;
+        ``groupExternalId`` narrows to one group exactly.
+        """
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            qs = GroupRoleMapping.objects.none()
+        else:
+            qs = GroupRoleMapping.objects.select_related("role").filter(organization_id=org_id)
+        if group_external_id is not None:
+            qs = qs.filter(group_external_id=group_external_id.strip())
+        term = (search or "").strip()
+        if term:
+            qs = qs.filter(search_q(term, "group_external_id", "role__slug", "role__name"))
+        numbered = numbered_page(
+            qs, order_by=["group_external_id", "-created_at", "pk"], page=page, page_size=page_size
+        )
+        items = group_role_mapping_types(numbered.rows, org_id)
+        return PageType(
+            items=items,
+            next_cursor=None,
+            total_count=numbered.total_count,
+            page=numbered.page,
+            page_size=numbered.page_size,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_access_on(
+        self,
+        info: Info,
+        scope_kind: str,
+        scope_id: str,
+        search: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> PageType[AccessEntryType]:
+        """Every principal with access on one app, agent, project or team
+        (#2157): bindings on it and on its ancestors (an ancestor binding
+        only when it inherits), user and group bindings, the org's group
+        mappings and, on an app or agent, the team shares. One row per
+        grant, with its source and the id of the row that grants it.
+
+        ``scopeKind`` is APP, AGENT, PROJECT, TEAM or ORG; ``scopeId`` is
+        the object's guid. A scope of another org reads as empty.
+        Numbered pages; the order is users, then groups, then teams, by
+        name.
+        """
+        from astrolift_identity.access import access_on, resolve_target
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        target = resolve_target(scope_kind, scope_id, org_id)
+        rows = access_on(org_id, target) if target is not None else []
+        term = (search or "").strip()
+        if term:
+            rows = [r for r in rows if r.matches(term)]
+        rows.sort(key=lambda r: r.sort_key)
+        size = clamp_limit(page_size, default=DEFAULT_PAGE_SIZE, maximum=MAX_PAGE_LIMIT)
+        number = page if page is not None and page > 0 else 1
+        start = (number - 1) * size
+        return PageType(
+            items=access_entry_types(rows[start : start + size]),
+            next_cursor=None,
+            total_count=len(rows),
+            page=number,
+            page_size=size,
+        )
+
+    # ---- Access UX (#2126, after #2157) ---------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_principal_search(
+        self,
+        info: Info,
+        search: str | None = None,
+        filter: PrincipalSearchFilterInput | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> PrincipalPageType:
+        """One search across the org's users, IdP groups, teams and pending
+        invitations (#2126), for the Grant access flow's who box and the
+        People list's principals.
+
+        Numbered pages ordered by kind (users, groups, teams, invitations),
+        then name. ``filter.kind`` narrows the kinds; ``counts`` gives the
+        matches per kind searched. Groups are every group the org knows of:
+        its members' stored IdP groups, its group bindings and its group
+        mappings. Everything is confined to the active org.
+        """
+        from astrolift_identity import principals
+
+        org_id, _viewer = _tenant_ids()
+        result = principals.search(org_id, search, filter, page=page, page_size=page_size)
+        return PrincipalPageType(
+            items=principal_types(result.rows),
+            total_count=result.total_count,
+            page=result.page,
+            page_size=result.page_size,
+            counts=[PrincipalKindCountType(kind=k, count=n) for k, n in result.counts.items()],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_grant_preview(
+        self, info: Info, input: GrantPreviewInput, limit: int | None = None
+    ) -> GrantPreviewType:
+        """Who a draft grant, change or removal would affect (#2126). Read-only.
+
+        Who gains the role's permissions at the scope, who already had them
+        and through which grant, who loses them; group members counted, a
+        team expanded to its members. ``allowed`` says whether the caller's
+        grant ceiling lets them submit it. People lists hold at most
+        ``limit`` (default 50, at most 200); the counts are exact. Every
+        lookup is confined to the active org: another org's role, scope,
+        user, team or binding reads as not found.
+        """
+        from astrolift_identity.grant_preview import preview
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        size = clamp_limit(limit, default=DEFAULT_PAGE_LIMIT, maximum=MAX_PAGE_LIMIT)
+        return preview(tenant, org_id, input, limit=size)
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def astrolift_policy_simulation(
+        self,
+        info: Info,
+        draft: PolicyDraftInput,
+        days: int | None = None,
+        limit: int | None = None,
+    ) -> PolicySimulationType:
+        """What a draft ABAC policy would deny (#2126). Read-only.
+
+        The draft runs through the evaluator against the org's current
+        holders of the actions it touches, and against the org's recorded
+        allowed decisions of the last ``days`` (default 7, at most 90) when
+        there are any; ``sources`` says which were evaluated. Each check is
+        DENIED, UNKNOWN (a fail-closed guess for want of an attribute a
+        simulation cannot know) or NOT_DENIED. Lists hold at most ``limit``;
+        the counts are exact. Confined to the active org.
+        """
+        from astrolift_identity.policy_simulation import simulate
+
+        org_id, _viewer = _tenant_ids()
+        size = clamp_limit(limit, default=DEFAULT_PAGE_LIMIT, maximum=MAX_PAGE_LIMIT)
+        return simulate(org_id, draft, days=days, limit=size)
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_policy_condition_catalog(self, info: Info) -> ConditionCatalogType:
+        """The condition kinds, their fields, and the resource and actor keys
+        the ABAC evaluator understands (#2126), read from the evaluator's own
+        tables so the policy editor and the evaluator cannot disagree. Not
+        org data: the same for every org."""
+        return condition_catalog()
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_role(self, info: Info, id: GUID) -> RoleType | None:
+        """One role (#2126): this org's own or a system role, with its
+        bindings count inside this org and the role it was duplicated from.
+        Another org's role reads as null."""
+        import uuid
+
+        org_id, _viewer = _tenant_ids()
+        if org_id is None:
+            return None
+        try:
+            guid = uuid.UUID(str(id))
+        except ValueError:
+            return None
+        qs = Role.objects.filter(Q(organization_id=org_id) | Q(organization__isnull=True), guid=guid)
+        role = lists.annotate_role_bindings_count(qs.select_related("duplicated_from"), org_id).first()
+        if role is None:
+            return None
+        return role_to_type(role, bindings_count=role._bindings_count)
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ)
+    @tenant_scoped()
+    def astrolift_policy(self, info: Info, id: GUID) -> PolicyType | None:
+        """One ABAC policy of this org (#2126); another org's reads as null."""
+        import uuid
+
+        org_id, _viewer = _tenant_ids()
+        if org_id is None:
+            return None
+        try:
+            guid = uuid.UUID(str(id))
+        except ValueError:
+            return None
+        policy = (
+            Policy.objects.filter(organization_id=org_id, guid=guid)
+            .select_related("created_by", "updated_by")
+            .first()
+        )
+        return policy_to_type(policy) if policy is not None else None
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage."
@@ -1328,6 +1705,41 @@ class IdentityQuery:
     @tenant_scoped()
     def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
         return [api_token_to_type(t) for t in _api_tokens_qs().order_by("-created_at")[:200]]
+
+    @strawberry.field
+    @require_permission(Permission.API_TOKEN_CREATE)
+    @tenant_scoped()
+    def astrolift_api_token_scope_catalog(self, info: Info) -> ApiTokenScopeCatalogType:
+        """The scopes a token may carry, what each unlocks, and which the
+        caller's roles let them use (#2120). The picker's only source."""
+        from astrolift_identity.api_tokens import SCOPE_CATALOG, SCOPE_PRESETS, permissions_for_scopes
+        from core.schema.types.permission_analysis import _held_slugs
+        from core.tenancy import get_current_tenant
+
+        held = set(_held_slugs(info.context.user, get_current_tenant().organization_id))
+        scopes = []
+        for scope in SCOPE_CATALOG:
+            grants = sorted(permissions_for_scopes([scope.value]))
+            usable = bool(set(grants) & held)
+            scopes.append(
+                ApiTokenScopeType(
+                    value=scope.value,
+                    label=scope.label,
+                    surface=scope.surface,
+                    description=scope.description,
+                    sensitive=scope.sensitive,
+                    permissions=grants,
+                    available=usable,
+                    unavailable_reason="" if usable else "Your roles grant none of what this scope unlocks.",
+                )
+            )
+        return ApiTokenScopeCatalogType(
+            scopes=scopes,
+            presets=[
+                ApiTokenScopePresetType(key=key, label=label, scopes=list(values))
+                for key, label, values in SCOPE_PRESETS
+            ],
+        )
 
     @strawberry.field
     @require_permission(Permission.API_TOKEN_CREATE)
@@ -1377,6 +1789,10 @@ class IdentityQuery:
         sort_by: ListSortKey | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: PoliciesListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[PolicyType]:
         """Cursor-paginated ABAC policy list (#1235).
 
@@ -1386,10 +1802,20 @@ class IdentityQuery:
         tiebreak to anchor a cursor on; newest-first also puts the
         policy an operator just wrote at the top. ``search`` matches
         slug, name, description, and ``action_pattern``.
+
+        The list contract (#2153): ``filter`` takes effect, scopeLevel and
+        createdBy ("me" is the viewer); ``sort`` takes name, slug, created,
+        updated, effect and scopeLevel (default -created). Any of ``sort``,
+        ``page`` or ``pageSize`` selects numbered paging.
         """
+        _org_id, viewer_id = _tenant_ids()
+        qs = _policies_qs(search=search).filter(filter_q(filter, lists.POLICIES_FILTERS, me=viewer_id))
+        if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
+            order_by = resolve_list_sort(sort, lists.POLICIES_SORT_KEYS, default=lists.POLICIES_DEFAULT_SORT)
+            return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(policy_to_type)
         order, scope = resolve_sort(sort_by, NAMED_MODEL_SORTS)
-        page = keyset_page(
-            _policies_qs(search=search),
+        result = keyset_page(
+            qs,
             cursor=after,
             limit=limit,
             sort_field=order.sort_field,
@@ -1397,7 +1823,7 @@ class IdentityQuery:
             descending=order.descending,
             cursor_scope=scope,
         )
-        return page.map(policy_to_type)
+        return result.map(policy_to_type)
 
     # ---- Domain allowlist --------------------------------------------
 
@@ -1475,6 +1901,32 @@ class IdentityQuery:
         session = getattr(request, "session", None) if request else None
         locked = _idp_locked_fields(viewer, session=session)
         return _my_profile_payload(viewer, org, locked)
+
+    @strawberry.field
+    @tenant_scoped()
+    def astrolift_my_ui_preferences(self, info: Info) -> UiPreferencesType | None:
+        """The viewer's own UI preferences (#2154), resolved for the UI.
+
+        Home layout, the visualization styles, whether settings the viewer
+        cannot change are shown or hidden, and their own appearance. A
+        person who never saved reads the defaults (no row is created by a
+        read); ``restrictedSettings`` falls back to the active org's
+        default. Self-service: the row is the viewer's, never another's,
+        and the only org data read is the active org's one default.
+        """
+        from astrolift_identity.models import UserPreferences
+        from astrolift_identity.ui_preferences import org_restricted_default
+        from core.tenancy import get_current_tenant
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not getattr(viewer, "is_authenticated", False):
+            return None
+        tenant = get_current_tenant()
+        prefs = UserPreferences.objects.filter(user_id=viewer.pk).first()
+        return ui_preferences_to_type(
+            prefs, org_default=org_restricted_default(tenant.organization_id if tenant else None)
+        )
 
     @strawberry.field
     @tenant_scoped()
@@ -1609,6 +2061,21 @@ class IdentityQuery:
             method=status.method,
             required_for=gated,
         )
+
+
+def _tenant_ids() -> tuple[int | None, int | None]:
+    """The active org's pk and the viewer's user pk, either None when unset."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    if tenant is None:
+        return None, None
+    return tenant.organization_id, tenant.actor_user_id
+
+
+def _row_team(member, teams: dict):
+    """The Team a TEAM-scope member row points at, from a per-page batch."""
+    return teams.get(member.scope_id) if member.scope_kind == Member.ScopeKind.TEAM else None
 
 
 def _org_scope_q(org_id: int | None) -> Q:
@@ -1766,3 +2233,154 @@ def _resolve_source_scope_labels(bindings) -> dict[tuple[str, int], str]:
         if key not in labels:
             labels[key] = rb.scope_kind.lower()
     return labels
+
+
+def _scope_guids(pairs) -> dict[tuple[str, int], str]:
+    """``(scope_kind, scope_id) -> guid`` in one query per kind."""
+    from astrolift_registry.models import RegisteredApp
+
+    grouped: dict[str, set[int]] = {}
+    for kind, ident in pairs:
+        grouped.setdefault(kind, set()).add(ident)
+    models = {"ORG": Organization, "TEAM": Team, "PROJECT": Project, "APP": RegisteredApp}
+    out: dict[tuple[str, int], str] = {}
+    for kind, ids in grouped.items():
+        model = models.get(kind)
+        if model is None:
+            continue
+        for pk, guid in model.all_objects.filter(pk__in=ids).values_list("pk", "guid"):
+            out[(kind, pk)] = str(guid)
+    return out
+
+
+def group_role_mapping_types(mappings, org_id: int | None) -> list[GroupRoleMappingType]:
+    """Map a batch of mappings with their scope guids, labels and group
+    sizes, a fixed number of queries per batch."""
+    from astrolift_identity.idp_groups import group_member_counts
+
+    mappings = list(mappings)
+    pairs = {(m.scope_kind, m.scope_id) for m in mappings}
+    guids = _scope_guids(pairs)
+    labels = _resolve_source_scope_labels(mappings)
+    counts = (
+        group_member_counts(org_id, sorted({m.group_external_id for m in mappings}))
+        if org_id is not None
+        else {}
+    )
+    return [
+        GroupRoleMappingType(
+            id=GUID(str(m.guid)),
+            group_external_id=m.group_external_id,
+            role=role_to_type(m.role),
+            scope_kind=m.scope_kind,
+            scope_guid=GUID(guids[(m.scope_kind, m.scope_id)])
+            if (m.scope_kind, m.scope_id) in guids
+            else None,
+            source_scope_label=labels.get((m.scope_kind, m.scope_id), ""),
+            member_count=counts.get(m.group_external_id, 0),
+            created_at=m.created_at,
+        )
+        for m in mappings
+    ]
+
+
+def access_entry_types(rows) -> list[AccessEntryType]:
+    from types import SimpleNamespace
+
+    rows = list(rows)
+    pairs = {(r.scope_kind, r.scope_id) for r in rows}
+    guids = _scope_guids(pairs)
+    labels = _resolve_source_scope_labels(
+        [SimpleNamespace(scope_kind=kind, scope_id=ident) for kind, ident in pairs]
+    )
+
+    def gid(value: str) -> GUID | None:
+        return GUID(value) if value else None
+
+    return [
+        AccessEntryType(
+            principal_kind=r.principal_kind,
+            source=r.source,
+            binding_id=GUID(r.binding_guid),
+            user=user_to_type(r.user) if r.user is not None else None,
+            member_id=gid(r.member_guid),
+            group_external_id=r.group_external_id or None,
+            group_member_count=r.group_member_count,
+            team_id=gid(str(r.team.guid)) if r.team is not None else None,
+            team_slug=r.team.slug if r.team is not None else None,
+            team_name=r.team.name if r.team is not None else None,
+            role=role_to_type(r.role) if r.role is not None else None,
+            access_level=r.access_level or None,
+            share_id=gid(r.share_guid),
+            scope_kind=r.scope_kind,
+            scope_guid=gid(guids.get((r.scope_kind, r.scope_id), "")),
+            source_scope_label=labels.get((r.scope_kind, r.scope_id), ""),
+            inherited=r.inherited,
+            inherits=r.inherits,
+            expires_at=r.expires_at,
+        )
+        for r in rows
+    ]
+
+
+def principal_types(rows) -> list[PrincipalType]:
+    """Map a page of principal-search rows, one query per kind for the extras."""
+    from auth1.models import UserInfo
+
+    user_ids = [m.user_id for kind, m in rows if kind == "USER"]
+    userinfo = {ui.internal_user_id: ui for ui in UserInfo.objects.filter(internal_user_id__in=user_ids)}
+    out: list[PrincipalType] = []
+    for kind, row in rows:
+        if kind == "USER":
+            ui = userinfo.get(row.user_id)
+            out.append(
+                PrincipalType(
+                    kind=kind,
+                    key=f"user:{row.user_id}",
+                    name=_resolve_display_name(row.user, userinfo=ui),
+                    secondary=row.user.email or "",
+                    user=user_to_type(row.user),
+                    user_id=str(row.user_id),
+                    member_id=GUID(str(row.guid)),
+                    lifecycle=row.lifecycle,
+                    avatar_url=(getattr(ui, "picture", "") or "") if ui is not None else "",
+                )
+            )
+        elif kind == "GROUP":
+            out.append(
+                PrincipalType(
+                    kind=kind,
+                    key=f"group:{row.group_external_id}",
+                    name=row.group_external_id,
+                    secondary="",
+                    group_external_id=row.group_external_id,
+                    member_count=row.member_count,
+                    bindings_count=row.bindings_count,
+                    mappings_count=row.mappings_count,
+                )
+            )
+        elif kind == "TEAM":
+            out.append(
+                PrincipalType(
+                    kind=kind,
+                    key=f"team:{row.guid}",
+                    name=row.name,
+                    secondary=row.slug,
+                    team_id=GUID(str(row.guid)),
+                    team_slug=row.slug,
+                    member_count=getattr(row, "_member_count", None),
+                )
+            )
+        else:
+            out.append(
+                PrincipalType(
+                    kind=kind,
+                    key=f"invitation:{row.guid}",
+                    name=row.email,
+                    secondary="",
+                    invitation_id=GUID(str(row.guid)),
+                    invitation_status=row.status,
+                    expires_at=row.expires_at,
+                )
+            )
+    return out

@@ -41,9 +41,11 @@ from _sdk.managed_service import (
     VolumeSourceKind,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import is_platform_label_key, label_identity_refusal, reserved_label_keys
 
 KIND = "filesystem"
 _API_ROOT = "https://file.googleapis.com/v1"
+_MISSING_IDENTITY = "Filestore needs the managed-service id to mark the instance it owns"
 _TIERS = {
     "STANDARD",
     "PREMIUM",
@@ -276,10 +278,13 @@ class FilestoreDriver(ManagedServiceDriver):
         error = self._validate_config(cfg, size=spec.size)
         if error:
             return ProvisionResult(False, "", error, ["invalid_filestore_config"])
+        if not spec.managed_service_id:
+            return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_filestore_config"])
         location = str(cfg.get("location") or self._config.location)
         instance_id = self._instance_id(spec)
         name = self._instance_name(location, instance_id)
         handle = _handle(location, instance_id)
+        record_proves = spec.recorded_handle_exclusive and spec.recorded_handle == handle
         try:
             current = self._get_instance(name)
             if current is None:
@@ -291,11 +296,7 @@ class FilestoreDriver(ManagedServiceDriver):
                 self._wait_operation(operation)
                 current = self._filestore.get_instance(name)
             else:
-                self._assert_adoptable(
-                    current,
-                    cfg,
-                    managed_service_id=spec.managed_service_id,
-                )
+                self._assert_owned(current, spec.managed_service_id, record_proves=record_proves)
                 self._assert_immutable_matches(current, cfg)
                 self._reconcile_mutable(
                     name,
@@ -307,11 +308,7 @@ class FilestoreDriver(ManagedServiceDriver):
         except FilestoreConflict:
             try:
                 current = self._filestore.get_instance(name)
-                self._assert_adoptable(
-                    current,
-                    cfg,
-                    managed_service_id=spec.managed_service_id,
-                )
+                self._assert_owned(current, spec.managed_service_id, record_proves=record_proves)
                 self._assert_immutable_matches(current, cfg)
                 self._reconcile_mutable(
                     name,
@@ -344,14 +341,16 @@ class FilestoreDriver(ManagedServiceDriver):
         name = self._instance_name(location, instance_id)
         try:
             current = self._filestore.get_instance(name)
-            self._assert_managed(current)
+            self._assert_owned(current, spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
             self._assert_immutable_matches(current, cfg)
+            # An identity planted on the instance is written over with the
+            # spec's, never read back (#2098).
             self._reconcile_mutable(
                 name,
                 current,
                 cfg,
                 size=spec.size,
-                claim_labels=None,
+                claim_labels=_identity_labels(spec.managed_service_id),
             )
         except FilestoreNotFound:
             return UpdateResult(False, spec.handle, "Filestore instance not found", ["not_found"])
@@ -391,7 +390,7 @@ class FilestoreDriver(ManagedServiceDriver):
         if current is None:
             return DeprovisionResult(True, spec.handle, "Filestore instance already gone")
         try:
-            self._assert_managed(current)
+            self._assert_owned(current, spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
         except Exception as exc:
             return DeprovisionResult(
                 False,
@@ -495,6 +494,8 @@ class FilestoreDriver(ManagedServiceDriver):
     ) -> Binding:
         location, instance_id = _parse_handle(handle.handle)
         current = self._filestore.get_instance(self._instance_name(location, instance_id))
+        # The mount below is the payoff of a handle two services record.
+        self._assert_owned(current, handle.managed_service_id, record_proves=handle.recorded_handle_exclusive)
         if str(current.get("state") or "") != "READY":
             raise FilestoreError(f"Filestore instance {instance_id} is not ready")
         cfg = dict(config or {})
@@ -574,6 +575,8 @@ class FilestoreDriver(ManagedServiceDriver):
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         location, instance_id = _parse_handle(handle.handle)
         current = self._filestore.get_instance(self._instance_name(location, instance_id))
+        # A backup is a copy of the data, retained under this service's record.
+        self._assert_owned(current, handle.managed_service_id, record_proves=handle.recorded_handle_exclusive)
         timestamp = self._now()
         backup_id = _resource_id(
             f"snap-{instance_id}-{timestamp.strftime('%Y%m%d%H%M%S%f')}",
@@ -753,8 +756,6 @@ class FilestoreDriver(ManagedServiceDriver):
             "type": "object",
             "properties": {
                 "instance_id": {"type": "string", "minLength": 1, "maxLength": 63},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "location": {"type": "string"},
                 "tier": {"type": "string", "enum": sorted(_TIERS)},
@@ -947,6 +948,9 @@ class FilestoreDriver(ManagedServiceDriver):
             share_limit = 16 if canonical_tier in {"BASIC_HDD", "BASIC_SSD"} else 63
             if not re.fullmatch(r"[a-z][a-z0-9_]*", share_name) or len(share_name) > share_limit:
                 return f"share_name must be 1-{share_limit} lowercase letters, digits, or underscores"
+        reserved = reserved_label_keys(cfg.get("labels") or {})
+        if reserved:
+            return f"labels cannot set Astrolift-reserved keys: {', '.join(reserved)}"
         instance_id = str(cfg.get("instance_id") or "")
         if instance_id and not _valid_resource_id(instance_id):
             return "instance_id must start with a letter and contain up to 63 lowercase letters, digits, or hyphens"
@@ -1046,15 +1050,10 @@ class FilestoreDriver(ManagedServiceDriver):
             body["description"] = str(cfg["description"])
             mask.append("description")
         labels = dict(current.get("labels") or {})
-        desired_labels = dict(labels)
-        if claim_labels is not None:
-            desired_labels.update(claim_labels)
-            if cfg.get("adopt_existing") and labels.get("astrolift-io-managed-by") != "platform":
-                desired_labels["astrolift-io-adopted"] = "true"
-        if "labels" in cfg:
-            desired_labels.update(
-                {_label_key(str(key)): _label_value(str(value)) for key, value in cfg["labels"].items()},
-            )
+        desired_labels = _platform_last(
+            {**labels, **(claim_labels or {})},
+            _tenant_labels(cfg) if "labels" in cfg else {},
+        )
         if desired_labels != labels:
             body["labels"] = desired_labels
             mask.append("labels")
@@ -1116,36 +1115,30 @@ class FilestoreDriver(ManagedServiceDriver):
             self._filestore.patch_instance(name, body, update_mask=mask),
         )
 
-    def _assert_adoptable(
-        self,
-        current: dict[str, Any],
-        cfg: dict[str, Any],
-        *,
-        managed_service_id: str,
-    ) -> None:
-        labels = dict(current.get("labels") or {})
-        if labels.get("astrolift-io-managed-by") == "platform":
-            current_service_id = str(labels.get("astrolift-io-managed-service-id") or "")
-            if (
-                current_service_id
-                and managed_service_id
-                and current_service_id != managed_service_id
-                and not cfg.get("reassign_existing")
-            ):
-                raise FilestoreError(
-                    "Filestore instance belongs to another Astrolift managed service; "
-                    "set reassign_existing=true to transfer ownership",
-                )
-            return
-        if not cfg.get("adopt_existing"):
-            raise FilestoreError(
-                "existing Filestore instance is not Astrolift-owned; set adopt_existing=true to claim it",
-            )
-
-    def _assert_managed(self, current: dict[str, Any]) -> None:
+    @staticmethod
+    def _assert_owned(current: dict[str, Any], managed_service_id: str, *, record_proves: bool) -> None:
+        # instance_id is tenant-settable, so an existing instance is either
+        # this service's or refused: neither one Astrolift never provisioned
+        # nor another managed service's may be claimed from here. Adoption of
+        # an existing resource is a separate, operator-authorized operation
+        # (#1365) that no tenant config flag may grant (#2021). An instance
+        # with no managed-service id, as a tenant could leave one before
+        # #2098, is this service's only when the platform's exclusive record
+        # of the handle says so (#2086).
         labels = dict(current.get("labels") or {})
         if labels.get("astrolift-io-managed-by") != "platform":
-            raise FilestoreError("Filestore instance is not owned by Astrolift")
+            raise FilestoreError(
+                "existing Filestore instance is not owned by Astrolift; adoption is a separate, "
+                "operator-authorized operation and cannot be granted by tenant config",
+            )
+        refusal = label_identity_refusal(
+            labels,
+            managed_service_id,
+            record_proves=record_proves,
+            resource="Filestore instance",
+        )
+        if refusal:
+            raise FilestoreError(refusal)
 
     def _assert_immutable_matches(self, current: dict[str, Any], cfg: dict[str, Any]) -> None:
         if "location" in cfg:
@@ -1324,20 +1317,14 @@ class FilestoreDriver(ManagedServiceDriver):
 
     def _labels(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         labels = {
-            "astrolift-io-managed-by": "platform",
             "astrolift-io-organization": _label_value(spec.organization_slug),
             "astrolift-io-app": _label_value(spec.app_slug),
             "astrolift-io-environment": _label_value(spec.environment_name),
+            **_identity_labels(spec.managed_service_id),
         }
         if spec.binding_id:
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
-        if spec.managed_service_id:
-            labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
-            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
-        labels.update(
-            {_label_key(str(key)): _label_value(str(value)) for key, value in cfg.get("labels", {}).items()},
-        )
-        return labels
+        return _platform_last(labels, _tenant_labels(cfg))
 
     @staticmethod
     def _performance_config(cfg: dict[str, Any]) -> dict[str, Any]:
@@ -1451,6 +1438,27 @@ def _label_key(value: str) -> str:
 def _label_value(value: str) -> str:
     clean = re.sub(r"[^a-z0-9_-]+", "-", value.lower()).strip("-_")
     return clean[:63]
+
+
+def _tenant_labels(cfg: dict[str, Any]) -> dict[str, str]:
+    return {_label_key(str(key)): _label_value(str(value)) for key, value in (cfg.get("labels") or {}).items()}
+
+
+def _identity_labels(managed_service_id: str) -> dict[str, str]:
+    """The labels ownership decides on, from the spec only."""
+    return {
+        "astrolift-io-managed-by": "platform",
+        "astrolift-io-managed-service-id": _label_value(managed_service_id),
+        MANAGED_SERVICE_ID_LABEL: _label_value(managed_service_id),
+    }
+
+
+def _platform_last(base: dict[str, str], tenant: dict[str, str]) -> dict[str, str]:
+    """``base`` with ``tenant`` applied to its tenant keys only: platform labels always win (#2098)."""
+    merged = {key: value for key, value in base.items() if not is_platform_label_key(key)}
+    merged.update({key: value for key, value in tenant.items() if not is_platform_label_key(key)})
+    merged.update({key: value for key, value in base.items() if is_platform_label_key(key)})
+    return merged
 
 
 def _deprovision_error(handle: str, action: str, exc: Exception) -> DeprovisionResult:

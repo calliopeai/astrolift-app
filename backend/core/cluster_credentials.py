@@ -139,6 +139,8 @@ CREDENTIAL_AWARE_CAPABILITIES: frozenset[str] = frozenset(
         "registry",
         "identity",
         "secrets",
+        # The edge identity provider's users (#2131), on the cluster's account.
+        "identity_users",
         *(f"managed:{kind}" for kind in _MANAGED_KINDS),
     }
 )

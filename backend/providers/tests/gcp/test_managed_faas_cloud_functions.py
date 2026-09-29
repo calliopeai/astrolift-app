@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.faas_cloud_functions import (
@@ -30,6 +31,7 @@ SPEC = ProvisionSpec(
     binding_id="binding-id",
     managed_service_id="managed-id",
 )
+MSID = SPEC.managed_service_id
 
 
 class FakeFunctions:
@@ -212,6 +214,7 @@ def test_update_uses_only_changed_top_level_fields(
     updated = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "available_memory": "2Gi",
                 "timeout_seconds": 240,
@@ -237,7 +240,7 @@ def test_binding_exposes_portable_contract_and_scoped_roles(
     driver: CloudFunctionsDriver,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    binding = driver.binding(ServiceHandle(result.handle), {"access_mode": "manage"})
+    binding = driver.binding(ServiceHandle(result.handle, managed_service_id=MSID), {"access_mode": "manage"})
     assert binding.env_vars["FUNCTION_NAME"].literal == "billing-webhook"
     assert binding.env_vars["FUNCTION_URL"].literal == "https://billing-webhook.example.test"
     assert binding.env_vars["GCP_CLOUD_FUNCTION_NAME"].literal.endswith("/billing-webhook")
@@ -252,24 +255,36 @@ def test_binding_exposes_portable_contract_and_scoped_roles(
     assert all(grant.resource == "projects/project-1" for grant in binding.iam_grants)
 
 
-def test_collision_requires_explicit_adoption_and_reassignment(
+def test_collision_is_refused_and_no_config_flag_adopts_or_reassigns(
     driver: CloudFunctionsDriver,
     client: FakeFunctions,
 ) -> None:
     name = "projects/project-1/locations/us-central1/functions/billing-webhook"
     client.resources[name] = {"name": name, "state": "ACTIVE", "labels": {"owner": "customer"}}
     denied = driver.provision(replace(SPEC, config=_full_config()))
-    assert not denied.ok and "adopt_existing" in denied.message
-    adopted_cfg = _full_config()
-    adopted_cfg["adopt_existing"] = True
-    assert driver.provision(replace(SPEC, config=adopted_cfg)).ok
-    assert client.resources[name]["labels"]["astrolift-io-adopted"] == "true"
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
 
+    # The flags are gone entirely: the schema tenant config is validated
+    # against rejects them, and a driver handed one anyway still refuses
+    # (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_full_config())
+    for flag in ("adopt_existing", "reassign_existing"):
+        assert not validator.is_valid({**_full_config(), flag: True})
+    still_denied = driver.provision(replace(SPEC, config={**_full_config(), "adopt_existing": True}))
+    assert not still_denied.ok
+    assert client.resources[name]["labels"] == {"owner": "customer"}
+
+    del client.resources[name]
+    assert driver.provision(replace(SPEC, config=_full_config())).ok
+    owned_labels = dict(client.resources[name]["labels"])
     other = replace(SPEC, managed_service_id="other-id")
-    denied = driver.provision(replace(other, config=adopted_cfg))
-    assert not denied.ok and "another managed service" in denied.message
-    adopted_cfg["reassign_existing"] = True
-    assert driver.provision(replace(other, config=adopted_cfg)).ok
+    for cfg in (_full_config(), {**_full_config(), "reassign_existing": True}):
+        refused = driver.provision(replace(other, config=cfg))
+        assert not refused.ok
+        assert "another managed service" in refused.message
+    assert client.resources[name]["labels"] == owned_labels
 
 
 def test_deprovision_guards_adopted_and_protected_functions(
@@ -278,12 +293,12 @@ def test_deprovision_guards_adopted_and_protected_functions(
 ) -> None:
     cfg = _full_config()
     result = driver.provision(replace(SPEC, config=cfg))
-    protected = driver.deprovision(DeprovisionSpec(result.handle, cfg))
+    protected = driver.deprovision(DeprovisionSpec(result.handle, cfg, managed_service_id=MSID))
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     name = "projects/project-1/locations/us-central1/functions/billing-webhook"
     client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
     adopted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not adopted.ok and adopted.errors == ["adopted_resource_guard"]
@@ -291,11 +306,12 @@ def test_deprovision_guards_adopted_and_protected_functions(
         DeprovisionSpec(
             result.handle,
             {"deletion_protection": False, "delete_adopted": True},
+            managed_service_id=MSID,
         ),
         force_destroy=True,
     )
     assert deleted.ok and name not in client.resources
-    assert driver.deprovision(DeprovisionSpec(result.handle, {}), force_destroy=True).ok
+    assert driver.deprovision(DeprovisionSpec(result.handle, {}, managed_service_id=MSID), force_destroy=True).ok
 
 
 def test_status_surfaces_provider_state_messages(
@@ -306,7 +322,7 @@ def test_status_surfaces_provider_state_messages(
     name = "projects/project-1/locations/us-central1/functions/billing-webhook"
     client.resources[name]["state"] = "FAILED"
     client.resources[name]["stateMessages"] = [{"message": "build failed"}]
-    status = driver.status(ServiceHandle(result.handle))
+    status = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
     assert status.state == "error" and "build failed" in status.message
 
 
@@ -555,7 +571,11 @@ def test_allowlisted_accounts_and_install_project_secrets_are_accepted(
 def test_update_refuses_an_account_outside_the_allowlist(driver: CloudFunctionsDriver, client: FakeFunctions) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
     updated = driver.update(
-        UpdateSpec(result.handle, config={"service_account_email": "platform-admin@project-1.iam.gserviceaccount.com"}),
+        UpdateSpec(
+            result.handle,
+            managed_service_id=MSID,
+            config={"service_account_email": "platform-admin@project-1.iam.gserviceaccount.com"},
+        ),
     )
     assert not updated.ok and "not allowed by the cluster install policy" in updated.message
     assert not [call for call in client.calls if call[0] == "patch"]
@@ -695,7 +715,7 @@ def test_update_refuses_a_proto_named_raw_field(
     raw_fields: dict[str, Any],
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    updated = driver.update(UpdateSpec(result.handle, config={"raw_fields": raw_fields}))
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"raw_fields": raw_fields}))
     assert not updated.ok and "lowerCamelCase JSON field names" in updated.message
     assert not [call for call in client.calls if call[0] == "patch"]
 
@@ -808,3 +828,72 @@ def test_operation_error_is_not_success(
     }
     with pytest.raises(CloudFunctionsError, match="quota exhausted"):
         driver._wait({"name": "operations/wait", "done": False})
+
+
+# Two-org cases (#2098): tenant labels in the platform namespace are refused,
+# and ownership comes from the spec, never from a label read back.
+
+FUNCTION = "projects/project-1/locations/us-central1/functions/billing-webhook"
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "astrolift_io_managed_service_id",
+        "astrolift-managed-by",
+        "Astrolift.IO.Organization",
+        "x-astrolift-managed-service-id",
+    ],
+)
+def test_tenant_labels_in_the_platform_namespace_are_refused(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+    key: str,
+) -> None:
+    cfg = {**_full_config(), "labels": {key: "managed-id"}}
+    refused = driver.provision(replace(SPEC, managed_service_id="managed-b", config=cfg))
+    assert not refused.ok and "Astrolift-reserved" in refused.message
+    assert not [call for call in client.calls if call[0] in {"create", "patch", "delete"}]
+
+
+def test_another_services_update_and_teardown_leave_its_function_untouched(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+) -> None:
+    result = driver.provision(replace(SPEC, config=_full_config()))
+    before = deepcopy(client.resources)
+    client.calls.clear()
+
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id="managed-b", config={"timeout_seconds": 60}))
+    assert not updated.ok and "another managed service" in updated.message
+    removed = driver.deprovision(
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id="managed-b"),
+        force_destroy=True,
+    )
+    assert not removed.ok and removed.errors == ["ownership_guard"]
+    with pytest.raises(CloudFunctionsError, match="another managed service"):
+        driver.binding(ServiceHandle(result.handle, managed_service_id="managed-b"), {"access_mode": "manage"})
+
+    assert client.resources == before
+    assert not [call for call in client.calls if call[0] in {"create", "patch", "delete"}]
+
+
+def test_an_unmarked_function_needs_the_exclusive_record_and_is_then_marked(
+    driver: CloudFunctionsDriver,
+    client: FakeFunctions,
+) -> None:
+    result = driver.provision(replace(SPEC, config=_full_config()))
+    for key in ("astrolift-io-managed-service-id", "astrolift_io_managed_service_id"):
+        client.resources[FUNCTION]["labels"].pop(key, None)
+    unproven = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"timeout_seconds": 60}))
+    assert not unproven.ok and "no managed-service id" in unproven.message
+    proven = driver.update(
+        UpdateSpec(
+            result.handle,
+            managed_service_id=MSID,
+            config={"timeout_seconds": 60},
+            recorded_handle_exclusive=True,
+        ),
+    )
+    assert proven.ok, proven.message
+    assert client.resources[FUNCTION]["labels"]["astrolift-io-managed-service-id"] == "managed-id"

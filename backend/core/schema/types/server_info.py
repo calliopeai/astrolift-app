@@ -110,6 +110,12 @@ _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
         "modules.agent_live_attach_allowed",
         "Organizations may turn on live agent attach. Off forces it off for every organization.",
     ),
+    (
+        "CHAT_STUDIO_AGENT_RUNS_ALLOWED",
+        "modules.chat_studio_agent_runs_allowed",
+        "Organizations may turn on launching registered Astrolift agents from Chat Studio. "
+        "Off forces it off for every organization.",
+    ),
 )
 
 

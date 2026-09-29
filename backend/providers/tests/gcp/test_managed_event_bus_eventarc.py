@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.event_bus_eventarc import (
@@ -30,6 +31,7 @@ SPEC = ProvisionSpec(
     binding_id="binding-id",
     managed_service_id="managed-id",
 )
+MSID = SPEC.managed_service_id
 
 
 class FakeEventarc:
@@ -112,6 +114,10 @@ class FakeEventarc:
         return operation
 
 
+_ALLOWED_ACCOUNT = "eventarc@project-1.iam.gserviceaccount.com"
+_FOREIGN_ACCOUNT = "platform-admin@project-1.iam.gserviceaccount.com"
+
+
 @pytest.fixture
 def config() -> EventarcConfig:
     return EventarcConfig(
@@ -119,6 +125,7 @@ def config() -> EventarcConfig:
         location="us-central1",
         operation_timeout_seconds=1,
         poll_interval_seconds=0,
+        allowed_service_accounts=(_ALLOWED_ACCOUNT,),
     )
 
 
@@ -247,7 +254,7 @@ def test_provision_composes_advanced_and_standard_eventarc_resources(
     channel = client.resources[f"{parent}/channels/partner-events"]
     assert channel["provider"] == f"{parent}/providers/partner-provider"
 
-    binding = driver.binding(ServiceHandle(result.handle), {"access_mode": "manage"})
+    binding = driver.binding(ServiceHandle(result.handle, managed_service_id=MSID), {"access_mode": "manage"})
     assert binding.env_vars["EVENT_BUS_NAME"].literal == bus_name
     assert binding.env_vars["EVENT_BUS_PUBLISH_URL"].literal == (
         f"https://eventarcpublishing.googleapis.com/v1/{bus_name}:publish"
@@ -280,6 +287,7 @@ def test_update_is_partial_and_prunes_only_declared_managed_children(
     updated = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "display_name": "Renamed",
                 "pipelines": [],
@@ -296,7 +304,7 @@ def test_update_is_partial_and_prunes_only_declared_managed_children(
 
 def test_missing_child_list_does_not_prune(driver: EventarcDriver, client: FakeEventarc) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    updated = driver.update(UpdateSpec(result.handle, config={"display_name": "Only bus"}))
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"display_name": "Only bus"}))
     assert updated.ok
     assert any("/pipelines/to-run" in name for name in client.resources)
 
@@ -316,6 +324,7 @@ def test_immutable_trigger_type_requires_replacement(driver: EventarcDriver) -> 
     updated = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "triggers": [
                     {
@@ -346,7 +355,7 @@ def test_pruning_does_not_cross_managed_service_ownership(
         },
         "destinations": [{"topic": "projects/p/topics/external"}],
     }
-    updated = driver.update(UpdateSpec(result.handle, config={"pipelines": []}))
+    updated = driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"pipelines": []}))
     assert updated.ok and other in client.resources
 
 
@@ -364,14 +373,14 @@ def test_clear_fields_explicitly_removes_mutable_provider_values(
 ) -> None:
     result = _provision(driver, display_name="Named")
     updated = driver.update(
-        UpdateSpec(result.handle, config={"clear_fields": ["displayName"]}),
+        UpdateSpec(result.handle, managed_service_id=MSID, config={"clear_fields": ["displayName"]}),
     )
     assert updated.ok
     bus = client.resources["projects/project-1/locations/us-central1/messageBuses/astrolift"]
     assert bus["displayName"] is None
 
 
-def test_existing_external_bus_requires_explicit_adoption(
+def test_existing_external_bus_is_refused_without_operator_adoption(
     driver: EventarcDriver,
     client: FakeEventarc,
 ) -> None:
@@ -379,30 +388,53 @@ def test_existing_external_bus_requires_explicit_adoption(
     client.resources[name] = {"name": name, "labels": {"owner": "customer"}}
     denied = _provision(driver)
     assert not denied.ok
+    assert "operator-authorized" in denied.message
     assert "one bus per project and region" in denied.message
 
-    adopted = _provision(driver, adopt_existing=True)
-    assert adopted.ok
-    assert client.resources[name]["labels"]["astrolift-io-managed-by"] == "platform"
+    # The flag is gone entirely, on the bus and on every child declaration:
+    # the schema tenant config is validated against rejects it, and a driver
+    # handed one anyway still refuses (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_full_config())
+    assert not validator.is_valid({**_full_config(), "adopt_existing": True})
+    child = deepcopy(_full_config())
+    child["triggers"][0]["adopt_existing"] = True
+    assert not validator.is_valid(child)
+    still_denied = _provision(driver, adopt_existing=True)
+    assert not still_denied.ok
+    assert client.resources[name]["labels"] == {"owner": "customer"}
 
 
-def test_existing_managed_bus_cannot_be_reassigned_silently(
+def test_existing_managed_bus_cannot_be_reassigned_by_config(
     driver: EventarcDriver,
     client: FakeEventarc,
 ) -> None:
     name = "projects/project-1/locations/us-central1/messageBuses/astrolift"
-    client.resources[name] = {
-        "name": name,
-        "labels": {
-            "astrolift-io-managed-by": "platform",
-            "astrolift-io-managed-service-id": "another-service",
-        },
+    labels = {
+        "astrolift-io-managed-by": "platform",
+        "astrolift-io-managed-service-id": "another-service",
     }
+    client.resources[name] = {"name": name, "labels": dict(labels)}
     denied = _provision(driver)
     assert not denied.ok and "another managed service" in denied.message
-    accepted = _provision(driver, reassign_existing=True)
-    assert accepted.ok
-    assert client.resources[name]["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+
+    validator = Draft202012Validator(driver.config_schema())
+    assert not validator.is_valid({**_full_config(), "reassign_existing": True})
+    still_denied = _provision(driver, reassign_existing=True)
+    assert not still_denied.ok
+    assert client.resources[name]["labels"] == labels
+
+
+def test_existing_external_child_is_refused_without_operator_adoption(
+    driver: EventarcDriver,
+    client: FakeEventarc,
+) -> None:
+    name = "projects/project-1/locations/us-central1/triggers/storage-finalized"
+    client.resources[name] = {"name": name, "labels": {"owner": "customer"}}
+    denied = driver.provision(replace(SPEC, config=_full_config()))
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    assert client.resources[name]["labels"] == {"owner": "customer"}
 
 
 def test_deprovision_requires_protection_override_and_removes_children_first(
@@ -410,11 +442,11 @@ def test_deprovision_requires_protection_override_and_removes_children_first(
     client: FakeEventarc,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    blocked = driver.deprovision(DeprovisionSpec(result.handle, _full_config()))
+    blocked = driver.deprovision(DeprovisionSpec(result.handle, _full_config(), managed_service_id=MSID))
     assert not blocked.ok and not blocked.retryable
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, _full_config()),
+        DeprovisionSpec(result.handle, _full_config(), managed_service_id=MSID),
         force_destroy=True,
     )
     assert deleted.ok
@@ -450,7 +482,7 @@ def test_external_enrollment_requires_double_confirmation(
         "labels": {"owner": "customer"},
     }
     blocked = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not blocked.ok and blocked.errors == ["external_dependents_present"]
@@ -458,6 +490,7 @@ def test_external_enrollment_requires_double_confirmation(
         DeprovisionSpec(
             result.handle,
             {"deletion_protection": False, "delete_external_dependents": True},
+            managed_service_id=MSID,
         ),
         force_destroy=True,
     )
@@ -470,11 +503,13 @@ def test_adopted_bus_requires_separate_deletion_consent(
     client: FakeEventarc,
 ) -> None:
     name = "projects/project-1/locations/us-central1/messageBuses/astrolift"
-    client.resources[name] = {"name": name, "labels": {"owner": "customer"}}
-    result = _provision(driver, adopt_existing=True, deletion_protection=False)
+    result = _provision(driver, deletion_protection=False)
     assert result.ok
+    # A bus adopted before #2074 still carries the marker, and teardown still
+    # asks for the second acknowledgement.
+    client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
     denied = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not denied.ok and denied.errors == ["adopted_resource_guard"]
@@ -482,6 +517,7 @@ def test_adopted_bus_requires_separate_deletion_consent(
         DeprovisionSpec(
             result.handle,
             {"deletion_protection": False, "delete_adopted": True},
+            managed_service_id=MSID,
         ),
         force_destroy=True,
     )
@@ -492,7 +528,7 @@ def test_status_reports_child_condition_failure(driver: EventarcDriver, client: 
     result = driver.provision(replace(SPEC, config=_full_config()))
     trigger = next(row for name, row in client.resources.items() if "/triggers/" in name)
     trigger["conditions"] = {"transport": {"code": "FAILED_PRECONDITION", "message": "topic denied"}}
-    status = driver.status(ServiceHandle(result.handle))
+    status = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
     assert status.state == "error"
     assert "topic denied" in status.message
 
@@ -511,7 +547,7 @@ def test_status_surfaces_partner_channel_readiness(
     channel = next(row for name, row in client.resources.items() if "/channels/" in name)
     channel["state"] = channel_state
 
-    status = driver.status(ServiceHandle(result.handle))
+    status = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
 
     assert status.state == expected_state
     assert channel_state.lower() in status.message.lower() or "partner connection" in status.message
@@ -623,6 +659,134 @@ def test_invalid_configs_are_rejected(
     assert not result.ok and message in result.message
 
 
+def _pipeline_with_token(kind: str, account: str, *, spelling: str = "typed") -> dict[str, Any]:
+    token = {"service_account": account, "audience": "https://receiver.example.test"}
+    authentication = {kind: token}
+    destination: dict[str, Any] = {"http_endpoint": {"uri": "https://receiver.example.test/events"}}
+    pipeline: dict[str, Any] = {"id": "to-run", "destinations": [destination]}
+    if spelling == "typed":
+        destination["authentication_config"] = authentication
+    elif spelling == "json":
+        destination["authenticationConfig"] = {
+            "googleOidc" if kind == "google_oidc" else "oauthToken": {"serviceAccount": account},
+        }
+    else:
+        pipeline["raw_fields"] = {
+            "destinations": [
+                {
+                    "httpEndpoint": {"uri": "https://receiver.example.test/events"},
+                    "authenticationConfig": {"oauthToken": {"serviceAccount": account}},
+                },
+            ],
+        }
+    return pipeline
+
+
+@pytest.mark.parametrize("kind", ["google_oidc", "oauth_token"])
+@pytest.mark.parametrize("spelling", ["typed", "json"])
+def test_a_pipeline_cannot_mint_tokens_for_an_unlisted_account(
+    driver: EventarcDriver,
+    client: FakeEventarc,
+    kind: str,
+    spelling: str,
+) -> None:
+    denied = _provision(driver, pipelines=[_pipeline_with_token(kind, _FOREIGN_ACCOUNT, spelling=spelling)])
+
+    assert not denied.ok
+    assert "eventarc_allowed_service_accounts" in denied.message
+    assert not [call for call in client.calls if call[0] == "create"]
+
+
+def test_a_pipeline_may_mint_tokens_for_a_listed_account(driver: EventarcDriver, client: FakeEventarc) -> None:
+    result = _provision(driver, pipelines=[_pipeline_with_token("oauth_token", _ALLOWED_ACCOUNT)])
+
+    assert result.ok, result.message
+    pipeline = client.resources["projects/project-1/locations/us-central1/pipelines/to-run"]
+    assert pipeline["destinations"][0]["authenticationConfig"]["oauthToken"]["serviceAccount"] == _ALLOWED_ACCOUNT
+
+
+def test_raw_destinations_cannot_replace_the_checked_identity(driver: EventarcDriver, client: FakeEventarc) -> None:
+    denied = _provision(driver, pipelines=[_pipeline_with_token("oauth_token", _FOREIGN_ACCOUNT, spelling="raw")])
+    listed = _provision(driver, pipelines=[_pipeline_with_token("oauth_token", _ALLOWED_ACCOUNT, spelling="raw")])
+
+    assert not denied.ok and "declare it in typed config" in denied.message
+    assert not listed.ok and "declare it in typed config" in listed.message
+    assert not [call for call in client.calls if call[0] == "create"]
+
+
+def _trigger(**overrides: Any) -> dict[str, Any]:
+    return {
+        "id": "storage-finalized",
+        "event_filters": [{"attribute": "type", "value": "google.cloud.storage.object.v1.finalized"}],
+        "destination": {"cloud_run": {"service": "receiver", "region": "us-central1"}},
+        **overrides,
+    }
+
+
+@pytest.mark.parametrize(
+    "trigger",
+    [
+        _trigger(service_account=_FOREIGN_ACCOUNT),
+        _trigger(serviceAccount=_FOREIGN_ACCOUNT),
+        _trigger(service_account=f"projects/-/serviceAccounts/{_FOREIGN_ACCOUNT}"),
+    ],
+)
+def test_a_trigger_cannot_invoke_as_an_unlisted_account(
+    driver: EventarcDriver,
+    client: FakeEventarc,
+    trigger: dict[str, Any],
+) -> None:
+    denied = _provision(driver, triggers=[trigger])
+
+    assert not denied.ok and "eventarc_allowed_service_accounts" in denied.message
+    assert not [call for call in client.calls if call[0] == "create"]
+
+
+@pytest.mark.parametrize(
+    "trigger",
+    [
+        _trigger(service_account=_ALLOWED_ACCOUNT, raw_fields={"serviceAccount": _FOREIGN_ACCOUNT}),
+        _trigger(service_account=_ALLOWED_ACCOUNT, clear_fields=["serviceAccount"]),
+    ],
+)
+def test_trigger_raw_and_clear_fields_cannot_touch_the_identity(
+    driver: EventarcDriver,
+    client: FakeEventarc,
+    trigger: dict[str, Any],
+) -> None:
+    denied = _provision(driver, triggers=[trigger])
+
+    assert not denied.ok and "declare it in typed config" in denied.message
+    assert not [call for call in client.calls if call[0] == "create"]
+
+
+def test_update_cannot_move_a_trigger_to_an_unlisted_account(driver: EventarcDriver, client: FakeEventarc) -> None:
+    created = _provision(driver, triggers=[_trigger(service_account=_ALLOWED_ACCOUNT)])
+    assert created.ok, created.message
+    calls = len(client.calls)
+
+    denied = driver.update(UpdateSpec(created.handle, config={"triggers": [_trigger(serviceAccount=_FOREIGN_ACCOUNT)]}))
+
+    assert not denied.ok and "eventarc_allowed_service_accounts" in denied.message
+    assert len(client.calls) == calls
+    trigger = client.resources["projects/project-1/locations/us-central1/triggers/storage-finalized"]
+    assert trigger["serviceAccount"] == _ALLOWED_ACCOUNT
+
+
+def test_no_allowlist_refuses_every_config_supplied_account(client: FakeEventarc) -> None:
+    driver = EventarcDriver(
+        config=EventarcConfig(project_id="project-1", location="us-central1", poll_interval_seconds=0),
+        client=client,
+        sleep=lambda _: None,
+    )
+
+    denied = _provision(driver, triggers=[_trigger(service_account=_ALLOWED_ACCOUNT)])
+    default_identity = _provision(driver, triggers=[_trigger()])
+
+    assert not denied.ok and "eventarc_allowed_service_accounts" in denied.message
+    assert default_identity.ok, default_identity.message
+
+
 def test_update_rejects_immutable_location_and_bus_id(driver: EventarcDriver) -> None:
     location = driver.update(
         UpdateSpec("event_bus/us-central1/astrolift", config={"location": "us-east1"}),
@@ -637,7 +801,7 @@ def test_update_rejects_immutable_location_and_bus_id(driver: EventarcDriver) ->
 def test_publish_test_event_uses_publishing_contract(driver: EventarcDriver, client: FakeEventarc) -> None:
     result = _provision(driver)
     driver.publish_test_event(
-        ServiceHandle(result.handle),
+        ServiceHandle(result.handle, managed_service_id=MSID),
         json_message='{"specversion":"1.0","type":"test","source":"astrolift","id":"1"}',
     )
     publish = next(call for call in client.calls if call[0] == "publish")
@@ -650,7 +814,7 @@ def test_partner_connection_consumes_token_without_persisting_it(
     client: FakeEventarc,
 ) -> None:
     result = _provision(driver)
-    handle = ServiceHandle(result.handle)
+    handle = ServiceHandle(result.handle, managed_service_id=MSID)
     status = driver.connect_partner_channel(
         handle,
         connection_id="provider-link",
@@ -781,3 +945,40 @@ def test_operation_error_is_never_reported_as_success(
     }
     with pytest.raises(EventarcError, match="quota exhausted"):
         driver._wait_operation({"name": "operations/wait", "done": False})
+
+
+def test_a_bus_adopted_before_2074_keeps_its_marker_through_reprovision_and_update(
+    driver: EventarcDriver,
+    client: FakeEventarc,
+) -> None:
+    """#2086: provision built the label map from the spec alone, so the next
+    one dropped the marker, and with it the ``delete_adopted`` guard."""
+    config = {**_full_config(), "deletion_protection": False}
+    result = driver.provision(replace(SPEC, config=config))
+    bus = "projects/project-1/locations/us-central1/messageBuses/astrolift"
+    trigger = next(name for name in client.resources if "/triggers/" in name)
+    for name in (bus, trigger):
+        client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
+
+    assert driver.provision(replace(SPEC, config=config)).ok
+    assert driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"labels": {"team": "platform"}})).ok
+
+    assert client.resources[bus]["labels"]["astrolift-io-adopted"] == "true"
+    assert client.resources[trigger]["labels"]["astrolift-io-adopted"] == "true"
+    denied = driver.deprovision(
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID), force_destroy=True
+    )
+    assert not denied.ok and denied.errors == ["adopted_resource_guard"]
+
+
+def test_children_do_not_inherit_an_adopted_buss_marker(driver: EventarcDriver, client: FakeEventarc) -> None:
+    result = _provision(driver, message_bus_id="astrolift", deletion_protection=False)
+    bus = "projects/project-1/locations/us-central1/messageBuses/astrolift"
+    client.resources[bus]["labels"]["astrolift-io-adopted"] = "true"
+
+    assert driver.update(
+        UpdateSpec(result.handle, managed_service_id=MSID, config={"pipelines": _full_config()["pipelines"]})
+    ).ok
+
+    pipeline = client.resources["projects/project-1/locations/us-central1/pipelines/to-run"]
+    assert "astrolift-io-adopted" not in pipeline["labels"]

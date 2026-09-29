@@ -46,7 +46,9 @@ async def test_a_successful_install_records_the_requesting_org(temporal_env):
     recorded: list = []
 
     @activity.defn(name="astrolift.cluster.install_prereqs")
-    async def install(cluster_id: int, selected_keys: list[str], option_overrides: dict) -> dict:
+    async def install(
+        cluster_id: int, selected_keys: list[str], option_overrides: dict, additive: bool = False
+    ) -> dict:
         return {"applied": [{"name": "cert-manager", "version": "1.15.0"}], "skipped": []}
 
     async with temporal_worker(
@@ -67,7 +69,9 @@ async def test_a_failed_install_records_the_requesting_org(temporal_env):
     recorded: list = []
 
     @activity.defn(name="astrolift.cluster.install_prereqs")
-    async def install(cluster_id: int, selected_keys: list[str], option_overrides: dict) -> dict:
+    async def install(
+        cluster_id: int, selected_keys: list[str], option_overrides: dict, additive: bool = False
+    ) -> dict:
         raise RuntimeError("apply refused")
 
     async with temporal_worker(

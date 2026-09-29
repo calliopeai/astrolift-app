@@ -131,6 +131,13 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// The page picks its section from `?section=`; the default (infrastructure) here.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/projects/storefront/resources",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("@/lib/permissions/use-my-permissions", () => ({
   useMyPermissions: () => ({ can: () => true }),
 }));

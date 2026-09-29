@@ -23,10 +23,12 @@ import {
   EXPORT_WORKFLOW_MANIFEST,
   GET_CONFIGURED_WORKFLOW,
   GET_TIERED_WORKFLOW_DEFINITION,
+  GET_WORKFLOW_DEFINITION_RUN,
   LIST_CONFIGURED_WORKFLOWS,
   LIST_TIERED_WORKFLOW_DEFINITIONS,
   LIST_WORKFLOW_RUNS,
   LIST_WORKFLOW_DEFINITION_RUNS,
+  LIST_PENDING_HUMAN_GATES,
   LIST_WORKFLOW_STAGE_EXECUTIONS,
   LIST_WORKFLOW_STAGES,
   PREVIEW_WORKFLOW_MANIFEST,
@@ -51,12 +53,15 @@ import type {
   TieredWorkflowRunsData,
   WorkflowDefinitionRunsData,
   WorkflowDefinitionRunsVars,
+  PendingHumanGatesData,
+  PendingHumanGatesVars,
   TieredWorkflowsData,
   TieredWorkflowStageExecutionsData,
   TieredWorkflowStagesData,
   UpdateConfiguredWorkflowData,
   UpdateWorkflowDefinitionTieredData,
   UpdateWorkflowStageData,
+  WorkflowDefinitionRun,
 } from "./tiered.types";
 
 // ─── Entitlement ─────────────────────────────────────────────────────────
@@ -245,6 +250,52 @@ export const useWorkflowDefinitionRuns = (params?: {
     startPolling,
     stopPolling,
   };
+};
+
+// One definition run by guid (#2155): the run page's own read, so a run
+// past the newest window of the definition's runs still resolves.
+export const useWorkflowDefinitionRun = (params: {
+  guid: string | null;
+  orgId?: string | null;
+  skip?: boolean;
+}) => {
+  const { data, loading, error, refetch, startPolling, stopPolling } = useQuery<{
+    workflowDefinitionRun: WorkflowDefinitionRun | null;
+  }>(GET_WORKFLOW_DEFINITION_RUN, {
+    variables: { guid: params.guid ?? "", orgId: params.orgId ?? null },
+    fetchPolicy: "cache-and-network",
+    skip: !params.guid || (params.skip ?? false),
+  });
+  return {
+    run: data?.workflowDefinitionRun ?? null,
+    loading,
+    error,
+    refetch,
+    startPolling,
+    stopPolling,
+  };
+};
+
+// Org-wide pending-gates list (#1820): every open human_gate the caller may
+// decide, across every run, the "an owner does not have to open every
+// workflow to find them" view. Same query, same authorization, as the CLI's
+// `astro workflow gates` / `astro workflow gate`.
+export const usePendingHumanGates = (params?: {
+  orgId?: string | null;
+  limit?: number;
+  pollInterval?: number;
+  skip?: boolean;
+}) => {
+  const { data, loading, error, refetch } = useQuery<PendingHumanGatesData, PendingHumanGatesVars>(
+    LIST_PENDING_HUMAN_GATES,
+    {
+      variables: { orgId: params?.orgId ?? null, limit: params?.limit ?? 50 },
+      fetchPolicy: "cache-and-network",
+      pollInterval: params?.pollInterval ?? 0,
+      skip: params?.skip ?? false,
+    }
+  );
+  return { gates: data?.pendingHumanGates ?? [], loading, error, refetch };
 };
 
 // `pollInterval` is passed straight to Apollo, which treats it reactively: a

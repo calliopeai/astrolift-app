@@ -137,8 +137,15 @@ def _skill_content(cfg: dict[str, Any]) -> str:
     return ""
 
 
-def _upsert_skill(*, organization, slug: str, cfg: dict[str, Any]) -> Skill:
-    """Create or update an org-scoped Skill from one ``[skills.<slug>]`` table."""
+def _upsert_skill(
+    *, organization, slug: str, cfg: dict[str, Any], source_ref: str = "", created_by_id: int | None = None
+) -> Skill:
+    """Create or update an org-scoped Skill from one ``[skills.<slug>]`` table.
+
+    ``source_ref`` is the ``owner/repo@branch`` pointer the import read, for
+    the catalog's Imported view; ``created_by_id`` is the importer, set on a
+    new row only so a re-import by someone else keeps the original author.
+    """
     content = _skill_content(cfg)
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -148,6 +155,7 @@ def _upsert_skill(*, organization, slug: str, cfg: dict[str, Any]) -> Skill:
             organization=organization,
             slug=slug,
             is_global=False,
+            created_by_id=created_by_id,
         )
         skill.skill_version = 1
     else:
@@ -164,6 +172,8 @@ def _upsert_skill(*, organization, slug: str, cfg: dict[str, Any]) -> Skill:
     skill.agent_type = str(cfg.get("agent_type") or "")
     skill.scaffolding_tags = _as_str_list(cfg.get("scaffolding_tags"))
     skill.is_active = bool(cfg.get("is_active", True))
+    skill.source_kind = Skill.SourceKind.REPO_IMPORT
+    skill.source_ref = source_ref[:512]
     skill.save()
     return skill
 
@@ -173,11 +183,13 @@ def _resolve_adapter(value: Any) -> str:
     return token if token in _VALID_ADAPTERS else _DEFAULT_ADAPTER
 
 
-def _upsert_tooldef(*, skill: Skill, slug: str, cfg: dict[str, Any]) -> ToolDef:
+def _upsert_tooldef(
+    *, skill: Skill, slug: str, cfg: dict[str, Any], created_by_id: int | None = None
+) -> ToolDef:
     """Create or update a ToolDef attached to ``skill`` from one ``[tools.<slug>]`` table."""
     tool = ToolDef.objects.filter(skill=skill, slug=slug).first()
     if tool is None:
-        tool = ToolDef(skill=skill, slug=slug)
+        tool = ToolDef(skill=skill, slug=slug, created_by_id=created_by_id)
 
     tool.name = str(cfg.get("name") or slug)
     tool.description = str(cfg.get("description") or "")
@@ -205,6 +217,7 @@ def import_skills_from_repo(
     repo_url: str,
     branch: str = "main",
     manifest_path: str = "",
+    created_by_id: int | None = None,
 ) -> ImportResult:
     """Import every ``[skills.*]`` + ``[tools.*]`` table from ``repo_url``.
 
@@ -243,7 +256,13 @@ def import_skills_from_repo(
         for skill_slug, skill_cfg in skills_table.items():
             if not isinstance(skill_cfg, dict):
                 continue
-            skill = _upsert_skill(organization=organization, slug=skill_slug, cfg=skill_cfg)
+            skill = _upsert_skill(
+                organization=organization,
+                slug=skill_slug,
+                cfg=skill_cfg,
+                source_ref=source_ref,
+                created_by_id=created_by_id,
+            )
             skills_by_slug[skill_slug] = skill
             result.imported_skills.append(skill.slug)
 
@@ -263,7 +282,7 @@ def import_skills_from_repo(
                     sorted(skills_by_slug),
                 )
                 continue
-            tool = _upsert_tooldef(skill=target, slug=tool_slug, cfg=tool_cfg)
+            tool = _upsert_tooldef(skill=target, slug=tool_slug, cfg=tool_cfg, created_by_id=created_by_id)
             result.imported_tools.append(tool.slug)
 
     log.info(

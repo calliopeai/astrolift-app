@@ -96,6 +96,53 @@ class WorkflowDefinitionRunType:
     child_run_count: int
     started_at: datetime | None
     ended_at: datetime | None
+    # Who and what started the run (#2152): manual, api, schedule, webhook,
+    # parent or unknown (``core.run_trigger``), and the initiator's user pk.
+    trigger_kind: str = "unknown"
+    triggered_by_user_id: str | None = None
+    triggered_by_me: bool = False
+
+
+@strawberry.input(name="WorkflowDefinitionRunsFilter")
+class WorkflowDefinitionRunsFilterInput:
+    """Declared filters on ``workflowDefinitionRunsPage`` (#2155).
+
+    Unset fields do not filter; set fields combine with AND, and the values
+    of one list field with OR. Slugs match case-insensitively.
+    """
+
+    status: list[str] | None = strawberry.field(default=None, description="Run statuses, any of.")
+    definition: list[str] | None = strawberry.field(default=None, description="Definition slugs.")
+    project: list[str] | None = strawberry.field(default=None, description="Project slugs.")
+    trigger: list[str] | None = strawberry.field(
+        default=None, description="manual, api, schedule, webhook, parent or unknown."
+    )
+    started_by: list[str] | None = strawberry.field(
+        default=None, description='Initiator user ids (as on the row), or "me".'
+    )
+    started_by_me: bool | None = strawberry.field(
+        default=None, description="true: runs the viewer started. false: runs someone or something else did."
+    )
+
+
+@strawberry.type(name="PendingHumanGate")
+class PendingHumanGateType:
+    """One open ``human_gate`` stage execution the caller may decide (#1820).
+
+    Flat and self-contained on purpose: everything a caller needs to deep
+    link into the run's observe page (``/workflows/<definitionSlug>/observe
+    ?run=<runGuid>``, #2068's ``GateReview``) or drive ``signalWorkflowInstance``
+    directly, without a second lookup.
+    """
+
+    execution_id: str
+    run_guid: str
+    workflow_id: str
+    definition_slug: str
+    definition_name: str
+    stage_role: str
+    stage_approvers: list[str]
+    started_at: datetime | None
 
 
 @strawberry.type(name="ConfiguredWorkflow")
@@ -250,6 +297,41 @@ def definition_run_to_type(run) -> WorkflowDefinitionRunType:
         child_run_count=getattr(run, "child_run_count", 0),
         started_at=run.started_at,
         ended_at=run.ended_at,
+        trigger_kind=run.trigger_kind,
+        triggered_by_user_id=str(run.trigger_actor_user_id) if run.trigger_actor_user_id else None,
+        triggered_by_me=_is_viewer(run.trigger_actor_user_id),
+    )
+
+
+def _is_viewer(user_id: int | None) -> bool:
+    """Whether ``user_id`` is the caller, for a run's ``triggeredByMe``."""
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    return user_id is not None and tenant is not None and tenant.actor_user_id == user_id
+
+
+def pending_gate_to_type(execution) -> PendingHumanGateType:
+    """*execution* is an open ``human_gate`` ``WorkflowStageExecution``.
+
+    The definition comes off the stage, which is always set (a stage always
+    belongs to one definition), not off ``workflow_run.workflow_definition``,
+    whose own denormalized link is not guaranteed for every caller of
+    ``create_stage_execution``.
+    """
+    stage = execution.stage
+    definition = stage.definition
+    run = execution.workflow_run
+    approvers = stage.approvers if isinstance(stage.approvers, list) else []
+    return PendingHumanGateType(
+        execution_id=str(execution.pk),
+        run_guid=str(run.guid),
+        workflow_id=run.workflow_id,
+        definition_slug=definition.slug or "",
+        definition_name=definition.name,
+        stage_role=stage.role or "",
+        stage_approvers=[str(a) for a in approvers if str(a).strip()],
+        started_at=execution.started_at,
     )
 
 

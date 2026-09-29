@@ -335,16 +335,43 @@ def _gcp_ref_reason(item: GcpSecretRef, *, owner, store: GcpSecretStore | None) 
 _IAM_ROLE_ARN_RE = re.compile(r"arn:aws[a-z-]*:iam::\d{12}:role(?P<path>/(?:[^/]+/)*)(?P<name>[^/]+)")
 
 
+# Keys that hold a role some AWS service assumes but do not end in ``role_arn``:
+# a list of roles (Redshift ``iam_roles``), and the role API Gateway assumes for
+# an integration or an authorizer (#2087). A credentials value that is not a
+# role ARN (``arn:aws:iam::*:user/*`` passes the caller's own) names none.
+_ROLE_LIST_KEY_SUFFIXES = ("rolearns", "iamroles")
+_ROLE_CREDENTIALS_KEYS = frozenset({"credentials", "credentialsarn", "authorizercredentials"})
+
+
 def config_role_arns(config: Any, path: str = "") -> list[tuple[str, str]]:
     """``(path, arn)`` for every IAM role ARN in ``config`` a driver hands to
     AWS or grants ``iam:PassRole`` on: any key ending in ``role_arn`` /
-    ``RoleARN`` / ``RoleArn``, in any spelling (#1960)."""
+    ``RoleARN`` / ``RoleArn``, in any spelling (#1960); every entry of a key
+    ending in ``role_arns`` or ``iam_roles``; a role ARN held by an API
+    Gateway ``credentials`` key; and a Firehose processor parameter named
+    ``RoleArn`` (#2087)."""
     found: list[tuple[str, str]] = []
     if isinstance(config, dict):
+        name = str(config.get("ParameterName") or "").replace("_", "").casefold()
+        value = config.get("ParameterValue")
+        if name.endswith("rolearn") and isinstance(value, str) and value.strip():
+            found.append((f"{path}.ParameterValue" if path else "ParameterValue", value.strip()))
         for key, value in config.items():
             here = f"{path}.{key}" if path else str(key)
             normalized = str(key).replace("_", "").replace("-", "").casefold()
             if normalized.endswith("rolearn") and isinstance(value, str) and value.strip():
+                found.append((here, value.strip()))
+            elif normalized.endswith(_ROLE_LIST_KEY_SUFFIXES) and isinstance(value, list):
+                found.extend(
+                    (f"{here}[{index}]", item.strip())
+                    for index, item in enumerate(value)
+                    if isinstance(item, str) and item.strip()
+                )
+            elif (
+                normalized in _ROLE_CREDENTIALS_KEYS
+                and isinstance(value, str)
+                and _IAM_ROLE_ARN_RE.fullmatch(value.strip())
+            ):
                 found.append((here, value.strip()))
             else:
                 found.extend(config_role_arns(value, here))
@@ -482,6 +509,32 @@ def _azure_ref_reason(item: AzureKeyVaultRef, *, owner, store: tuple[str, str] |
     return f"{where} is {_namespace_message(owner)}; in Key Vault its name must start {root!r}"
 
 
+# A ``credentials`` or ``authorizerCredentials`` key as YAML or JSON writes it.
+_CREDENTIALS_KEY_TEXT_RE = re.compile(r"""["']?(?:authorizer)?credentials["']?\s*:""", re.IGNORECASE)
+
+
+def unjudged_openapi_credentials(config: Any, path: str = "") -> list[str]:
+    """Paths of ``openapi`` documents given as text that name integration or
+    authorizer credentials. The role check reads a document as the object
+    config holds; text reaches API Gateway as written, where a parser the check
+    does not share decides which credentials apply, so credentials must come in
+    the object form (#2087)."""
+    found: list[str] = []
+    if isinstance(config, dict):
+        for key, value in config.items():
+            here = f"{path}.{key}" if path else str(key)
+            if str(key).casefold() == "openapi" and isinstance(value, (str, bytes)):
+                text = value.decode("utf-8", "replace") if isinstance(value, bytes) else value
+                if _CREDENTIALS_KEY_TEXT_RE.search(text):
+                    found.append(here)
+            else:
+                found.extend(unjudged_openapi_credentials(value, here))
+    elif isinstance(config, list):
+        for index, value in enumerate(config):
+            found.extend(unjudged_openapi_credentials(value, f"{path}[{index}]"))
+    return found
+
+
 def unscoped_config_secret_refs(config: Any, *, owner, cluster) -> list[tuple[str, str, str]]:
     """``(path, ref, reason)`` for each secret reference in ``config`` that
     sits outside the namespace of ``owner`` (the app or project owning the
@@ -496,6 +549,15 @@ def unscoped_config_secret_refs(config: Any, *, owner, cluster) -> list[tuple[st
         reason = _role_arn_reason(arn, owner)
         if reason is not None:
             found.append((path, arn, f"config.{path} {arn!r} {reason}"))
+    for path in unjudged_openapi_credentials(config):
+        found.append(
+            (
+                path,
+                "",
+                f"config.{path} names integration or authorizer credentials in a document given as text; "
+                "give the document as an object so the IAM roles it names can be checked",
+            )
+        )
     native = gcp_secret_refs(config)
     if native:
         store = gcp_secret_store(cluster)

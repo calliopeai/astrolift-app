@@ -134,6 +134,7 @@ def _desired_claims(app, manifest, *, subdomain: str | None = None):
     nothing actually serves.
     """
     from astrolift_manifest.hostname import HostnameInputs, compute_hostnames
+    from core.app_deploy import environment_hostname_inputs
 
     label = subdomain if subdomain is not None else (app.subdomain or app.slug)
     org_slug = app.organization.slug if app.organization_id else "none"
@@ -143,13 +144,18 @@ def _desired_claims(app, manifest, *, subdomain: str | None = None):
         previewed_environment__isnull=True,
     ).select_related("managed_domain")
     for env in envs:
+        # An environment in a namespace of its own renders its own label
+        # (#1922), so that is the hostname it holds.
         for wh in compute_hostnames(
             manifest,
-            HostnameInputs(
-                app_slug=app.slug,
-                org_slug=org_slug,
-                base_zone=env.managed_domain.zone,
-                subdomain_override=label,
+            environment_hostname_inputs(
+                env,
+                HostnameInputs(
+                    app_slug=app.slug,
+                    org_slug=org_slug,
+                    base_zone=env.managed_domain.zone,
+                    subdomain_override=label,
+                ),
             ),
         ):
             yield env, wh.workload_slug, wh.hostname

@@ -355,6 +355,8 @@ def test_rest_accepts_native_fragments_and_multiple_lambda_grants() -> None:
         ({"openapi": {}, "openapi_mode": "append"}, "merge or overwrite"),
         ({"openapi": {}, "stage_name": "bad/stage"}, "stage_name"),
         ({"openapi": {}, "rest_api": {"name": "escape"}}, "Astrolift-owned"),
+        # cloneFrom copies another API, integration credentials included (#2087).
+        ({"openapi": {}, "rest_api": {"cloneFrom": "other-tenant-api"}}, "cannot set cloneFrom"),
     ],
 )
 def test_rest_rejects_invalid_or_identity_overriding_config(config: dict, message: str) -> None:

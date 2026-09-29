@@ -699,6 +699,12 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     When the dev env declares a data file, ``data_persistent`` says whether
     it sits on a persistent volume (true) or an emptyDir that resets on
     restart (false); it is null without a data file.
+
+    Re-promoting into the app this exact dev environment already promoted
+    to (matched by slug) updates it in place instead of 409ing (#1875): the
+    same ownership checks apply, onboarding does not repeat, and the
+    runtime re-renders and records a fresh Workload + Deployment so the app
+    pages, rollback and observability see it.
     """
     token = getattr(request, "_api_token", None)
     if token is None:
@@ -761,9 +767,14 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     if dev.status not in (
         DevEnvironment.Status.RUNNING,
         DevEnvironment.Status.FAILED,
+        # A promoted dev env flips back to RUNNING once its deploy succeeds
+        # (#1875); PROMOTING itself stays allowed too, defensively, for a
+        # row promoted before that fix shipped and for a re-promote that
+        # lands while the previous one is still applying.
+        DevEnvironment.Status.PROMOTING,
     ):
         return JsonResponse(
-            {"detail": "can only promote a running or failed environment"},
+            {"detail": "can only promote a running, failed, or already-promoted environment"},
             status=409,
         )
 
@@ -794,7 +805,15 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
 
     from astrolift_registry.models import RegisteredApp
 
-    if RegisteredApp.objects.filter(slug=app_slug, organization=org, deleted_at__isnull=True).exists():
+    # An app at this slug that this exact dev environment already promoted
+    # to is an update, not a collision (#1875): re-render its runtime in
+    # place instead of 409ing. A slug any other app holds -- including one
+    # this dev env never promoted to -- is still refused unchanged.
+    existing_app = RegisteredApp.objects.filter(
+        slug=app_slug, organization=org, deleted_at__isnull=True
+    ).first()
+    is_update = existing_app is not None and dev.promoted_app_id == existing_app.pk
+    if existing_app is not None and not is_update:
         return JsonResponse(
             {"detail": f"app slug {app_slug!r} already exists in this org"},
             status=409,
@@ -840,82 +859,121 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
                 status=404,
             )
 
-    from _sdk.k8s_naming import app_namespace
-
-    from astrolift_registry.hostname_claims import hostname_label_refusal
-    from astrolift_registry.namespaces import namespace_refusal
-
-    refusal = namespace_refusal(
-        app_namespace(organization_slug=org.slug, app_slug=app_slug), organization_id=org.pk
-    ) or hostname_label_refusal(app_slug, organization=org, managed_domain=managed_domain)
-    if refusal is not None:
-        return JsonResponse({"detail": refusal}, status=409)
-
     storage_class = _persistent_storage_class(cluster) if dev.data_file_path else ""
 
-    app = RegisteredApp.objects.create(
-        organization=org,
-        team=team,
-        name=app_name,
-        slug=app_slug,
-        source_kind=RegisteredApp.SourceKind.DIRECT_UPLOAD,
-        provisioning_status=RegisteredApp.ProvisioningStatus.PENDING,
-        default_tenant_cluster=cluster,
-    )
+    if is_update:
+        # Re-promoting the same dev env into the app it already promoted to
+        # (#1875). ``namespace_refusal``/``hostname_label_refusal`` are
+        # create-only checks -- neither excludes the app's own existing
+        # claim, so calling them here would refuse every update. The
+        # destination team must still be the app's own: promote updates a
+        # runtime in place, it does not move an app between teams.
+        if existing_app.team_id != team.pk:
+            return JsonResponse(
+                {"detail": "app already belongs to a different team; promote cannot move it between teams"},
+                status=409,
+            )
+        app = existing_app
 
-    from astrolift_lifecycle.models import AppEnvironment
+        from astrolift_lifecycle.models import AppEnvironment
+        from astrolift_registry.namespaces import namespace_for_new_environment
 
-    AppEnvironment.objects.create(
-        registered_app=app,
-        name=environment_name,
-        tenant_cluster=cluster,
-        managed_domain=managed_domain,
-    )
+        if not AppEnvironment.objects.filter(
+            registered_app=app, name=environment_name, deleted_at__isnull=True
+        ).exists():
+            AppEnvironment.objects.create(
+                registered_app=app,
+                name=environment_name,
+                tenant_cluster=cluster,
+                managed_domain=managed_domain,
+                k8s_namespace=namespace_for_new_environment(app, name=environment_name, cluster=cluster),
+            )
+    else:
+        from _sdk.k8s_naming import app_namespace
 
-    # Hostname ledger (#2012) -- same call site the #1930 label check
-    # covers. A promoted app has no Workload rows yet (its "web" service is
-    # rendered by DeployPromotedAppWorkflow, not persist_manifest), so this
-    # is a no-op today; wiring it in now means it starts claiming the day
-    # that changes, with no call site to remember to add.
-    from astrolift_registry.hostname_claims import sync_workload_hostname_claims
+        from astrolift_registry.hostname_claims import hostname_label_refusal
+        from astrolift_registry.namespaces import namespace_refusal
 
-    sync_workload_hostname_claims(app)
+        refusal = namespace_refusal(
+            app_namespace(organization_slug=org.slug, app_slug=app_slug), organization_id=org.pk
+        ) or hostname_label_refusal(app_slug, organization=org, managed_domain=managed_domain)
+        if refusal is not None:
+            return JsonResponse({"detail": refusal}, status=409)
+
+        app = RegisteredApp.objects.create(
+            organization=org,
+            team=team,
+            name=app_name,
+            slug=app_slug,
+            source_kind=RegisteredApp.SourceKind.DIRECT_UPLOAD,
+            provisioning_status=RegisteredApp.ProvisioningStatus.PENDING,
+            default_tenant_cluster=cluster,
+        )
+
+        from astrolift_lifecycle.models import AppEnvironment
+        from astrolift_registry.namespaces import namespace_for_new_environment
+
+        AppEnvironment.objects.create(
+            registered_app=app,
+            name=environment_name,
+            tenant_cluster=cluster,
+            managed_domain=managed_domain,
+            # A brand-new app's only environment, so the app namespace; asked
+            # anyway so every creation path places its environment the same way
+            # (#1922).
+            k8s_namespace=namespace_for_new_environment(app, name=environment_name, cluster=cluster),
+        )
+
+        # Hostname ledger (#2012) -- same call site the #1930 label check
+        # covers. A promoted app has no Workload rows yet (its "web" service is
+        # rendered by DeployPromotedAppWorkflow, not persist_manifest), so this
+        # is a no-op today; wiring it in now means it starts claiming the day
+        # that changes, with no call site to remember to add.
+        from astrolift_registry.hostname_claims import sync_workload_hostname_claims
+
+        sync_workload_hostname_claims(app)
 
     dev.status = DevEnvironment.Status.PROMOTING
     dev.promoted_app = app
     dev.save(update_fields=["status", "promoted_app", "updated_at", "version"])
 
+    from astrolift_workflows.client import start_workflow
+
     # Onboard the new app through the standard pipeline so it goes
     # through the same provisioning steps (registry repo, namespace)
     # as a normally-registered app. The ``OnboardAppWorkflow`` is the
-    # entry point the deploy mutations also use.
-    from astrolift_workflows.client import start_workflow
-    from astrolift_workflows.inputs import Actor, OnboardAppInput
+    # entry point the deploy mutations also use. Skipped on an update
+    # (#1875): the app is already onboarded, and onboarding is a one-time
+    # bootstrap, not something a re-promote should repeat.
+    if not is_update:
+        from astrolift_workflows.inputs import Actor, OnboardAppInput
 
-    actor = Actor(kind="user", user_id=request.user.pk, display=str(request.user))
-    try:
-        start_workflow(
-            "OnboardAppWorkflow",
-            [
-                OnboardAppInput(
-                    registered_app_id=app.pk,
-                    actor=actor,
-                    provider_plugin_id=cluster.provider_plugin_id or 0,
-                    tenant_cluster_id=cluster.pk,
-                )
-            ],
-            workflow_id=f"OnboardAppWorkflow-{app.guid}",
-            task_queue=_TASK_QUEUE,
-        )
-    except Exception:  # noqa: BLE001
-        log.exception(
-            "failed to start OnboardAppWorkflow for promoted app %s",
-            app.slug,
-        )
+        actor = Actor(kind="user", user_id=request.user.pk, display=str(request.user))
+        try:
+            start_workflow(
+                "OnboardAppWorkflow",
+                [
+                    OnboardAppInput(
+                        registered_app_id=app.pk,
+                        actor=actor,
+                        provider_plugin_id=cluster.provider_plugin_id or 0,
+                        tenant_cluster_id=cluster.pk,
+                    )
+                ],
+                workflow_id=f"OnboardAppWorkflow-{app.guid}",
+                task_queue=_TASK_QUEUE,
+            )
+        except Exception:  # noqa: BLE001
+            log.exception(
+                "failed to start OnboardAppWorkflow for promoted app %s",
+                app.slug,
+            )
 
     # Onboarding gives the app a namespace but runs nothing in it; this
     # serves the uploaded files there, independent of the dev env's own
-    # workload and lifetime.
+    # workload and lifetime. Also how an update re-ships an edit (#1875):
+    # the caller syncs new files / a new data file onto the dev env, then
+    # re-promotes, and this re-renders them into the same app.
     from astrolift_workflows.activities.dev_environment import promoted_app_hostname
     from astrolift_workflows.inputs import DeployPromotedAppInput
 

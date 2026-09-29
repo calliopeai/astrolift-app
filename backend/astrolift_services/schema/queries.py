@@ -4,11 +4,23 @@ from __future__ import annotations
 
 import strawberry
 from django.db.models import Prefetch, Q
+from django.db.models.functions import Lower
 from strawberry.types import Info
 
 from astrolift_clusters.models import TenantCluster
 from astrolift_clusters.schema.types import TenantClusterType, cluster_to_type
-from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql import (
+    GUID,
+    FilterField,
+    PageType,
+    SortKey,
+    filter_q,
+    filter_values,
+    keyset_page,
+    numbered_page,
+    resolve_list_sort,
+    search_q,
+)
 from astrolift_identity.models import Project
 from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_lifecycle.models import AppEnvironment
@@ -44,6 +56,7 @@ from astrolift_services.schema.types import (
     ManagedServiceObjectType,
     ManagedServiceQueueDepthType,
     ManagedServiceType,
+    ModelEndpointsFilterInput,
     SecretBundleType,
     SecretChangeProposalType,
     SecretHistoryActorType,
@@ -487,6 +500,87 @@ def _list_app_secrets(*, app, env_names: list[str]) -> list[AppSecretType]:
     return out
 
 
+def _model_endpoints_qs(org_id: int):
+    """Model endpoints in ``org_id`` on apps and projects the caller's bindings cover (#2040)."""
+    from astrolift_identity.scope_visibility import visible_apps, visible_projects
+
+    apps = visible_apps(RegisteredApp.objects.filter(organization_id=org_id), Permission.APP_READ)
+    projects = visible_projects(Project.objects.filter(organization_id=org_id), Permission.PROJECT_READ)
+    return (
+        ManagedService.objects.select_related(
+            "registered_app",
+            "project",
+            "app_environment__tenant_cluster",
+            "tenant_cluster__provider_plugin",
+            "created_by",
+        )
+        .prefetch_related(
+            "attachments",
+            "volume_bindings",
+            Prefetch(
+                "workload_identity_grants",
+                queryset=WorkloadIdentityGrant.objects.select_related("app_environment"),
+            ),
+        )
+        .filter(kind=ManagedService.Kind.MODEL_ENDPOINT, deleted_at__isnull=True)
+        .filter(
+            Q(registered_app__in=apps, registered_app__organization_id=org_id)
+            | Q(project__in=projects, project__organization_id=org_id)
+        )
+    )
+
+
+def _iexact_any(path: str, values) -> Q:
+    query = Q(pk__in=[])
+    for value in values:
+        query |= Q(**{f"{path}__iexact": value})
+    return query
+
+
+def _user_ids(values) -> list[int]:
+    """``["me", "12"]`` as user pks; "me" is the viewer, junk is dropped."""
+    tenant = get_current_tenant()
+    viewer = tenant.actor_user_id if tenant else None
+    out: list[int] = []
+    for value in values:
+        if value == "me":
+            if viewer is not None:
+                out.append(viewer)
+            continue
+        try:
+            out.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+_MODEL_ENDPOINT_SORTS: dict[str, SortKey] = {
+    "name": SortKey(Lower("name")),
+    "status": SortKey("status"),
+    "variant": SortKey("variant"),
+    "created": SortKey("created_at"),
+    "updated": SortKey("updated_at"),
+}
+
+_MODEL_ENDPOINT_FILTERS: dict[str, FilterField] = {
+    "status": FilterField("status"),
+    "variant": FilterField(q=lambda v: _iexact_any("variant", v)),
+    "project": FilterField(
+        q=lambda v: _iexact_any("project__slug", v) | _iexact_any("registered_app__project__slug", v)
+    ),
+    "app": FilterField(q=lambda v: _iexact_any("registered_app__slug", v)),
+    "cluster": FilterField(
+        q=lambda v: _iexact_any("tenant_cluster__slug", v)
+        | _iexact_any("app_environment__tenant_cluster__slug", v)
+    ),
+    "owner_scope": FilterField(
+        q=lambda v: (Q(project__isnull=False) if "project" in v else Q(pk__in=[]))
+        | (Q(project__isnull=True) if "app" in v else Q(pk__in=[]))
+    ),
+    # ``deployed_by`` needs the viewer; the resolver applies it.
+}
+
+
 def _managed_services_qs(
     *,
     app_slug: str,
@@ -514,7 +608,7 @@ def _managed_services_qs(
     if org_id is None:
         return ManagedService.objects.none()
     qs = (
-        ManagedService.objects.select_related("registered_app", "app_environment")
+        ManagedService.objects.select_related("registered_app", "app_environment", "created_by")
         .prefetch_related(
             "attachments",
             "volume_bindings",
@@ -626,22 +720,85 @@ class ServicesQuery:
         Vertex) alike, for the Models page. Narrowed to the caller's org and
         then to the apps and projects its bindings cover.
         """
-        from astrolift_identity.scope_visibility import visible_apps, visible_projects
-
         org_id = _caller_org_id()
         if org_id is None:
             return []
-        apps = visible_apps(RegisteredApp.objects.filter(organization_id=org_id), Permission.APP_READ)
-        projects = visible_projects(Project.objects.filter(organization_id=org_id), Permission.PROJECT_READ)
-        rows = (
-            ManagedService.objects.select_related(
-                "registered_app", "project", "tenant_cluster__provider_plugin"
-            )
-            .filter(kind=ManagedService.Kind.MODEL_ENDPOINT, deleted_at__isnull=True)
-            .filter(Q(registered_app__in=apps) | Q(project__in=projects))
-            .order_by("name", "guid")
-        )
+        rows = _model_endpoints_qs(org_id).order_by("name", "guid")
         return [managed_service_to_type(row) for row in rows]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_model_endpoints_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        filter: ModelEndpointsFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> PageType[ManagedServiceType]:
+        """``astroliftModelEndpoints`` on the list contract (#2155), numbered.
+
+        ``search`` matches the name, variant, owning app and project and the
+        cluster; ``filter``: status, variant, project, app, cluster,
+        ownerScope and deployedBy (user ids or "me", the Mine view);
+        ``sort`` is a multi-key spec over name, status, variant, created and
+        updated (``name`` by default). Same visibility as the list: the
+        caller's org, narrowed to the apps and projects its bindings cover.
+        """
+        org_id = _caller_org_id()
+        qs = _model_endpoints_qs(org_id) if org_id is not None else ManagedService.objects.none()
+        if search and search.strip():
+            qs = qs.filter(
+                search_q(
+                    search.strip(),
+                    "name",
+                    "variant",
+                    "registered_app__slug",
+                    "project__slug",
+                    "registered_app__project__slug",
+                    "tenant_cluster__slug",
+                    "app_environment__tenant_cluster__slug",
+                )
+            )
+        values = filter_values(filter)
+        qs = qs.filter(filter_q(values, _MODEL_ENDPOINT_FILTERS))
+        if "deployed_by" in values:
+            qs = qs.filter(created_by_id__in=_user_ids(values["deployed_by"]))
+        order_by = resolve_list_sort(sort, _MODEL_ENDPOINT_SORTS, default="name")
+        return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(
+            managed_service_to_type
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_model_endpoint(self, info: Info, id: GUID) -> ManagedServiceType | None:
+        """One model endpoint by id, or null (#2155).
+
+        Resolved inside the same visibility as ``astroliftModelEndpoints``:
+        another org's endpoint, one the caller's bindings do not cover, a
+        managed service of another kind and a malformed id all read as null.
+        """
+        import uuid
+
+        org_id = _caller_org_id()
+        try:
+            guid = str(uuid.UUID(str(id)))
+        except (TypeError, ValueError, AttributeError):
+            return None
+        if org_id is None:
+            return None
+        row = (
+            _model_endpoints_qs(org_id)
+            .filter(
+                Q(registered_app__organization_id=org_id) | Q(project__organization_id=org_id),
+                guid=guid,
+            )
+            .first()
+        )
+        return managed_service_to_type(row) if row is not None else None
 
     @strawberry.field
     @require_permission(Permission.PROJECT_READ, scope=project_scope_by_guid("project_id"))
@@ -660,6 +817,7 @@ class ServicesQuery:
             ManagedService.objects.select_related(
                 "project",
                 "tenant_cluster__provider_plugin",
+                "created_by",
             )
             .prefetch_related(
                 "attachments__agent_environment_spec",

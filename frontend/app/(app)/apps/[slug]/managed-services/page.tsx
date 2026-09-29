@@ -1,25 +1,18 @@
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { ManagedServicesClient } from "./managed-services-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export const metadata = { title: "Managed services · App · Astrolift" };
-
-export default async function AppManagedServicesPage({
+/**
+ * Managed services are a section of Workloads now (spec 44 §5.2). The old
+ * URL keeps resolving, with whatever query it carried.
+ */
+export default async function AppManagedServicesRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: slug }}>
-      <PreloadQuery
-        query={LIST_MANAGED_SERVICES}
-        variables={{ appSlug: slug, environmentName: null }}
-      >
-        <ManagedServicesClient slug={slug} />
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "workloads", "managed-services", await searchParams));
 }

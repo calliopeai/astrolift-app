@@ -134,6 +134,9 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="identity", plugin_id="aws", variant="irsa"),
         DriverEntry(role="registry", plugin_id="aws", variant="ecr"),
         DriverEntry(role="notification", plugin_id="aws", variant="sns"),
+        # The edge identity provider's users (#2131). Cognito first; the other
+        # clouds are on the roadmap with the same contract.
+        DriverEntry(role="identity_users", plugin_id="aws", variant="cognito"),
         # GCP plugin
         DriverEntry(role="cluster", plugin_id="gcp"),
         DriverEntry(role="ingress", plugin_id="gcp", variant="gce_ingress"),
@@ -144,6 +147,7 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="identity", plugin_id="gcp", variant="workload_identity"),
         DriverEntry(role="registry", plugin_id="gcp", variant="artifact_registry"),
         DriverEntry(role="notification", plugin_id="gcp", variant="fcm"),
+        DriverEntry(role="identity_users", plugin_id="gcp", variant="identity_platform", status="planned"),
         # Azure plugin
         DriverEntry(role="cluster", plugin_id="azure"),
         DriverEntry(role="ingress", plugin_id="azure", variant="agic"),
@@ -159,6 +163,7 @@ MATRIX = AvailabilityMatrix(
         ),
         DriverEntry(role="registry", plugin_id="azure", variant="acr"),
         DriverEntry(role="notification", plugin_id="azure", variant="notification_hubs"),
+        DriverEntry(role="identity_users", plugin_id="azure", variant="entra_id", status="planned"),
         # k8s_native plugin
         DriverEntry(role="cluster", plugin_id="k8s_native"),
         DriverEntry(role="ingress", plugin_id="k8s_native", variant="nginx_ingress"),
@@ -180,6 +185,7 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="registry", plugin_id="k8s_native", variant="ghcr"),
         DriverEntry(role="registry", plugin_id="k8s_native", variant="harbor"),
         DriverEntry(role="notification", plugin_id="k8s_native", variant="webhook_smtp"),
+        DriverEntry(role="identity_users", plugin_id="k8s_native", variant="keycloak", status="planned"),
     ),
     managed_services=(
         # AWS — MVP set; extended catalog tracked in #79
@@ -1335,7 +1341,7 @@ MATRIX = AvailabilityMatrix(
             description=(
                 "Google Cloud Workflows definitions, immutable revisions, executions, "
                 "CMEK, service identity, environment, logging, history, IAM bindings, "
-                "rollback, adoption, and protected teardown"
+                "rollback, and protected teardown"
             ),
             binding_envs=(
                 "WORKFLOW_ENGINE_ID",

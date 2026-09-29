@@ -51,9 +51,9 @@ EVERY_PERMISSION = frozenset(
         "admin.elevate agent.create agent.delete agent.dispatch agent.read agent.update "
         "agent_box.attach agent_env_spec.create agent_env_spec.delete agent_env_spec.read "
         "agent_env_spec.update agent_task.send_input agent_task.watch api_token.create "
-        "api_token.revoke app.approve_deploy app.create app.delete app.deploy app.exec_pod "
+        "api_token.revoke app.access app.approve_deploy app.create app.delete app.deploy app.exec_pod "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback app.transfer app.update "
-        "audit_log.export audit_log.read billing.read billing.update cluster.manage cluster.register "
+        "audit_log.export audit_log.read billing.read billing.update cluster.manage cluster.register cluster.users "
         "cluster.unregister cluster.update deploy_token.create deploy_token.revoke deploy_token.rotate "
         "form.create form.delete form.moderate form.read form.submit form.update managed_service.adopt "
         "managed_service.create managed_service.destroy managed_service.update org.delete "
@@ -93,12 +93,12 @@ PINNED = {
     ),
     "cluster_owner": (
         "ORG",
-        "cluster.manage cluster.register cluster.unregister cluster.update "
+        "cluster.users cluster.manage cluster.register cluster.unregister cluster.update "
         "provider_plugin.configure provider_plugin.read",
     ),
     "team_owner": (
         "TEAM",
-        "agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
+        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
         "agent_env_spec.create agent_env_spec.delete agent_env_spec.read agent_env_spec.update "
         "app.create app.delete app.deploy app.log_export app.read app.read_logs app.read_metrics "
         "app.rollback app.update project.create project.delete project.read project.update "
@@ -138,7 +138,7 @@ PINNED = {
     ),
     "project_admin": (
         "PROJECT",
-        "agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
+        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
         "agent_env_spec.create agent_env_spec.delete agent_env_spec.read agent_env_spec.update "
         "app.create app.delete app.deploy app.log_export app.read app.read_logs app.read_metrics "
         "app.rollback app.update project.read project.update secret.list secret.read secret.write "
@@ -165,7 +165,7 @@ PINNED = {
     ),
     "app_admin": (
         "APP",
-        "agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
+        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
         "agent_env_spec.delete agent_env_spec.read agent_env_spec.update app.delete app.deploy "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback app.update "
         "secret.list secret.read secret.write workflow.create workflow.delete workflow.read "

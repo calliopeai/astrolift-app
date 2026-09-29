@@ -371,31 +371,36 @@ def test_gateway_class_override_requires_install_policy() -> None:
     assert _gateway(cluster)["spec"]["gatewayClassName"] == "cilium"
 
 
-def test_existing_gateway_and_routes_require_exact_explicit_adoption() -> None:
+def test_existing_gateway_and_routes_are_refused_even_with_their_exact_uids() -> None:
     driver, cluster = _driver()
     gateway_key = (f"{API_VERSION}/Gateway", "steady-md-triage", "triage-prod-edge")
     route_key = (f"{API_VERSION}/HTTPRoute", "steady-md-triage", "api")
-    cluster.objects[gateway_key] = {"metadata": {"uid": "gw-uid", "labels": {}}}
+    foreign_gateway = {"metadata": {"uid": "gw-uid", "labels": {}}}
+    cluster.objects[gateway_key] = foreign_gateway
 
-    assert driver.provision(_spec(routes=[_route()])).ok is False
-    cluster.objects[route_key] = {"metadata": {"uid": "route-uid", "labels": {}}}
-    gateway_adopted = driver.provision(
-        _spec(
-            adopt_existing=True,
-            expected_existing_uid="gw-uid",
-            routes=[_route()],
-        ),
-    )
-    route_adopted = driver.provision(
-        _spec(
-            adopt_existing=True,
-            expected_existing_uid="gw-uid",
-            routes=[_route(adopt_existing=True, expected_existing_uid="route-uid")],
-        ),
-    )
+    refused = driver.provision(_spec(routes=[_route()]))
+    assert refused.ok is False
+    assert "operator-authorized" in refused.message
 
-    assert gateway_adopted.ok is False
-    assert route_adopted.ok is True
+    # Knowing the uid proved only that the caller could see the object.
+    # Adoption is operator-only (#2021); the flags are rejected, not ignored.
+    flagged = driver.provision(_spec(adopt_existing=True, expected_existing_uid="gw-uid", routes=[_route()]))
+    assert flagged.ok is False
+    assert "unsupported Gateway config fields" in flagged.message
+
+    del cluster.objects[gateway_key]
+    foreign_route = {"metadata": {"uid": "route-uid", "labels": {}}}
+    cluster.objects[route_key] = foreign_route
+    route_refused = driver.provision(_spec(routes=[_route()]))
+    assert route_refused.ok is False
+    assert "HTTPRoute api already exists" in route_refused.message
+    route_flagged = driver.provision(
+        _spec(routes=[_route(adopt_existing=True, expected_existing_uid="route-uid")]),
+    )
+    assert route_flagged.ok is False
+    assert "unsupported route fields" in route_flagged.message
+    assert cluster.objects[route_key] is foreign_route
+    assert cluster.applied == []
 
 
 def test_reprovision_never_hijacks_another_astrolift_gateway() -> None:

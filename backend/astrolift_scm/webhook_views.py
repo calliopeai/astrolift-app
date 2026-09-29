@@ -120,6 +120,7 @@ def _build_pr_context(payload: dict) -> github_pr_dispatch.PrEventContext | None
         head_branch=head_branch,
         is_merge=bool(pull_request.get("merged", False)) is True,
         is_bot_author=(user.get("type") or "") == "Bot",
+        author_login=str(user.get("login") or ""),
     )
 
 
@@ -136,6 +137,7 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     from django.db import transaction
 
     from astrolift_lifecycle.models import AppEnvironment, PreviewEnvironment
+    from astrolift_registry.namespaces import namespace_for_new_preview
     from astrolift_workflows.preview_build import (
         env_slug_for_preview,
         namespace_for_preview,
@@ -166,10 +168,17 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     org_slug = (getattr(org, "slug", "") or getattr(org, "name", "") or "org").lower()
     app_slug = app.slug
 
-    namespace = namespace_for_preview(
-        org_slug=org_slug,
-        app_slug=app_slug,
-        pr_number=pr_ctx.pr_number,
+    env_name = env_slug_for_preview(pr_number=pr_ctx.pr_number)
+    # The preview's deploys render into this namespace (#1922), so it may
+    # not be one another app or environment already holds.
+    namespace = namespace_for_new_preview(
+        app,
+        name=env_name,
+        preferred=namespace_for_preview(
+            org_slug=org_slug,
+            app_slug=app_slug,
+            pr_number=pr_ctx.pr_number,
+        ),
     )
     # Hostname matches the manual-preview convention
     # (``preview-<slug>.<app>.<org>``) so audits group both paths under
@@ -186,7 +195,6 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     base = f"pr-{pr_ctx.pr_number}.{app_slug}.{org_slug}"
     zone = getattr(_managed_domain, "zone", None)
     hostname = (f"{base}.{zone}" if zone else base).lower()
-    env_name = env_slug_for_preview(pr_number=pr_ctx.pr_number)
 
     from astrolift_lifecycle.services.preview_lineage import (
         resolve_previewed_environment,
@@ -197,6 +205,7 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
             registered_app=app,
             tenant_cluster=cluster,
             name=env_name,
+            k8s_namespace=namespace,
             url=f"https://{hostname}",
             managed_domain=_managed_domain,
             required_approvals=0,
@@ -216,6 +225,7 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
             hostname=hostname,
             namespace=namespace,
             app_environment=env,
+            opened_by_login=pr_ctx.author_login[:255],
         )
     return preview, True
 

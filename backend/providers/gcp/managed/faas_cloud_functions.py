@@ -27,8 +27,10 @@ from _sdk.managed_service import (
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp._raw_fields import raw_field_conflicts
+from gcp.managed._ownership import is_platform_label_key, label_identity_refusal, reserved_label_keys
 
 KIND = "faas"
+_MISSING_IDENTITY = "Cloud Run functions need the managed-service id to mark the function they own"
 _API_ROOT = "https://cloudfunctions.googleapis.com/v2"
 _FUNCTION_ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,61}[a-z0-9]$")
 _SECRET_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,255}$")
@@ -222,13 +224,14 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         error = self._validate(cfg, update=False)
         if error:
             return ProvisionResult(False, "", error, ["invalid_cloud_functions_config"])
+        if not spec.managed_service_id:
+            return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_cloud_functions_config"])
         region = str(cfg.get("region") or self._config.region)
         function_id = self._function_id(spec, cfg)
         handle = _handle(region, function_id)
         name = self._name(region, function_id)
         labels = self._labels(spec, cfg)
-        labels.setdefault("astrolift-io-managed-service-id", _label_value(spec.managed_service_id or function_id))
-        labels.setdefault(MANAGED_SERVICE_ID_LABEL, _label_value(spec.managed_service_id or function_id))
+        record_proves = spec.recorded_handle_exclusive and spec.recorded_handle == handle
         try:
             current = self._get(name)
             body = self._body(cfg, labels, partial=False)
@@ -238,13 +241,13 @@ class CloudFunctionsDriver(ManagedServiceDriver):
                     current = self._functions.get(name)
                 except CloudFunctionsConflict:
                     current = self._functions.get(name)
-                    self._assert_adoptable(current, cfg, spec.managed_service_id, "function")
-                    labels = self._adoption_labels(current, labels, cfg)
+                    self._assert_owned(current, spec.managed_service_id, "function", record_proves=record_proves)
+                    labels = self._merged_labels(current, labels)
                     body = self._body(cfg, labels, partial=False)
                     self._patch(name, current, body)
             else:
-                self._assert_adoptable(current, cfg, spec.managed_service_id, "function")
-                labels = self._adoption_labels(current, labels, cfg)
+                self._assert_owned(current, spec.managed_service_id, "function", record_proves=record_proves)
+                labels = self._merged_labels(current, labels)
                 body = self._body(cfg, labels, partial=False)
                 self._patch(name, current, body)
         except Exception as exc:
@@ -270,9 +273,19 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         name = self._name(region, function_id)
         try:
             current = self._functions.get(name)
-            self._assert_managed(current, "function")
-            labels = dict(current.get("labels") or {})
-            self._patch(name, current, self._body(cfg, labels, partial=True))
+            self._assert_owned(
+                current,
+                spec.managed_service_id,
+                "function",
+                record_proves=spec.recorded_handle_exclusive,
+            )
+            # The live map is the base, but the identity comes from the spec:
+            # an id planted on the function is written over, never read back
+            # (#2098). ``_patch`` sends nothing when it already matches.
+            labels = {**dict(current.get("labels") or {}), **_identity_labels(spec.managed_service_id)}
+            body = self._body(cfg, labels, partial=True)
+            body["labels"] = _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
+            self._patch(name, current, body)
         except CloudFunctionsNotFound:
             return UpdateResult(False, spec.handle, "Cloud Run function not found", ["not_found"])
         except Exception as exc:
@@ -303,7 +316,12 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         if current is None:
             return DeprovisionResult(True, spec.handle, f"Cloud Run function {function_id} already gone")
         try:
-            self._assert_managed(current, "function")
+            self._assert_owned(
+                current,
+                spec.managed_service_id,
+                "function",
+                record_proves=spec.recorded_handle_exclusive,
+            )
         except Exception as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["ownership_guard"], retryable=False)
         labels = dict(current.get("labels") or {})
@@ -365,7 +383,13 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         region, function_id = _parse_handle(handle.handle)
         name = self._name(region, function_id)
         function = self._functions.get(name)
-        self._assert_managed(function, "function")
+        # The grants below are the payoff of a handle two services record.
+        self._assert_owned(
+            function,
+            handle.managed_service_id,
+            "function",
+            record_proves=handle.recorded_handle_exclusive,
+        )
         uri = str((function.get("serviceConfig") or {}).get("uri") or function.get("url") or "")
         access_mode = str((config or {}).get("access_mode") or "invoke")
         grants: list[Grant] = []
@@ -561,8 +585,6 @@ class CloudFunctionsDriver(ManagedServiceDriver):
                 "build_raw_fields": raw,
                 "service_raw_fields": raw,
                 "clear_fields": {"type": "array", "items": {"type": "string"}},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "reassign_existing": {"type": "boolean", "default": False},
                 "delete_adopted": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
                 "access_mode": {"type": "string", "enum": ["none", "invoke", "manage"]},
@@ -590,7 +612,7 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             {
                 *self.config_schema()["properties"],
             }
-            - {"function_id", "region", "adopt_existing", "reassign_existing"},
+            - {"function_id", "region"},
         )
 
     def _validate(self, cfg: dict[str, Any], *, update: bool) -> str:
@@ -715,9 +737,10 @@ class CloudFunctionsDriver(ManagedServiceDriver):
                 return "event_trigger filter operator must be match-path-pattern"
         if cfg.get("access_mode") not in {None, "none", "invoke", "manage"}:
             return "access_mode must be none, invoke, or manage"
-        reserved_labels = sorted(
-            key for key in _normalized_labels(cfg.get("labels") or {}) if key.startswith("astrolift-io-")
-        )
+        # Every spelling of every platform label, not only astrolift-io-*: the
+        # canonical astrolift_io_managed_service_id slipped past a prefix check
+        # (#2098).
+        reserved_labels = reserved_label_keys(cfg.get("labels") or {})
         if reserved_labels:
             return f"labels cannot set Astrolift-reserved keys: {', '.join(reserved_labels)}"
         for values, protected, label, verb in (
@@ -808,7 +831,7 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         for field in cfg.get("clear_fields") or []:
             body[str(field)] = None
         if not partial or "labels" in cfg:
-            body["labels"] = {**labels, **_normalized_labels(cfg.get("labels") or {})}
+            body["labels"] = _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
         return body
 
     def _build_config(self, cfg: dict[str, Any], *, partial: bool) -> dict[str, Any]:
@@ -922,53 +945,45 @@ class CloudFunctionsDriver(ManagedServiceDriver):
             raise CloudFunctionsError(str(error.get("message") or error))
         return dict(current.get("response") or current)
 
-    def _assert_managed(self, resource: dict[str, Any], label: str) -> None:
-        if (resource.get("labels") or {}).get("astrolift-io-managed-by") != "platform":
-            raise CloudFunctionsError(f"{label} is not Astrolift-owned")
-
-    def _assert_adoptable(
-        self,
+    @staticmethod
+    def _assert_owned(
         resource: dict[str, Any],
-        cfg: dict[str, Any],
         service_id: str,
         label: str,
+        *,
+        record_proves: bool,
     ) -> None:
+        # function_id is tenant-settable, so neither a function Astrolift never
+        # provisioned nor another managed service's may be redeployed from
+        # here. Adoption of an existing resource is a separate,
+        # operator-authorized operation (#1365) that no tenant config flag may
+        # grant (#2021). A function with no managed-service id, as a tenant
+        # could leave one before #2098, is this service's only when the
+        # platform's exclusive record of the handle says so (#2086).
         labels = dict(resource.get("labels") or {})
         if labels.get("astrolift-io-managed-by") != "platform":
-            if not cfg.get("adopt_existing"):
-                raise CloudFunctionsError(f"existing {label} is not Astrolift-owned; set adopt_existing=true")
-            return
-        owner = str(labels.get("astrolift-io-managed-service-id") or "")
-        expected = _label_value(service_id) if service_id else ""
-        if owner and expected and owner != expected and not cfg.get("reassign_existing"):
-            raise CloudFunctionsError(f"existing {label} belongs to another managed service")
+            raise CloudFunctionsError(
+                f"existing {label} is not Astrolift-owned; adoption is a separate, operator-authorized "
+                "operation and cannot be granted by tenant config",
+            )
+        refusal = label_identity_refusal(labels, service_id, record_proves=record_proves, resource=f"existing {label}")
+        if refusal:
+            raise CloudFunctionsError(refusal)
 
-    def _adoption_labels(
-        self,
-        resource: dict[str, Any],
-        desired: dict[str, str],
-        cfg: dict[str, Any],
-    ) -> dict[str, str]:
-        current = dict(resource.get("labels") or {})
-        result = {**current, **desired}
-        if current.get("astrolift-io-managed-by") != "platform" and cfg.get("adopt_existing"):
-            result["astrolift-io-adopted"] = "true"
-        return result
+    @staticmethod
+    def _merged_labels(resource: dict[str, Any], desired: dict[str, str]) -> dict[str, str]:
+        return {**dict(resource.get("labels") or {}), **desired}
 
     def _labels(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, str]:
         labels = {
-            "astrolift-io-managed-by": "platform",
             "astrolift-io-organization": _label_value(spec.organization_slug),
             "astrolift-io-app": _label_value(spec.app_slug),
             "astrolift-io-environment": _label_value(spec.environment_name),
+            **_identity_labels(spec.managed_service_id),
         }
         if spec.binding_id:
             labels["astrolift-io-binding"] = _label_value(spec.binding_id)
-        if spec.managed_service_id:
-            labels["astrolift-io-managed-service-id"] = _label_value(spec.managed_service_id)
-            labels[MANAGED_SERVICE_ID_LABEL] = _label_value(spec.managed_service_id)
-        labels.update(_normalized_labels(cfg.get("labels") or {}))
-        return labels
+        return _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
 
 
 def _handle(region: str, function_id: str) -> str:
@@ -993,6 +1008,23 @@ def _label_value(value: str) -> str:
 
 def _normalized_labels(labels: dict[str, Any]) -> dict[str, str]:
     return {_label_key(str(key)): _label_value(str(value)) for key, value in labels.items()}
+
+
+def _identity_labels(managed_service_id: str) -> dict[str, str]:
+    """The labels ownership decides on, from the spec only."""
+    return {
+        "astrolift-io-managed-by": "platform",
+        "astrolift-io-managed-service-id": _label_value(managed_service_id),
+        MANAGED_SERVICE_ID_LABEL: _label_value(managed_service_id),
+    }
+
+
+def _platform_last(base: dict[str, str], tenant: dict[str, str]) -> dict[str, str]:
+    """``base`` with ``tenant`` applied to its tenant keys only: platform labels always win (#2098)."""
+    merged = {key: value for key, value in base.items() if not is_platform_label_key(key)}
+    merged.update({key: value for key, value in tenant.items() if not is_platform_label_key(key)})
+    merged.update({key: value for key, value in base.items() if is_platform_label_key(key)})
+    return merged
 
 
 def _mapped_body(source: dict[str, Any], mapping: dict[str, str]) -> dict[str, Any]:

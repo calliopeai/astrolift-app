@@ -4,12 +4,11 @@ from django.db.models import Q
 
 from astrolift_identity.api_tokens import get_current_api_token, token_scope_allows_permission
 from astrolift_identity.models import Project, Team
+from astrolift_identity.permission_resolver import share_levels
 from astrolift_identity.scope_visibility import visible_apps, visible_projects, visible_teams
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
 from core.permissions import Permission, PermissionScope, ScopeKind, granted_scopes
 from core.tenancy import get_current_tenant
-
-_READ_PERMISSIONS = {Permission.AGENT_READ, Permission.APP_READ, Permission.AGENT_TASK_WATCH}
 
 
 def _shares(team_ids, permission):
@@ -21,8 +20,8 @@ def _shares(team_ids, permission):
 
 
 def _share_levels(permission):
-    levels = [AppTeamAccess.AccessLevel.DEPLOYER, AppTeamAccess.AccessLevel.OWNER]
-    return [AppTeamAccess.AccessLevel.VIEWER, *levels] if permission in _READ_PERMISSIONS else levels
+    # One rule for the lists here and the permission resolver (#2157).
+    return share_levels(permission)
 
 
 def _permitted_apps(qs, permission):
@@ -94,6 +93,19 @@ def workload_rows(org_id, permission):
 
 def agent_workloads(org_id, permission=Permission.AGENT_READ):
     return workload_rows(org_id, permission).filter(kind=Workload.Kind.AGENT)
+
+
+def dispatchable_agent_workloads(org_id):
+    """Agent workloads ``runAstroliftAgent`` would actually accept from the
+    caller (#2071): gated on ``agent.dispatch``, not the coarser
+    ``agent.read`` the plain agent list uses, through the same token
+    team/share ceiling every other org-scoped agent read applies, and
+    narrowed to the Task run family -- ``dispatch_registered_agent``
+    refuses a Service-family agent regardless of RBAC. A caller who can
+    read an agent but not dispatch it, or whose bearer token is scoped to
+    a team that does not hold the dispatch share, sees it absent here even
+    though ``agent_workloads`` still lists it."""
+    return agent_workloads(org_id, Permission.AGENT_DISPATCH).filter(run_family=Workload.RunFamily.TASK)
 
 
 def agent_by_slug(org_id, slug, permission):

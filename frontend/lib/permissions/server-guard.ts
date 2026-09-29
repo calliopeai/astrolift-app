@@ -1,10 +1,7 @@
 import { getClient } from "@/lib/apollo";
 import { GET_MY_PERMISSIONS } from "@/graphql/permissions/astrolift.queries";
 
-import {
-  type PermissionCheck,
-  permissionMatches,
-} from "./astrolift-permissions";
+import { type PermissionCheck, permissionMatches } from "./astrolift-permissions";
 
 interface MyPermissionsResp {
   astroliftMyPermissions: string[];
@@ -23,9 +20,7 @@ interface MyPermissionsResp {
  *     notFound();
  *   }
  */
-export async function viewerHasPermission(
-  check: PermissionCheck,
-): Promise<boolean> {
+export async function viewerHasPermission(check: PermissionCheck): Promise<boolean> {
   try {
     const client = await getClient();
     const { data } = await client.query<MyPermissionsResp>({

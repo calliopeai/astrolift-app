@@ -10,7 +10,15 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from strawberry.types import Info
 
-from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql import (
+    GUID,
+    PageType,
+    filter_q,
+    keyset_page,
+    numbered_page,
+    resolve_list_sort,
+    search_q,
+)
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_identity.scope_visibility import visible_apps
 from astrolift_lifecycle.models import (
@@ -24,6 +32,28 @@ from astrolift_lifecycle.models import (
     PreviewEnvironment,
     ScheduledJobRun,
     TaskRun,
+)
+from astrolift_lifecycle.schema.list_contract import (
+    COMMAND_RUNS_FILTERS,
+    DEPLOYMENTS_DEFAULT_SORT,
+    DEPLOYMENTS_FILTERS,
+    DEPLOYMENTS_SORT_FIELDS,
+    ENVIRONMENTS_DEFAULT_SORT,
+    ENVIRONMENTS_FILTERS,
+    ENVIRONMENTS_SORT_KEYS,
+    PREVIEW_FILTERS,
+    PREVIEW_SORT_FIELDS,
+    PREVIEWS_DEFAULT_SORT,
+    SCHEDULED_JOB_RUNS_FILTERS,
+    CommandRunsFilterInput,
+    DeploymentsListFilterInput,
+    EnvironmentsListFilterInput,
+    PreviewEnvironmentsFilterInput,
+    ScheduledJobRunsFilterInput,
+    annotate_deployments,
+    annotate_environments,
+    annotate_previews,
+    cursor_sort,
 )
 from astrolift_lifecycle.schema.types import (
     AgentRunType,
@@ -45,6 +75,7 @@ from astrolift_lifecycle.schema.types import (
     DeregisterPreviewType,
     ForceRedeployPreviewType,
     ManifestDiffEntryType,
+    PreviewEnvironmentCountsType,
     PreviewEnvironmentType,
     ReleaseNotesType,
     ScheduledJobRunType,
@@ -58,6 +89,7 @@ from astrolift_lifecycle.schema.types import (
     command_run_to_type,
     deploy_token_to_type,
     deployment_log_to_type,
+    deployment_status_reason,
     deployment_to_type,
     dns_record_to_type,
     identity_binding_to_type,
@@ -79,6 +111,7 @@ from core.cluster_observability import (
     ClusterObservabilityError,
     list_app_pods,
     namespace_for_app,
+    namespace_for_environment,
 )
 from core.decorators import tenant_scoped
 from core.permissions import Permission, check_platform_operator, require_permission
@@ -99,6 +132,12 @@ _APPROVAL_LIFECYCLE_ACTIONS = (
     "deployment.reject_by_token",
     "deployment.abort",
 )
+
+
+def _actor_user_id() -> int | None:
+    """The tenant's acting user, for callers with no request (token, test)."""
+    tenant = get_current_tenant()
+    return tenant.actor_user_id if tenant else None
 
 
 def _viewer_user_id(info: Info) -> int | None:
@@ -152,7 +191,8 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
 
     Extracted from ``astrolift_app_pods`` (#429) so the workload-
     detail breakdown resolver shares the exact same resolution rules
-    (env-named cluster preferred → default cluster, ``namespace_for_app``).
+    (env-named cluster and namespace preferred → default cluster and
+    ``namespace_for_app``).
     Returns an empty list on any kind of cluster-side failure so the
     UI stays renderable.
 
@@ -170,6 +210,7 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
         return []
 
     cluster = None
+    namespace = namespace_for_app(app)
     if environment_name:
         env = (
             AppEnvironment.objects.select_related("tenant_cluster")
@@ -181,12 +222,14 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
             .first()
         )
         cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+        if cluster is not None:
+            # The environment's own namespace when it has one (#1922).
+            namespace = namespace_for_environment(env)
     if cluster is None:
         cluster = app.default_tenant_cluster
     if cluster is None or not getattr(cluster, "is_active", True):
         return []
 
-    namespace = namespace_for_app(app)
     try:
         return list(
             list_app_pods(
@@ -276,6 +319,7 @@ def _recent_pod_warnings_for_app(
         return {}
 
     cluster = None
+    namespace = namespace_for_app(app)
     if environment_name:
         env = (
             AppEnvironment.objects.select_related("tenant_cluster")
@@ -287,12 +331,13 @@ def _recent_pod_warnings_for_app(
             .first()
         )
         cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
+        if cluster is not None:
+            namespace = namespace_for_environment(env)
     if cluster is None:
         cluster = app.default_tenant_cluster
     if cluster is None or not getattr(cluster, "is_active", True):
         return {}
 
-    namespace = namespace_for_app(app)
     from core.cluster_observability import (
         ClusterObservabilityError,
         list_app_pod_warning_events,
@@ -795,6 +840,59 @@ class LifecycleQuery:
             qs = qs.filter(registered_app__slug=app_slug)
         return [app_env_to_type(e) for e in qs[:300]]
 
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @tenant_scoped()
+    def astrolift_environments_page(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        search: str | None = None,
+        filter: EnvironmentsListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> PageType[AppEnvironmentType]:
+        """Environments on the list contract, numbered (spec 44 §5.1, #2155).
+
+        ``astroliftEnvironments`` caps at 300 with no filter or search. This
+        is the same org-scoped set of live environments, with ``filter``
+        (kind, app, cluster, region, owner), ``search`` over the name, the
+        app's slug and name and the cluster's slug and region, ``sort`` a
+        multi-key spec over name, app, kind, cluster, region and created
+        (default ``app,name``, the flat list's order), and an exact
+        filtered ``totalCount``. Fails closed (empty) without a tenant.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        qs = (
+            AppEnvironment.objects.select_related(
+                "registered_app", "tenant_cluster", "tenant_cluster__provider_plugin", "managed_domain"
+            )
+            .prefetch_related("settings")
+            .filter(registered_app__organization_id=org_id, registered_app__deleted_at__isnull=True)
+            if org_id is not None
+            else AppEnvironment.objects.none()
+        )
+        if app_slug:
+            qs = qs.filter(registered_app__slug=app_slug)
+        if search and search.strip():
+            qs = qs.filter(
+                search_q(
+                    search.strip(),
+                    "name",
+                    "registered_app__slug",
+                    "registered_app__name",
+                    "tenant_cluster__slug",
+                    "tenant_cluster__region",
+                )
+            )
+        qs = annotate_environments(qs).filter(
+            filter_q(filter, ENVIRONMENTS_FILTERS, me=tenant.actor_user_id if tenant else None)
+        )
+        order_by = resolve_list_sort(sort, ENVIRONMENTS_SORT_KEYS, default=ENVIRONMENTS_DEFAULT_SORT)
+        return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(app_env_to_type)
+
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage.")
     )
@@ -825,6 +923,8 @@ class LifecycleQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: DeploymentsListFilterInput | None = None,
+        sort: str | None = None,
     ) -> PageType[DeploymentType]:
         """Cursor-paginated deployment history (#1235).
 
@@ -842,8 +942,17 @@ class LifecycleQuery:
         ``status`` cannot express. Without them the surface has to fetch
         everything and split it client-side — which is exactly the
         capped-then-filtered pattern #1230 is removing.
+
+        The list contract (#2155): ``filter`` takes who started it
+        (``triggeredBy``, ``"me"`` is the viewer), the trigger kind and a
+        start-time window; ``sort`` is ``-created`` (the default), ``created``,
+        ``-started`` or ``started``, where started reads the creation time
+        for a deploy that has not started. Any other key is refused.
         """
-        page = keyset_page(
+        sort_field, descending, cursor_scope = cursor_sort(
+            sort, DEPLOYMENTS_SORT_FIELDS, default=DEPLOYMENTS_DEFAULT_SORT, list_name="deployments"
+        )
+        qs = annotate_deployments(
             _deployments_qs(
                 app_slug=app_slug,
                 environment_name=environment_name,
@@ -851,9 +960,15 @@ class LifecycleQuery:
                 statuses=statuses,
                 is_preview=is_preview,
                 search=search,
-            ),
+            )
+        ).filter(filter_q(filter, DEPLOYMENTS_FILTERS, me=_viewer_user_id(info) or _actor_user_id()))
+        page = keyset_page(
+            qs,
             cursor=after,
             limit=limit,
+            sort_field=sort_field,
+            descending=descending,
+            cursor_scope=cursor_scope,
         )
         viewer = _viewer_user_id(info)
         return page.map(lambda d: deployment_to_type(d, viewer_user_id=viewer))
@@ -1164,6 +1279,7 @@ class LifecycleQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: ScheduledJobRunsFilterInput | None = None,
     ) -> PageType[ScheduledJobRunType]:
         """Cursor-paginated cron-run history (#1235).
 
@@ -1177,6 +1293,9 @@ class LifecycleQuery:
         ``workload_slug`` narrows to one scheduled job, which is what a
         cronjob's own page shows (#1512). Pass ``app_slug`` with it:
         workload slugs are unique within an app, not across the org.
+
+        ``filter`` (#2155) takes the run status, the trigger (``scheduled``
+        or ``manual``) and who ran it now (``"me"`` is the viewer).
         """
         page = keyset_page(
             _scheduled_job_runs_qs(
@@ -1184,6 +1303,8 @@ class LifecycleQuery:
                 environment_name=environment_name,
                 workload_slug=workload_slug,
                 search=search,
+            ).filter(
+                filter_q(filter, SCHEDULED_JOB_RUNS_FILTERS, me=_viewer_user_id(info) or _actor_user_id())
             ),
             cursor=after,
             limit=limit,
@@ -1236,6 +1357,7 @@ class LifecycleQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: CommandRunsFilterInput | None = None,
     ) -> PageType[CommandRunType]:
         """Cursor-paginated ``astro app exec`` history (#1235).
 
@@ -1245,10 +1367,13 @@ class LifecycleQuery:
         when") is exactly the one that reaches back past the window.
 
         Seek key is ``(-created_at, -guid)``; ``search`` matches the app,
-        workload, and the operator who invoked the command.
+        workload, and the operator who invoked the command. ``filter``
+        (#2155) takes who ran it (``invokedBy``, ``"me"`` is the viewer).
         """
         page = keyset_page(
-            _command_runs_qs(app_slug=app_slug, search=search),
+            _command_runs_qs(app_slug=app_slug, search=search).filter(
+                filter_q(filter, COMMAND_RUNS_FILTERS, me=_viewer_user_id(info) or _actor_user_id())
+            ),
             cursor=after,
             limit=limit,
         )
@@ -1298,6 +1423,8 @@ class LifecycleQuery:
         statuses: list[str] | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: PreviewEnvironmentsFilterInput | None = None,
+        sort: str | None = None,
     ) -> PageType[PreviewEnvironmentType]:
         """Cursor-paginated preview environments (#1235).
 
@@ -1309,13 +1436,58 @@ class LifecycleQuery:
 
         Seek key is ``(-created_at, -guid)``; ``search`` matches the app,
         branch, hostname, commit, and status.
+
+        The list contract (#2155): ``filter`` takes the status, who opened
+        it (``"me"`` is the viewer) and manual-or-PR; ``sort`` is one of
+        ``created``, ``deployed`` (the last deploy, else creation) and
+        ``ttl``, either direction, default ``-created``. Rows carry who
+        opened them and, when failed, why; ``astroliftPreviewEnvironmentCounts``
+        has the per-status totals.
         """
+        sort_field, descending, cursor_scope = cursor_sort(
+            sort, PREVIEW_SORT_FIELDS, default=PREVIEWS_DEFAULT_SORT, list_name="previews"
+        )
+        qs = annotate_previews(
+            _preview_environments_qs(app_slug=app_slug, search=search, statuses=statuses)
+        ).filter(filter_q(filter, PREVIEW_FILTERS, me=_viewer_user_id(info) or _actor_user_id()))
         page = keyset_page(
-            _preview_environments_qs(app_slug=app_slug, search=search, statuses=statuses),
+            qs,
             cursor=after,
             limit=limit,
+            sort_field=sort_field,
+            descending=descending,
+            cursor_scope=cursor_scope,
         )
-        return page.map(_preview_with_cost)
+        reasons = _preview_deploy_failure_reasons(page.rows)
+        return page.map(lambda p: _preview_with_cost(p, failure_reason=reasons.get(p.pk)))
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @tenant_scoped()
+    def astrolift_preview_environment_counts(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        search: str | None = None,
+    ) -> PreviewEnvironmentCountsType:
+        """Previews per status over the page's app and search (#2155).
+
+        One aggregate over the same org-scoped set the page walks, before
+        any status filter, so the status pills can show their counts.
+        """
+        rows = dict(
+            _preview_environments_qs(app_slug=app_slug, search=search)
+            .order_by()
+            .values_list("status")
+            .annotate(n=Count("pk"))
+        )
+        return PreviewEnvironmentCountsType(
+            total=sum(rows.values()),
+            building=rows.get(PreviewEnvironment.Status.BUILDING.value, 0),
+            running=rows.get(PreviewEnvironment.Status.RUNNING.value, 0),
+            failed=rows.get(PreviewEnvironment.Status.FAILED.value, 0),
+            torn_down=rows.get(PreviewEnvironment.Status.TORN_DOWN.value, 0),
+        )
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)
@@ -1922,7 +2094,6 @@ class LifecycleQuery:
         )
         from astrolift_registry.models import Workload
         from astrolift_services.models import AppSecretBundleRef, ManagedService
-        from core.app_deploy import namespace_for_app
 
         # Org-scope the lookup to the caller's tenant — slugs are unique only
         # within an org, so an unscoped fetch would leak a sibling org's
@@ -1965,7 +2136,6 @@ class LifecycleQuery:
             names.append(app.slug)
             seen.add(app.slug)
 
-        namespace = namespace_for_app(app)
         # apiVersion / kind pairs the renderer emits for a typical app.
         # Same list the force-redeploy delete path targets so the preview
         # honestly reflects what gets deleted; the namespace cascade
@@ -1983,6 +2153,9 @@ class LifecycleQuery:
             cluster = env.tenant_cluster
             if cluster is None:
                 continue
+            # Each environment's own namespace when it has one (#1922),
+            # which is what teardown deletes.
+            namespace = namespace_for_environment(env)
             for api_version, kind in _RENDER_KINDS:
                 if kind == "Namespace":
                     k8s_objects.append(
@@ -2383,7 +2556,29 @@ class LifecycleQuery:
         return page.map(agent_run_to_type)
 
 
-def _preview_with_cost(p) -> PreviewEnvironmentType:
+def _preview_deploy_failure_reasons(previews) -> dict[int, str]:
+    """For failed previews that recorded no reason, their latest deployment's (#2155).
+
+    Rows from before ``failure_reason`` was kept, and failures the build
+    workflow did not describe, still say why when the deploy did. One query
+    per page, over the page's own environments.
+    """
+    wanted = {p.app_environment_id: p.pk for p in previews if p.status == "failed" and not p.failure_reason}
+    if not wanted:
+        return {}
+    latest = (
+        Deployment.objects.filter(app_environment_id__in=list(wanted), deleted_at__isnull=True)
+        .order_by("app_environment_id", "-created_at")
+        .distinct("app_environment_id")
+    )
+    return {
+        wanted[d.app_environment_id]: deployment_status_reason(d)
+        for d in latest
+        if d.status == Deployment.Status.FAILED
+    }
+
+
+def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnvironmentType:
     """Project a ``PreviewEnvironment`` row, attaching live pod-resource
     aggregates + a daily cost estimate from the cluster's provider
     plugin (#431).
@@ -2445,6 +2640,7 @@ def _preview_with_cost(p) -> PreviewEnvironmentType:
         estimated_daily_cost_usd=estimate.daily_usd if estimate else None,
         estimated_cost_notes=list(estimate.notes) if estimate else [],
         estimated_cost_approximate=bool(estimate and estimate.approximate),
+        failure_reason=failure_reason,
     )
 
 

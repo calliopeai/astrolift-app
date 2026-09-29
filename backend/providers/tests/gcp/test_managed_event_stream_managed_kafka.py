@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from gcp.managed.event_stream_managed_kafka import (
@@ -30,6 +31,7 @@ SPEC = ProvisionSpec(
     binding_id="binding-id",
     managed_service_id="managed-id",
 )
+MSID = SPEC.managed_service_id
 
 
 class FakeManagedKafka:
@@ -350,7 +352,7 @@ def test_binding_emits_portable_kafka_and_schema_registry_contract(
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
     binding = driver.binding(
-        ServiceHandle(result.handle),
+        ServiceHandle(result.handle, managed_service_id=MSID),
         {
             "schema_registry_id": "events_registry",
             "schema_registry_access": "write",
@@ -380,7 +382,7 @@ def test_binding_emits_only_the_mtls_secrets_the_config_supplies(driver: Managed
     absent slot has to stay absent rather than pick up a sibling's value.
     """
     result = driver.provision(replace(SPEC, config=_full_config()))
-    handle = ServiceHandle(result.handle)
+    handle = ServiceHandle(result.handle, managed_service_id=MSID)
 
     none_supplied = driver.binding(handle, {})
     assert not {"EVENT_STREAM_CLIENT_CERT", "EVENT_STREAM_CLIENT_KEY", "EVENT_STREAM_CA_CERT"} & set(
@@ -404,6 +406,7 @@ def test_update_scales_cluster_and_increases_topic_partitions(
     updated = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "vcpu_count": 12,
                 "memory_gib": 48,
@@ -435,12 +438,14 @@ def test_immutable_kms_and_replication_changes_are_rejected(driver: ManagedKafka
     kms = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={"kms_key": "projects/p/locations/us-central1/keyRings/r/cryptoKeys/other"},
         ),
     )
     replication = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "topics": [
                     {
@@ -471,6 +476,7 @@ def test_consumer_group_rewind_requires_explicit_consent(
     denied = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "consumer_group_offsets": [
                     {
@@ -485,6 +491,7 @@ def test_consumer_group_rewind_requires_explicit_consent(
     accepted = driver.update(
         UpdateSpec(
             result.handle,
+            managed_service_id=MSID,
             config={
                 "consumer_group_offsets": [
                     {
@@ -507,11 +514,11 @@ def test_connector_state_and_restart_controls_are_explicit(
     result = driver.provision(replace(SPEC, config=_full_config()))
     connect = _full_config()["connect_clusters"][0]
     connect["connectors"][0]["desired_state"] = "PAUSED"
-    assert driver.update(UpdateSpec(result.handle, config={"connect_clusters": [connect]})).ok
+    assert driver.update(UpdateSpec(result.handle, managed_service_id=MSID, config={"connect_clusters": [connect]})).ok
     connector_name = "projects/project-1/locations/us-central1/connectClusters/events-connect/connectors/warehouse-sink"
     assert client.resources[connector_name]["state"] == "PAUSED"
     restart = driver.restart_connector(
-        ServiceHandle(result.handle),
+        ServiceHandle(result.handle, managed_service_id=MSID),
         connect_cluster_id="events-connect",
         connector_id="warehouse-sink",
     )
@@ -521,19 +528,19 @@ def test_connector_state_and_restart_controls_are_explicit(
 
     with pytest.raises(ManagedKafkaError, match="Connect cluster ID"):
         driver.restart_connector(
-            ServiceHandle(result.handle),
+            ServiceHandle(result.handle, managed_service_id=MSID),
             connect_cluster_id="../other",
             connector_id="warehouse-sink",
         )
     with pytest.raises(ManagedKafkaError, match="connector ID"):
         driver.restart_connector(
-            ServiceHandle(result.handle),
+            ServiceHandle(result.handle, managed_service_id=MSID),
             connect_cluster_id="events-connect",
             connector_id="../other",
         )
 
 
-def test_schema_registry_collision_requires_adoption_or_reassignment(
+def test_schema_registry_collision_is_refused_without_operator_adoption(
     driver: ManagedKafkaDriver,
     client: FakeManagedKafka,
 ) -> None:
@@ -541,21 +548,68 @@ def test_schema_registry_collision_requires_adoption_or_reassignment(
     registry = f"{parent}/schemaRegistries/events_registry"
     client.resources[registry] = {"name": registry}
     denied = driver.provision(replace(SPEC, config=_full_config()))
-    assert not denied.ok and "not Astrolift-owned" in denied.message
-    adopted_cfg = _full_config()
-    adopted_cfg["schema_registries"][0]["adopt_existing"] = True
-    adopted = driver.provision(replace(SPEC, config=adopted_cfg))
-    assert adopted.ok
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    assert driver._registry_owner(registry) == ""
+
+    # The flags are gone entirely, on the cluster and on every registry and
+    # Connect declaration: the schema tenant config is validated against
+    # rejects them, and a driver handed one anyway still refuses (#2021).
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_full_config())
+    for flag in ("adopt_existing", "reassign_existing"):
+        assert not validator.is_valid({**_full_config(), flag: True})
+        for key in ("schema_registries", "connect_clusters"):
+            nested = _full_config()
+            nested[key][0][flag] = True
+            assert not validator.is_valid(nested)
+    flagged = _full_config()
+    flagged["schema_registries"][0]["adopt_existing"] = True
+    assert not driver.provision(replace(SPEC, config=flagged)).ok
+    assert driver._registry_owner(registry) == ""
+
+
+def test_existing_unowned_cluster_is_refused_without_operator_adoption(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    name = "projects/project-1/locations/us-central1/clusters/shared-events"
+    client.resources[name] = {"name": name, "state": "ACTIVE", "labels": {"owner": "customer"}}
+    denied = driver.provision(replace(SPEC, config=_full_config()))
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    assert client.resources[name]["labels"] == {"owner": "customer"}
+
+
+def test_another_services_cluster_and_registry_are_not_reassigned(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    assert driver.provision(replace(SPEC, config=_full_config())).ok
+    cluster = "projects/project-1/locations/us-central1/clusters/shared-events"
+    registry = "projects/project-1/locations/us-central1/schemaRegistries/events_registry"
     assert driver._registry_owner(registry) == "managed-id"
 
     other_spec = replace(SPEC, managed_service_id="other-id")
-    adopted_cfg.pop("connect_clusters")
-    reassignment_denied = driver.provision(replace(other_spec, config=adopted_cfg))
-    assert not reassignment_denied.ok and "another managed service" in reassignment_denied.message
-    adopted_cfg["schema_registries"][0]["reassign_existing"] = True
-    adopted_cfg["reassign_existing"] = True
-    assert driver.provision(replace(other_spec, config=adopted_cfg)).ok
-    assert driver._registry_owner(registry) == "other-id"
+    for reassign in (False, True):
+        cfg = _full_config()
+        if reassign:
+            cfg["reassign_existing"] = True
+            cfg["schema_registries"][0]["reassign_existing"] = True
+        refused = driver.provision(replace(other_spec, config=cfg))
+        assert not refused.ok
+        assert "another managed service" in refused.message
+    assert client.resources[cluster]["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+    assert driver._registry_owner(registry) == "managed-id"
+
+    # The registry refuses on its own marker, not only behind the cluster
+    # check: a second cluster naming the same registry is still turned away.
+    other_cluster = {k: v for k, v in _full_config().items() if k != "connect_clusters"}
+    other_cluster["cluster_id"] = "other-events"
+    refused = driver.provision(replace(other_spec, config=other_cluster))
+    assert not refused.ok
+    assert "schema registry events_registry belongs to another managed service" in refused.message
+    assert driver._registry_owner(registry) == "managed-id"
 
 
 def test_destructive_child_operations_require_specific_confirmation(driver: ManagedKafkaDriver) -> None:
@@ -581,10 +635,10 @@ def test_deprovision_requires_force_and_data_consent_and_blocks_external_connect
     client: FakeManagedKafka,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_full_config()))
-    protected = driver.deprovision(DeprovisionSpec(result.handle, _full_config()))
+    protected = driver.deprovision(DeprovisionSpec(result.handle, _full_config(), managed_service_id=MSID))
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     retained = driver.deprovision(
-        DeprovisionSpec(result.handle, {**_full_config(), "deletion_protection": False}),
+        DeprovisionSpec(result.handle, {**_full_config(), "deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
     assert not retained.ok and retained.errors == ["kafka_data_requires_delete_data"]
@@ -598,7 +652,7 @@ def test_deprovision_requires_force_and_data_consent_and_blocks_external_connect
         "labels": {"owner": "customer"},
     }
     blocked = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -607,6 +661,7 @@ def test_deprovision_requires_force_and_data_consent_and_blocks_external_connect
         DeprovisionSpec(
             result.handle,
             {"deletion_protection": False, "delete_external_dependents": True},
+            managed_service_id=MSID,
         ),
         delete_data=True,
         force_destroy=True,
@@ -619,7 +674,7 @@ def test_status_surfaces_failed_connector(driver: ManagedKafkaDriver, client: Fa
     result = driver.provision(replace(SPEC, config=_full_config()))
     connector = next(value for name, value in client.resources.items() if "/connectors/" in name)
     connector["state"] = "FAILED"
-    status = driver.status(ServiceHandle(result.handle))
+    status = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
     assert status.state == "error" and "FAILED" in status.message
 
 
@@ -917,3 +972,47 @@ def test_operation_error_is_not_reported_as_success(
     }
     with pytest.raises(ManagedKafkaError, match="quota exhausted"):
         driver._wait_operation({"name": "operations/wait", "done": False})
+
+
+def test_a_cluster_adopted_before_2074_keeps_its_marker_through_reprovision(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    """#2086: provision built the label map from the spec alone, so the next
+    one dropped the marker, and with it the ``delete_adopted`` guard."""
+    result = driver.provision(replace(SPEC, config=_full_config()))
+    parent = "projects/project-1/locations/us-central1"
+    cluster = f"{parent}/clusters/shared-events"
+    connect = f"{parent}/connectClusters/events-connect"
+    for name in (cluster, connect):
+        client.resources[name]["labels"]["astrolift-io-adopted"] = "true"
+
+    assert driver.provision(replace(SPEC, config=_full_config())).ok
+
+    assert client.resources[cluster]["labels"]["astrolift-io-adopted"] == "true"
+    assert client.resources[connect]["labels"]["astrolift-io-adopted"] == "true"
+    denied = driver.deprovision(
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
+        delete_data=True,
+        force_destroy=True,
+    )
+    assert not denied.ok and denied.errors == ["adopted_resource_guard"]
+
+
+def test_connect_clusters_do_not_inherit_an_adopted_clusters_marker(
+    driver: ManagedKafkaDriver,
+    client: FakeManagedKafka,
+) -> None:
+    config = {key: value for key, value in _full_config().items() if key != "connect_clusters"}
+    result = driver.provision(replace(SPEC, config=config))
+    parent = "projects/project-1/locations/us-central1"
+    client.resources[f"{parent}/clusters/shared-events"]["labels"]["astrolift-io-adopted"] = "true"
+
+    updated = driver.update(
+        UpdateSpec(
+            result.handle, managed_service_id=MSID, config={"connect_clusters": _full_config()["connect_clusters"]}
+        )
+    )
+
+    assert updated.ok
+    assert "astrolift-io-adopted" not in client.resources[f"{parent}/connectClusters/events-connect"]["labels"]

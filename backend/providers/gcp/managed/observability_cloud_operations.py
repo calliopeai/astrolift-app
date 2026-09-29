@@ -8,6 +8,8 @@ objects; Astrolift reserves only identity and ownership fields.
 
 from __future__ import annotations
 
+import hashlib
+import re
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
 from copy import deepcopy
@@ -32,6 +34,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from gcp._service_accounts import unlisted_service_account
 
 KIND = "observability"
 _LOGGING_ROOT = "https://logging.googleapis.com"
@@ -60,6 +63,14 @@ _CONFIG_KEYS = {
     "metric_descriptors",
     "services",
 }
+#: A declaration's ``adopt`` flag used to let tenant config take over an
+#: existing resource under a tenant-chosen id. Rejected rather than ignored.
+_ADOPT_REMOVED = (
+    "adopt is not accepted: adoption of an existing resource is a separate, operator-authorized "
+    "operation and cannot be granted by tenant config"
+)
+_MISSING_IDENTITY = "Cloud Operations needs the managed-service id to name the bundle it owns"
+_SERVICE_BUNDLE = re.compile(r".+--([0-9a-f]{12})")
 
 
 class CloudOperationsError(Exception):
@@ -83,6 +94,9 @@ class CloudOperationsConfig:
     request_timeout_seconds: float = 30
     operation_timeout_seconds: float = 900
     operation_poll_interval_seconds: float = 2
+    # Service accounts a log sink may write to its destination as, through
+    # custom_writer_identity. Empty refuses every one (#2087).
+    allowed_writer_identities: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -402,15 +416,28 @@ class CloudOperationsDriver(ManagedServiceDriver):
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cfg = spec.config or {}
-        error = _validate_config(cfg)
+        error = _validate_config(cfg, allowed_writer_identities=self._config.allowed_writer_identities) or (
+            "" if spec.managed_service_id else _MISSING_IDENTITY
+        )
         if error:
             return ProvisionResult(False, "", error, ["invalid_cloud_operations_config"])
-        bundle_id = _bundle_id(
-            str(cfg.get("name") or spec.service_handle_hint or spec.app_slug),
-            prefix=self._config.name_prefix,
-        )
+        name = str(cfg.get("name") or spec.service_handle_hint or spec.app_slug)
+        legacy = _bundle_id(name, prefix=self._config.name_prefix)
         location = str(cfg.get("location") or self._config.location)
+        if _recorded_bundle(spec.recorded_handle) == legacy:
+            # Named before #2086 and recorded that way: keep it, since its
+            # resources are named and marked after it.
+            bundle_id = legacy
+        else:
+            bundle_id = _service_bundle_id(
+                name,
+                prefix=self._config.name_prefix,
+                managed_service_id=spec.managed_service_id,
+            )
         handle = _handle_for(bundle_id, location)
+        refusal = _bundle_refusal(bundle_id, spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
+        if refusal:
+            return ProvisionResult(False, handle, refusal, ["resource_not_owned"])
         try:
             counts = self._reconcile(
                 bundle_id,
@@ -438,9 +465,12 @@ class CloudOperationsDriver(ManagedServiceDriver):
         except CloudOperationsError as exc:
             return UpdateResult(False, spec.handle, str(exc), ["invalid_handle"])
         cfg = spec.config or {}
-        error = _validate_config(cfg)
+        error = _validate_config(cfg, allowed_writer_identities=self._config.allowed_writer_identities)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_cloud_operations_config"])
+        refusal = _bundle_refusal(bundle_id, spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
+        if refusal:
+            return UpdateResult(False, spec.handle, refusal, ["resource_not_owned"], retryable=False)
         requested_location = str(cfg.get("location") or location)
         if requested_location != location:
             return UpdateResult(
@@ -478,6 +508,9 @@ class CloudOperationsDriver(ManagedServiceDriver):
             location, bundle_id = _parse_handle(spec.handle)
         except CloudOperationsError as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["invalid_handle"], retryable=False)
+        refusal = _bundle_refusal(bundle_id, spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
+        if refusal:
+            return DeprovisionResult(False, spec.handle, refusal, ["resource_not_owned"], retryable=False)
         protected = bool(
             spec.config.get(
                 "deletion_protection",
@@ -629,6 +662,9 @@ class CloudOperationsDriver(ManagedServiceDriver):
         config: dict[str, Any] | None = None,
     ) -> Binding:
         location, bundle_id = _parse_handle(handle.handle)
+        refusal = _bundle_refusal(bundle_id, handle.managed_service_id, record_proves=handle.recorded_handle_exclusive)
+        if refusal:
+            raise CloudOperationsError(refusal)
         cfg = config or {}
         inventory = self._inventory(bundle_id, location)
         bucket = next(iter(inventory[_BUCKET.key]), {})
@@ -704,7 +740,6 @@ class CloudOperationsDriver(ManagedServiceDriver):
                         ],
                     },
                 },
-                "adopt": {"type": "boolean", "default": False},
             },
         }
         return {
@@ -731,7 +766,6 @@ class CloudOperationsDriver(ManagedServiceDriver):
                                 "locked": {"type": "boolean"},
                                 "analytics_enabled": {"type": "boolean"},
                                 "body": {"type": "object"},
-                                "adopt": {"type": "boolean", "default": False},
                             },
                         },
                     ],
@@ -1172,11 +1206,15 @@ class CloudOperationsDriver(ManagedServiceDriver):
                 request_params=_request_params(resource, declaration),
             )
             return dict(created)
-        if not _is_owned(existing, bundle_id, resource_id) and not bool(
-            declaration.get("adopt", False),
-        ):
+        if not _is_owned(existing, bundle_id, resource_id):
+            # Declaration ids are tenant-chosen, so a deterministic name can
+            # land on an existing resource somebody else created in the same
+            # project. Adoption of an existing resource is a separate,
+            # operator-authorized operation (#1365) that no tenant config flag
+            # may grant (#2021).
             raise CloudOperationsError(
-                f"refusing to adopt existing {resource.key} {explicit_name!r}; set adopt=true explicitly",
+                f"refusing to adopt existing {resource.key} {explicit_name!r}; adoption is a separate, "
+                "operator-authorized operation and cannot be granted by tenant config",
             )
         if resource is _BUCKET and existing.get("locked"):
             changed = _changed_fields(existing, body)
@@ -1563,7 +1601,6 @@ def _bucket_declaration(
     return {
         "id": str(raw.get("id") or _resource_id(bundle_id, "logs")),
         "body": body,
-        "adopt": bool(raw.get("adopt", False)),
     }
 
 
@@ -1763,6 +1800,56 @@ def _bundle_id(value: str, *, prefix: str) -> str:
     return _resource_id(prefix, value)
 
 
+def _service_digest(managed_service_id: str) -> str:
+    return hashlib.sha256(managed_service_id.encode()).hexdigest()[:12]
+
+
+def _service_bundle_id(value: str, *, prefix: str, managed_service_id: str) -> str:
+    """The bundle id new bundles take (#2086).
+
+    Every ownership marker in a bundle keys on its id, and ``_bundle_id`` built
+    that id from the service's name alone, which the tenant chooses: two orgs'
+    services with one name shared a bundle, and each reconciled, bound and
+    pruned the other's resources. The digest of the managed-service id is always
+    kept, whatever the name, so no name yields another service's bundle. ``--``
+    sets it off: ``_resource_id`` collapses a double hyphen, so no bundle named
+    before #2086 has one, and a digest can never be mistaken for the tail of an
+    old name.
+    """
+    digest = _service_digest(managed_service_id)
+    return f"{_resource_id(prefix, value)[: 63 - len(digest) - 2].rstrip('-')}--{digest}"
+
+
+def _recorded_bundle(recorded_handle: str) -> str:
+    try:
+        return _parse_handle(recorded_handle)[1]
+    except CloudOperationsError:
+        return ""
+
+
+def _bundle_refusal(bundle_id: str, managed_service_id: str, *, record_proves: bool) -> str:
+    """Why a service may not act on ``bundle_id``, or ``""``.
+
+    A bundle id carrying a digest is decided by it alone. One named before
+    #2086 carries no identity at all, so only the platform's exclusive record of
+    the handle can say whose it is.
+    """
+    if not managed_service_id:
+        return _MISSING_IDENTITY
+    scoped = _SERVICE_BUNDLE.fullmatch(bundle_id)
+    if scoped:
+        if scoped.group(1) == _service_digest(managed_service_id):
+            return ""
+        return f"Cloud Operations bundle {bundle_id} belongs to another managed service"
+    if record_proves:
+        return ""
+    return (
+        f"Cloud Operations bundle {bundle_id} predates the managed-service identity in bundle ids, and no "
+        "exclusive platform record says it is this service's (another live service records it, or this one "
+        "does not); an operator must decide which service owns it"
+    )
+
+
 def _handle_for(bundle_id: str, location: str) -> str:
     return f"{KIND}/{location}/{bundle_id}"
 
@@ -1805,7 +1892,7 @@ def _secret_reference(reference: Any) -> tuple[str, str]:
     raise CloudOperationsError("notification channel secret reference must be a string or object")
 
 
-def _validate_config(cfg: Mapping[str, Any]) -> str:
+def _validate_config(cfg: Mapping[str, Any], *, allowed_writer_identities: Iterable[str] = ()) -> str:
     unknown = sorted(set(cfg) - _CONFIG_KEYS)
     if unknown:
         return "unsupported Cloud Operations config keys: " + ", ".join(unknown)
@@ -1824,6 +1911,8 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
     if not isinstance(bucket, (bool, Mapping)):
         return "config.log_bucket must be a boolean or object"
     if isinstance(bucket, Mapping):
+        if "adopt" in bucket:
+            return f"config.log_bucket: {_ADOPT_REMOVED}"
         body = bucket.get("body") or {}
         if not isinstance(body, Mapping):
             return "config.log_bucket.body must be an object"
@@ -1852,6 +1941,8 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
                 return f"config.{key}[{index}] must be an object"
             if any(str(field).startswith("_") for field in item):
                 return f"config.{key}[{index}] contains a reserved internal field"
+            if "adopt" in item:
+                return f"config.{key}[{index}]: {_ADOPT_REMOVED}"
             resource_id = str(item.get("id") or "")
             if not _valid_id(resource_id):
                 return f"config.{key}[{index}].id must match ^[a-z][a-z0-9-]{{0,62}}$"
@@ -1894,6 +1985,12 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
                     return f"config.{key}[{index}].custom_writer_identity cannot be empty"
                 if custom_writer is not None and unique_writer:
                     return f"config.{key}[{index}] custom_writer_identity requires unique_writer_identity=false"
+                writer = unlisted_service_account(custom_writer, allowed_writer_identities)
+                if writer:
+                    return (
+                        f"config.{key}[{index}].custom_writer_identity {writer!r} is not allowed by the cluster "
+                        "install policy cloud_operations_allowed_writer_identities"
+                    )
             if "[astrolift-observability bundle=" in str(body.get("description") or ""):
                 return f"config.{key}[{index}].body.description cannot contain ownership markers"
             if key == _GROUP.key and "[astrolift:" in str(body.get("displayName") or ""):
@@ -1966,6 +2063,8 @@ def _validate_config(cfg: Mapping[str, Any]) -> str:
                         return f"config.{key}[{index}].service_level_objectives[{child_index}] requires a valid id"
                     if str(child["id"]) in nested_ids:
                         return f"service {resource_id!r} contains duplicate SLO id {child['id']!r}"
+                    if "adopt" in child:
+                        return f"service {resource_id!r} SLO {child['id']!r}: {_ADOPT_REMOVED}"
                     nested_ids.add(str(child["id"]))
                     if not isinstance(child.get("body"), Mapping):
                         return f"service {resource_id!r} SLO {child['id']!r} body must be an object"

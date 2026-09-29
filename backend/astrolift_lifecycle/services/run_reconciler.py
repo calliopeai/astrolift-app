@@ -48,7 +48,7 @@ from django.utils import timezone
 
 from astrolift_lifecycle.models.jobs import ScheduledJobRun
 from astrolift_lifecycle.models.task_run import TaskRun
-from core.app_deploy import namespace_for_app
+from core.app_deploy import namespace_for_environment
 
 log = logging.getLogger(__name__)
 
@@ -200,8 +200,8 @@ def _reconcile_scheduled_run(run: ScheduledJobRun) -> str:
         log.info("run reconciler: ScheduledJobRun %s has no cluster; skipping", run.pk)
         return "skipped"
     # The row stores the exact namespace the CronJob was rendered into;
-    # fall back to the app's canonical namespace if it was never recorded.
-    namespace = run.namespace or namespace_for_app(env.registered_app)
+    # fall back to the environment's namespace if it was never recorded.
+    namespace = run.namespace or namespace_for_environment(env)
     if not namespace:
         return "skipped"
 
@@ -219,14 +219,14 @@ def _reconcile_task_run(run: TaskRun) -> str:
 
     TaskRun has no ``namespace`` column and its ``app_environment`` is
     nullable — with no environment there's no cluster to resolve, so we
-    skip. Namespace is the app's canonical deploy namespace (the same one
+    skip. Namespace is the environment's deploy namespace (the same one
     the runTask Job targets)."""
     env = run.app_environment
     cluster = getattr(env, "tenant_cluster", None) if env is not None else None
     if cluster is None:
         log.info("run reconciler: TaskRun %s has no environment/cluster; skipping", run.pk)
         return "skipped"
-    namespace = namespace_for_app(env.registered_app)
+    namespace = namespace_for_environment(env)
     if not namespace:
         return "skipped"
 

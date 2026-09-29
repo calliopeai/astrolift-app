@@ -27,7 +27,7 @@ from astrolift_operations import observability_retention
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from core import cluster_log_query
-from core.cluster_observability import namespace_for_app
+from core.cluster_observability import namespace_for_app_environment
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
@@ -258,7 +258,7 @@ class LogHistoryQuery:
             now=dt.datetime.now(dt.UTC),
         )
 
-        namespace = namespace_for_app(app)
+        namespace = namespace_for_app_environment(app, environment_name)
         try:
             page = cluster_log_query.query_app_logs(
                 cluster=cluster,

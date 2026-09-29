@@ -60,6 +60,8 @@ class Permission(enum.StrEnum):
     APP_READ_LOGS = "app.read_logs"
     APP_READ_METRICS = "app.read_metrics"
     APP_EXEC_POD = "app.exec_pod"
+    # Who may enter an app behind central auth (#2132).
+    APP_ACCESS = "app.access"
 
     # --- Secrets ---------------------------------------------------
     SECRET_READ = "secret.read"
@@ -109,6 +111,10 @@ class Permission(enum.StrEnum):
     CLUSTER_UPDATE = "cluster.update"
     CLUSTER_UNREGISTER = "cluster.unregister"
     CLUSTER_MANAGE = "cluster.manage"
+    # The users of the cluster's edge identity provider: list, create,
+    # disable, delete, reset password, groups (#2131). Not ``cluster.manage``:
+    # adding a login is a people decision, not an infrastructure one.
+    CLUSTER_USERS = "cluster.users"
     PROVIDER_PLUGIN_READ = "provider_plugin.read"
     PROVIDER_PLUGIN_CONFIGURE = "provider_plugin.configure"
 
@@ -281,7 +287,7 @@ _ADMIN_VIEW_SLUGS = (
 # Modules an org admin switches on per organization (#1859). The keys match
 # ``astrolift_identity.models.OrganizationModule.Key``; the org-side state
 # lives there because this module sits below the identity app.
-ORG_MODULE_KEYS = ("chat_studio_integration", "agent_live_attach")
+ORG_MODULE_KEYS = ("chat_studio_integration", "agent_live_attach", "chat_studio_agent_runs")
 
 
 def module_entitlements(
@@ -301,7 +307,7 @@ def module_entitlements(
     on for the active org (``astrolift_identity.org_modules.enabled_modules``).
     Returns one :class:`ModuleEntitlement` per module in a stable order:
     ``apps``, ``agents``, ``workflows``, ``admin``,
-    ``chat_studio_integration``, ``agent_live_attach``.
+    ``chat_studio_integration``, ``agent_live_attach``, ``chat_studio_agent_runs``.
 
     The mapping table is fixed (do not re-derive capability anywhere
     else):
@@ -316,12 +322,17 @@ def module_entitlements(
                                   OR staff/super   | org.manage_members
     ``chat_studio_integration``   app.read         app.create         app.update | app.delete       app.deploy
     ``agent_live_attach``         agent.read       (always false)     (always false)                agent_box.attach
+    ``chat_studio_agent_runs``    agent.read       (always false)     (always false)                agent.dispatch
     ============================  ===============  =================  ============================  ================
 
     ``chat_studio_integration`` mirrors ``apps`` because shipping from
-    Chat Studio creates and deploys apps. ``enabled`` is ``True`` for the
-    first four (install-wide) and, for the two per-org modules, whether
-    the key is in ``org_modules_enabled``.
+    Chat Studio creates and deploys apps. ``chat_studio_agent_runs`` mirrors
+    ``agent_live_attach`` -- both are Chat Studio entry points onto the
+    Agents module that never create or manage, only view + run -- it is
+    the capability calliope-chat-studio#694's ``astrolift_capability(...,
+    "chat_studio_agent_runs", can="run")`` reads. ``enabled`` is ``True``
+    for the first four (install-wide) and, for the three per-org modules,
+    whether the key is in ``org_modules_enabled``.
 
     One deliberate exception to "the mapping table is fixed": the
     ``AstroliftMe.modules`` resolver recomputes ``chat_studio_integration``'s
@@ -408,7 +419,23 @@ def module_entitlements(
         can_run=has("agent_box.attach"),
         enabled="agent_live_attach" in org_on,
     )
-    return [apps, agents, workflows, admin, chat_studio_integration, agent_live_attach]
+    chat_studio_agent_runs = ModuleEntitlement(
+        key="chat_studio_agent_runs",
+        can_view=has("agent.read"),
+        can_create=False,
+        can_manage=False,
+        can_run=has("agent.dispatch"),
+        enabled="chat_studio_agent_runs" in org_on,
+    )
+    return [
+        apps,
+        agents,
+        workflows,
+        admin,
+        chat_studio_integration,
+        agent_live_attach,
+        chat_studio_agent_runs,
+    ]
 
 
 class ScopeKind(enum.StrEnum):
@@ -480,9 +507,21 @@ class GrantedScopes:
     team_ids: frozenset[int]
     project_ids: frozenset[int]
     app_ids: frozenset[int]
+    # Scopes held by a non-inheriting grant (``RoleBinding.inherits=False``,
+    # #2157): the team or project row itself, never its projects or apps.
+    # A reader that ignores these under-grants, which is the safe side.
+    exact_team_ids: frozenset[int] = frozenset()
+    exact_project_ids: frozenset[int] = frozenset()
 
     def __bool__(self) -> bool:
-        return self.org or bool(self.team_ids) or bool(self.project_ids) or bool(self.app_ids)
+        return (
+            self.org
+            or bool(self.team_ids)
+            or bool(self.project_ids)
+            or bool(self.app_ids)
+            or bool(self.exact_team_ids)
+            or bool(self.exact_project_ids)
+        )
 
 
 NO_SCOPES = GrantedScopes(org=False, team_ids=frozenset(), project_ids=frozenset(), app_ids=frozenset())

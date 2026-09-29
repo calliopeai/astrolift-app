@@ -26,7 +26,7 @@ export function TagInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = suggestions.filter(
-    (s) => s.toLowerCase().includes(input.toLowerCase()) && !value.includes(s),
+    (s) => s.toLowerCase().includes(input.toLowerCase()) && !value.includes(s)
   );
 
   const addTag = (tag: string) => {
@@ -61,11 +61,11 @@ export function TagInput({
   return (
     <div className={`relative ${className || ""}`}>
       <div
-        className="flex min-h-[32px] flex-wrap items-center gap-1 rounded-md border px-2 py-1 text-xs focus-within:ring-1 focus-within:ring-ring"
+        className="focus-within:ring-ring flex min-h-[32px] flex-wrap items-center gap-1 rounded-md border px-2 py-1 text-xs focus-within:ring-1"
         onClick={() => !disabled && inputRef.current?.focus()}
       >
         {value.map((tag) => (
-          <Badge key={tag} variant="secondary" className="gap-1 py-0 text-2xs">
+          <Badge key={tag} variant="secondary" className="text-2xs gap-1 py-0">
             {tag}
             <button
               type="button"
@@ -74,7 +74,7 @@ export function TagInput({
                 e.stopPropagation();
                 removeTag(tag);
               }}
-              className="ml-0.5 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+              className="hover:bg-muted ml-0.5 rounded-full"
             >
               <XIcon className="h-2.5 w-2.5" />
             </button>
@@ -84,7 +84,7 @@ export function TagInput({
           ref={inputRef}
           type="text"
           disabled={disabled}
-          className="min-w-[80px] flex-1 border-none bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+          className="placeholder:text-muted-foreground min-w-[80px] flex-1 border-none bg-transparent text-xs outline-none"
           placeholder={value.length === 0 ? placeholder : ""}
           value={input}
           onChange={(e) => {
@@ -102,12 +102,12 @@ export function TagInput({
 
       {/* Suggestions dropdown */}
       {showSuggestions && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 max-h-32 w-full overflow-y-auto rounded-md border bg-white shadow-md dark:bg-gray-950">
+        <div className="bg-popover absolute z-50 mt-1 max-h-32 w-full overflow-y-auto rounded-md border shadow-md">
           {filtered.map((s) => (
             <button
               key={s}
               type="button"
-              className="block w-full px-3 py-1.5 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="hover:bg-muted block w-full px-3 py-1.5 text-left text-xs"
               onMouseDown={(e) => {
                 e.preventDefault();
                 addTag(s);

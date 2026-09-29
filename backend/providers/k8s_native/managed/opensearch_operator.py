@@ -43,6 +43,7 @@ from _sdk.managed_service import (
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
 SEARCH_KIND = "search"
 VECTOR_KIND = "vector_index"
@@ -785,6 +786,13 @@ class _OpenSearchOperatorDriver(ManagedServiceDriver):
         cfg.setdefault("affinity", {})
         cfg.setdefault("node_annotations", {})
         cfg.setdefault("image_pull_secrets", [])
+        # A pull secret is a registry credential; in a namespace shared between
+        # tenants its name can resolve to another tenant's (#1959, #2087).
+        refuse_shared_namespace_secrets(
+            self._config.namespace,
+            None,
+            extra=[str(name) for name in cfg["image_pull_secrets"] or []],
+        )
         cfg.setdefault("priority_class_name", "")
         cfg.setdefault("network_policy_mode", "managed_namespaces")
         cfg.setdefault("deletion_protection", True)

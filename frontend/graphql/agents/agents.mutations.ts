@@ -136,6 +136,27 @@ export const LAUNCH_TASK = gql`
   }
 `;
 
+// Run a finished agent task again with the same brief, environment spec,
+// inputs and timeout (#2155); the caller is recorded as the new run's
+// initiator. PRECONDITION for a live run, one with no registered agent, or
+// one whose brief was revoked.
+export const RETRY_AGENT_TASK = gql`
+  mutation RetryAgentTask($id: ID!) {
+    retryAgentTask(id: $id) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        status
+      }
+    }
+  }
+`;
+
 export const CANCEL_TASK = gql`
   mutation CancelTask($id: ID!) {
     cancelTask(id: $id) {

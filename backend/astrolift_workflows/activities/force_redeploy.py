@@ -209,7 +209,7 @@ def _delete_app_k8s_objects_sync(
     """
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_registry.models import RegisteredApp, Workload
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
 
     app = RegisteredApp.all_objects.select_related("organization").get(pk=app_id)
     envs_qs = AppEnvironment.objects.filter(
@@ -227,14 +227,18 @@ def _delete_app_k8s_objects_sync(
         ),
     )
     names = _candidate_names_for_app(app, workloads)
-    namespace = namespace_for_app(app)
 
     deleted = 0
     errors: list[str] = []
+    namespaces: list[str] = []
     for env in envs:
         cluster = env.tenant_cluster
         if cluster is None:
             continue
+        # Each environment's objects live in its own namespace when it has
+        # one (#1922), else in the app namespace.
+        namespace = namespace_for_environment(env)
+        namespaces.append(namespace)
         try:
             driver = _driver_for_cluster(cluster)
         except Exception as exc:  # noqa: BLE001 — log + continue
@@ -275,7 +279,7 @@ def _delete_app_k8s_objects_sync(
         deleted += max(0, len(stubs) - len(per_cluster_errors))
         for e in per_cluster_errors:
             errors.append(f"{cluster.slug}: {e}")
-    return {"deleted": deleted, "errors": errors, "namespace": namespace}
+    return {"deleted": deleted, "errors": errors, "namespaces": sorted(set(namespaces))}
 
 
 # ---------------------------------------------------------------------------

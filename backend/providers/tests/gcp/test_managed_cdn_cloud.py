@@ -406,7 +406,7 @@ def test_disabling_https_redirect_prunes_only_redirect_graph(
     assert set(fake.resources["urlMaps"]) == {"portal-cdn-map"}
 
 
-def test_unowned_mutable_resource_requires_adoption_and_is_marked(
+def test_unowned_mutable_resource_is_refused_without_operator_adoption(
     driver: CloudCdnDriver,
     fake: FakeCompute,
 ) -> None:
@@ -417,16 +417,37 @@ def test_unowned_mutable_resource_requires_adoption_and_is_marked(
         "enableCdn": True,
     }
     denied = driver.provision(spec())
-    adopted = driver.provision(spec(adopt_existing=True))
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
 
-    assert not denied.ok and "not owned" in denied.message
-    assert adopted.ok
-    assert fake.resources["backendBuckets"]["portal-cdn-bucket"]["description"] == marker(
-        adopted=True,
-    )
+    # The flag is gone entirely, not just ignored: adoption is operator-only
+    # and no tenant config reopens it (#2021).
+    rejected = driver.provision(spec(adopt_existing=True))
+    assert not rejected.ok
+    assert "unknown" in rejected.message
+    assert fake.resources["backendBuckets"]["portal-cdn-bucket"]["description"] == "legacy"
 
 
-def test_compatible_immutable_address_can_be_reused_but_is_not_claimed(
+def test_another_services_stack_resource_is_not_taken_over(
+    driver: CloudCdnDriver,
+    fake: FakeCompute,
+) -> None:
+    other = marker().replace("resource=service-id", "resource=other-service")
+    fake.resources["backendBuckets"]["portal-cdn-bucket"] = {
+        "name": "portal-cdn-bucket",
+        "description": other,
+        "bucketName": "other-assets",
+        "enableCdn": True,
+    }
+    denied = driver.provision(spec())
+    assert not denied.ok
+    assert "operator-authorized" in denied.message
+    bucket = fake.resources["backendBuckets"]["portal-cdn-bucket"]
+    assert bucket["description"] == other
+    assert bucket["bucketName"] == "other-assets"
+
+
+def test_foreign_immutable_address_is_refused_rather_than_reused(
     driver: CloudCdnDriver,
     fake: FakeCompute,
 ) -> None:
@@ -439,9 +460,11 @@ def test_compatible_immutable_address_can_be_reused_but_is_not_claimed(
         "address": "203.0.113.90",
         "selfLink": fake._self_link("addresses", "portal-cdn-ip"),
     }
-    result = driver.provision(spec(adopt_existing=True))
-    assert result.ok
+    result = driver.provision(spec())
+    assert not result.ok
+    assert "operator-authorized" in result.message
     assert fake.resources["addresses"]["portal-cdn-ip"]["description"] == "network-team"
+    assert fake.resources["forwardingRules"] == {}
 
 
 @pytest.mark.parametrize(
@@ -737,3 +760,21 @@ def test_provider_operation_error_surfaces_without_partial_success(
     fake.operation_error = {"errors": [{"code": "INVALID_FIELD", "message": "bad"}]}
     result = driver.provision(spec())
     assert not result.ok and "INVALID_FIELD" in result.message
+
+
+def test_a_resource_adopted_before_2074_keeps_its_marker_through_reprovision_and_update(
+    driver: CloudCdnDriver,
+    fake: FakeCompute,
+) -> None:
+    """#2086: ``_ensure_resource`` diffed every desired field, so the next
+    reconcile patched the description back to the plain marker and
+    ``delete_adopted_resources`` stopped guarding the resource."""
+    assert driver.provision(spec()).ok
+    fake.resources["urlMaps"]["portal-cdn-map"]["description"] = marker(adopted=True)
+
+    assert driver.provision(spec()).ok
+    assert driver.update(UpdateSpec("cdn/portal-cdn", config=spec().config)).ok
+
+    assert fake.resources["urlMaps"]["portal-cdn-map"]["description"] == marker(adopted=True)
+    blocked = driver.deprovision(DeprovisionSpec("cdn/portal-cdn", {"deletion_protection": False}))
+    assert not blocked.ok and "delete_adopted_resources=true" in blocked.message

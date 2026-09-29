@@ -197,7 +197,7 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
     Walks each ``AppEnvironment`` bound to ``cluster`` that carries a
     ManagedDomain (those are the envs whose deploys render a
     managed-subdomain Ingress), lists the Ingresses labelled
-    ``astrolift.dev/managed-subdomain=true`` in the app's namespace, and
+    ``astrolift.dev/managed-subdomain=true`` in the environment's namespace, and
     strategic-merge-patches the auth annotation keys onto each — adding
     them when ``cluster.alb_auth_config`` is set, removing them when it's
     null.
@@ -211,12 +211,20 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
         namespace doesn't abort the rest of the sweep.
     """
     from astrolift_lifecycle.models import AppEnvironment
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import _driver_for_cluster
 
     reconciled = 0
     skipped = 0
     errors: list[str] = []
+
+    if getattr(cluster, "ingress_class", None) == "envoy":
+        # The Envoy edge gates in one SecurityPolicy, rendered by the
+        # cluster's bootstrap recipe, not in per-Ingress annotations (#2055).
+        # A changed gate reaches it through installClusterPrereqs; stamping
+        # nginx keys here would only decorate the Ingresses apps are moving
+        # off.
+        return {"reconciled": 0, "skipped": 0, "errors": []}
 
     try:
         driver = _driver_for_cluster(cluster)
@@ -257,7 +265,7 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
     )
 
     for env in envs:
-        namespace = namespace_for_app(env.registered_app)
+        namespace = namespace_for_environment(env)
         try:
             listing = client.list_namespaced_ingress(
                 namespace,

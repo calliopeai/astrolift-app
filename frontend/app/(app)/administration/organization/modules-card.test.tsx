@@ -61,11 +61,13 @@ describe("ModulesCard", () => {
     state.modules = [
       moduleEntitlement("chat_studio_integration", true),
       moduleEntitlement("agent_live_attach", false),
+      moduleEntitlement("chat_studio_agent_runs", false),
     ];
     state.permissions = ["org.update"];
     state.featureFlags = [
       { key: "modules.chat_studio_integration_allowed", enabled: true },
       { key: "modules.agent_live_attach_allowed", enabled: false },
+      { key: "modules.chat_studio_agent_runs_allowed", enabled: true },
     ];
     state.setModule = vi.fn().mockResolvedValue({
       data: {
@@ -85,6 +87,10 @@ describe("ModulesCard", () => {
       screen.getByRole("switch", { name: /disable chat studio integration/i })
     ).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("switch", { name: /enable agent live attach/i })).toHaveAttribute(
+      "aria-checked",
+      "false"
+    );
+    expect(screen.getByRole("switch", { name: /enable chat studio agent runs/i })).toHaveAttribute(
       "aria-checked",
       "false"
     );

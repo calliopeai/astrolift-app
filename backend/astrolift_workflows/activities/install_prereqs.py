@@ -216,6 +216,19 @@ def _flux_crd_missing(errors: list) -> bool:
     return False
 
 
+def _operator_not_serving(errors: list) -> bool:
+    """A post-install object failed because its operator is not up yet.
+
+    Either its CRD is not registered, or the operator's admission webhook
+    has no ready endpoint. The chart that brings both was applied moments
+    ago, so an object sent while the controller is still starting is refused
+    the same way a CR sent before its CRD is. Kept apart from
+    ``_flux_crd_missing``, which decides whether to bootstrap Flux and must
+    not fire on a webhook error.
+    """
+    return _flux_crd_missing(errors) or any("failed calling webhook" in str(err).lower() for err in errors)
+
+
 def _ensure_flux_installed(driver, ctx_slug: str) -> None:
     """Fetch the pinned Flux install manifest and apply it to the cluster.
 
@@ -388,16 +401,16 @@ def _apply_post_install_manifests(
             )
             continue
 
-        if _flux_crd_missing(result.errors):
+        if _operator_not_serving(result.errors):
             crd_not_ready = True
             log.info(
-                "install_cluster_prereqs: post-install %s deferred — its "
-                "operator CRD isn't registered yet; Temporal will retry",
+                "install_cluster_prereqs: post-install %s deferred; its "
+                "operator isn't serving yet (CRD or webhook); Temporal will retry",
                 component.key,
             )
         for err in result.errors:
             errors.append(str(err))
-            if not _flux_crd_missing([err]):
+            if not _operator_not_serving([err]):
                 log.warning(
                     "install_cluster_prereqs: post-install %s manifest error " "(non-fatal): %s",
                     component.key,
@@ -558,10 +571,113 @@ _LEGACY_HELM_REPO_NAMES: frozenset[str] = frozenset(
 )
 
 
+def _without_secrets(text: str, secrets: list[str]) -> str:
+    """``text`` with each secret masked, raw and base64-encoded.
+
+    Apply errors carry the apiserver's reply verbatim, and they end up in
+    the run's error message, which operators read.
+    """
+    import base64
+
+    for secret in secrets:
+        if not secret:
+            continue
+        for form in (secret, base64.b64encode(secret.encode("utf-8")).decode("ascii")):
+            text = text.replace(form, "***REDACTED***")
+    return text
+
+
+def _apply_edge_oidc_secret(driver: Any, ctx_slug: str, cluster: Any, selected_set: set[str]) -> None:
+    """Write the edge's OIDC client Secret from the cluster row (#2055).
+
+    Envoy's SecurityPolicy references the client secret by name. Built here,
+    at apply time, rather than in the recipe, which operators read over
+    GraphQL, and written with its namespace before the releases, so the
+    policy never renders against a missing Secret. When the row carries no
+    ``client_secret`` an existing Secret is kept (the platform does not own
+    it); the run refuses only when the gate is configured and neither exists.
+    No log line or error carries the secret.
+    """
+    from providers.k8s_native.edge_gateway import (
+        EDGE_COMPONENT_KEY,
+        EDGE_NAMESPACE,
+        EDGE_OIDC_SECRET_NAME,
+        edge_configured,
+        edge_oidc_secret_manifest,
+    )
+
+    if EDGE_COMPONENT_KEY not in selected_set:
+        return
+    from core.app_deploy import AppDeployError
+
+    config = getattr(cluster, "oidc_auth_config", None) or {}
+    manifest = edge_oidc_secret_manifest(config)
+    if manifest is None:
+        if (
+            edge_configured(config)
+            and driver.get_manifest(ctx_slug, EDGE_NAMESPACE, "Secret", EDGE_OIDC_SECRET_NAME) is None
+        ):
+            raise AppDeployError(
+                f"the Envoy edge reads Secret {EDGE_OIDC_SECRET_NAME} in {EDGE_NAMESPACE}, which does not "
+                "exist, and the cluster's oidcAuthConfig has no client_secret to write it from. Set it "
+                "with updateTenantCluster, then run the install again.",
+            )
+        return
+    namespace = {
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {"name": EDGE_NAMESPACE, "labels": {"astrolift.io/managed-by": "platform"}},
+    }
+    result = driver.apply_manifests(ctx_slug, EDGE_NAMESPACE, [namespace, manifest])
+    if not result.ok:
+        raise AppDeployError(
+            f"could not write Secret {EDGE_OIDC_SECRET_NAME} in {EDGE_NAMESPACE}: "
+            + _without_secrets(
+                "; ".join(str(e) for e in result.errors), [str(config.get("client_secret") or "")]
+            ),
+        )
+    log.info(
+        "install_cluster_prereqs: edge OIDC Secret %s/%s created=%d updated=%d unchanged=%d",
+        EDGE_NAMESPACE,
+        EDGE_OIDC_SECRET_NAME,
+        len(result.created),
+        len(result.updated),
+        len(result.unchanged),
+    )
+
+
+def _edge_controllers_for_additive_run(
+    cluster: Any, components: list[Any], selected_set: set[str]
+) -> set[str]:
+    """The controllers the control plane's own edge install brings along (#2130).
+
+    Probed live, not read from the stored capabilities: on a fresh cluster the
+    probe may never have run, and guessing "absent" there would install a
+    second copy of a controller someone put in by hand. A probe that fails
+    raises, so Temporal retries rather than the run going ahead blind.
+    """
+    from astrolift_clusters.edge_install import edge_controllers_to_add
+    from core.cluster_management import probe_cluster_capabilities_dispatch
+    from providers.k8s_native.edge_gateway import EDGE_COMPONENT_KEY
+
+    if EDGE_COMPONENT_KEY not in selected_set:
+        return set()
+    recipe_keys = {c.key for c in components}
+    capabilities = probe_cluster_capabilities_dispatch(cluster=cluster)
+    added = edge_controllers_to_add(recipe_keys, capabilities)
+    if added:
+        log.info(
+            "install_cluster_prereqs: the edge install adds %s, which the cluster does not run",
+            sorted(added),
+        )
+    return added
+
+
 def _install_cluster_prereqs_sync(
     cluster_id: int,
     selected_keys: list[str],
     option_overrides: dict[str, dict[str, str]],
+    additive: bool = False,
 ) -> dict[str, Any]:
     from astrolift_clusters.models import TenantCluster
     from core.app_deploy import AppDeployError
@@ -580,6 +696,9 @@ def _install_cluster_prereqs_sync(
     components = bootstrap_components_dispatch(cluster=cluster)
     selected_set = set(selected_keys)
     target_namespace = "astrolift-system"
+
+    if additive:
+        selected_set |= _edge_controllers_for_additive_run(cluster, components, selected_set)
 
     # Self-provision the AWS controllers' IRSA roles before their HelmReleases
     # land, so each controller can assume its role as soon as its pods start
@@ -610,6 +729,14 @@ def _install_cluster_prereqs_sync(
         component_key=_S3_CSI_COMPONENT_KEY,
         mint_method="provision_s3_csi_role",
     )
+
+    _apply_edge_oidc_secret(driver, ctx.slug, cluster, selected_set)
+
+    # The releases this run renders. The stale cleanup below deletes every
+    # other recipe release, so a dependsOn naming one can never be met and
+    # Flux holds the dependent forever: the Dex a Cognito-backed auth host
+    # never uses, or a controller the cluster runs outside Flux.
+    rendered_release_keys = {c.key for c in components if c.key in selected_set and c.chart_repo_url}
 
     resources: list[dict[str, Any]] = []
     applied: list[dict[str, str]] = []
@@ -665,6 +792,7 @@ def _install_cluster_prereqs_sync(
         merged_values = _merge_helm_values(component.helm_values, component_options)
         merged_values = _apply_semantic_options(component.key, merged_values, component_options)
         _assert_storage_class_preflight(driver, ctx.slug, component.key, component_options)
+        depends_on = [dep for dep in component.depends_on if dep in rendered_release_keys]
 
         # Slug the repo URL into a valid K8s resource name:
         # strip scheme, replace non-alphanumeric with '-', truncate to 52 chars
@@ -730,10 +858,10 @@ def _install_cluster_prereqs_sync(
                                 "name": f"astrolift-{dep.replace('_', '-')}",
                                 "namespace": target_namespace,
                             }
-                            for dep in component.depends_on
+                            for dep in depends_on
                         ]
                     }
-                    if component.depends_on
+                    if depends_on
                     else {}
                 ),
             },
@@ -783,6 +911,8 @@ def _install_cluster_prereqs_sync(
     # desired state for selected components.
     deleted: list[str] = []
 
+    # An additive run applies its selection and removes nothing: the other
+    # recipe releases were not deselected, just not part of this run (#2130).
     # Deselected components that had charts (skipped components without
     # chart_repo_url never emitted a HelmRelease, so nothing to delete).
     deselected_releases = [
@@ -809,7 +939,7 @@ def _install_cluster_prereqs_sync(
         for name in to_delete_repos
     ]
 
-    if stale_manifests:
+    if stale_manifests and not additive:
         try:
             del_result = driver.delete_manifests(ctx.slug, target_namespace, stale_manifests)
             deleted = list(del_result.deleted)
@@ -861,8 +991,25 @@ def _install_cluster_prereqs_sync(
             non_retryable=False,
         )
 
+    # What the bootstrap-run row records as the recipe's set. An additive run
+    # added to the recipe rather than replacing it, so it records what it
+    # applied on top of what the last run left. Recording only its own
+    # releases would make the next operator run read every other recipe
+    # release as running outside the recipe, leave it unchecked, and delete it.
+    recorded = applied
+    if additive:
+        from astrolift_clusters.recipe_detection import components_installed_by_recipe
+
+        mine = {a["name"] for a in applied}
+        recorded = applied + [
+            {"name": key, "version": ""}
+            for key in sorted(components_installed_by_recipe(cluster))
+            if key not in mine
+        ]
+
     return {
         "applied": applied,
+        "recorded": recorded,
         "skipped": skipped,
         "deleted": deleted,
         "namespace": target_namespace,
@@ -961,6 +1108,7 @@ async def install_cluster_prereqs(
     cluster_id: int,
     selected_keys: list[str],
     option_overrides: dict[str, dict[str, str]],
+    additive: bool = False,
 ) -> dict[str, Any]:
     """Apply Flux ``HelmRelease`` CRDs for each selected bootstrap
     component to the cluster. Idempotent — re-run converges; an
@@ -978,6 +1126,7 @@ async def install_cluster_prereqs(
         cluster_id,
         selected_keys,
         option_overrides,
+        additive,
     )
     log.info(
         "install_cluster_prereqs applied=%d skipped=%d",

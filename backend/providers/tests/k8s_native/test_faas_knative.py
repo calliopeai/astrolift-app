@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from astrolift_drivers.registry import PluginManifest, plugins
+from jsonschema import Draft202012Validator
 
 from _sdk import UnsupportedOperationError
 from _sdk.cluster_capabilities import ClusterCapabilities
@@ -149,6 +150,25 @@ def test_public_route_requires_install_policy() -> None:
     assert "networking.knative.dev/visibility" not in _manifest(cluster)["metadata"]["labels"]
 
 
+def test_a_shared_namespace_runs_only_listed_service_accounts() -> None:
+    # In a namespace shared between tenants a ServiceAccount name can resolve
+    # to another tenant's account and the cloud identity annotated on it (#2087).
+    shared, shared_cluster = _driver(namespace="functions")
+    listed, listed_cluster = _driver(namespace="functions", allowed_service_accounts=("functions-runner",))
+    own, own_cluster = _driver()
+
+    refused = shared.provision(_spec(service_account_name="other-tenant-runner"))
+    accepted = listed.provision(_spec(service_account_name="functions-runner"))
+    per_app = own.provision(_spec(service_account_name="triage-function"))
+
+    assert refused.ok is False and "knative_allowed_service_accounts" in refused.message
+    assert shared_cluster.applied == []
+    assert accepted.ok is True
+    assert _manifest(listed_cluster)["spec"]["template"]["spec"]["serviceAccountName"] == "functions-runner"
+    assert per_app.ok is True
+    assert _manifest(own_cluster)["spec"]["template"]["spec"]["serviceAccountName"] == "triage-function"
+
+
 def test_tagged_image_requires_install_policy() -> None:
     denied, _ = _driver()
     allowed, _ = _driver(allow_tagged_images=True)
@@ -226,25 +246,31 @@ def test_invalid_runtime_config_fails_before_cluster_mutation(config: dict[str, 
     assert cluster.applied == []
 
 
-def test_existing_resource_requires_matching_owner_or_explicit_uid_adoption() -> None:
+def test_existing_resource_is_refused_even_with_its_exact_uid() -> None:
     driver, cluster = _driver()
     key = (
         f"{API_VERSION}/Service",
         "steady-md-triage",
         "triage-prod-intake-function",
     )
-    cluster.objects[key] = {
-        "metadata": {"uid": "uid-1", "labels": {"app.kubernetes.io/managed-by": "someone-else"}},
-    }
+    foreign = {"metadata": {"uid": "uid-1", "labels": {"app.kubernetes.io/managed-by": "someone-else"}}}
+    cluster.objects[key] = foreign
 
     refused = driver.provision(_spec())
-    wrong_uid = driver.provision(_spec(adopt_existing=True, expected_existing_uid="wrong"))
-    adopted = driver.provision(_spec(adopt_existing=True, expected_existing_uid="uid-1"))
-
     assert refused.ok is False
-    assert wrong_uid.ok is False
-    assert adopted.ok is True
-    assert _manifest(cluster)["metadata"]["labels"]["astrolift.io/managed-service-id"] == "service-1"
+    assert "operator-authorized" in refused.message
+
+    # Knowing the uid proved only that the caller could see the object.
+    # Adoption is operator-only (#2021): the schema tenant config is validated
+    # against rejects the flags, and a driver handed them anyway still refuses.
+    validator = Draft202012Validator(driver.config_schema())
+    assert validator.is_valid(_spec().config)
+    assert not validator.is_valid({**_spec().config, "adopt_existing": True})
+    assert not validator.is_valid({**_spec().config, "expected_existing_uid": "uid-1"})
+    flagged = driver.provision(_spec(adopt_existing=True, expected_existing_uid="uid-1"))
+    assert flagged.ok is False
+    assert cluster.objects[key] is foreign
+    assert cluster.applied == []
 
 
 def test_reprovision_reconciles_resource_owned_by_same_managed_service() -> None:
@@ -261,12 +287,7 @@ def test_reprovision_never_adopts_another_astrolift_managed_resource() -> None:
     driver, _ = _driver()
     assert driver.provision(_spec()).ok is True
 
-    result = driver.provision(
-        replace(
-            _spec(adopt_existing=True, expected_existing_uid=""),
-            managed_service_id="service-2",
-        ),
-    )
+    result = driver.provision(replace(_spec(), managed_service_id="service-2"))
 
     assert result.ok is False
     assert "another Astrolift managed resource" in result.message

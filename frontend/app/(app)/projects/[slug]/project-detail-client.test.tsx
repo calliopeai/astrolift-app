@@ -211,7 +211,11 @@ describe("ProjectDetailClient workload-aware overview", () => {
 
     expect(screen.getByText("Agent project")).toBeInTheDocument();
     expect(screen.getByText("Agents in this project")).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "Agents in this project" })).toBeInTheDocument();
+    // An overview summarises its lists (list rule 3): the agents' top rows and View all.
+    expect(screen.getByRole("link", { name: /view all/i })).toHaveAttribute(
+      "href",
+      `/agents?project=${encodeURIComponent(project.slug)}`
+    );
     expect(screen.getByText("Registered agents")).toBeInTheDocument();
     expect(screen.getByText("Active agent runs")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /project resources/i })).toHaveAttribute(

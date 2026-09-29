@@ -23,7 +23,7 @@ from typing import Any
 
 from django.db.models import Q
 
-from core.permissions import Permission, PermissionScope, ScopeKind, granted_scopes
+from core.permissions import Permission, PermissionScope, ScopeKind, granted_scopes, is_platform_operator
 from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
@@ -271,3 +271,29 @@ def visible_runs(qs, org_id: int | None, permission: Permission):
         Q(registered_app_id__in=apps.values("pk"))
         | Q(registered_app__isnull=True, workflow_definition__project_id__in=projects)
     )
+
+
+def may_decide_human_gate(user, approvers: list | None) -> bool:
+    """Whether ``user`` may decide a ``human_gate`` whose stage names *approvers*.
+
+    Shared by the ``human_gate_decision`` signal path (mutations.py
+    ``_gate_approver_refusal``) and the org-wide pending-gates list, so
+    "who may decide this gate" cannot drift between deciding one and
+    listing them (#1820).
+
+    The platform operator may always decide. ``approvers`` holds opaque
+    references (team / role slugs, or addresses). When it names at least
+    one address, only a caller whose own email matches one may decide;
+    slug references are not resolved to real identities (no team
+    membership model backs them, #1982), so a stage naming only slugs --
+    or none -- defers entirely to whether the caller holds
+    ``workflow.trigger`` at the run's own scope, which the caller has
+    already checked by the time this runs.
+    """
+    if is_platform_operator(user):
+        return True
+    addresses = {a.strip().casefold() for a in (approvers or []) if isinstance(a, str) and "@" in a}
+    if not addresses:
+        return True
+    email = (getattr(user, "email", "") or "").strip().casefold()
+    return bool(email) and email in addresses

@@ -585,6 +585,11 @@ CONSTANCE_CONFIG = {
         "Organizations may turn on live attach to running agents. Off forces the module "
         "off for every organization.",
     ),
+    "CHAT_STUDIO_AGENT_RUNS_ALLOWED": (
+        True,
+        "Organizations may turn on launching registered Astrolift agents from Chat Studio "
+        "(calliope-chat-studio#686). Off forces the module off for every organization.",
+    ),
     "WEBHOOK_SECRET_ROTATION_GRACE_SECONDS": (
         3600,
         "Window (in seconds) the previous webhook subscription secret stays valid after a "
@@ -810,7 +815,11 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "collapse": False,
     },
     "Organization modules": {
-        "fields": ("CHAT_STUDIO_INTEGRATION_ALLOWED", "AGENT_LIVE_ATTACH_ALLOWED"),
+        "fields": (
+            "CHAT_STUDIO_INTEGRATION_ALLOWED",
+            "AGENT_LIVE_ATTACH_ALLOWED",
+            "CHAT_STUDIO_AGENT_RUNS_ALLOWED",
+        ),
         "collapse": False,
     },
     "Log exports": {

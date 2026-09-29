@@ -96,6 +96,11 @@ class RDSSqlServerConfig(CredentialedConfig):
     multi_az_default: bool = False
     deletion_protection_default: bool = True
     secrets_manager_prefix: str = "astrolift/managed"
+    # Option groups an instance may join. One can carry the IAM role SQL
+    # Server's native backup and restore reads S3 with, or an audit bucket it
+    # writes to, so an unlisted group is refused; empty refuses every one
+    # (#2087).
+    allowed_option_groups: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.engine not in _ENGINES:
@@ -127,6 +132,9 @@ class RDSSqlServerDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
+        refusal = self._option_group_refusal(spec.config or {})
+        if refusal:
+            return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
         instance_id = self._instance_id(spec)
         existing = self._describe(instance_id)
         if existing is not None:
@@ -215,6 +223,9 @@ class RDSSqlServerDriver(ManagedServiceDriver):
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, instance_id = parse_handle(spec.handle)
         cfg = spec.config or {}
+        refusal = self._option_group_refusal(cfg)
+        if refusal:
+            return UpdateResult(ok=False, handle=spec.handle, message=refusal, errors=[refusal])
         kwargs: dict[str, Any] = {
             "DBInstanceIdentifier": instance_id,
             "ApplyImmediately": bool(cfg.get("apply_immediately", False)),
@@ -525,6 +536,14 @@ class RDSSqlServerDriver(ManagedServiceDriver):
                 "set config.instance_class explicitly from describe-orderable-db-instance-options",
             )
         return selected
+
+    def _option_group_refusal(self, cfg: dict[str, Any]) -> str:
+        group = str(cfg.get("option_group") or "").strip()
+        if not group or group.casefold() in {
+            str(item).strip().casefold() for item in self._config.allowed_option_groups
+        }:
+            return ""
+        return f"option_group {group!r} is not allowed by the cluster install policy mssql_allowed_option_groups"
 
     def _instance_id(self, spec: ProvisionSpec) -> str:
         raw = "-".join(

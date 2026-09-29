@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+from copy import deepcopy
+from dataclasses import dataclass, replace
 from typing import Any
 
 import pytest
@@ -106,11 +108,15 @@ class FakeCloudOperationsClient:
         self.resources.setdefault(key, {})[str(item["name"])] = dict(item)
 
 
+_LISTED_WRITER = "logging@example.iam.gserviceaccount.com"
+
+
 def _driver(
     *,
     logging: FakeCloudOperationsClient | None = None,
     monitoring: FakeCloudOperationsClient | None = None,
     secret_reader: Any | None = None,
+    allowed_writer_identities: tuple[str, ...] = (_LISTED_WRITER,),
 ) -> tuple[CloudOperationsDriver, FakeCloudOperationsClient, FakeCloudOperationsClient]:
     logging = logging or FakeCloudOperationsClient()
     monitoring = monitoring or FakeCloudOperationsClient()
@@ -120,6 +126,7 @@ def _driver(
                 project_id="acme-prod",
                 location="global",
                 request_timeout_seconds=1,
+                allowed_writer_identities=allowed_writer_identities,
             ),
             logging_client=logging,
             monitoring_client=monitoring,
@@ -128,6 +135,13 @@ def _driver(
         logging,
         monitoring,
     )
+
+
+MSID = "managed-1"
+
+
+def _digest(managed_service_id: str) -> str:
+    return hashlib.sha256(managed_service_id.encode()).hexdigest()[:12]
 
 
 def _spec(config: dict[str, Any] | None = None) -> ProvisionSpec:
@@ -143,7 +157,7 @@ def _spec(config: dict[str, Any] | None = None) -> ProvisionSpec:
         size="small",
         config=config or {},
         binding_id="binding-1",
-        managed_service_id="managed-1",
+        managed_service_id=MSID,
     )
 
 
@@ -279,7 +293,7 @@ def test_full_bundle_reconciles_all_logging_and_monitoring_resources() -> None:
 
     assert result.ok is True
     assert result.ready is True
-    assert result.handle == "observability/global/astrolift-observability-operations"
+    assert result.handle == f"observability/global/astrolift-observability-operations--{_digest(MSID)}"
     assert "17 resources" in result.message
     channel = next(iter(monitoring.resources["notification_channels"].values()))
     assert channel["labels"]["service_key"] == "secret-routing-key"
@@ -332,6 +346,7 @@ def test_update_reconciles_mutable_provider_native_fields() -> None:
 
     result = driver.update(
         UpdateSpec(
+            managed_service_id=MSID,
             handle=first.handle,
             config={
                 "deletion_protection": False,
@@ -356,6 +371,7 @@ def test_logging_location_is_immutable_and_carried_by_handle() -> None:
 
     result = driver.update(
         UpdateSpec(
+            managed_service_id=MSID,
             handle=first.handle,
             config={"location": "europe-west1", "deletion_protection": False},
         ),
@@ -388,6 +404,62 @@ def test_log_sink_writer_identity_options_reconcile_through_api_query_params() -
     }
     sink = next(iter(logging.resources["log_sinks"].values()))
     assert sink["writerIdentity"] == "serviceAccount:logging@example.iam.gserviceaccount.com"
+
+
+@pytest.mark.parametrize(
+    ("writer", "allowed"),
+    [
+        ("serviceAccount:platform-admin@example.iam.gserviceaccount.com", (_LISTED_WRITER,)),
+        ("platform-admin@example.iam.gserviceaccount.com", (_LISTED_WRITER,)),
+        (f"serviceAccount:{_LISTED_WRITER}", ()),
+    ],
+)
+def test_a_sink_cannot_write_as_an_unlisted_identity(writer: str, allowed: tuple[str, ...]) -> None:
+    driver, logging, _ = _driver(allowed_writer_identities=allowed)
+    config = {
+        "log_sinks": [
+            {
+                "id": "audit",
+                "body": {"destination": "storage.googleapis.com/audit-logs"},
+                "unique_writer_identity": False,
+                "custom_writer_identity": writer,
+            },
+        ],
+    }
+
+    result = driver.provision(_spec(config))
+
+    assert result.ok is False
+    assert "cloud_operations_allowed_writer_identities" in result.message
+    assert not [call for call in logging.calls if call[0] in {"create", "update"}]
+
+
+def test_update_cannot_move_a_sink_to_an_unlisted_writer() -> None:
+    driver, logging, _ = _driver()
+    sink = {
+        "id": "audit",
+        "body": {"destination": "storage.googleapis.com/audit-logs"},
+        "unique_writer_identity": False,
+        "custom_writer_identity": f"serviceAccount:{_LISTED_WRITER}",
+    }
+    created = driver.provision(_spec({"log_sinks": [sink]}))
+    assert created.ok, created.message
+    writes = [call for call in logging.calls if call[0] in {"create", "update"}]
+
+    denied = driver.update(
+        UpdateSpec(
+            created.handle,
+            config={
+                "log_sinks": [
+                    {**sink, "custom_writer_identity": "serviceAccount:platform-admin@example.iam.gserviceaccount.com"},
+                ],
+            },
+        ),
+    )
+
+    assert denied.ok is False
+    assert "cloud_operations_allowed_writer_identities" in denied.message
+    assert [call for call in logging.calls if call[0] in {"create", "update"}] == writes
 
 
 def test_nested_monitoring_groups_bind_uptime_checks_by_bundle_id() -> None:
@@ -441,6 +513,7 @@ def test_prune_deletes_omitted_owned_resources() -> None:
 
     result = driver.update(
         UpdateSpec(
+            managed_service_id=MSID,
             handle=first.handle,
             config={"deletion_protection": False, "dashboards": []},
         ),
@@ -464,6 +537,7 @@ def test_prune_false_retains_omitted_owned_resources() -> None:
 
     result = driver.update(
         UpdateSpec(
+            managed_service_id=MSID,
             handle=first.handle,
             config={"deletion_protection": False, "prune": False},
         ),
@@ -492,6 +566,7 @@ def test_prune_refuses_to_omit_log_data_or_custom_metric_series() -> None:
 
     result = driver.update(
         UpdateSpec(
+            managed_service_id=MSID,
             handle=first.handle,
             config={"deletion_protection": False, "log_bucket": False},
         ),
@@ -503,7 +578,7 @@ def test_prune_refuses_to_omit_log_data_or_custom_metric_series() -> None:
     assert len(monitoring.resources["metric_descriptors"]) == 1
 
 
-def test_refuses_unowned_deterministic_resource_without_adopt() -> None:
+def test_refuses_unowned_deterministic_resource_without_operator_adoption() -> None:
     driver, logging, _ = _driver()
     name = "projects/acme-prod/locations/global/buckets/application-logs"
     logging.seed(
@@ -517,9 +592,34 @@ def test_refuses_unowned_deterministic_resource_without_adopt() -> None:
 
     assert result.ok is False
     assert "refusing to adopt" in result.message
+    assert "operator-authorized" in result.message
+    assert logging.resources["log_bucket"][name] == {
+        "name": name,
+        "retentionDays": 7,
+        "description": "created elsewhere",
+    }
 
 
-def test_explicit_adoption_stamps_ownership() -> None:
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"log_bucket": {"id": "application-logs", "retention_days": 30, "adopt": True}},
+        {"log_metrics": [{"id": "failures", "body": {"filter": "severity>=ERROR"}, "adopt": True}]},
+        {
+            "services": [
+                {
+                    "id": "checkout-api",
+                    "body": {"displayName": "Checkout API", "custom": {}},
+                    "service_level_objectives": [
+                        {"id": "availability", "body": {"goal": 0.999}, "adopt": True},
+                    ],
+                },
+            ],
+        },
+    ],
+)
+def test_adopt_flag_is_rejected_not_ignored(config: dict[str, Any]) -> None:
+    """Adoption is operator-only (#2021): the old per-declaration ``adopt`` is refused outright."""
     driver, logging, _ = _driver()
     name = "projects/acme-prod/locations/global/buckets/application-logs"
     logging.seed(
@@ -527,20 +627,12 @@ def test_explicit_adoption_stamps_ownership() -> None:
         {"name": name, "retentionDays": 7, "description": "created elsewhere"},
     )
 
-    result = driver.provision(
-        _spec(
-            {
-                "log_bucket": {
-                    "id": "application-logs",
-                    "retention_days": 30,
-                    "adopt": True,
-                },
-            },
-        ),
-    )
+    result = driver.provision(_spec(config))
 
-    assert result.ok
-    assert "astrolift-observability" in logging.resources["log_bucket"][name]["description"]
+    assert result.ok is False
+    assert result.errors == ["invalid_cloud_operations_config"]
+    assert "adopt is not accepted" in result.message
+    assert "astrolift-observability" not in logging.resources["log_bucket"][name]["description"]
 
 
 def test_locked_bucket_refuses_mutation_and_data_delete_even_with_force() -> None:
@@ -554,12 +646,13 @@ def test_locked_bucket_refuses_mutation_and_data_delete_even_with_force() -> Non
 
     update = driver.update(
         UpdateSpec(
+            managed_service_id=MSID,
             handle=result.handle,
             config={"deletion_protection": False, "log_bucket": {"retention_days": 365}},
         ),
     )
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -582,7 +675,7 @@ def test_safe_deprovision_retains_bucket_and_views_but_deletes_configuration() -
     child_group = next(item for item in groups if ":checkout]" in item["displayName"])
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
     )
 
     assert deleted.ok
@@ -612,7 +705,7 @@ def test_destructive_deprovision_deletes_bucket_and_views() -> None:
     assert result.ok
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
     )
 
@@ -625,7 +718,7 @@ def test_deletion_protection_is_non_retryable() -> None:
     result = driver.provision(_spec())
     assert result.ok
 
-    deleted = driver.deprovision(DeprovisionSpec(result.handle))
+    deleted = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=MSID))
 
     assert deleted.ok is False
     assert deleted.retryable is False
@@ -658,7 +751,7 @@ def test_external_alert_channel_dependency_is_preflighted_before_mutation() -> N
     monitoring.calls.clear()
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
     )
 
     assert deleted.ok is False
@@ -693,7 +786,7 @@ def test_force_destroy_allows_channel_dependency_delete_request() -> None:
     )
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
 
@@ -724,7 +817,7 @@ def test_unmanaged_slo_is_preflighted_before_any_delete() -> None:
     monitoring.calls.clear()
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
 
@@ -757,7 +850,7 @@ def test_unmanaged_uptime_check_blocks_monitoring_group_delete() -> None:
     monitoring.calls.clear()
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         force_destroy=True,
     )
 
@@ -782,7 +875,7 @@ def test_unmanaged_log_view_blocks_data_delete_before_any_delete() -> None:
     monitoring.calls.clear()
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -808,7 +901,7 @@ def test_unmanaged_sink_blocks_log_bucket_data_delete() -> None:
     monitoring.calls.clear()
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -847,7 +940,7 @@ def test_unmanaged_alert_blocks_custom_metric_data_delete() -> None:
     monitoring.calls.clear()
 
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, {"deletion_protection": False}),
+        DeprovisionSpec(result.handle, {"deletion_protection": False}, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -1061,7 +1154,7 @@ def test_binding_emits_portable_values_and_least_privilege_modes() -> None:
     )
     assert result.ok
 
-    binding = driver.binding(ServiceHandle(result.handle), {"access_mode": "logs"})
+    binding = driver.binding(ServiceHandle(result.handle, managed_service_id=MSID), {"access_mode": "logs"})
 
     assert binding.env_vars["OBSERVABILITY_PROVIDER"].literal == "cloud_operations"
     assert binding.env_vars["GCP_LOG_BUCKET"].literal.startswith(
@@ -1075,7 +1168,7 @@ def test_status_and_schema_contracts() -> None:
     driver, _, _ = _driver()
     missing = driver.status(ServiceHandle("observability/global/missing"))
     result = driver.provision(_spec({"deletion_protection": False}))
-    ready = driver.status(ServiceHandle(result.handle))
+    ready = driver.status(ServiceHandle(result.handle, managed_service_id=MSID))
 
     assert missing.state == "deprovisioned"
     assert ready.state == "available"
@@ -1086,7 +1179,7 @@ def test_status_and_schema_contracts() -> None:
     assert "GCP_CLOUD_OPERATIONS_BUNDLE" in driver.binding_schema().env_vars
     assert driver.editable_fields() == ["*"]
     with pytest.raises(CloudOperationsError, match="no snapshot API"):
-        driver.snapshot(ServiceHandle(result.handle))
+        driver.snapshot(ServiceHandle(result.handle, managed_service_id=MSID))
 
 
 def test_plugin_runtime_and_availability_registration() -> None:
@@ -1122,6 +1215,7 @@ def test_runtime_config_reads_operator_controls() -> None:
             "cloud_operations_request_timeout_seconds": 12,
             "cloud_operations_operation_timeout_seconds": 600,
             "cloud_operations_operation_poll_interval_seconds": 0.25,
+            "cloud_operations_allowed_writer_identities": [_LISTED_WRITER],
             "secret_id_prefix": "platform",
         },
         auth_config={},
@@ -1146,6 +1240,7 @@ def test_runtime_config_reads_operator_controls() -> None:
         request_timeout_seconds=12,
         operation_timeout_seconds=600,
         operation_poll_interval_seconds=0.25,
+        allowed_writer_identities=(_LISTED_WRITER,),
     )
 
 
@@ -1310,3 +1405,170 @@ def test_rest_client_waits_for_logging_link_operations() -> None:
     assert session.calls[1]["url"].endswith(
         "/v2/projects/p/locations/global/operations/create-link",
     )
+
+
+# ---- #2086: a bundle's identity is the managed-service id, not the tenant's name ----
+
+VICTIM = "01996b1a-3c4d-7e8f-9a0b-1c2d3e4f5a6b"
+STRANGER = "01996b1a-ffff-7e8f-9a0b-aaaaaaaaaaaa"
+_LEGACY_HANDLE = "observability/global/astrolift-observability-operations"
+_WRITES = {"create", "update", "delete"}
+
+
+def _as(spec: ProvisionSpec, managed_service_id: str, **identity: Any) -> ProvisionSpec:
+    return replace(spec, managed_service_id=managed_service_id, **identity)
+
+
+def _bundle(handle: str) -> str:
+    return handle.rsplit("/", 1)[-1]
+
+
+def _state(*clients: FakeCloudOperationsClient) -> list[dict[str, Any]]:
+    return [deepcopy(client.resources) for client in clients]
+
+
+def _writes(*clients: FakeCloudOperationsClient) -> list[tuple[Any, ...]]:
+    return [call for client in clients for call in client.calls if call[0] in _WRITES]
+
+
+def _with_dashboard(**config: Any) -> dict[str, Any]:
+    return {
+        "deletion_protection": False,
+        "dashboards": [{"id": "overview", "body": {"displayName": "Overview"}}],
+        **config,
+    }
+
+
+def _legacy_bundle(driver: CloudOperationsDriver, config: dict[str, Any]) -> str:
+    """A bundle as provisioned before #2086: named after the tenant's name alone."""
+    result = driver.provision(
+        replace(_as(_spec(config), VICTIM), recorded_handle=_LEGACY_HANDLE, recorded_handle_exclusive=True),
+    )
+    assert result.ok and result.handle == _LEGACY_HANDLE
+    return result.handle
+
+
+def test_two_orgs_naming_their_bundles_alike_get_separate_bundles() -> None:
+    driver, logging, monitoring = _driver()
+    # Both orgs name their service "shared", the hint the bundle id derives from.
+    first = driver.provision(_as(_spec(_with_dashboard()), VICTIM, service_handle_hint="shared"))
+    # The second org's config omits the dashboard: sharing one bundle id, its
+    # default prune deleted the first org's.
+    second = driver.provision(
+        _as(
+            _spec({"deletion_protection": False}),
+            STRANGER,
+            organization_slug="globex",
+            service_handle_hint="shared",
+        ),
+    )
+
+    assert first.ok and second.ok
+    assert first.handle != second.handle
+    assert len(monitoring.resources["dashboards"]) == 1
+    assert len(logging.resources["log_bucket"]) == 2
+    first_logs = driver.binding(ServiceHandle(first.handle, managed_service_id=VICTIM), {})
+    second_logs = driver.binding(ServiceHandle(second.handle, managed_service_id=STRANGER), {})
+    assert first_logs.env_vars["LOG_GROUP"].literal != second_logs.env_vars["LOG_GROUP"].literal
+
+
+def test_no_tenant_name_reaches_another_services_bundle() -> None:
+    driver, logging, monitoring = _driver()
+    victim = driver.provision(_as(_spec(_with_dashboard()), VICTIM, service_handle_hint="payments"))
+    before = _state(logging, monitoring)
+    tail = _bundle(victim.handle).removeprefix("astrolift-observability-")
+
+    # The victim's service name, and names spelling out its whole bundle id.
+    for name in ("payments", tail, f"{tail}--{tail.rsplit('--', 1)[-1]}"):
+        attack = driver.provision(_as(_spec({"deletion_protection": False}), STRANGER, service_handle_hint=name))
+        assert attack.ok
+        assert _bundle(attack.handle) != _bundle(victim.handle)
+
+    after = _state(logging, monitoring)
+    assert after[1]["dashboards"] == before[1]["dashboards"]
+    victim_bucket = next(name for name in before[0]["log_bucket"])
+    assert after[0]["log_bucket"][victim_bucket] == before[0]["log_bucket"][victim_bucket]
+
+
+def test_another_services_bundle_is_refused_by_update_binding_and_deprovision() -> None:
+    driver, logging, monitoring = _driver()
+    victim = driver.provision(_as(_spec(_with_dashboard()), VICTIM))
+    before = _state(logging, monitoring)
+    logging.calls.clear()
+    monitoring.calls.clear()
+    # The digest decides: a record claiming exclusivity does not get anyone in.
+    stranger: dict[str, Any] = {"managed_service_id": STRANGER, "recorded_handle_exclusive": True}
+
+    updated = driver.update(
+        UpdateSpec(victim.handle, config={"deletion_protection": False, "dashboards": []}, **stranger)
+    )
+    assert not updated.ok and "another managed service" in updated.message
+    with pytest.raises(CloudOperationsError, match="another managed service"):
+        driver.binding(ServiceHandle(victim.handle, **stranger), {})
+    deleted = driver.deprovision(
+        DeprovisionSpec(victim.handle, {"deletion_protection": False}, **stranger),
+        delete_data=True,
+        force_destroy=True,
+    )
+    assert not deleted.ok and deleted.errors == ["resource_not_owned"] and deleted.retryable is False
+
+    assert _state(logging, monitoring) == before
+    assert not _writes(logging, monitoring)
+
+
+def test_a_bundle_named_before_2086_keeps_its_recorded_id() -> None:
+    driver, logging, monitoring = _driver()
+    handle = _legacy_bundle(driver, _with_dashboard())
+    logging.calls.clear()
+    monitoring.calls.clear()
+
+    again = driver.provision(
+        replace(_as(_spec(_with_dashboard()), VICTIM), recorded_handle=handle, recorded_handle_exclusive=True),
+    )
+
+    assert again.ok and again.handle == handle
+    assert not _writes(logging, monitoring)
+
+
+def test_a_bundle_from_before_2086_needs_an_exclusive_record() -> None:
+    driver, logging, monitoring = _driver()
+    handle = _legacy_bundle(driver, _with_dashboard())
+    before = _state(logging, monitoring)
+    logging.calls.clear()
+    monitoring.calls.clear()
+    victim: dict[str, Any] = {"managed_service_id": VICTIM}
+
+    reprovisioned = driver.provision(
+        replace(_as(_spec(_with_dashboard(dashboards=[])), VICTIM), recorded_handle=handle)
+    )
+    assert not reprovisioned.ok and "exclusive platform record" in reprovisioned.message
+    updated = driver.update(UpdateSpec(handle, config=_with_dashboard(dashboards=[]), **victim))
+    assert not updated.ok and "exclusive platform record" in updated.message
+    with pytest.raises(CloudOperationsError, match="exclusive platform record"):
+        driver.binding(ServiceHandle(handle, **victim), {})
+    deleted = driver.deprovision(DeprovisionSpec(handle, {"deletion_protection": False}, **victim), force_destroy=True)
+    assert not deleted.ok and deleted.errors == ["resource_not_owned"]
+    assert _state(logging, monitoring) == before
+    assert not _writes(logging, monitoring)
+
+    proven = driver.update(UpdateSpec(handle, config=_with_dashboard(), recorded_handle_exclusive=True, **victim))
+    assert proven.ok
+
+
+def test_a_new_provision_never_lands_on_a_bundle_named_before_2086() -> None:
+    driver, _, monitoring = _driver()
+    _legacy_bundle(driver, _with_dashboard())
+
+    # Same hint, no record: the pre-#2086 derivation would have reconciled the
+    # legacy bundle and pruned its dashboard.
+    fresh = driver.provision(_as(_spec({"deletion_protection": False}), STRANGER))
+
+    assert fresh.ok and fresh.handle != _LEGACY_HANDLE
+    assert len(monitoring.resources["dashboards"]) == 1
+
+
+def test_provision_without_a_managed_service_id_fails_closed() -> None:
+    driver, logging, monitoring = _driver()
+    result = driver.provision(_as(_spec(_with_dashboard()), ""))
+    assert not result.ok and "managed-service id" in result.message
+    assert not _writes(logging, monitoring)

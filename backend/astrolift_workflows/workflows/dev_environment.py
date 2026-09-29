@@ -10,7 +10,11 @@ handling).
 
 ``DeployPromotedAppWorkflow`` (#1858): serves a promoted app from its own
 namespace (calls ``deploy_promoted_app``; same failure handling, recorded
-on the dev environment the app was promoted from).
+on the dev environment the app was promoted from). Records the runtime as
+a Workload + Deployment so the app's own pages, rollback and observability
+see it (``record_promoted_app_deployment``, #1875), gated behind
+``workflow.patched`` since it is a new step in the workflow's own
+sequence, not just a change inside an existing activity.
 
 All are intentionally thin: a single activity + a catch-all that
 records the failure. The activity is where idempotency + provider
@@ -36,6 +40,7 @@ with workflow.unsafe.imports_passed_through():
         deploy_promoted_app,
         mark_dev_environment_failed,
         provision_dev_environment,
+        record_promoted_app_deployment,
         sync_dev_environment_files,
     )
 
@@ -111,6 +116,17 @@ class DeployPromotedAppWorkflow:
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
                 retry_policy=_ACTIVITY_RETRY,
             )
+            # #1875: record the runtime as a Workload + Deployment so the
+            # app pages, rollback and observability see it. Patched so a
+            # deploy already in flight when this shipped replays without
+            # the extra step.
+            if workflow.patched("deploy-promoted-app-records-workload"):
+                await workflow.execute_activity(
+                    record_promoted_app_deployment,
+                    args=[input.dev_environment_id, input.storage_class],
+                    start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    retry_policy=_ACTIVITY_RETRY,
+                )
             return WorkflowResult(ok=True, message="promoted app deployed", data=result)
         except Exception as exc:  # noqa: BLE001 (explicit catch-all)
             await workflow.execute_activity(

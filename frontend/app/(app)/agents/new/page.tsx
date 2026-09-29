@@ -4,17 +4,13 @@ import { PreloadQuery } from "@/lib/apollo";
 
 import { WizardClient } from "./wizard-client";
 
-export const metadata = { title: "Register agent repo · Astrolift" };
+export const metadata = { title: "New agent · Astrolift" };
 
 /**
- * Register-agent-repo wizard (spec 33 PR-8).
- *
- * Cloned from the register-app wizard (`apps/new`) with the manifest /
- * app-details / deploy-strategy steps swapped for a single scan +
- * multi-agent review step: point at a repo, discover its agent manifests
- * (`scanAgentManifests`), pick the destination project, then register the
- * whole repo's agents (`registerAgentRepo`) — each manifest becomes an agent
- * Workload under its own RegisteredApp and surfaces on the `/agents` list.
+ * Agents › New agent (spec 33 PR-8, spec 44 §5.4): point at a repo, find its
+ * agent manifests (`scanAgentManifests`), pick the destination project, then
+ * register the repo's agents (`registerAgentRepo`). Each manifest becomes an
+ * agent workload under its own app and shows on the `/agents` list.
  */
 export default function RegisterAgentRepoPage() {
   return (

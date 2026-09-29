@@ -124,7 +124,8 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
     """Delete the k8s namespace per (app, env) for every environment
     the app is bound to. Cascades all Deployments / Services /
     Ingresses / ConfigMaps / Secrets / PVCs the renderer ever
-    produced.
+    produced. Each environment's own namespace (#1922), or the app
+    namespace for the environments that share it.
 
     Idempotent: if the namespace is already absent the driver's
     delete_namespace must short-circuit cleanly (per the
@@ -135,7 +136,7 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
     from astrolift_services.filesystem_bindings import cleanup_binding_resources
     from astrolift_services.models import ManagedServiceVolumeBinding
     from astrolift_workflows.activities.app_lifecycle import _managed_services_for_environment
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import (
         _context_for_cluster,  # type: ignore[attr-defined]
         _driver_for_cluster,  # type: ignore[attr-defined]
@@ -153,7 +154,7 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
         cluster = env.tenant_cluster
         if cluster is None:
             continue
-        namespace = namespace_for_app(app)
+        namespace = namespace_for_environment(env)
         try:
             driver = _driver_for_cluster(cluster)
             ctx = _context_for_cluster(cluster)
@@ -165,6 +166,18 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
                 ).order_by("name"),
             )
             driver.delete_namespace(ctx.slug, namespace, wait=True)
+            if getattr(cluster, "ingress_class", None) == "envoy":
+                # The environment's routes live on the shared edge, not in its
+                # namespace, so the delete above does not reach them. An empty
+                # rendered set prunes every route labelled with this namespace,
+                # which frees its hostnames for the next claim (#2055).
+                from core.app_deploy import prune_edge_leftovers
+
+                prune_edge_leftovers(driver, ctx.slug, app_slug=app.slug, namespace=namespace, rendered=[])
+                # And its access rule, which named hostnames it no longer holds (#2132).
+                from core.edge_access import record_environment
+
+                record_environment(cluster, app, namespace, [])
             pv_refs = [
                 ref
                 for ref in cleanup_binding_resources(

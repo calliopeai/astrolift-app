@@ -140,6 +140,14 @@ class PreviewEnvironment(BaseCoreModel):
         on_delete=models.SET_NULL,
     )
     pin_reason = models.CharField(max_length=PREVIEW_PIN_REASON_MAX_CHARS, blank=True, default="")
+    # Who opened the preview (#2155): the pull request author's SCM login on
+    # the webhook path, the platform username on a manual preview (which
+    # also records ``created_by``). Empty on rows from before it was kept.
+    opened_by_login = models.CharField(max_length=255, blank=True, default="")
+    # Why the last build failed (#2155). The build workflow always passed a
+    # reason to ``mark_preview_failed`` and it only reached a log line, so a
+    # failed preview could not say why. Cleared when a rebuild starts.
+    failure_reason = models.TextField(blank=True, default="")
 
     class Meta:
         constraints = [

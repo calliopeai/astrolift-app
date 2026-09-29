@@ -91,10 +91,9 @@ describe("DataTable", () => {
   });
 
   it("distinguishes a filtered-empty list from an empty one", () => {
-    renderTable(
-      controller({ rows: [], state: "emptyFiltered", isFiltered: true }),
-      { emptyFiltered: { title: "No matching apps" } }
-    );
+    renderTable(controller({ rows: [], state: "emptyFiltered", isFiltered: true }), {
+      emptyFiltered: { title: "No matching apps" },
+    });
     expect(screen.getByText("No matching apps")).toBeInTheDocument();
     expect(screen.queryByText("No apps yet")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /clear search/i })).toBeInTheDocument();
@@ -124,7 +123,9 @@ describe("DataTable", () => {
 
   it("offers a retry on error rather than looking empty", () => {
     const retry = vi.fn();
-    renderTable(controller({ rows: [], state: "error", error: { message: "nope" } as never, retry }));
+    renderTable(
+      controller({ rows: [], state: "error", error: { message: "nope" } as never, retry })
+    );
 
     expect(screen.getByText(/could not load apps/i)).toBeInTheDocument();
     expect(screen.getByText("nope")).toBeInTheDocument();
@@ -296,7 +297,12 @@ describe("DataTable", () => {
 
     it("puts aria-sort on the header cell, not the button", () => {
       const { container } = renderTable(
-        controller({ rows, state: "ready", sortEnabled: true, sort: { key: "status", dir: "desc" } })
+        controller({
+          rows,
+          state: "ready",
+          sortEnabled: true,
+          sort: { key: "status", dir: "desc" },
+        })
       );
       const header = container.querySelector('th[aria-sort="descending"]');
       expect(header).toBeInTheDocument();

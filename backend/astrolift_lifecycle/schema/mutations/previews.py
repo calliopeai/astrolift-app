@@ -49,6 +49,7 @@ from astrolift_workflows.inputs import (
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
+from core.run_trigger import request_trigger
 from core.tenancy import get_current_tenant
 
 
@@ -135,6 +136,7 @@ class PreviewMutations:
                 registered_app_id=preview.registered_app_id,
                 app_environment_id=None,
                 actor=actor,
+                trigger_kind=request_trigger(),
             )
 
         latest = (
@@ -371,7 +373,18 @@ class PreviewMutations:
         org_slug = (
             getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
         ).lower()
-        namespace = _manual_preview_namespace(org_slug=org_slug, app_slug=app.slug, branch_slug=branch_slug)
+        from astrolift_registry.namespaces import namespace_for_new_preview
+
+        # The preview's deploys render into this namespace (#1922), so it may
+        # not be one another app or environment already holds (a branch
+        # named ``pr-3`` computes PR #3's name).
+        namespace = namespace_for_new_preview(
+            app,
+            name=environment_name,
+            preferred=_manual_preview_namespace(
+                org_slug=org_slug, app_slug=app.slug, branch_slug=branch_slug
+            ),
+        )
         # Hostname follows the platform's preview wildcard convention
         # but keyed on the branch slug (no PR number). The cluster's
         # ingress-target resolution happens at apply time in the
@@ -391,11 +404,15 @@ class PreviewMutations:
             resolve_previewed_environment,
         )
 
+        actor = _actor_from_request(info)
+        opener_id = actor.user_id if actor.kind == "user" else None
         with transaction.atomic():
             env = AppEnvironment.objects.create(
                 registered_app=app,
                 tenant_cluster=cluster,
                 name=environment_name,
+                created_by_id=opener_id,
+                k8s_namespace=namespace,
                 url=f"https://{hostname}",
                 managed_domain=_managed_domain,
                 required_approvals=0,
@@ -414,9 +431,11 @@ class PreviewMutations:
                 hostname=hostname,
                 namespace=namespace,
                 app_environment=env,
+                # Who opened it (#2155); a manual preview has no PR author.
+                created_by_id=opener_id,
+                opened_by_login=(actor.display if actor.kind == "user" else "")[:255],
             )
 
-        actor = _actor_from_request(info)
         handle = start_workflow(
             "BuildPreviewWorkflow",
             args=[
@@ -436,6 +455,7 @@ class PreviewMutations:
                 registered_app_id=preview.registered_app_id,
                 app_environment_id=env.pk,
                 actor=actor,
+                trigger_kind=request_trigger(),
             )
 
         return gql_success(preview_to_type(preview))

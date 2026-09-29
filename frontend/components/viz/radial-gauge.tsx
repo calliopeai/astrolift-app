@@ -40,7 +40,7 @@ export function RadialGauge({
   const c = 2 * Math.PI * r;
   const pct = Math.round(clamped * 100);
 
-  const centre = label === null ? null : label ?? `${pct}%`;
+  const centre = label === null ? null : (label ?? `${pct}%`);
 
   return (
     <div

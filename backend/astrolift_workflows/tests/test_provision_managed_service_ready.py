@@ -154,6 +154,23 @@ def test_provision_sync_uses_manifest_restore_intent_instead_of_fresh_provision(
             )
 
     svc = _make_service()
+    # A restore reads only a snapshot the platform retained for this app on
+    # this cluster (#2087): the earlier service it came from.
+    retained = ManagedService.objects.create(
+        registered_app=svc.registered_app,
+        app_environment=svc.app_environment,
+        kind=svc.kind,
+        variant=svc.variant,
+        name="model-before",
+        lifecycle_policy={
+            "last_retained_snapshot": {
+                "snapshot_id": "snapshot-123",
+                "source_handle": "model_endpoint/source",
+                "created_at": "2026-08-23T00:00:00Z",
+            }
+        },
+    )
+    retained.soft_delete()
     svc.lifecycle_policy = {
         "restore": {
             "snapshot_id": "snapshot-123",

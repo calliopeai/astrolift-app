@@ -17,6 +17,7 @@ import hashlib
 import logging
 import secrets
 from collections.abc import Callable, Mapping
+from typing import Any
 
 import strawberry
 from django.db import transaction
@@ -199,6 +200,14 @@ def _caller(info: Info):
     return getattr(request, "user", None) or getattr(info.context, "user", None)
 
 
+def _registering_user(info: Info):
+    """The signed-in user behind a register call, or None (anonymous, a key)."""
+    user = _caller(info)
+    if user is not None and getattr(user, "is_authenticated", False) and getattr(user, "pk", None):
+        return user
+    return None
+
+
 def canonical_zone(zone: str) -> str:
     """A DNS zone name in the one form rows store: lowercase, no trailing dot."""
     return (zone or "").strip().lower().rstrip(".")
@@ -331,6 +340,12 @@ class UpdateTenantClusterInput:
     # Write-only: the read side comes back redacted on TenantClusterType
     # because this carries the oauth2-proxy cookie secret (#1616).
     oidc_auth_config: JSON | None = strawberry.UNSET
+    # Also commit the new gate to every bound app's astrolift.toml when the
+    # class changes. Off by default: that commit redeploys every app at once
+    # through its CI, and the deploy path renders from this row, not from
+    # the manifest, so a class change moves each app on its next deploy
+    # without it (#2122).
+    sync_manifests: bool = False
 
 
 @strawberry.input
@@ -596,6 +611,29 @@ def _has_auth_gate(ingress_class: str, cluster) -> bool:
     return all(config.get(k) for k in ("discovery_url", "client_id", "auth_proxy_host"))
 
 
+# Write-only in the API: the read side reports only ``<key>_set`` (#1616,
+# #2055), so a client editing the config has no secret to send back.
+_OIDC_SECRET_KEYS = ("client_secret", "cookie_secret", "gateway_secret")
+# Not secret, but absent from the read side too (#1716), so the same rule.
+_OIDC_UNREAD_KEYS = (*_OIDC_SECRET_KEYS, "proxy_extra_args")
+
+
+def _carry_oidc_secrets(existing: Any, incoming: Any) -> Any:
+    """``incoming`` with each secret it omits carried over from ``existing``.
+
+    Omitted means "keep": the settings page edits the routing fields without
+    ever holding a secret (#2119). An explicit empty string clears one. A
+    ``None`` config is a deliberate removal of the gate and carries nothing.
+    """
+    if not isinstance(incoming, dict):
+        return incoming
+    merged = dict(incoming)
+    for key in _OIDC_UNREAD_KEYS:
+        if key not in merged and isinstance(existing, dict) and existing.get(key):
+            merged[key] = existing[key]
+    return {k: v for k, v in merged.items() if not (k in _OIDC_SECRET_KEYS and v == "")}
+
+
 @strawberry.type
 class ClustersMutation:
     @strawberry.field
@@ -649,6 +687,8 @@ class ClustersMutation:
             auth_config=input.auth_config or {},
             provider_config=input.provider_config or {},
             ingress_class=input.ingress_class or "nginx",
+            # Who registered it: the list's Registered by column and Mine (#2150).
+            created_by=_registering_user(info),
         )
         return gql_success(cluster_to_type(cluster))
 
@@ -851,7 +891,7 @@ class ClustersMutation:
                 configured_logout_url(input.oidc_auth_config)
             except ValueError as exc:
                 return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="oidcAuthConfig")
-            cluster.oidc_auth_config = input.oidc_auth_config
+            cluster.oidc_auth_config = _carry_oidc_secrets(cluster.oidc_auth_config, input.oidc_auth_config)
         if class_changing and had_gate and not _has_auth_gate(cluster.ingress_class, cluster):
             needs = "oidcAuthConfig" if cluster.ingress_class != "alb" else "albAuthConfig"
             return gql_failure(
@@ -870,11 +910,14 @@ class ClustersMutation:
         # ingress_class flip counts as a change even when neither config
         # was touched: the class decides which gate is in force, so the
         # manifest's [ingress.auth] describes a different gate after it
-        # (#1539). This
+        # (#1539), but only when the operator asks (``syncManifests``): the
+        # commit lands on every app's deploy branch and each one redeploys,
+        # which turned one class flip into a cluster-wide migration (#2122).
+        # This
         # is best-effort and must never block the UI save — a missing
         # source connection is a graceful skip, and any SCM failure is
         # swallowed here and surfaced only in the logs.
-        if auth_config_changed or oidc_changed or class_changing:
+        if auth_config_changed or oidc_changed or (class_changing and input.sync_manifests):
             try:
                 from astrolift_clusters.services.toml_writeback import (
                     write_auth_config_for_cluster,
@@ -887,6 +930,13 @@ class ClustersMutation:
                     "auth config TOML write-back failed for cluster %s",
                     cluster.slug,
                 )
+
+        # Moving onto the Envoy edge installs it (#2130). Additive, and a
+        # no-op once a recipe run has it, so saving again changes nothing.
+        if class_changing or oidc_changed:
+            from astrolift_clusters.edge_install import ensure_edge_installed
+
+            ensure_edge_installed(cluster)
 
         return gql_success(cluster_to_type(cluster))
 

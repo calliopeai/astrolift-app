@@ -721,4 +721,14 @@ class Auth1SessionWorkflow:
                     request.session[SESSION_SSO_AUTH_TIME_KEY] = int(auth_time)
             except Exception:  # noqa: BLE001 — metadata stamping must never break auth
                 logger.exception("[Auth0] failed to stamp SSO session metadata")
+            # #2157: record the IdP's groups claim on the user's org
+            # memberships, replacing the last sign-in's, so group role
+            # bindings and group mappings match what the IdP asserts now.
+            # A failure clears nothing and grants nothing new; it is logged.
+            try:
+                from astrolift_identity.idp_groups import sync_member_groups
+
+                sync_member_groups(authentication.userinfo.internal_user, _raw_userinfo)
+            except Exception:  # noqa: BLE001 -- group sync must never break auth
+                logger.exception("[Auth0] failed to sync IdP groups")
         return authentication

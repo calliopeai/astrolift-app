@@ -4,7 +4,7 @@ import { PreloadQuery } from "@/lib/apollo";
 
 import { WizardClient } from "./wizard-client";
 
-export const metadata = { title: "Register app · Astrolift" };
+export const metadata = { title: "New app · Astrolift" };
 
 export default function RegisterAppPage() {
   return (

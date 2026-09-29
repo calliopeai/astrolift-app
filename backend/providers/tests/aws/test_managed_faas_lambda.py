@@ -489,22 +489,51 @@ def test_exec_role_has_lambda_service_trust_not_oidc():
     assert create["Path"] == "/"
 
 
-def test_exec_role_folds_bound_grants_into_inline_policy():
+@pytest.mark.parametrize(
+    "grants",
+    [
+        [{"actions": ["s3:GetObject"], "resource": "arn:aws:s3:::other-tenant-bucket/*"}],
+        [{"actions": ["*"], "resource": "*"}],
+    ],
+)
+def test_config_grants_never_reach_the_execution_role(grants):
+    # grants became inline statements on the role the function's code runs
+    # as, with whatever actions and resources the config named (#2087).
+    drv, lam, iam = _driver()
+
+    result = drv.provision(_spec({"image_uri": "repo@sha256:abc", "grants": grants}))
+
+    assert result.ok is False
+    assert "grants are no longer supported" in result.message
+    assert "create_role" not in iam.names() and "put_role_policy" not in iam.names()
+    assert "create_function" not in lam.names()
+
+
+def test_the_execution_role_carries_basic_execution_only():
     drv, _, iam = _driver()
-    drv.provision(
-        _spec(
-            {
-                "image_uri": "repo@sha256:abc",
-                "grants": [{"actions": ["s3:GetObject"], "resource": "arn:aws:s3:::bkt/*"}],
-            },
-        ),
-    )
+
+    assert drv.provision(_spec({"image_uri": "repo@sha256:abc", "grants": []})).ok
     policy = json.loads(iam.kwargs_for("put_role_policy")["PolicyDocument"])
-    actions = [s["Action"] for s in policy["Statement"]]
-    # basic-execution logs statement is always present...
-    assert ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"] in actions
-    # ...plus the bound managed-service grant folded in.
-    assert ["s3:GetObject"] in actions
+
+    assert [statement["Action"] for statement in policy["Statement"]] == [
+        ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+    ]
+
+
+def test_update_resets_a_role_that_carried_config_grants_and_refuses_new_ones():
+    drv, _, iam = _driver()
+
+    refused = drv.update(
+        UpdateSpec(handle=f"{KIND}/{_FN}", config={"image_uri": "repo@sha256:v2", "grants": [{"actions": ["*"]}]}),
+    )
+    updated = drv.update(UpdateSpec(handle=f"{KIND}/{_FN}", config={"image_uri": "repo@sha256:v2"}))
+
+    assert refused.ok is False and "grants are no longer supported" in refused.message
+    assert updated.ok is True
+    reset = iam.kwargs_for("put_role_policy")
+    assert [statement["Action"] for statement in json.loads(reset["PolicyDocument"])["Statement"]] == [
+        ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+    ]
 
 
 def test_exec_role_self_heals_when_already_exists():

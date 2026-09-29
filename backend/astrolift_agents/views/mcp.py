@@ -46,6 +46,7 @@ from core.permissions import (
     check_permission,
     check_permission_any_scope,
 )
+from core.run_trigger import RunTrigger
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
@@ -341,6 +342,7 @@ def _run_agent(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
             trigger_payload=args.get("trigger_payload") or None,
             timeout_seconds=args.get("timeout_seconds"),
             trigger="mcp",
+            trigger_kind=RunTrigger.API,
         )
     except AgentDispatchError as exc:
         raise McpCallError(exc.message, code=exc.code) from exc

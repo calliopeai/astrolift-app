@@ -1,12 +1,4 @@
-import { AgentPillarPage } from "../components/agent-pillar-page";
+import { formerAgentRoute } from "../components/former-route";
 
-export const metadata = { title: "Secure · Agent · Astrolift" };
-
-export default async function AgentSecurePage({
-  params,
-}: {
-  params: Promise<{ agentSlug: string }>;
-}) {
-  const { agentSlug } = await params;
-  return <AgentPillarPage agentSlug={agentSlug} pillar="secure" />;
-}
+/** Absorbed by the agent's tab row; redirects to where it lives now (AGENT_FORMER_ROUTES). */
+export default formerAgentRoute("secure");

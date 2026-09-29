@@ -145,7 +145,7 @@ urlpatterns = [
     path(f"{base}auth1/", include(Auth1SessionWorkflow.urls())),
     # CLI / mobile device-flow REST surface (#475). Mounted at the
     # project root (NOT under /app/) so the wire URLs the CLI ships
-    # against — POST /api/cli/v1/auth/{start,complete,refresh} —
+    # against — POST /api/cli/v1/auth/{start,complete,refresh,signout} —
     # work without rewriting the consumer.
     *identity_api_urls,
     # SCIM 2.0 provisioning surface (#78, #91). Mounted at the project

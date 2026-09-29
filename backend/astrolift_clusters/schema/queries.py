@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import uuid
 
 import strawberry
-from django.db.models import Q
+from django.db import models
+from django.db.models import Case, ExpressionWrapper, F, Q, Value, When
+from django.db.models.functions import Greatest, Lower
+from django.utils import timezone
 from strawberry.types import Info
 
+from astrolift_clusters.heartbeat_status import (
+    CONNECTED_GRACE_FACTOR,
+    MIN_INTERVAL_SECONDS,
+    OFFLINE_MISS_THRESHOLD,
+    HeartbeatStatus,
+)
 from astrolift_clusters.models import (
     ManagedDomain,
     ProviderPlugin,
@@ -24,6 +34,7 @@ from astrolift_clusters.schema.types import (
     ClusterPrometheusRangeMetricsType,
     ClusterPrometheusRangePointType,
     ClusterPrometheusRangeSeriesType,
+    ClustersListFilterInput,
     ClusterSystemMetricPointType,
     ClusterSystemMetricSeriesType,
     ClusterSystemMetricsType,
@@ -44,7 +55,17 @@ from astrolift_clusters.schema.types import (
     domain_to_type,
     plugin_to_type,
 )
-from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql import (
+    GUID,
+    FilterField,
+    PageType,
+    SortKey,
+    filter_q,
+    keyset_page,
+    numbered_page,
+    resolve_list_sort,
+    search_q,
+)
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -90,9 +111,10 @@ def _tenant_view_of_shared(info: Info, cluster) -> bool:
 
 
 def _org_app_namespaces(cluster, organization_id) -> list[str]:
-    """Namespaces of ``organization_id``'s apps bound to ``cluster``."""
+    """Namespaces of ``organization_id``'s app environments bound to
+    ``cluster``: the app namespace, or an environment's own (#1922)."""
     from astrolift_lifecycle.models.app_environment import AppEnvironment
-    from core.cluster_observability import namespace_for_app
+    from core.cluster_observability import namespace_for_environment
 
     envs = (
         AppEnvironment.objects.filter(
@@ -101,9 +123,14 @@ def _org_app_namespaces(cluster, organization_id) -> list[str]:
             registered_app__organization_id=organization_id,
         )
         .select_related("registered_app__organization")
-        .only("registered_app__slug", "registered_app__k8s_namespace", "registered_app__organization__slug")
+        .only(
+            "k8s_namespace",
+            "registered_app__slug",
+            "registered_app__k8s_namespace",
+            "registered_app__organization__slug",
+        )
     )
-    return sorted({namespace_for_app(env.registered_app) for env in envs})
+    return sorted({namespace_for_environment(env) for env in envs})
 
 
 def _primary_app_namespace(cluster) -> str:
@@ -116,7 +143,7 @@ def _primary_app_namespace(cluster) -> str:
     namespace. Mirrors the namespace collection
     ``astroliftClusterWorkloadHealth`` already does."""
     from astrolift_lifecycle.models.app_environment import AppEnvironment
-    from core.cluster_observability import namespace_for_app
+    from core.cluster_observability import namespace_for_environment
 
     envs = (
         AppEnvironment.objects.filter(
@@ -125,12 +152,13 @@ def _primary_app_namespace(cluster) -> str:
         )
         .select_related("registered_app__organization")
         .only(
+            "k8s_namespace",
             "registered_app__slug",
             "registered_app__k8s_namespace",
             "registered_app__organization__slug",
         )
     )
-    namespaces = sorted({namespace_for_app(ae.registered_app) for ae in envs})
+    namespaces = sorted({namespace_for_environment(ae) for ae in envs})
     return namespaces[0] if namespaces else "astrolift-system"
 
 
@@ -153,7 +181,7 @@ def _clusters_qs(*, search: str | None = None):
         return TenantCluster.objects.none()
     qs = TenantCluster.objects.filter(
         Q(organization_id=org_id) | Q(organization_id__isnull=True),
-    ).select_related("organization", "provider_plugin")
+    ).select_related("organization", "provider_plugin", "created_by")
     if search:
         qs = qs.filter(
             search_q(
@@ -166,6 +194,102 @@ def _clusters_qs(*, search: str | None = None):
             )
         )
     return qs
+
+
+# ---------------------------------------------------------------------------
+# The list contract on the Clusters list (spec 44 §5.1, #2150)
+# ---------------------------------------------------------------------------
+#
+# What /clusters used to work out in the browser over the whole fleet
+# (provider, lifecycle, the Offline and Mine views, the column sorts,
+# numbered pages) is a column or an annotation here, so OFFSET and
+# totalCount are exact. See astrolift_graphql/README.md.
+
+#: Lifecycles in the order the Status column sorts them.
+_LIFECYCLE_ORDER = [choice.value for choice in TenantCluster.Lifecycle]
+
+#: Heartbeat statuses in the order the Live column sorts them: reachable first.
+_HEARTBEAT_ORDER = [
+    HeartbeatStatus.CONNECTED.value,
+    HeartbeatStatus.DEGRADED.value,
+    HeartbeatStatus.OFFLINE.value,
+    HeartbeatStatus.NEVER_SEEN.value,
+]
+
+_CLUSTERS_DEFAULT_SORT = "name"
+
+_CLUSTERS_SORT_KEYS = {
+    "name": SortKey(Lower("name")),
+    "slug": SortKey("slug"),
+    "created": SortKey("created_at"),
+    "status": SortKey("_lifecycle_rank"),
+    "provider": SortKey("provider_plugin__slug"),
+    "region": SortKey(Lower("region")),
+    "live": SortKey("_heartbeat_rank"),
+    # Never probed sorts below the oldest probe, as it did in the browser.
+    "lastProbe": SortKey("capabilities_probed_at", nulls_low=True),
+}
+
+_CLUSTERS_FILTERS = {
+    "provider": FilterField("provider_plugin__slug"),
+    "status": FilterField("lifecycle"),
+    "live": FilterField("_heartbeat_status"),
+    "registered_by": FilterField("created_by__username", me=True),
+}
+
+
+def _annotate_clusters_list(qs, *, now: dt.datetime | None = None):
+    """Annotate the heartbeat status and the sort ranks the list needs.
+
+    ``_heartbeat_status`` is ``heartbeat_status.resolve`` in SQL: the same
+    floored interval and the same bands, so the Offline view counts the
+    rows the Live column paints red.
+    """
+    now = now or timezone.now()
+    interval = ExpressionWrapper(
+        Greatest(F("heartbeat_interval_seconds"), Value(MIN_INTERVAL_SECONDS))
+        * Value(dt.timedelta(seconds=1)),
+        output_field=models.DurationField(),
+    )
+
+    def seen_since(factor: float):
+        return ExpressionWrapper(Value(now) - interval * Value(factor), output_field=models.DateTimeField())
+
+    qs = qs.annotate(
+        _heartbeat_status=Case(
+            When(last_heartbeat_at__isnull=True, then=Value(HeartbeatStatus.NEVER_SEEN.value)),
+            When(
+                last_heartbeat_at__gte=seen_since(CONNECTED_GRACE_FACTOR),
+                then=Value(HeartbeatStatus.CONNECTED.value),
+            ),
+            When(
+                last_heartbeat_at__gt=seen_since(OFFLINE_MISS_THRESHOLD),
+                then=Value(HeartbeatStatus.DEGRADED.value),
+            ),
+            default=Value(HeartbeatStatus.OFFLINE.value),
+            output_field=models.CharField(),
+        ),
+        _lifecycle_rank=Case(
+            *(When(lifecycle=value, then=Value(rank)) for rank, value in enumerate(_LIFECYCLE_ORDER)),
+            default=Value(len(_LIFECYCLE_ORDER)),
+            output_field=models.IntegerField(),
+        ),
+    )
+    return qs.annotate(
+        _heartbeat_rank=Case(
+            *(When(_heartbeat_status=value, then=Value(rank)) for rank, value in enumerate(_HEARTBEAT_ORDER)),
+            default=Value(len(_HEARTBEAT_ORDER)),
+            output_field=models.IntegerField(),
+        )
+    )
+
+
+def _viewer_username(info: Info) -> str | None:
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) or getattr(info.context, "user", None)
+    if user is not None and getattr(user, "is_authenticated", False):
+        return user.get_username()
+    return None
 
 
 # Mutations whose input names the cluster by slug: registration runs before
@@ -227,6 +351,10 @@ class ClustersQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: ClustersListFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> PageType[TenantClusterType]:
         """Cursor-paginated cluster inventory (#1235).
 
@@ -245,16 +373,51 @@ class ClustersQuery:
         ``search`` matches what an operator types into the /clusters
         search box — name, slug, endpoint, region, and the provider
         plugin's slug.
+
+        The list contract (spec 44 §5.1, #2150): ``filter`` takes the
+        declared filters (provider, status, live, registeredBy), ``sort`` a
+        multi-key spec over name, slug, created, status, provider, region,
+        live and lastProbe (``-lastProbe,name``), and ``page`` /
+        ``pageSize`` a numbered page. Any of ``sort``, ``page`` or
+        ``pageSize`` selects numbered paging: an exact ``totalCount``,
+        ``page`` and ``pageSize`` echoed, ``nextCursor`` null, default
+        order ``name``. Otherwise the cursor walk runs unchanged, with
+        ``filter`` applied first. An undeclared sort key is an error.
         """
-        page = keyset_page(
-            _clusters_qs(search=search),
+        qs = _clusters_qs(search=search)
+        if filter is not None:
+            qs = _annotate_clusters_list(qs).filter(
+                filter_q(filter, _CLUSTERS_FILTERS, me=_viewer_username(info))
+            )
+        if page is not None or page_size is not None or sort is not None:
+            order_by = resolve_list_sort(sort, _CLUSTERS_SORT_KEYS, default=_CLUSTERS_DEFAULT_SORT)
+            if filter is None:
+                qs = _annotate_clusters_list(qs)
+            return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(cluster_to_type)
+        result = keyset_page(
+            qs,
             cursor=after,
             limit=limit,
             sort_field="slug",
             tiebreak_field="guid",
             descending=False,
         )
-        return page.map(cluster_to_type)
+        return result.map(cluster_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.CLUSTER_REGISTER)
+    @tenant_scoped()
+    def astrolift_cluster(self, info: Info, slug: str) -> TenantClusterType | None:
+        """One cluster by slug, or null when the caller cannot see it (#2150).
+
+        The detail page and its tabs used to find the cluster in the
+        deprecated ``astroliftClusters`` list, which stops at 200 rows, so
+        a cluster past the 200th alphabetically read as "not found" on its
+        own page. Same visibility as the list: the caller's org plus shared
+        clusters, never another org's.
+        """
+        cluster = _clusters_qs().filter(slug=slug).first()
+        return cluster_to_type(cluster) if cluster is not None else None
 
     @strawberry.field
     @require_permission(Permission.APP_CREATE)
@@ -1334,7 +1497,7 @@ class ClustersQuery:
         # this cluster so the workload-health table includes app workloads, not
         # just the astrolift-system namespace.
         from astrolift_lifecycle.models.app_environment import AppEnvironment
-        from core.cluster_observability import namespace_for_app
+        from core.cluster_observability import namespace_for_environment
 
         app_envs = (
             AppEnvironment.objects.filter(
@@ -1343,12 +1506,13 @@ class ClustersQuery:
             )
             .select_related("registered_app__organization")
             .only(
+                "k8s_namespace",
                 "registered_app__slug",
                 "registered_app__k8s_namespace",
                 "registered_app__organization__slug",
             )
         )
-        app_namespaces = list({namespace_for_app(ae.registered_app) for ae in app_envs})
+        app_namespaces = list({namespace_for_environment(ae) for ae in app_envs})
         if _tenant_view_of_shared(info, cluster):
             # Only this org's own namespaces on a shared cluster, never the
             # platform's or another org's; and never "all namespaces" (the

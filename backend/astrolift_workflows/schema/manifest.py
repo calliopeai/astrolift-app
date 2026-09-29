@@ -26,7 +26,7 @@ from strawberry.types import Info
 
 from astrolift_manifest.parser import ManifestError
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_permission, require_permission
 from core.schema.common import MutationResult, ValidationError
 from core.tenancy import get_current_tenant
 from workflows.manifest import (
@@ -36,7 +36,7 @@ from workflows.manifest import (
     parse_workflow_manifest,
 )
 from workflows.models import WorkflowDefinition
-from workflows.scopes import definition_scope_by_slug
+from workflows.scopes import definition_scope, definition_scope_by_slug
 
 
 @strawberry.type
@@ -181,10 +181,20 @@ class WorkflowManifestQuery:
 class ImportWorkflowManifestResult(MutationResult):
     """Parsed manifest (or its structured parse error) + the created slug
     when persisting. ``created_slug`` may differ from the manifest's slug —
-    it is uniquified within the org on collision."""
+    it is uniquified within the org on collision.
+
+    ``mode`` / ``repointed_slugs`` are populated only by ``replace=true``
+    (#1822): ``mode`` is one of ``"created"``, ``"updated_in_place"`` or
+    ``"versioned"`` (see ``workflows.manifest.ReplaceOutcome``). A
+    ``replace=true`` call that would break a configured Workflow's
+    ``stage_bindings`` comes back ``ok=false`` with one error per blocked
+    Workflow (field ``workflow.<slug>``) and persists nothing.
+    """
 
     created_slug: str | None = None
     manifest: WorkflowManifestPreviewType | None = None
+    mode: str | None = None
+    repointed_slugs: list[str] = strawberry.field(default_factory=list)
 
 
 @strawberry.type
@@ -194,7 +204,13 @@ class WorkflowManifestMutation:
             "Import a workflow manifest TOML. preview=true (default) returns "
             "the parsed shape without persisting; preview=false creates a "
             "disabled, org-scoped WorkflowDefinition + stages in the caller's "
-            "org and returns the (possibly uniquified) slug."
+            "org and returns the (possibly uniquified) slug. replace=true "
+            "instead upserts the org's own definition sharing the manifest's "
+            "slug: in place when the stage kinds are unchanged (configured "
+            "Workflows, bindings and schedules all keep working untouched), "
+            "otherwise as a new version with every configured Workflow "
+            "repointed to it, or a clear refusal when a repoint would break "
+            "one's bindings."
         )
     )
     @require_permission(Permission.WORKFLOW_CREATE)
@@ -204,6 +220,7 @@ class WorkflowManifestMutation:
         info: Info,
         toml: str,
         preview: bool = True,
+        replace: bool = False,
         org_id: strawberry.ID | None = None,
     ) -> ImportWorkflowManifestResult:
         try:
@@ -218,14 +235,18 @@ class WorkflowManifestMutation:
         if preview:
             return ImportWorkflowManifestResult(ok=True, manifest=_preview_type(parsed))
 
-        from django.db import transaction
-
         from astrolift_workflows.schema.mutations import _resolve_caller_org
-        from workflows.manifest import create_definition_from_manifest
 
         org, err = _resolve_caller_org(org_id)
         if err is not None:
             return ImportWorkflowManifestResult(ok=err.ok, errors=err.errors)
+
+        if replace:
+            return _import_replace(info, parsed, org)
+
+        from django.db import transaction
+
+        from workflows.manifest import create_definition_from_manifest
 
         with transaction.atomic():
             definition = create_definition_from_manifest(
@@ -236,3 +257,54 @@ class WorkflowManifestMutation:
         # Report the slug that actually persisted (uniquified on collision).
         manifest_type.definition.slug = definition.slug
         return ImportWorkflowManifestResult(ok=True, created_slug=definition.slug, manifest=manifest_type)
+
+
+def _import_replace(info: Info, parsed: ParsedWorkflowManifest, org) -> ImportWorkflowManifestResult:
+    """``importWorkflowManifest(replace: true)`` (#1822): upsert the org's
+    own definition sharing ``parsed.definition.slug``. See
+    ``workflows.manifest.replace_definition_from_manifest`` for the
+    in-place / versioned / blocked decision.
+
+    Gated the same as the sibling definition-write mutations: a
+    source-managed or platform-global definition refuses
+    (``_definition_write_error``, the same gate ``updateWorkflowDefinition``
+    uses), and repointing configured Workflows requires the same
+    ``WORKFLOW_UPDATE`` the caller would need to edit that definition
+    directly: checked once, at the definition's own scope, since every
+    configured Workflow being repointed shares that scope by construction.
+    """
+    from workflows.manifest import replace_definition_from_manifest
+    from workflows.schema.mutations import _definition_write_error
+
+    user = info.context.user
+    existing = WorkflowDefinition.objects.filter(
+        organization=org, slug=parsed.definition.slug, deleted_at__isnull=True
+    ).first()
+    if existing is not None:
+        write_err = _definition_write_error(user, existing)
+        if write_err is not None:
+            return ImportWorkflowManifestResult(
+                ok=False, errors=[ValidationError(field=write_err[0], messages=[write_err[1]])]
+            )
+        check_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope(existing, org.pk))
+
+    # replace_definition_from_manifest is its own transaction: a "blocked"
+    # outcome has already rolled back the candidate new version.
+    outcome = replace_definition_from_manifest(parsed, organization=org, created_by=user)
+
+    if outcome.mode == "blocked":
+        errors = [
+            ValidationError(field=f"workflow.{slug}", messages=messages)
+            for slug, messages in outcome.blocked_errors.items()
+        ]
+        return ImportWorkflowManifestResult(ok=False, errors=errors)
+
+    manifest_type = _preview_type(parsed)
+    manifest_type.definition.slug = outcome.definition.slug
+    return ImportWorkflowManifestResult(
+        ok=True,
+        created_slug=outcome.definition.slug,
+        manifest=manifest_type,
+        mode=outcome.mode,
+        repointed_slugs=outcome.repointed_slugs,
+    )

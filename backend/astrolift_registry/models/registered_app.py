@@ -173,6 +173,11 @@ class RegisteredApp(NamedBaseCoreModel):
     # deploys are unaffected.
     cron_paused = models.BooleanField(default=False)
     deploy_branch = models.CharField(max_length=128, default="main")
+    # Who may enter the app behind central auth (#2132): ``{groups, users,
+    # source}``. Empty lets in every signed-in user of the cluster's IdP.
+    # ``source`` is ``manifest`` when astrolift.toml's [ingress.access] set
+    # it, which the UI then leaves to the repo.
+    edge_access = models.JSONField(default=dict, blank=True)
 
     # App-global webhook-deploy pause (#399). Independent of the
     # per-env ``deploys_paused`` (#378) and the per-env ``ingress_paused``

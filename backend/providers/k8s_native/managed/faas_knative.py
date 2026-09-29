@@ -98,6 +98,10 @@ class KnativeServiceConfig:
     default_port: int = 8080
     default_timeout_seconds: int = 300
     default_container_concurrency: int = 0
+    # ServiceAccounts a Service may run as when ``namespace`` is shared between
+    # tenants, where a name can resolve to another tenant's account and the
+    # cloud identity annotated on it. Empty refuses every one there (#2087).
+    allowed_service_accounts: tuple[str, ...] = ()
 
 
 class KnativeServiceDriver(ManagedServiceDriver):
@@ -123,7 +127,6 @@ class KnativeServiceDriver(ManagedServiceDriver):
                 namespace=namespace,
                 name=name,
                 managed_service_id=spec.managed_service_id,
-                cfg=cfg,
             )
             manifest = self._manifest(
                 namespace=namespace,
@@ -365,8 +368,6 @@ class KnativeServiceDriver(ManagedServiceDriver):
                 "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 8080},
                 "public": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": False},
-                "adopt_existing": {"type": "boolean", "default": False},
-                "expected_existing_uid": {"type": "string"},
                 "command": {"type": "array", "items": {"type": "string"}},
                 "args": {"type": "array", "items": {"type": "string"}},
                 "working_dir": {"type": "string"},
@@ -439,9 +440,7 @@ class KnativeServiceDriver(ManagedServiceDriver):
         )
 
     def editable_fields(self) -> list[str]:
-        return sorted(
-            set(self.config_schema()["properties"]) - {"adopt_existing", "expected_existing_uid"},
-        )
+        return sorted(self.config_schema()["properties"])
 
     def _require_driver(self) -> None:
         if self._config.cluster_driver is None:
@@ -495,6 +494,13 @@ class KnativeServiceDriver(ManagedServiceDriver):
             {"image_pull_secrets": cfg.get("image_pull_secrets") or [], "volumes": cfg.get("volumes") or []},
             extra=[str(value.get("secret_name")) for value in secret_env.values()],
         )
+        account = str(cfg.get("service_account_name") or "")
+        if account and self._config.namespace and account not in self._config.allowed_service_accounts:
+            raise ValueError(
+                f"service_account_name {account!r} is not allowed: this driver runs in the namespace "
+                f"{self._config.namespace!r}, shared between tenants, where the name can resolve to another "
+                "tenant's ServiceAccount; the cluster's knative_allowed_service_accounts does not list it"
+            )
         labels = cfg.get("labels") or {}
         if not isinstance(labels, dict):
             raise ValueError("labels must be an object")
@@ -596,7 +602,6 @@ class KnativeServiceDriver(ManagedServiceDriver):
         namespace: str,
         name: str,
         managed_service_id: str,
-        cfg: dict[str, Any],
     ) -> None:
         current = self._config.cluster_driver.get_manifest(
             cluster_id,
@@ -613,11 +618,14 @@ class KnativeServiceDriver(ManagedServiceDriver):
             return
         if labels.get("app.kubernetes.io/managed-by") == "astrolift" and owner:
             raise ValueError("Knative Service belongs to another Astrolift managed resource")
-        if not bool(cfg.get("adopt_existing", False)):
-            raise ValueError("Knative Service already exists and is not owned by this managed resource")
-        expected_uid = str(cfg.get("expected_existing_uid") or "")
-        if not expected_uid or expected_uid != str(metadata.get("uid") or ""):
-            raise ValueError("adopting a Knative Service requires its exact expected_existing_uid")
+        # An object's uid is a precondition, not an authorization: in an
+        # operator-fixed shared namespace the object may be anyone's. Adoption
+        # of an existing resource is a separate, operator-authorized operation
+        # (#1365) that no tenant config flag may grant (#2021).
+        raise ValueError(
+            "Knative Service already exists and is not owned by this managed resource; adoption is a "
+            "separate, operator-authorized operation and cannot be granted by tenant config",
+        )
 
     def _manifest(
         self,

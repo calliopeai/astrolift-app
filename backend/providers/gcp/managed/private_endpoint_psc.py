@@ -28,16 +28,21 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL, readable_keys
 
 KIND = "private_endpoint"
 VARIANT = "private_service_connect"
 _API_ROOT = "https://compute.googleapis.com/compute/v1"
 _ID_PATTERN = re.compile(r"[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?")
 _GOOGLE_API_ID_PATTERN = re.compile(r"[a-z][a-z0-9]{0,19}")
+_UUID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+#: Every spelling of the managed-service id is reserved, not just the one this
+#: driver writes, so tenant labels cannot plant one (#2086).
 _RESERVED_LABELS = {
     "astrolift-managed-by",
     "astrolift-private-endpoint",
     "astrolift-adopted",
+    *readable_keys("gcp"),
 }
 _ADDRESS_OWNED_FIELDS = {
     "name",
@@ -267,11 +272,18 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_private_service_connect_config"])
+        if not spec.managed_service_id:
+            return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_private_service_connect_config"])
         endpoint_type = _endpoint_type(cfg)
         location = _location(cfg, self._config.region)
-        endpoint_id = str(cfg.get("endpoint_id") or self._endpoint_id(spec, endpoint_type))
+        endpoint_id = str(cfg.get("endpoint_id") or self._endpoint_id(spec, endpoint_type, location))
         handle = _handle(location, endpoint_id)
-        labels = _labels(endpoint_id, self._config.labels, cfg.get("labels") or {})
+        labels = _labels(
+            endpoint_id,
+            self._config.labels,
+            cfg.get("labels") or {},
+            managed_service_id=spec.managed_service_id,
+        )
         description = _description(endpoint_id, spec)
         try:
             endpoint, _address = self._ensure_stack(
@@ -281,6 +293,10 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 labels=labels,
                 description=description,
                 allow_create=True,
+                owner=_Owner(
+                    spec.managed_service_id,
+                    record_proves=spec.recorded_handle_exclusive and spec.recorded_handle == handle,
+                ),
             )
         except Exception as exc:
             return ProvisionResult(False, handle, f"provision Private Service Connect: {exc}", [str(exc)])
@@ -302,13 +318,15 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         error = self._validate_config(cfg, expected_location=location, expected_id=endpoint_id)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_private_service_connect_config"])
+        owner = _Owner(spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
         try:
             current = self._compute.get_forwarding_rule(location, endpoint_id)
-            self._assert_owned(current, endpoint_id)
+            self._assert_owned(current, endpoint_id, owner)
             labels = _labels(
                 endpoint_id,
                 self._config.labels,
                 cfg.get("labels") or {},
+                managed_service_id=spec.managed_service_id,
                 adopted=_adopted(current),
             )
             self._ensure_stack(
@@ -318,6 +336,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 labels=labels,
                 description=str(current.get("description") or "Astrolift Private Service Connect"),
                 allow_create=False,
+                owner=owner,
             )
         except PrivateServiceConnectNotFound:
             return UpdateResult(False, spec.handle, "Private Service Connect endpoint not found", ["not_found"])
@@ -355,13 +374,16 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 ["deletion_protection_enabled"],
                 retryable=False,
             )
+        owner = _Owner(spec.managed_service_id, record_proves=spec.recorded_handle_exclusive)
         endpoint = self._get_forwarding_optional(location, endpoint_id)
         if endpoint is not None:
-            if not _owned(endpoint, endpoint_id):
+            refusal = "" if _owned(endpoint, endpoint_id) else "is not owned by Astrolift"
+            refusal = refusal or _identity_refusal(endpoint, owner)
+            if refusal:
                 return DeprovisionResult(
                     False,
                     spec.handle,
-                    "refusing to delete an unowned Private Service Connect endpoint",
+                    f"refusing to delete Private Service Connect endpoint {endpoint_id}: it {refusal}",
                     ["resource_not_owned"],
                     retryable=False,
                 )
@@ -377,11 +399,13 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         address_name = str(cfg.get("address_id") or _name(endpoint_id, "ip"))
         address = self._get_address_optional(location, address_name) if managed_address else None
         if address is not None:
-            if not _owned(address, endpoint_id):
+            refusal = "" if _owned(address, endpoint_id) else "is not owned by Astrolift"
+            refusal = refusal or _identity_refusal(address, owner)
+            if refusal:
                 return DeprovisionResult(
                     False,
                     spec.handle,
-                    "refusing to delete an unowned Private Service Connect address",
+                    f"refusing to delete Private Service Connect address {address_name}: it {refusal}",
                     ["resource_not_owned"],
                     retryable=False,
                 )
@@ -441,7 +465,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
             return ServiceStatus(handle.handle, "deprovisioned", "Private Service Connect endpoint is gone")
         except Exception as exc:
             return ServiceStatus(handle.handle, "error", f"describe Private Service Connect: {exc}")
-        if not _owned(endpoint, endpoint_id):
+        if not _owned(endpoint, endpoint_id) or _names_another_service(endpoint, handle.managed_service_id):
             return ServiceStatus(handle.handle, "error", "Private Service Connect endpoint is not owned")
         endpoint_type = "google_apis" if location == "global" else "service_attachment"
         provider_state, ready = _state(endpoint, endpoint_type)
@@ -457,7 +481,11 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         location, endpoint_id = _parse_handle(handle.handle)
         endpoint = self._compute.get_forwarding_rule(location, endpoint_id)
-        self._assert_owned(endpoint, endpoint_id)
+        self._assert_owned(
+            endpoint,
+            endpoint_id,
+            _Owner(handle.managed_service_id, record_proves=handle.recorded_handle_exclusive),
+        )
         cfg = dict(config or {})
         ip_address = str(endpoint.get("IPAddress") or "")
         dns_name = str(cfg.get("dns_name") or "")
@@ -572,7 +600,6 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 "labels": {"type": "object", "additionalProperties": {"type": "string"}},
                 "address": {"type": "object"},
                 "forwarding_rule": {"type": "object"},
-                "adopt_existing": {"type": "boolean", "default": False},
                 "delete_adopted_resources": {"type": "boolean", "default": False},
                 "deletion_protection": {"type": "boolean", "default": True},
             },
@@ -638,6 +665,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         labels: dict[str, str],
         description: str,
         allow_create: bool,
+        owner: _Owner,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         address, address_external = self._ensure_address(
             endpoint_id,
@@ -646,6 +674,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
             labels=labels,
             description=description,
             allow_create=allow_create,
+            owner=owner,
         )
         address_value = str(address.get("address") or address.get("selfLink") or "")
         if not address_value:
@@ -658,6 +687,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
             labels=labels,
             description=description,
             allow_create=allow_create,
+            owner=owner,
         )
         if address_external:
             return endpoint, address
@@ -672,6 +702,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         labels: dict[str, str],
         description: str,
         allow_create: bool,
+        owner: _Owner,
     ) -> tuple[dict[str, Any], bool]:
         external = bool(cfg.get("address_resource"))
         address_name = _resource_name(
@@ -707,11 +738,17 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         if external:
             return current, True
         if not _owned(current, endpoint_id):
-            if not cfg.get("adopt_existing"):
-                raise PrivateServiceConnectError(
-                    f"address {location}/{address_name} exists but is not owned by this endpoint",
-                )
-            labels = {**labels, "astrolift-adopted": "true"}
+            # The astrolift-adopted label this driver used to write on the
+            # tenant's say-so proves nothing about who authorized it. Adoption
+            # of an existing resource is a separate, operator-authorized
+            # operation (#1365) that no tenant config flag may grant (#2021).
+            raise PrivateServiceConnectError(
+                f"address {location}/{address_name} exists but is not owned by this endpoint; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
+            )
+        refusal = _identity_refusal(current, owner)
+        if refusal:
+            raise PrivateServiceConnectError(f"address {location}/{address_name} {refusal}")
         current = self._ensure_labels(
             "address",
             location,
@@ -731,6 +768,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         labels: dict[str, str],
         description: str,
         allow_create: bool,
+        owner: _Owner,
     ) -> dict[str, Any]:
         desired = self._forwarding_body(
             endpoint_id,
@@ -750,11 +788,13 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
             )
             return self._compute.get_forwarding_rule(location, endpoint_id)
         if not _owned(current, endpoint_id):
-            if not cfg.get("adopt_existing"):
-                raise PrivateServiceConnectError(
-                    f"forwarding rule {location}/{endpoint_id} exists but is not owned by Astrolift",
-                )
-            labels = {**labels, "astrolift-adopted": "true"}
+            raise PrivateServiceConnectError(
+                f"forwarding rule {location}/{endpoint_id} exists but is not owned by Astrolift; adoption is a "
+                "separate, operator-authorized operation and cannot be granted by tenant config",
+            )
+        refusal = _identity_refusal(current, owner)
+        if refusal:
+            raise PrivateServiceConnectError(f"forwarding rule {location}/{endpoint_id} {refusal}")
         self._assert_forwarding_compatible(current, desired, location)
         current = self._ensure_labels(
             "forwarding",
@@ -963,11 +1003,14 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
             return self._compute.get_address(location, name)
         return self._compute.get_forwarding_rule(location, name)
 
-    def _assert_owned(self, resource: dict[str, Any], endpoint_id: str) -> None:
+    def _assert_owned(self, resource: dict[str, Any], endpoint_id: str, owner: _Owner) -> None:
         if not _owned(resource, endpoint_id):
             raise PrivateServiceConnectError(
                 "resource is not owned by this Private Service Connect endpoint",
             )
+        refusal = _identity_refusal(resource, owner)
+        if refusal:
+            raise PrivateServiceConnectError(f"Private Service Connect endpoint {endpoint_id} {refusal}")
 
     def _get_address_optional(self, location: str, name: str) -> dict[str, Any] | None:
         try:
@@ -1101,7 +1144,6 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
         for key in (
             "allow_global_access",
             "no_automate_dns_zone",
-            "adopt_existing",
             "delete_adopted_resources",
             "deletion_protection",
         ):
@@ -1150,7 +1192,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 return f"{key} cannot override Astrolift-owned fields: {', '.join(reserved)}"
         return ""
 
-    def _endpoint_id(self, spec: ProvisionSpec, endpoint_type: str) -> str:
+    def _endpoint_id(self, spec: ProvisionSpec, endpoint_type: str, location: str) -> str:
         raw = "-".join(
             filter(
                 None,
@@ -1163,9 +1205,18 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 ),
             ),
         )
-        if endpoint_type == "google_apis":
-            return _google_api_id(raw)
-        return _resource_id(raw, maximum=48)
+
+        def derive(value: str) -> str:
+            return _google_api_id(value) if endpoint_type == "google_apis" else _resource_id(value, maximum=48)
+
+        legacy = derive(raw)
+        if spec.recorded_handle == _handle(location, legacy):
+            # Named before #2086 and recorded that way: keep it rather than
+            # derive a new name and create a second endpoint beside it.
+            return legacy
+        # Slug-joined names collide across orgs (acme + web-prod and acme-web +
+        # prod), so new names carry a digest of the managed-service id.
+        return derive(f"{raw}-{hashlib.sha256(spec.managed_service_id.encode()).hexdigest()[:8]}")
 
 
 def _safe_raw(cfg: dict[str, Any], key: str, owned_fields: set[str]) -> dict[str, Any]:
@@ -1227,6 +1278,7 @@ def _labels(
     operator: dict[str, str],
     service: dict[str, str],
     *,
+    managed_service_id: str,
     adopted: bool = False,
 ) -> dict[str, str]:
     labels = {**operator, **service}
@@ -1234,6 +1286,7 @@ def _labels(
         {
             "astrolift-managed-by": "platform",
             "astrolift-private-endpoint": _label_value(endpoint_id),
+            MANAGED_SERVICE_ID_LABEL: _label_value(managed_service_id),
         },
     )
     if adopted:
@@ -1246,6 +1299,68 @@ def _owned(resource: dict[str, Any], endpoint_id: str) -> bool:
     return labels.get("astrolift-managed-by") == "platform" and labels.get(
         "astrolift-private-endpoint",
     ) == _label_value(endpoint_id)
+
+
+_MISSING_IDENTITY = "Private Service Connect needs the managed-service id to mark the resources it owns"
+
+
+@dataclass(frozen=True)
+class _Owner:
+    """The service asking, and whether its record vouches for a resource that predates its label."""
+
+    managed_service_id: str
+    record_proves: bool
+
+
+def _identity_refusal(resource: dict[str, Any], owner: _Owner) -> str:
+    """Why ``owner`` may not act on a resource ``_owned`` already accepted, or ``""`` (#2086).
+
+    ``_owned`` keys on the endpoint id, which a tenant chooses, so it says only
+    that Astrolift made the resource. Whose it is comes from, in order: the
+    managed-service label; the description written at create since #1330, which
+    tenant config cannot set and this driver never rewrites; the platform's
+    exclusive record of the handle, for a resource that has neither.
+    """
+    if not owner.managed_service_id:
+        return f"cannot be checked: {_MISSING_IDENTITY}"
+    ours = _label_value(owner.managed_service_id)
+    labeled = str((resource.get("labels") or {}).get(MANAGED_SERVICE_ID_LABEL) or "")
+    if labeled:
+        return "" if labeled == ours else "belongs to another managed service"
+    described = _described_service(resource)
+    if described == owner.managed_service_id:
+        return ""
+    if _UUID_PATTERN.fullmatch(described):
+        return "was created for another managed service"
+    if owner.record_proves:
+        return ""
+    return (
+        "predates the managed-service ownership label, and neither its description nor an exclusive platform "
+        "record says it is this service's; an operator must mark its owner"
+    )
+
+
+def _names_another_service(resource: dict[str, Any], managed_service_id: str) -> bool:
+    if not managed_service_id:
+        return False
+    labeled = str((resource.get("labels") or {}).get(MANAGED_SERVICE_ID_LABEL) or "")
+    if labeled:
+        return labeled != _label_value(managed_service_id)
+    described = _described_service(resource)
+    return bool(_UUID_PATTERN.fullmatch(described)) and described != managed_service_id
+
+
+def _described_service(resource: dict[str, Any]) -> str:
+    """The managed-service id ``_description`` wrote, or ``""``.
+
+    A description at the 256-character cap may have been cut through the id and
+    had a digest appended, so it is not read at all.
+    """
+    description = str(resource.get("description") or "")
+    match = re.search(r"; resource=([^;]+)$", description)
+    if match is None or len(description) >= 256:
+        return ""
+    return match.group(1)
 
 
 def _adopted(resource: dict[str, Any]) -> bool:

@@ -15,6 +15,7 @@ import type {
   AstroliftAgentSkill as GeneratedAgentSkill,
   AstroliftAgentTask as GeneratedAgentTask,
   AstroliftAgentTrigger as GeneratedAgentTrigger,
+  AstroliftAgentUpcomingRun as GeneratedAgentUpcomingRun,
   AstroliftAgentTriggerResult as GeneratedAgentTriggerResult,
   AstroliftBrief as GeneratedBrief,
   AstroliftDiscoveredAgentManifest as GeneratedDiscoveredAgentManifest,
@@ -240,6 +241,24 @@ export type AstroliftAgentListItem = Pick<
   | "lastRunAt"
   | "runningCount"
 >;
+
+// A fleet row on the list contract (#2155): the list item plus the columns
+// the Agents list used to join in the browser (status, model, runtime,
+// clusters, owner), as `AGENT_FLEET_LIST_PAGE` selects them.
+export type AstroliftAgentFleetRow = AstroliftAgentListItem &
+  Pick<
+    GeneratedAgentListItem,
+    | "status"
+    | "modelSource"
+    | "runtime"
+    | "environmentSpecSlug"
+    | "clusterSlugs"
+    | "ownerEmail"
+    | "ownedByMe"
+  >;
+
+// One upcoming firing of a scheduled agent (`agentUpcomingRuns`, #2155).
+export type AstroliftAgentUpcomingRun = GeneratedAgentUpcomingRun;
 
 // Volatile live-status companion (PR-7), merged into list rows by workloadId.
 export type AstroliftAgentLiveStatus = Pick<

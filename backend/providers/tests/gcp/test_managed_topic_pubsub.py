@@ -122,6 +122,10 @@ class FakeSubscriber:
         del self.state.subscriptions[request["subscription"]]
 
 
+_ALLOWED_ACCOUNT = "push@acme-prod.iam.gserviceaccount.com"
+_FOREIGN_ACCOUNT = "platform-admin@acme-prod.iam.gserviceaccount.com"
+
+
 @dataclass
 class Harness:
     state: CloudState
@@ -145,6 +149,7 @@ def harness() -> Harness:
                 topic_prefix="astrolift",
                 publisher_client=publisher,
                 subscriber_client=subscriber,
+                allowed_service_accounts=(_ALLOWED_ACCOUNT,),
             ),
         ),
     )
@@ -445,6 +450,153 @@ def test_update_can_add_bigquery_and_cloud_storage_subscriptions(harness: Harnes
     assert any("bigquery_config" in item for item in deliveries)
     assert any("cloud_storage_config" in item for item in deliveries)
     assert any("bigtable_config" in item for item in deliveries)
+
+
+def _subscription(**fields: Any) -> dict[str, Any]:
+    return {"name": "exports", **fields}
+
+
+def _ai_transform(account: str) -> dict[str, Any]:
+    return {
+        "ai_inference": {
+            "endpoint": "projects/acme-prod/locations/us-central1/endpoints/1",
+            "service_account_email": account,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        pytest.param(
+            {
+                "subscriptions": [
+                    _subscription(
+                        push_config={
+                            "push_endpoint": "https://example.test/events",
+                            "oidc_token": {"service_account_email": _FOREIGN_ACCOUNT},
+                        },
+                    ),
+                ],
+            },
+            id="push-oidc",
+        ),
+        pytest.param(
+            {
+                "subscriptions": [
+                    _subscription(
+                        bigquery_config={"table": "acme-prod.events.raw", "service_account_email": _FOREIGN_ACCOUNT},
+                    ),
+                ],
+            },
+            id="bigquery",
+        ),
+        pytest.param(
+            {
+                "subscriptions": [
+                    _subscription(
+                        bigtable_config={
+                            "table": "projects/acme-prod/instances/events/tables/hot",
+                            "service_account_email": _FOREIGN_ACCOUNT,
+                        },
+                    ),
+                ],
+            },
+            id="bigtable",
+        ),
+        pytest.param(
+            {
+                "subscriptions": [
+                    _subscription(
+                        cloud_storage_config={"bucket": "events-archive", "service_account_email": _FOREIGN_ACCOUNT},
+                    ),
+                ],
+            },
+            id="cloud-storage",
+        ),
+        pytest.param({"message_transforms": [_ai_transform(_FOREIGN_ACCOUNT)]}, id="topic-ai-transform"),
+        pytest.param(
+            {"subscriptions": [_subscription(message_transforms=[_ai_transform(_FOREIGN_ACCOUNT)])]},
+            id="subscription-ai-transform",
+        ),
+        pytest.param(
+            {
+                "ingestion_data_source_settings": {
+                    "aws_kinesis": {
+                        "stream_arn": "arn:aws:kinesis:us-east-1:111122223333:stream/events",
+                        "consumer_arn": "arn:aws:kinesis:us-east-1:111122223333:stream/events/consumer/c:1",
+                        "aws_role_arn": "arn:aws:iam::111122223333:role/pubsub-ingest",
+                        "gcp_service_account": _FOREIGN_ACCOUNT,
+                    },
+                },
+            },
+            id="ingestion",
+        ),
+        pytest.param(
+            {
+                "subscriptions": [
+                    _subscription(
+                        push_config={
+                            "push_endpoint": "https://example.test/events",
+                            "oidc_token": {"serviceAccountEmail": _FOREIGN_ACCOUNT},
+                        },
+                    ),
+                ],
+            },
+            id="json-spelling",
+        ),
+    ],
+)
+def test_pubsub_cannot_act_as_an_unlisted_account(harness: Harness, config: dict[str, Any]) -> None:
+    denied = harness.driver.provision(_spec(config))
+
+    assert not denied.ok
+    assert "pubsub_allowed_service_accounts" in denied.message
+    assert harness.state.topics == {}
+    assert harness.state.subscriptions == {}
+
+
+def test_a_listed_account_may_back_push_and_export_subscriptions(harness: Harness) -> None:
+    _provision(
+        harness,
+        {
+            "subscriptions": [
+                _subscription(
+                    bigquery_config={"table": "acme-prod.events.raw", "service_account_email": _ALLOWED_ACCOUNT},
+                ),
+            ],
+        },
+    )
+
+    subscription = next(iter(harness.state.subscriptions.values()))
+    assert subscription["bigquery_config"]["service_account_email"] == _ALLOWED_ACCOUNT
+
+
+def test_update_cannot_move_a_subscription_to_an_unlisted_account(harness: Harness) -> None:
+    provisioned = _provision(harness)
+
+    denied = harness.driver.update(
+        UpdateSpec(
+            handle=provisioned.handle,
+            config={
+                "subscriptions": [
+                    _subscription(
+                        cloud_storage_config={"bucket": "events-archive", "service_account_email": _FOREIGN_ACCOUNT},
+                    ),
+                ],
+            },
+        ),
+    )
+
+    assert not denied.ok and "pubsub_allowed_service_accounts" in denied.message
+    assert harness.state.subscriptions == {}
+
+
+def test_a_label_named_like_an_identity_field_is_not_an_identity(harness: Harness) -> None:
+    _provision(harness, {"labels": {"service_account_email": "anything"}})
+
+    topic = next(iter(harness.state.topics.values()))
+    assert topic["labels"]["service_account_email"] == "anything"
 
 
 def test_prune_removes_undeclared_topic_subscriptions(harness: Harness) -> None:

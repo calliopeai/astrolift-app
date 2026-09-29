@@ -129,8 +129,17 @@ Returns `202`:
 Promote registers the app (`source_kind` `direct_upload`), onboards it,
 and serves the promoted files from the app's own namespace at `app_url`.
 The app keeps running independently of the dev environment. It answers
-`409` for an environment that is not `running` or `failed`, has no
-cluster, or sits on another organization's cluster.
+`409` for an environment that is not `running`, `failed`, or already
+`promoting`, has no cluster, or sits on another organization's cluster.
+The runtime is recorded as a Workload + Deployment on the app, so its
+pages, rollback and observability see it the same way they see a
+manifest-driven deploy's.
+
+Promoting the same dev environment again with the same `app_slug` updates
+that app in place instead of `409`ing: sync new files onto the dev
+environment, then promote again to ship them. Onboarding does not repeat;
+only the runtime re-renders. The destination team must still be the app's
+own -- promote does not move an app between teams.
 
 `data_persistent` answers "does data the app writes survive a restart":
 

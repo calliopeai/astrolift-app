@@ -1,16 +1,14 @@
 import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Members · Astrolift",
-};
+import { legacyPeopleHref } from "@/components/screens/administration/access/access-nav";
 
-/**
- * /settings/members is an alias for the canonical org-members
- * surface at /administration/members. The redirect runs server-side
- * so deep-links from a settings-shaped mental model land on the real
- * page without a client-side bounce. Permission gating lives on the
- * canonical page and is unchanged by this alias.
- */
-export default function SettingsMembersAliasPage() {
-  redirect("/administration/members");
+export const metadata = { title: "People · Astrolift" };
+
+/** People moved to Admin › Access (access UX design 5); old links keep working. */
+export default async function SettingsMembersAliasPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirect(legacyPeopleHref(await searchParams));
 }

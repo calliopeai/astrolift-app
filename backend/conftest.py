@@ -95,6 +95,18 @@ from core.tests.fixtures.tenants import two_tenants  # noqa: E402, F401
 
 
 @pytest.fixture(autouse=True)
+def _reset_abac_attributes():
+    """Drop the ABAC request attributes (and their per-request policy cache)
+    after every test. A test that drives middleware or a consumer directly
+    never reaches process_response, so without this the next test in the
+    worker would read the previous one's cached policies (#2157)."""
+    yield
+    from astrolift_identity.abac import clear_request_attributes
+
+    clear_request_attributes()
+
+
+@pytest.fixture(autouse=True)
 def _reset_request_id():
     rid = generate_ulid()
     token = set_request_id(rid)

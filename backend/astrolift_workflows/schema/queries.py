@@ -3,13 +3,25 @@ Workflow surface (spec 40 §6, #968)."""
 
 from __future__ import annotations
 
+import uuid
+
 import strawberry
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Prefetch, Q, Value
 from django.db.models.functions import Coalesce
 from strawberry.types import Info
 
-from astrolift_graphql import KeysetPage, PageType, keyset_page, search_q
+from astrolift_graphql import (
+    FilterField,
+    KeysetPage,
+    PageType,
+    UnsupportedSort,
+    filter_q,
+    filter_values,
+    keyset_page,
+    parse_sort_spec,
+    search_q,
+)
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.client import (
     describe_workflow_instance,
@@ -26,12 +38,15 @@ from astrolift_workflows.schema.types import (
 )
 from astrolift_workflows.schema.workflow_config_types import (
     ConfiguredWorkflowType,
+    PendingHumanGateType,
+    WorkflowDefinitionRunsFilterInput,
     WorkflowDefinitionRunType,
     WorkflowDefinitionSummaryType,
     WorkflowRunType,
     definition_run_to_type,
     definition_summary,
     environment_model_map,
+    pending_gate_to_type,
     run_to_type,
     workflow_to_type,
 )
@@ -48,12 +63,82 @@ from workflows.scopes import (
     covered_project_ids,
     definition_scope_by_slug,
     execution_scope_by_id,
+    may_decide_human_gate,
     visible_runs,
     workflow_run_scope,
     workflow_run_scope_by_id,
     workflow_scope_by_guid,
     workflow_scope_by_slug,
 )
+
+
+def _viewer_id() -> int | None:
+    tenant = get_current_tenant()
+    return tenant.actor_user_id if tenant else None
+
+
+def _definition_runs_qs(caller: int):
+    """The definition runs the caller may read, with what a row renders joined."""
+    qs = (
+        WorkflowRun.objects.filter(
+            organization_id=caller,
+            workflow_kind="WorkflowDefinitionRunWorkflow",
+            workflow_definition_id__isnull=False,
+            workflow_definition__deleted_at__isnull=True,
+        )
+        .select_related(
+            "workflow_definition",
+            "workflow_definition__project",
+            "current_stage_execution",
+            "current_stage_execution__stage",
+            "parent_run",
+            "parent_stage_execution",
+        )
+        .annotate(child_run_count=Count("child_runs", filter=Q(child_runs__deleted_at__isnull=True)))
+    )
+    return visible_runs(qs, caller, Permission.WORKFLOW_READ)
+
+
+def _iexact_any(path: str, values) -> Q:
+    query = Q(pk__in=[])
+    for value in values:
+        query |= Q(**{f"{path}__iexact": value})
+    return query
+
+
+def _user_ids(values, viewer_id: int | None) -> list[int]:
+    out: list[int] = []
+    for value in values:
+        if value == "me":
+            if viewer_id is not None:
+                out.append(viewer_id)
+            continue
+        try:
+            out.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+_DEFINITION_RUN_FILTERS: dict[str, FilterField] = {
+    "status": FilterField("status"),
+    "trigger": FilterField("trigger_kind"),
+    "definition": FilterField(q=lambda v: _iexact_any("workflow_definition__slug", v)),
+    "project": FilterField(q=lambda v: _iexact_any("workflow_definition__project__slug", v)),
+    # ``started_by`` / ``started_by_me`` need the viewer; applied below.
+}
+
+
+def _apply_definition_run_filter(qs, values: dict, viewer_id: int | None):
+    qs = qs.filter(filter_q(values, _DEFINITION_RUN_FILTERS))
+    if "started_by" in values:
+        qs = qs.filter(trigger_actor_user_id__in=_user_ids(values["started_by"], viewer_id))
+    mine = values.get("started_by_me")
+    if mine is True:
+        qs = qs.filter(trigger_actor_user_id=viewer_id) if viewer_id is not None else qs.none()
+    elif mine is False and viewer_id is not None:
+        qs = qs.filter(Q(trigger_actor_user_id__isnull=True) | ~Q(trigger_actor_user_id=viewer_id))
+    return qs
 
 
 def _caller_org_pk() -> int | None:
@@ -694,3 +779,126 @@ class WorkflowsQuery:
             qs = qs.filter(status=status)
         rows = qs.order_by("-started_at", "-guid")[: max(1, min(int(limit), 200))]
         return [definition_run_to_type(run) for run in rows]
+
+    @strawberry.field(
+        description=(
+            "Runs of workflow definitions visible in the caller's organization, cursor-paged, "
+            "with search and filters (#2155)."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
+    @tenant_scoped()
+    def workflow_definition_runs_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID | None = None,
+        search: str | None = None,
+        filter: WorkflowDefinitionRunsFilterInput | None = None,
+        sort: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[WorkflowDefinitionRunType]:
+        """The paged sibling of ``workflowDefinitionRuns``.
+
+        ``search`` matches the definition's name and slug, the project slug,
+        and the run guid and Temporal workflow id by prefix. ``filter``:
+        status (any of), definition and project (slugs), trigger kind, and
+        the initiator (``startedBy`` user ids or "me", and ``startedByMe``).
+        ``sort`` is ``created`` in either direction, newest first by default:
+        a cursor list sorts on one NOT NULL key, and ``startedAt`` is
+        nullable. Same visibility as the list: the caller's org, narrowed to
+        the runs whose owner the caller covers.
+        """
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return KeysetPage.empty().map(definition_run_to_type)
+        pairs = parse_sort_spec(sort) or [("created", True)]
+        if len(pairs) > 1 or pairs[0][0] != "created":
+            raise UnsupportedSort(f"sort {sort!r} is not available on workflow runs; supported: created")
+        descending = pairs[0][1]
+        qs = _definition_runs_qs(caller)
+        if search and search.strip():
+            term = search.strip()
+            qs = qs.filter(
+                search_q(
+                    term,
+                    "workflow_definition__name",
+                    "workflow_definition__slug",
+                    "workflow_definition__project__slug",
+                    prefix=("guid", "workflow_id"),
+                )
+            )
+        qs = _apply_definition_run_filter(qs, filter_values(filter), _viewer_id())
+        page = keyset_page(
+            qs,
+            cursor=after,
+            limit=limit,
+            descending=descending,
+            cursor_scope=f"workflow-definition-runs:{'-' if descending else ''}created",
+        )
+        return page.map(definition_run_to_type)
+
+    @strawberry.field(description="One run of a workflow definition by guid, or null (#2155).")
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
+    @tenant_scoped()
+    def workflow_definition_run(
+        self, info: Info, guid: str, org_id: strawberry.ID | None = None
+    ) -> WorkflowDefinitionRunType | None:
+        """So a run page can open a workflow run by the guid a list row carries.
+
+        Resolved inside the caller's org and its run visibility, exactly as
+        ``workflowDefinitionRuns`` lists them: another org's run, one the
+        caller's grants do not cover, and a malformed guid all read as null.
+        """
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return None
+        try:
+            run_guid = str(uuid.UUID(str(guid)))
+        except (TypeError, ValueError, AttributeError):
+            return None
+        run = _definition_runs_qs(caller).filter(guid=run_guid, organization_id=caller).first()
+        return definition_run_to_type(run) if run is not None else None
+
+    @strawberry.field(
+        description=(
+            "Open human_gate stage executions across the org's runs that the caller may "
+            "decide, newest first (#1820)."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_TRIGGER, any_scope=True)
+    @tenant_scoped()
+    def pending_human_gates(
+        self,
+        info: Info,
+        org_id: strawberry.ID | None = None,
+        limit: int = 50,
+    ) -> list[PendingHumanGateType]:
+        caller, ok = _org_pk_matches(org_id)
+        if not ok:
+            return []
+        from workflows.models import WorkflowStage, WorkflowStageExecution
+
+        runs = visible_runs(
+            WorkflowRun.objects.filter(organization_id=caller), caller, Permission.WORKFLOW_TRIGGER
+        )
+        # A gate naming specific approver addresses the caller isn't one of
+        # is filtered out below, after the DB slice. Declared approvers are
+        # almost always team/role slugs rather than addresses in practice,
+        # and this mirrors the exact check the decide path applies
+        # (``may_decide_human_gate``), so the two never disagree.
+        rows = (
+            WorkflowStageExecution.objects.filter(
+                stage__kind=WorkflowStage.StageKind.HUMAN_GATE,
+                workflow_run_id__in=runs.values("pk"),
+            )
+            .exclude(status__in=WorkflowStageExecution.TERMINAL_STATUSES)
+            .select_related("stage__definition", "workflow_run")
+            .order_by("-started_at", "-pk")[: max(1, min(int(limit), 200))]
+        )
+        user = info.context.user
+        return [
+            pending_gate_to_type(execution)
+            for execution in rows
+            if may_decide_human_gate(user, execution.stage.approvers)
+        ]

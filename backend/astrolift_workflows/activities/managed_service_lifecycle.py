@@ -11,6 +11,7 @@ stays off the activity event loop.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import Any
 
@@ -170,7 +171,64 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
         # among them — had a path to a resource (#1505). Validated on the
         # way into the org, so it is portable by the time it lands here.
         tags=dict(getattr(org, "default_resource_tags", None) or {}),
+        recorded_handle=str(svc.backend_ref or ""),
     )
+
+
+def _recorded_handle_exclusive(svc: Any, *, resolved: Any, cfg: Any) -> bool:
+    """Whether ``svc.backend_ref`` is recorded for ``svc`` and no other live service (#2086).
+
+    A driver whose identity marker postdates some of its resources can prove one
+    of those older resources is this service's only by the platform's record, and
+    the record proves that only while it is unique. Two live rows recording one
+    handle is the collision #2086 describes: the second row recorded it because
+    its own provision accepted a resource keyed by a tenant-settable id. Neither
+    record then proves anything, so the driver refuses both until an operator
+    decides which service owns the resource.
+
+    Scoped the way a GCP handle is. A handle names a resource inside one project,
+    so another row counts only when it resolves to the same driver in the same
+    project. Established for GCP drivers only, the ones that read it; ``False``
+    elsewhere means "not established". A row that cannot be placed counts against
+    exclusivity, because unknown is not unique.
+    """
+    from astrolift_drivers.managed_resolution import resolve_managed_driver
+    from astrolift_services.models import ManagedService
+    from core.cluster_observability import managed_config_for
+
+    handle = str(svc.backend_ref or "")
+    project = str(getattr(cfg, "project_id", "") or "")
+    if not handle or not project or resolved.plugin_slug != "gcp":
+        return False
+    others = (
+        ManagedService.objects.filter(kind=svc.kind, backend_ref=handle)
+        .exclude(pk=svc.pk)
+        .select_related(
+            "app_environment__tenant_cluster__provider_plugin",
+            "tenant_cluster__provider_plugin",
+        )
+    )
+    for other in others:
+        cluster = _service_cluster(other)
+        if cluster is None:
+            return False
+        variant = str(getattr(other, "variant", "") or "")
+        try:
+            other_resolved = resolve_managed_driver(
+                cluster_plugin_slug=cluster.provider_plugin.slug,
+                kind=other.kind,
+                variant=variant,
+            )
+            if other_resolved.driver_cls is not resolved.driver_cls:
+                continue
+            other_cfg = managed_config_for(
+                other_resolved.plugin_slug, cluster, kind=other.kind, variant=variant
+            )
+        except Exception:  # noqa: BLE001 - a row that cannot be placed may still be the same resource
+            return False
+        if str(getattr(other_cfg, "project_id", "") or "") == project:
+            return False
+    return True
 
 
 def _assert_email_identity_unclaimed(svc: Any, spec: Any, cluster: Any) -> None:
@@ -220,6 +278,73 @@ def _assert_email_identity_unclaimed(svc: Any, spec: Any, cluster: Any) -> None:
             f"managed service {svc.name or svc.kind!r}: identity {identity!r} is already "
             f"provisioned by another managed service"
         )
+
+
+def _recorded_restore_source(svc: Any, restore: dict[str, Any]) -> dict[str, str]:
+    """Refuse a restore whose source is not a snapshot Astrolift retained for
+    this service's own app or project on this cluster (#2087).
+
+    ``restore.snapshot_id`` and ``restore.source_handle`` are typed into the
+    manifest, and a driver's ``restore`` reads whatever they name with the
+    platform's credentials: a backup, revision or export of another org's
+    service on a shared cluster, or a platform one. Few snapshots carry a
+    label a driver could read, and none carries one a tenant cannot copy, so
+    the platform decides from its own records before any driver runs.
+
+    The snapshot it records is the one a data-preserving teardown takes,
+    ``lifecycle_policy.last_retained_snapshot``. The pair must match one, and
+    every service recording it must share this service's organization, its
+    owner (the app, or the project for a project service), its kind and its
+    cluster: the identifiers resolve in the account, project or namespace
+    they were taken in, and the same string on another cluster can name
+    another tenant's resource. Every refusal reads the same, so it does not
+    tell a caller whether another org holds the snapshot.
+
+    Returns the record, and the driver restores exactly that: its
+    ``created_at`` is the point in time several drivers restore to, so a
+    ``created_at`` typed beside the pair must be the recorded one or absent.
+    """
+    from astrolift_services.models import ManagedService
+    from astrolift_services.secret_ref_config import service_owner
+
+    def boundary(service: Any) -> tuple[Any, ...]:
+        env = service.app_environment
+        return (
+            service_owner(service).organization_id,
+            service.registered_app_id,
+            service.project_id,
+            service.kind,
+            service.tenant_cluster_id or (env.tenant_cluster_id if env is not None else None),
+        )
+
+    snapshot_id = str(restore.get("snapshot_id") or "")
+    source_handle = str(restore.get("source_handle") or "")
+    recorded = (
+        ManagedService.all_objects.select_related("registered_app", "project", "app_environment").filter(
+            lifecycle_policy__last_retained_snapshot__snapshot_id=snapshot_id,
+            lifecycle_policy__last_retained_snapshot__source_handle=source_handle,
+        )
+        if snapshot_id and source_handle
+        else []
+    )
+    target = boundary(svc)
+    records = {
+        str((source.lifecycle_policy.get("last_retained_snapshot") or {}).get("created_at") or "")
+        for source in recorded
+    }
+    requested_at = str(restore.get("created_at") or "")
+    if (
+        not recorded
+        or any(boundary(source) != target for source in recorded)
+        or len(records) != 1
+        or requested_at not in ("", *records)
+    ):
+        owner = "project" if svc.project_id else "app"
+        raise ManagedServicePreflightError(
+            f"managed service {svc.name or svc.kind!r}: restore source {snapshot_id!r} is not a "
+            f"snapshot Astrolift retained for a {svc.kind} service of this {owner} on this cluster"
+        )
+    return {"snapshot_id": snapshot_id, "source_handle": source_handle, "created_at": records.pop()}
 
 
 def _signals_already_gone(*parts: object) -> bool:
@@ -286,7 +411,7 @@ def _delete_dynamic_pvc_data(svc: Any, cluster: Any, *, force_destroy: bool) -> 
         storage_consumer_key,
     )
     from astrolift_services.models import ManagedServiceAttachment, ManagedServiceVolumeBinding
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     bindings = list(
@@ -315,13 +440,13 @@ def _delete_dynamic_pvc_data(svc: Any, cluster: Any, *, force_destroy: bool) -> 
     namespaces: set[str] = set()
     for attachment in attachments:
         if attachment.app_environment_id:
-            namespaces.add(namespace_for_app(attachment.app_environment.registered_app))
+            namespaces.add(namespace_for_environment(attachment.app_environment))
         elif attachment.agent_environment_spec_id:
             from astrolift_workflows.activities.agent_stage import _agent_namespace
 
             namespaces.add(_agent_namespace(attachment.agent_environment_spec.organization.slug))
     if not svc.project_id and svc.app_environment_id:
-        namespaces.add(namespace_for_app(svc.registered_app))
+        namespaces.add(namespace_for_environment(svc.app_environment))
     if not namespaces:
         return True, "no materialized dynamic claims found"
 
@@ -458,6 +583,7 @@ def _deprovision_sync(
 
     from _sdk.managed_service import DeprovisionSpec, ServiceHandle
 
+    exclusive = _recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg)
     # ``delete_data=False`` is a preservation claim, not just a driver flag.
     # Complete and record a provider-backed snapshot/export before allowing the
     # destructive half of teardown to start. Unsupported snapshot methods fail
@@ -468,6 +594,7 @@ def _deprovision_sync(
             ServiceHandle(
                 handle=svc.backend_ref,
                 managed_service_id=_service_identity(svc),
+                recorded_handle_exclusive=exclusive,
             )
         )
         snapshot_id = str(getattr(retained, "snapshot_id", "") or "")
@@ -492,6 +619,7 @@ def _deprovision_sync(
         handle=svc.backend_ref or "",
         config=deprovision_config,
         managed_service_id=_service_identity(svc),
+        recorded_handle_exclusive=exclusive,
     )
     try:
         result = driver.deprovision(
@@ -658,6 +786,8 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     _assert_config_secret_refs_scoped(svc, cluster)
+    restore = dict((getattr(svc, "lifecycle_policy", None) or {}).get("restore") or {})
+    source = _recorded_restore_source(svc, restore) if restore and not svc.backend_ref else None
     _run_managed_service_preflight(svc, cluster)
     spec = build_provision_spec(svc, cluster=cluster)
     _assert_email_identity_unclaimed(svc, spec, cluster)
@@ -672,16 +802,19 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
 
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
+    spec = dataclasses.replace(
+        spec,
+        recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+    )
 
-    restore = dict((getattr(svc, "lifecycle_policy", None) or {}).get("restore") or {})
-    if restore and not svc.backend_ref:
+    if source is not None:
         from _sdk.managed_service import SnapshotHandle
 
         result = driver.restore(
             SnapshotHandle(
-                handle=str(restore["source_handle"]),
-                snapshot_id=str(restore["snapshot_id"]),
-                created_at=str(restore.get("created_at", "")),
+                handle=source["source_handle"],
+                snapshot_id=source["snapshot_id"],
+                created_at=source["created_at"],
             ),
             spec,
         )
@@ -739,6 +872,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
             size=str(desired["size"]) if "size" in desired else None,
             config=desired,
             managed_service_id=_service_identity(svc),
+            recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
         ),
     )
     return {
@@ -981,7 +1115,11 @@ def _managed_binding_for(svc: Any) -> Any:
         return None
     from _sdk.managed_service import ServiceHandle
 
-    handle = ServiceHandle(handle=svc.backend_ref, managed_service_id=_service_identity(svc))
+    handle = ServiceHandle(
+        handle=svc.backend_ref,
+        managed_service_id=_service_identity(svc),
+        recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+    )
     # Thread the operator-supplied ``ManagedService.config`` into the
     # binding so config-driven binding fields render (#1038): the SES
     # driver folds ``from_name``/``reply_to``/``return_path``/
@@ -1213,7 +1351,7 @@ def _bounce_dependent_workloads_sync(
 
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_services.models import ManagedService
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     if not rebound_binding_ids:
@@ -1245,7 +1383,7 @@ def _bounce_dependent_workloads_sync(
         .order_by("pk")
     )
     for env in environments:
-        namespace = namespace_for_app(env.registered_app)
+        namespace = namespace_for_environment(env)
         driver = _driver_for_cluster(env.tenant_cluster)
         cluster_slug = _context_for_cluster(env.tenant_cluster).slug
         patch_workload = getattr(driver, "patch_workload", None)

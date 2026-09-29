@@ -542,6 +542,17 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
         has_any = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).exists()
         if not has_any:
             effective_env_names = ["production"]
+    from astrolift_lifecycle.services.preview_lineage import PRIMARY_NAME_PREFERENCE
+    from astrolift_registry.namespaces import namespace_for_new_environment
+    from core.app_deploy import environment_hostname_label
+
+    # The first environment of an app on a cluster renders into the app
+    # namespace and serves the app's hostname; a later one on the same
+    # cluster gets a namespace and hostname of its own (#1922). So a primary
+    # name goes first, not whichever manifest service happened to be listed
+    # first.
+    rank = {name: index for index, name in enumerate(PRIMARY_NAME_PREFERENCE)}
+    effective_env_names.sort(key=lambda name: rank.get(name.lower(), len(rank)))
     for env_name in effective_env_names:
         existing = AppEnvironment.objects.filter(
             registered_app=app,
@@ -549,11 +560,16 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
             deleted_at__isnull=True,
         ).exists()
         if not existing:
+            k8s_namespace = namespace_for_new_environment(app, name=env_name, cluster=cluster)
+            label = app.subdomain or app.slug
+            if k8s_namespace:
+                label = environment_hostname_label(label, env_name)
             AppEnvironment.objects.create(
                 registered_app=app,
                 tenant_cluster=cluster,
                 name=env_name,
-                url=(f"https://{app.subdomain or app.slug}.{base_zone}" if base_zone else ""),
+                k8s_namespace=k8s_namespace,
+                url=(f"https://{label}.{base_zone}" if base_zone else ""),
                 managed_domain=_managed_domain,
                 required_approvals=0,
             )

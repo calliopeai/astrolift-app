@@ -166,6 +166,7 @@ export const UPDATE_ORGANIZATION = gql`
         appearanceLocked
       appearanceDefault
       appearanceLocked
+        restrictedSettingsDefault
         previewMaxActiveDefault
         logRetentionDaysDefault
         allowUserProfileEdit

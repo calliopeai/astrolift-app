@@ -135,7 +135,7 @@ def _resolve_driver_and_namespace(workload: Workload) -> tuple[Any, str, str]:
     the same fallback. Raises :class:`K8sOpError` when the workload
     can't be bound to a deploy target.
     """
-    from core.app_deploy import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
     env = _primary_environment_for_workload(workload)
@@ -145,7 +145,7 @@ def _resolve_driver_and_namespace(workload: Workload) -> tuple[Any, str, str]:
             f"workload {workload.slug!r} has no active environment bound to a cluster",
         )
     cluster = env.tenant_cluster
-    namespace = namespace_for_app(workload.registered_app)
+    namespace = namespace_for_environment(env)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
     return driver, namespace, ctx.slug
