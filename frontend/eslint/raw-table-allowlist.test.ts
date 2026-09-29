@@ -22,6 +22,8 @@ const SEARCH_ROOTS = ["app", "components"];
 const SKIP_DIRS = new Set(["node_modules", ".next", "__generated__"]);
 // DataTable owns the primitives; the rule already exempts its directory.
 const RULE_EXEMPT_DIR = "components/data-table/";
+// The primitive's own story: its Storybook catalog entry, not a surface.
+const RULE_EXEMPT_FILES = new Set(["components/ui/table.stories.tsx"]);
 const RAW_TABLE_IMPORT = '"@/components/ui/table"';
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -38,7 +40,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 function filesImportingThePrimitives(): string[] {
   return SEARCH_ROOTS.flatMap((root) => walk(root))
-    .filter((rel) => !rel.startsWith(RULE_EXEMPT_DIR))
+    .filter((rel) => !rel.startsWith(RULE_EXEMPT_DIR) && !RULE_EXEMPT_FILES.has(rel))
     .filter((rel) => readFileSync(path.join(FRONTEND, rel), "utf8").includes(RAW_TABLE_IMPORT))
     .sort();
 }

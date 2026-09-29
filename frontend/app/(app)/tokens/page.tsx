@@ -1,25 +1,25 @@
-import { LIST_API_TOKENS } from "@/graphql/identity/identity.queries";
+import { LIST_API_TOKENS_PAGE } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
-import { AdministrationSubnav } from "../administration/administration-subnav";
 import { TokensClient } from "./tokens-client";
 
 export const metadata = { title: "API keys · Astrolift" };
 
+/**
+ * Preloads the list's first page, the query the page reads. The variables
+ * have to be exactly the ones `useTokens` sends for the default list state
+ * (tokensVariables: no search, the first page size, no cursor).
+ */
+const FIRST_PAGE = { search: null, limit: 25, after: null };
+
 // /tokens is the canonical Tokens surface but lives at the top level rather
-// than under /administration (see administration-subnav.tsx, #893). Render the
-// same Administration sub-navigation here so the page keeps its place in the
-// admin control plane — Tokens highlighted, every sibling section one click
-// away — instead of stranding the operator on a page with no way back.
+// than under /administration (#893). It keeps its place in the admin control
+// plane through the rail's Admin › Usage & governance › API keys row and the
+// `Admin ▾` switcher on every Admin page.
 export default function TokensPage() {
   return (
-    <div className="flex flex-1 flex-col">
-      <AdministrationSubnav />
-      <div className="flex-1">
-        <PreloadQuery query={LIST_API_TOKENS}>
-          <TokensClient />
-        </PreloadQuery>
-      </div>
-    </div>
+    <PreloadQuery query={LIST_API_TOKENS_PAGE} variables={FIRST_PAGE}>
+      <TokensClient />
+    </PreloadQuery>
   );
 }

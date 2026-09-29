@@ -1,24 +1,19 @@
 import { redirect } from "next/navigation";
 
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
+
 /**
- * The Console tab split into Observe › Logs and Control › Shell (#1247).
- * Its logs half is what deep links point at — PodExpander's "open in console"
- * link, bookmarks, URLs pasted into incident threads — so `/console` keeps
- * resolving and lands on Logs with the query string intact.
+ * The old Console tab's logs half is what deep links point at (PodExpander,
+ * bookmarks, incident threads), so it lands on Logs & metrics › Logs (spec
+ * 44 §5.2). The old URL keeps resolving, with whatever query it carried.
  */
 export default async function AppConsoleRedirect({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(await searchParams)) {
-    if (Array.isArray(value)) value.forEach((v) => query.append(key, v));
-    else if (value !== undefined) query.set(key, value);
-  }
-  const suffix = query.size > 0 ? `?${query}` : "";
-  redirect(`/apps/${slug}/logs${suffix}`);
+  redirect(redirectTarget(slug, "logs", "logs", await searchParams));
 }

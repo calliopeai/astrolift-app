@@ -19,21 +19,23 @@ import { HelpCircle, Loader2, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Turn = {
+export type WayfindingTurn = {
   question: string;
   answer: string;
   routes: string[];
 };
 
-const NOT_CONFIGURED =
-  "Wayfinding isn't switched on for this install. Ask an operator to set the platform's model key.";
+export interface WayfindingBubbleProps {
+  turns: WayfindingTurn[];
+  pending: boolean;
+  error: string | null;
+  onAsk: (question: string) => void;
+}
 
-export function WayfindingBubble() {
+/** Pure (Storybook first): the conversation comes from useWayfinding, wired by the shell. */
+export function WayfindingBubble({ turns, pending, error, onAsk }: WayfindingBubbleProps) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -62,42 +64,12 @@ export function WayfindingBubble() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  async function ask(event: React.FormEvent) {
+  function ask(event: React.FormEvent) {
     event.preventDefault();
     const asked = question.trim();
     if (!asked || pending) return;
-
-    setPending(true);
-    setError(null);
     setQuestion("");
-    try {
-      const res = await fetch("/api/agents/v1/wayfinding/ask/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-platform": "web" },
-        body: JSON.stringify({ question: asked }),
-      });
-      if (res.status === 503) {
-        setError(NOT_CONFIGURED);
-        return;
-      }
-      if (!res.ok) {
-        // The endpoint's error bodies are operator-facing prose; surfacing
-        // the raw body beats "something went wrong", which tells the person
-        // nothing they can act on.
-        const body = await res.json().catch(() => null);
-        setError(body?.error ?? `Request failed (HTTP ${res.status})`);
-        return;
-      }
-      const json = await res.json();
-      setTurns((prior) => [
-        ...prior,
-        { question: asked, answer: json.answer ?? "", routes: json.routes ?? [] },
-      ]);
-    } catch {
-      setError("Couldn't reach the wayfinding service.");
-    } finally {
-      setPending(false);
-    }
+    onAsk(asked);
   }
 
   if (!open) {

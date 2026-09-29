@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
+import { PILL_TONE, type StatusTone } from "@/lib/status-tones";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,6 +27,14 @@ export type RunStatus =
   | "unknown";
 
 type Dot = "ok" | "warn" | "error" | "muted" | "pending";
+
+const DOT_PILL: Record<Dot, StatusTone> = {
+  ok: "ok",
+  warn: "warn",
+  error: "error",
+  muted: "muted",
+  pending: "info",
+};
 
 const STATUS_DOT: Record<RunStatus, Dot> = {
   running: "pending",
@@ -53,13 +62,13 @@ export function RunStatusBadge({ status, exitCode, className }: RunStatusBadgePr
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       <StatusDot status={dot} />
-      <Badge variant={dot === "error" ? "destructive" : "secondary"} className="capitalize">
+      <Badge variant="outline" className={cn("capitalize", PILL_TONE[DOT_PILL[dot]])}>
         {label}
       </Badge>
       {showExit ? (
         <Badge
           variant="outline"
-          className="border-destructive/40 text-destructive font-mono"
+          className={cn("font-mono", PILL_TONE.error)}
           title={t("exitCodeTooltip", { code: exitCode })}
         >
           {t("exitCodeLabel", { code: exitCode })}

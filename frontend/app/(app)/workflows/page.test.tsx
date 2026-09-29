@@ -3,12 +3,15 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import WorkflowsPage from "./page";
+import { workflowsFormerTabTarget } from "@/components/screens/workflows/list/workflows-list";
+
+import { WorkflowsClient } from "./workflows-client";
 
 const state = vi.hoisted(() => ({
-  tab: "",
+  query: "",
   canAudit: false,
   runDefinition: vi.fn(),
+  push: vi.fn(),
   replace: vi.fn(),
   definitions: [
     {
@@ -82,18 +85,31 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: state.replace }),
+  useRouter: () => ({ replace: state.replace, push: state.push }),
   usePathname: () => "/workflows",
-  useSearchParams: () => new URLSearchParams(state.tab ? `tab=${state.tab}` : ""),
+  useSearchParams: () => new URLSearchParams(state.query),
 }));
 
 vi.mock("@apollo/client/react", () => ({
-  useQuery: () => ({ data: { workflows: [], astroliftWorkflowRuns: [] }, loading: false }),
+  useQuery: () => ({
+    data: { workflowsPage: { items: [], nextCursor: null, totalCount: 0 } },
+    loading: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("@/graphql/identity/identity.hooks", () => ({
+  useActiveOrg: () => ({ org: { id: "org-1" } }),
 }));
 
 vi.mock("@/graphql/workflows/tiered.hooks", () => ({
-  useWorkflowDefinitions: () => ({ definitions: state.definitions, loading: false }),
+  useWorkflowDefinitions: () => ({
+    definitions: state.definitions,
+    loading: false,
+    refetch: vi.fn(),
+  }),
   useDeleteDefinition: () => [vi.fn()],
+  useCloneDefinition: () => [vi.fn()],
   useWorkflowsEntitlement: () => ({
     canCreate: true,
     canManage: true,
@@ -120,42 +136,16 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@/components/PageShell", () => ({
-  PageShell: ({
-    title,
-    actions,
-    children,
-  }: {
-    title: ReactNode;
-    actions?: ReactNode;
-    children: ReactNode;
-  }) => (
-    <main>
-      <h1>{title}</h1>
-      {actions}
-      {children}
-    </main>
-  ),
-}));
+function openMenu(name: string) {
+  fireEvent.pointerDown(screen.getByRole("button", { name }), { button: 0, ctrlKey: false });
+}
 
-vi.mock("./instances-panel", () => ({
-  WorkflowInstancesPanel: () => <div>Temporal instances panel</div>,
-}));
-
-vi.mock("./[slug]/components/workflow-detail-shell", () => ({
-  formatTriggerKind: (value: string) => value,
-}));
-
-vi.mock("./[slug]/components/run-content", () => ({
-  latestRun: () => null,
-  RunStateBadge: ({ state: value }: { state: string }) => <span>{value}</span>,
-}));
-
-describe("WorkflowsPage repository topology", () => {
+describe("Workflows list", () => {
   beforeEach(() => {
-    state.tab = "";
+    state.query = "";
     state.canAudit = false;
     state.definitionRuns = [];
+    state.push.mockReset();
     state.replace.mockReset();
     state.runDefinition.mockReset();
     state.runDefinition.mockResolvedValue({
@@ -163,26 +153,27 @@ describe("WorkflowsPage repository topology", () => {
     });
   });
 
-  it("renders imported definitions directly and starts one without a configured wrapper", async () => {
-    render(<WorkflowsPage />);
+  it("lists an imported definition directly and starts one without a configured wrapper", async () => {
+    render(<WorkflowsClient />);
 
-    expect(screen.getByText("Repository workflows")).toBeInTheDocument();
-    expect(
-      screen.getByRole("application", { name: "Workflow stage topology" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /EMR Triage/ })).toHaveAttribute(
+      "href",
+      "/workflows/emr-triage"
+    );
+    expect(screen.getByText("steadymd/smd-agents/workflows/emr-triage.toml")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    openMenu("Workflows: row actions");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Run now" }));
 
     await waitFor(() =>
       expect(state.runDefinition).toHaveBeenCalledWith({
         variables: { workflowSlug: "emr-triage", triggerPayload: null },
       })
     );
-    expect(state.replace).toHaveBeenCalledWith("/workflows?tab=running", { scroll: false });
+    await waitFor(() => expect(state.push).toHaveBeenCalledWith("/workflows/emr-triage/runs"));
   });
 
-  it("shows direct definition runs without requiring audit access to raw Temporal", () => {
-    state.tab = "running";
+  it("shows a definition's run state without audit access, and keeps raw Temporal behind it", async () => {
     state.definitionRuns = [
       {
         guid: "run-1",
@@ -201,10 +192,32 @@ describe("WorkflowsPage repository topology", () => {
       },
     ];
 
-    render(<WorkflowsPage />);
+    render(<WorkflowsClient />);
 
-    expect(screen.getByText("Agent workflow runs")).toBeInTheDocument();
-    expect(screen.getByText("Stage 1: intake")).toBeInTheDocument();
-    expect(screen.queryByText("Temporal instances panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Running")).toBeInTheDocument();
+    openMenu("More workflow actions");
+    expect(await screen.findByRole("menuitem", { name: "Workflow runs" })).toHaveAttribute(
+      "href",
+      "/tasks?kind=workflow"
+    );
+    expect(screen.queryByRole("menuitem", { name: "Platform instances" })).not.toBeInTheDocument();
+  });
+
+  it("offers the platform instances to audit readers", async () => {
+    state.canAudit = true;
+    render(<WorkflowsClient />);
+    openMenu("More workflow actions");
+    expect(await screen.findByRole("menuitem", { name: "Platform instances" })).toHaveAttribute(
+      "href",
+      "/workflows/instances"
+    );
+  });
+
+  it("sends the old tabs where they went", () => {
+    expect(workflowsFormerTabTarget({})).toBeNull();
+    expect(workflowsFormerTabTarget({ tab: "running" })).toBe("/tasks?view=running&kind=workflow");
+    expect(workflowsFormerTabTarget({ tab: "history" })).toBe("/tasks?kind=workflow");
+    expect(workflowsFormerTabTarget({ tab: "definitions" })).toBe("/workflows?view=templates");
+    expect(workflowsFormerTabTarget({ tab: "nonsense" })).toBe("/workflows");
   });
 });

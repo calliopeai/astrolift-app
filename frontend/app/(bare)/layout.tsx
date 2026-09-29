@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { BareShell } from "@/components/screens/shell/BareShell";
+
 /**
  * Chromeless shell for surfaces that are the whole window rather than a page
  * in the app: today just the popped-out pod terminal (#1246). No sidebar, no
@@ -17,5 +19,5 @@ export default async function BareLayout({ children }: { children: React.ReactNo
   if (!cookieStore.has("backend_jwt") && !cookieStore.has("sessionid")) {
     redirect("/auth/login");
   }
-  return <div className="bg-background h-svh w-svw overflow-hidden">{children}</div>;
+  return <BareShell>{children}</BareShell>;
 }

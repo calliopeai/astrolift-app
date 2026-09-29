@@ -256,7 +256,29 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
 
     result.hostname_conflicts = sync_workload_hostname_claims(app, manifest)
 
+    _sync_ingress_access(app, manifest)
+
     return result
+
+
+def _sync_ingress_access(app, manifest: NormalizedManifest) -> None:
+    """Apply ``[ingress.access]`` (#2132).
+
+    Declared: the repo's grant wins, and the UI shows it as managed there.
+    Removed from a manifest that set it: the rule is cleared. Never declared:
+    whatever an operator set in the UI or CLI is left alone.
+    """
+    from core.edge_access import normalize_access, set_app_access
+
+    declared = manifest.serialized.get("ingress_access")
+    current = app.edge_access or {}
+    if declared is not None:
+        wanted = normalize_access(declared.get("groups"), declared.get("users"))
+        have = normalize_access(current.get("groups"), current.get("users"))
+        if wanted != have or current.get("source") != "manifest":
+            set_app_access(app, groups=wanted["groups"], users=wanted["users"], source="manifest")
+    elif current.get("source") == "manifest":
+        set_app_access(app, groups=[], users=[], source="manifest")
 
 
 def _merge_config(service: ManagedServiceManifest) -> dict:

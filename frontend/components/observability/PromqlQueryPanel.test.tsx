@@ -4,6 +4,12 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { PromqlQueryPanel } from "./PromqlQueryPanel";
+import { usePromql } from "./use-promql";
+
+/** The panel as the observability page wires it. */
+function Wired({ appSlug, environmentName }: { appSlug: string; environmentName: string }) {
+  return <PromqlQueryPanel {...usePromql(appSlug, environmentName)} />;
+}
 
 /**
  * The Query panel could always run PromQL. What an operator lacked was any
@@ -53,7 +59,7 @@ vi.mock("recharts", () => ({
 }));
 
 function openPanel() {
-  render(<PromqlQueryPanel appSlug="shop" environmentName="production" />);
+  render(<Wired appSlug="shop" environmentName="production" />);
   // Collapsed by default — discovery is a Prometheus round trip and should
   // not fire for an operator who never opens the panel.
   fireEvent.click(screen.getByRole("button", { name: /query/i }));

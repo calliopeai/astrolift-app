@@ -1,222 +1,217 @@
 "use client";
 
-import { useLazyQuery, useQuery } from "@apollo/client/react";
 import { ChevronDownIcon, ChevronRightIcon, GitBranchIcon } from "lucide-react";
 import * as React from "react";
 
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { type SelectRowsSpec, selectRows } from "@/components/list/select-rows";
+import {
+  type ListDefinition,
+  standardViews,
+  useLocalListState,
+} from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { GET_APP_TRACES, GET_TRACE_SPANS } from "@/graphql/observability/observability.queries";
 import type { AstroliftAppTrace, AstroliftTraceSpan } from "@/graphql/__generated__/schema";
 
-interface TracesResp {
-  astroliftAppTraces: AstroliftAppTrace[];
+/** One trace's spans, loaded on first expand. */
+export interface TraceSpans {
+  loading: boolean;
+  spans: AstroliftTraceSpan[];
 }
 
-interface SpansResp {
-  astroliftTraceSpans: AstroliftTraceSpan[];
-}
+export type TraceStatusFilter = "ALL" | "OK" | "ERROR";
 
 export interface TraceExplorerPanelProps {
-  appSlug: string;
-  environmentName?: string | null;
+  traces: AstroliftAppTrace[];
+  loading: boolean;
+  statusFilter: TraceStatusFilter;
+  onStatusFilterChange: (filter: TraceStatusFilter) => void;
+  spans: Record<string, TraceSpans>;
+  onExpand: (traceId: string) => void;
 }
 
-type StatusFilter = "ALL" | "OK" | "ERROR";
-
-const TRACE_LOOKBACK_SECONDS = 3600;
-const TRACE_LIMIT = 50;
-
-export function TraceExplorerPanel({ appSlug, environmentName }: TraceExplorerPanelProps) {
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("ALL");
-
-  // Snapshot the range on mount via lazy state init so the query
-  // variables stay stable across re-renders (Date.now is impure and
-  // can't be called during render).
-  const [{ since, until }] = React.useState(() => {
-    const nowSec = Math.floor(Date.now() / 1000);
-    return {
-      since: String(nowSec - TRACE_LOOKBACK_SECONDS),
-      until: String(nowSec),
-    };
-  });
-
-  const { data, loading } = useQuery<TracesResp>(GET_APP_TRACES, {
-    variables: {
-      appSlug,
-      since,
-      until,
-      environmentName: environmentName ?? null,
-      status: statusFilter === "ALL" ? null : statusFilter,
-      limit: TRACE_LIMIT,
+/**
+ * The traces as an embedded list. Status is the query's filter (the hook
+ * sends it); search, sort and numbered pages run over the bounded window the
+ * query returns (needsBackend: a Page field). Traces are the app's, not a
+ * person's, so Mine is empty.
+ */
+const TRACES_LIST: ListDefinition = {
+  id: "observability.traces",
+  fields: [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "OK", label: "OK" },
+        { value: "ERROR", label: "ERROR" },
+      ],
     },
-    fetchPolicy: "cache-and-network",
-  });
+  ],
+  searchPlaceholder: "Search services, operations, trace ids…",
+  defaultSort: [{ key: "recent", dir: "asc" }],
+  views: standardViews({ owner: "me" }, [], {
+    mineNote: "Traces are the app's, not a person's, so Mine is empty.",
+  }),
+  paging: "numbered",
+  pageSizes: [25, 50, 100],
+};
 
-  const traces = data?.astroliftAppTraces ?? [];
-  const isInitialLoading = loading && !data;
+function tracesSelect(traces: AstroliftAppTrace[]): SelectRowsSpec<AstroliftAppTrace> {
+  // The query's own order (most recent first) is the default.
+  const order = new Map(traces.map((t, i) => [t.traceId, i]));
+  return {
+    filter: { owner: () => false },
+    text: (t) => [t.rootService, t.rootOperation, t.traceId],
+    sort: {
+      recent: (t) => order.get(t.traceId) ?? 0,
+      service: (t) => t.rootService.toLowerCase(),
+      operation: (t) => t.rootOperation.toLowerCase(),
+      spans: (t) => t.spanCount,
+      duration: (t) => t.durationMs,
+    },
+    id: (t) => t.traceId,
+  };
+}
+
+/** Pure (Storybook first): traces, filter and spans come from useTraceExplorer. */
+export function TraceExplorerPanel({
+  traces,
+  loading: isInitialLoading,
+  statusFilter,
+  onStatusFilterChange,
+  spans,
+  onExpand,
+}: TraceExplorerPanelProps) {
+  const list = useLocalListState(TRACES_LIST, {
+    filters: statusFilter === "ALL" ? {} : { status: statusFilter },
+  });
+  const status = list.filters.status;
+  // The status chip is the query's filter: hand it to the hook.
+  React.useEffect(() => {
+    onStatusFilterChange(status === "OK" || status === "ERROR" ? status : "ALL");
+  }, [status, onStatusFilterChange]);
+
+  const [expanded, setExpanded] = React.useState<ReadonlySet<string>>(() => new Set());
+  const toggle = (traceId: string) => {
+    const open = !expanded.has(traceId);
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(traceId);
+      else next.delete(traceId);
+      return next;
+    });
+    if (open) onExpand(traceId);
+  };
+
+  const page = selectRows(
+    traces,
+    {
+      filters: list.filters,
+      q: list.state.q,
+      sort: list.state.sort,
+      page: list.state.page,
+      pageSize: list.state.pageSize,
+    },
+    tracesSelect(traces)
+  );
+
+  const columns: Column<AstroliftAppTrace>[] = [
+    {
+      id: "operation",
+      header: "Root Operation",
+      sortKey: "operation",
+      cellClassName: "min-w-0",
+      cell: (trace) => {
+        const open = expanded.has(trace.traceId);
+        const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
+        return (
+          <div className="flex min-w-0 flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => toggle(trace.traceId)}
+              aria-expanded={open}
+              className="flex min-w-0 items-center gap-2 text-left"
+            >
+              <Chevron className="text-muted-foreground size-4 shrink-0" />
+              <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                {trace.rootOperation}
+              </span>
+            </button>
+            {open && (
+              <div className="bg-muted/20 rounded-md py-3">
+                <SpanList
+                  loading={spans[trace.traceId]?.loading ?? true}
+                  spans={spans[trace.traceId]?.spans ?? []}
+                />
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "service",
+      header: "Root Service",
+      sortKey: "service",
+      cellClassName: "align-top font-mono text-xs",
+      cell: (trace) => trace.rootService,
+    },
+    {
+      id: "spans",
+      header: "Spans",
+      sortKey: "spans",
+      align: "right",
+      cellClassName: "align-top font-mono text-xs",
+      cell: (trace) => trace.spanCount,
+    },
+    {
+      id: "duration",
+      header: "Duration",
+      sortKey: "duration",
+      align: "right",
+      cellClassName: "align-top font-mono text-xs",
+      cell: (trace) => formatDuration(trace.durationMs),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cellClassName: "align-top",
+      cell: (trace) => <StatusBadge code={trace.statusCode} />,
+    },
+  ];
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <GitBranchIcon className="size-4" /> Traces
-            </CardTitle>
-            <CardDescription>
-              Recent distributed traces from the last 1h. Click a row to expand spans.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs">Status</span>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-            >
-              <SelectTrigger size="sm" className="h-8 w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="OK">OK</SelectItem>
-                <SelectItem value="ERROR">ERROR</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <GitBranchIcon className="size-4" /> Traces
+        </CardTitle>
+        <CardDescription>
+          Recent distributed traces from the last 1h. Click an operation to expand its spans.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8" />
-              <TableHead>Root Service</TableHead>
-              <TableHead>Root Operation</TableHead>
-              <TableHead className="text-right">Spans</TableHead>
-              <TableHead className="text-right">Duration</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isInitialLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={`skeleton-${i}`}>
-                  <TableCell />
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-48" />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="ml-auto h-4 w-8" />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Skeleton className="ml-auto h-4 w-12" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-12" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : traces.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground py-8 text-center text-sm">
-                  No traces — tracing backend not configured
-                </TableCell>
-              </TableRow>
-            ) : (
-              traces.map((trace) => (
-                <TraceRow
-                  key={trace.traceId}
-                  trace={trace}
-                  appSlug={appSlug}
-                  environmentName={environmentName ?? null}
-                />
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <ListPage<AstroliftAppTrace>
+          embedded
+          list={list}
+          label="Traces"
+          columns={columns}
+          rows={page.rows}
+          getRowId={(t) => t.traceId}
+          totalCount={page.totalCount}
+          loading={isInitialLoading}
+          empty={{
+            icon: <GitBranchIcon className="size-5" />,
+            title: "No traces",
+            description: "The tracing backend is not configured.",
+          }}
+        />
       </CardContent>
     </Card>
-  );
-}
-
-interface TraceRowProps {
-  trace: AstroliftAppTrace;
-  appSlug: string;
-  environmentName: string | null;
-}
-
-function TraceRow({ trace, appSlug, environmentName }: TraceRowProps) {
-  const [expanded, setExpanded] = React.useState(false);
-  const [fetchSpans, spansQuery] = useLazyQuery<SpansResp>(GET_TRACE_SPANS);
-
-  const toggle = () => {
-    const next = !expanded;
-    setExpanded(next);
-    if (next && !spansQuery.called) {
-      void fetchSpans({
-        variables: {
-          appSlug,
-          traceId: trace.traceId,
-          environmentName,
-        },
-      });
-    }
-  };
-
-  const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
-  // useLazyQuery returns DeepPartial<TData>; coerce here since the whole
-  // span shape lands or `data` is undefined (mirrors the settings panel
-  // helper).
-  const spans = (spansQuery.data?.astroliftTraceSpans as AstroliftTraceSpan[] | undefined) ?? [];
-
-  return (
-    <>
-      <TableRow
-        className="hover:bg-muted/40 cursor-pointer"
-        onClick={toggle}
-        aria-expanded={expanded}
-      >
-        <TableCell className="w-8">
-          <Chevron className="text-muted-foreground size-4" />
-        </TableCell>
-        <TableCell className="font-mono text-xs">{trace.rootService}</TableCell>
-        <TableCell className="font-mono text-xs">{trace.rootOperation}</TableCell>
-        <TableCell className="text-right font-mono text-xs">{trace.spanCount}</TableCell>
-        <TableCell className="text-right font-mono text-xs">
-          {formatDuration(trace.durationMs)}
-        </TableCell>
-        <TableCell>
-          <StatusBadge code={trace.statusCode} />
-        </TableCell>
-      </TableRow>
-      {expanded && (
-        <TableRow className="bg-muted/20 hover:bg-muted/20">
-          <TableCell colSpan={6} className="py-3">
-            <SpanList loading={spansQuery.loading && !spansQuery.data} spans={spans} />
-          </TableCell>
-        </TableRow>
-      )}
-    </>
   );
 }
 
@@ -255,9 +250,7 @@ function SpanList({ loading, spans }: SpanListProps) {
         >
           <span className="font-mono">{span.operation}</span>
           <span className="text-muted-foreground font-mono">{span.service}</span>
-          <span className="text-muted-foreground font-mono">
-            {formatDuration(span.durationMs)}
-          </span>
+          <span className="text-muted-foreground font-mono">{formatDuration(span.durationMs)}</span>
           <StatusBadge code={span.statusCode} />
         </div>
       ))}

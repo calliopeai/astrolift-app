@@ -28,6 +28,7 @@ from _sdk.base import ProviderPlugin
 from aws.cluster_eks import EKSClusterDriver
 from aws.dns_route53 import Route53Driver
 from aws.identity_irsa import IRSADriver
+from aws.identity_users_cognito import CognitoIdentityUsersDriver
 from aws.ingress_alb import ALBIngressDriver
 from aws.managed.api_gateway_http import ApiGatewayHttpDriver
 from aws.managed.api_gateway_rest import ApiGatewayRestDriver
@@ -101,6 +102,8 @@ PLUGIN = ProviderPlugin(
         "cluster": EKSClusterDriver,
         "ingress": ALBIngressDriver,
         "notification": SNSNotificationDriver,
+        # The edge identity provider's users (#2131).
+        "identity_users": CognitoIdentityUsersDriver,
     },
     managed_service_drivers={
         # Cloud-neutral kinds map to provider-specific executable variants.

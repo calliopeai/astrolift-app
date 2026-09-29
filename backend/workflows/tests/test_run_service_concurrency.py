@@ -25,7 +25,9 @@ def test_overlapping_initial_inserts_keep_distinct_execution_handles():
 
     def build():
         try:
-            return build_workflow_definition_run_input(definition, organization_id=org.pk)
+            return build_workflow_definition_run_input(
+                definition, organization_id=org.pk, trigger_kind="manual"
+            )
         finally:
             connections.close_all()
 

@@ -16,7 +16,6 @@
  * consistent at a glance.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { BrainCircuitIcon, ChartSplineIcon, DatabaseIcon, HardDriveIcon } from "lucide-react";
 import * as React from "react";
 import {
@@ -31,18 +30,13 @@ import {
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GET_MANAGED_SERVICE_METRICS } from "@/graphql/observability/observability.queries";
 import type {
-  AstroliftManagedServiceMetrics,
   AstroliftManagedServiceMetricSeries,
   AstroliftTimeSeriesPoint,
 } from "@/graphql/__generated__/schema";
 
 import { TIME_RANGE_OPTIONS, type TimeRangeKey } from "./golden-signals-types";
-
-interface MetricsResp {
-  astroliftAppManagedServiceMetrics: AstroliftManagedServiceMetrics | null;
-}
+import type { useManagedServiceMetrics } from "./use-managed-service-metrics";
 
 /** Managed-service kinds the resolver supports today. The FE filters
  *  on this set so an app with five managed services renders panels
@@ -134,10 +128,7 @@ const KIND_HEADER: Record<string, { label: string; description: string }> = {
   },
 };
 
-interface PanelProps {
-  managedServiceId: string;
-  rangeSeconds?: number;
-}
+export type ManagedServiceMetricsPanelProps = ReturnType<typeof useManagedServiceMetrics>;
 
 /**
  * Per-binding metrics panel — wraps one ManagedService row. Returns
@@ -145,18 +136,12 @@ interface PanelProps {
  * service) so the caller doesn't need to know which kinds we support
  * at the GraphQL layer.
  */
-export function ManagedServiceMetricsPanel({ managedServiceId, rangeSeconds }: PanelProps) {
-  const [range, setRange] = React.useState<TimeRangeKey>("1h");
-  const rangeS = rangeSeconds ?? TIME_RANGE_OPTIONS.find((o) => o.key === range)?.seconds ?? 3600;
-
-  const q = useQuery<MetricsResp>(GET_MANAGED_SERVICE_METRICS, {
-    variables: { managedServiceId, rangeSeconds: rangeS },
-    fetchPolicy: "cache-and-network",
-  });
-
-  const data = q.data?.astroliftAppManagedServiceMetrics ?? null;
-  const isLoading = q.loading && !q.data;
-
+export function ManagedServiceMetricsPanel({
+  range,
+  onRangeChange: setRange,
+  data,
+  loading: isLoading,
+}: ManagedServiceMetricsPanelProps) {
   // Resolver returned null → unsupported kind. Skip render entirely
   // rather than blank out the page; the caller usually iterates an
   // app's full ManagedService list and renders only the ones we
@@ -222,15 +207,18 @@ export interface ManagedServiceBindingLite {
 
 export function ManagedServiceMetricsList({
   managedServices,
+  renderPanel,
 }: {
   managedServices: ManagedServiceBindingLite[];
+  /** One panel per supported binding; the app pairs it with its data. */
+  renderPanel: (managedServiceId: string) => React.ReactNode;
 }) {
   const supported = managedServices.filter((m) => SUPPORTED_KINDS.has(m.kind));
   if (supported.length === 0) return null;
   return (
     <div className="space-y-4">
       {supported.map((m) => (
-        <ManagedServiceMetricsPanel key={m.id} managedServiceId={m.id} />
+        <React.Fragment key={m.id}>{renderPanel(m.id)}</React.Fragment>
       ))}
     </div>
   );

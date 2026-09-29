@@ -21,6 +21,7 @@ from astrolift_graphql import (
 )
 from astrolift_identity.grants import REFUSAL, GrantCeiling, grant_ceiling, require_grantable
 from astrolift_identity.models import (
+    GroupRoleMapping,
     Member,
     Organization,
     Role,
@@ -35,14 +36,18 @@ from astrolift_identity.schema.mutations.helpers import (
 from astrolift_identity.schema.mutations.types import (
     BulkAssignTeamMemberRolesInput,
     BulkRevokeRoleBindingsInput,
+    CreateGroupRoleMappingInput,
+    DeleteGroupRoleMappingInput,
     GrantRoleInput,
     RevokeRoleBindingInput,
+    UpdateRoleBindingInput,
     _BulkAssignTeamMemberRolesPayload,
     _BulkOpItemResult,
     _BulkRevokeRoleBindingsPayload,
     _SoftDeletePayload,
 )
 from astrolift_identity.schema.types import (
+    GroupRoleMappingType,
     RoleBindingType,
     role_binding_to_type,
 )
@@ -134,12 +139,31 @@ def _revoke_refusal(
     return None
 
 
+def _input_of(args, kwargs):
+    payload = kwargs.get("input")
+    if payload is None and len(args) >= 3:
+        payload = args[2]
+    return payload
+
+
+def _grant_target(*args, **kwargs):
+    """File a grant under the user it grants to, so a person's page can list it (#2151)."""
+    user_id = getattr(_input_of(args, kwargs), "user_id", "")
+    return ("user", str(user_id)) if user_id else None
+
+
+def _revoke_target(*args, **kwargs):
+    """File a revoke under the binding it revokes; the subject filter maps it to the user (#2151)."""
+    binding_id = getattr(_input_of(args, kwargs), "id", "")
+    return ("role_binding", str(binding_id)) if binding_id else None
+
+
 @strawberry.type
 class RoleBindingMutations:
     # ---- RBAC --------------------------------------------------------
 
     @strawberry.field
-    @mutation_audit(action="role_binding.grant")
+    @mutation_audit(action="role_binding.grant", target=_grant_target)
     @requires_elevation(action_label="role_binding.grant")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()
@@ -157,27 +181,50 @@ class RoleBindingMutations:
         if org_id is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid")
 
-        try:
-            target_user_pk = int(input.user_id)
-        except ValueError:
-            return gql_failure(ErrorCode.VALIDATION.value, "userId must be a numeric pk", field="userId")
+        # Exactly one principal (#2157): a member of this org, or an IdP
+        # group named by its external id.
+        user_arg = (input.user_id or "").strip()
+        group_id = (input.group_external_id or "").strip()
+        if bool(user_arg) == bool(group_id):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "give exactly one of userId or groupExternalId",
+                field="userId",
+            )
+        if len(group_id) > 255:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "groupExternalId may be at most 255 characters",
+                field="groupExternalId",
+            )
+        if input.expires_at is not None and input.expires_at <= timezone.now():
+            return gql_failure(
+                ErrorCode.VALIDATION.value, "expiresAt must be in the future", field="expiresAt"
+            )
 
-        # The target must already be a member of the caller's org.
-        # Checking org membership (rather than global user existence)
-        # both enforces the tenant boundary and avoids leaking whether an
-        # arbitrary user pk exists anywhere on the install.
-        if not Member.objects.filter(
-            user_id=target_user_pk,
-            scope_kind=Member.ScopeKind.ORG,
-            scope_id=org_id,
-            deleted_at__isnull=True,
-        ).exists():
-            return gql_failure(ErrorCode.NOT_FOUND.value, "user not found", field="userId")
+        user = None
+        if user_arg:
+            try:
+                target_user_pk = int(user_arg)
+            except ValueError:
+                return gql_failure(ErrorCode.VALIDATION.value, "userId must be a numeric pk", field="userId")
 
-        User = get_user_model()
-        user = User.objects.filter(pk=target_user_pk).first()
-        if user is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "user not found", field="userId")
+            # The target must already be a member of the caller's org.
+            # Checking org membership (rather than global user existence)
+            # both enforces the tenant boundary and avoids leaking whether an
+            # arbitrary user pk exists anywhere on the install.
+            if not Member.objects.filter(
+                user_id=target_user_pk,
+                scope_kind=Member.ScopeKind.ORG,
+                scope_id=org_id,
+                deleted_at__isnull=True,
+            ).exists():
+                return gql_failure(ErrorCode.NOT_FOUND.value, "user not found", field="userId")
+
+            User = get_user_model()
+            user = User.objects.filter(pk=target_user_pk).first()
+            if user is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "user not found", field="userId")
 
         # Restrict the role to the caller's own custom roles or a
         # system/null-org role — another org's custom role reads as
@@ -206,30 +253,39 @@ class RoleBindingMutations:
             gate=Permission.ORG_MANAGE_MEMBERS,
         )
 
+        principal = (
+            {"user": user} if user is not None else {"user__isnull": True, "group_external_id": group_id}
+        )
         if RoleBinding.objects.filter(
-            user=user, role=role, scope_kind=scope_kind, scope_id=scope_id
+            role=role, scope_kind=scope_kind, scope_id=scope_id, **principal
         ).exists():
             return gql_failure(
                 ErrorCode.CONFLICT.value,
-                "this user already has this role on this scope",
+                "this user already has this role on this scope"
+                if user is not None
+                else "this group already has this role on this scope",
             )
 
         binding = RoleBinding.objects.create(
             user=user,
+            group_external_id=group_id,
             role=role,
             scope_kind=scope_kind,
             scope_id=scope_id,
             granted_by=_actor(),
+            expires_at=input.expires_at,
         )
 
         # Auto-add a Member row at the target scope so middleware can
-        # resolve the tenant when this user logs in.
-        Member.objects.get_or_create(
-            user=user,
-            scope_kind=scope_kind,
-            scope_id=scope_id,
-            defaults={"is_active": True, "lifecycle": "active"},
-        )
+        # resolve the tenant when this user logs in. A group has no
+        # Member row: its members already belong to the org.
+        if user is not None:
+            Member.objects.get_or_create(
+                user=user,
+                scope_kind=scope_kind,
+                scope_id=scope_id,
+                defaults={"is_active": True, "lifecycle": "active"},
+            )
 
         # Resolve a single source-scope label inline so the FE can show
         # the role-source tooltip on the freshly-granted binding without
@@ -240,7 +296,188 @@ class RoleBindingMutations:
         return gql_success(role_binding_to_type(binding, source_scope_label=label))
 
     @strawberry.field
-    @mutation_audit(action="role_binding.revoke")
+    @mutation_audit(action="role_binding.update")
+    @requires_elevation(action_label="role_binding.update")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def update_role_binding(
+        self, info: Info, input: UpdateRoleBindingInput
+    ) -> MutationResultType[RoleBindingType]:
+        """Change a binding's role or its expiry (#2157).
+
+        Capped like a revoke of the old role and a grant of the new one at
+        the binding's scope, and an org keeps its last owner: moving the
+        last owner to another role, or putting an expiry on that binding,
+        is refused unless the caller is the platform operator.
+        """
+        from astrolift_identity.schema.queries import _org_scope_q, _resolve_source_scope_labels
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
+        binding = (
+            RoleBinding.objects.select_related("role", "user")
+            .filter(guid=str(input.id))
+            .filter(_org_scope_q(org_id))
+            .first()
+        )
+        if binding is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "role binding not found")
+
+        new_role = None
+        if input.role_id is not strawberry.UNSET and input.role_id is not None:
+            new_role = (
+                Role.objects.filter(guid=str(input.role_id))
+                .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+                .first()
+            )
+            if new_role is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleId")
+        expiry_given = input.expires_at is not strawberry.UNSET
+        if expiry_given and input.expires_at is not None and input.expires_at <= timezone.now():
+            return gql_failure(
+                ErrorCode.VALIDATION.value, "expiresAt must be in the future", field="expiresAt"
+            )
+        if new_role is None and not expiry_given:
+            return gql_failure(ErrorCode.VALIDATION.value, "give roleId or expiresAt", field="roleId")
+        role_changes = new_role is not None and new_role.pk != binding.role_id
+
+        with transaction.atomic():
+            _lock_org(org_id)
+            ceilings: dict[tuple[str, int], GrantCeiling] = {}
+            # Changing either field can take the old role's access away, so
+            # it is capped like a revoke, last owner included.
+            refusal = _revoke_refusal(binding, org_id, ceilings)
+            takes_owner_away = role_changes or (expiry_given and input.expires_at is not None)
+            if refusal == LAST_OWNER_REFUSAL and not takes_owner_away:
+                refusal = None
+            if refusal is None and role_changes:
+                if not ceilings[(binding.scope_kind, binding.scope_id)].allows(new_role.permissions):
+                    refusal = REFUSAL
+            if refusal is not None:
+                raise PermissionDenied(
+                    Permission.ORG_MANAGE_MEMBERS,
+                    PermissionScope(kind=ScopeKind(binding.scope_kind), id=binding.scope_id),
+                    refusal,
+                )
+            if role_changes:
+                duplicate = RoleBinding.objects.filter(
+                    role=new_role, scope_kind=binding.scope_kind, scope_id=binding.scope_id
+                ).exclude(pk=binding.pk)
+                duplicate = (
+                    duplicate.filter(user_id=binding.user_id)
+                    if binding.user_id is not None
+                    else duplicate.filter(user__isnull=True, group_external_id=binding.group_external_id)
+                )
+                if duplicate.exists():
+                    return gql_failure(
+                        ErrorCode.CONFLICT.value, "this principal already has that role on this scope"
+                    )
+                binding.role = new_role
+            if expiry_given:
+                binding.expires_at = input.expires_at
+            binding.save()
+
+        label = _resolve_source_scope_labels([binding]).get((binding.scope_kind, binding.scope_id), "")
+        return gql_success(role_binding_to_type(binding, source_scope_label=label))
+
+    # ---- IdP group mappings (#2157) -----------------------------------
+
+    @strawberry.field
+    @mutation_audit(action="group_role_mapping.create")
+    @requires_elevation(action_label="group_role_mapping.create")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def create_group_role_mapping(
+        self, info: Info, input: CreateGroupRoleMappingInput
+    ) -> MutationResultType[GroupRoleMappingType]:
+        """Map an IdP group to a role on a scope of this org. Applies to
+        every member the IdP puts in the group, exactly like a group
+        binding, and is capped by the caller's own reach there (#1964)."""
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid")
+        group_id = (input.group_external_id or "").strip()
+        if not group_id or len(group_id) > 255:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "groupExternalId is required and at most 255 characters",
+                field="groupExternalId",
+            )
+        role = (
+            Role.objects.filter(guid=str(input.role_id))
+            .filter(Q(organization_id=org_id) | Q(organization__isnull=True))
+            .first()
+        )
+        if role is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "role not found", field="roleId")
+        scope_kind = input.scope_kind.upper()
+        scope_id = _resolve_scope_pk_in_org(scope_kind, str(input.scope_guid), org_id)
+        if scope_id is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "scope not found", field="scopeGuid")
+        require_grantable(
+            role.permissions,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+            gate=Permission.ORG_MANAGE_MEMBERS,
+        )
+        if GroupRoleMapping.objects.filter(
+            organization_id=org_id,
+            group_external_id=group_id,
+            role=role,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+        ).exists():
+            return gql_failure(ErrorCode.CONFLICT.value, "this group already maps to this role on this scope")
+        mapping = GroupRoleMapping.objects.create(
+            organization_id=org_id,
+            group_external_id=group_id,
+            role=role,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+        )
+        from astrolift_identity.schema.queries import group_role_mapping_types
+
+        return gql_success(group_role_mapping_types([mapping], org_id)[0])
+
+    @strawberry.field
+    @mutation_audit(action="group_role_mapping.delete")
+    @requires_elevation(action_label="group_role_mapping.delete")
+    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @tenant_scoped()
+    def delete_group_role_mapping(
+        self, info: Info, input: DeleteGroupRoleMappingInput
+    ) -> MutationResultType[_SoftDeletePayload]:
+        """Remove a group mapping. Capped like revoking a binding: the
+        mapping's role must be within the caller's reach at its scope."""
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        mapping = (
+            GroupRoleMapping.objects.select_related("role")
+            .filter(guid=str(input.id), organization_id=org_id)
+            .first()
+            if org_id is not None
+            else None
+        )
+        if mapping is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "group mapping not found")
+        kind, scope_id = mapping.scope_kind, mapping.scope_id
+        if not _scope_ancestry(tenant, PermissionScope(kind=ScopeKind(kind), id=scope_id)):
+            # The scope was deleted; the org's own ceiling decides.
+            kind, scope_id = "ORG", org_id
+        if not grant_ceiling(tenant, scope_kind=kind, scope_id=scope_id).allows(mapping.role.permissions):
+            raise PermissionDenied(
+                Permission.ORG_MANAGE_MEMBERS,
+                PermissionScope(kind=ScopeKind(kind), id=scope_id),
+                REFUSAL,
+            )
+        mapping.soft_delete(by=_actor())
+        return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.field
+    @mutation_audit(action="role_binding.revoke", target=_revoke_target)
     @requires_elevation(action_label="role_binding.revoke")
     @require_permission(Permission.ORG_MANAGE_MEMBERS)
     @tenant_scoped()

@@ -13,6 +13,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+/** A required free-form reason, for actions the audit trail must explain. */
+export interface ConfirmReason {
+  /** Label above the textarea (e.g. "Reason for rejection"). */
+  label: React.ReactNode;
+  placeholder?: string;
+  /** Shown inline on an empty reason. Defaults to "Reason required". */
+  requiredError?: string;
+}
 
 interface ConfirmDialogProps {
   /** Controlled open state — pair with `onOpenChange`. */
@@ -38,11 +49,16 @@ interface ConfirmDialogProps {
    *  to a "working" state. On resolve, the dialog closes. On reject, the
    *  dialog stays open and a sonner toast surfaces the error message so
    *  the operator can correct and retry. */
-  onConfirm: () => Promise<unknown> | unknown;
+  onConfirm: (reason: string) => Promise<unknown> | unknown;
+  /** Ask for a required reason (reject a deploy, abort a rollout). The
+   *  trimmed reason is passed to `onConfirm`; an empty one is refused
+   *  inline without calling it. Without this, `onConfirm` gets "". */
+  reason?: ConfirmReason;
 }
 
 /**
- * Shared confirmation dialog for destructive actions. Replaces the
+ * Shared confirmation dialog for destructive actions, with an optional
+ * required reason (the former ConfirmDialogWithReason, #2126). Replaces the
  * native browser `confirm()` so the prompt matches the rest of the UI
  * (centered AlertDialog, themed buttons, destructive accent) and so we
  * can show real error feedback when the underlying mutation fails
@@ -79,8 +95,20 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   destructive = false,
   onConfirm,
+  reason,
 }: ConfirmDialogProps) {
   const [pending, setPending] = React.useState(false);
+  const [draft, setDraft] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const reasonId = React.useId();
+
+  // Cleared on every close, so a fresh open never shows the draft of a
+  // cancelled attempt.
+  function close() {
+    setDraft("");
+    setError(null);
+    onOpenChange(false);
+  }
 
   // We don't reset `pending` on `open` flips — the only writer is
   // `handleConfirm` and it always clears the flag in `finally`. The
@@ -93,10 +121,16 @@ export function ConfirmDialog({
     // if it throws.
     e.preventDefault();
     if (pending) return;
+    const trimmed = draft.trim();
+    if (reason && !trimmed) {
+      setError(reason.requiredError ?? "Reason required");
+      return;
+    }
+    setError(null);
     setPending(true);
     try {
-      await onConfirm();
-      onOpenChange(false);
+      await onConfirm(trimmed);
+      close();
     } catch (err) {
       const message =
         err instanceof Error && err.message
@@ -119,7 +153,8 @@ export function ConfirmDialog({
         // once it re-enables, but a stray backdrop click shouldn't
         // abandon a running request.
         if (pending && !next) return;
-        onOpenChange(next);
+        if (next) onOpenChange(true);
+        else close();
       }}
     >
       <AlertDialogContent>
@@ -127,6 +162,29 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description != null && <AlertDialogDescription>{description}</AlertDialogDescription>}
         </AlertDialogHeader>
+        {reason && (
+          <div className="grid min-w-0 gap-2">
+            <Label htmlFor={reasonId}>{reason.label}</Label>
+            <Textarea
+              id={reasonId}
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                if (error) setError(null);
+              }}
+              placeholder={reason.placeholder}
+              rows={4}
+              disabled={pending}
+              aria-invalid={error != null}
+              aria-describedby={error ? `${reasonId}-error` : undefined}
+            />
+            {error && (
+              <p id={`${reasonId}-error`} className="text-destructive text-xs" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction

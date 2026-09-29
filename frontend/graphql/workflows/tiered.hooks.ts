@@ -23,6 +23,7 @@ import {
   EXPORT_WORKFLOW_MANIFEST,
   GET_CONFIGURED_WORKFLOW,
   GET_TIERED_WORKFLOW_DEFINITION,
+  GET_WORKFLOW_DEFINITION_RUN,
   LIST_CONFIGURED_WORKFLOWS,
   LIST_TIERED_WORKFLOW_DEFINITIONS,
   LIST_WORKFLOW_RUNS,
@@ -60,6 +61,7 @@ import type {
   UpdateConfiguredWorkflowData,
   UpdateWorkflowDefinitionTieredData,
   UpdateWorkflowStageData,
+  WorkflowDefinitionRun,
 } from "./tiered.types";
 
 // ─── Entitlement ─────────────────────────────────────────────────────────
@@ -242,6 +244,30 @@ export const useWorkflowDefinitionRuns = (params?: {
   });
   return {
     runs: data?.workflowDefinitionRuns ?? [],
+    loading,
+    error,
+    refetch,
+    startPolling,
+    stopPolling,
+  };
+};
+
+// One definition run by guid (#2155): the run page's own read, so a run
+// past the newest window of the definition's runs still resolves.
+export const useWorkflowDefinitionRun = (params: {
+  guid: string | null;
+  orgId?: string | null;
+  skip?: boolean;
+}) => {
+  const { data, loading, error, refetch, startPolling, stopPolling } = useQuery<{
+    workflowDefinitionRun: WorkflowDefinitionRun | null;
+  }>(GET_WORKFLOW_DEFINITION_RUN, {
+    variables: { guid: params.guid ?? "", orgId: params.orgId ?? null },
+    fetchPolicy: "cache-and-network",
+    skip: !params.guid || (params.skip ?? false),
+  });
+  return {
+    run: data?.workflowDefinitionRun ?? null,
     loading,
     error,
     refetch,

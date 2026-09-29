@@ -258,6 +258,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.CLUSTER_UPDATE,
             Permission.CLUSTER_UNREGISTER,
             Permission.CLUSTER_MANAGE,
+            Permission.CLUSTER_USERS,
             Permission.PROVIDER_PLUGIN_READ,
             Permission.PROVIDER_PLUGIN_CONFIGURE,
         ),
@@ -281,6 +282,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            Permission.APP_ACCESS,
             # Skill registry: team owners maintain the agent Skill +
             # ToolDef catalog and import skills from config repos.
             Permission.SKILL_READ,
@@ -393,6 +395,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            Permission.APP_ACCESS,
             *_AGENT_ENV_SPEC_FULL,
             # Agents + Workflows modules (Phase 0): full management.
             *_AGENT_FULL,
@@ -451,6 +454,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.APP_UPDATE,
             Permission.APP_DELETE,
             *_DEPLOY_OPS,
+            Permission.APP_ACCESS,
             Permission.AGENT_ENV_SPEC_READ,
             Permission.AGENT_ENV_SPEC_UPDATE,
             Permission.AGENT_ENV_SPEC_DELETE,

@@ -54,6 +54,7 @@ def workflow_webhook(request: HttpRequest, org_slug: str, slug: str) -> JsonResp
         dispatch_agent_task_from_webhook,
         trigger_workflow_instance,
     )
+    from core.run_trigger import RunTrigger
     from workflows.run_service import start_workflow_definition_run
 
     webhook = (
@@ -96,6 +97,7 @@ def workflow_webhook(request: HttpRequest, org_slug: str, slug: str) -> JsonResp
                 definition,
                 trigger_payload=payload,
                 organization_id=webhook.organization_id,
+                trigger_kind=RunTrigger.WEBHOOK,
             )
             task_id = str(run.workflow_id)
         else:

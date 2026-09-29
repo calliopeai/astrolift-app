@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
 import { GitBranchIcon, PlugIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -17,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LIST_AVAILABLE_REPOS, LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
 import type { AstroliftRemoteRepoList, AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 
 import type { OnboardingWizardState } from "./types";
@@ -27,38 +25,23 @@ interface Props {
   setState: React.Dispatch<React.SetStateAction<OnboardingWizardState>>;
 }
 
-interface ConnectionsResp {
-  astroliftSourceConnections: AstroliftSourceConnection[];
+/** The repo step's data: source connections, and the repos of the chosen one. */
+export interface RepoStepData {
+  connections: AstroliftSourceConnection[];
+  connectionsLoading: boolean;
+  repos: AstroliftRemoteRepoList | null;
+  reposLoading: boolean;
 }
 
-interface ReposResp {
-  astroliftAvailableRepos: AstroliftRemoteRepoList;
-}
-
-/**
- * Step 3 — optional repo picker. When the org has no SCM connection
- * configured yet we render a "skip and add later" CTA rather than a
- * broken empty picker. The wizard treats this step as fully optional
- * — leaving the picker empty registers no app and just creates the
- * team + project.
- */
-export function RepoStep({ state, setState }: Props) {
+export function RepoStep({
+  state,
+  setState,
+  connections: availableConnections,
+  connectionsLoading,
+  repos: repoList,
+  reposLoading,
+}: Props & RepoStepData) {
   const t = useTranslations("onboarding.repo");
-
-  const connections = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS, {
-    fetchPolicy: "cache-and-network",
-  });
-
-  const availableConnections = React.useMemo(
-    () => connections.data?.astroliftSourceConnections ?? [],
-    [connections.data]
-  );
-
-  const repos = useQuery<ReposResp>(LIST_AVAILABLE_REPOS, {
-    variables: { connectionId: state.sourceConnectionId, limit: 100 },
-    skip: !state.sourceConnectionId,
-    fetchPolicy: "cache-and-network",
-  });
 
   // When connections load, default to the first one so the operator
   // doesn't see an empty <select> placeholder when they actually
@@ -72,7 +55,7 @@ export function RepoStep({ state, setState }: Props) {
     );
   }, [availableConnections, state.sourceConnectionId, setState]);
 
-  if (connections.loading && availableConnections.length === 0) {
+  if (connectionsLoading && availableConnections.length === 0) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-9 w-full" />
@@ -101,8 +84,8 @@ export function RepoStep({ state, setState }: Props) {
     );
   }
 
-  const reposList = repos.data?.astroliftAvailableRepos.repos ?? [];
-  const repoErrorCode = repos.data?.astroliftAvailableRepos.errorCode ?? null;
+  const reposList = repoList?.repos ?? [];
+  const repoErrorCode = repoList?.errorCode ?? null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -145,7 +128,7 @@ export function RepoStep({ state, setState }: Props) {
       {state.sourceConnectionId && (
         <div className="grid gap-2">
           <Label htmlFor="ob-repo">{t("repoLabel")}</Label>
-          {repos.loading ? (
+          {reposLoading ? (
             <Skeleton className="h-9 w-full" />
           ) : repoErrorCode ? (
             <p className="text-destructive text-xs">

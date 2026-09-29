@@ -24,6 +24,7 @@ from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
+from core.run_trigger import RunTrigger, request_trigger
 from core.tenancy import get_current_tenant
 
 
@@ -113,7 +114,10 @@ class TaskMutations:
         run = TaskRun.objects.create(
             workload=workload,
             app_environment=env,
-            trigger_kind=TaskRun.TriggerKind.MANUAL,
+            # A token-authenticated call is an API run, not a manual one (#2152).
+            trigger_kind=(
+                TaskRun.TriggerKind.API if request_trigger() == RunTrigger.API else TaskRun.TriggerKind.MANUAL
+            ),
             triggered_by_user=actor if actor.is_authenticated else None,
             command=input.command or [],
             status=TaskRun.Status.PENDING,

@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { StarIcon } from "lucide-react";
+
+import {
+  type PlaygroundStarredPrompt,
+  PlaygroundStarredScreen,
+} from "@/components/screens/playground/PlaygroundStarredScreen";
 
 import { isRouteEnabled } from "@/lib/route-flags";
 
-const starred = [
+const starred: PlaygroundStarredPrompt[] = [
   {
     title: "Unit test generator",
     prompt:
@@ -53,30 +55,5 @@ const starred = [
 export default function PlaygroundStarredPage() {
   if (!isRouteEnabled("/playground")) notFound();
 
-  return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-xl font-semibold">Starred prompts</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Your saved prompt templates.</p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {starred.map((item) => (
-          <Card key={item.title} className="flex flex-col">
-            <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-              <CardTitle className="text-base">{item.title}</CardTitle>
-              <StarIcon className="h-4 w-4 shrink-0 fill-warning text-warning-fg" />
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-3">
-              <p className="text-muted-foreground line-clamp-3 text-sm">{item.prompt}</p>
-              <div className="mt-auto flex items-center justify-between">
-                <Badge variant="outline">{item.model}</Badge>
-                <span className="text-muted-foreground text-xs">{item.date}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+  return <PlaygroundStarredScreen items={starred} />;
 }

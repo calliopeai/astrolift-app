@@ -1,0 +1,182 @@
+"use client";
+
+import { FileBoxIcon, FolderInputIcon, Loader2Icon, XCircleIcon } from "lucide-react";
+import * as React from "react";
+
+import { Can } from "@/components/Can";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+
+import type { useAssignProject } from "./use-assign-project";
+
+export type AssignProjectCardViewProps = ReturnType<typeof useAssignProject>;
+
+/**
+ * Settings landing card for re-parenting an app under a Team/Project (#391).
+ *
+ * Three states:
+ *  - `unassigned` — current project FK is null. Picker is enabled,
+ *    Unassign button is hidden.
+ *  - `assigned` — current project is set. Picker is enabled (to move),
+ *    Unassign button is shown.
+ *  - `loading` — assignable-projects query in flight; both controls show
+ *    a skeleton.
+ *
+ * Read-only viewers (`!app.update`) see the current value and the
+ * picker as a static badge, with no Save / Unassign affordance.
+ */
+export function AssignProjectCardView({
+  currentProjectId,
+  currentProjectName,
+  currentTeamName,
+  byTeam,
+  projectsLoading,
+  assigning,
+  onAssign,
+  onUnassign,
+}: AssignProjectCardViewProps) {
+  // Selected project drives the Save button enablement. Default to the
+  // current project so re-opening the card doesn't reset the picker.
+  const [selectedProjectId, setSelectedProjectId] = React.useState<string>(currentProjectId ?? "");
+  React.useEffect(() => {
+    setSelectedProjectId(currentProjectId ?? "");
+  }, [currentProjectId]);
+
+  const dirty = selectedProjectId && selectedProjectId !== currentProjectId;
+
+  async function handleSave() {
+    if (!dirty) return;
+    await onAssign(selectedProjectId);
+  }
+
+  const currentLabel = currentProjectId
+    ? `${currentProjectName} (${currentTeamName})`
+    : "Unassigned";
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+        <div className="bg-primary/10 text-primary shrink-0 rounded-md p-2.5">
+          <FolderInputIcon className="size-5" />
+        </div>
+        <div className="flex-1">
+          <CardTitle className="text-base">Project assignment</CardTitle>
+          <CardDescription className="mt-1">
+            Place this app under a project to group it in the sidebar and scope team-level
+            permissions. Apps without a project surface in the team&apos;s &quot;Unassigned&quot;
+            bucket.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Current project</Label>
+          <div className="flex items-center gap-2">
+            {currentProjectId ? (
+              <Badge variant="outline" className="gap-1.5">
+                <FileBoxIcon className="size-3" aria-hidden />
+                <span className="font-mono text-xs">{currentLabel}</span>
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className="border-warning-border bg-warning/10 text-warning-fg"
+              >
+                Unassigned
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <Can
+          permission="app.update"
+          fallback={
+            <p className="text-muted-foreground text-xs italic">
+              You need the <span className="font-mono">app.update</span> permission to change this
+              assignment.
+            </p>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+            <div className="space-y-1.5">
+              <Label htmlFor="assign-project-picker" className="text-xs">
+                Move to project
+              </Label>
+              {projectsLoading ? (
+                <Skeleton className="h-9 w-full" />
+              ) : (
+                <Select
+                  value={selectedProjectId}
+                  onValueChange={setSelectedProjectId}
+                  disabled={assigning || byTeam.length === 0}
+                >
+                  <SelectTrigger id="assign-project-picker" className="w-full">
+                    <SelectValue
+                      placeholder={
+                        byTeam.length === 0
+                          ? "No projects you can assign to"
+                          : "Pick a target project"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {byTeam.map((group) => (
+                      <SelectGroup key={group.teamSlug}>
+                        <SelectLabel className="text-2xs tracking-wide uppercase">
+                          {group.teamName}
+                        </SelectLabel>
+                        {group.projects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span>{p.name}</span>
+                            <span className="text-muted-foreground text-2xs ml-2 font-mono">
+                              {p.slug}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <Button onClick={handleSave} disabled={!dirty || assigning} className="sm:self-end">
+              {assigning ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : (
+                <FolderInputIcon className="size-4" />
+              )}
+              Save
+            </Button>
+            {currentProjectId ? (
+              <Button
+                variant="outline"
+                onClick={onUnassign}
+                disabled={assigning}
+                className="sm:self-end"
+              >
+                {assigning ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <XCircleIcon className="size-4" />
+                )}
+                Unassign
+              </Button>
+            ) : null}
+          </div>
+        </Can>
+      </CardContent>
+    </Card>
+  );
+}

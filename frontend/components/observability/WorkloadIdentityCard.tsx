@@ -11,7 +11,6 @@
  * "not available on this cloud", and "no binding yet" read distinctly.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { KeyRoundIcon, RefreshCwIcon, RotateCcwIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -26,13 +25,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GET_APP_IDENTITY_BINDING } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppIdentityBinding,
   IdentityBindingKind,
 } from "@/graphql/lifecycle/lifecycle.types";
 
-interface Resp {
+export interface WorkloadIdentityCardData {
   astroliftAppIdentityBinding: {
     reason: ObservabilityPanelReason;
     binding: AstroliftAppIdentityBinding | null;
@@ -55,16 +53,19 @@ function formatLastUsed(iso: string | null | undefined): string {
 
 export interface WorkloadIdentityCardProps {
   appSlug: string;
-  environmentName?: string;
 }
 
-export function WorkloadIdentityCard({ appSlug, environmentName }: WorkloadIdentityCardProps) {
-  const { data, loading, refetch } = useQuery<Resp>(GET_APP_IDENTITY_BINDING, {
-    variables: { appSlug, environmentName: environmentName ?? null },
-    fetchPolicy: "cache-and-network",
-    notifyOnNetworkStatusChange: true,
-  });
-
+/** Pure (Storybook first): the data comes from useWorkloadIdentity. */
+export function WorkloadIdentityCard({
+  appSlug,
+  data,
+  loading,
+  onRefresh,
+}: WorkloadIdentityCardProps & {
+  data: WorkloadIdentityCardData | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
   const binding = data?.astroliftAppIdentityBinding?.binding ?? null;
   const reason = data?.astroliftAppIdentityBinding?.reason;
   const isEmptyAfterLoad = !loading && binding === null;
@@ -86,8 +87,8 @@ export function WorkloadIdentityCard({ appSlug, environmentName }: WorkloadIdent
           </CardTitle>
           <CardDescription>
             The cloud-IAM identity bound to this app&apos;s pods. Source: cluster&apos;s
-            WorkloadIdentityDriver ({" "}
-            <code className="font-mono text-2xs">describe_identity</code> ).
+            WorkloadIdentityDriver ( <code className="text-2xs font-mono">describe_identity</code>{" "}
+            ).
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
@@ -95,7 +96,7 @@ export function WorkloadIdentityCard({ appSlug, environmentName }: WorkloadIdent
             size="sm"
             variant="outline"
             onClick={() => {
-              void refetch();
+              onRefresh();
             }}
             disabled={loading}
           >
@@ -139,7 +140,7 @@ export function WorkloadIdentityCard({ appSlug, environmentName }: WorkloadIdent
             actionLabel={showConfigureAction ? "Configure workload identity" : undefined}
             secondary={
               reason === "ERROR" ? (
-                <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                <Button size="sm" variant="outline" onClick={() => onRefresh()}>
                   Try again
                 </Button>
               ) : undefined

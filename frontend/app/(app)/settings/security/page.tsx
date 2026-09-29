@@ -1,4 +1,4 @@
-import { PageShell } from "@/components/PageShell";
+import { SecurityScreen } from "@/components/screens/settings/account/SecurityScreen";
 import { LIST_ACTIVE_SESSIONS } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
@@ -9,16 +9,13 @@ export const metadata = { title: "Security · Settings · Astrolift" };
 
 export default function SecuritySettingsPage() {
   return (
-    <PageShell
-      title="Security"
-      description="Active sessions and bearer credentials issued for your account."
-    >
-      <div className="grid gap-4">
+    <SecurityScreen
+      sessions={
         <PreloadQuery query={LIST_ACTIVE_SESSIONS}>
           <SecuritySettingsClient />
         </PreloadQuery>
-        <PairDeviceCard />
-      </div>
-    </PageShell>
+      }
+      pairDevice={<PairDeviceCard />}
+    />
   );
 }

@@ -1,25 +1,12 @@
+import { SettingsShell } from "@/components/screens/settings/shell/SettingsShell";
+
 import { SettingsSubnav } from "./settings-subnav";
 
 export const metadata = {
   title: "Settings · Astrolift",
 };
 
-/**
- * Shared chrome for the /settings subtree.
- *
- * Uses the same horizontal subnav pattern as /resources and
- * /administration — the previous left-rail sidebar caused a double-nav
- * when combined with the main AppSidebar.
- */
-export default function SettingsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-1 flex-col">
-      <SettingsSubnav />
-      <div className="flex-1">{children}</div>
-    </div>
-  );
+/** Shared chrome for the /settings subtree; the view is SettingsShell. */
+export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+  return <SettingsShell subnav={<SettingsSubnav />}>{children}</SettingsShell>;
 }

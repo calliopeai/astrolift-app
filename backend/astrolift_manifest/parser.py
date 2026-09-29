@@ -271,6 +271,7 @@ def parse_raw(toml_text: str) -> RawManifest:
     brief = _parse_brief(data.get("brief"), "brief")
     skills = _parse_skills(data.get("skills", []), "skills")
     edge = _parse_edge(data.get("edge"), "edge")
+    ingress_access = _parse_ingress_access(data.get("ingress"), "ingress")
 
     if workloads:
         public_count = sum(1 for w in workloads if w.is_public)
@@ -288,8 +289,38 @@ def parse_raw(toml_text: str) -> RawManifest:
         brief=brief,
         skills=skills,
         edge=edge,
+        ingress_access=ingress_access,
         raw=data,
     )
+
+
+def _parse_ingress_access(value: Any, path: str) -> dict[str, list[str]] | None:
+    """``[ingress.access]``: who may enter the app behind central auth (#2132).
+
+    ``groups`` are the identity provider's groups, ``users`` are emails.
+    Absent is ``None``; the rest of ``[ingress]`` (class, the auth mirror)
+    is the platform's to write and is not read here.
+    """
+    if not isinstance(value, dict) or "access" not in value:
+        return None
+    access = value["access"]
+    if not isinstance(access, dict):
+        raise ManifestError("ingress.access must be a table", path=f"{path}.access")
+    unknown = sorted(set(access) - {"groups", "users"})
+    if unknown:
+        raise ManifestError(
+            f"unknown ingress.access key(s): {', '.join(unknown)}; valid keys are groups, users",
+            path=f"{path}.access",
+        )
+    out: dict[str, list[str]] = {}
+    for key in ("groups", "users"):
+        items = access.get(key, [])
+        if not isinstance(items, list) or not all(isinstance(i, str) and i.strip() for i in items):
+            raise ManifestError(f"ingress.access.{key} must be a list of names", path=f"{path}.access.{key}")
+        if key == "users" and not all("@" in i for i in items):
+            raise ManifestError("ingress.access.users must be email addresses", path=f"{path}.access.users")
+        out[key] = sorted({i.strip().lower() if key == "users" else i.strip() for i in items})
+    return out
 
 
 # The gate identities an app may ask to have forwarded, and the

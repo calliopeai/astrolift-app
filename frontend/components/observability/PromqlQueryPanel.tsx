@@ -1,6 +1,5 @@
 "use client";
 
-import { useLazyQuery, useQuery } from "@apollo/client/react";
 import { AlertTriangleIcon, ChevronDownIcon, ChevronRightIcon, SearchCodeIcon } from "lucide-react";
 import * as React from "react";
 import {
@@ -17,11 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -31,42 +26,32 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  APP_METRIC_NAMES,
-  EXECUTE_PROMQL,
-} from "@/graphql/observability/observability.queries";
+import type { usePromql } from "./use-promql";
 import type {
   AstroliftExecutePromqlResult,
   AstroliftPromqlSeries,
   AstroliftTimeSeriesPoint,
 } from "@/graphql/__generated__/schema";
 
-interface PromqlResp {
-  astroliftExecutePromql: AstroliftExecutePromqlResult;
+/** What the app exposes (#1226): its own metric names. */
+export interface MetricDiscovery {
+  ok: boolean;
+  error?: string | null;
+  names: string[];
+  truncated: boolean;
+  limit: number;
 }
 
-interface MetricNamesResp {
-  astroliftAppMetricNames: {
-    ok: boolean;
-    error?: string | null;
-    names: string[];
-    truncated: boolean;
-    limit: number;
-  };
-}
+export type PromqlQueryPanelProps = ReturnType<typeof usePromql>;
 
-export interface PromqlQueryPanelProps {
-  appSlug: string;
-  environmentName?: string | null;
-}
-
-const RANGE_OPTIONS = [
+export const RANGE_OPTIONS = [
   { key: "15m", label: "15m", seconds: 15 * 60, step: 15 },
   { key: "1h", label: "1h", seconds: 60 * 60, step: 60 },
   { key: "6h", label: "6h", seconds: 6 * 60 * 60, step: 300 },
   { key: "24h", label: "24h", seconds: 24 * 60 * 60, step: 1800 },
 ] as const;
-type RangeKey = (typeof RANGE_OPTIONS)[number]["key"];
+export type PromqlRangeKey = (typeof RANGE_OPTIONS)[number]["key"];
+type RangeKey = PromqlRangeKey;
 const DEFAULT_RANGE: RangeKey = "1h";
 
 // Chart series colors mirror the GoldenSignalsPanel palette so the
@@ -80,13 +65,7 @@ const SERIES_COLORS = [
 ];
 
 interface MetricNamePickerProps {
-  discovery: {
-    ok: boolean;
-    error?: string | null;
-    names: string[];
-    truncated: boolean;
-    limit: number;
-  } | null;
+  discovery: MetricDiscovery | null;
   loading: boolean;
   onPick: (metric: string) => void;
 }
@@ -159,7 +138,7 @@ function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps)
             key={name}
             type="button"
             onClick={() => onPick(name)}
-            className="border-border hover:bg-accent rounded border px-2 py-0.5 font-mono text-2xs"
+            className="border-border hover:bg-accent text-2xs rounded border px-2 py-0.5 font-mono"
           >
             {name}
           </button>
@@ -174,23 +153,19 @@ function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps)
   );
 }
 
-export function PromqlQueryPanel({ appSlug, environmentName }: PromqlQueryPanelProps) {
-  const [open, setOpen] = React.useState(false);
+/** Pure (Storybook first): the query runs and the names load through usePromql. */
+export function PromqlQueryPanel({
+  open,
+  onOpenChange: setOpen,
+  discovery,
+  discoveryLoading,
+  running: loading,
+  transportError,
+  result,
+  onRun: run,
+}: PromqlQueryPanelProps) {
   const [query, setQuery] = React.useState("");
   const [range, setRange] = React.useState<RangeKey>(DEFAULT_RANGE);
-
-  const [execute, { data, loading, error }] = useLazyQuery<PromqlResp>(EXECUTE_PROMQL, {
-    fetchPolicy: "network-only",
-  });
-
-  // What the app exposes (#1226). Fetched only once the panel is open —
-  // it is a Prometheus round trip and the panel is collapsed by default.
-  const names = useQuery<MetricNamesResp>(APP_METRIC_NAMES, {
-    variables: { appSlug, environmentName: environmentName ?? null, limit: 200 },
-    skip: !open,
-    fetchPolicy: "cache-first",
-  });
-  const discovery = names.data?.astroliftAppMetricNames ?? null;
 
   // Clicking a name writes the simplest expression that charts it rather
   // than the bare name: a counter graphed raw is a monotonic ramp, which
@@ -202,22 +177,9 @@ export function PromqlQueryPanel({ appSlug, environmentName }: PromqlQueryPanelP
 
   const onRun = () => {
     if (!query.trim()) return;
-    const opt = RANGE_OPTIONS.find((o) => o.key === range) ?? RANGE_OPTIONS[1];
-    const endUnix = Math.floor(Date.now() / 1000);
-    const startUnix = endUnix - opt.seconds;
-    void execute({
-      variables: {
-        appSlug,
-        query: query.trim(),
-        startUnix,
-        endUnix,
-        stepSeconds: opt.step,
-        environmentName: environmentName ?? null,
-      },
-    });
+    run(query.trim(), range);
   };
 
-  const result = data?.astroliftExecutePromql ?? null;
   const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
 
   return (
@@ -242,7 +204,11 @@ export function PromqlQueryPanel({ appSlug, environmentName }: PromqlQueryPanelP
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="space-y-4">
-            <MetricNamePicker discovery={discovery} loading={names.loading} onPick={onPickMetric} />
+            <MetricNamePicker
+              discovery={discovery}
+              loading={discoveryLoading}
+              onPick={onPickMetric}
+            />
 
             <div className="space-y-2">
               <Textarea
@@ -281,7 +247,7 @@ export function PromqlQueryPanel({ appSlug, environmentName }: PromqlQueryPanelP
               </div>
             </div>
 
-            <PromqlBody loading={loading} transportError={error?.message ?? null} result={result} />
+            <PromqlBody loading={loading} transportError={transportError} result={result} />
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
@@ -314,9 +280,7 @@ function PromqlBody({ loading, transportError, result }: PromqlBodyProps) {
   }
   if (result.series.length === 0) {
     return (
-      <p className="text-muted-foreground py-8 text-center text-sm">
-        Query returned no series.
-      </p>
+      <p className="text-muted-foreground py-8 text-center text-sm">Query returned no series.</p>
     );
   }
   return <PromqlChart series={result.series} />;

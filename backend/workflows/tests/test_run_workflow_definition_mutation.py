@@ -92,6 +92,7 @@ def test_happy_path_starts_executor_and_creates_rows(patched_start, permission_r
     assert run.workflow_kind == "WorkflowDefinitionRunWorkflow"
     assert run.workflow_definition_id == wd.pk
     assert run.organization_id == org.pk
+    assert run.trigger_kind == "manual"  # a session call (#2152)
     assert result.temporal_workflow_id == f"WorkflowDefinitionRunWorkflow-{run.pk}"
     assert run.workflow_id == result.temporal_workflow_id
     # The executor was actually enqueued with the right id + definition slug.

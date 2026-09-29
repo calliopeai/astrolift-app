@@ -309,6 +309,7 @@ class Mutation:
         # the Temporal client + operations models at import time (the app is
         # feature-gated).
         from astrolift_workflows.inputs import Actor
+        from core.run_trigger import request_trigger
         from workflows.run_service import start_workflow_definition_run
 
         # Start the stage executor via the shared helper (the same path the
@@ -322,6 +323,7 @@ class Mutation:
                 user_id=user.pk if getattr(user, "pk", None) else None,
                 display=getattr(user, "username", "") or "",
             ),
+            trigger_kind=request_trigger(),
         )
 
         # Keep the existing instance surface populated (UI mirror). Agent stage

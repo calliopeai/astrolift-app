@@ -218,6 +218,14 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
     skipped = 0
     errors: list[str] = []
 
+    if getattr(cluster, "ingress_class", None) == "envoy":
+        # The Envoy edge gates in one SecurityPolicy, rendered by the
+        # cluster's bootstrap recipe, not in per-Ingress annotations (#2055).
+        # A changed gate reaches it through installClusterPrereqs; stamping
+        # nginx keys here would only decorate the Ingresses apps are moving
+        # off.
+        return {"reconciled": 0, "skipped": 0, "errors": []}
+
     try:
         driver = _driver_for_cluster(cluster)
     except Exception as exc:  # noqa: BLE001

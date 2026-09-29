@@ -207,6 +207,8 @@ def test_tick_dispatches_task_not_deploy_for_schedule_agent(agent_stack, setting
     assert task.status == AgentTask.Status.QUEUED
     assert task.queued_at is not None
     assert str(task.guid) == summary.fired_task_guids[0]
+    # The cron tick started it (#2152).
+    assert task.trigger_kind == "schedule"
     # The dispatch is a Task, NOT an app deploy: no Deployment row exists.
     assert Deployment.objects.count() == 0
 

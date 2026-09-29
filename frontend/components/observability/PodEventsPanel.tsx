@@ -250,13 +250,13 @@ export function PodEventsPanel({
                       </Badge>
                       {isWarning && (
                         <AlertTriangleIcon
-                          className="size-3 text-warning-fg"
+                          className="text-warning-fg size-3"
                           aria-label={t("events.warningBadgeLabel")}
                         />
                       )}
                     </div>
                     {Object.keys(e.payload).length > 0 && (
-                      <pre className="text-muted-foreground mt-1 ml-44 overflow-x-auto font-mono text-2xs">
+                      <pre className="text-muted-foreground text-2xs mt-1 ml-44 overflow-x-auto font-mono">
                         {JSON.stringify(e.payload, null, 2)}
                       </pre>
                     )}

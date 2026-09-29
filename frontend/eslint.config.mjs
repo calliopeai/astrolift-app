@@ -5,6 +5,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
 
+import { LIST_ARCHETYPE_ALLOWLIST_FILES } from "./eslint/list-archetype-allowlist.mjs";
 import { RAW_TABLE_ALLOWLIST_FILES } from "./eslint/raw-table-allowlist.mjs";
 
 /**
@@ -28,6 +29,15 @@ const COLOR_FN = /\b(?:rgb|rgba|hsl|hsla)\(/;
 const TEXT_SIZE = /(?<![\w-])text-\[[0-9.]+px\]/;
 const ROUND_SIZE = /(?<![\w-])rounded-\[[0-9.]+px\]/;
 const VARIANT_HELPERS = new Set(["cva", "tv"]);
+// Tailwind's own palette (bg-emerald-500, text-gray-400): status and chrome
+// colours come from the semantic tokens so a theme or accent change reaches
+// them. Checked in every string, since class maps live in plain objects too.
+const RAW_PALETTE =
+  /(?<![\w-])(?:[a-z-]+:)*(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|shadow|decoration|accent|caret)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d{2,3}\b/;
+// Arbitrary padding, margin and gap in px or rem: use the spacing scale.
+// Positioning (inset, top, left) is geometry, not rhythm, and stays allowed.
+const ARBITRARY_SPACING =
+  /(?<![\w-])-?(?:p|px|py|pt|pb|pl|pr|ps|pe|m|mx|my|mt|mb|ml|mr|ms|me|gap|gap-x|gap-y|space-x|space-y)-\[[0-9.]+(?:px|rem)\]/;
 
 /**
  * Data-surface guardrail (#1231 / epic #1230).
@@ -59,8 +69,7 @@ const dataSurfacePlugin = {
       meta: {
         type: "problem",
         docs: {
-          description:
-            "Disallow importing the raw table primitives outside components/data-table.",
+          description: "Disallow importing the raw table primitives outside components/data-table.",
         },
         messages: {
           rawTable:
@@ -83,6 +92,57 @@ const dataSurfacePlugin = {
           ImportDeclaration(node) {
             if (node.source.value === "@/components/ui/table") {
               context.report({ node, messageId: "rawTable" });
+            }
+          },
+        };
+      },
+    },
+    /**
+     * `list-archetype` (Leo's list rules 3 to 5, 2026-09-28): every list is
+     * `ListPage` (full or embedded), a second list on an overview is a
+     * `ListSummary`, and a thing that grows is a `Feed`. Rendering
+     * `DataTable` yourself skips the filters, sort, paging and URL state the
+     * archetype carries, so importing it (as a value; types are fine) is an
+     * error outside components/list, components/data-table and
+     * components/feed. The residue is an exact-path allowlist,
+     * eslint/list-archetype-allowlist.mjs, held in step by its test.
+     */
+    "list-archetype": {
+      meta: {
+        type: "problem",
+        docs: {
+          description: "Disallow rendering DataTable directly; use ListPage, ListSummary or Feed.",
+        },
+        messages: {
+          listArchetype:
+            "`DataTable` rendered directly. A list is `ListPage` (or `ListPage embedded` in a detail tab); a second list on an overview is `ListSummary`; a growing stream is `Feed`. If this surface cannot move yet, add it to eslint/list-archetype-allowlist.mjs with the blocker written out.",
+        },
+        schema: [{ type: "array", items: { type: "string" }, uniqueItems: true }],
+      },
+      create(context) {
+        const allowlist = context.options[0] ?? [];
+        const relative = path.relative(context.cwd, context.filename).split(path.sep).join("/");
+        if (allowlist.some((entry) => relative === entry || relative.endsWith(`/${entry}`))) {
+          return {};
+        }
+        return {
+          ImportDeclaration(node) {
+            const source = node.source.value;
+            if (
+              source !== "@/components/data-table" &&
+              !source.startsWith("@/components/data-table/")
+            ) {
+              return;
+            }
+            if (node.importKind === "type") return;
+            for (const spec of node.specifiers) {
+              if (
+                spec.type === "ImportSpecifier" &&
+                spec.importKind !== "type" &&
+                (spec.imported.name ?? spec.imported.value) === "DataTable"
+              ) {
+                context.report({ node: spec, messageId: "listArchetype" });
+              }
             }
           },
         };
@@ -149,6 +209,10 @@ const designTokensPlugin = {
             "Arbitrary text-[Npx] size. Use the type scale (text-2xs … text-2xl) — see frontend/bootstrap.md.",
           roundSize:
             "Arbitrary rounded-[Npx] radius. Use a radius token (rounded-md … rounded-2xl) — see frontend/bootstrap.md.",
+          palette:
+            "Raw Tailwind palette colour. Use a semantic token (text-success-fg, bg-warning/10, border-danger-border, text-muted-foreground, bg-muted …) — see frontend/bootstrap.md.",
+          spacing:
+            "Arbitrary px/rem padding, margin or gap. Use the spacing scale (p-3, gap-1.5 …).",
         },
         schema: [],
       },
@@ -159,6 +223,10 @@ const designTokensPlugin = {
           if (COLOR_FN.test(text)) context.report({ node, messageId: "colorFn" });
           if (TEXT_SIZE.test(text)) context.report({ node, messageId: "textSize" });
           if (ROUND_SIZE.test(text)) context.report({ node, messageId: "roundSize" });
+          if (ARBITRARY_SPACING.test(text)) context.report({ node, messageId: "spacing" });
+        };
+        const checkPalette = (node, text) => {
+          if (RAW_PALETTE.test(text)) context.report({ node, messageId: "palette" });
         };
         return {
           JSXAttribute(node) {
@@ -168,6 +236,74 @@ const designTokensPlugin = {
           CallExpression(node) {
             if (node.callee?.type === "Identifier" && VARIANT_HELPERS.has(node.callee.name)) {
               check(node, sourceCode.getText(node));
+            }
+          },
+          Literal(node) {
+            if (typeof node.value === "string") checkPalette(node, node.value);
+          },
+          TemplateElement(node) {
+            checkPalette(node, node.value.raw);
+          },
+        };
+      },
+    },
+  },
+};
+
+/**
+ * Storybook-first guardrail (spec 44 §8; the rule in frontend/bootstrap.md).
+ *
+ * Every component and every screen is built in the catalog first; a route
+ * under `app/` only fetches data and renders a screen from `components/`.
+ * So `app/` holds no markup of its own:
+ *
+ *   - `no-markup-in-app` — no intrinsic JSX (`<div>`, `<span>`, `<table>`…).
+ *     The document shell (`html`, `head`, `body`) is the one exception; the
+ *     root layout has to render it.
+ *   - `no-ui-in-app` — no `@/components/ui/*` imports. Primitives compose
+ *     into screens in `components/`, where they have stories; a route that
+ *     reaches for them is building UI outside the catalog.
+ *
+ * Both at `error`, no allowlist: Leo chose "hard now".
+ */
+const DOCUMENT_TAGS = new Set(["html", "head", "body"]);
+
+const screensPlugin = {
+  rules: {
+    "no-markup-in-app": {
+      meta: {
+        type: "problem",
+        messages: {
+          markup:
+            "<{{tag}}> in app/: build the markup as a screen in components/ with a story, and render that screen here.",
+        },
+        schema: [],
+      },
+      create(context) {
+        return {
+          JSXOpeningElement(node) {
+            if (node.name.type !== "JSXIdentifier") return;
+            const tag = node.name.name;
+            if (!/^[a-z]/.test(tag) || DOCUMENT_TAGS.has(tag)) return;
+            context.report({ node, messageId: "markup", data: { tag } });
+          },
+        };
+      },
+    },
+    "no-ui-in-app": {
+      meta: {
+        type: "problem",
+        messages: {
+          ui: "{{source}} in app/: primitives compose into screens in components/, not in routes.",
+        },
+        schema: [],
+      },
+      create(context) {
+        return {
+          ImportDeclaration(node) {
+            const source = node.source.value;
+            if (typeof source === "string" && source.startsWith("@/components/ui/")) {
+              context.report({ node, messageId: "ui", data: { source } });
             }
           },
         };
@@ -210,7 +346,9 @@ const eslintConfig = defineConfig([
   // Data-surface guardrail — see the rule's doc block above.
   {
     files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
-    ignores: ["components/data-table/**"],
+    // DataTable is the one surface built on the primitives; the table's own
+    // story is its catalog entry (Storybook first), not a data surface.
+    ignores: ["components/data-table/**", "components/ui/table.stories.tsx"],
     plugins: { astroliftData: dataSurfacePlugin },
     rules: {
       // `error`: at `warn` the count went 59 → 38 → 35 across three waves
@@ -224,6 +362,49 @@ const eslintConfig = defineConfig([
       "astroliftData/no-native-confirm": "error",
     },
   },
+  // List-archetype guardrail: see the rule's doc block above. The three
+  // primitives that are built on DataTable are exempt; everyone else renders
+  // them.
+  {
+    files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    ignores: ["components/data-table/**", "components/list/**", "components/feed/**"],
+    plugins: { astroliftData: dataSurfacePlugin },
+    rules: {
+      // `error` from day one, with the residue in
+      // eslint/list-archetype-allowlist.mjs; that list may only shrink.
+      "astroliftData/list-archetype": ["error", LIST_ARCHETYPE_ALLOWLIST_FILES],
+    },
+  },
+  // Radix is wrapped once, in components/ui; everything else composes those
+  // primitives so focus, motion and theming stay in one place.
+  {
+    files: ["components/**/*.{ts,tsx}", "app/**/*.{ts,tsx}"],
+    ignores: ["components/ui/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@radix-ui/*", "radix-ui", "radix-ui/*"],
+              message:
+                "Import the wrapped primitive from @/components/ui instead of Radix directly.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Storybook-first guardrail — see the rule's doc block above.
+  {
+    files: ["app/**/*.tsx"],
+    ignores: ["app/**/*.test.tsx"],
+    plugins: { astroliftScreens: screensPlugin },
+    rules: {
+      "astroliftScreens/no-markup-in-app": "error",
+      "astroliftScreens/no-ui-in-app": "error",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -233,6 +414,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // GraphQL codegen output — regenerated by `make codegen`.
     "graphql/__generated__/**",
+    // The component catalog build — `npm run build-storybook`.
+    "storybook-static/**",
   ]),
 ]);
 

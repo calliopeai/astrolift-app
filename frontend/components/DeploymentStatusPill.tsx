@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type { DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
+import { IN_FLIGHT, PILL_TONE } from "@/lib/status-tones";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,8 +15,9 @@ import { cn } from "@/lib/utils";
  * means every surface picks up the same colour tokens, the same
  * animated pulse on in-flight states, and the same a11y label.
  *
- * Colour tokens deliberately match the ``StatusDot`` rules:
- *   running  → brand green (success)
+ * Colours come from the one status map (lib/status-tones), shared with
+ * ``StatusDot``:
+ *   running  → success (never the accent)
  *   failed   → red
  *   pending* → amber (operator attention required)
  *   deploying / redeploying → info green + pulse (in-flight)
@@ -28,39 +30,14 @@ interface PillStyle {
 }
 
 const STATUS_STYLES: Record<DeploymentStatus, PillStyle> = {
-  pending_approval: {
-    className: "bg-warning/15 text-warning-fg border-warning-border",
-    label: "Pending approval",
-  },
-  pending: {
-    className: "bg-warning/15 text-warning-fg border-warning-border",
-    label: "Pending",
-  },
-  deploying: {
-    className: "bg-info/15 text-info-fg border-info-border animate-pulse",
-    label: "Deploying",
-  },
-  redeploying: {
-    className: "bg-info/15 text-info-fg border-info-border animate-pulse",
-    label: "Redeploying",
-  },
-  running: {
-    className:
-      "bg-[color:var(--brand-primary)]/15 text-[color:var(--brand-primary)] border-[color:var(--brand-primary)]/30",
-    label: "Running",
-  },
-  failed: {
-    className: "bg-danger/15 text-danger-fg border-danger-border",
-    label: "Failed",
-  },
-  rolled_back: {
-    className: "bg-foreground/5 text-muted-foreground border-border",
-    label: "Rolled back",
-  },
-  superseded: {
-    className: "bg-foreground/5 text-muted-foreground border-border line-through",
-    label: "Superseded",
-  },
+  pending_approval: { className: PILL_TONE.warn, label: "Pending approval" },
+  pending: { className: PILL_TONE.warn, label: "Pending" },
+  deploying: { className: cn(PILL_TONE.info, IN_FLIGHT), label: "Deploying" },
+  redeploying: { className: cn(PILL_TONE.info, IN_FLIGHT), label: "Redeploying" },
+  running: { className: PILL_TONE.ok, label: "Running" },
+  failed: { className: PILL_TONE.error, label: "Failed" },
+  rolled_back: { className: PILL_TONE.muted, label: "Rolled back" },
+  superseded: { className: cn(PILL_TONE.muted, "line-through"), label: "Superseded" },
 };
 
 interface DeploymentStatusPillProps {

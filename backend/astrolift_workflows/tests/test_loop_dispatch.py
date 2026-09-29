@@ -214,6 +214,8 @@ def test_tick_fills_to_cap_and_enqueues_dispatch(loop_agent, settings):
         assert t.status == AgentTask.Status.QUEUED
         assert t.queued_at is not None
         assert t.organization_id == loop_agent["org"].id
+        # The loop tick started it, like a cron one (#2152).
+        assert t.trigger_kind == "schedule"
     # Loop is a Task dispatch, NOT an app deploy.
     assert Deployment.objects.count() == 0
 

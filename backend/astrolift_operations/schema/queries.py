@@ -27,6 +27,8 @@ from astrolift_operations.models import (
     ZentinelleConnection,
     default_enabled,
 )
+from astrolift_operations.schema.audit_list import AuditEventsFilterInput, audit_events_qs, audit_sort
+from astrolift_operations.schema.run_audit import RunAuditFilterInput, RunAuditItemType, run_audit_page
 from astrolift_operations.schema.types import (
     ActivityPageType,
     AggregatedEventType,
@@ -684,14 +686,30 @@ class OperationsQuery:
         created_at_gte: dt.datetime | None = None,
         created_at_lte: dt.datetime | None = None,
         include_total: bool = False,
+        search: str | None = None,
+        target_kind: str | None = None,
+        target_id: str | None = None,
+        subject_user_id: str | None = None,
+        filter: AuditEventsFilterInput | None = None,
+        sort: str | None = None,
     ) -> AuditEventPageType:
-        """Cursor-paginated audit slice with date bounds (#433).
+        """Cursor-paginated audit slice with date bounds (#433), on the list contract (#2151).
 
         Cursor encoding mirrors ``astrolift_events_page`` so the UI can
         reuse one paging helper. ``include_total`` returns the matching
         row count alongside the page — operators want the count for
         narrow filters but a full-range count is expensive, so the
-        caller opts in."""
+        caller opts in.
+
+        ``search`` matches an action prefix, the actor (display, id, or
+        the user's username or email), the target slug or id, and the
+        request id. ``targetKind`` (case-insensitive) and ``targetId``
+        narrow to one kind or one object; ``subjectUserId`` to events
+        about one person, grants and revokes included. ``filter`` is the
+        same set as a list input (``"me"`` is the viewer). ``sort`` is
+        ``-occurredAt`` (the default) or ``occurredAt``; any other key is
+        refused. Every argument ANDs with the rest."""
+        descending, cursor_scope = audit_sort(sort)
         # Pre-clamp to this surface's own 500-row ceiling before the
         # shared helper sees it, so ``limit=0`` still collapses to a
         # single row rather than the helper's default page size.
@@ -707,17 +725,21 @@ class OperationsQuery:
                 next_cursor=None,
                 total_count=0 if include_total else None,
             )
-        qs = AuditEvent.objects.filter(organization_id=org_id)
-        if action:
-            qs = qs.filter(action=action)
-        if decision:
-            qs = qs.filter(decision=decision.upper())
-        if actor_id:
-            qs = qs.filter(actor_id=actor_id)
-        if created_at_gte is not None:
-            qs = qs.filter(occurred_at__gte=created_at_gte)
-        if created_at_lte is not None:
-            qs = qs.filter(occurred_at__lte=created_at_lte)
+        tenant = get_current_tenant()
+        qs = audit_events_qs(
+            org_id,
+            action=action,
+            decision=decision,
+            actor_id=actor_id,
+            created_at_gte=created_at_gte,
+            created_at_lte=created_at_lte,
+            search=search,
+            target_kind=target_kind,
+            target_id=target_id,
+            subject_user_id=subject_user_id,
+            filter=filter,
+            viewer_id=tenant.actor_user_id if tenant else None,
+        )
 
         page = keyset_page(
             qs,
@@ -725,12 +747,50 @@ class OperationsQuery:
             limit=page_size,
             max_limit=500,
             sort_field="occurred_at",
+            descending=descending,
             with_total=include_total,
+            cursor_scope=cursor_scope,
         )
         return AuditEventPageType(
             items=[audit_to_type(a) for a in page.rows],
             next_cursor=page.next_cursor,
             total_count=page.total_count,
+        )
+
+    @strawberry.field(
+        description=(
+            "Everything that ran, of every kind, in one cursor list (#2152): agent tasks, "
+            "workflow runs, deployments, job runs and task runs, newest first. Each kind is "
+            "read under its own permission and narrowed to the caller's scopes."
+        )
+    )
+    @tenant_scoped()
+    def astrolift_run_audit(
+        self,
+        info: Info,
+        filter: RunAuditFilterInput | None = None,
+        search: str | None = None,
+        sort: str | None = None,
+        first: int = 25,
+        after: str | None = None,
+    ) -> PageType[RunAuditItemType]:
+        """``sort`` is ``-at`` (the default) or ``at``. ``search`` matches the
+        run's guid prefix, status, subject (agent, workflow, app, job or task
+        slug and name), environment, branch, commit author and the
+        initiator's username. ``totalCount`` is exact: one count per kind.
+
+        The permission gate is per kind, in ``run_audit_page`` (exempt
+        from the static guard for that reason): a caller with no run
+        read at all is refused there."""
+        tenant = get_current_tenant()
+        return run_audit_page(
+            _caller_org_id(),
+            filter=filter,
+            search=search,
+            sort=sort,
+            first=first,
+            after=after,
+            viewer_id=tenant.actor_user_id if tenant else None,
         )
 
     @strawberry.field

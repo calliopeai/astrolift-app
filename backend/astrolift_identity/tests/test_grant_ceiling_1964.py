@@ -569,7 +569,11 @@ def test_manage_members_alone_cannot_revoke_an_owner_or_an_admin(world, stock, a
     assert bulk.data.results[0].errors[0].code == "PERMISSION_DENIED"
     assert _live(binding)
     revokes = [e for e in audit_capture if e.action == "role_binding.revoke"]
-    assert [(e.decision, e.target_id) for e in revokes] == [("DENY", None), ("DENY", str(binding.guid))]
+    # Both rows name the binding: the single revoke files under it too (#2151).
+    assert [(e.decision, e.target_id) for e in revokes] == [
+        ("DENY", str(binding.guid)),
+        ("DENY", str(binding.guid)),
+    ]
 
 
 def test_manage_members_revokes_what_it_could_grant(world):

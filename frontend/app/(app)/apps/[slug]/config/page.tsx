@@ -1,19 +1,18 @@
-import { GET_APP } from "@/graphql/registry/registry.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { ConfigEditorClient } from "./config-editor-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export const metadata = { title: "Config · App · Astrolift" };
-
-export default async function AppConfigPage({
+/**
+ * The config editor is Settings › Configuration now (spec 44 §5.2). The old
+ * URL keeps resolving, with whatever query it carried.
+ */
+export default async function AppConfigRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <ConfigEditorClient slug={slug} />
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "settings", "configuration", await searchParams));
 }

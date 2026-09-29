@@ -9,10 +9,11 @@ import { EventsClient } from "./events-client";
  * /events was the surface that fired a server query per keystroke: the
  * filter input was wired straight into `eventType`, and a second,
  * client-side `useListControls` pass sliced whatever fit under a
- * `limit: 200` fetch (#1230). Both are gone. These tests pin the three
- * claims that replaced them — the search box is debounced and server-side,
- * paging walks the server's cursor, and grouping still opens a bucket's
- * members — because all three regress silently.
+ * `limit: 200` fetch (#1230). Both are gone, and the stream is a Feed now
+ * (list rule 5). These tests pin the claims that replaced them: the search
+ * box is debounced and server-side, older events load on the server's
+ * cursor, and grouping still opens a bucket's members, because all three
+ * regress silently.
  */
 
 type Vars = Record<string, unknown>;
@@ -27,20 +28,37 @@ const state = vi.hoisted(() => ({
   calls: [] as { op: string; variables: Record<string, unknown> }[],
 }));
 
-// The hook under test is `useCursorTable`, not Apollo: mock the transport
+function pageFor(op: string) {
+  return op === "ListEventsAggregatedPage"
+    ? state.agg && { astroliftEventsAggregatedPage: state.agg }
+    : state.raw && { astroliftEventsPage: state.raw };
+}
+
+// The hook under test is `useCursorFeed`, not Apollo: mock the transport
 // and record what each query was actually asked for, since "what reached
-// the server" is the whole point of this migration.
+// the server" is the whole point of this migration. Older pages go through
+// the client's `query`, so it records too.
 vi.mock("@apollo/client/react", () => ({
+  useApolloClient: () => ({
+    query: async ({
+      query: doc,
+      variables,
+    }: {
+      query: { definitions?: { kind: string; name?: { value: string } }[] };
+      variables?: Vars;
+    }) => {
+      const op = doc.definitions?.find((d) => d.kind === "OperationDefinition")?.name?.value ?? "";
+      state.calls.push({ op, variables: variables ?? {} });
+      return { data: pageFor(op) ?? undefined };
+    },
+  }),
   useQuery: (
     doc: { definitions?: { kind: string; name?: { value: string } }[] },
     options?: { variables?: Vars }
   ) => {
     const op = doc.definitions?.find((d) => d.kind === "OperationDefinition")?.name?.value ?? "";
     state.calls.push({ op, variables: options?.variables ?? {} });
-    const data =
-      op === "ListEventsAggregatedPage"
-        ? state.agg && { astroliftEventsAggregatedPage: state.agg }
-        : state.raw && { astroliftEventsPage: state.raw };
+    const data = pageFor(op);
     return {
       data: data ?? undefined,
       previousData: undefined,
@@ -109,14 +127,14 @@ function event(id: string, eventType: string): Record<string, unknown> {
   };
 }
 
-// The table's own calls: the rate card passes no `search`, and a bucket's
+// The feed's own calls: the rate card passes no `search`, and a bucket's
 // member fetch is the only one that pins `eventType`.
 const tableCalls = () =>
   state.calls.filter((c) => "search" in c.variables && c.variables.eventType === undefined);
 const lastTableVars = () => tableCalls()[tableCalls().length - 1].variables;
 
 const ungroup = () => fireEvent.click(screen.getByRole("checkbox", { name: "Group repeats" }));
-const searchBox = () => screen.getByRole("textbox", { name: MESSAGES.filterPlaceholder });
+const searchBox = () => screen.getByRole("searchbox", { name: MESSAGES.filterPlaceholder });
 
 describe("EventsClient", () => {
   beforeEach(() => {
@@ -145,8 +163,8 @@ describe("EventsClient", () => {
   it("renders each raw event as a real link to its detail page", () => {
     render(<EventsClient />);
     ungroup();
-    const table = screen.getByRole("table", { name: "Events" });
-    expect(within(table).getByRole("link", { name: "app.deployed" })).toHaveAttribute(
+    const feed = screen.getByRole("region", { name: "Events" });
+    expect(within(feed).getByRole("link", { name: "app.deployed" })).toHaveAttribute(
       "href",
       "/events/e1"
     );
@@ -170,13 +188,16 @@ describe("EventsClient", () => {
     expect([...new Set(searched)]).toEqual(["app.dep"]);
   });
 
-  it("pages with the cursor the server handed back, not a client slice", () => {
+  it("loads older events with the cursor the server handed back, not a client slice", async () => {
     state.agg = { ...state.agg!, nextCursor: "cursor-2", totalCount: 40 };
     render(<EventsClient />);
     expect(lastTableVars().after).toBeUndefined();
 
-    fireEvent.click(screen.getByRole("button", { name: /next page/i }));
-    expect(lastTableVars().after).toBe("cursor-2");
+    fireEvent.click(screen.getByRole("button", { name: "Load older" }));
+    // The older page is its own request; the newest page keeps polling as it was.
+    await vi.waitFor(() =>
+      expect(tableCalls().some((c) => c.variables.after === "cursor-2")).toBe(true)
+    );
   });
 
   it("keeps the roll-up window out of the walk's way", () => {
@@ -184,7 +205,7 @@ describe("EventsClient", () => {
     // Grouping is a server-side fold now; the window is a query argument,
     // not a client-side pass over a fetched page.
     expect(lastTableVars().aggregateWindowSeconds).toBe(300);
-    expect(screen.getByRole("table", { name: "Event groups" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Event groups" })).toBeInTheDocument();
   });
 
   it("opens a bucket's members in a dialog", async () => {
