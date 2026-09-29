@@ -1,43 +1,59 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { userEvent, within } from "storybook/test";
 
-import { TeamMembersPanel } from "./TeamMembersPanel";
-import { MEMBERS_PANEL, MEMBERS_PANEL_LONG } from "./teams-tokens.fixtures";
+import { useLocalListState } from "@/components/list/use-list-state";
 
-const meta: Meta = { title: "Screens/Teams/TeamMembersPanel" };
+import { TEAM_MEMBERS_LIST } from "./teams-list";
+import { MEMBERS, MEMBERS_LONG, membersPanelProps, TEAM_LONG } from "./teams.fixtures";
+import { TeamMembersPanel, type TeamMembersPanelProps } from "./TeamMembersPanel";
+
+const meta: Meta = {
+  title: "Screens/Teams/TeamMembersPanel",
+  parameters: { layout: "padded" },
+};
 export default meta;
 
 type Story = StoryObj;
 
-export const Full: Story = { render: () => <TeamMembersPanel {...MEMBERS_PANEL} /> };
+function Panel({
+  members = MEMBERS,
+  ...overrides
+}: Partial<Omit<TeamMembersPanelProps, "list">> & { members?: typeof MEMBERS }) {
+  const list = useLocalListState(TEAM_MEMBERS_LIST);
+  return <TeamMembersPanel list={list} {...membersPanelProps(list, members, overrides)} />;
+}
 
-/** A viewer without team.manage_members: no checkboxes, no bulk footer. */
-export const ReadOnly: Story = {
-  render: () => <TeamMembersPanel {...MEMBERS_PANEL} canManageTeamMembers={false} />,
-};
+export const Full: Story = { render: () => <Panel /> };
 
-/** Two rows checked: the sticky bulk-assign footer shows. */
+/** A viewer without team.manage_members: no selection, no Add member. */
+export const ReadOnly: Story = { render: () => <Panel canManageTeamMembers={false} /> };
+
+/** Two rows checked: Assign role shows in the selection bar. */
 export const Selected: Story = {
-  render: () => <TeamMembersPanel {...MEMBERS_PANEL} />,
+  render: () => <Panel />,
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("checkbox", { name: /leo/ }));
-    await userEvent.click(canvas.getByRole("checkbox", { name: /keith/ }));
+    const boxes = within(canvasElement).getAllByRole("checkbox");
+    await userEvent.click(boxes[1]!);
+    await userEvent.click(boxes[2]!);
   },
 };
 
-export const Loading: Story = {
-  render: () => <TeamMembersPanel {...MEMBERS_PANEL} members={[]} loading />,
-};
+export const Loading: Story = { render: () => <Panel members={[]} loading /> };
 
-export const Empty: Story = {
-  render: () => <TeamMembersPanel {...MEMBERS_PANEL} members={[]} />,
-};
+export const Empty: Story = { render: () => <Panel members={[]} /> };
 
 export const LoadFailed: Story = {
-  render: () => (
-    <TeamMembersPanel {...MEMBERS_PANEL} error={new globalThis.Error("upstream timed out")} />
-  ),
+  render: () => <Panel members={[]} error={{ message: "upstream timed out" }} />,
 };
 
-export const LongStrings: Story = { render: () => <TeamMembersPanel {...MEMBERS_PANEL_LONG} /> };
+export const LongStrings: Story = {
+  render: () => <Panel members={MEMBERS_LONG} team={TEAM_LONG} />,
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border p-4">
+      <Panel members={MEMBERS_LONG} team={TEAM_LONG} />
+    </div>
+  ),
+};

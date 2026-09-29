@@ -11,21 +11,24 @@ import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { SCOPE_NOUN } from "@/components/access/access-model";
+import { parsePolicy } from "@/components/access/policy-model";
+import { PolicySentence } from "@/components/access/PolicySentence";
 import type { AstroliftPolicy } from "@/graphql/identity/identity.types";
 import { DOC_LINKS } from "@/lib/docs/urls";
 import { useFormatters } from "@/lib/i18n/formatters";
 
-import { adminCrumb } from "./admin-crumbs";
+import { NEW_POLICY_HREF, policiesCrumbs, policyHref } from "./policy-routes";
 import type { usePolicies } from "./use-policies";
-
-const effectStyles: Record<string, string> = {
-  ALLOW: "bg-success/15 text-success-fg",
-  DENY: "bg-danger/15 text-danger-fg",
-};
 
 export type PoliciesScreenProps = ReturnType<typeof usePolicies>;
 
-/** Admin › Policies: the ABAC policy list (spec 44 §5.1) with soft-delete. */
+/**
+ * Admin › Policies: the ABAC policy list (design 3.6, spec 44 §5.1), each row
+ * read as its sentence and opening the policy's page, with soft-delete. The
+ * backend stores policies and does not evaluate them yet (design 1), so
+ * nothing here claims a policy denies anything today.
+ */
 export function PoliciesScreen({
   list,
   page,
@@ -40,16 +43,24 @@ export function PoliciesScreen({
     {
       id: "policy",
       header: "Policy",
-      cellClassName: "max-w-80",
+      cellClassName: "max-w-[36rem]",
+      // The sentence is the row (design 3.6): what it denies, on what, for
+      // whom and unless what, read the way the editor builds it.
       cell: (p) => (
-        <div className="min-w-0">
-          <div className="truncate font-medium" title={p.name}>
-            {p.name}
-          </div>
-          <div className="text-muted-foreground truncate font-mono text-xs" title={p.slug}>
-            {p.slug}
-          </div>
-        </div>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate font-medium" title={p.name}>
+              {p.name}
+            </span>
+            <span
+              className="text-muted-foreground min-w-0 truncate font-mono text-xs"
+              title={p.slug}
+            >
+              {p.slug}
+            </span>
+          </span>
+          <PolicySentence policy={parsePolicy(p)} className="text-muted-foreground line-clamp-2" />
+        </span>
       ),
     },
     {
@@ -57,37 +68,9 @@ export function PoliciesScreen({
       header: "Scope",
       cell: (p) => (
         <Badge variant="outline" className="font-mono">
-          {p.scopeLevel}
+          {SCOPE_NOUN[p.scopeLevel] ?? p.scopeLevel}
         </Badge>
       ),
-    },
-    {
-      id: "effect",
-      header: "Effect",
-      cell: (p) => (
-        <Badge className={`${effectStyles[p.effect] ?? ""} font-mono`} variant="secondary">
-          {p.effect}
-        </Badge>
-      ),
-    },
-    {
-      id: "action",
-      header: "Action",
-      cellClassName: "max-w-64",
-      cell: (p) => (
-        <span className="block min-w-0 truncate font-mono text-xs" title={p.actionPattern}>
-          {p.actionPattern}
-        </span>
-      ),
-    },
-    {
-      id: "conditions",
-      header: "Conditions",
-      cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (p) =>
-        Array.isArray(p.conditions) && p.conditions.length > 0
-          ? `${p.conditions.length} condition${p.conditions.length === 1 ? "" : "s"}`
-          : "—",
     },
     {
       id: "createdBy",
@@ -98,15 +81,15 @@ export function PoliciesScreen({
           className="text-muted-foreground block min-w-0 truncate font-mono text-xs"
           title={p.createdByUsername ?? undefined}
         >
-          {p.createdByUsername ?? "—"}
+          {p.createdByUsername ?? "unknown"}
         </span>
       ),
     },
     {
-      id: "createdAt",
-      header: "Created at",
+      id: "updatedAt",
+      header: "Updated",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (p) => (p.createdAt ? fmt.formatDate(p.createdAt) : "—"),
+      cell: (p) => fmt.formatDate(p.updatedAt || p.createdAt),
     },
   ];
 
@@ -114,13 +97,13 @@ export function PoliciesScreen({
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <ListPage<AstroliftPolicy>
         header={{
-          crumbs: [adminCrumb("policies"), { label: "Policies" }],
-          title: "ABAC policies",
-          context: "Evaluated after RBAC. Policies can only deny.",
+          crumbs: policiesCrumbs(),
+          title: "Policies",
+          context: "Rules that narrow what roles allow. Stored, not yet enforced.",
           primaryAction: (
             <Can permission="org.update">
               <Button size="sm" asChild>
-                <Link href="/administration/policies/new">
+                <Link href={NEW_POLICY_HREF}>
                   <PlusIcon className="size-4" />
                   New policy
                 </Link>
@@ -133,6 +116,7 @@ export function PoliciesScreen({
         columns={columns}
         rows={page.rows}
         getRowId={(p) => p.id}
+        rowHref={(p) => policyHref(p.id)}
         loading={page.loading}
         stale={page.stale}
         error={page.error}
@@ -163,25 +147,20 @@ export function PoliciesScreen({
           icon: <ScaleIcon className="size-5" />,
           title: "No policies yet",
           description:
-            "ABAC policies layer on top of RBAC. They can deny based on time, IP, env, MFA freshness — never grant beyond what the role binding already permits.",
-          actionHref: canManage ? "/administration/policies/new" : undefined,
+            "A policy narrows what roles allow: deny an action unless it is working hours, the office network, approved, or a fresh sign-in. It never grants more than a role does.",
+          actionHref: canManage ? NEW_POLICY_HREF : undefined,
           actionLabel: canManage ? "New policy" : undefined,
           learnMoreHref: DOC_LINKS.policies,
         }}
       />
 
-      <div className="border-info-border bg-info/10 flex min-w-0 flex-col gap-2 rounded-md border p-3">
-        <div className="flex items-center gap-2">
-          <InfoIcon className="text-info-fg size-4 shrink-0" />
-          <span className="text-sm font-medium">What ABAC policies do</span>
-        </div>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          Attribute-Based Access Control (ABAC) grants or denies an action by evaluating attributes
-          of the user, the resource, and the request context — such as time of day, source IP,
-          environment, or MFA freshness — against policy rules. Policies here run{" "}
-          <span className="font-medium">after</span> role-based access (RBAC) and can only deny:
-          they narrow what a member&apos;s roles already allow, never widen it. The server matches
-          name, slug, description and action pattern in search; scope and effect are not searchable.{" "}
+      <div className="border-warning-border bg-warning/10 flex min-w-0 items-start gap-2 rounded-md border p-3">
+        <InfoIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
+        <p className="text-muted-foreground min-w-0 text-xs leading-relaxed">
+          <span className="text-foreground font-medium">Not enforced yet.</span> Astrolift stores
+          these policies and reads them back as written, but the permission check does not evaluate
+          them: today a policy changes no one&apos;s access. Search matches name, slug, description
+          and action.{" "}
           <Link className="underline underline-offset-2" href={DOC_LINKS.policies}>
             Learn more
           </Link>
@@ -194,7 +173,7 @@ export function PoliciesScreen({
           if (!next) setDeleteTarget(null);
         }}
         title={deleteTarget ? `Delete policy ${deleteTarget.slug}?` : "Delete policy?"}
-        description="Soft-deletes the policy. Any DENY rule it enforced stops applying immediately — operators previously blocked by this policy regain that access on their next request. The slug becomes reclaimable for a new policy."
+        description="Soft-deletes the policy and frees its slug for a new one. Policies are not enforced yet, so no one's access changes today; once they are, whatever this policy denied is allowed again."
         confirmLabel="Delete policy"
         destructive
         onConfirm={async () => {

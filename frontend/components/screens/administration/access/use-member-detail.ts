@@ -3,27 +3,25 @@
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
-import { LIST_MEMBERS, LIST_ROLE_BINDINGS } from "@/graphql/identity/identity.queries";
-import type { AstroliftMember, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
+import { LIST_MEMBERS } from "@/graphql/identity/identity.queries";
+import type { AstroliftMember } from "@/graphql/identity/identity.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface MembersResp {
   astroliftMembers: AstroliftMember[];
 }
-interface RoleBindingsResp {
-  astroliftRoleBindings: AstroliftRoleBinding[];
-}
 
 /**
- * The data half of MemberDetail (#1106). Reuses LIST_MEMBERS (no singular
- * query exists) and the already-loaded LIST_ROLE_BINDINGS to surface the
- * member's granted roles.
+ * The person a People row opened (#1106): the Member row `id`, and every
+ * other Member row of the same user (their ORG, TEAM and APP rows), which
+ * the Teams tab reads. There is no singular member query, so this reads
+ * LIST_MEMBERS, shared by every tab of the page from the cache. The tabs'
+ * own data comes from their own hooks.
  */
 export function useMemberDetail(id: string) {
+  const perms = useMyPermissions();
   const { data, loading, error, refetch } = useQuery<MembersResp>(LIST_MEMBERS, {
     variables: {},
-    fetchPolicy: "cache-and-network",
-  });
-  const bindingsQuery = useQuery<RoleBindingsResp>(LIST_ROLE_BINDINGS, {
     fetchPolicy: "cache-and-network",
   });
 
@@ -31,24 +29,21 @@ export function useMemberDetail(id: string) {
     () => (data?.astroliftMembers ?? []).find((row) => row.id === id) ?? null,
     [data, id]
   );
-
-  const roleBindings = React.useMemo(
+  const memberships = React.useMemo(
     () =>
-      (bindingsQuery.data?.astroliftRoleBindings ?? []).filter(
-        (b) => b.user?.id && member?.user.id && b.user.id === member.user.id
-      ),
-    [bindingsQuery.data, member]
+      member ? (data?.astroliftMembers ?? []).filter((row) => row.user.id === member.user.id) : [],
+    [data, member]
   );
 
   return {
     id,
     member,
-    loading,
+    memberships,
+    canManage: perms.can("org.manage_members"),
+    loading: loading && !data,
     error: error && !data ? { message: error.message } : null,
     onRetry: () => {
       void refetch();
     },
-    roleBindings,
-    rolesLoading: bindingsQuery.loading,
   };
 }

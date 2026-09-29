@@ -1,47 +1,113 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
+import { useLocalListState } from "@/components/list/use-list-state";
+import { ROLE_BINDINGS } from "@/components/screens/administration/access/fixtures";
+import { accessProps } from "@/components/screens/administration/access/principal.fixtures";
+import { ACCESS_LIST } from "@/components/screens/administration/access/principal-access";
+
+import { TeamAccessPanel } from "./TeamAccessPanel";
 import { TeamDetailScreen } from "./TeamDetailScreen";
-import { TeamMembersPanel } from "./TeamMembersPanel";
+import { TEAM_MEMBERS_LIST } from "./teams-list";
 import {
-  MEMBERS_PANEL,
-  MEMBERS_PANEL_LONG,
+  MEMBERS_LONG,
+  membersPanelProps,
+  PROJECTS,
   TEAM_DETAIL,
   TEAM_DETAIL_LONG,
-} from "./teams-tokens.fixtures";
+  TEAM_LONG,
+} from "./teams.fixtures";
+import { TeamMembersPanel } from "./TeamMembersPanel";
 
-const meta: Meta = { title: "Screens/Teams/TeamDetailScreen" };
+const meta: Meta = {
+  title: "Screens/Teams/TeamDetailScreen",
+  parameters: { layout: "fullscreen" },
+};
 export default meta;
 
 type Story = StoryObj;
 
-function Screen({
-  members = MEMBERS_PANEL,
-  ...props
-}: typeof TEAM_DETAIL & { members?: typeof MEMBERS_PANEL }) {
+function Access() {
+  const list = useLocalListState(ACCESS_LIST);
   return (
-    <TeamDetailScreen
-      {...props}
-      renderMembers={(team, roles) => <TeamMembersPanel {...members} team={team} roles={roles} />}
+    <TeamAccessPanel
+      slug="platform"
+      access={{ list, ...accessProps(list, ROLE_BINDINGS) }}
+      reach={{ projects: PROJECTS, loading: false, error: null, onRetry: () => {} }}
     />
   );
 }
 
-export const Full: Story = { render: () => <Screen {...TEAM_DETAIL} /> };
+function Members({ long = false }: { long?: boolean }) {
+  const list = useLocalListState(TEAM_MEMBERS_LIST);
+  return (
+    <TeamMembersPanel
+      list={list}
+      {...membersPanelProps(list, long ? MEMBERS_LONG : undefined, long ? { team: TEAM_LONG } : {})}
+    />
+  );
+}
+
+/** Access: every grant held at the team, and what it reaches. */
+export const Full: Story = {
+  render: () => (
+    <TeamDetailScreen {...TEAM_DETAIL} tab="access">
+      <Access />
+    </TeamDetailScreen>
+  ),
+};
+
+export const MembersTab: Story = {
+  render: () => (
+    <TeamDetailScreen {...TEAM_DETAIL} tab="members">
+      <Members />
+    </TeamDetailScreen>
+  ),
+};
 
 export const Loading: Story = {
-  render: () => <Screen {...TEAM_DETAIL} team={null} loading />,
+  render: () => (
+    <TeamDetailScreen {...TEAM_DETAIL} team={null} loading tab="access">
+      <Access />
+    </TeamDetailScreen>
+  ),
 };
 
-/** A team with no members yet. */
-export const Empty: Story = {
-  render: () => <Screen {...TEAM_DETAIL} members={{ ...MEMBERS_PANEL, members: [] }} />,
-};
-
-/** The slug matched no team (or the team list failed): the screen's only error state. */
+/** The slug matched no team. */
 export const NotFound: Story = {
-  render: () => <Screen {...TEAM_DETAIL} slug="no-such-team" team={null} />,
+  render: () => (
+    <TeamDetailScreen {...TEAM_DETAIL} slug="no-such-team" team={null} tab="access">
+      <Access />
+    </TeamDetailScreen>
+  ),
+};
+
+export const LoadFailed: Story = {
+  render: () => (
+    <TeamDetailScreen
+      {...TEAM_DETAIL}
+      team={null}
+      error={{ message: "upstream timed out" }}
+      tab="access"
+    >
+      <Access />
+    </TeamDetailScreen>
+  ),
 };
 
 export const LongStrings: Story = {
-  render: () => <Screen {...TEAM_DETAIL_LONG} members={MEMBERS_PANEL_LONG} />,
+  render: () => (
+    <TeamDetailScreen {...TEAM_DETAIL_LONG} tab="members">
+      <Members long />
+    </TeamDetailScreen>
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }} className="overflow-hidden border">
+      <TeamDetailScreen {...TEAM_DETAIL_LONG} tab="access">
+        <Access />
+      </TeamDetailScreen>
+    </div>
+  ),
 };

@@ -5,16 +5,15 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import type { Column, RowSelection } from "@/components/data-table";
+import type { RowSelection } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { permissionsCrumbs } from "../access/admin-crumbs";
-import { SCOPE_TONE } from "./scope-tone";
+import { bindingColumns } from "./binding-columns";
 import type { useAssignments } from "./use-assignments";
 
 export type AssignmentsViewProps = Omit<ReturnType<typeof useAssignments>, "roles"> & {
@@ -33,7 +32,14 @@ function subjectLabel(b: AstroliftRoleBinding): string {
   return b.user?.username ?? `group:${b.groupExternalId}`;
 }
 
-/** Admin › Permissions › Assignments: role bindings (spec 44 §5.1), grant and revoke. */
+/**
+ * Admin › Permissions › Assignments: every role binding in the org (spec 44
+ * §5.1), grant and revoke. It stays a list of its own: it is the only place
+ * that shows every binding at once, IdP group mappings included, and the only
+ * bulk revoke. One role's bindings are that role's Holders tab; a person's
+ * are their Access tab (design 3.2). Design 5 folds this into People with
+ * `has:binding` once People can filter on it.
+ */
 export function AssignmentsView({
   list,
   page,
@@ -61,69 +67,7 @@ export function AssignmentsView({
     }
   }
 
-  const columns: Column<AstroliftRoleBinding>[] = [
-    {
-      id: "user",
-      header: "User",
-      cellClassName: "max-w-72",
-      cell: (b) =>
-        b.user ? (
-          <div className="min-w-0">
-            <div className="truncate font-medium" title={b.user.username}>
-              {b.user.username}
-            </div>
-            <div className="text-muted-foreground truncate font-mono text-xs" title={b.user.email}>
-              {b.user.email}
-            </div>
-          </div>
-        ) : (
-          <div className="truncate font-mono text-xs" title={`group:${b.groupExternalId}`}>
-            group:{b.groupExternalId}
-          </div>
-        ),
-    },
-    {
-      id: "role",
-      header: "Role",
-      cellClassName: "max-w-72",
-      cell: (b) => (
-        <div className="min-w-0">
-          <div className="truncate font-medium" title={b.role.name}>
-            {b.role.name}
-          </div>
-          <div className="text-muted-foreground truncate font-mono text-xs" title={b.role.slug}>
-            {b.role.slug}
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "scope",
-      header: "Scope",
-      cellClassName: "max-w-64",
-      cell: (b) => (
-        <div className="flex min-w-0 flex-col items-start gap-1">
-          <Badge className={`${SCOPE_TONE[b.scopeKind] ?? ""} font-mono`} variant="secondary">
-            {b.scopeKind}
-          </Badge>
-          {b.sourceScopeLabel && (
-            <span
-              className="text-muted-foreground block max-w-full truncate text-xs"
-              title={b.sourceScopeLabel}
-            >
-              {b.sourceScopeLabel}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: "granted",
-      header: "Granted",
-      cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (b) => fmt.formatDate(b.grantedAt),
-    },
-  ];
+  const columns = bindingColumns({ formatDate: fmt.formatDate });
 
   return (
     <div className="flex min-w-0 flex-1 flex-col p-6">
@@ -131,7 +75,7 @@ export function AssignmentsView({
         header={{
           crumbs: permissionsCrumbs("assignments"),
           title: "Assignments",
-          context: "Every role granted to a user or IdP group, and the scope it applies to.",
+          context: "Every role held by a user or an IdP group, where it applies, and why.",
           primaryAction: (
             <Can permission="org.manage_members">
               <Button size="sm" onClick={() => setGrantOpen(true)} disabled={rolesLoading}>

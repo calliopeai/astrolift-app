@@ -8,7 +8,11 @@ import type { AstroliftRole, AstroliftRoleBinding } from "@/graphql/identity/ide
 import { pageData } from "../access/fixtures";
 
 import type { AssignmentsViewProps } from "./AssignmentsView";
+import type { NewRoleScreenProps } from "./NewRoleScreen";
 import type { PermissionsDiagnosticsViewProps } from "./PermissionsDiagnosticsView";
+import { roleCatalog } from "./role-catalog";
+import type { RoleDetailScreenProps } from "./RoleDetailScreen";
+import type { RoleHoldersTabProps } from "./RoleHoldersTab";
 import type { RolesViewProps } from "./RolesView";
 
 const resolved =
@@ -92,19 +96,54 @@ export const LONG_ROLE = role(
   }
 );
 
-export const LONG_PERMISSIONS = [...LONG_ROLE.permissions].sort((a, b) => a.localeCompare(b));
-
 /** Everything but the list controller, which a story makes with useLocalListState. */
 export function rolesProps(
   overrides: Partial<Omit<RolesViewProps, "list">> = {}
 ): Omit<RolesViewProps, "list"> {
+  return { page: pageData(ROLES), ...overrides };
+}
+
+/** A custom role duplicated from Viewer and widened: the diff has something to show. */
+export const AUDITOR_ROLE = role(
+  "r-auditor",
+  "auditor",
+  "Auditor",
+  ["app.read", "audit_log.read", "billing.read", "cluster.read"],
+  { description: "Reads everything an audit needs, changes nothing." }
+);
+
+export const DETAIL_ROLES: AstroliftRole[] = [...ROLES, AUDITOR_ROLE];
+export const CATALOG = roleCatalog(DETAIL_ROLES);
+
+export function roleDetailProps(
+  role: AstroliftRole | null = RELEASE_ROLE,
+  overrides: Partial<Omit<RoleDetailScreenProps, "tab">> = {}
+): Omit<RoleDetailScreenProps, "tab"> {
   return {
-    page: pageData(ROLES),
-    allPermissions: ALL_PERMISSIONS,
+    id: role?.id ?? "r-missing",
+    role,
+    roles: DETAIL_ROLES,
+    catalog: CATALOG,
+    loading: false,
+    error: null,
+    onRetry: () => {},
     canManage: true,
-    createRole: resolved(true),
-    updateRole: resolved(true),
     saving: false,
+    savePermissions: resolved(null),
+    saveSettings: resolved(null),
+    ...overrides,
+  };
+}
+
+export function newRoleProps(overrides: Partial<NewRoleScreenProps> = {}): NewRoleScreenProps {
+  return {
+    roles: DETAIL_ROLES,
+    from: null,
+    catalog: CATALOG,
+    loading: false,
+    creating: false,
+    onCreate: resolved(null),
+    onCancel: () => {},
     ...overrides,
   };
 }
@@ -187,20 +226,68 @@ export function assignmentsProps(
 }
 
 export const ME: NonNullable<PermissionsDiagnosticsViewProps["me"]> = {
+  kind: "user",
   id: "u-ada",
-  profile: { id: "p-ada", username: "ada" },
-  modules: [],
+  name: "ada",
 };
 
+const noSearch = () => ({ query: "", setQuery: () => {}, results: [] });
+
+/**
+ * Check access asked nothing yet, as the hook returns it for the viewer.
+ * Stories pass the answer, the scope tree and the picks they need.
+ */
 export function diagnosticsProps(
   overrides: Partial<PermissionsDiagnosticsViewProps> = {}
 ): PermissionsDiagnosticsViewProps {
   return {
     me: ME,
-    permissions: ALL_PERMISSIONS,
-    permissionsLoading: false,
-    myBindings: [BINDINGS[0], BINDINGS[1]],
-    bindingsLoading: false,
+    meLoading: false,
+    comparing: false,
+    onCompareToggle: () => {},
+    who: ME,
+    whoSearch: noSearch(),
+    onWhoChange: () => {},
+    permission: null,
+    onPermissionChange: () => {},
+    scope: null,
+    onScopeChange: () => {},
+    scopeTree: { roots: [], loading: false, error: null, onRetry: () => {} },
+    explainer: { diagnosis: null, loading: false, error: null, onRetry: () => {} },
+    bindingHref: () => "/administration/permissions/assignments",
+    other: null,
+    otherSearch: noSearch(),
+    onOtherChange: () => {},
+    compare: { comparison: null, loading: false, error: null, onRetry: () => {} },
+    ...overrides,
+  };
+}
+
+/** A role's holders: two users and an IdP group's mapping. */
+export const RELEASE_HOLDERS: AstroliftRoleBinding[] = [
+  BINDINGS[1],
+  binding("b-5", RELEASE_ROLE, {
+    user: null,
+    groupExternalId: "okta:release-captains",
+    sourceScopeLabel: "project: storefront",
+  }),
+  binding("b-6", RELEASE_ROLE, {
+    user: user("u-dana", "dana", "dana@example.com"),
+    sourceScopeLabel: "project: checkout",
+  }),
+];
+
+/** Everything but the list controller, which a story makes with useLocalListState. */
+export function holdersProps(
+  overrides: Partial<Omit<RoleHoldersTabProps, "list">> = {}
+): Omit<RoleHoldersTabProps, "list"> {
+  return {
+    page: pageData(RELEASE_HOLDERS, { totalCount: null }),
+    canManage: true,
+    revoking: false,
+    onRevoke: resolved(undefined),
+    roleName: RELEASE_ROLE.name,
+    grantHref: "/administration/access/grant?role=r-release",
     ...overrides,
   };
 }

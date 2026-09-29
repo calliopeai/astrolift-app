@@ -1,206 +1,225 @@
 "use client";
 
-import { CheckCircle2Icon, XCircleIcon } from "lucide-react";
-import * as React from "react";
+import { ArrowLeftRightIcon, InfoIcon, ShieldQuestionIcon } from "lucide-react";
+import type * as React from "react";
 
+import type { Principal } from "@/components/access/access-model";
+import { AccessCompare, AccessExplainer } from "@/components/access/AccessExplainer";
+import { PermissionPicker } from "@/components/access/PermissionPicker";
+import { PrincipalPicker } from "@/components/access/PrincipalPicker";
+import { ScopePicker } from "@/components/access/ScopePicker";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DefinitionList } from "@/components/ui/definition-list";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
-import { StatTile } from "@/components/ui/stat-tile";
-import { useFormatters } from "@/lib/i18n/formatters";
 
 import { permissionsCrumbs } from "../access/admin-crumbs";
 import type { usePermissionsDiagnostics } from "./use-permissions-diagnostics";
 
-export type PermissionsDiagnosticsViewProps = ReturnType<typeof usePermissionsDiagnostics>;
+interface Loadable {
+  loading: boolean;
+  error: { message: string } | null;
+  onRetry: () => void;
+}
 
-const RESOURCE_TONE: Record<string, string> = {
-  app: "bg-info/15 text-info-fg",
-  cluster: "bg-chart-3/15 text-chart-3",
-  org: "bg-success/15 text-success-fg",
-  team: "bg-success/15 text-success-fg",
-  project: "bg-success/15 text-success-fg",
-  api_token: "bg-warning/15 text-warning-fg",
-  deploy_token: "bg-warning/15 text-warning-fg",
-  policy: "bg-danger/15 text-danger-fg",
-  audit_log: "bg-foreground/5 text-muted-foreground",
-  billing: "bg-foreground/5 text-muted-foreground",
+type Hook = ReturnType<typeof usePermissionsDiagnostics>;
+
+/** The hook's shape, with its retries typed as plain callbacks so fixtures can pass them. */
+export type PermissionsDiagnosticsViewProps = Omit<Hook, "scopeTree" | "explainer" | "compare"> & {
+  scopeTree: Loadable & { roots: Hook["scopeTree"]["roots"] };
+  explainer: Loadable & { diagnosis: Hook["explainer"]["diagnosis"] };
+  compare: Loadable & { comparison: Hook["compare"]["comparison"] };
 };
 
 /**
- * Admin › Permissions › Diagnostics (#1206): the read-only "why do I have
- * this access" page. Detail-like (spec 44 §5.2): the shared header, then
- * panels; it has no tab row and no list controls of its own.
+ * Admin › Permissions › Check access (design 3.7), on the Diagnostics route
+ * it replaces: "Can <who> <do what> on <which>?" with a person picker (the
+ * viewer by default), the catalog grouped by area and the scope tree, then
+ * the answer as the resolver's reasoning chain. Compare puts two people side
+ * by side instead. Detail-like (spec 44 §5.2): the shared header, then the
+ * question and its answer; no tab row, no list. Pure.
  */
-export function PermissionsDiagnosticsView({
-  me,
-  permissions: allPerms,
-  permissionsLoading,
-  myBindings,
-  bindingsLoading,
-}: PermissionsDiagnosticsViewProps) {
-  const fmt = useFormatters();
-  const [filter, setFilter] = React.useState("");
-
-  const filtered = React.useMemo(() => {
-    if (!filter.trim()) return allPerms;
-    const needle = filter.toLowerCase();
-    return allPerms.filter((p) => p.toLowerCase().includes(needle));
-  }, [allPerms, filter]);
-
-  // Group permissions by resource (the "<resource>." prefix) so the
-  // operator can scan their access by domain. Unprefixed permissions
-  // get an "other" bucket — robust against custom catalogs.
-  const grouped = React.useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const p of filtered) {
-      const dot = p.indexOf(".");
-      const resource = dot >= 0 ? p.slice(0, dot) : "other";
-      if (!map.has(resource)) map.set(resource, []);
-      map.get(resource)!.push(p);
-    }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
-
+export function PermissionsDiagnosticsView(props: PermissionsDiagnosticsViewProps) {
+  const { comparing, onCompareToggle } = props;
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <ShellHeader
         crumbs={permissionsCrumbs("diagnostics")}
-        title="Diagnostics"
-        context={
-          me?.profile?.username ? (
-            <span className="font-mono">{me.profile.username}</span>
-          ) : undefined
+        title={comparing ? "Compare access" : "Check access"}
+        primaryAction={
+          <Button variant="outline" size="sm" onClick={() => onCompareToggle(!comparing)}>
+            {comparing ? (
+              <>
+                <ShieldQuestionIcon className="size-4" /> Check one permission
+              </>
+            ) : (
+              <>
+                <ArrowLeftRightIcon className="size-4" /> Compare two people
+              </>
+            )}
+          </Button>
         }
       />
-      <p className="text-muted-foreground max-w-2xl text-sm">
-        Your effective permissions in this organization, grouped by resource. Use this to figure out
-        why a button is hidden or a mutation rejects.
+      {comparing ? <CompareBody {...props} /> : <CheckBody {...props} />}
+    </div>
+  );
+}
+
+function meQuickPick(me: Principal | null) {
+  return me ? [{ label: "Me", principal: me }] : [];
+}
+
+function CheckBody({
+  me,
+  who,
+  whoSearch,
+  onWhoChange,
+  permission,
+  onPermissionChange,
+  scope,
+  onScopeChange,
+  scopeTree,
+  explainer,
+  bindingHref,
+}: PermissionsDiagnosticsViewProps) {
+  return (
+    <>
+      <p className="max-w-3xl min-w-0 text-base [overflow-wrap:anywhere]" aria-live="polite">
+        Can <Slot filled={Boolean(who)}>{who?.name ?? "someone"}</Slot>{" "}
+        <Slot filled={Boolean(permission)} mono>
+          {permission ?? "do something"}
+        </Slot>{" "}
+        on{" "}
+        <Slot filled={Boolean(scope)} mono={Boolean(scope)}>
+          {scope?.name ?? "the organization"}
+        </Slot>
+        ?
       </p>
 
-      <div className="grid min-w-0 gap-4 sm:grid-cols-3">
-        <StatTile label="Total permissions" value={allPerms.length} loading={permissionsLoading} />
-        <StatTile
-          label="Role bindings on you"
-          value={myBindings.length}
-          loading={bindingsLoading}
+      <div className="grid min-w-0 gap-5 lg:grid-cols-3">
+        <PrincipalPicker
+          label="Who"
+          value={who}
+          onChange={onWhoChange}
+          search={whoSearch}
+          quickPicks={meQuickPick(me)}
         />
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-medium">Account</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DefinitionList
-              orientation="stack"
-              items={[
-                {
-                  term: "Username",
-                  description: (
-                    <span className="font-mono text-sm [overflow-wrap:anywhere]">
-                      {me?.profile?.username ?? "—"}
-                    </span>
-                  ),
-                },
-                {
-                  term: "ID",
-                  description: (
-                    <span className="font-mono text-xs [overflow-wrap:anywhere]">
-                      {me?.id ?? "—"}
-                    </span>
-                  ),
-                },
-              ]}
-            />
-          </CardContent>
-        </Card>
+        <PermissionPicker value={permission} onChange={onPermissionChange} />
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              On
+            </span>
+            {scope && (
+              <Button size="sm" variant="ghost" onClick={() => onScopeChange(null)}>
+                Whole organization
+              </Button>
+            )}
+          </div>
+          <ScopePicker
+            label="On"
+            roots={scopeTree.roots}
+            loading={scopeTree.loading}
+            error={scopeTree.error}
+            onRetry={scopeTree.onRetry}
+            value={scope}
+            onChange={(n) => onScopeChange({ kind: n.kind, id: n.id, name: n.name })}
+          />
+        </div>
       </div>
 
-      <Section title="Effective permissions">
-        <div className="space-y-4">
-          <Input
-            placeholder="Filter by name (e.g. 'app.deploy')"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="max-w-md"
-          />
-          {permissionsLoading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : grouped.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              {filter
-                ? `No permissions match ${JSON.stringify(filter)}.`
-                : "You have no granted permissions in this organization."}
-            </p>
-          ) : (
-            grouped.map(([resource, perms]) => (
-              <div key={resource}>
-                <div className="mb-2 flex items-center gap-2">
-                  <Badge variant="secondary" className={RESOURCE_TONE[resource] ?? ""}>
-                    {resource}
-                  </Badge>
-                  <span className="text-muted-foreground font-mono text-xs">{perms.length}</span>
-                </div>
-                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {perms.map((p) => (
-                    <div
-                      key={p}
-                      className="bg-muted/40 inline-flex min-w-0 items-center gap-2 rounded px-2 py-1 font-mono text-xs"
-                    >
-                      <CheckCircle2Icon className="text-success-fg size-3 shrink-0" />
-                      <span className="min-w-0 [overflow-wrap:anywhere]">{p}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+      <Section title="Answer" divided className="min-w-0">
+        <AccessExplainer
+          diagnosis={explainer.diagnosis}
+          target={scope}
+          loading={explainer.loading}
+          error={explainer.error}
+          onRetry={explainer.onRetry}
+          bindingHref={bindingHref}
+        />
+        <Scoping />
       </Section>
+    </>
+  );
+}
 
-      <Section title="Why these permissions? (Role bindings)">
-        {bindingsLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : myBindings.length === 0 ? (
-          <div className="bg-warning/10 border-warning-border rounded-md border p-3 text-sm">
-            <div className="flex items-center gap-2 font-medium">
-              <XCircleIcon className="size-4" /> No role bindings on your account
-            </div>
-            <p className="text-muted-foreground mt-1">
-              Either you&apos;re a superuser (in which case all permissions are bypassed at the
-              resolver level), or this org hasn&apos;t bound any roles to you yet. An org admin can
-              issue an invitation with a role.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y">
-            {myBindings.map((b) => (
-              <div key={b.id} className="py-3 text-sm first:pt-0 last:pb-0">
-                <div className="flex min-w-0 flex-wrap items-baseline gap-2">
-                  <span className="min-w-0 font-mono [overflow-wrap:anywhere]">{b.role.slug}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {b.role.name}
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    {b.scopeKind}
-                  </Badge>
-                  {b.expiresAt && (
-                    <span className="text-muted-foreground font-mono text-xs">
-                      expires {fmt.formatDateTime(b.expiresAt)}
-                    </span>
-                  )}
-                </div>
-                <div className="text-muted-foreground mt-1 font-mono text-xs">
-                  granted {fmt.formatDateTime(b.grantedAt)}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+function CompareBody({
+  me,
+  who,
+  whoSearch,
+  onWhoChange,
+  other,
+  otherSearch,
+  onOtherChange,
+  compare,
+}: PermissionsDiagnosticsViewProps) {
+  return (
+    <>
+      <p className="max-w-3xl min-w-0 text-base [overflow-wrap:anywhere]" aria-live="polite">
+        What can <Slot filled={Boolean(who)}>{who?.name ?? "someone"}</Slot> do that{" "}
+        <Slot filled={Boolean(other)}>{other?.name ?? "someone else"}</Slot> cannot, and the other
+        way round?
+      </p>
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+        <PrincipalPicker
+          label="First person"
+          value={who}
+          onChange={onWhoChange}
+          search={whoSearch}
+          quickPicks={meQuickPick(me)}
+        />
+        <PrincipalPicker
+          label="Second person"
+          value={other}
+          onChange={onOtherChange}
+          search={otherSearch}
+        />
+      </div>
+      <Section title="Side by side" divided className="min-w-0">
+        <AccessCompare
+          comparison={compare.comparison}
+          loading={compare.loading}
+          error={compare.error}
+          onRetry={compare.onRetry}
+        />
+        <Scoping compare />
       </Section>
-    </div>
+    </>
+  );
+}
+
+/** What the backend answers today (design 6, item 8), said once under the answer. */
+function Scoping({ compare = false }: { compare?: boolean }) {
+  return (
+    <p className="text-muted-foreground flex max-w-3xl min-w-0 items-start gap-2 text-xs">
+      <InfoIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+      <span className="min-w-0">
+        {compare
+          ? "Comparing is open to superusers only for now."
+          : "You can check your own access; checking someone else needs a superuser for now."}{" "}
+        Grants through team shares and IdP groups are not in the answer yet.
+      </span>
+    </p>
+  );
+}
+
+function Slot({
+  filled,
+  mono = false,
+  children,
+}: {
+  filled: boolean;
+  mono?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={
+        filled
+          ? `text-foreground font-medium ${mono ? "font-mono text-sm" : ""}`
+          : "text-muted-foreground italic"
+      }
+    >
+      {children}
+    </span>
   );
 }

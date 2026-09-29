@@ -1,195 +1,233 @@
 "use client";
 
-import { ShieldIcon, Trash2Icon, UsersIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { SearchCheckIcon, ShieldIcon, UserPlusIcon, UsersIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
+import { GrantSource } from "@/components/access/GrantSource";
+import { PrincipalChip } from "@/components/access/PrincipalChip";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
+import { ListPage } from "@/components/list/ListPage";
+import type { ListStateController } from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 
-import type { useAppMembers } from "./use-app-members";
+import type { AccessRow } from "./app-access-rows";
 
-export type AppMembersScreenProps = ReturnType<typeof useAppMembers> & {
+export interface AppMembersScreenProps {
+  /** The app (or agent) being looked at; null when it does not exist or is not visible. */
+  app: { id: string; slug: string } | null;
+  /** The app itself, first load. */
+  loading: boolean;
+  list: ListStateController;
+  rows: AccessRow[];
+  rowsLoading: boolean;
+  stale?: boolean;
+  error: { message: string } | null;
+  onRetry: () => void;
+  totalCount?: number | null;
+  nextCursor?: string | null;
+  removing: boolean;
+  /** Removes at the source; throws so the confirm dialog shows why. */
+  onRemove: (row: AccessRow) => Promise<void>;
+  /** The Grant access flow with this app preselected. */
+  grantHref: string;
+  /** Check access for the row's person on this app. */
+  checkHref: (row: AccessRow) => string;
   slug: string;
-  /** The app detail tab row. */
-  tabs?: React.ReactNode;
-};
+}
 
 /**
- * The app members tab: the roles available at APP scope and every role
- * binding on this app, each revocable by an org member manager.
+ * People with access (design 3.3), the Access tab's first section on an app
+ * or an agent: who can get in and why. One embedded list of principals (a
+ * user, an IdP group, a team) with the role or access level they hold and
+ * the grant's source, role bindings and team shares together. Grant access
+ * opens the one flow with this app preselected; Remove acts at the source;
+ * each person links to Check access on this app. Pure.
  */
 export function AppMembersScreen({
   app: a,
   loading,
-  appRoles,
-  table,
-  revoking,
-  onRevoke,
+  list,
+  rows,
+  rowsLoading,
+  stale,
+  error,
+  onRetry,
+  totalCount,
+  nextCursor,
+  removing,
+  onRemove,
+  grantHref,
+  checkHref,
   slug,
-  tabs,
 }: AppMembersScreenProps) {
-  const tCommon = useTranslations("apps.common");
-  const t = useTranslations("apps.members");
-  const [revokeTarget, setRevokeTarget] = React.useState<AstroliftRoleBinding | null>(null);
-
-  const columns: Column<AstroliftRoleBinding>[] = [
-    {
-      id: "user",
-      header: t("columns.user"),
-      cell: (rb) =>
-        rb.user ? (
-          <>
-            <div className="font-medium">{rb.user.username}</div>
-            <div className="text-muted-foreground text-xs">{rb.user.email}</div>
-          </>
-        ) : (
-          <span className="font-mono text-xs">
-            {t("groupPrefix")} {rb.groupExternalId}
-          </span>
-        ),
-    },
-    {
-      id: "role",
-      header: t("columns.role"),
-      cell: (rb) => (
-        <Badge variant="secondary" className="text-2xs font-mono">
-          {rb.role.slug}
-        </Badge>
-      ),
-    },
-    {
-      id: "granted",
-      header: t("columns.granted"),
-      cellClassName: "text-muted-foreground text-xs",
-      cell: (rb) => new Date(rb.grantedAt).toLocaleDateString(),
-    },
-    {
-      id: "expires",
-      header: t("columns.expires"),
-      cellClassName: "text-muted-foreground text-xs",
-      cell: (rb) => (rb.expiresAt ? new Date(rb.expiresAt).toLocaleDateString() : t("never")),
-    },
-    {
-      id: "actions",
-      header: "",
-      align: "right",
-      width: "w-16",
-      cell: (rb) => (
-        <Can permission="org.manage_members">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={() => setRevokeTarget(rb)}
-            disabled={revoking}
-          >
-            <Trash2Icon className="size-4" />
-            <span className="sr-only">{t("revoke")}</span>
-          </Button>
-        </Can>
-      ),
-    },
-  ];
+  const fmt = useFormatters();
+  const [target, setTarget] = React.useState<AccessRow | null>(null);
 
   if (loading) {
     return (
-      <PageShell title={t("loadingTitle")} description={tCommon("loading")}>
-        <Skeleton className="h-32 w-full" />
-      </PageShell>
+      <div className="flex min-w-0 flex-col gap-3" aria-busy>
+        <Skeleton className="h-9 w-40" />
+        <Skeleton className="h-48 w-full" />
+      </div>
     );
   }
 
   if (!a) {
     return (
-      <PageShell title={tCommon("notFound")} description={tCommon("notFoundPermission")}>
-        <EmptyState
-          icon={<UsersIcon className="size-5" />}
-          title={tCommon("notFoundSlug", { slug })}
-          actionHref="/apps"
-          actionLabel={tCommon("backToApps")}
-        />
-      </PageShell>
+      <EmptyState
+        icon={<UsersIcon className="size-5" />}
+        title={`No app called ${slug}`}
+        description="It does not exist, or you do not have permission to see it."
+        actionHref="/apps"
+        actionLabel="Back to apps"
+      />
     );
   }
 
-  return (
-    <PageShell
-      title={t("title")}
-      description={
-        <span className="text-muted-foreground font-mono text-xs">
-          {t("description", { slug: a.slug })}
+  const columns: Column<AccessRow>[] = [
+    {
+      id: "principal",
+      header: "Who",
+      cell: (r) => <PrincipalChip principal={r.principal} variant="block" />,
+    },
+    {
+      id: "role",
+      header: "Role",
+      cell: (r) => (
+        <span className="flex min-w-0 flex-col">
+          <span className="min-w-0 truncate text-sm" title={r.role.name}>
+            {r.role.name}
+          </span>
+          {r.role.slug !== r.role.name && (
+            <span className="text-muted-foreground text-2xs min-w-0 truncate font-mono">
+              {r.role.slug}
+            </span>
+          )}
         </span>
-      }
-    >
-      {tabs}
+      ),
+    },
+    {
+      id: "source",
+      header: "Source",
+      cell: (r) =>
+        r.kind === "team_share" ? (
+          <Badge variant="outline" className="text-2xs">
+            team share
+          </Badge>
+        ) : (
+          <GrantSource source={r.source} />
+        ),
+    },
+    {
+      id: "expires",
+      header: "Expires",
+      cellClassName: "text-muted-foreground font-mono text-xs whitespace-nowrap",
+      cell: (r) => (r.expiresAt ? fmt.formatDateTime(r.expiresAt) : "never"),
+    },
+    {
+      id: "granted",
+      header: "Granted",
+      cellClassName: "text-muted-foreground font-mono text-xs whitespace-nowrap",
+      cell: (r) => fmt.formatDateTime(r.grantedAt),
+    },
+  ];
 
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-muted-foreground text-xs tracking-wide uppercase">
-            {t("availableRoles")}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {appRoles.map((r) => (
-              <Badge key={r.id} variant="outline" className="text-2xs font-mono">
-                {r.slug}
-              </Badge>
-            ))}
-            {appRoles.length === 0 && (
-              <span className="text-muted-foreground text-xs">{t("noRolesDefined")}</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <p className="text-muted-foreground max-w-2xl min-w-0 text-sm">
+          Who can get into <span className="font-mono">{a.slug}</span>, with what, and why.
+        </p>
+        <Can permission="org.manage_members">
+          <Button asChild size="sm">
+            <Link href={grantHref}>
+              <UserPlusIcon className="size-4" /> Grant access
+            </Link>
+          </Button>
+        </Can>
+      </div>
 
-      <DataTable
-        label="App members"
-        controller={table}
+      <ListPage<AccessRow>
+        embedded
+        list={list}
+        label="People with access"
         columns={columns}
-        getRowId={(rb) => rb.id}
-        searchPlaceholder={t("searchPlaceholder")}
+        rows={rows}
+        getRowId={(r) => r.id}
+        rowActions={(r) => (
+          <>
+            {r.principal.kind === "user" && (
+              <DropdownMenuItem asChild>
+                <Link href={checkHref(r)}>
+                  <SearchCheckIcon className="size-4" /> Check their access
+                </Link>
+              </DropdownMenuItem>
+            )}
+            {r.principal.href && (
+              <DropdownMenuItem asChild>
+                <Link href={r.principal.href}>
+                  <UsersIcon className="size-4" /> Open {r.principal.kind}
+                </Link>
+              </DropdownMenuItem>
+            )}
+            <Can permission={r.kind === "binding" ? "org.manage_members" : "app.update"}>
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={removing || (r.kind === "team_share" && r.share.isHome)}
+                onSelect={() => setTarget(r)}
+              >
+                {r.kind === "binding" ? "Remove role" : "End team share"}
+              </DropdownMenuItem>
+            </Can>
+          </>
+        )}
+        loading={rowsLoading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
         empty={{
           icon: <ShieldIcon className="size-5" />,
-          title: t("emptyTitle"),
-          description: t("emptyDescription"),
-          actionHref: "/administration/members",
-          actionLabel: t("openMembers"),
-        }}
-        emptyFiltered={{
-          title: "No matching members",
+          title: "No one holds a role on this app",
           description:
-            "No grant on this app matches that search. The server matches the user, the group, and the role.",
+            "Grants on its project, team or the organization still reach it. Grant access to give someone a role here.",
+          actionHref: grantHref,
+          actionLabel: "Grant access",
         }}
+        totalCount={totalCount}
+        nextCursor={nextCursor}
       />
 
       <ConfirmDialog
-        open={revokeTarget !== null}
+        open={target !== null}
         onOpenChange={(next) => {
-          if (!next) setRevokeTarget(null);
+          if (!next) setTarget(null);
         }}
         title={
-          revokeTarget
-            ? t("revokeConfirm.title", {
-                role: revokeTarget.role.slug,
-                target: revokeTarget.user?.username ?? revokeTarget.groupExternalId,
-              })
-            : t("revokeConfirm.fallbackTitle")
+          target
+            ? target.kind === "binding"
+              ? `Remove ${target.role.slug} from ${target.principal.name}?`
+              : `End ${target.principal.name}'s share of ${a.slug}?`
+            : "Remove access?"
         }
-        description={t("revokeConfirm.description")}
-        confirmLabel={t("revokeConfirm.confirm")}
+        description={
+          target?.kind === "team_share"
+            ? "The team loses its access level on this app. Its members keep any role they hold here, or on the project, team or organization."
+            : "Revokes this role on this app. They keep any access granted on the project, team or organization, and any other role that carries the same permissions."
+        }
+        confirmLabel={target?.kind === "team_share" ? "End share" : "Remove role"}
         destructive
         onConfirm={async () => {
-          if (revokeTarget) await onRevoke(revokeTarget);
+          if (target) await onRemove(target);
         }}
       />
-    </PageShell>
+    </div>
   );
 }

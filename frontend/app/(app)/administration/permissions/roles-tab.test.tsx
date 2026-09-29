@@ -1,22 +1,17 @@
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { RolesTab } from "./roles-tab";
 
 /**
- * The roles table moved onto DataTable (#1243), which means the rows are a
- * page now. The editor's permission checklist is the union of *every*
- * role's permission set, so it must keep reading the flat list: derive it
- * from whichever page is on screen and the catalogue silently shrinks as
- * an operator pages or searches, and a role saved from that sheet loses
- * the permissions the page did not happen to contain.
- *
- * That is the failure this migration could introduce and it is invisible
- * — a shorter checklist looks like a shorter checklist. So it is pinned
- * with a page that deliberately does not contain the role holding the
- * full enum.
+ * The roles table is a page of `astroliftRolesPage` (#1243). Editing moved
+ * off the list to each role's own page (design 3.5), and with it the flat
+ * roles list the editor's catalogue is built from: the list fetches only the
+ * page it shows (Leo's page rule 2). The catalogue invariant (built from the
+ * whole flat list, never from a page) is pinned where the editor now lives,
+ * in roles/[id]/role-detail-client.test.tsx.
  */
 
 type Vars = Record<string, unknown>;
@@ -95,25 +90,20 @@ describe("RolesTab", () => {
     expect(screen.queryByText("Org Owner")).not.toBeInTheDocument();
   });
 
-  it("builds the permission catalogue from the flat list, not from the page", async () => {
+  it("does not fetch the flat roles list it no longer shows", () => {
+    state.calls.length = 0;
     render(<RolesTab />);
-
-    // Open the editor for the row that is on the page. Its own permission
-    // set is one entry; the catalogue it offers must still be all four.
-    fireEvent.click(screen.getByRole("button", { name: "Edit role Viewer" }));
-
-    const checklist = await screen.findByText("1 of 4 selected");
-    expect(checklist).toBeInTheDocument();
-    for (const permission of ["app.create", "app.delete", "org.manage_members", "app.read"]) {
-      expect(screen.getAllByText(permission).length).toBeGreaterThan(0);
-    }
+    expect(state.calls.some((c) => c.op === "ListRoles")).toBe(false);
   });
 
-  it("names the row activator so a keyboard can reach the editor", () => {
-    // The row is not a link — it opens a sheet — so its activator is a
-    // button, and the button's name is the only thing announced (#1503).
+  it("makes each row a link to the role's page, named by the role", () => {
+    // A row opens the role's page rather than a sheet, so its activator is
+    // a real link and its name is what a keyboard announces (#1503).
     render(<RolesTab />);
-    expect(screen.getByRole("button", { name: "Edit role Viewer" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Viewer/ })).toHaveAttribute(
+      "href",
+      "/administration/permissions/roles/r-viewer"
+    );
   });
 
   it("asks the server to search rather than filtering a page in the browser", () => {

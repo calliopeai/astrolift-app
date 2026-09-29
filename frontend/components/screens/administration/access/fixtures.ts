@@ -8,9 +8,9 @@ import type {
   AstroliftRoleBinding,
 } from "@/graphql/identity/identity.types";
 
-import type { CreatePolicyScreenProps } from "./CreatePolicyScreen";
 import type { MemberDetailProps } from "./MemberDetail";
 import type { PoliciesScreenProps } from "./PoliciesScreen";
+import type { PolicyEditorScreenProps } from "./PolicyEditorScreen";
 import type { ListPageData } from "./use-list-page-query";
 
 const USER = {
@@ -63,29 +63,31 @@ const binding = (
   user: USER,
 });
 
+// Labels in the server's form (`_resolve_source_scope_labels`), which the
+// Access tab parses to name and link each scope.
 export const ROLE_BINDINGS: AstroliftRoleBinding[] = [
-  binding("1", "org_viewer", "ORG", "Acme Corp"),
-  binding("2", "team_developer", "TEAM", "Platform team"),
-  binding("3", "project_admin", "PROJECT", "checkout-service", true),
-  binding("4", "app_admin", "APP", "checkout-api"),
-  binding("5", "app_admin", "APP", "checkout-worker"),
+  binding("1", "org_viewer", "ORG", "organization acme"),
+  binding("2", "team_developer", "TEAM", "team platform"),
+  binding("3", "project_admin", "PROJECT", "project platform/checkout-service", true),
+  binding("4", "app_admin", "APP", "app checkout-api"),
+  binding("5", "app_admin", "APP", "app checkout-worker"),
 ];
 
 const LONG = "a-very-long-identifier-that-keeps-going-well-past-any-sensible-column-width";
 
 export const LONG_ROLE_BINDINGS: AstroliftRoleBinding[] = [
-  binding("6", `org_${LONG}`, "ORG", `Acme Corporation International Holdings ${LONG}`),
-  binding("7", `project_${LONG}`, "PROJECT", `checkout-${LONG}`, true),
+  binding("6", `org_${LONG}`, "ORG", `organization acme-international-holdings-${LONG}`),
+  binding("7", `project_${LONG}`, "PROJECT", `project platform/checkout-${LONG}`, true),
 ];
 
-export const MEMBER_DETAIL: MemberDetailProps = {
+/** The page frame's props; a story adds the tab and its body. */
+export const MEMBER_DETAIL: Omit<MemberDetailProps, "tab" | "children"> = {
   id: MEMBER.id,
   member: MEMBER,
+  canManage: true,
   loading: false,
   error: null,
   onRetry: () => {},
-  roleBindings: ROLE_BINDINGS,
-  rolesLoading: false,
 };
 
 export const LONG_MEMBER: AstroliftMember = {
@@ -215,8 +217,23 @@ export function policiesProps(
   };
 }
 
-export const CREATE_POLICY: CreatePolicyScreenProps = {
-  creating: false,
-  createPolicy: async () => null,
+/** The editor on New: nothing to load. */
+export const NEW_POLICY: PolicyEditorScreenProps = {
+  mode: "create",
+  id: null,
+  policy: null,
+  loading: false,
+  error: null,
+  onRetry: noop,
+  canManage: true,
+  saving: false,
+  onSave: async () => null,
   onCancel: noop,
 };
+
+/** The editor on an existing policy. */
+export function editPolicyProps(
+  overrides: Partial<PolicyEditorScreenProps> = {}
+): PolicyEditorScreenProps {
+  return { ...NEW_POLICY, mode: "edit", id: POLICIES[0].id, policy: POLICIES[0], ...overrides };
+}

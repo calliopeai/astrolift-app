@@ -1,68 +1,78 @@
 "use client";
 
-import { UsersIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { ShieldPlusIcon } from "lucide-react";
+import Link from "next/link";
 import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PageShell } from "@/components/PageShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { AstroliftRole, AstroliftTeam } from "@/graphql/identity/identity.types";
+import {
+  accessCrumbs,
+  grantHref,
+  TEAMS_HREF,
+} from "@/components/screens/administration/access/access-nav";
+import { PrincipalPage } from "@/components/screens/administration/access/PrincipalPage";
+import { type TeamTab, teamTabs } from "@/components/screens/administration/access/principal-tabs";
+import { Button } from "@/components/ui/button";
 
 import type { useTeamDetail } from "./use-team-detail";
 
 export type TeamDetailScreenProps = ReturnType<typeof useTeamDetail> & {
-  /** The members table; it runs its own query, so the route supplies it. */
-  renderMembers: (team: AstroliftTeam, roles: AstroliftRole[]) => React.ReactNode;
+  tab: TeamTab;
+  /** The active tab's body, fed by that tab's own hook. */
+  children: React.ReactNode;
 };
 
-/** A team's page: its members, with bulk role assignment. */
+/**
+ * A team's page (access UX design 3.2) on the detail archetype: what being
+ * on the team gives (Access: every grant held at the team, and what it
+ * reaches) and who is on it (Members). Grant access opens the grant page
+ * with the team as the scope. Pure.
+ */
 export function TeamDetailScreen({
   slug,
   team,
+  canManage,
   loading,
-  grantableRoles,
-  renderMembers,
+  error,
+  onRetry,
+  tab,
+  children,
 }: TeamDetailScreenProps) {
-  const tPage = useTranslations("lists.teamMembersBulk");
-
-  if (loading) {
-    return (
-      <PageShell title={tPage("tabTitle")} description={tPage("description", { team: slug })}>
-        <Card>
-          <CardContent className="p-6">
-            <Skeleton className="h-24 w-full" />
-          </CardContent>
-        </Card>
-      </PageShell>
-    );
-  }
-
-  if (!team) {
-    return (
-      <PageShell title={tPage("tabTitle")} description={tPage("description", { team: slug })}>
-        <Card>
-          <CardContent className="p-6">
-            <EmptyState
-              icon={<UsersIcon className="size-5" />}
-              title={tPage("loadError")}
-              description=""
-            />
-          </CardContent>
-        </Card>
-      </PageShell>
-    );
-  }
-
+  const tabs = teamTabs(slug, tab);
   return (
-    <PageShell title={team.name} description={tPage("description", { team: team.slug })}>
-      <Card>
-        <CardHeader>
-          <CardTitle>{tPage("tabTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">{renderMembers(team, grantableRoles)}</CardContent>
-      </Card>
-    </PageShell>
+    <PrincipalPage
+      crumbs={accessCrumbs("teams", team?.name ?? slug)}
+      principal={team ? { kind: "team", id: team.slug, name: team.name } : null}
+      fallbackTitle={slug}
+      context={team ? <span className="font-mono">{team.slug}</span> : undefined}
+      primaryAction={
+        team && canManage ? (
+          <Button size="sm" asChild>
+            <Link
+              href={grantHref({
+                scope: { kind: "TEAM", id: team.id, name: team.slug },
+                returnTo: tabs.find((t) => t.active)?.href ?? TEAMS_HREF,
+              })}
+            >
+              <ShieldPlusIcon className="size-4" />
+              Grant access
+            </Link>
+          </Button>
+        ) : undefined
+      }
+      tabs={tabs}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      notFound={!loading && !error && !team}
+      notFoundCopy={{
+        title: "Team not found",
+        description:
+          "This team may not exist, may have been deleted, or you may not have access to it.",
+        backHref: TEAMS_HREF,
+        backLabel: "Back to Teams",
+      }}
+    >
+      {children}
+    </PrincipalPage>
   );
 }

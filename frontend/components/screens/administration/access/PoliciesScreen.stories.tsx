@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
@@ -69,4 +70,15 @@ export const Width768: Story = {
       <Policies {...policiesProps({ rows: [...LONG_POLICIES, ...POLICIES] })} />
     </div>
   ),
+};
+
+/** Each row reads as its sentence and links to the policy's page. */
+export const RowsReadAsSentences: Story = {
+  render: () => <Policies {...policiesProps()} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    const row = c.getByRole("link", { name: /No prod deploys after hours/ });
+    await expect(row).toHaveAttribute("href", "/administration/policies/pol-1");
+    await expect(row).toHaveTextContent(/Deny app\.deploy on anything for everyone unless/);
+  },
 };

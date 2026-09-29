@@ -1,26 +1,14 @@
-import { fakeController } from "@/components/data-table/fixtures";
 import type { AstroliftApiTokenScopeCatalog } from "@/graphql/__generated__/schema";
 import type {
   AstroliftApiToken,
   AstroliftApiTokenPlaintext,
-  AstroliftMember,
-  AstroliftRole,
   AstroliftTeam,
 } from "@/graphql/identity/identity.types";
 
 import type { ScopePickerProps } from "../tokens/ScopePicker";
 import type { TokenDetailScreenProps } from "../tokens/TokenDetailScreen";
-import type { TokensScreenProps } from "../tokens/TokensScreen";
-
-import type { TeamDetailScreenProps } from "./TeamDetailScreen";
-import type { TeamMembersPanelProps } from "./TeamMembersPanel";
-import type { TeamsScreenProps } from "./TeamsScreen";
 
 /** Hand-typed fixtures for the teams and API tokens screens. */
-
-const noop = () => {};
-const asyncNoop = async () => {};
-const yes = async () => true;
 
 export const LONG =
   "platform-engineering-shared-production-workloads-us-west-2-with-a-deliberately-long-name-that-keeps-going";
@@ -49,109 +37,6 @@ export const TEAMS: AstroliftTeam[] = [
 ];
 
 export const TEAM_LONG = team("team-9", LONG, LONG, "2026-09-20T08:00:00Z");
-
-// ---------------------------------------------------------------- TeamsScreen
-
-type TeamsData = Omit<TeamsScreenProps, "renderCreateDialog" | "renderEditDialog">;
-
-export const TEAMS_SCREEN: TeamsData = {
-  table: fakeController<AstroliftTeam>({ rows: TEAMS, totalCount: TEAMS.length }),
-  deleting: false,
-  onDelete: asyncNoop,
-};
-
-export const TEAMS_SCREEN_LONG: TeamsData = {
-  ...TEAMS_SCREEN,
-  table: fakeController<AstroliftTeam>({ rows: [TEAM_LONG, ...TEAMS], totalCount: 4 }),
-};
-
-// ----------------------------------------------------------- TeamMembersPanel
-
-const ROLES: AstroliftRole[] = [
-  {
-    id: "role-1",
-    slug: "team-admin",
-    name: "Team admin",
-    description: "Manage the team and its projects.",
-    isSystem: true,
-    permissions: ["team.update", "team.manage_members"],
-    scopeLevel: "TEAM",
-  },
-  {
-    id: "role-2",
-    slug: "org-viewer",
-    name: "Org viewer",
-    description: "Read everything in the org.",
-    isSystem: true,
-    permissions: ["org.read"],
-    scopeLevel: "ORG",
-  },
-];
-
-function member(
-  id: string,
-  username: string,
-  email: string,
-  opts: Partial<AstroliftMember> = {}
-): AstroliftMember {
-  return {
-    id,
-    isActive: true,
-    lifecycle: "active",
-    createdAt: "2026-06-02T10:00:00Z",
-    joinedAt: "2026-06-03T11:00:00Z",
-    deletedAt: null,
-    lastActiveAt: null,
-    lastSeenAt: null,
-    scopeId: "team-1",
-    scopeKind: "TEAM",
-    user: { id: `u-${id}`, username, email, isActive: true },
-    ...opts,
-  };
-}
-
-export const MEMBERS: AstroliftMember[] = [
-  member("m-1", "leo", "leo@example.com"),
-  member("m-2", "keith", "keith@example.com", { joinedAt: null }),
-  member("m-3", "eric", "eric@example.com", { isActive: false, lifecycle: "suspended" }),
-];
-
-type MembersData = Omit<TeamMembersPanelProps, "team" | "roles">;
-
-export const MEMBERS_PANEL: MembersData & Pick<TeamMembersPanelProps, "team" | "roles"> = {
-  team: TEAMS[0]!,
-  roles: ROLES,
-  members: MEMBERS,
-  loading: false,
-  error: undefined,
-  canManageTeamMembers: true,
-  assigning: false,
-  onAssign: yes,
-};
-
-export const MEMBERS_PANEL_LONG: typeof MEMBERS_PANEL = {
-  ...MEMBERS_PANEL,
-  team: TEAM_LONG,
-  members: [member("m-9", LONG, `${LONG}@example.com`, { lifecycle: LONG }), ...MEMBERS],
-};
-
-// ----------------------------------------------------------- TeamDetailScreen
-
-type TeamDetailData = Omit<TeamDetailScreenProps, "renderMembers">;
-
-export const TEAM_DETAIL: TeamDetailData = {
-  slug: "platform",
-  team: TEAMS[0]!,
-  loading: false,
-  grantableRoles: ROLES,
-};
-
-export const TEAM_DETAIL_LONG: TeamDetailData = {
-  slug: LONG,
-  team: TEAM_LONG,
-  loading: false,
-  grantableRoles: ROLES,
-};
 
 // ----------------------------------------------------------------- API tokens
 
@@ -210,28 +95,6 @@ export const TOKEN_LONG = token("7c1e0f3a-0000-4000-8000-000000000009", {
 export const TOKEN_CREATED: AstroliftApiTokenPlaintext = {
   apiToken: TOKENS[0]!,
   plaintext: "alft_at_3kq9Zx7Lw2Vb8Nf4Rt6Yp1Hc5Jd0Ms9Ga7Ue2Io4Pl8",
-};
-
-type TokensData = Omit<TokensScreenProps, "renderScopePicker">;
-
-export const TOKENS_SCREEN: TokensData = {
-  table: fakeController<AstroliftApiToken>({ rows: TOKENS, totalCount: TOKENS.length }),
-  creating: false,
-  revoking: false,
-  createdToken: null,
-  onDismissCreated: noop,
-  mcpEndpoint: "https://astrolift.example.com/api/mcp/v1/",
-  onCreate: yes,
-  onRevoke: asyncNoop,
-  onCopyPlaintext: noop,
-  onCopyMcpEndpoint: noop,
-};
-
-export const TOKENS_SCREEN_LONG: TokensData = {
-  ...TOKENS_SCREEN,
-  table: fakeController<AstroliftApiToken>({ rows: [TOKEN_LONG, ...TOKENS], totalCount: 4 }),
-  createdToken: { apiToken: TOKEN_LONG, plaintext: `alft_at_${LONG}${LONG}` },
-  mcpEndpoint: `https://${LONG}.example.com/api/mcp/v1/`,
 };
 
 export const TOKEN_DETAIL: TokenDetailScreenProps = {

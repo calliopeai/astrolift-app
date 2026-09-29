@@ -1,9 +1,9 @@
 "use client";
 
-import { CreatePolicyScreen } from "@/components/screens/administration/access/CreatePolicyScreen";
-import { useCreatePolicy } from "@/components/screens/administration/access/use-create-policy";
+import { PolicyEditorScreen } from "@/components/screens/administration/access/PolicyEditorScreen";
+import { usePolicyEditor } from "@/components/screens/administration/access/use-policy-editor";
 
-/** Administration > Policies > New policy: the stepped create page. */
+/** Administration › Policies › New policy: the stepped sentence editor. */
 export function CreatePolicyClient() {
-  return <CreatePolicyScreen {...useCreatePolicy()} />;
+  return <PolicyEditorScreen {...usePolicyEditor()} />;
 }

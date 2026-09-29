@@ -5,9 +5,12 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PageShell } from "@/components/PageShell";
-import { DataTable, type Column } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
+import { accessCrumbs, TEAMS_HREF } from "@/components/screens/administration/access/access-nav";
+import { WALK_CAP } from "@/components/screens/members/use-walk";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftTeam } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -19,7 +22,7 @@ export type TeamsScreenProps = ReturnType<typeof useTeams> & {
     open: boolean;
     onOpenChange: (open: boolean) => void;
   }) => React.ReactNode;
-  /** The edit-team sheet, for the row whose pencil was clicked. */
+  /** The edit-team sheet, for the row whose Edit was picked. */
   renderEditDialog: (props: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -28,11 +31,21 @@ export type TeamsScreenProps = ReturnType<typeof useTeams> & {
 };
 
 /**
- * The org teams list. Holds only UI state (which sheet or confirm is open);
- * the table walk and the delete mutation come in from useTeams.
+ * Admin › Access › Teams (access UX design 3.1): the org's teams, numbered.
+ * A team scopes projects, apps and their grants; its page says what being on
+ * it gives (Access) and who is (Members). Pure view; data from useTeams.
  */
 export function TeamsScreen({
-  table,
+  list,
+  rows,
+  totalCount,
+  loading,
+  stale,
+  error,
+  truncated,
+  onRetry,
+  canUpdate,
+  canDelete,
   deleting,
   onDelete,
   renderCreateDialog,
@@ -43,91 +56,96 @@ export function TeamsScreen({
   const [editTarget, setEditTarget] = React.useState<AstroliftTeam | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftTeam | null>(null);
 
-  // The create sheet refetches LIST_TEAMS, which is a different root field
-  // from the page this table walks, so a newly created team would not appear
-  // until a navigation. Refetch the walk when the sheet closes.
+  // The create sheet refetches LIST_TEAMS, a different root field from this
+  // walk, so a new team would not appear until a navigation.
   function handleCreateOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) table.refetch();
+    if (!next) onRetry();
   }
 
   const columns: Column<AstroliftTeam>[] = [
     {
       id: "name",
       header: "Team",
-      cell: (team) => <span className="font-medium">{team.name}</span>,
-    },
-    {
-      id: "slug",
-      header: "Slug",
-      cell: (team) => <span className="text-muted-foreground font-mono text-xs">{team.slug}</span>,
-    },
-    {
-      id: "createdAt",
-      header: "Created",
+      sortKey: "name",
+      cellClassName: "max-w-96",
       cell: (team) => (
-        <span className="text-muted-foreground text-sm">{fmt.formatDate(team.createdAt)}</span>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      align: "right",
-      cell: (team) => (
-        // The row link is a stretched overlay on the first cell, so the row
-        // actions need their own stacking context to stay clickable.
-        <div className="relative z-10 flex justify-end">
-          <Can permission="team.update">
-            <Button size="sm" variant="ghost" onClick={() => setEditTarget(team)}>
-              <PencilIcon className="size-4" />
-              <span className="sr-only">Edit</span>
-            </Button>
-          </Can>
-          <Can permission="team.delete">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDeleteTarget(team)}
-              disabled={deleting}
-            >
-              <Trash2Icon className="size-4" />
-              <span className="sr-only">Delete</span>
-            </Button>
-          </Can>
+        <div className="min-w-0">
+          <div className="truncate font-medium" title={team.name}>
+            {team.name}
+          </div>
+          <div className="text-muted-foreground truncate font-mono text-xs" title={team.slug}>
+            {team.slug}
+          </div>
         </div>
       ),
+    },
+    {
+      id: "created",
+      header: "Created",
+      sortKey: "created",
+      cellClassName: "text-muted-foreground font-mono text-xs",
+      cell: (team) => fmt.formatDate(team.createdAt),
     },
   ];
 
   return (
-    <PageShell
-      title="Teams"
-      description="Groups that scope projects, API tokens, and policies. Use teams to delegate ownership of a subset of apps."
-      actions={
-        <Can permission="team.create">
-          <Button onClick={() => setOpen(true)}>
-            <PlusIcon className="size-4" />
-            New team
-          </Button>
-        </Can>
-      }
-    >
-      <DataTable
+    <div className="flex min-w-0 flex-1 flex-col p-6">
+      <ListPage<AstroliftTeam>
+        header={{
+          crumbs: accessCrumbs("teams"),
+          title: "Teams",
+          context: truncated
+            ? `Sort and pages cover the first ${WALK_CAP.toLocaleString()} teams.`
+            : "Teams scope projects, apps and the grants on them.",
+          primaryAction: (
+            <Can permission="team.create">
+              <Button size="sm" onClick={() => setOpen(true)}>
+                <PlusIcon className="size-4" />
+                New team
+              </Button>
+            </Can>
+          ),
+        }}
+        list={list}
         label="Teams"
-        controller={table}
         columns={columns}
+        rows={rows}
         getRowId={(team) => team.id}
-        rowHref={(team) => `/teams/${team.slug}`}
-        searchPlaceholder="Search teams..."
+        rowHref={(team) => `${TEAMS_HREF}/${encodeURIComponent(team.slug)}`}
+        rowActions={
+          canUpdate || canDelete
+            ? (team) => (
+                <>
+                  {canUpdate && (
+                    <DropdownMenuItem onSelect={() => setEditTarget(team)}>
+                      <PencilIcon className="size-4" />
+                      Edit
+                    </DropdownMenuItem>
+                  )}
+                  {canDelete && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={deleting}
+                      onSelect={() => setDeleteTarget(team)}
+                    >
+                      <Trash2Icon className="size-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  )}
+                </>
+              )
+            : undefined
+        }
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        totalCount={totalCount}
         empty={{
           icon: <UsersIcon className="size-5" />,
           title: "No teams yet",
           description: "Create a team to start grouping projects and apps.",
-        }}
-        emptyFiltered={{
-          title: "No matching teams",
-          description:
-            "No team matches that search. The server matches team name, slug and description.",
         }}
       />
 
@@ -147,13 +165,13 @@ export function TeamsScreen({
           if (!next) setDeleteTarget(null);
         }}
         title={deleteTarget ? `Delete team ${deleteTarget.slug}?` : "Delete team?"}
-        description="Soft delete only — the slug becomes reclaimable. Projects under this team stay visible until reassigned."
+        description="Soft delete only: the slug becomes reclaimable. Projects under this team stay visible until reassigned."
         confirmLabel="Delete team"
         destructive
         onConfirm={async () => {
           if (deleteTarget) await onDelete(deleteTarget);
         }}
       />
-    </PageShell>
+    </div>
   );
 }

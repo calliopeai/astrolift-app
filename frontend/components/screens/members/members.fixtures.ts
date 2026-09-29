@@ -3,7 +3,7 @@
  * against each view's props so a story cannot drift from what the hooks
  * return.
  */
-import { pageData } from "@/components/screens/administration/access/fixtures";
+import type { ListStateController } from "@/components/list/use-list-state";
 import type {
   AstroliftInvitation,
   AstroliftMember,
@@ -18,6 +18,7 @@ import type {
 import type { GrantRoleSheetProps } from "./GrantRoleDialog";
 import type { InviteSheetProps } from "./InviteDialog";
 import type { MembersScreenProps } from "./MembersScreen";
+import { buildPeopleRows, type PeopleRow, selectPeople } from "./people-model";
 
 const noop = () => {};
 const resolved =
@@ -71,8 +72,8 @@ const role = (
 });
 
 export const ROLES: AstroliftRole[] = [
-  role("r-owner", "org_owner", "Org Owner"),
-  role("r-admin", "org_admin", "Org Admin"),
+  role("r-owner", "org_owner", "Org Owner", { permissions: ["org.manage_members", "org.update"] }),
+  role("r-admin", "org_admin", "Org Admin", { permissions: ["org.manage_members"] }),
   role("r-viewer", "viewer", "Viewer"),
   role("r-team", "team-lead", "Team Lead", { scopeLevel: "TEAM" }),
   role("r-release", "release-manager", "Release Manager", { scopeLevel: "PROJECT" }),
@@ -126,7 +127,7 @@ const member = (
   id,
   user: u,
   scopeKind: "ORG",
-  scopeId: ORG.id,
+  scopeId: "1",
   isActive: true,
   lifecycle: "active",
   createdAt: "2026-03-01T10:00:00Z",
@@ -140,10 +141,12 @@ export const MEMBERS: AstroliftMember[] = [
   member("m-2", GRACE, { lastActiveAt: fromNow(-3) }),
   // A second, APP-scope row for grace: collapses into one People row.
   member("m-3", GRACE, { scopeKind: "APP", scopeId: "app-42", lastActiveAt: fromNow(-3) }),
-  member("m-4", LINUS, { scopeKind: "TEAM", scopeId: "t-platform", lastActiveAt: fromNow(-120) }),
+  member("m-4", LINUS, { scopeKind: "TEAM", scopeId: "14", lastActiveAt: fromNow(-120) }),
+  // Ada is on platform too, so Mine (as ada) shows linus.
+  member("m-6", ADA, { scopeKind: "TEAM", scopeId: "14" }),
   member("m-5", MARGARET, {
     scopeKind: "PROJECT",
-    scopeId: "p-checkout",
+    scopeId: "31",
     lastActiveAt: null,
     joinedAt: null,
   }),
@@ -152,7 +155,7 @@ export const MEMBERS: AstroliftMember[] = [
 export const LONG_MEMBERS: AstroliftMember[] = [
   member("m-long", LONG_USER, {
     scopeKind: "PROJECT",
-    scopeId: "p-missing",
+    scopeId: "977",
     lastActiveAt: fromNow(-400),
   }),
   member("m-anon", user("6", "anon-7c2f19ab", "7c2f19ab@anonymized.invalid"), {
@@ -170,7 +173,7 @@ const binding = (
   role: r,
   user: u,
   scopeKind: r.scopeLevel,
-  scopeId: ORG.id,
+  scopeId: "1",
   sourceScopeLabel: "",
   groupExternalId: "",
   grantedAt: "2026-08-14T15:20:00Z",
@@ -181,27 +184,29 @@ const binding = (
 
 export const BINDINGS: AstroliftRoleBinding[] = [
   binding("b-1", OWNER, ADA),
-  binding("b-2", ADMIN, GRACE, { sourceScopeLabel: "organization: acme" }),
+  binding("b-2", ADMIN, GRACE, { sourceScopeLabel: "organization acme" }),
   binding("b-3", APP_OPERATOR, GRACE, {
-    scopeId: "app-42",
-    sourceScopeLabel: "app: payments-api",
+    scopeId: "42",
+    sourceScopeLabel: "app payments-api",
     grantedAt: "2026-09-02T09:05:00Z",
+    expiresAt: fromNow(12),
   }),
-  binding("b-4", TEAM_LEAD, LINUS, { scopeId: "t-platform", sourceScopeLabel: "team: platform" }),
+  binding("b-4", TEAM_LEAD, LINUS, { scopeId: "14", sourceScopeLabel: "team platform" }),
   binding("b-5", RELEASE, null, {
     groupExternalId: "okta:release-managers",
-    scopeId: "p-checkout",
-    sourceScopeLabel: "project: payments/checkout",
+    scopeId: "31",
+    sourceScopeLabel: "project payments/checkout",
   }),
+  binding("b-7", ADMIN, null, { groupExternalId: "okta:platform-admins" }),
   binding("b-6", VIEWER, MARGARET),
 ];
 
 export const LONG_BINDINGS: AstroliftRoleBinding[] = [
   binding("b-long-1", LONG_ROLE, LONG_USER, {
     scopeKind: "PROJECT",
-    scopeId: "p-missing",
+    scopeId: "977",
     sourceScopeLabel:
-      "project: emea-subsidiary-quarter-end-freeze-coordination-and-release-readiness",
+      "project emea/emea-subsidiary-quarter-end-freeze-coordination-and-release-readiness",
   }),
   binding("b-long-2", LONG_ROLE, null, {
     groupExternalId: "azure_ad:emea-regional-compliance-and-release-coordination-group-0001",
@@ -274,30 +279,68 @@ export const LONG_INVITATIONS: AstroliftInvitation[] = [
 
 /* ---- props ------------------------------------------------------------- */
 
-/** Everything but the list controller, which a story makes with useLocalListState. */
+/** The walked sets a People story selects from, as the hook would. */
+export interface PeopleData {
+  members?: AstroliftMember[];
+  bindings?: AstroliftRoleBinding[];
+  invitations?: AstroliftInvitation[];
+  roles?: AstroliftRole[];
+  /** The viewer, for Mine. */
+  me?: string | null;
+}
+
+/** Every row the walks would hold, before the view and filters. */
+export function peopleRows({
+  members = MEMBERS,
+  bindings = BINDINGS,
+  invitations = [...INVITATIONS, ...RESOLVED_INVITATIONS],
+  roles = ROLES,
+}: PeopleData = {}): PeopleRow[] {
+  const { users, groups } = buildPeopleRows({ members, bindings, roles });
+  return [
+    ...users,
+    ...groups,
+    ...invitations.map(
+      (invitation): PeopleRow => ({
+        kind: "invitation",
+        key: `invitation:${invitation.id}`,
+        invitation,
+      })
+    ),
+  ];
+}
+
+/** Everything but the list controller: the page `list` selects, and the actions. */
 export function membersProps(
+  list: ListStateController,
+  data: PeopleData = {},
   overrides: Partial<Omit<MembersScreenProps, "list">> = {}
 ): Omit<MembersScreenProps, "list"> {
+  const selected = selectPeople(peopleRows(data), {
+    filters: list.filters,
+    q: list.state.q,
+    sort: list.state.sort,
+    page: list.state.page,
+    pageSize: list.state.pageSize,
+    me: data.me === undefined ? "ada" : data.me,
+    now: Date.now(),
+  });
   return {
     canManageMembers: true,
-    people: pageData(MEMBERS, { totalCount: 140, nextCursor: "c2" }),
-    invitations: pageData(INVITATIONS),
-    bindings: pageData(BINDINGS),
-    bindingIndexRows: BINDINGS,
-    teams: TEAMS,
-    projects: PROJECTS,
-    roles: ROLES,
-    rolesLoading: false,
-    revoking: false,
-    bulkRevoking: false,
+    rows: selected.rows,
+    totalCount: selected.totalCount,
+    filtered: selected.filtered,
+    loading: false,
+    stale: false,
+    error: null,
+    truncated: false,
+    onRetry: noop,
     revokingInvite: false,
     deletingInvite: false,
     resendingInvite: false,
     onRevokeInvite: resolved(undefined),
     onResendInvite: resolved(undefined),
     onDeleteInvite: resolved(undefined),
-    onRevokeBinding: resolved(undefined),
-    onBulkRevoke: resolved(true),
     onAnonymize: resolved(true),
     ...overrides,
   };

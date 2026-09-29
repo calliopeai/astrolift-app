@@ -1,12 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
-import { pageData } from "@/components/screens/administration/access/fixtures";
 
-import { GrantRoleSheet } from "./GrantRoleDialog";
 import { InviteSheet } from "./InviteDialog";
-import { MEMBERS_LIST } from "./members-list";
 import {
   BINDINGS,
   INVITATIONS,
@@ -14,12 +11,13 @@ import {
   LONG_INVITATIONS,
   LONG_MEMBERS,
   MEMBERS,
+  type PeopleData,
   RESOLVED_INVITATIONS,
-  grantRoleProps,
   inviteProps,
   membersProps,
 } from "./members.fixtures";
 import { MembersScreen, type MembersScreenProps } from "./MembersScreen";
+import { PEOPLE_LIST } from "./people-model";
 
 const meta: Meta = {
   title: "Screens/Members/MembersScreen",
@@ -29,116 +27,111 @@ export default meta;
 
 type Story = StoryObj;
 
-function Members({
+/** The screen over fixture walks, selected the way the hook selects them. */
+function People({
   initial,
-  ...props
-}: Omit<MembersScreenProps, "list"> & { initial?: Partial<ListState> }) {
-  const list = useLocalListState(MEMBERS_LIST, initial);
-  return <MembersScreen list={list} {...props} />;
+  data,
+  ...overrides
+}: Partial<Omit<MembersScreenProps, "list">> & {
+  initial?: Partial<ListState>;
+  data?: PeopleData;
+}) {
+  const list = useLocalListState(PEOPLE_LIST, initial);
+  return <MembersScreen list={list} {...membersProps(list, data, overrides)} />;
 }
 
-/** People, with the grant and invite sheets wired to fixtures (closed until clicked). */
+/** Users and IdP groups in one list, with the invite sheet wired (closed until clicked). */
 export const Full: Story = {
-  render: () => (
-    <Members
-      {...membersProps()}
-      renderGrantDialog={(p) => <GrantRoleSheet {...grantRoleProps()} {...p} />}
-      renderInviteDialog={(p) => <InviteSheet {...inviteProps()} {...p} />}
-    />
-  ),
+  render: () => <People renderInviteDialog={(p) => <InviteSheet {...inviteProps()} {...p} />} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // A group is a row of the same list as the users.
+    await expect(canvas.getAllByText("okta:release-managers").length).toBeGreaterThan(0);
+    await expect(canvas.getByText("grace@example.com")).toBeInTheDocument();
+  },
 };
 
 export const Loading: Story = {
-  render: () => (
-    <Members
-      {...membersProps({
-        people: pageData([], { loading: true }),
-        bindingIndexRows: undefined,
-        teams: undefined,
-        projects: undefined,
-        roles: undefined,
-        rolesLoading: true,
-      })}
-    />
-  ),
+  render: () => <People data={{ members: [], bindings: [] }} loading />,
 };
 
 export const Empty: Story = {
-  render: () => <Members {...membersProps({ people: pageData([]), bindingIndexRows: [] })} />,
+  render: () => <People data={{ members: [], bindings: [], invitations: [] }} />,
 };
 
 export const NoMatches: Story = {
-  render: () => <Members {...membersProps({ people: pageData([]) })} initial={{ q: "nobody" }} />,
+  render: () => <People initial={{ q: "nobody" }} />,
 };
 
 export const LoadFailed: Story = {
   render: () => (
-    <Members
-      {...membersProps({
-        people: pageData([], { error: { message: "upstream timed out after 30s" } }),
-      })}
+    <People
+      data={{ members: [], bindings: [] }}
+      error={{ message: "upstream timed out after 30s (identity.membersPage)" }}
     />
   ),
+};
+
+/** Mine: people who share a team with the viewer (ada is on platform with linus). */
+export const Mine: Story = {
+  render: () => <People initial={{ view: "mine" }} />,
 };
 
 /** The Invited view: pending invitations with resend and revoke. */
 export const Invited: Story = {
-  render: () => <Members {...membersProps()} initial={{ view: "invited" }} />,
+  render: () => <People initial={{ view: "invited" }} />,
+};
+
+/** Invitation history is a status chip on the Invited view. */
+export const InvitationHistory: Story = {
+  render: () => <People initial={{ view: "invited", filters: { status: "accepted" } }} />,
 };
 
 export const InvitedEmpty: Story = {
-  render: () => (
-    <Members {...membersProps({ invitations: pageData([]) })} initial={{ view: "invited" }} />
-  ),
+  render: () => <People data={{ invitations: [] }} initial={{ view: "invited" }} />,
 };
 
-/** Invitation history: accepted, revoked and expired rows with their delete action. */
-export const InvitationHistory: Story = {
-  render: () => (
-    <Members
-      {...membersProps({ invitations: pageData([...INVITATIONS, ...RESOLVED_INVITATIONS]) })}
-      initial={{ view: "invitations" }}
-    />
-  ),
+/** IdP groups that hold a binding, with the note on what the backend does not do yet. */
+export const Groups: Story = {
+  render: () => <People initial={{ view: "groups" }} />,
 };
 
-export const RoleBindings: Story = {
-  render: () => <Members {...membersProps()} initial={{ view: "bindings" }} />,
+/** Holders of an org role that can manage members. */
+export const Admins: Story = {
+  render: () => <People initial={{ view: "admins" }} />,
 };
 
-/** Two bindings selected: the bulk revoke action shows. */
-export const WithSelection: Story = {
-  render: () => <Members {...membersProps()} initial={{ view: "bindings" }} />,
-  play: async ({ canvasElement }) => {
-    const boxes = within(canvasElement).getAllByRole("checkbox");
-    await userEvent.click(boxes[2]);
-    await userEvent.click(boxes[4]);
-    await expect(within(canvasElement).getByRole("button", { name: /Revoke 2/ })).toBeVisible();
-  },
+/** Filter chips: a scope and a last-active window. */
+export const Filtered: Story = {
+  render: () => <People initial={{ filters: { scope: "APP", active: "7d" } }} />,
 };
 
-/** A viewer without org.manage_members: no row menus, no selection column. */
+/** The walk stopped at the cap, and the header says what the filters cover. */
+export const Truncated: Story = {
+  render: () => <People truncated />,
+};
+
+/** A viewer without org.manage_members: no row menus. */
 export const NoManageAccess: Story = {
-  render: () => (
-    <Members {...membersProps({ canManageMembers: false })} initial={{ view: "bindings" }} />
-  ),
+  render: () => <People canManageMembers={false} />,
 };
 
 export const LongStrings: Story = {
   render: () => (
-    <Members
-      {...membersProps({
-        people: pageData([...LONG_MEMBERS, ...MEMBERS], { totalCount: 1_284, nextCursor: "c2" }),
-        bindingIndexRows: [...LONG_BINDINGS, ...BINDINGS],
-      })}
+    <People
+      data={{
+        members: [...LONG_MEMBERS, ...MEMBERS],
+        bindings: [...LONG_BINDINGS, ...BINDINGS],
+        invitations: [...LONG_INVITATIONS, ...INVITATIONS, ...RESOLVED_INVITATIONS],
+      }}
     />
   ),
 };
 
 export const LongInvitations: Story = {
   render: () => (
-    <Members
-      {...membersProps({ invitations: pageData([...LONG_INVITATIONS, ...INVITATIONS]) })}
+    <People
+      data={{ invitations: [...LONG_INVITATIONS, ...INVITATIONS] }}
       initial={{ view: "invited" }}
     />
   ),
@@ -147,11 +140,11 @@ export const LongInvitations: Story = {
 export const Width768: Story = {
   render: () => (
     <div style={{ width: 768 }} className="overflow-hidden border">
-      <Members
-        {...membersProps({
-          people: pageData([...LONG_MEMBERS, ...MEMBERS]),
-          bindingIndexRows: [...LONG_BINDINGS, ...BINDINGS],
-        })}
+      <People
+        data={{
+          members: [...LONG_MEMBERS, ...MEMBERS],
+          bindings: [...LONG_BINDINGS, ...BINDINGS],
+        }}
       />
     </div>
   ),
