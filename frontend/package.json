@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build --quiet"
+    "build-storybook": "storybook build --quiet",
+    "test:layout": "playwright test"
   },
   "dependencies": {
     "@apollo/client": "^4.1.6",
@@ -64,6 +65,7 @@
     "@graphql-codegen/typescript": "^4.1.6",
     "@graphql-codegen/typescript-operations": "^4.6.1",
     "@parcel/watcher": "^2.5.0",
+    "@playwright/test": "^1.63.0",
     "@storybook/addon-a11y": "^10.6.0",
     "@storybook/nextjs-vite": "^10.6.0",
     "@storybook/react": "^10.6.0",
