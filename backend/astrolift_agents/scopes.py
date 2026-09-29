@@ -196,9 +196,15 @@ def agent_env_spec_scope(field: str = "slug", permission=Permission.AGENT_ENV_SP
         org_id = _org_id()
         if not slug or org_id is None:
             return _org_scope()
-        from astrolift_agents.visibility import environment_specs, spec_owner_scope
+        from astrolift_agents.visibility import (
+            check_org_shared_spec_write,
+            environment_specs,
+            spec_owner_scope,
+        )
 
         spec = environment_specs(org_id, permission).filter(slug=str(slug)).first()
+        if spec is not None and spec.team_id is None and spec.project_id is None:
+            return check_org_shared_spec_write(org_id, permission)
         return spec_owner_scope(spec) if spec is not None else _org_scope()
 
     return _scope
@@ -223,6 +229,10 @@ def agent_env_spec_owner_scope(field: str = "input"):
         if team_guid:
             team = Team.objects.filter(guid=team_guid, organization_id=org_id).first()
             return PermissionScope(kind=ScopeKind.TEAM, id=team.pk) if team else _org_scope()
+        if read_arg(args, field) is not None:
+            from astrolift_agents.visibility import check_org_shared_spec_write
+
+            return check_org_shared_spec_write(org_id, Permission.AGENT_ENV_SPEC_CREATE)
         return _org_scope()
 
     return _scope

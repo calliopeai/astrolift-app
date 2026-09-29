@@ -201,6 +201,37 @@ def test_only_an_org_grant_edits_or_deletes_a_shared_spec(world):
         assert AgentsMutation().delete_agent_environment_spec(world.info, slug="shared-env").ok
 
 
+def test_team_token_cannot_write_shared_specs_with_an_org_role(world):
+    grant(
+        world,
+        Permission.AGENT_ENV_SPEC_CREATE,
+        Permission.AGENT_ENV_SPEC_UPDATE,
+        Permission.AGENT_ENV_SPEC_DELETE,
+        Permission.AGENT_ENV_SPEC_READ,
+        kind="ORG",
+    )
+    with member(world, selected=True), team_token(world):
+        assert AgentsQuery().agent_environment_spec(world.info, slug="shared-env") is not None
+        assert _create(world, "new-owned-env", project_id=str(world.medops_project.guid)).ok
+        assert (
+            AgentsMutation()
+            .update_agent_environment_spec(
+                world.info, slug="medops-env", input=UpdateAgentEnvironmentSpecInput(tool_preset="dev")
+            )
+            .ok
+        )
+        assert refused(_create(world, "new-shared-env"))
+        assert refused(
+            AgentsMutation().update_agent_environment_spec(
+                world.info, slug="shared-env", input=UpdateAgentEnvironmentSpecInput(tool_preset="changed")
+            )
+        )
+        assert refused(AgentsMutation().delete_agent_environment_spec(world.info, slug="shared-env"))
+    world.shared_spec.refresh_from_db()
+    assert world.shared_spec.deleted_at is None and world.shared_spec.tool_preset == ""
+    assert not AgentEnvironmentSpec.objects.filter(slug="new-shared-env").exists()
+
+
 def test_spec_delete_checks_the_specs_owner(world):
     grant(world, Permission.AGENT_ENV_SPEC_DELETE)
     with member(world, selected=True):
@@ -593,12 +624,82 @@ def test_registration_never_rewrites_another_scopes_spec(world):
 
     with pytest.raises(SpecOwnedElsewhere):
         spec_for_registration(organization=world.org, slug="platform-env", app=world.medops_app)
-    assert spec_for_registration(organization=world.org, slug="shared-env", app=world.medops_app).pk == (
-        world.shared_spec.pk
-    )
     fresh = spec_for_registration(organization=world.org, slug="new-env", app=world.medops_app)
     assert fresh.pk is None
     assert (fresh.team_id, fresh.project_id) == (world.medops.pk, world.medops_project.pk)
+
+
+@pytest.mark.parametrize("kind", ["TEAM", "PROJECT"])
+def test_registration_cannot_rewrite_shared_spec_with_only_local_grants(world, kind):
+    from astrolift_agents.services.agent_importers import import_agent_spec
+    from astrolift_agents.services.imported_agent_registration import (
+        ImportedAgentRegistrationError,
+        persist_imported_agent_package,
+    )
+    from astrolift_registry.models import RegisteredApp
+
+    grant(world, Permission.AGENT_CREATE, Permission.AGENT_ENV_SPEC_UPDATE, kind=kind)
+    package = import_agent_spec(
+        "agents_md",
+        {"name": "Replacement bot", "content": "Review changes."},
+        options={"runtime_image": "example/agent:2"},
+    ).package
+    with member(world, selected=True), pytest.raises(ImportedAgentRegistrationError, match="org-shared"):
+        persist_imported_agent_package(project=world.medops_project, package=package, slug="shared-env")
+    world.shared_spec.refresh_from_db()
+    assert world.shared_spec.image_tag == "example/agent:1"
+    assert not RegisteredApp.objects.filter(organization=world.org, slug="shared-env").exists()
+
+
+def test_manifest_sync_cannot_rewrite_shared_spec_with_project_grants(world):
+    from astrolift_agents.services.project_membership import SpecOwnedElsewhere
+    from astrolift_registry.services.manifest_sync import _upsert_agent_environment_spec
+
+    grant(world, Permission.AGENT_UPDATE, Permission.AGENT_ENV_SPEC_UPDATE, kind="PROJECT")
+    world.shared_spec.slug = world.medops_agent.slug
+    world.shared_spec.save(update_fields=["slug"])
+    with member(world, selected=True), pytest.raises(SpecOwnedElsewhere, match="org-shared"):
+        _upsert_agent_environment_spec(
+            app=world.medops_app,
+            workload_slug=world.medops_agent.slug,
+            raw_manifest=SimpleNamespace(raw={"environment": {"CHANGED": "yes"}}),
+            source_repo="https://example.com/agent.git",
+            deploy_branch="main",
+            manifest_path="astrolift.toml",
+        )
+    world.shared_spec.refresh_from_db()
+    assert world.shared_spec.image_tag == "example/agent:1" and world.shared_spec.env_vars == {}
+
+
+def test_org_grant_can_register_against_a_shared_spec(world):
+    from astrolift_agents.services.agent_importers import import_agent_spec
+    from astrolift_agents.services.imported_agent_registration import persist_imported_agent_package
+
+    grant(world, Permission.AGENT_ENV_SPEC_UPDATE, kind="ORG")
+    package = import_agent_spec(
+        "agents_md",
+        {"name": "Replacement bot", "content": "Review changes."},
+        options={"runtime_image": "example/agent:2"},
+    ).package
+    with member(world):
+        registered = persist_imported_agent_package(
+            project=world.medops_project, package=package, slug="shared-env"
+        )
+    world.shared_spec.refresh_from_db()
+    assert registered.environment_spec.pk == world.shared_spec.pk
+    assert world.shared_spec.image_tag == "example/agent:2"
+
+
+def test_team_token_cannot_register_against_shared_spec_with_org_grant(world):
+    from astrolift_agents.services.project_membership import SpecOwnedElsewhere, spec_for_registration
+
+    grant(world, Permission.AGENT_ENV_SPEC_UPDATE, kind="ORG")
+    with (
+        member(world, selected=True),
+        team_token(world),
+        pytest.raises(SpecOwnedElsewhere, match="org-shared"),
+    ):
+        spec_for_registration(organization=world.org, slug="shared-env", app=world.medops_app)
 
 
 # ---------------------------------------------------------------------------

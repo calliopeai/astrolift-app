@@ -7,7 +7,14 @@ from astrolift_identity.models import Project, Team
 from astrolift_identity.permission_resolver import share_levels
 from astrolift_identity.scope_visibility import visible_apps, visible_projects, visible_teams
 from astrolift_registry.models import AppTeamAccess, RegisteredApp, Workload
-from core.permissions import Permission, PermissionScope, ScopeKind, granted_scopes
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    PermissionScope,
+    ScopeKind,
+    check_permission,
+    granted_scopes,
+)
 from core.tenancy import get_current_tenant
 
 
@@ -238,6 +245,19 @@ def spec_owner_scope(spec) -> PermissionScope:
         if team.organization_id == org_id and team.deleted_at is None:
             return PermissionScope(kind=ScopeKind.TEAM, id=team.pk)
     return PermissionScope(kind=ScopeKind.ORG, id=org_id)
+
+
+def check_org_shared_spec_write(org_id, permission=Permission.AGENT_ENV_SPEC_UPDATE):
+    """Shared recipes are readable by local grants, but writes require an
+    org grant and an org-scoped credential, including during registration.
+    A token's team ceiling must survive its user's broader org role.
+    """
+    scope = PermissionScope(kind=ScopeKind.ORG, id=org_id)
+    token = get_current_api_token()
+    if token is not None and token.team_id is not None:
+        raise PermissionDenied(permission, scope, "org-shared spec writes require an org-scoped credential")
+    check_permission(permission, scope=scope)
+    return scope
 
 
 def spec_usable_by_app(spec, app) -> bool:

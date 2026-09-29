@@ -28,6 +28,10 @@
   `astrolift_import_agent_spec` check at the named project, and an import
   no longer moves another project's agent. Manifest sync and agent import
   stamp a new spec's owner and refuse to rewrite another scope's spec.
+  Rewriting an org-shared spec during registration requires an explicit
+  org-level spec-update grant. Team-scoped credentials cannot create,
+  update or delete shared specs even when their user has an org role;
+  shared reads and owned-spec registration remain available.
   `core/tests/test_surface_guardrail_1866.py` walks the served GraphQL
   schemas, the URL conf, the WebSocket routes and the MCP registry, and
   fails on any route without a declared scope that is not on its allowlist;
