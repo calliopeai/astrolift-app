@@ -201,6 +201,24 @@ def test_only_an_org_grant_edits_or_deletes_a_shared_spec(world):
         assert AgentsMutation().delete_agent_environment_spec(world.info, slug="shared-env").ok
 
 
+@pytest.mark.parametrize("owner_kind", ["team", "project"])
+@pytest.mark.parametrize("own_team", [False, True])
+def test_new_spec_owner_respects_the_team_tokens_ceiling(world, owner_kind, own_team):
+    grant(world, Permission.AGENT_ENV_SPEC_CREATE, kind="ORG")
+    if owner_kind == "project":
+        owner = world.medops_project if own_team else world.platform_project
+        fields = {"project_id": str(owner.guid)}
+    else:
+        owner = world.medops if own_team else world.platform
+        fields = {"team_id": str(owner.guid)}
+    with member(world, selected=True), team_token(world):
+        result = _create(world, "new-owned-env", **fields)
+    assert result.ok is own_team
+    assert (
+        AgentEnvironmentSpec.objects.filter(organization=world.org, slug="new-owned-env").exists() is own_team
+    )
+
+
 def test_team_token_cannot_write_shared_specs_with_an_org_role(world):
     grant(
         world,
@@ -471,6 +489,26 @@ def test_an_org_grant_ensures_an_org_level_box(world, started):
         assert _ensure(world, environment_spec_slug="shared-env").ok
         assert _ensure(world, image="example/agent:1").ok
     assert all(box.team_id is None and box.project_id is None for box in started)
+
+
+@pytest.mark.parametrize("fields", [{"image": "example/agent:1"}, {"environment_spec_slug": "shared-env"}])
+def test_team_token_cannot_launch_an_org_level_box(world, started, fields):
+    grant(world, Permission.AGENT_DISPATCH, kind="ORG")
+    AgentBox.objects.all().delete()
+    with member(world, selected=True), team_token(world):
+        assert refused(_ensure(world, **fields))
+    assert not started and not AgentBox.objects.exists()
+
+
+def test_team_token_can_launch_an_owned_box_and_use_a_shared_recipe_with_its_agent(world, started):
+    grant(world, Permission.AGENT_DISPATCH, kind="ORG")
+    AgentBox.objects.all().delete()
+    with member(world, selected=True), team_token(world):
+        assert _ensure(world, environment_spec_slug="medops-env").ok
+        assert _ensure(world, agent_slug="medops-bot", environment_spec_slug="shared-env").ok
+    assert len(started) == 2
+    assert started[0].project_id == world.medops_project.pk
+    assert started[1].agent_definition_id == world.medops_agent.pk
 
 
 def test_ensure_never_hands_over_a_live_box_of_another_scope(world, started):

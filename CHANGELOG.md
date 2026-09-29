@@ -72,6 +72,9 @@
   Registering against a team-shared recipe also requires its owning team's
   spec-update grant and respects the credential's team ceiling; a project
   grant alone cannot rewrite the recipe used by the team's other projects.
+  Team-scoped credentials create specs only inside their own team and
+  cannot launch org-level image-only or shared-spec boxes. They can still
+  launch their own agent with a shared recipe or a box on an owned spec.
   `core/tests/test_surface_guardrail_1866.py` walks the served GraphQL
   schemas, the URL conf, the WebSocket routes and the MCP registry, and
   fails on any route without a declared scope that is not on its allowlist;

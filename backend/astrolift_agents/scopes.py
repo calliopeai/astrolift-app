@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.permissions import Permission, PermissionScope, ScopeKind
+from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind
 from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
@@ -33,6 +33,16 @@ def _org_id() -> int | None:
 def _org_scope():
     # A factory miss must not inherit the selected team/project (#1745).
     return PermissionScope(kind=ScopeKind.ORG, id=_org_id() or 0)
+
+
+def _token_owner_scope(scope, *, team_id, permission):
+    """A new owned resource must fit inside its credential's team ceiling."""
+    from astrolift_identity.api_tokens import get_current_api_token
+
+    token = get_current_api_token()
+    if token is not None and token.team_id is not None and token.team_id != team_id:
+        raise PermissionDenied(permission, scope, "owner is outside the credential's team")
+    return scope
 
 
 def agent_org_scope(_args):
@@ -180,7 +190,14 @@ def agent_box_ensure_scope(field: str = "input"):
                 .filter(slug=str(spec_slug).strip())
                 .first()
             )
-            return spec_owner_scope(spec) if spec is not None else _org_scope()
+            if spec is not None:
+                scope = spec_owner_scope(spec)
+                if scope.kind == ScopeKind.ORG:
+                    return _token_owner_scope(scope, team_id=None, permission=Permission.AGENT_DISPATCH)
+                return scope
+            return _org_scope()
+        if read_arg(args, field) is not None:
+            return _token_owner_scope(_org_scope(), team_id=None, permission=Permission.AGENT_DISPATCH)
         return _org_scope()
 
     return _scope
@@ -224,11 +241,23 @@ def agent_env_spec_owner_scope(field: str = "input"):
         project_guid = read_guid(args, f"{field}.project_id")
         if project_guid:
             project = Project.objects.filter(guid=project_guid, organization_id=org_id).first()
-            return PermissionScope(kind=ScopeKind.PROJECT, id=project.pk) if project else _org_scope()
+            if project is not None:
+                return _token_owner_scope(
+                    PermissionScope(kind=ScopeKind.PROJECT, id=project.pk),
+                    team_id=project.team_id,
+                    permission=Permission.AGENT_ENV_SPEC_CREATE,
+                )
+            return _org_scope()
         team_guid = read_guid(args, f"{field}.team_id")
         if team_guid:
             team = Team.objects.filter(guid=team_guid, organization_id=org_id).first()
-            return PermissionScope(kind=ScopeKind.TEAM, id=team.pk) if team else _org_scope()
+            if team is not None:
+                return _token_owner_scope(
+                    PermissionScope(kind=ScopeKind.TEAM, id=team.pk),
+                    team_id=team.pk,
+                    permission=Permission.AGENT_ENV_SPEC_CREATE,
+                )
+            return _org_scope()
         if read_arg(args, field) is not None:
             from astrolift_agents.visibility import check_org_shared_spec_write
 
