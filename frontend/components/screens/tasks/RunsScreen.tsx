@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  AlertTriangleIcon,
   ClipboardListIcon,
   ExternalLinkIcon,
   HistoryIcon,
   MonitorPlayIcon,
   MoreHorizontalIcon,
   PlayIcon,
+  RotateCcwIcon,
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -41,21 +41,21 @@ export interface RunsScreenProps {
   newRows?: { count: number; onReveal: () => void };
   loading: boolean;
   stale: boolean;
-  /** Every source failed. One failing source is `unavailable` instead. */
   error: { message: string } | null;
   onRetry: () => void;
   nextCursor: string | null;
   totalCount: number | null;
   approximateCount: boolean;
-  /** Sources that failed to load, by label: the list shows the rest. */
-  unavailable: string[];
-  /** How much of each source the list covers while it is merged client-side. */
-  coverage: string | null;
   /** A run by key, from any page: the bulk bar acts on the selection. */
   lookup: (key: string) => RunRow | null;
   /** Cancels the runs; throws when none could be. Absent: no Cancel. */
   onCancel?: (runs: RunRow[]) => Promise<void>;
+  /** Runs finished agent runs again; throws when none could be. Absent: no Retry. */
+  onRetryRuns?: (runs: RunRow[]) => Promise<void>;
 }
+
+/** The Scheduled view lists firings to come, so its time column is when each fires. */
+const upcomingView = (list: ListStateController) => Boolean(list.filters.upcoming);
 
 const DOT: Record<RunOutcome, "ok" | "warn" | "error" | "muted" | "pending"> = {
   running: "pending",
@@ -94,8 +94,10 @@ export function RunOutcomeCell({ run }: { run: Pick<RunRow, "outcome" | "status"
  * run, with the container task runs, in one live list. Views All · Mine ·
  * Running · Failed · Waiting · Scheduled; chips for kind, status, agent,
  * workflow, project, trigger and since; newest first by cursor; new rows
- * wait behind the pill; running runs cancel in bulk. `embedded` is an
- * agent's Runs tab, the same list under the agent's tabs. Pure.
+ * wait behind the pill; running runs cancel and finished agent runs retry
+ * in bulk. The Scheduled view lists the next firings of scheduled agents.
+ * `embedded` is an agent's Runs tab, the same list under the agent's tabs.
+ * Pure.
  */
 export function RunsScreen({
   list,
@@ -109,27 +111,35 @@ export function RunsScreen({
   nextCursor,
   totalCount,
   approximateCount,
-  unavailable,
-  coverage,
   lookup,
   onCancel,
+  onRetryRuns,
 }: RunsScreenProps) {
   const fmt = useFormatters();
   const [toCancel, setToCancel] = React.useState<{ runs: RunRow[]; clear?: () => void } | null>(
     null
   );
+  const [toRetry, setToRetry] = React.useState<{ runs: RunRow[]; clear?: () => void } | null>(null);
 
   const columns: Column<RunRow>[] = [
     {
       id: "run",
       header: "Run",
       cellClassName: "max-w-48",
-      cell: (r) => (
-        <div className="flex min-w-0 flex-col">
-          <Identifier value={r.id} kind="id" copyable={false} className="text-xs" />
-          <span className="text-muted-foreground text-xs">{RUN_KIND_LABEL[r.kind]}</span>
-        </div>
-      ),
+      cell: (r) =>
+        r.upcoming ? (
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-mono text-xs" title={r.id}>
+              {r.id}
+            </span>
+            <span className="text-muted-foreground text-xs">Scheduled run</span>
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-col">
+            <Identifier value={r.id} kind="id" copyable={false} className="text-xs" />
+            <span className="text-muted-foreground text-xs">{RUN_KIND_LABEL[r.kind]}</span>
+          </div>
+        ),
     },
     ...(embedded
       ? []
@@ -164,7 +174,6 @@ export function RunsScreen({
       id: "took",
       header: "Took",
       align: "right",
-      sortKey: "took",
       cellClassName: "font-mono text-xs tabular-nums",
       cell: (r) => formatTook(r.durationSeconds),
     },
@@ -187,36 +196,52 @@ export function RunsScreen({
     },
     {
       id: "at",
-      header: "Started",
+      header: upcomingView(list) ? "Fires" : "Started",
       sortKey: "at",
       cellClassName: "font-mono text-xs whitespace-nowrap",
       cell: (r) => (r.at ? fmt.formatDateTime(r.at) : "—"),
     },
   ];
 
-  const bulkActions = onCancel
-    ? (selection: RowSelection) => {
-        const runs = selection.selectedIds
-          .map(lookup)
-          .filter((r): r is RunRow => Boolean(r?.cancel));
-        return (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={runs.length === 0}
-            onClick={() => setToCancel({ runs, clear: selection.clear })}
-          >
-            <XCircleIcon className="size-4" />
-            Cancel{runs.length > 0 ? ` ${runs.length}` : ""}
-          </Button>
-        );
-      }
-    : undefined;
+  const bulkActions =
+    onCancel || onRetryRuns
+      ? (selection: RowSelection) => {
+          const picked = selection.selectedIds.map(lookup).filter((r): r is RunRow => Boolean(r));
+          const cancellable = picked.filter((r) => r.cancel);
+          const retryable = picked.filter((r) => r.retry);
+          return (
+            <>
+              {onRetryRuns && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={retryable.length === 0}
+                  onClick={() => setToRetry({ runs: retryable, clear: selection.clear })}
+                >
+                  <RotateCcwIcon className="size-4" />
+                  Retry{retryable.length > 0 ? ` ${retryable.length}` : ""}
+                </Button>
+              )}
+              {onCancel && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={cancellable.length === 0}
+                  onClick={() => setToCancel({ runs: cancellable, clear: selection.clear })}
+                >
+                  <XCircleIcon className="size-4" />
+                  Cancel{cancellable.length > 0 ? ` ${cancellable.length}` : ""}
+                </Button>
+              )}
+            </>
+          );
+        }
+      : undefined;
 
   const rowActions = (r: RunRow) => (
     <>
       <DropdownMenuItem asChild>
-        <Link href={r.href}>Open run</Link>
+        <Link href={r.href}>{r.upcoming ? "Open agent" : "Open run"}</Link>
       </DropdownMenuItem>
       {r.watchHref && (
         <DropdownMenuItem asChild>
@@ -225,6 +250,12 @@ export function RunsScreen({
             Watch live
             <ExternalLinkIcon className="size-3.5" />
           </Link>
+        </DropdownMenuItem>
+      )}
+      {onRetryRuns && r.retry && (
+        <DropdownMenuItem onSelect={() => setToRetry({ runs: [r] })}>
+          <RotateCcwIcon className="size-4" />
+          Retry run
         </DropdownMenuItem>
       )}
       {onCancel && r.cancel && (
@@ -307,18 +338,24 @@ export function RunsScreen({
         />
       )}
 
-      {unavailable.length > 0 && !error && (
-        <p role="status" className="text-warning-fg flex min-w-0 items-start gap-1.5 text-xs">
-          <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          <span className="min-w-0 [overflow-wrap:anywhere]">
-            Not shown, could not load: {unavailable.join(", ")}.{" "}
-            <button type="button" onClick={onRetry} className="underline underline-offset-2">
-              Retry
-            </button>
-          </span>
-        </p>
+      {onRetryRuns && (
+        <ConfirmDialog
+          open={toRetry !== null}
+          onOpenChange={(open) => !open && setToRetry(null)}
+          title={
+            toRetry && toRetry.runs.length > 1
+              ? `Retry ${toRetry.runs.length} runs?`
+              : "Retry this run?"
+          }
+          description="Each agent run starts again with the same brief, environment and inputs, as a new run you started. A run that could not start again says why."
+          confirmLabel="Retry runs"
+          onConfirm={async () => {
+            if (!toRetry) return;
+            await onRetryRuns(toRetry.runs);
+            toRetry.clear?.();
+          }}
+        />
       )}
-      {coverage && <p className="text-muted-foreground text-xs">{coverage}</p>}
 
       {onCancel && (
         <ConfirmDialog

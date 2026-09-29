@@ -1,6 +1,5 @@
 "use client";
 
-import { gql } from "@apollo/client";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -13,32 +12,8 @@ import {
   validateTool,
 } from "@/components/screens/agents/skills/use-add-tool";
 import { DELETE_TOOL_DEF, UPDATE_TOOL_DEF } from "@/graphql/agents/agents.mutations";
+import { GET_TOOL_DEF } from "@/graphql/agents/agents.queries";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
-
-// ─── GraphQL ─────────────────────────────────────────────────────────────────
-
-// The global toolDefs resolver is skill-scoped, so we fetch the single
-// tool def via the list query on its parent skill — but we don't have
-// the parent skill from the URL here. Use a local inline query on the
-// orgToolDefs resolver instead, filtering client-side by ID.
-// Alternatively, use a dedicated GET_TOOL_DEF query once it exists.
-// For now we re-use LIST_ORG_TOOL_DEFS and find by id param.
-
-const GET_TOOL_DEF = gql`
-  query GetToolDef($orgId: ID!, $id: ID!) {
-    orgToolDefs(orgId: $orgId) {
-      id
-      name
-      slug
-      description
-      adapter
-      inputSchema
-      outputSchema
-      handlerRef
-      createdAt
-    }
-  }
-`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +35,7 @@ export type ToolDetailTool = {
 /** What the form hands the hook on submit, schemas still as raw text. */
 export type ToolDetailFormValues = ToolDefFields;
 
-type OrgToolDefsData = { orgToolDefs: ToolDetailTool[] };
+type ToolDefData = { toolDef: ToolDetailTool | null };
 
 type MutError = { field: string; message: string; code: string };
 
@@ -87,20 +62,22 @@ export function useToolDetail(id: string) {
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
 
-  const { data, loading, error, refetch } = useQuery<OrgToolDefsData>(GET_TOOL_DEF, {
-    variables: { orgId, id },
+  // `toolDef(id)` is scoped to the org's own and global skills (#2155); the
+  // org id only gates the read until the active org is known.
+  const { data, loading, error, refetch } = useQuery<ToolDefData>(GET_TOOL_DEF, {
+    variables: { id },
     fetchPolicy: "cache-and-network",
     skip: !orgId,
   });
 
-  const tool = data?.orgToolDefs?.find((t) => t.id === id) ?? null;
+  const tool = data?.toolDef ?? null;
 
   const [updateToolDef, { loading: saving }] = useMutation<UpdateToolDefData>(UPDATE_TOOL_DEF, {
-    refetchQueries: ["ListOrgToolDefs", "ListToolDefs"],
+    refetchQueries: ["ListOrgToolDefs", "ListToolDefs", "ToolDefsListPage", "GetToolDef"],
   });
 
   const [deleteToolDef, { loading: deleting }] = useMutation<DeleteToolDefData>(DELETE_TOOL_DEF, {
-    refetchQueries: ["ListOrgToolDefs", "ListToolDefs"],
+    refetchQueries: ["ListOrgToolDefs", "ListToolDefs", "ToolDefsListPage"],
   });
 
   /** Resolves the errors to show beside their fields; empty when it saved. */

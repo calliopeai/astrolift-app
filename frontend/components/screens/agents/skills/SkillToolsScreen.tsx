@@ -14,7 +14,7 @@ import { useFormatters } from "@/lib/i18n/formatters";
 
 import { SkillFrame, skillTabHref } from "./SkillFrame";
 import { ADAPTER_LABEL } from "./tool-adapters";
-import type { ToolDef } from "./use-skill-tool-defs";
+import type { SkillToolRow } from "./skill-tools-list";
 import type { SkillToolsState } from "./use-skill-tools";
 
 export type SkillToolsScreenProps = SkillToolsState;
@@ -41,10 +41,10 @@ export function SkillToolsScreen({
   removeTool,
 }: SkillToolsScreenProps) {
   const fmt = useFormatters();
-  const [toRemove, setToRemove] = useState<ToolDef | null>(null);
+  const [toRemove, setToRemove] = useState<SkillToolRow | null>(null);
   const newHref = `${skillTabHref(id, "tools")}/new`;
 
-  const columns: Column<ToolDef>[] = [
+  const columns: Column<SkillToolRow>[] = [
     {
       id: "tool",
       header: "Tool",
@@ -112,7 +112,7 @@ export function SkillToolsScreen({
         </Button>
       }
     >
-      <ListPage<ToolDef>
+      <ListPage<SkillToolRow>
         embedded
         list={list}
         label="Tools"

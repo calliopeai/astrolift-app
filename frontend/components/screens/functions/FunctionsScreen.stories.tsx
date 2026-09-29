@@ -6,11 +6,12 @@ import {
   APP_WORKLOAD,
   AREA,
   LONG_WORKLOADS,
+  type AreaWorkload,
   MANY_WORKLOADS,
+  serveWorkloads,
 } from "@/components/screens/workloads/workloads.fixtures";
-import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-import { FUNCTIONS_LIST, selectFunctions } from "./functions-list";
+import { FUNCTIONS_LIST } from "./functions-list";
 import { FunctionsScreen, type FunctionsScreenProps } from "./FunctionsScreen";
 
 const meta: Meta = {
@@ -22,20 +23,24 @@ export default meta;
 type Story = StoryObj;
 
 type Props = Partial<Omit<FunctionsScreenProps, "list">> & {
-  workloads?: AstroliftWorkload[];
+  workloads?: AreaWorkload[];
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture workloads, narrowed and paged the way the hook does it. */
+/** The screen over fixture workloads, narrowed and paged the way the server does it. */
 function Functions({ workloads = AREA, initial, ...patch }: Props) {
   const list = useLocalListState(FUNCTIONS_LIST, initial);
-  const { rows, totalCount } = selectFunctions(workloads, {
-    filters: list.filters,
-    q: list.state.q,
-    sort: list.state.sort,
-    page: list.state.page,
-    pageSize: list.state.pageSize,
-  });
+  const { rows, totalCount } = serveWorkloads(
+    workloads,
+    {
+      filters: list.filters,
+      q: list.state.q,
+      sort: list.state.sort,
+      page: list.state.page,
+      pageSize: list.state.pageSize,
+    },
+    ["function"]
+  );
   return (
     <FunctionsScreen
       list={list}

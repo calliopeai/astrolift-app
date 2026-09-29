@@ -8,7 +8,7 @@ import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import {
   usePendingHumanGates,
   useWorkflowDefinition,
-  useWorkflowDefinitionRuns,
+  useWorkflowDefinitionRun,
   useWorkflowRuns,
   useWorkflowsEntitlement,
   useWorkflowStageExecutions,
@@ -32,15 +32,13 @@ import type { WorkflowRunScreenProps } from "./WorkflowRunScreen";
 /** Inside the 3 to 5 second live window (#1090); nothing polls once the run settles. */
 const LIVE_POLL_MS = 4000;
 const GATES_POLL_MS = 10_000;
-/** The window the frame and the Runs tab read a definition's runs with. */
-const DEFINITION_RUNS_LIMIT = 100;
 
 /**
- * One run's page, the data half of WorkflowRunScreen. The run comes from
- * the list the Runs tab reads (a configured workflow's `workflowRuns`, or
- * the definition's window of `workflowDefinitionRuns`), so opening it from
- * the list costs no fetch; the plan is the definition topology the frame
- * already read. The stage executions and the engine history are the run's
+ * One run's page, the data half of WorkflowRunScreen. A configured
+ * workflow's run comes from the `workflowRuns` list its Runs tab reads; a
+ * definition's run is read by guid (`workflowDefinitionRun`, #2155), so a
+ * run past the newest window of the definition's runs still opens. The
+ * plan is the definition topology the frame already read. The stage executions and the engine history are the run's
  * own, polled while it is live. Whether a waiting gate waits on the viewer
  * is `pendingHumanGates`, the gates the server says the viewer may decide.
  */
@@ -60,10 +58,9 @@ export function useWorkflowRunPage(
     configured?.guid ?? null,
     configured?.organizationGuid ?? null
   );
-  const definitionRunsQ = useWorkflowDefinitionRuns({
+  const definitionRunQ = useWorkflowDefinitionRun({
+    guid: runId,
     orgId: definition?.organizationGuid,
-    projectId: definition?.projectGuid,
-    limit: DEFINITION_RUNS_LIMIT,
     skip: !definition,
   });
   // The definition behind a configured workflow, read with the frame's variables.
@@ -74,17 +71,18 @@ export function useWorkflowRunPage(
       configured.runs.find((r) => r.guid === runId) ??
       null)
     : null;
-  const defRun = definition
-    ? (definitionRunsQ.runs.find((r) => r.guid === runId && r.definitionGuid === definition.guid) ??
-      null)
-    : null;
+  // A guid of another definition's run under this slug is not this page's run.
+  const defRun =
+    definition && definitionRunQ.run?.definitionGuid === definition.guid
+      ? definitionRunQ.run
+      : null;
   const run: WorkflowRunSubject | null = raw
     ? configuredRunSubject(raw)
     : defRun
       ? definitionRunSubject(defRun)
       : null;
   const live = run?.live ?? false;
-  const runsQ = configured ? configuredQ : definitionRunsQ;
+  const runsQ = configured ? configuredQ : definitionRunQ;
 
   const { startPolling, stopPolling } = runsQ;
   React.useEffect(() => {

@@ -38,7 +38,7 @@ export function useImportSkills() {
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const [importMutation, { loading }] = useMutation<ImportSkillsData>(IMPORT_SKILLS_FROM_REPO, {
-    refetchQueries: ["ListSkills"],
+    refetchQueries: ["ListSkills", "SkillsListPage"],
   });
 
   /** Resolves the errors to show; empty when the import went through. */

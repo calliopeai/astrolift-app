@@ -80,7 +80,7 @@ export function useAddTool(skillId: string) {
   const router = useRouter();
   const skill = useSkill(skillId);
   const [createToolDef, { loading }] = useMutation<CreateToolDefData>(CREATE_TOOL_DEF, {
-    refetchQueries: ["ListToolDefs", "ListOrgToolDefs"],
+    refetchQueries: ["ListToolDefs", "ListOrgToolDefs", "ToolDefsListPage"],
   });
 
   async function createTool(fields: ToolDefFields): Promise<ToolErrors> {

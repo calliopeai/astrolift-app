@@ -46,6 +46,10 @@ export function AgentSecretValues({
   rows,
   totalCount,
   loading,
+  stale,
+  error,
+  onRetry,
+  readError,
   refNamespace,
   reveals,
   busyVar,
@@ -110,7 +114,7 @@ export function AgentSecretValues({
     {
       id: "status",
       header: "Value",
-      sortKey: "status",
+      sortKey: "exists",
       width: "w-28",
       cell: (r) => {
         const s = secretState(r);
@@ -157,6 +161,12 @@ export function AgentSecretValues({
         </Button>
       </div>
 
+      {readError && (
+        <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]" role="status">
+          The secret store could not be read: {readError}.
+        </p>
+      )}
+
       <ListPage<AstroliftAgentSecretStatus>
         embedded
         list={list}
@@ -165,6 +175,9 @@ export function AgentSecretValues({
         rows={rows}
         getRowId={(r) => r.envVar}
         loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
         totalCount={totalCount}
         empty={{
           icon: <KeyRoundIcon className="size-5" />,

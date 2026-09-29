@@ -1,20 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { selectModels } from "@/components/screens/models/models-list";
-import { MODELS } from "@/components/screens/models/models-providers.fixtures";
-import { selectTools } from "@/components/screens/agents/tools/tools-list";
-import { TOOLS as REGISTRY_TOOLS } from "@/components/screens/agents/tools/agent-tools.fixtures";
-import { selectFunctions } from "@/components/screens/functions/functions-list";
 import {
-  APP_WORKLOAD,
-  AREA,
-  MANY_WORKLOADS,
-} from "@/components/screens/workloads/workloads.fixtures";
-import { areaWorkloads, selectWorkloads } from "@/components/screens/workloads/workloads-list";
+  effectiveFilters,
+  parseListState,
+  type ListDefinition,
+} from "@/components/list/list-state";
+import {
+  functionsPageVariables,
+  FUNCTIONS_LIST,
+} from "@/components/screens/functions/functions-list";
+import { modelEndpointsPageVariables, MODELS_LIST } from "@/components/screens/models/models-list";
+import { toolDefsPageVariables, TOOLS_LIST } from "@/components/screens/agents/tools/tools-list";
+import {
+  workloadsPageVariables,
+  WORKLOADS_LIST,
+} from "@/components/screens/workloads/workloads-list";
 
-import { MANY_SKILLS, SKILL_ITEMS } from "./agent-skills.fixtures";
-import { agentsCrumbs, selectPage, splitErrors } from "./catalog";
-import { selectSkills } from "./skills-list";
+import { agentsCrumbs, numberedPageVariables, selectPage, splitErrors } from "./catalog";
+import { skillToolsPageVariables } from "./skill-tools-list";
+import { SKILLS_LIST, skillsPageVariables } from "./skills-list";
+
+/** A URL query as the numbered list state a hook reads. */
+function queryOf(def: ListDefinition, qs: string) {
+  const state = parseListState(def, qs);
+  return {
+    q: state.q,
+    filters: effectiveFilters(def, state),
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
+  };
+}
 
 const base = { filters: {}, q: "", sort: [], page: 1, pageSize: 25 };
 
@@ -76,34 +92,114 @@ describe("splitErrors", () => {
   });
 });
 
-describe("the catalog lists", () => {
-  it("Skills: Mine is the org's own, Imported cannot pick any out yet", () => {
-    expect(selectSkills(SKILL_ITEMS, { ...base, filters: { scope: "org" } }).totalCount).toBe(2);
-    expect(selectSkills(SKILL_ITEMS, { ...base, filters: { imported: "1" } }).totalCount).toBe(0);
-    expect(selectSkills(MANY_SKILLS, { ...base, page: 3 }).rows).toHaveLength(10);
-  });
-
-  it("Tools: Built-in and Custom stay empty until the flag is in the API", () => {
-    expect(selectTools(REGISTRY_TOOLS, { ...base, filters: { builtin: "1" } }).totalCount).toBe(0);
+describe("numberedPageVariables", () => {
+  it("trims search, nulls an empty filter and falls back to the default sort", () => {
     expect(
-      selectTools(REGISTRY_TOOLS, { ...base, filters: { adapter: "python_fn" } }).totalCount
-    ).toBe(2);
+      numberedPageVariables({ ...base, q: "  qwen " }, {}, [{ key: "name", dir: "asc" }])
+    ).toEqual({ search: "qwen", filter: null, sort: "name", page: 1, pageSize: 25 });
+    expect(
+      numberedPageVariables(
+        { ...base, page: 0, sort: [{ key: "created", dir: "desc" }] },
+        {
+          a: 1,
+        },
+        []
+      )
+    ).toMatchObject({ filter: { a: 1 }, sort: "-created", page: 1 });
+  });
+});
+
+describe("the catalog lists, as server variables", () => {
+  it("Skills: Mine is created by me, Imported is imported, chips map to filter fields", () => {
+    expect(skillsPageVariables(queryOf(SKILLS_LIST, "")).filter).toBeNull();
+    expect(skillsPageVariables(queryOf(SKILLS_LIST, "")).sort).toBe("-updated");
+    expect(skillsPageVariables(queryOf(SKILLS_LIST, "view=mine")).filter).toEqual({
+      createdBy: ["me"],
+    });
+    expect(skillsPageVariables(queryOf(SKILLS_LIST, "view=imported")).filter).toEqual({
+      imported: true,
+    });
+    expect(
+      skillsPageVariables(queryOf(SKILLS_LIST, "status=inactive&scope=global&page=3")).filter
+    ).toEqual({ scope: ["global"], active: false });
   });
 
-  it("Models: Endpoints are cloud-served, Hosted run on the org's GPUs", () => {
-    const names = (hosted: string) =>
-      selectModels(MODELS, {
-        ...base,
-        sort: [{ key: "name", dir: "asc" }],
-        filters: { hosted },
-      }).rows.map((m) => m.name);
-    expect(names("1")).toEqual(["embeddings", "llama-70b", "qwen"]);
-    expect(names("0")).toEqual(["claude"]);
+  it("Tools: Built-in and Custom split on the flag; skill and adapter chips", () => {
+    expect(toolDefsPageVariables(queryOf(TOOLS_LIST, "view=builtin")).filter).toEqual({
+      builtin: true,
+    });
+    expect(toolDefsPageVariables(queryOf(TOOLS_LIST, "view=custom")).filter).toEqual({
+      builtin: false,
+    });
+    expect(toolDefsPageVariables(queryOf(TOOLS_LIST, "view=mine")).filter).toEqual({
+      createdBy: ["me"],
+    });
+    expect(
+      toolDefsPageVariables(queryOf(TOOLS_LIST, "skill=crm&adapter=python_fn&sort=skill,name"))
+    ).toMatchObject({ filter: { skill: ["crm"], adapter: ["python_fn"] }, sort: "skill,name" });
   });
 
-  it("Workloads keep only the area's kinds; Functions only functions", () => {
-    expect(areaWorkloads([APP_WORKLOAD, ...AREA])).toEqual(AREA);
-    expect(selectWorkloads(AREA, { ...base, filters: { kind: "agent" } }).totalCount).toBe(1);
-    expect(selectFunctions(MANY_WORKLOADS, base).totalCount).toBe(30);
+  it("A skill's Tools tab: that skill, in its own scope", () => {
+    expect(
+      skillToolsPageVariables({ slug: "crm", isGlobal: false }, { ...base, filters: {} }).filter
+    ).toEqual({ skill: ["crm"], scope: ["org"] });
+    expect(
+      skillToolsPageVariables(
+        { slug: "repo-search", isGlobal: true },
+        { ...base, filters: { adapter: "mcp_server" } }
+      ).filter
+    ).toEqual({ skill: ["repo-search"], scope: ["global"], adapter: ["mcp_server"] });
+  });
+
+  it("Models: Endpoints and Hosted are variant lists; a Serving chip narrows them", () => {
+    expect(modelEndpointsPageVariables(queryOf(MODELS_LIST, "view=hosted"))?.filter).toEqual({
+      variant: ["vllm", "kserve"],
+    });
+    expect(modelEndpointsPageVariables(queryOf(MODELS_LIST, "view=endpoints"))?.filter).toEqual({
+      variant: ["bedrock", "vertex_ai", "azure_openai", "azure_foundry"],
+    });
+    expect(
+      modelEndpointsPageVariables(queryOf(MODELS_LIST, "view=hosted&serving=VLLM"))?.filter
+    ).toEqual({ variant: ["vllm"] });
+    expect(
+      modelEndpointsPageVariables(
+        queryOf(MODELS_LIST, "view=mine&owner=project&status=failed&cluster=aws-main")
+      )?.filter
+    ).toEqual({
+      deployedBy: ["me"],
+      ownerScope: ["project"],
+      status: ["failed"],
+      cluster: ["aws-main"],
+    });
+  });
+
+  it("Models: a Serving chip outside its view asks nothing", () => {
+    expect(modelEndpointsPageVariables(queryOf(MODELS_LIST, "view=endpoints&serving=vllm"))).toBe(
+      null
+    );
+  });
+
+  it("Workloads keep the area's kinds; Functions only functions", () => {
+    expect(workloadsPageVariables(queryOf(WORKLOADS_LIST, ""))).toEqual({
+      kinds: ["agent", "workflow", "function"],
+      search: null,
+      filter: null,
+      sort: "name",
+      page: 1,
+      pageSize: 25,
+    });
+    expect(
+      workloadsPageVariables(queryOf(WORKLOADS_LIST, "view=agents&app=support")).filter
+    ).toEqual({
+      kind: ["agent"],
+      app: ["support"],
+    });
+    expect(workloadsPageVariables(queryOf(WORKLOADS_LIST, "view=mine")).filter).toEqual({
+      owner: ["me"],
+    });
+    expect(functionsPageVariables(queryOf(FUNCTIONS_LIST, "view=mine"))).toMatchObject({
+      kinds: ["function"],
+      filter: { owner: ["me"] },
+    });
   });
 });

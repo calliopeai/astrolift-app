@@ -1,79 +1,58 @@
 /**
  * Agents › Tools (spec 44 §4.4, §5.1): views All · Mine · Built-in · Custom,
- * an adapter filter, numbered pages.
+ * skill and adapter filters, numbered pages.
  *
- * Why the step runs here and not on the server: `orgToolDefs(orgId)` returns
- * every tool on the org's skills and the global catalog at once (capped at
- * 500), with no search, filter, sort or page argument. A tool records no
- * owner, and its `is_builtin` flag is not in the API yet, so Mine lists every
- * tool and Built-in and Custom cannot split them. Each view's note says so.
- * Pure.
+ * The server answers every view, chip, search, sort and page
+ * (`orgToolDefsPage`, #2155): Mine is the tools the viewer registered
+ * (`createdBy: "me"`), Built-in and Custom split on the tool's `isBuiltin`
+ * flag. Nothing is filtered, sorted or paged in the browser. Pure.
  */
-import type { SortState } from "@/components/data-table";
 import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import {
-  clientNote,
-  lower,
-  selectPage,
-  time,
-  withAllNote,
+  type NumberedListQuery,
+  numberedPageVariables,
 } from "@/components/screens/agents/skills/catalog";
 import { ADAPTERS } from "@/components/screens/agents/skills/tool-adapters";
 
-import type { ToolRegistryTool } from "./use-tool-registry";
-
-const NOTE = clientNote("the registry returns every tool at once, up to 500");
-const NO_FLAG =
-  "Tools do not carry their built-in flag in the API yet, so this view cannot pick them out and stays empty. Every tool is in All.";
-
 export const TOOLS_LIST: ListDefinition = {
   id: "agents.tools",
-  fields: [{ key: "adapter", label: "Adapter", options: ADAPTERS }],
+  fields: [
+    // Free text: the parent skill's slug.
+    { key: "skill", label: "Skill" },
+    { key: "adapter", label: "Adapter", options: ADAPTERS },
+  ],
+  // The server matches name, slug, description, handler and skill slug.
   searchPlaceholder: "Search tools, slugs, handlers…",
   defaultSort: [{ key: "created", dir: "desc" }],
-  views: withAllNote(
-    standardViews(
-      {},
-      [
-        { key: "builtin", label: "Built-in", filters: { builtin: "1" }, note: NO_FLAG },
-        { key: "custom", label: "Custom", filters: { builtin: "0" }, note: NO_FLAG },
-      ],
-      {
-        mineNote: `Mine lists every tool until tools record who registered them. ${NOTE}`,
-      }
-    ),
-    NOTE
+  views: standardViews(
+    { createdBy: "me" },
+    [
+      { key: "builtin", label: "Built-in", filters: { builtin: "1" } },
+      { key: "custom", label: "Custom", filters: { builtin: "0" } },
+    ],
+    {
+      mineNote:
+        "Mine means tools you registered. Tools from before Astrolift recorded who registered them show only in All.",
+    }
   ),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
 
-export function selectTools(
-  tools: ToolRegistryTool[],
-  q: {
-    filters: Record<string, string>;
-    q: string;
-    sort: SortState[];
-    page: number;
-    pageSize: number;
-  }
-) {
-  return selectPage(
-    tools,
-    {
-      matches: (t, f) => {
-        // No tool carries is_builtin yet (see the views' note).
-        if (f.builtin) return false;
-        return !f.adapter || t.adapter === f.adapter;
-      },
-      text: (t) => [t.name, t.slug, t.description, t.handlerRef],
-      sortValue: {
-        name: (t) => lower(t.name),
-        adapter: (t) => t.adapter,
-        created: (t) => time(t.createdAt),
-      },
-      id: (t) => t.id,
-    },
-    q
-  );
+export interface ToolDefsFilter {
+  skill?: string[];
+  adapter?: string[];
+  builtin?: boolean;
+  createdBy?: string[];
+}
+
+/** The list state as `orgToolDefsPage` variables (plus `orgId`, which the hook adds). */
+export function toolDefsPageVariables(q: NumberedListQuery) {
+  const f = q.filters;
+  const filter: ToolDefsFilter = {};
+  if (f.skill) filter.skill = [f.skill];
+  if (f.adapter) filter.adapter = [f.adapter];
+  if (f.builtin) filter.builtin = f.builtin === "1";
+  if (f.createdBy) filter.createdBy = [f.createdBy];
+  return numberedPageVariables(q, filter, TOOLS_LIST.defaultSort);
 }

@@ -58,7 +58,7 @@ export function useSkillBuilder(id: string) {
   });
 
   const [deleteSkillMutation, { loading: deleting }] = useMutation<DeleteSkillData>(DELETE_SKILL, {
-    refetchQueries: ["ListSkills"],
+    refetchQueries: ["ListSkills", "SkillsListPage"],
   });
 
   /** Resolves the errors to show beside their fields; empty when it saved. */

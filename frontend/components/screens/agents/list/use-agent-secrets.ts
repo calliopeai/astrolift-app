@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -11,7 +11,10 @@ import {
   SET_AGENT_SECRET_VALUE,
   UPSERT_AGENT_SECRET_REF,
 } from "@/graphql/agents/agents.mutations";
-import { AGENT_ENV_SPEC_SECRET_STATUS } from "@/graphql/agents/agents.queries";
+import {
+  AGENT_ENV_SPEC_SECRET_STATUS,
+  AGENT_SECRET_STATUS_PAGE,
+} from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
@@ -40,16 +43,21 @@ function firstError(errs: { message: string }[]): string {
 /**
  * The secret refs of an env spec with their Set / Missing / Error status, and
  * the value/ref mutations behind them (#1173): set/rotate, delete, bind,
- * unbind, and the audited Reveal (auto-hides after 30 seconds). Queries run
- * only while `open`. The data half of AgentSecretsView. Handlers the view
- * reacts to resolve true on success.
+ * unbind, and the audited Reveal (auto-hides after 30 seconds). The whole
+ * status read runs only while `open`; the agent's Secrets tab passes false
+ * and reads its own page. A mutation re-reads whichever of the two is on
+ * screen. The data half of AgentSecretsView. Handlers the view reacts to
+ * resolve true on success.
  */
 export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) {
-  const { data, loading, refetch } = useQuery<SecretStatusResp>(AGENT_ENV_SPEC_SECRET_STATUS, {
+  const client = useApolloClient();
+  const { data, loading } = useQuery<SecretStatusResp>(AGENT_ENV_SPEC_SECRET_STATUS, {
     variables: { slug: envSpecSlug },
     skip: !open || !envSpecSlug,
     fetchPolicy: "cache-and-network",
   });
+  const refetch = () =>
+    client.refetchQueries({ include: [AGENT_ENV_SPEC_SECRET_STATUS, AGENT_SECRET_STATUS_PAGE] });
   const rows = data?.agentEnvironmentSpecSecretStatus ?? [];
   // The backend refuses a ref outside agents/<org guid>/ (#1921).
   const { org } = useActiveOrg();

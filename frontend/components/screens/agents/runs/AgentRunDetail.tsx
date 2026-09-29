@@ -21,9 +21,8 @@ import { Identifier } from "@/components/Identifier";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { RunPage } from "@/components/run/RunPage";
-import { outcomeOf } from "@/components/screens/administration/insights/combined-runs";
 import { RunMissing } from "@/components/screens/jobs/RunDetailParts";
-import { runCrumbs } from "@/components/screens/tasks/runs-list";
+import { agentRunCrumbs, statusOutcome } from "@/components/screens/tasks/runs-list";
 import { RunOutcomeCell } from "@/components/screens/tasks/RunsScreen";
 import { Button } from "@/components/ui/button";
 import { DefinitionList } from "@/components/ui/definition-list";
@@ -98,7 +97,8 @@ export function AgentRunDetail({
   const [killOpen, setKillOpen] = React.useState(false);
   const [open, setOpen] = React.useState<Open>(null);
   const title = `run ${taskId.slice(0, 8)}`;
-  const crumbs = runCrumbs({ label: title });
+  // Agents ▾ › Runs › <agent> › run a1b2c3d4, the agent from the task itself.
+  const crumbs = agentRunCrumbs(task, { label: title });
 
   if (!task && loading) {
     return (
@@ -136,7 +136,7 @@ export function AgentRunDetail({
   // spawn-failed run never starts a pod, so its log is empty and this is the
   // only debug signal: it leads the Timeline panel.
   const failureMessage = task.failureMessage?.trim() ? task.failureMessage : null;
-  const outcome = outcomeOf("agent", task.status);
+  const outcome = statusOutcome(task.status);
   const calls = interactions.interactions.filter((i) => i.kind !== "control_api").length;
 
   const menu = (

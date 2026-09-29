@@ -3,39 +3,69 @@
 import { useQuery } from "@apollo/client/react";
 
 import { useListState } from "@/components/list/use-list-state";
-import type { ListModelEndpointsQuery } from "@/graphql/__generated__/operations";
-import { LIST_MODEL_ENDPOINTS } from "@/graphql/models/models.queries";
+import { GET_MODEL_ENDPOINT, LIST_MODEL_ENDPOINTS_PAGE } from "@/graphql/models/models.queries";
 
-import { MODELS_LIST, selectModels } from "./models-list";
+import { type ModelEndpoint, MODELS_LIST, modelEndpointsPageVariables } from "./models-list";
 
-/** The org's model endpoints (#2040). One read the list and the detail share. */
-export function useModelEndpoints() {
-  const { data, previousData, loading, error, refetch } =
-    useQuery<ListModelEndpointsQuery>(LIST_MODEL_ENDPOINTS);
-  const models = (data ?? previousData)?.astroliftModelEndpoints ?? [];
+interface ModelEndpointsPageResp {
+  astroliftModelEndpointsPage: { items: ModelEndpoint[]; totalCount: number | null };
+}
+interface ModelEndpointResp {
+  astroliftModelEndpoint: ModelEndpoint | null;
+}
+
+/**
+ * The Models list: URL list state in, one numbered page of
+ * `astroliftModelEndpointsPage` out (#2155). The server filters, searches,
+ * sorts and counts. The data half of ModelsScreen.
+ */
+export function useModels() {
+  const list = useListState(MODELS_LIST);
+  const { state } = list;
+  const variables = modelEndpointsPageVariables({
+    q: state.q,
+    filters: list.filters,
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
+  });
+  const query = useQuery<ModelEndpointsPageResp>(LIST_MODEL_ENDPOINTS_PAGE, {
+    variables: variables ?? undefined,
+    skip: variables === null,
+    fetchPolicy: "cache-and-network",
+  });
+  // A Serving chip outside its view matches nothing; nothing was asked.
+  const data = variables === null ? undefined : (query.data ?? query.previousData);
+  const rows = data?.astroliftModelEndpointsPage.items ?? [];
   return {
-    models,
-    loading: loading && models.length === 0 && !error,
+    list,
+    rows,
+    totalCount: data?.astroliftModelEndpointsPage.totalCount ?? rows.length,
+    loading: variables !== null && query.loading && !data && !query.error,
+    // Rows on screen answer the previous list state while the next loads.
+    stale: variables !== null && query.loading && !query.data && Boolean(data),
+    error: query.error ? { message: query.error.message } : null,
+    onRetry: () => {
+      void query.refetch();
+    },
+  };
+}
+
+export type ModelsState = ReturnType<typeof useModels>;
+
+/** One model endpoint by id (`astroliftModelEndpoint`, #2155). */
+export function useModelEndpoint(id: string) {
+  const { data, loading, error, refetch } = useQuery<ModelEndpointResp>(GET_MODEL_ENDPOINT, {
+    variables: { id },
+    skip: !id,
+    fetchPolicy: "cache-and-network",
+  });
+  return {
+    model: data?.astroliftModelEndpoint ?? null,
+    loading: loading && !data && !error,
     error: error ? { message: error.message } : null,
     refetch: () => {
       void refetch();
     },
   };
 }
-
-/** The Models list on URL list state. The data half of ModelsScreen. */
-export function useModels() {
-  const list = useListState(MODELS_LIST);
-  const { state } = list;
-  const { models, loading, error, refetch } = useModelEndpoints();
-  const { rows, totalCount } = selectModels(models, {
-    filters: list.filters,
-    q: state.q,
-    sort: state.sort,
-    page: state.page,
-    pageSize: state.pageSize,
-  });
-  return { list, rows, totalCount, loading, error, onRetry: refetch };
-}
-
-export type ModelsState = ReturnType<typeof useModels>;

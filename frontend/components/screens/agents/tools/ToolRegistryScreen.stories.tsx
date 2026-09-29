@@ -3,8 +3,8 @@ import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { LONG_TOOLS, MANY_TOOLS, TOOLS } from "./agent-tools.fixtures";
-import { selectTools, TOOLS_LIST } from "./tools-list";
+import { LONG_TOOLS, MANY_TOOLS, serveTools, TOOLS } from "./agent-tools.fixtures";
+import { TOOLS_LIST } from "./tools-list";
 import { ToolRegistryScreen, type ToolRegistryScreenProps } from "./ToolRegistryScreen";
 import type { ToolRegistryTool } from "./use-tool-registry";
 
@@ -21,10 +21,10 @@ type Props = Partial<Omit<ToolRegistryScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture tools, filtered and paged the way the hook does it. */
+/** The screen over fixture tools, filtered and paged the way the server does it. */
 function Tools({ tools = TOOLS, initial, ...patch }: Props) {
   const list = useLocalListState(TOOLS_LIST, initial);
-  const { rows, totalCount } = selectTools(tools, {
+  const { rows, totalCount } = serveTools(tools, {
     filters: list.filters,
     q: list.state.q,
     sort: list.state.sort,
@@ -37,6 +37,7 @@ function Tools({ tools = TOOLS, initial, ...patch }: Props) {
       rows={rows}
       totalCount={totalCount}
       loading={false}
+      stale={false}
       error={null}
       onRetry={() => {}}
       {...patch}
@@ -63,11 +64,14 @@ export const LoadError: Story = {
   render: () => <Tools tools={[]} error={{ message: "Network error: 502" }} />,
 };
 
-/** Mine lists every tool for now; its note says so. */
+/** Mine: the tools the viewer registered. */
 export const Mine: Story = { render: () => <Tools initial={{ view: "mine" }} /> };
 
-/** Built-in cannot split tools until the API carries the flag: an empty view with a note. */
+/** Built-in: the tools that ship with the platform. */
 export const BuiltIn: Story = { render: () => <Tools initial={{ view: "builtin" }} /> };
+
+/** Custom: the tools the organization registered on its own skills. */
+export const Custom: Story = { render: () => <Tools initial={{ view: "custom" }} /> };
 
 export const EmptyFiltered: Story = {
   render: () => <Tools initial={{ filters: { adapter: "mcp_server" }, q: "invoice" }} />,

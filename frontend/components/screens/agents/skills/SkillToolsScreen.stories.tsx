@@ -3,8 +3,8 @@ import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { LONG_TOOLS, MANY_TOOLS, SKILL, TOOLS } from "./agent-skills.fixtures";
-import { SKILL_TOOLS_LIST, selectSkillTools } from "./skill-tools-list";
+import { LONG_TOOLS, MANY_TOOLS, serveSkillTools, SKILL, TOOLS } from "./agent-skills.fixtures";
+import { SKILL_TOOLS_LIST } from "./skill-tools-list";
 import { SkillToolsScreen, type SkillToolsScreenProps } from "./SkillToolsScreen";
 import type { ToolDef } from "./use-skill-tool-defs";
 
@@ -21,10 +21,10 @@ type Props = Partial<Omit<SkillToolsScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The tab over fixture tools, filtered and paged the way the hook does it. */
+/** The tab over fixture tools, filtered and paged the way the server does it. */
 function Tools({ tools = TOOLS, initial, ...patch }: Props) {
   const list = useLocalListState(SKILL_TOOLS_LIST, initial);
-  const { rows, totalCount } = selectSkillTools(tools, {
+  const { rows, totalCount } = serveSkillTools(tools, {
     filters: list.filters,
     q: list.state.q,
     sort: list.state.sort,

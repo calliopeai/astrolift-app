@@ -1,48 +1,52 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
-import { CANCEL_TASK } from "@/graphql/agents/agents.mutations";
-import { LIST_AGENT_TASKS_PAGE } from "@/graphql/agents/agents.queries";
+import { CANCEL_TASK, RETRY_AGENT_TASK } from "@/graphql/agents/agents.mutations";
+import {
+  AGENT_TASKS_LIST_PAGE,
+  AGENT_UPCOMING_RUNS,
+  AGENTS_AREA_RUN_AUDIT,
+} from "@/graphql/agents/agents.queries";
+import type { AstroliftAgentUpcomingRun } from "@/graphql/agents/agents.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
-import { LIST_TASK_RUNS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
-import type { AstroliftTaskRun } from "@/graphql/lifecycle/lifecycle.types";
-import { useMe, useModules } from "@/graphql/user/user.hooks";
+import { useModules } from "@/graphql/user/user.hooks";
 import { useCancelWorkflowInstance } from "@/graphql/workflows/workflows.hooks";
-import { LIST_WORKFLOW_DEFINITION_RUNS } from "@/graphql/workflows/tiered.queries";
-import type { WorkflowDefinitionRun } from "@/graphql/workflows/tiered.types";
+import { GET_WORKFLOW_DEFINITION_RUN } from "@/graphql/workflows/tiered.queries";
 
 import {
-  activeSources,
   AGENT_RUNS_LIST,
   type AgentTaskSource,
-  filterRunRows,
+  agentTasksVariables,
   fromAgentTask,
-  fromTaskRun,
-  fromWorkflowRun,
-  pageRunRows,
+  fromRunAuditItem,
+  fromUpcomingRun,
+  type RunAuditSource,
   type RunKind,
   type RunRow,
   RUNS_LIST,
-  sortRunRows,
+  runAuditVariables,
+  UPCOMING,
+  upcomingNextCursor,
+  upcomingVariables,
 } from "./runs-list";
 import type { RunsScreenProps } from "./RunsScreen";
 
-/**
- * INTERIM, CLIENT-SIDE MERGE. There is no runs query across kinds, so this
- * reads the newest SOURCE_LIMIT of each source (agent tasks, workflow runs,
- * container task runs), maps them to one row shape, and filters, sorts and
- * pages them in the browser. The screen says so under the list when a
- * source had more. Replace with one paged `runs(filter, search, sort,
- * first, after)` query (see the report's needsBackend) and drop the merge.
- */
-const SOURCE_LIMIT = 100;
 const POLL_MS = 10_000;
+/** The running agent tasks the page reads for Watch live; a page shows at most 100 rows. */
+const LIVE_TASKS_LIMIT = 100;
 
+interface RunAuditResp {
+  astroliftRunAudit: {
+    items: RunAuditSource[];
+    nextCursor: string | null;
+    totalCount: number | null;
+  };
+}
 interface AgentTasksPageResp {
   agentTasksPage: {
     items: AgentTaskSource[];
@@ -50,168 +54,245 @@ interface AgentTasksPageResp {
     totalCount: number | null;
   };
 }
-interface WorkflowRunsResp {
-  workflowDefinitionRuns: WorkflowDefinitionRun[];
-}
-interface TaskRunsPageResp {
-  astroliftTaskRunsPage: { items: AstroliftTaskRun[]; nextCursor: string | null };
+interface UpcomingResp {
+  agentUpcomingRuns: {
+    items: AstroliftAgentUpcomingRun[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+  };
 }
 interface CancelTaskResp {
   cancelTask: { ok: boolean; errors: { message: string }[] };
 }
-
-const SOURCE_LABEL: Record<RunKind, string> = {
-  agent: "agent runs",
-  workflow: "workflow runs",
-  task: "task runs",
-};
+interface RetryTaskResp {
+  retryAgentTask: { ok: boolean; errors: { message: string }[] };
+}
+interface WorkflowRunResp {
+  workflowDefinitionRun: { temporalWorkflowId: string } | null;
+}
 
 export interface UseRunsOptions {
   /** An agent's Runs tab: only this agent's runs (its Workload id scopes the query). */
   agent?: { id: string; slug: string };
 }
 
-/** The Runs list's data half, for the Runs page or an agent's Runs tab. */
+/**
+ * The Runs list's data half, for the Runs page or an agent's Runs tab. One
+ * server read answers the list state (spec 44 §5.1): the Runs page reads
+ * `astroliftRunAudit` held to the kinds the viewer's modules show, an
+ * agent's tab reads `agentTasksPage`, and the Scheduled view reads
+ * `agentUpcomingRuns`. The first page polls, with new rows held behind the
+ * pill. Cancel and Retry act on the selection.
+ */
 export function useRuns({ agent }: UseRunsOptions = {}): RunsScreenProps {
+  const client = useApolloClient();
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
   const modules = useModules();
-  const { user } = useMe();
-  const me = user?.profile?.username ?? null;
   const list = useListState(agent ? AGENT_RUNS_LIST : RUNS_LIST);
+  const { state, filters } = list;
   const [now] = React.useState(() => Date.now());
-
-  const on = activeSources(list.filters, {
-    agent: modules.canView("agents"),
-    workflow: !agent && modules.canView("workflows"),
-    task: !agent && modules.canView("apps"),
-  });
-  const firstPage = list.state.after === null;
+  const firstPage = state.after === null;
+  const upcoming = !agent && Boolean(filters[UPCOMING]);
   const common = {
     fetchPolicy: "cache-and-network" as const,
     pollInterval: firstPage ? POLL_MS : 0,
   };
 
-  const agentQ = useQuery<AgentTasksPageResp>(LIST_AGENT_TASKS_PAGE, {
-    ...common,
-    variables: {
-      orgId,
-      status: null,
-      workloadId: agent?.id ?? null,
-      search: null,
-      limit: SOURCE_LIMIT,
-      after: null,
-    },
-    skip: !orgId || modules.loading || !on.agent,
-  });
-  const workflowQ = useQuery<WorkflowRunsResp>(LIST_WORKFLOW_DEFINITION_RUNS, {
-    ...common,
-    variables: { orgId: orgId || null, projectId: null, status: null, limit: SOURCE_LIMIT },
-    skip: !orgId || modules.loading || !on.workflow,
-  });
-  const taskQ = useQuery<TaskRunsPageResp>(LIST_TASK_RUNS_PAGE, {
-    ...common,
-    variables: { limit: SOURCE_LIMIT, after: null },
-    skip: modules.loading || !on.task,
-  });
-
-  const sources = { agent: agentQ, workflow: workflowQ, task: taskQ };
-  const active = (Object.keys(sources) as RunKind[]).filter((k) => on[k]);
-
-  const merged: RunRow[] = [
-    ...(on.agent ? (agentQ.data?.agentTasksPage.items ?? []).map(fromAgentTask) : []),
-    ...(on.workflow ? (workflowQ.data?.workflowDefinitionRuns ?? []).map(fromWorkflowRun) : []),
-    ...(on.task
-      ? (taskQ.data?.astroliftTaskRunsPage.items ?? []).map((r) => fromTaskRun(r, me))
-      : []),
+  const kinds: RunKind[] = [
+    ...(modules.canView("agents") ? (["agent"] as const) : []),
+    ...(modules.canView("workflows") ? (["workflow"] as const) : []),
+    ...(modules.canView("apps") ? (["task"] as const) : []),
   ];
-  const filtered = sortRunRows(
-    filterRunRows(merged, list.filters, list.state.q, now),
-    list.state.sort
+  const auditVars = runAuditVariables(
+    { filters, q: state.q, sort: state.sort, after: state.after, pageSize: state.pageSize },
+    kinds,
+    now
   );
-  const page = pageRunRows(filtered, list.state.after, list.state.pageSize);
+  const auditQ = useQuery<RunAuditResp>(AGENTS_AREA_RUN_AUDIT, {
+    ...common,
+    variables: auditVars ?? undefined,
+    skip: Boolean(agent) || upcoming || modules.loading || auditVars === null,
+  });
 
-  const failed = active.filter((k) => sources[k].error && !sources[k].data);
-  const pending = active.some((k) => sources[k].loading && !sources[k].data);
-  const hasAny = active.some((k) => sources[k].data);
+  const tasksQ = useQuery<AgentTasksPageResp>(AGENT_TASKS_LIST_PAGE, {
+    ...common,
+    variables: agentTasksVariables(orgId, agent?.id ?? "", {
+      filters,
+      q: state.q,
+      sort: state.sort,
+      after: state.after,
+      pageSize: state.pageSize,
+    }),
+    skip: !agent || !orgId,
+  });
 
-  const held = useHeldRows(page.rows, (r) => r.key, {
+  const upcomingVars = upcomingVariables(orgId, {
+    filters,
+    q: state.q,
+    after: state.after,
+    pageSize: state.pageSize,
+  });
+  const upcomingQ = useQuery<UpcomingResp>(AGENT_UPCOMING_RUNS, {
+    ...common,
+    variables: upcomingVars ?? undefined,
+    skip: !upcoming || !orgId || upcomingVars === null,
+  });
+
+  // The audit row carries no VNC coordinates: Watch live reads the org's
+  // running agent tasks while the page shows one.
+  // Rows on screen answer the previous list state while the next loads.
+  const auditData = auditQ.data ?? auditQ.previousData;
+  const tasksData = tasksQ.data ?? tasksQ.previousData;
+  const upcomingData = upcomingQ.data ?? upcomingQ.previousData;
+  const auditItems = auditData?.astroliftRunAudit.items ?? [];
+  const anyRunningAgent = auditItems.some((r) => r.kind === "agent" && r.status === "running");
+  const liveQ = useQuery<AgentTasksPageResp>(AGENT_TASKS_LIST_PAGE, {
+    ...common,
+    variables: agentTasksVariables(orgId, null, {
+      filters: { status: "running" },
+      q: "",
+      sort: [],
+      after: null,
+      pageSize: LIVE_TASKS_LIMIT,
+    }),
+    skip: Boolean(agent) || upcoming || !orgId || !anyRunningAgent,
+  });
+  const vncById = new Map((liveQ.data?.agentTasksPage.items ?? []).map((t) => [t.id, t]));
+
+  // The one source this list state reads.
+  const source = agent ? tasksQ : upcoming ? upcomingQ : auditQ;
+  const nothingToAsk = agent ? !orgId : upcoming ? upcomingVars === null : auditVars === null;
+
+  let pageRows: RunRow[] = [];
+  let nextCursor: string | null = null;
+  let totalCount: number | null = null;
+  if (agent && tasksData) {
+    pageRows = tasksData.agentTasksPage.items.map(fromAgentTask);
+    nextCursor = tasksData.agentTasksPage.nextCursor;
+    totalCount = tasksData.agentTasksPage.totalCount;
+  } else if (upcoming && upcomingData) {
+    const p = upcomingData.agentUpcomingRuns;
+    pageRows = p.items.map(fromUpcomingRun);
+    nextCursor = upcomingNextCursor(p.page, p.pageSize, p.totalCount);
+    totalCount = p.totalCount;
+  } else if (!agent && !upcoming && auditData) {
+    pageRows = auditItems.map((r) => fromRunAuditItem(r, vncById.get(r.id)));
+    nextCursor = auditData.astroliftRunAudit.nextCursor;
+    totalCount = auditData.astroliftRunAudit.totalCount;
+  } else if (nothingToAsk && !modules.loading) {
+    // A chip only another kind of run could match: nothing to ask, nothing to show.
+    totalCount = 0;
+  }
+
+  const shown = agent ? tasksData : upcoming ? upcomingData : auditData;
+  const hasData = Boolean(shown) || (nothingToAsk && !modules.loading);
+  const pending = source.loading && !source.data;
+
+  const held = useHeldRows(pageRows, (r) => r.key, {
     live: firstPage && !pending,
     resetKey:
-      JSON.stringify(list.filters) +
-      list.state.q +
-      list.state.pageSize +
-      JSON.stringify(list.state.sort),
+      JSON.stringify(filters) + state.q + state.pageSize + JSON.stringify(state.sort) + state.view,
   });
 
-  const capped =
-    (on.agent && Boolean(agentQ.data?.agentTasksPage.nextCursor)) ||
-    (on.workflow && (workflowQ.data?.workflowDefinitionRuns.length ?? 0) >= SOURCE_LIMIT) ||
-    (on.task && Boolean(taskQ.data?.astroliftTaskRunsPage.nextCursor));
+  // The bulk bar acts on the selected runs on screen, as they read now: a
+  // run selected on another page is not acted on, and the button's count
+  // says how many will be.
+  const byKey = new Map(pageRows.map((r) => [r.key, r]));
 
-  const refetchAll = () => {
-    for (const k of active) void sources[k].refetch();
+  const refetch = () => {
+    if (!nothingToAsk) void source.refetch();
   };
 
   const [cancelTask] = useMutation<CancelTaskResp>(CANCEL_TASK);
+  const [retryTask] = useMutation<RetryTaskResp>(RETRY_AGENT_TASK);
   const [cancelWorkflow] = useCancelWorkflowInstance();
 
-  /** Cancels each run; throws when none could be, so the confirm dialog stays open. */
-  async function onCancel(runs: RunRow[]) {
-    const results = await Promise.all(
-      runs.map(async (r): Promise<string | null> => {
-        try {
-          if (r.cancel?.kind === "agent") {
-            const { data } = await cancelTask({ variables: { id: r.cancel.id } });
-            return data?.cancelTask.ok ? null : (data?.cancelTask.errors[0]?.message ?? "failed");
-          }
-          if (r.cancel?.kind === "workflow") {
-            const { data } = await cancelWorkflow({
-              variables: { workflowId: r.cancel.workflowId },
-            });
-            const res = data?.cancelWorkflowInstance;
-            return res?.ok ? null : (res?.errors?.[0]?.messages?.[0] ?? "failed");
-          }
-          return "not cancellable";
-        } catch (e) {
-          return e instanceof Error ? e.message : "failed";
+  async function cancelOne(r: RunRow): Promise<string | null> {
+    try {
+      if (r.cancel?.kind === "agent") {
+        const { data } = await cancelTask({ variables: { id: r.cancel.id } });
+        return data?.cancelTask.ok ? null : (data?.cancelTask.errors[0]?.message ?? "failed");
+      }
+      if (r.cancel?.kind === "workflow") {
+        // The audit row names the run; Temporal cancels by its workflow id.
+        let workflowId = r.cancel.workflowId;
+        if (!workflowId && r.cancel.guid) {
+          const { data: run } = await client.query<WorkflowRunResp>({
+            query: GET_WORKFLOW_DEFINITION_RUN,
+            variables: { guid: r.cancel.guid, orgId: orgId || null },
+            fetchPolicy: "network-only",
+          });
+          workflowId = run?.workflowDefinitionRun?.temporalWorkflowId;
         }
-      })
-    );
-    const errors = results.filter((e): e is string => e !== null);
-    refetchAll();
-    if (errors.length === runs.length) throw new Error(errors[0] ?? "Nothing was cancelled");
-    if (errors.length > 0) {
-      toast.warning(`Cancelled ${runs.length - errors.length} of ${runs.length} runs`, {
-        description: errors[0],
-      });
-    } else {
-      toast.success(runs.length === 1 ? "Run cancelled" : `Cancelled ${runs.length} runs`);
+        if (!workflowId) return "the workflow run was not found";
+        const { data } = await cancelWorkflow({ variables: { workflowId } });
+        const res = data?.cancelWorkflowInstance;
+        return res?.ok ? null : (res?.errors?.[0]?.messages?.[0] ?? "failed");
+      }
+      return "not cancellable";
+    } catch (e) {
+      return e instanceof Error ? e.message : "failed";
     }
   }
 
-  const byKey = new Map(merged.map((r) => [r.key, r]));
-  const allFailed = active.length > 0 && failed.length === active.length;
+  async function retryOne(r: RunRow): Promise<string | null> {
+    if (!r.retry) return "not retryable";
+    try {
+      const { data } = await retryTask({ variables: { id: r.retry.id } });
+      return data?.retryAgentTask.ok ? null : (data?.retryAgentTask.errors[0]?.message ?? "failed");
+    } catch (e) {
+      return e instanceof Error ? e.message : "failed";
+    }
+  }
+
+  /** Runs `act` on each run; throws when none succeeded, so the dialog stays open. */
+  async function each(
+    runs: RunRow[],
+    act: (r: RunRow) => Promise<string | null>,
+    words: { one: string; many: (n: number) => string; some: (n: number, of: number) => string }
+  ) {
+    const errors = (await Promise.all(runs.map(act))).filter((e): e is string => e !== null);
+    refetch();
+    if (errors.length === runs.length) throw new Error(errors[0] ?? "Nothing changed");
+    if (errors.length > 0) {
+      toast.warning(words.some(runs.length - errors.length, runs.length), {
+        description: errors[0],
+      });
+    } else {
+      toast.success(runs.length === 1 ? words.one : words.many(runs.length));
+    }
+  }
+
+  const onCancel = (runs: RunRow[]) =>
+    each(runs, cancelOne, {
+      one: "Run cancelled",
+      many: (n) => `Cancelled ${n} runs`,
+      some: (n, of) => `Cancelled ${n} of ${of} runs`,
+    });
+
+  const onRetryRuns = (runs: RunRow[]) =>
+    each(runs, retryOne, {
+      one: "Run started again",
+      many: (n) => `Started ${n} runs again`,
+      some: (n, of) => `Started ${n} of ${of} runs again`,
+    });
 
   return {
     list,
     embedded: Boolean(agent),
     rows: held.rows,
     newRows: { count: held.newCount, onReveal: held.reveal },
-    loading: (modules.loading || !orgId || pending) && !hasAny,
-    stale: pending && hasAny,
-    error: allFailed
-      ? { message: sources[failed[0]].error?.message ?? "The runs failed to load." }
-      : null,
-    onRetry: refetchAll,
-    nextCursor: page.nextCursor,
-    totalCount: hasAny ? filtered.length : null,
-    approximateCount: capped,
-    unavailable: failed.map((k) => SOURCE_LABEL[k]),
-    coverage: capped
-      ? `Merged from the newest ${SOURCE_LIMIT} of each kind; filters and search cover those.`
-      : null,
+    loading: (modules.loading || (!orgId && !nothingToAsk) || pending) && !hasData,
+    stale: pending && Boolean(shown),
+    error: source.error && !shown ? { message: source.error.message } : null,
+    onRetry: refetch,
+    nextCursor,
+    totalCount,
+    approximateCount: false,
     lookup: (key) => byKey.get(key) ?? null,
     onCancel,
+    onRetryRuns,
   };
 }

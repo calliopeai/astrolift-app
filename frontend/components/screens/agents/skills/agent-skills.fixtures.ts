@@ -1,6 +1,9 @@
 import type { AddToolState } from "./use-add-tool";
 import type { ImportResult, ImportSkillsState } from "./use-import-skills";
 import type { NewSkillState } from "./use-new-skill";
+import type { SortState } from "@/components/data-table";
+
+import { lower, selectPage, time } from "./catalog";
 import type { SkillListItem } from "./skills-list";
 import type { SkillBuilderState } from "./use-skill-builder";
 import type { Skill } from "./use-skill";
@@ -33,6 +36,11 @@ export const SKILL_ITEMS: SkillListItem[] = [
     isGlobal: false,
     isActive: true,
     updatedAt: "2026-09-27T10:12:00Z",
+    createdByEmail: "leo@example.com",
+    createdByMe: true,
+    sourceKind: "",
+    sourceRef: "",
+    isImported: false,
   },
   {
     id: "sk-2",
@@ -43,6 +51,11 @@ export const SKILL_ITEMS: SkillListItem[] = [
     isGlobal: false,
     isActive: false,
     updatedAt: "2026-09-20T08:00:00Z",
+    createdByEmail: "ops@example.com",
+    createdByMe: false,
+    sourceKind: "repo_import",
+    sourceRef: "calliopeai/agent-skills@main:skills/release-notes",
+    isImported: true,
   },
   {
     id: "sk-3",
@@ -53,6 +66,11 @@ export const SKILL_ITEMS: SkillListItem[] = [
     isGlobal: true,
     isActive: true,
     updatedAt: "2026-09-25T16:40:00Z",
+    createdByEmail: "",
+    createdByMe: false,
+    sourceKind: "catalogue",
+    sourceRef: "astrolift/catalogue/repo-search",
+    isImported: true,
   },
 ];
 
@@ -66,6 +84,11 @@ export const MANY_SKILLS: SkillListItem[] = Array.from({ length: 60 }, (_, i) =>
   isGlobal: i % 5 === 0,
   isActive: i % 4 !== 0,
   updatedAt: new Date(Date.UTC(2026, 8, 28, 12) - i * 3_600_000).toISOString(),
+  createdByEmail: i % 2 === 0 ? "leo@example.com" : "",
+  createdByMe: i % 2 === 0,
+  sourceKind: i % 3 === 1 ? "repo_import" : "",
+  sourceRef: i % 3 === 1 ? `calliopeai/agent-skills@main:skills/skill-${i + 1}` : "",
+  isImported: i % 3 === 1,
 }));
 
 export const LONG_SKILL: SkillListItem = {
@@ -77,7 +100,48 @@ export const LONG_SKILL: SkillListItem = {
   isGlobal: true,
   isActive: true,
   updatedAt: "2026-09-28T09:00:00Z",
+  createdByEmail: "a.person.with.a.very.long.email.address@a-long-subdomain.example.com",
+  createdByMe: false,
+  sourceKind: "repo_import",
+  sourceRef: LONG_URL,
+  isImported: true,
 };
+
+/**
+ * A stand-in for `skillsPage` in stories: the fixture skills filtered,
+ * searched, sorted and sliced the way the server answers the list state.
+ */
+export function serveSkills(
+  skills: SkillListItem[],
+  q: {
+    filters: Record<string, string>;
+    q: string;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
+  }
+) {
+  return selectPage(
+    skills,
+    {
+      matches: (s, f) =>
+        (!f.imported || s.isImported) &&
+        (!f.createdBy || s.createdByMe) &&
+        (f.status !== "active" || s.isActive) &&
+        (f.status !== "inactive" || !s.isActive) &&
+        (f.scope !== "global" || s.isGlobal) &&
+        (f.scope !== "org" || !s.isGlobal),
+      text: (s) => [s.name, s.slug, s.description, s.sourceRef],
+      sortValue: {
+        name: (s) => lower(s.name),
+        version: (s) => s.skillVersion,
+        updated: (s) => time(s.updatedAt),
+      },
+      id: (s) => s.slug,
+    },
+    q
+  );
+}
 
 // ─── Skill builder ────────────────────────────────────────────────────────────
 
@@ -142,6 +206,36 @@ export const MANY_TOOLS: ToolDef[] = Array.from({ length: 40 }, (_, i) => ({
   name: `tool_${String(i + 1).padStart(2, "0")}`,
   slug: `tool_${i + 1}`,
 }));
+
+/**
+ * A stand-in for `orgToolDefsPage` narrowed to one skill, in stories: the
+ * fixture tools filtered, searched, sorted and sliced the way the server does.
+ */
+export function serveSkillTools(
+  tools: ToolDef[],
+  q: {
+    filters: Record<string, string>;
+    q: string;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
+  }
+) {
+  return selectPage(
+    tools,
+    {
+      matches: (t, f) => !f.adapter || t.adapter === f.adapter,
+      text: (t) => [t.name, t.slug, t.description, t.handlerRef],
+      sortValue: {
+        name: (t) => lower(t.name),
+        adapter: (t) => t.adapter,
+        created: (t) => time(t.createdAt),
+      },
+      id: (t) => t.slug,
+    },
+    q
+  );
+}
 
 export const SKILL_BUILDER: SkillBuilderState = {
   id: "sk-1",

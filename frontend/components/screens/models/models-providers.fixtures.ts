@@ -1,3 +1,5 @@
+import type { SortState } from "@/components/data-table";
+import { lower, selectPage } from "@/components/screens/agents/skills/catalog";
 import type { AstroliftProviderPlugin } from "@/graphql/clusters/clusters.types";
 
 import type { CloudProvidersPanelViewProps } from "../providers/CloudProvidersPanel";
@@ -6,7 +8,7 @@ import { ARN200, LONG_URL, SHA64 } from "../agents/skills/agent-skills.fixtures"
 
 import type { DeployModelScreenProps } from "./DeployModelScreen";
 import type { ModelReplicasViewProps } from "./ModelReplicas";
-import type { ModelEndpoint } from "./models-list";
+import { HOSTED_VARIANTS, CLOUD_VARIANTS, type ModelEndpoint } from "./models-list";
 import type { ModelTestDialogViewProps } from "./ModelTestDialog";
 import type { ModelTestOutcome } from "./use-model-test";
 
@@ -35,6 +37,8 @@ export const MODELS: ModelEndpoint[] = [
     ownerScope: "app",
     clusterSlug: "gpu-east",
     environmentName: "prod",
+    deployedByEmail: "leo@example.com",
+    deployedByMe: true,
   },
   {
     id: "m2",
@@ -48,6 +52,8 @@ export const MODELS: ModelEndpoint[] = [
     ownerScope: "app",
     clusterSlug: "gpu-east",
     environmentName: "staging",
+    deployedByEmail: "ops@example.com",
+    deployedByMe: false,
   },
   {
     id: "m3",
@@ -61,6 +67,8 @@ export const MODELS: ModelEndpoint[] = [
     ownerScope: "project",
     clusterSlug: "gpu-east",
     environmentName: "",
+    deployedByEmail: "",
+    deployedByMe: false,
   },
   {
     id: "m4",
@@ -74,6 +82,8 @@ export const MODELS: ModelEndpoint[] = [
     ownerScope: "project",
     clusterSlug: "aws-main",
     environmentName: "",
+    deployedByEmail: "leo@example.com",
+    deployedByMe: true,
   },
 ];
 
@@ -90,7 +100,7 @@ export const LONG_MODELS: ModelEndpoint[] = [
     ...MODELS[3],
     id: "l2",
     name: LONG,
-    variant: "azure_ai_foundry",
+    variant: "azure_foundry",
     statusError: LONG,
     projectSlug: LONG,
   },
@@ -125,6 +135,46 @@ export const MANY_MODELS: ModelEndpoint[] = Array.from({ length: 40 }, (_, i) =>
   id: `m-many-${i}`,
   name: `model-${String(i + 1).padStart(2, "0")}`,
 }));
+
+const SORT_VALUE: Record<string, (m: ModelEndpoint) => string> = {
+  name: (m) => lower(m.name),
+  variant: (m) => m.variant,
+  status: (m) => m.status,
+};
+
+/**
+ * A stand-in for `astroliftModelEndpointsPage` in stories: the fixture
+ * models filtered, searched, sorted and sliced the way the server answers
+ * the list state.
+ */
+export function serveModels(
+  models: ModelEndpoint[],
+  q: {
+    filters: Record<string, string>;
+    q: string;
+    sort: SortState[];
+    page: number;
+    pageSize: number;
+  }
+) {
+  return selectPage(
+    models,
+    {
+      matches: (m, f) =>
+        (f.hosted !== "1" || HOSTED_VARIANTS.includes(m.variant)) &&
+        (f.hosted !== "0" || CLOUD_VARIANTS.includes(m.variant)) &&
+        (!f.deployedBy || m.deployedByMe) &&
+        (!f.serving || lower(m.variant) === lower(f.serving)) &&
+        (!f.status || m.status === f.status) &&
+        (!f.owner || m.ownerScope === f.owner) &&
+        (!f.cluster || lower(m.clusterSlug) === lower(f.cluster)),
+      text: (m) => [m.name, m.variant, m.registeredAppSlug, m.projectSlug, m.clusterSlug],
+      sortValue: SORT_VALUE,
+      id: (m) => m.id,
+    },
+    q
+  );
+}
 
 export const REPLICAS: ModelReplicasViewProps = {
   name: "qwen",

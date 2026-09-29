@@ -3,8 +3,14 @@ import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { AGENTS_LIST, type AgentRow, selectAgents } from "./agents-list";
-import { AGENT_ROWS, LONG_AGENT_ROW, MANY_AGENT_ROWS, listProps } from "./agents-list.fixtures";
+import { AGENTS_LIST, type AgentRow } from "./agents-list";
+import {
+  AGENT_ROWS,
+  LONG_AGENT_ROW,
+  MANY_AGENT_ROWS,
+  listProps,
+  serveAgents,
+} from "./agents-list.fixtures";
 import { AgentsListScreen, type AgentsListScreenProps } from "./AgentsListScreen";
 
 // List or cards is a per-person preference in localStorage; pin it per story
@@ -35,10 +41,10 @@ type Props = Partial<Omit<AgentsListScreenProps, "list">> & {
   initial?: Partial<ListState>;
 };
 
-/** The screen over fixture agents, filtered and paged the way the hook does it. */
+/** The screen over fixture agents, filtered and paged the way the server does it. */
 function Agents({ agents = AGENT_ROWS, initial, ...patch }: Props) {
   const list = useLocalListState(AGENTS_LIST, initial);
-  const { rows, totalCount } = selectAgents(agents, {
+  const { rows, totalCount } = serveAgents(agents, {
     q: list.state.q,
     filters: list.filters,
     sort: list.state.sort,
@@ -48,7 +54,7 @@ function Agents({ agents = AGENT_ROWS, initial, ...patch }: Props) {
   return <AgentsListScreen {...listProps({ rows, totalCount, ...patch })} list={list} />;
 }
 
-/** The fleet by name: running, failing, scheduled, paused and idle agents. */
+/** The fleet by name: running, failing, scheduled (next firing), paused and idle agents. */
 export const Full: Story = { render: () => <Agents /> };
 
 export const Loading: Story = { render: () => <Agents agents={[]} loading /> };
@@ -66,7 +72,7 @@ export const ErrorState: Story = {
 /** Rows answer the previous poll while the next loads. */
 export const Refetching: Story = { render: () => <Agents stale /> };
 
-/** Mine: agents on the apps the viewer holds a role on, with the note. */
+/** Mine: agents the viewer registered, with the note on agents that have no owner. */
 export const Mine: Story = { render: () => <Agents initial={{ view: "mine" }} /> };
 
 export const Paused: Story = { render: () => <Agents initial={{ view: "paused" }} /> };

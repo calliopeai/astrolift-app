@@ -107,6 +107,9 @@ export const GET_AGENT_TASK = gql`
   query GetAgentTask($id: ID!) {
     agentTask(id: $id) {
       id
+      agentSlug
+      agentName
+      projectSlug
       status
       callbackUrl
       result
@@ -536,6 +539,313 @@ export const LIST_AGENT_BOXES = gql`
       endedAt
       lastAttachedAt
       createdAt
+    }
+  }
+`;
+
+// ---------------------------------------------------------------------------
+// The Agents area on the list contract (spec 44 §5.1, #2155). Each list sends
+// its view, chips, search, sort and page as arguments and renders what comes
+// back; nothing is filtered, sorted or paged in the browser.
+// ---------------------------------------------------------------------------
+
+// Agents › Agents. Status, model, runtime, clusters and owner are server
+// columns, so a numbered page's totalCount is exact.
+export const AGENT_FLEET_LIST_PAGE = gql`
+  query AgentFleetListPage(
+    $orgId: ID!
+    $search: String
+    $filter: AstroliftAgentFleetFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    agentFleetPage(
+      orgId: $orgId
+      search: $search
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        id
+        name
+        slug
+        appSlug
+        projectSlug
+        sourceRepo
+        sourceUrl
+        runFamily
+        runMode
+        runPaused
+        runCronExpression
+        lastRunStatus
+        lastRunAt
+        runningCount
+        status
+        modelSource
+        runtime
+        environmentSpecSlug
+        clusterSlugs
+        ownerEmail
+        ownedByMe
+      }
+      totalCount
+      page
+      pageSize
+    }
+  }
+`;
+
+// The next firings of unpaused schedule-mode agents, soonest first. The
+// Agents list asks for one per scheduled agent on its page; the Runs page's
+// Scheduled view pages through them.
+export const AGENT_UPCOMING_RUNS = gql`
+  query AgentUpcomingRuns(
+    $orgId: ID!
+    $search: String
+    $project: [String!]
+    $agent: [String!]
+    $perAgent: Int! = 1
+    $page: Int
+    $pageSize: Int
+  ) {
+    agentUpcomingRuns(
+      orgId: $orgId
+      search: $search
+      project: $project
+      agent: $agent
+      perAgent: $perAgent
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        agentId
+        agentSlug
+        agentName
+        appSlug
+        projectSlug
+        cronExpression
+        scheduledAt
+      }
+      totalCount
+      page
+      pageSize
+    }
+  }
+`;
+
+// An agent's Runs tab: its tasks, cursor paged, with status (any of),
+// initiator and created-order sort answered by the server.
+export const AGENT_TASKS_LIST_PAGE = gql`
+  query AgentTasksListPage(
+    $orgId: ID!
+    $workloadId: ID
+    $search: String
+    $filter: AstroliftAgentTasksFilter
+    $sort: String
+    $limit: Int!
+    $after: String
+  ) {
+    agentTasksPage(
+      orgId: $orgId
+      workloadId: $workloadId
+      search: $search
+      filter: $filter
+      sort: $sort
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        id
+        agentSlug
+        agentName
+        projectSlug
+        status
+        createdAt
+        startedAt
+        finishedAt
+        vncEnabled
+        vncUrl
+        triggerKind
+        triggeredByUserId
+        triggeredByMe
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+// Agents › Runs: every agent, workflow and task run in one cursor list
+// (#2152). The page narrows `kind` to the three the Agents area owns.
+export const AGENTS_AREA_RUN_AUDIT = gql`
+  query AgentsAreaRunAudit(
+    $filter: AstroliftRunAuditFilter
+    $search: String
+    $sort: String
+    $first: Int!
+    $after: String
+  ) {
+    astroliftRunAudit(filter: $filter, search: $search, sort: $sort, first: $first, after: $after) {
+      items {
+        kind
+        id
+        subject
+        agentSlug
+        workflowSlug
+        projectSlug
+        appSlug
+        trigger
+        startedByDisplay
+        startedByMe
+        at
+        startedAt
+        endedAt
+        durationSeconds
+        status
+        outcome
+      }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+// Agents › Skills: the org's skills and the global catalog, numbered.
+export const SKILLS_LIST_PAGE = gql`
+  query SkillsListPage(
+    $orgId: ID!
+    $search: String
+    $filter: AstroliftSkillsFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    skillsPage(
+      orgId: $orgId
+      search: $search
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        id
+        name
+        slug
+        description
+        skillVersion
+        isGlobal
+        isActive
+        updatedAt
+        createdByEmail
+        createdByMe
+        sourceKind
+        sourceRef
+        isImported
+      }
+      totalCount
+      page
+      pageSize
+    }
+  }
+`;
+
+// Agents › Tools: every tool on the org's skills and the global catalog.
+export const TOOL_DEFS_LIST_PAGE = gql`
+  query ToolDefsListPage(
+    $orgId: ID!
+    $search: String
+    $filter: AstroliftToolDefsFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    orgToolDefsPage(
+      orgId: $orgId
+      search: $search
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        id
+        name
+        slug
+        description
+        adapter
+        handlerRef
+        createdAt
+        isBuiltin
+        skillId
+        skillSlug
+        skillName
+        skillIsGlobal
+        createdByEmail
+        createdByMe
+      }
+      totalCount
+      page
+      pageSize
+    }
+  }
+`;
+
+// One tool definition by id, scoped to the org's own and global skills.
+export const GET_TOOL_DEF = gql`
+  query GetToolDef($id: ID!) {
+    toolDef(id: $id) {
+      id
+      name
+      slug
+      description
+      adapter
+      inputSchema
+      outputSchema
+      handlerRef
+      createdAt
+      isBuiltin
+      skillId
+      skillSlug
+      skillName
+    }
+  }
+`;
+
+// An agent's secret refs, probed against the store and paged there.
+export const AGENT_SECRET_STATUS_PAGE = gql`
+  query AgentSecretStatusPage(
+    $slug: String!
+    $search: String
+    $filter: AstroliftAgentSecretStatusFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    agentEnvironmentSpecSecretStatusPage(
+      slug: $slug
+      search: $search
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        envVar
+        uri
+        exists
+        error
+        provider
+        canReveal
+        readLimitation
+      }
+      totalCount
+      page
+      pageSize
+      error
     }
   }
 `;

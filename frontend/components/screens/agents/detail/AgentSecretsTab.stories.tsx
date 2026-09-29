@@ -11,14 +11,15 @@ import {
   SECRET_ROW_ERROR,
   SECRET_ROWS,
   SECRETS,
+  serveSecrets,
 } from "../list/agents-dispatch-secrets.fixtures";
 import { AgentSecretBundlesView } from "../list/AgentSecretBundles";
-import { agentSecretsList, secretProviders, selectSecrets } from "./agent-secrets-list";
+import { AGENT_SECRETS_LIST } from "./agent-secrets-list";
 import { AgentSecretsTab, AgentSecretValues } from "./AgentSecretsTab";
 
 /**
  * The agent's Secrets tab (spec 44 §5.2): its bindings on the embedded list
- * (filtered, sorted and paged in the browser) under Values, and the
+ * (filtered, sorted and paged by the server) under Values, and the
  * reusable bundles under Bundles, one section at a time.
  */
 const meta: Meta = {
@@ -33,16 +34,34 @@ function Values({
   rows,
   loading = false,
   reveals = {},
+  readError = null,
 }: {
   rows: AstroliftAgentSecretStatus[];
   loading?: boolean;
   reveals?: Record<string, string>;
+  readError?: string | null;
 }) {
-  const list = useLocalListState(agentSecretsList(secretProviders(rows)));
+  const list = useLocalListState(AGENT_SECRETS_LIST);
   const { state } = list;
-  const page = selectSecrets(rows, list.filters, state.q, state.sort, state.page, state.pageSize);
+  const page = serveSecrets(rows, {
+    filters: list.filters,
+    q: state.q,
+    sort: state.sort,
+    page: state.page,
+    pageSize: state.pageSize,
+  });
   return (
-    <AgentSecretValues {...SECRETS} {...page} list={list} loading={loading} reveals={reveals} />
+    <AgentSecretValues
+      {...SECRETS}
+      {...page}
+      list={list}
+      loading={loading}
+      stale={false}
+      error={null}
+      onRetry={() => {}}
+      readError={readError}
+      reveals={reveals}
+    />
   );
 }
 
@@ -51,16 +70,18 @@ function Tab({
   rows = [...SECRET_ROWS, SECRET_ROW_ERROR],
   loading,
   reveals,
+  readError,
 }: {
   initial?: string | null;
   rows?: AstroliftAgentSecretStatus[];
   loading?: boolean;
   reveals?: Record<string, string>;
+  readError?: string | null;
 }) {
   return (
     <AgentSecretsTab
       section={useLocalSettingsSection(initial)}
-      values={<Values rows={rows} loading={loading} reveals={reveals} />}
+      values={<Values rows={rows} loading={loading} reveals={reveals} readError={readError} />}
       bundles={<AgentSecretBundlesView {...BUNDLES} />}
     />
   );
@@ -94,11 +115,23 @@ export const Empty: Story = {
   },
 };
 
-/**
- * The status read has no error of its own (a failed read comes back empty);
- * a binding whose provider refuses the read is the error the list shows.
- */
+/** A binding whose provider refuses the read is the error its row shows. */
 export const ProviderError: Story = { render: () => <Tab rows={[SECRET_ROW_ERROR]} /> };
+
+/** The whole read could not answer: no agent cluster, so every ref reads as missing. */
+export const StoreUnavailable: Story = {
+  render: () => (
+    <Tab
+      rows={SECRET_ROWS.map((r) => ({ ...r, exists: false }))}
+      readError="the organization has no agent cluster"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText(/The secret store could not be read/)
+    ).toBeInTheDocument();
+  },
+};
 
 export const LongStrings: Story = {
   render: () => <Tab rows={[LONG_SECRET_ROW, ...SECRET_ROWS]} />,
