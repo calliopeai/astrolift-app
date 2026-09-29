@@ -272,6 +272,10 @@ class PolicyOutcome:
     denies: bool
     detail: str
     conditions: tuple[ConditionOutcome, ...] = ()
+    # Why the policy was taken to apply without knowing (an attribute the
+    # check does not carry, an unknown key): fail-closed guesses, kept apart
+    # so a simulation can tell a definite denial from a guessed one.
+    assumed: tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -409,6 +413,8 @@ def _evaluate_policy(policy, subject: Subject) -> PolicyOutcome:
     slug = policy.slug
     effect = policy.effect
 
+    unknown: list[str] = []
+
     def outcome(applies: bool, denies: bool, detail: str, conditions=()) -> PolicyOutcome:
         return PolicyOutcome(
             policy_guid=str(policy.guid),
@@ -418,6 +424,7 @@ def _evaluate_policy(policy, subject: Subject) -> PolicyOutcome:
             denies=denies,
             detail=detail,
             conditions=tuple(conditions),
+            assumed=tuple(unknown) if applies else (),
         )
 
     # 1. Scope.
@@ -431,7 +438,6 @@ def _evaluate_policy(policy, subject: Subject) -> PolicyOutcome:
 
     # 3. Resource, then 4. actor. A definite mismatch anywhere means the
     # policy does not apply; an unknown means it applies (fail closed).
-    unknown: list[str] = []
     for part in (
         _match_resource(policy.resource_pattern, subject),
         _match_actor(policy.actor_pattern, subject),
@@ -484,6 +490,98 @@ def _scope_covers(policy, subject: Subject) -> bool:
     return True
 
 
+# ---- resource and actor keys -----------------------------------------
+#
+# The keys a policy's ``resource_pattern`` and ``actor_pattern`` may name.
+# The matchers below read these tables and nothing else, and the condition
+# catalog query (``astroliftPolicyConditionCatalog``) publishes them, so the
+# policy editor offers exactly the keys this module evaluates.
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ResourceKey:
+    """One ``resource_pattern`` key: glob values matched against ``read``.
+
+    ``read`` returns None when the value is not known. When
+    ``missing_mismatches`` is set that is a definite mismatch (the target
+    is not in any app), otherwise the value is unknown and the policy
+    counts as applying (fail closed) with ``missing`` as the reason.
+    """
+
+    key: str
+    label: str
+    description: str
+    read: Callable[[Subject], str | None]
+    missing: str
+    missing_mismatches: bool = False
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ActorKey:
+    """One ``actor_pattern`` key: the actor matches when ``read`` holds any
+    of the pattern's values."""
+
+    key: str
+    label: str
+    description: str
+    read: Callable[[Subject], frozenset[str]]
+    mismatch: str
+
+
+RESOURCE_KEYS: tuple[ResourceKey, ...] = (
+    ResourceKey(
+        key="app_slug",
+        label="App",
+        description="The slug of the app the target is in, read from the target itself.",
+        read=lambda s: s.scope_slug("APP"),
+        missing="the target is not in any app",
+        missing_mismatches=True,
+    ),
+    ResourceKey(
+        key="project_slug",
+        label="Project",
+        description="The slug of the project the target is in, read from the target itself.",
+        read=lambda s: s.scope_slug("PROJECT"),
+        missing="the target is not in any project",
+        missing_mismatches=True,
+    ),
+    ResourceKey(
+        key="env",
+        label="Environment",
+        description="The environment of the operation, when the call site supplies it.",
+        read=lambda s: s.attrs.environment,
+        missing="this check carries no environment",
+    ),
+    ResourceKey(
+        key="region",
+        label="Region",
+        description="The region of the operation, when the call site supplies it.",
+        read=lambda s: s.attrs.region,
+        missing="this check carries no region",
+    ),
+)
+
+ACTOR_KEYS: tuple[ActorKey, ...] = (
+    ActorKey(
+        key="user_in_groups",
+        label="In IdP group",
+        description="The actor is in any of these IdP groups, as asserted at their last sign-in.",
+        read=lambda s: s.groups,
+        mismatch="the actor is in none of the groups {values}",
+    ),
+    ActorKey(
+        key="user_role_at_scope",
+        label="Holds role here",
+        description="The actor holds any of these role slugs on the target or an ancestor that reaches it.",
+        read=lambda s: s.roles_at_target,
+        mismatch="the actor holds none of the roles {values} here",
+    ),
+)
+
+_RESOURCE_KEYS = {k.key: k for k in RESOURCE_KEYS}
+_ACTOR_KEYS = {k.key: k for k in ACTOR_KEYS}
+
+
 def _match_resource(pattern: Any, subject: Subject) -> tuple[bool | None, str]:
     if pattern in (None, {}):
         return True, ""
@@ -496,22 +594,15 @@ def _match_resource(pattern: Any, subject: Subject) -> tuple[bool | None, str]:
             if raw not in (None, "", []):
                 unknown.append(f"resource {key} has an unreadable value")
             continue
-        if key in ("app_slug", "project_slug"):
-            actual = subject.scope_slug("APP" if key == "app_slug" else "PROJECT")
-            if actual is None:
-                return False, f"the target is not in any {key.split('_')[0]}"
-        elif key == "env":
-            actual = subject.attrs.environment
-            if actual is None:
-                unknown.append("this check carries no environment")
-                continue
-        elif key == "region":
-            actual = subject.attrs.region
-            if actual is None:
-                unknown.append("this check carries no region")
-                continue
-        else:
+        spec = _RESOURCE_KEYS.get(key)
+        if spec is None:
             unknown.append(f"unknown resource key {key!r}")
+            continue
+        actual = spec.read(subject)
+        if actual is None:
+            if spec.missing_mismatches:
+                return False, spec.missing
+            unknown.append(spec.missing)
             continue
         if not any(fnmatch.fnmatchcase(actual, v) for v in values):
             return False, f"resource {key} {actual!r} does not match {values}"
@@ -532,14 +623,12 @@ def _match_actor(pattern: Any, subject: Subject) -> tuple[bool | None, str]:
             if raw not in (None, "", []):
                 unknown.append(f"actor {key} has an unreadable value")
             continue
-        if key == "user_in_groups":
-            if not subject.groups.intersection(values):
-                return False, f"the actor is in none of the groups {values}"
-        elif key == "user_role_at_scope":
-            if not subject.roles_at_target.intersection(values):
-                return False, f"the actor holds none of the roles {values} here"
-        else:
+        spec = _ACTOR_KEYS.get(key)
+        if spec is None:
             unknown.append(f"unknown actor key {key!r}")
+            continue
+        if not spec.read(subject).intersection(values):
+            return False, spec.mismatch.format(values=values)
     if unknown:
         return None, "; ".join(unknown)
     return True, ""
@@ -681,13 +770,143 @@ def _is_own_request(subject: Subject) -> bool:
     return subject.attrs.actor_user_id is not None and subject.attrs.actor_user_id == subject.actor_user_id
 
 
+# ---- the condition catalog ---------------------------------------------
+#
+# Every condition kind this module evaluates, with the fields its handler
+# reads. ``_HANDLERS`` is built from this table, so a kind is evaluable
+# exactly when the catalog lists it, and the policy editor builds its
+# pickers from the same rows through ``astroliftPolicyConditionCatalog``.
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ConditionField:
+    """One field of a condition, as its handler reads it.
+
+    ``type`` is one of: ``weekdays`` (a list of ``options``), ``time_ranges``
+    (a list of ``HH:MM-HH:MM``, an end before the start wraps past
+    midnight), ``time_zone`` (an IANA name), ``cidrs`` (a list of IP
+    ranges), ``strings`` (a list of values) or ``integer`` (at least
+    ``minimum``).
+    """
+
+    name: str
+    type: str
+    label: str
+    description: str
+    required: bool = True
+    default: Any = None
+    options: tuple[str, ...] = ()
+    minimum: int | None = None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ConditionKind:
+    """One condition kind: its fields, the attributes it needs, its handler.
+
+    ``needs`` names what the check must carry: ``clock`` (always), ``client_ip``,
+    ``session`` (person-bound: only for the request's own user, so a
+    diagnosis or a simulation about someone else cannot evaluate it), or
+    ``operation`` (supplied by the call site that knows the environment or
+    the approval count). A condition that lacks what it needs cannot be
+    evaluated, and an applying policy with it denies.
+    """
+
+    kind: str
+    label: str
+    description: str
+    fields: tuple[ConditionField, ...]
+    needs: str
+    example: dict
+    handler: Callable[[dict, Subject], ConditionOutcome]
+
+
+CONDITION_KINDS: tuple[ConditionKind, ...] = (
+    ConditionKind(
+        kind="time_window",
+        label="During hours",
+        description="Holds while the evaluation clock, in the time zone, is inside one of the ranges on one of the days.",
+        fields=(
+            ConditionField("days", "weekdays", "Days", "The days the ranges apply on.", options=WEEKDAYS),
+            ConditionField("hours", "time_ranges", "Hours", "One or more HH:MM-HH:MM ranges."),
+            ConditionField(
+                "tz", "time_zone", "Time zone", "An IANA time zone name.", required=False, default="UTC"
+            ),
+        ),
+        needs="clock",
+        example={"kind": "time_window", "days": ["mon", "fri"], "hours": ["09:00-18:00"], "tz": "UTC"},
+        handler=_time_window,
+    ),
+    ConditionKind(
+        kind="ip_allowlist",
+        label="From network",
+        description="Holds when the request's client IP is inside one of the ranges.",
+        fields=(ConditionField("cidrs", "cidrs", "Ranges", "IPv4 or IPv6 ranges, like 10.0.0.0/8."),),
+        needs="client_ip",
+        example={"kind": "ip_allowlist", "cidrs": ["10.0.0.0/8"]},
+        handler=_ip_allowlist,
+    ),
+    ConditionKind(
+        kind="approval_required",
+        label="Approved",
+        description="Holds when the operation carries at least this many approvals.",
+        fields=(
+            ConditionField(
+                "min_approvers",
+                "integer",
+                "Approvers",
+                "The fewest approvals the operation needs.",
+                required=False,
+                default=1,
+                minimum=1,
+            ),
+        ),
+        needs="operation",
+        example={"kind": "approval_required", "min_approvers": 2},
+        handler=_approval_required,
+    ),
+    ConditionKind(
+        kind="env_match",
+        label="In environment",
+        description="Holds when the operation's environment is one of these.",
+        fields=(ConditionField("env_in", "strings", "Environments", "Environment names, exactly."),),
+        needs="operation",
+        example={"kind": "env_match", "env_in": ["staging"]},
+        handler=_env_match,
+    ),
+    ConditionKind(
+        kind="device_assertion",
+        label="Signed in with",
+        description="Holds when the session used every one of these sign-in factors.",
+        fields=(
+            ConditionField(
+                "required_factors", "strings", "Factors", "Sign-in and step-up methods, like sso or webauthn."
+            ),
+        ),
+        needs="session",
+        example={"kind": "device_assertion", "required_factors": ["webauthn"]},
+        handler=_device_assertion,
+    ),
+    ConditionKind(
+        kind="freshness",
+        label="Signed in recently",
+        description="Holds when the session's user signed in no longer ago than this.",
+        fields=(
+            ConditionField(
+                "max_session_age_minutes",
+                "integer",
+                "Minutes",
+                "The oldest sign-in that still holds.",
+                minimum=1,
+            ),
+        ),
+        needs="session",
+        example={"kind": "freshness", "max_session_age_minutes": 30},
+        handler=_freshness,
+    ),
+)
+
 _HANDLERS: dict[str, Callable[[dict, Subject], ConditionOutcome]] = {
-    "time_window": _time_window,
-    "ip_allowlist": _ip_allowlist,
-    "approval_required": _approval_required,
-    "env_match": _env_match,
-    "device_assertion": _device_assertion,
-    "freshness": _freshness,
+    k.kind: k.handler for k in CONDITION_KINDS
 }
 
 
