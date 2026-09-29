@@ -14,16 +14,24 @@ export const Running: Story = { args: { state: "running" } };
 export const Completed: Story = { args: { state: "completed" } };
 export const Failed: Story = { args: { state: "failed" } };
 export const Cancelled: Story = { args: { state: "cancelled" } };
+export const HistoryExpired: Story = { args: { state: "expired" } };
 
 /** Every state the engine reports, side by side. */
 export const AllStates: Story = {
   render: () => (
     <div className="flex flex-wrap gap-2">
-      {["pending", "running", "completed", "failed", "cancelled", "terminated", "timed_out"].map(
-        (state) => (
-          <RunStateBadge key={state} state={state} />
-        )
-      )}
+      {[
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+        "terminated",
+        "timed_out",
+        "expired",
+      ].map((state) => (
+        <RunStateBadge key={state} state={state} />
+      ))}
     </div>
   ),
 };
