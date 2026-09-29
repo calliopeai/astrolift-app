@@ -21,6 +21,20 @@
   and owned-task cleanup continues without querying missing history. Apply
   additive migration `astrolift_operations.0027` before worker rollout.
 
+- Upload confirmation by URL and ID now requires the uploader and active
+  membership in the upload's organization; a platform operator can manage
+  another uploader's file only within the selected organization (#2174).
+  Deleted files cannot be confirmed again. Generic upload bearer writes need
+  `admin` and the same organization GUID across the legacy upload and token
+  identities. `/app/metrics/` requires an active platform operator, with
+  `admin` for bearer requests; the Sentry and OpenTelemetry debug routes are
+  removed. Existing anonymous Prometheus scrapes must use an operator bearer.
+  Upload initiation retries a caller-supplied UUID only for the same uploader
+  and organization; another owner's, another organization's or a deleted
+  upload cannot be reassigned through that UUID (#2110, partial).
+- Request-ID and trace context cleanup now consumes each token once, so a
+  handled view exception preserves its original HTTP status and request-ID
+  header when Django subsequently runs response middleware (#2174).
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).
   `restore.snapshot_id` and `restore.source_handle` came from the manifest
