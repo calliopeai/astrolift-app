@@ -76,7 +76,10 @@ os.system("service cron start")
 BASE_DIR = Path(__file__).resolve().parent
 os.chdir(BASE_DIR)
 for command in ON_STARTUP:
-    execute_and_log(f"python manage.py {command}")
+    returncode = execute_and_log(f"python manage.py {command}")
+    if command == "migrate" and returncode != 0:
+        logger.error("[STARTUP] Schema migration failed (exit %s); stopping startup", returncode)
+        raise SystemExit(returncode)
 
 
 # Subscriptions need an ASGI server. uvicorn handles HTTP + WS in

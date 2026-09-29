@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Backend startup exits when schema migration fails, before dependent
+  bootstrap commands or the HTTP server (#2187). Successful migrations keep
+  the existing production/development server behavior, and other startup
+  commands remain best-effort. The operator upgrade procedure requires a
+  verified migration task before the paired web/worker rollout.
+
 - The deployment detail Redeploy action sends the selected deployment ID required
   by the API, and reports server or network failures in a toast (#2173).
 

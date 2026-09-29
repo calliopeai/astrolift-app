@@ -81,6 +81,12 @@ it releases when the command finishes or fails. Normal Django options, including
 Both callers must run an application image containing this command (#1739;
 calliopeai/calliope-installer#304).
 
+Backend startup stops before bootstrap commands and the server when migration
+fails (#2187). The worker does not migrate; require a successful one-off
+migration with the new backend image before rolling out web and worker.
+See [control-plane upgrades](../docs/operators/control-plane-upgrades.md) for
+the paired release and rollback procedure.
+
 ## Conventions
 
 - **Request context cleanup**: request-ID and trace middleware consume their
