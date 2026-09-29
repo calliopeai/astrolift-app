@@ -7,7 +7,7 @@
  * so. A ref has no owner, so there is no Mine. Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 
 export type SecretState = "set" | "missing" | "error";

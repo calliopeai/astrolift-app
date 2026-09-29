@@ -20,7 +20,7 @@ import {
   type ListFieldOption,
   type ListView,
   standardViews,
-} from "@/components/list/use-list-state";
+} from "@/components/list/list-state";
 import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
 
 export const PREVIEWS_VIEW = "previews";

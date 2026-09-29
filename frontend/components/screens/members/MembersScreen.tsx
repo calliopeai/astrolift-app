@@ -22,7 +22,7 @@ import type { Column } from "@/components/data-table";
 import { DetailStatusBadge, type Dot } from "@/components/detail/EntityDetailShell";
 import { exportCsv } from "@/components/list/exportCsv";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import {
   accessCrumbs,
   grantHref,

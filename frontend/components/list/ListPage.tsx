@@ -99,7 +99,7 @@ import { cn } from "@/lib/utils";
 import { FilterBar, type FilterBarColumn } from "./FilterBar";
 import { ListPagination } from "./ListPagination";
 import { NewRowsPill } from "./NewRowsPill";
-import type { ListStateController } from "./use-list-state";
+import type { ListStateController } from "./list-state";
 
 /** A routed list owns the page header; an embedded one sits under an entity's tabs. */
 type ListPageFrame =

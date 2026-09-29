@@ -18,7 +18,7 @@
  * `list.filters`, `sort` and `page` instead and this step goes away.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import type { WorkflowLine } from "@/components/viz/core/workflow-model";
 import {

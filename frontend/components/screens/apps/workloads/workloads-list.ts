@@ -11,7 +11,7 @@
  * rest exactly, with numbered pages. Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 import type { AstroliftWorkload, WorkloadKind } from "@/graphql/registry/registry.types";
 
 export const KIND_LABEL: Record<WorkloadKind, string> = {

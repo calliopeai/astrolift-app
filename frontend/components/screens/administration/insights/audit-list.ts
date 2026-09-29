@@ -10,7 +10,7 @@ import {
   type ListDefinition,
   type ListFieldOption,
   standardViews,
-} from "@/components/list/use-list-state";
+} from "@/components/list/list-state";
 
 /** The `since` choices; a typed `since:2026-09-01` date is accepted too. */
 export const SINCE_OPTIONS: ListFieldOption[] = [

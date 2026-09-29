@@ -7,7 +7,7 @@
  * lean on it say so. When the query grows `filter` and `sort` the hook sends
  * them and this step goes away; the screen does not change.
  */
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftApiToken } from "@/graphql/identity/identity.types";
 
 /** The page walked when a client-side filter narrows it. */

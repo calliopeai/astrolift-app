@@ -3,7 +3,7 @@
  * their tabs, typed against each panel's props and selected the way the
  * hooks select, so a story cannot drift from them.
  */
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import type {
   AstroliftMember,
   AstroliftRole,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildCsv } from "@/components/list/exportCsv";
-import { parseListState } from "@/components/list/use-list-state";
+import { parseListState } from "@/components/list/list-state";
 
 import { AUDIT_LIST, auditVariables, sinceToIso } from "./audit-list";
 import {

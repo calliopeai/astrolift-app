@@ -9,7 +9,7 @@
  * the views say so. Environments record no owner, so Mine is empty.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
 export type EnvironmentKind = "production" | "preview" | "other";

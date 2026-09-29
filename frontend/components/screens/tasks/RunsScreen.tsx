@@ -17,7 +17,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column, RowSelection } from "@/components/data-table";
 import { Identifier } from "@/components/Identifier";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import {

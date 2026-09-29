@@ -4,7 +4,7 @@ import { BookOpenIcon, WrenchIcon } from "lucide-react";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
 import type { AstroliftAgentSkill } from "@/graphql/agents/agents.types";
 

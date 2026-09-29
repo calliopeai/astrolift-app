@@ -11,7 +11,7 @@
  * Events (their own route, /alerts/events): a Feed on
  * `astroliftAlertEventsPage`, All or Firing (`unresolvedOnly`).
  */
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 
 import type { AlertRule } from "./use-alerts";
 

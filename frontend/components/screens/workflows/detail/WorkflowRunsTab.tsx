@@ -5,7 +5,7 @@ import { HistoryIcon } from "lucide-react";
 import type { Column } from "@/components/data-table";
 import { Identifier } from "@/components/Identifier";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import type { RunRow } from "@/components/screens/tasks/runs-list";
 import { formatTook, RunOutcomeCell } from "@/components/screens/tasks/RunsScreen";
 import { WorkflowView } from "@/components/viz";

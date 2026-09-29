@@ -1,4 +1,4 @@
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import type { AstroliftRole, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import type { AstroliftAppTeamAccess } from "@/graphql/registry/registry.types";
 

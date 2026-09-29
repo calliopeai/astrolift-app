@@ -18,7 +18,7 @@
  *   the numbered page run here, over at most the principal's own grants.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 import {
   type GrantSourceInfo,
   type RoleRef,

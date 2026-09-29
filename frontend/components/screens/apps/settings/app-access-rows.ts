@@ -19,7 +19,7 @@ import {
   principalOfBinding,
   sourceOfBinding,
 } from "@/components/access/access-model";
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import type { AstroliftAppTeamAccess } from "@/graphql/registry/registry.types";
 

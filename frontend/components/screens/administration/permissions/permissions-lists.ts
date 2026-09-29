@@ -1,4 +1,4 @@
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 
 /**
  * Admin › Permissions › Roles (spec 44 §5.1). `astroliftRolesPage` takes

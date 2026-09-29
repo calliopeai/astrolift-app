@@ -34,7 +34,7 @@ import {
   type ListField,
   type ListFieldOption,
   type ListStateController,
-} from "./use-list-state";
+} from "./list-state";
 
 /**
  * The one filter bar on every list (spec 44 §5.1):

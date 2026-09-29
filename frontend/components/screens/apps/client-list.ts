@@ -7,7 +7,7 @@
  * compares; this does the rest, stably. Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListState } from "@/components/list/use-list-state";
+import type { ListState } from "@/components/list/list-state";
 
 /** The note each such list's view carries while the field is unpaginated. */
 export const CLIENT_LIST_NOTE =

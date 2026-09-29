@@ -12,7 +12,7 @@
  * are filtered, sorted and paged here too.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftMember, AstroliftTeam } from "@/graphql/identity/identity.types";
 
 export const TEAMS_LIST: ListDefinition = {

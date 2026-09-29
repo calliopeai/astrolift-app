@@ -6,7 +6,7 @@
  * Every session here is the viewer's own, so Mine is the same as All.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftActiveSession } from "@/graphql/identity/identity.types";
 
 const KINDS = ["web", "cli", "mobile", "browser_extension", "api_token"];

@@ -7,7 +7,7 @@
  * own subscriptions, not the apps query, so Mine (apps you get at least one
  * alert for) and Alerts narrow a wider page (`NARROW_LIMIT`) in the client.
  */
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftUserAlertSubscription } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 

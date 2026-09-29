@@ -12,7 +12,7 @@ import {
   serializeListState,
   standardViews,
   toggleSortKey,
-} from "./use-list-state";
+} from "./list-state";
 
 describe("parseListState / serializeListState", () => {
   it("parses the spec's example URL", () => {

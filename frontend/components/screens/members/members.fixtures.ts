@@ -3,7 +3,7 @@
  * against each view's props so a story cannot drift from what the hooks
  * return.
  */
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import type {
   AstroliftInvitation,
   AstroliftMember,

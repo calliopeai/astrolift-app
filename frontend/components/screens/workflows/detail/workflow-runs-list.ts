@@ -4,7 +4,7 @@
  * Runs tab is the same idea (`AGENT_RUNS_LIST`), so this is that list with
  * the workflow's own list id and Mine note. Pure.
  */
-import { standardViews, type ListDefinition } from "@/components/list/use-list-state";
+import { standardViews, type ListDefinition } from "@/components/list/list-state";
 import { AGENT_RUNS_LIST, type RunRow } from "@/components/screens/tasks/runs-list";
 import type { TieredWorkflowRun } from "@/graphql/workflows/tiered.types";
 

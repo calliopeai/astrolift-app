@@ -29,7 +29,7 @@ import { PageShell } from "@/components/PageShell";
 import type { Column } from "@/components/data-table";
 import { Feed } from "@/components/feed/Feed";
 import { ListPage } from "@/components/list/ListPage";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { LogView } from "@/components/run/LogView";
 import {

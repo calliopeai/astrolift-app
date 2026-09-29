@@ -6,7 +6,7 @@
  * and numbered pages all run in the client (needsBackend: a Page field).
  * The rows are the cluster's, not a person's, so Mine is empty.
  */
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { SelectRowsSpec } from "@/components/list/select-rows";
 
 import type { WorkloadRow } from "./types";

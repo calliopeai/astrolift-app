@@ -6,7 +6,7 @@
  * Domains record no creator, so Mine is empty.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftOrganizationAllowlistedDomain } from "@/graphql/identity/identity.types";
 
 export const TRUSTED_DOMAINS_LIST: ListDefinition = {

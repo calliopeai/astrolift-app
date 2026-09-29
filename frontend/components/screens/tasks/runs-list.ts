@@ -10,11 +10,7 @@
  */
 import type { SortState } from "@/components/data-table";
 import type { Crumb } from "@/components/shell/ShellHeader";
-import {
-  type ListDefinition,
-  type ListView,
-  standardViews,
-} from "@/components/list/use-list-state";
+import { type ListDefinition, type ListView, standardViews } from "@/components/list/list-state";
 import {
   outcomeOf,
   type RunOutcome,

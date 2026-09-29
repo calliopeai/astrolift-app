@@ -1,5 +1,5 @@
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftAppEndpointMetric } from "@/graphql/__generated__/schema";
 
 /**

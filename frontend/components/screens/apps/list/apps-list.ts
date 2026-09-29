@@ -15,7 +15,7 @@
  * change.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, standardViews } from "@/components/list/use-list-state";
+import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import type {
   AppHealthPulseStatus,

@@ -15,7 +15,7 @@ import * as React from "react";
 
 import { Feed } from "@/components/feed/Feed";
 import { FilterBar } from "@/components/list/FilterBar";
-import type { ListStateController } from "@/components/list/use-list-state";
+import type { ListStateController } from "@/components/list/list-state";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

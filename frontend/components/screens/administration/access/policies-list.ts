@@ -1,4 +1,4 @@
-import type { ListDefinition } from "@/components/list/use-list-state";
+import type { ListDefinition } from "@/components/list/list-state";
 
 /**
  * Admin › Policies (spec 44 §5.1). `astroliftPoliciesPage` takes `search`,
