@@ -8,6 +8,15 @@
   workload; live, failed and in-flight deployments remain protected. Repositories
   enroll in the preview-first age/count cleanup job on creation or adoption
   (calliopeai/astrolift-opscode#69).
+- Outbound webhooks retry transient failures with Temporal's replay-safe jitter
+  instead of failing the workflow sandbox (#2165). Permanent HTTP errors and
+  unsubscribe responses still stop immediately; retries retain signed delivery
+  records and replay without sending new requests.
+- Workflow reconciliation settles exact executions with purged Temporal history
+  once, logs at INFO and stops looking them up (#2166). Running mirrors display
+  History expired with an unknown outcome, existing final results stay intact,
+  and owned-task cleanup continues without querying missing history. Apply
+  additive migration `astrolift_operations.0027` before worker rollout.
 
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).
