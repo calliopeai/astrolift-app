@@ -40,6 +40,7 @@ SPEC = ProvisionSpec(
     binding_id="binding-id",
     managed_service_id="service-id",
 )
+MSID = SPEC.managed_service_id
 
 
 class FakeFilestore:
@@ -247,7 +248,7 @@ def test_provision_builds_current_v1_psc_instance_and_binding(
     assert body["deletionProtectionEnabled"] is True
 
     binding = driver.binding(
-        ServiceHandle(result.handle),
+        ServiceHandle(result.handle, managed_service_id=MSID),
         {"security_flavor": "krb5p", "read_only": True},
     )
     assert binding.env_vars["FILESYSTEM_ENDPOINT"].literal == "10.20.30.40"
@@ -393,7 +394,7 @@ def test_existing_managed_service_cannot_be_reassigned_by_config(
     client.instances[name]["labels"]["astrolift-io-managed-service-id"] = "other-service"
     refused = _provision(driver)
     assert not refused.ok
-    assert "another Astrolift managed service" in refused.message
+    assert "another managed service" in refused.message
 
     validator = Draft202012Validator(driver.config_schema())
     assert not validator.is_valid({"reassign_existing": True})
@@ -410,7 +411,9 @@ def test_update_cannot_use_adopt_flag_to_bypass_ownership(
     location, instance_id = _parse_handle(handle)
     name = f"projects/project-1/locations/{location}/instances/{instance_id}"
     client.instances[name]["labels"] = {"owner": "external"}
-    result = driver.update(UpdateSpec(handle, config={"adopt_existing": True, "description": "take"}))
+    result = driver.update(
+        UpdateSpec(handle, managed_service_id=MSID, config={"adopt_existing": True, "description": "take"})
+    )
     assert not result.ok and "not owned" in result.message
 
 
@@ -419,14 +422,15 @@ def test_update_scales_and_requires_explicit_decrease(
     client: FakeFilestore,
 ) -> None:
     handle = _provision(driver).handle
-    grown = driver.update(UpdateSpec(handle, config={"capacity_gb": 1280}))
+    grown = driver.update(UpdateSpec(handle, managed_service_id=MSID, config={"capacity_gb": 1280}))
     assert grown.ok
     assert client.patch_calls[-1][1]["fileShares"][0]["capacityGb"] == "1280"
-    refused = driver.update(UpdateSpec(handle, config={"capacity_gb": 1024}))
+    refused = driver.update(UpdateSpec(handle, managed_service_id=MSID, config={"capacity_gb": 1024}))
     assert not refused.ok and "allow_capacity_decrease" in refused.message
     shrunk = driver.update(
         UpdateSpec(
             handle,
+            managed_service_id=MSID,
             config={"capacity_gb": 1024, "allow_capacity_decrease": True},
         ),
     )
@@ -446,6 +450,7 @@ def test_partial_export_update_uses_live_direct_peering_mode(
     result = driver.update(
         UpdateSpec(
             handle,
+            managed_service_id=MSID,
             config={
                 "nfs_export_options": [
                     {
@@ -466,6 +471,7 @@ def test_update_description_without_size_does_not_require_capacity(driver: Files
     result = driver.update(
         UpdateSpec(
             handle,
+            managed_service_id=MSID,
             config={
                 "description": "new",
                 "location": "us-central1",
@@ -498,7 +504,7 @@ def test_immutable_changes_are_rejected(
     value: str,
 ) -> None:
     handle = _provision(driver).handle
-    result = driver.update(UpdateSpec(handle, config={field: value}))
+    result = driver.update(UpdateSpec(handle, managed_service_id=MSID, config={field: value}))
     assert not result.ok
     assert "immutable" in result.message
 
@@ -508,12 +514,12 @@ def test_safe_delete_requires_force_for_protection_and_retains_backup(
     client: FakeFilestore,
 ) -> None:
     handle = _provision(driver).handle
-    refused = driver.deprovision(DeprovisionSpec(handle))
+    refused = driver.deprovision(DeprovisionSpec(handle, managed_service_id=MSID))
     assert not refused.ok
     assert refused.errors == ["deletion_protection_enabled"]
     assert client.backup_calls == []
 
-    removed = driver.deprovision(DeprovisionSpec(handle), force_destroy=True)
+    removed = driver.deprovision(DeprovisionSpec(handle, managed_service_id=MSID), force_destroy=True)
     assert removed.ok
     assert "retained backup" in removed.message
     assert len(client.backup_calls) == 1
@@ -539,7 +545,7 @@ def test_safe_delete_retry_reuses_generation_backup(
 
 def test_delete_data_skips_backup(driver: FilestoreDriver, client: FakeFilestore) -> None:
     handle = _provision(driver, deletion_protection=False).handle
-    result = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id=MSID), delete_data=True)
     assert result.ok
     assert client.backup_calls == []
     assert client.delete_calls[-1][1] is False
@@ -550,10 +556,10 @@ def test_adopted_delete_has_second_guard(driver: FilestoreDriver, client: FakeFi
     location, instance_id = _parse_handle(handle)
     name = f"projects/project-1/locations/{location}/instances/{instance_id}"
     client.instances[name]["labels"]["astrolift-io-adopted"] = "true"
-    refused = driver.deprovision(DeprovisionSpec(handle), delete_data=True)
+    refused = driver.deprovision(DeprovisionSpec(handle, managed_service_id=MSID), delete_data=True)
     assert not refused.ok and refused.errors == ["adopted_resource_guard"]
     allowed = driver.deprovision(
-        DeprovisionSpec(handle, config={"delete_adopted": True}),
+        DeprovisionSpec(handle, config={"delete_adopted": True}, managed_service_id=MSID),
         delete_data=True,
     )
     assert allowed.ok
@@ -564,7 +570,7 @@ def test_portable_snapshot_is_regional_backup_and_restores_new_instance(
     client: FakeFilestore,
 ) -> None:
     handle = _provision(driver, deletion_protection=False).handle
-    snapshot = driver.snapshot(ServiceHandle(handle))
+    snapshot = driver.snapshot(ServiceHandle(handle, managed_service_id=MSID))
     assert "/locations/us-central1/backups/" in snapshot.snapshot_id
     restored_target = replace(
         SPEC,
@@ -585,7 +591,7 @@ def test_restore_rejects_native_snapshot_and_undersized_target(driver: Filestore
     assert not driver.restore(native, SPEC).ok
 
     source = _provision(driver, deletion_protection=False)
-    backup = driver.snapshot(ServiceHandle(source.handle))
+    backup = driver.snapshot(ServiceHandle(source.handle, managed_service_id=MSID))
     # Simulate a larger source backup than the requested small target.
     driver._filestore.backups[backup.snapshot_id]["capacityGb"] = "2560"  # type: ignore[attr-defined]
     result = driver.restore(backup, replace(SPEC, service_handle_hint="small-restore"))
@@ -597,28 +603,28 @@ def test_native_snapshot_revert_and_replica_promotion(
     client: FakeFilestore,
 ) -> None:
     handle = _provision(driver).handle
-    native = driver.create_native_snapshot(ServiceHandle(handle), snapshot_id="before-upgrade")
+    native = driver.create_native_snapshot(ServiceHandle(handle, managed_service_id=MSID), snapshot_id="before-upgrade")
     assert native.snapshot_id.endswith("/snapshots/before-upgrade")
     with pytest.raises(FilestoreError, match="acknowledge_data_loss"):
-        driver.revert_native_snapshot(ServiceHandle(handle), native.snapshot_id)
+        driver.revert_native_snapshot(ServiceHandle(handle, managed_service_id=MSID), native.snapshot_id)
     driver.revert_native_snapshot(
-        ServiceHandle(handle),
+        ServiceHandle(handle, managed_service_id=MSID),
         native.snapshot_id,
         acknowledge_data_loss=True,
     )
     with pytest.raises(FilestoreError, match="acknowledge_paused_write_loss"):
-        driver.promote_replica(ServiceHandle(handle))
+        driver.promote_replica(ServiceHandle(handle, managed_service_id=MSID))
     driver.promote_replica(
-        ServiceHandle(handle),
+        ServiceHandle(handle, managed_service_id=MSID),
         peer_instance="projects/p/locations/r/instances/peer",
         acknowledge_paused_write_loss=True,
     )
     with pytest.raises(FilestoreError, match="acknowledge_ephemeral_writes"):
-        driver.pause_replica(ServiceHandle(handle))
-    driver.pause_replica(ServiceHandle(handle), acknowledge_ephemeral_writes=True)
+        driver.pause_replica(ServiceHandle(handle, managed_service_id=MSID))
+    driver.pause_replica(ServiceHandle(handle, managed_service_id=MSID), acknowledge_ephemeral_writes=True)
     with pytest.raises(FilestoreError, match="acknowledge_data_loss"):
-        driver.resume_replica(ServiceHandle(handle))
-    driver.resume_replica(ServiceHandle(handle), acknowledge_data_loss=True)
+        driver.resume_replica(ServiceHandle(handle, managed_service_id=MSID))
+    driver.resume_replica(ServiceHandle(handle, managed_service_id=MSID), acknowledge_data_loss=True)
     assert client.revert_calls[-1][1] == "before-upgrade"
     assert client.promote_calls[-1][1].endswith("/peer")
     assert client.pause_calls and client.resume_calls
@@ -644,7 +650,7 @@ def test_status_mapping(
     handle = _provision(driver).handle
     location, instance_id = _parse_handle(handle)
     client.instances[f"projects/project-1/locations/{location}/instances/{instance_id}"]["state"] = provider_state
-    assert driver.status(ServiceHandle(handle)).state == expected
+    assert driver.status(ServiceHandle(handle, managed_service_id=MSID)).state == expected
 
 
 def test_replica_failure_is_part_of_status(driver: FilestoreDriver, client: FakeFilestore) -> None:
@@ -655,7 +661,7 @@ def test_replica_failure_is_part_of_status(driver: FilestoreDriver, client: Fake
         "role": "ACTIVE",
         "replicas": [{"state": "FAILED", "stateReasons": ["PEER_INSTANCE_UNREACHABLE"]}],
     }
-    status = driver.status(ServiceHandle(handle))
+    status = driver.status(ServiceHandle(handle, managed_service_id=MSID))
     assert status.state == "error"
     assert "PEER_INSTANCE_UNREACHABLE" in status.message
 
@@ -787,3 +793,69 @@ def test_registration_catalog_cost_encryption_and_runtime_config_are_wired() -> 
         operation_timeout_seconds=123,
         poll_interval_seconds=0.5,
     )
+
+
+# Two-org cases (#2098): tenant labels in the platform namespace are refused,
+# and ownership comes from the spec, never from a label read back.
+
+
+def _instance(handle: str) -> str:
+    location, instance_id = _parse_handle(handle)
+    return f"projects/project-1/locations/{location}/instances/{instance_id}"
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "astrolift_io_managed_service_id",
+        "astrolift-managed-by",
+        "Astrolift.IO.Organization",
+        "x-astrolift-managed-service-id",
+    ],
+)
+def test_tenant_labels_in_the_platform_namespace_are_refused(
+    driver: FilestoreDriver,
+    client: FakeFilestore,
+    key: str,
+) -> None:
+    refused = _provision(driver, labels={key: "service-id"})
+    assert not refused.ok and "Astrolift-reserved" in refused.message
+    assert client.create_calls == [] and client.instances == {}
+
+
+def test_another_services_update_teardown_and_mount_leave_its_instance_untouched(
+    driver: FilestoreDriver,
+    client: FakeFilestore,
+) -> None:
+    handle = _provision(driver, deletion_protection=False).handle
+    before = {name: dict(row) for name, row in client.instances.items()}
+    other = "other-service"
+
+    updated = driver.update(UpdateSpec(handle, managed_service_id=other, config={"description": "take"}))
+    assert not updated.ok and "another managed service" in updated.message
+    removed = driver.deprovision(DeprovisionSpec(handle, managed_service_id=other), delete_data=True)
+    assert not removed.ok
+    with pytest.raises(FilestoreError, match="another managed service"):
+        driver.binding(ServiceHandle(handle, managed_service_id=other))
+    with pytest.raises(FilestoreError, match="another managed service"):
+        driver.snapshot(ServiceHandle(handle, managed_service_id=other))
+
+    assert client.instances == before
+    assert client.patch_calls == [] and client.delete_calls == [] and client.backup_calls == []
+
+
+def test_an_unmarked_instance_needs_the_exclusive_record_and_is_then_marked(
+    driver: FilestoreDriver,
+    client: FakeFilestore,
+) -> None:
+    handle = _provision(driver).handle
+    name = _instance(handle)
+    for key in ("astrolift-io-managed-service-id", "astrolift_io_managed_service_id"):
+        client.instances[name]["labels"].pop(key, None)
+    unproven = driver.update(UpdateSpec(handle, managed_service_id=MSID, config={"description": "new"}))
+    assert not unproven.ok and "no managed-service id" in unproven.message
+    proven = driver.update(
+        UpdateSpec(handle, managed_service_id=MSID, config={"description": "new"}, recorded_handle_exclusive=True),
+    )
+    assert proven.ok, proven.message
+    assert client.instances[name]["labels"]["astrolift-io-managed-service-id"] == "service-id"
