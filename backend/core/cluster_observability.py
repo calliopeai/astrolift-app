@@ -455,6 +455,9 @@ def _gcp_managed_config_for(
             poll_interval_seconds=float(
                 pc.get("api_gateway_operation_poll_interval_seconds", 5),
             ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("api_gateway_allowed_service_accounts") or []
+            ),
         )
 
     if pair == ("event_stream", "managed_kafka") or (kind == "event_stream" and not variant):
@@ -503,6 +506,9 @@ def _gcp_managed_config_for(
             ),
             poll_interval_seconds=float(
                 pc.get("eventarc_operation_poll_interval_seconds", 5),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("eventarc_allowed_service_accounts") or []
             ),
         )
 
@@ -571,6 +577,9 @@ def _gcp_managed_config_for(
         return PubSubTopicConfig(
             project_id=project_id,
             topic_prefix=str(pc.get("pubsub_topic_prefix", "astrolift")),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("pubsub_allowed_service_accounts") or []
+            ),
         )
 
     if pair == ("warehouse", "bigquery") or (kind == "warehouse" and not variant):
@@ -592,6 +601,7 @@ def _gcp_managed_config_for(
                     "https://bigqueryreservation.googleapis.com/v1",
                 ),
             ),
+            allowed_connections=tuple(str(value) for value in pc.get("bigquery_allowed_connections") or []),
         )
 
     if pair == ("document_db", "firestore_native") or (kind == "document_db" and not variant):
@@ -679,6 +689,9 @@ def _gcp_managed_config_for(
             poll_interval_seconds=float(
                 pc.get("workflows_operation_poll_interval_seconds", 2),
             ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("workflows_allowed_service_accounts") or []
+            ),
         )
 
     if pair == ("observability", "cloud_operations") or (kind == "observability" and not variant):
@@ -717,6 +730,9 @@ def _gcp_managed_config_for(
             ),
             operation_poll_interval_seconds=float(
                 pc.get("cloud_operations_operation_poll_interval_seconds", 2),
+            ),
+            allowed_writer_identities=tuple(
+                str(value) for value in pc.get("cloud_operations_allowed_writer_identities") or []
             ),
         )
 
@@ -1176,6 +1192,9 @@ def _k8s_managed_config_for(
             ),
             default_container_concurrency=int(
                 pc.get("knative_default_container_concurrency", 0),
+            ),
+            allowed_service_accounts=tuple(
+                str(value) for value in pc.get("knative_allowed_service_accounts") or []
             ),
         )
     if pair == ("api_gateway", "gateway_api"):
@@ -1802,6 +1821,9 @@ def _azure_managed_config_for(
             public_network_access_default=str(
                 pc.get("eventgrid_public_network_access_default", "Enabled"),
             ),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("eventgrid_allowed_identity_resource_ids") or []
+            ),
         )
 
     event_hubs_pairs = {
@@ -1824,6 +1846,9 @@ def _azure_managed_config_for(
             default_consumer_group=str(pc.get("eventhubs_default_consumer_group", "astrolift")),
             public_network_access_default=str(
                 pc.get("eventhubs_public_network_access_default", "Enabled"),
+            ),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("eventhubs_allowed_identity_resource_ids") or []
             ),
         )
 
@@ -1888,6 +1913,9 @@ def _azure_managed_config_for(
                 pc.get("eventgrid_namespace_secret_name_prefix", "event-grid-namespace"),
             ),
             default_capacity=int(pc.get("eventgrid_namespace_default_capacity", 1)),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("eventgrid_namespace_allowed_identity_resource_ids") or []
+            ),
         )
 
     if pair == ("postgres", "azure_pg_flex") or (kind == "postgres" and not variant):
@@ -2012,6 +2040,9 @@ def _azure_managed_config_for(
             keyvault_url=vault_url,
             secret_name_prefix=str(
                 pc.get("cosmos_api_secret_name_prefix", "astrolift-cosmos-api"),
+            ),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("cosmos_api_allowed_identity_resource_ids") or []
             ),
         )
 
@@ -2280,6 +2311,9 @@ def _azure_managed_config_for(
             ),
             keyvault_url=vault_url,
             secret_name_prefix=str(pc.get("managed_redis_secret_name_prefix", "astrolift-amr")),
+            allowed_identity_resource_ids=tuple(
+                str(value) for value in pc.get("managed_redis_allowed_identity_resource_ids") or []
+            ),
         )
 
     if pair == ("api_gateway", "api_management") or (kind == "api_gateway" and not variant):
@@ -2733,6 +2767,9 @@ def _managed_config_uncredentialed(
                 ),
                 secrets_manager_prefix=str(
                     pc.get("managed_service_secrets_prefix", "astrolift/managed"),
+                ),
+                allowed_option_groups=tuple(
+                    str(value) for value in pc.get("mssql_allowed_option_groups") or []
                 ),
             )
         if kind == "mysql":

@@ -166,3 +166,24 @@ def test_express_rejects_multi_az_before_calling_aws():
     assert not result.ok
     assert "does not support Multi-AZ" in result.message
     assert not rds.creates
+
+
+def test_an_instance_joins_only_an_option_group_the_operator_listed():
+    # An option group can carry the IAM role native backup and restore reads
+    # S3 with, so naming another tenant's restores from its bucket (#2087).
+    subject, rds, sm = driver()
+    listed = RDSSqlServerDriver(
+        config=replace(subject._config, allowed_option_groups=("Platform-Native-Backup",)),
+        rds_client=rds,
+        secrets_client=sm,
+    )
+
+    refused = subject.provision(replace(spec(), config={"option_group": "other-tenant-backup-restore"}))
+    accepted = listed.provision(replace(spec(), config={"option_group": "platform-native-backup"}))
+    moved = listed.update(UpdateSpec(handle=accepted.handle, config={"option_group": "other-tenant-backup-restore"}))
+
+    assert not refused.ok and "mssql_allowed_option_groups" in refused.message
+    assert accepted.ok
+    assert [create["OptionGroupName"] for create in rds.creates] == ["platform-native-backup"]
+    assert not moved.ok and "mssql_allowed_option_groups" in moved.message
+    assert rds.modifies == []

@@ -611,3 +611,31 @@ def test_sql_database_disabled_public_endpoint_requires_private_endpoint_driver(
             kind="mssql",
             variant="azure_sql_database",
         )
+
+
+_LISTED_IDENTITY = (
+    "/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-platform-prod/"
+    "providers/Microsoft.ManagedIdentity/userAssignedIdentities/operator-approved"
+)
+
+
+@pytest.mark.parametrize(
+    ("key", "kind", "variant"),
+    [
+        ("eventgrid_allowed_identity_resource_ids", "event_bus", "event_grid"),
+        ("eventgrid_namespace_allowed_identity_resource_ids", "event_bus", "event_grid_namespace"),
+        ("eventhubs_allowed_identity_resource_ids", "stream", "event_hubs"),
+        ("cosmos_api_allowed_identity_resource_ids", "document_db", "cosmos_nosql"),
+        ("managed_redis_allowed_identity_resource_ids", "redis", "azure_managed_redis"),
+    ],
+)
+def test_managed_configs_carry_the_install_identity_allowlists(key: str, kind: str, variant: str) -> None:
+    """Each driver refuses a config-supplied user-assigned identity outside its
+    list (#2087); an install that sets none refuses every one."""
+    allowed = managed_config_for("azure", _cluster(**{key: [_LISTED_IDENTITY]}), kind=kind, variant=variant)
+    unset = managed_config_for("azure", _cluster(), kind=kind, variant=variant)
+    nulled = managed_config_for("azure", _cluster(**{key: None}), kind=kind, variant=variant)
+
+    assert allowed.allowed_identity_resource_ids == (_LISTED_IDENTITY,)
+    assert unset.allowed_identity_resource_ids == ()
+    assert nulled.allowed_identity_resource_ids == ()

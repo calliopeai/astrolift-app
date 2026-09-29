@@ -95,6 +95,13 @@ _CLOUDFRONT_INVOKE_STATEMENT_ID = "AstroliftFunctionUrlCloudFront"
 # retry so a first-create succeeds without operator intervention (mirrors the
 # kaniko first-build IRSA race, #978).
 _ROLE_PROPAGATION_RETRIES = 6
+# grants became inline policy statements on the execution role the function's
+# code runs as, with whatever actions and resources a config named: any
+# identity at all in the shared account (#2087).
+_GRANTS_REFUSAL = (
+    "faas config grants are no longer supported: the execution role carries basic execution only, "
+    "and a function reaches a managed service through that service's binding"
+)
 _ROLE_PROPAGATION_SLEEP = 5
 
 
@@ -147,6 +154,8 @@ class LambdaDriver(ManagedServiceDriver):
         invalid = self._validate_packaging(cfg)
         if invalid is not None:
             return ProvisionResult(ok=False, handle="", message=invalid, errors=[invalid])
+        if cfg.get("grants"):
+            return ProvisionResult(ok=False, handle="", message=_GRANTS_REFUSAL, errors=[_GRANTS_REFUSAL])
 
         function_name = self._function_name(spec)
         role_name = self._role_name_for(function_name)
@@ -159,11 +168,7 @@ class LambdaDriver(ManagedServiceDriver):
                 return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
 
         try:
-            role_arn = self._ensure_exec_role(
-                role_name=role_name,
-                function_name=function_name,
-                grants=list(cfg.get("grants") or []),
-            )
+            role_arn = self._ensure_exec_role(role_name=role_name, function_name=function_name)
         except Exception as exc:
             return ProvisionResult(ok=False, handle="", message=f"exec-role: {exc}", errors=[str(exc)])
 
@@ -203,11 +208,15 @@ class LambdaDriver(ManagedServiceDriver):
     @driver_op(cloud="aws", driver="faas_lambda")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         _, function_name = parse_handle(spec.handle)
+        if (spec.config or {}).get("grants"):
+            return UpdateResult(ok=False, handle=spec.handle, message=_GRANTS_REFUSAL, errors=[_GRANTS_REFUSAL])
         try:
             # The new code reference (image digest / zip key) and any
-            # env/memory/timeout changes arrive via spec.config. Role is not
-            # changed on update (left as-is).
+            # env/memory/timeout changes arrive via spec.config. The role is
+            # kept, but its policy is re-asserted: one provisioned before
+            # #2087 may still carry statements a config chose.
             self._apply_code_then_config(function_name, spec.config or {}, role_arn=None)
+            self._put_exec_policy(self._role_name_for(function_name), function_name)
         except Exception as exc:
             return UpdateResult(ok=False, handle=spec.handle, message=f"update function: {exc}", errors=[str(exc)])
         return UpdateResult(ok=True, handle=spec.handle, message=f"function {function_name} updated")
@@ -382,11 +391,6 @@ class LambdaDriver(ManagedServiceDriver):
                         "through the distribution, never publicly."
                     ),
                 },
-                "grants": {
-                    "type": "array",
-                    "items": {"type": "object"},
-                    "description": "Bound managed-service IAM grants folded into the execution role.",
-                },
             },
         }
 
@@ -450,7 +454,7 @@ class LambdaDriver(ManagedServiceDriver):
             ],
         }
 
-    def _exec_inline_policy(self, function_name: str, grants: list[dict[str, Any]]) -> dict[str, Any]:
+    def _exec_inline_policy(self, function_name: str) -> dict[str, Any]:
         statements: list[dict[str, Any]] = [
             {
                 "Sid": "AstroliftLambdaBasicExecution",
@@ -463,20 +467,9 @@ class LambdaDriver(ManagedServiceDriver):
                 "Resource": f"arn:aws:logs:{self._config.region}:*:log-group:/aws/lambda/{function_name}:*",
             },
         ]
-        for grant in grants:
-            actions = grant.get("actions") or []
-            resource = grant.get("resource")
-            if actions and resource:
-                statements.append({"Effect": "Allow", "Action": actions, "Resource": resource})
         return {"Version": "2012-10-17", "Statement": statements}
 
-    def _ensure_exec_role(
-        self,
-        *,
-        role_name: str,
-        function_name: str,
-        grants: list[dict[str, Any]],
-    ) -> str:
+    def _ensure_exec_role(self, *, role_name: str, function_name: str) -> str:
         trust = self._service_trust_policy()
         try:
             resp = self._iam.create_role(
@@ -501,15 +494,18 @@ class LambdaDriver(ManagedServiceDriver):
         except Exception as exc:
             raise map_client_error(exc) from exc
 
+        self._put_exec_policy(role_name, function_name)
+        return role_arn
+
+    def _put_exec_policy(self, role_name: str, function_name: str) -> None:
         try:
             self._iam.put_role_policy(
                 RoleName=role_name,
                 PolicyName=_INLINE_POLICY_NAME,
-                PolicyDocument=json.dumps(self._exec_inline_policy(function_name, grants)),
+                PolicyDocument=json.dumps(self._exec_inline_policy(function_name)),
             )
         except Exception as exc:
             raise map_client_error(exc) from exc
-        return role_arn
 
     def _delete_exec_role(self, role_name: str) -> None:
         # Inline policy name is deterministic, so delete by name (no

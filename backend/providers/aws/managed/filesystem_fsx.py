@@ -764,6 +764,15 @@ class FSxDriver(ManagedServiceDriver):
                 return f"{field} must be an object"
             if field in cfg and _contains_plaintext_password(cfg[field]):
                 return f"{field} cannot contain plaintext password fields; use a Secrets Manager reference"
+            # A Lustre data repository path imports from or exports to any S3
+            # path FSx can reach: a restore source the platform never checked,
+            # and a write into a bucket this app does not own (#2087).
+            repository = sorted(_data_repository_fields(cfg.get(field)))
+            if repository:
+                return (
+                    f"{field} cannot set S3 data repository fields ({', '.join(repository)}); "
+                    "restore from a snapshot Astrolift retained for this app instead"
+                )
         for field in ("tls", "read_only", "deletion_protection"):
             if field in cfg and not isinstance(cfg[field], bool):
                 return f"{field} must be a boolean"
@@ -1068,6 +1077,22 @@ def _digest(value: Any) -> str:
 
 def _tag_map(tags: list[dict[str, Any]]) -> dict[str, str]:
     return {str(tag.get("Key") or ""): str(tag.get("Value") or "") for tag in tags}
+
+
+_DATA_REPOSITORY_FIELDS = frozenset({"importpath", "exportpath", "autoimportpolicy"})
+
+
+def _data_repository_fields(value: Any) -> set[str]:
+    found: set[str] = set()
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if str(key).casefold() in _DATA_REPOSITORY_FIELDS:
+                found.add(str(key))
+            found |= _data_repository_fields(nested)
+    elif isinstance(value, list):
+        for item in value:
+            found |= _data_repository_fields(item)
+    return found
 
 
 def _contains_plaintext_password(value: Any) -> bool:

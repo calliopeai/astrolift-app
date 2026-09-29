@@ -792,6 +792,16 @@ class AmazonMQDriver(ManagedServiceDriver):
         broker = cfg.get("broker", {})
         if not isinstance(broker, dict):
             return "broker must be an object"
+        # A cross-region data replication pair makes this broker a replica of
+        # the named primary, whoever owns it (#2087).
+        replication = sorted(
+            key
+            for key, value in broker.items()
+            if str(key).casefold() == "datareplicationprimarybrokerarn"
+            or (str(key).casefold() == "datareplicationmode" and value != "NONE")
+        )
+        if replication:
+            return f"broker cannot set {', '.join(replication)}: a broker replicates no other broker's data from config"
         sensitive_path = _sensitive_native_path(broker)
         if sensitive_path:
             return (

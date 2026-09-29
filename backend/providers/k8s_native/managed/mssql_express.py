@@ -757,7 +757,12 @@ class SQLServerExpressDriver(ManagedServiceDriver):
         tls_secret_name = str(cfg.get("tls_secret_name") or "")
         if tls_secret_name and (len(tls_secret_name) > 63 or not _DNS_LABEL.fullmatch(tls_secret_name)):
             raise ValueError("tls_secret_name must be a Kubernetes DNS label")
-        refuse_shared_namespace_secrets(self._config.namespace, None, extra=[tls_secret_name])
+        # A pull secret is a registry credential like any other Secret (#1959, #2087).
+        refuse_shared_namespace_secrets(
+            self._config.namespace,
+            None,
+            extra=[tls_secret_name, *(str(name) for name in cfg.get("image_pull_secrets") or [])],
+        )
         extra_env = dict(cfg.get("extra_env") or {})
         denied = sorted(_RESERVED_ENV & extra_env.keys())
         if denied:

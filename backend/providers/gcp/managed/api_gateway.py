@@ -30,6 +30,7 @@ from _sdk.managed_service import (
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp._raw_fields import raw_field_conflicts
+from gcp._service_accounts import unlisted_service_account
 from gcp.managed._ownership import (
     is_marked_for,
     is_platform_label_key,
@@ -84,6 +85,9 @@ class APIGatewayConfig:
     deletion_protection_default: bool = True
     operation_timeout_seconds: float = 1800
     poll_interval_seconds: float = 5
+    # Service accounts an API config may have the gateway call backends as.
+    # Empty refuses every one (#2087).
+    allowed_service_accounts: tuple[str, ...] = ()
 
 
 class APIGatewayRestClient:
@@ -622,6 +626,9 @@ class APIGatewayDriver(ManagedServiceDriver):
             return "gRPC API configs require managed_service_configs"
         if cfg.get("openapi_documents") and cfg.get("managed_service_configs"):
             return "managed_service_configs are only valid with grpc_services"
+        account_error = self._unlisted_account_error(cfg.get("gateway_service_account"))
+        if account_error:
+            return account_error
         api_config_ref = str(cfg.get("api_config_ref") or "")
         if api_config_ref:
             expected = f"projects/{self._config.project_id}/locations/global/apis/"
@@ -707,6 +714,11 @@ class APIGatewayDriver(ManagedServiceDriver):
             name = str(cfg["api_config_ref"])
             current = self._api.get(name, params={"view": "FULL"})
             self._assert_owned(current, service_id, "API config", record_proves=False)
+            # A reused config (a restore takes this path) keeps the identity it
+            # was created with, which may predate the install policy.
+            account_error = self._unlisted_account_error(current.get("gatewayServiceAccount"))
+            if account_error:
+                raise APIGatewayError(account_error)
             return name
         body = self._config_body(cfg, labels)
         config_id = str(cfg.get("config_id") or self._derived_config_id(body))
@@ -790,6 +802,15 @@ class APIGatewayDriver(ManagedServiceDriver):
         body.update(dict(cfg.get("api_raw_fields") or {}))
         body["labels"] = _platform_last(labels, _normalized_labels(cfg.get("labels") or {}))
         return body
+
+    def _unlisted_account_error(self, value: Any) -> str:
+        account = unlisted_service_account(value, self._config.allowed_service_accounts)
+        if not account:
+            return ""
+        return (
+            f"gateway_service_account {account!r} is not allowed by the cluster install policy "
+            "api_gateway_allowed_service_accounts"
+        )
 
     def _config_body(self, cfg: dict[str, Any], labels: dict[str, str]) -> dict[str, Any]:
         body: dict[str, Any] = {}

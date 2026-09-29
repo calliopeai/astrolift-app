@@ -432,6 +432,31 @@ def test_snapshot_and_restore_use_cluster_snapshot_lifecycle():
     _validate("RestoreDBClusterFromSnapshot", restore)
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        {"snapshot_identifier": "arn:aws:rds:us-west-2:123456789012:cluster-snapshot:other-tenant-final"},
+        {"replication_source_identifier": "arn:aws:rds:us-east-1:123456789012:cluster:other-tenant-graph"},
+        {"global_cluster_identifier": "other-tenant-global"},
+        {"source_region": "us-east-1", "pre_signed_url": "https://rds.us-east-1.amazonaws.com/?Action=Copy"},
+    ],
+)
+def test_config_cannot_name_a_cluster_or_snapshot_to_copy_data_from(source):
+    # restore() takes only the snapshot the platform retained for this app; a
+    # config that names one itself, or a cluster to replicate or a global
+    # database to join, skipped that check.
+    client = _client()
+    client.describe_db_clusters.return_value = {"DBClusters": []}
+    driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
+
+    result = driver.provision(_spec(config=source))
+
+    assert not result.ok
+    assert "cannot name a cluster or snapshot to copy data from" in result.message
+    client.create_db_cluster.assert_not_called()
+    client.restore_db_cluster_from_snapshot.assert_not_called()
+
+
 def test_schemas_expose_protocol_identity_and_operational_controls():
     driver = NeptuneServerlessDriver(config=_config(serverless=True), neptune_client=_client())
 
@@ -441,11 +466,11 @@ def test_schemas_expose_protocol_identity_and_operational_controls():
         "instance_classes",
         "min_capacity",
         "max_capacity",
-        "global_cluster_identifier",
-        "replication_source_identifier",
         "cloudwatch_log_exports",
         "publicly_accessible",
     } <= properties.keys()
+    # A cluster copies no other cluster's data from config (#2087).
+    assert not {"global_cluster_identifier", "replication_source_identifier", "source_region"} & properties.keys()
     assert {
         "GRAPH_DB_URL",
         "GRAPH_DB_READER_URL",

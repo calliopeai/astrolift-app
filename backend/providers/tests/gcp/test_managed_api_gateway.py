@@ -116,6 +116,10 @@ class FakeGatewayAPI:
         return operation
 
 
+_ALLOWED_ACCOUNT = "gateway@project-1.iam.gserviceaccount.com"
+_FOREIGN_ACCOUNT = "platform-admin@project-1.iam.gserviceaccount.com"
+
+
 @pytest.fixture
 def config() -> APIGatewayConfig:
     return APIGatewayConfig(
@@ -123,6 +127,7 @@ def config() -> APIGatewayConfig:
         region="us-central1",
         operation_timeout_seconds=1,
         poll_interval_seconds=0,
+        allowed_service_accounts=(_ALLOWED_ACCOUNT,),
     )
 
 
@@ -312,6 +317,70 @@ def test_binding_status_snapshot_and_restore_use_active_revision(
     assert restored.ok
     restored_name = "projects/project-1/locations/us-central1/gateways/restored-gateway"
     assert client.resources[restored_name]["apiConfig"] == snapshot.snapshot_id
+
+
+@pytest.mark.parametrize(
+    "account",
+    [_FOREIGN_ACCOUNT, f"projects/-/serviceAccounts/{_FOREIGN_ACCOUNT}", "projects/project-1/accounts/1234567890"],
+)
+def test_a_gateway_cannot_call_backends_as_an_unlisted_account(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+    account: str,
+) -> None:
+    denied = driver.provision(replace(SPEC, config={**_openapi_config(), "gateway_service_account": account}))
+
+    assert not denied.ok and "api_gateway_allowed_service_accounts" in denied.message
+    assert not [call for call in client.calls if call[0] == "create"]
+
+
+def test_update_cannot_move_a_gateway_to_an_unlisted_account(driver: APIGatewayDriver, client: FakeGatewayAPI) -> None:
+    created = driver.provision(replace(SPEC, config=_openapi_config()))
+    assert created.ok, created.message
+    creates = len([call for call in client.calls if call[0] == "create"])
+
+    moved = _openapi_config("openapi: 3.0.0\ninfo:\n  title: Billing v2\n  version: 2.0.0\n")
+    moved.pop("gateway_id")
+    moved["gateway_service_account"] = _FOREIGN_ACCOUNT
+
+    denied = driver.update(UpdateSpec(created.handle, config=moved))
+
+    assert not denied.ok and "api_gateway_allowed_service_accounts" in denied.message
+    assert len([call for call in client.calls if call[0] == "create"]) == creates
+
+
+def test_a_reused_config_keeps_no_identity_the_policy_does_not_list(
+    driver: APIGatewayDriver,
+    client: FakeGatewayAPI,
+) -> None:
+    created = driver.provision(replace(SPEC, config=_openapi_config()))
+    snapshot = driver.snapshot(ServiceHandle(created.handle, managed_service_id=MSID))
+    # A revision created before the policy, still running as an account the
+    # operator never listed.
+    client.resources[snapshot.snapshot_id]["gatewayServiceAccount"] = _FOREIGN_ACCOUNT
+
+    restored = driver.restore(
+        snapshot,
+        replace(SPEC, service_handle_hint="restored", config={"api_id": "billing-api", "gateway_id": "restored"}),
+    )
+
+    assert not restored.ok and "api_gateway_allowed_service_accounts" in restored.message
+    assert "projects/project-1/locations/us-central1/gateways/restored" not in client.resources
+
+
+def test_no_allowlist_refuses_every_config_supplied_account(client: FakeGatewayAPI) -> None:
+    driver = APIGatewayDriver(
+        config=APIGatewayConfig(project_id="project-1", region="us-central1", poll_interval_seconds=0),
+        client=client,
+        sleep=lambda _: None,
+    )
+    without_account = {key: value for key, value in _openapi_config().items() if key != "gateway_service_account"}
+
+    denied = driver.provision(replace(SPEC, config=_openapi_config()))
+    default_identity = driver.provision(replace(SPEC, config=without_account))
+
+    assert not denied.ok and "api_gateway_allowed_service_accounts" in denied.message
+    assert default_identity.ok, default_identity.message
 
 
 def test_collision_is_refused_without_operator_adoption(
