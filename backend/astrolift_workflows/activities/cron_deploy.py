@@ -134,6 +134,7 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
         select_matches,
     )
     from astrolift_workflows.inputs import Actor, DeployAppInput
+    from core.run_trigger import RunTrigger
 
     now = timezone.now()
 
@@ -265,6 +266,7 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
                 trigger_actor_user_id=None,
                 trigger_actor_token_kind="cron",
                 trigger_actor_token_id=None,
+                trigger_kind=RunTrigger.SCHEDULE,
             )
             deployment.workflow_run = run
             deployment.save(update_fields=["workflow_run", "updated_at", "version"])
@@ -342,6 +344,7 @@ def _dispatch_agent_crons_sync() -> AgentCronDispatchSummary:
         select_agent_matches,
     )
     from astrolift_workflows.inputs import Actor, DispatchAgentTaskInput
+    from core.run_trigger import RunTrigger
 
     now = timezone.now()
 
@@ -405,6 +408,7 @@ def _dispatch_agent_crons_sync() -> AgentCronDispatchSummary:
                     agent_definition=workload,
                     status=AgentTask.Status.DRAFT,
                     timeout_seconds=int(workload.tool_timeout_seconds or 300),
+                    trigger_kind=RunTrigger.SCHEDULE,
                 )
             from astrolift_agents.services.task_preparation import (
                 prepare_agent_task,
@@ -550,6 +554,7 @@ def _dispatch_agent_loops_sync() -> LoopDispatchSummary:
         select_loop_dispatches,
     )
     from astrolift_workflows.inputs import Actor, DispatchAgentTaskInput
+    from core.run_trigger import RunTrigger
 
     now = timezone.now()
 
@@ -644,6 +649,8 @@ def _dispatch_agent_loops_sync() -> LoopDispatchSummary:
                     agent_definition=workload,
                     status=AgentTask.Status.DRAFT,
                     timeout_seconds=int(workload.tool_timeout_seconds or 300),
+                    # A loop refill is the platform's own tick, like a cron one.
+                    trigger_kind=RunTrigger.SCHEDULE,
                 )
                 to_start.append((task.pk, str(task.guid)))
 

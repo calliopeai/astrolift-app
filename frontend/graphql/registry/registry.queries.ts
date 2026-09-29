@@ -144,6 +144,11 @@ export const LIST_APPS = gql`
  * (base64-JSON of ``(createdAt, guid)``); the FE treats the value as
  * opaque and just round-trips ``nextCursor`` back through the cursor
  * argument.
+ *
+ * ``filter``, ``sort``, ``page`` and ``pageSize`` are the §5.1 list
+ * contract (#2149): passing any of the last three returns one numbered
+ * page with an exact ``totalCount``. The Apps list sends them
+ * (``appsPageVariables``); the other callers keep the cursor walk.
  */
 export const LIST_APPS_PAGE = gql`
   ${APP_FIELDS}
@@ -158,6 +163,11 @@ export const LIST_APPS_PAGE = gql`
     $sortBy: AppsListSortKey = CREATED_DESC
     $cursor: String
     $limit: Int = 50
+    $includeArchived: Boolean = false
+    $filter: AstroliftAppsListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
   ) {
     astroliftAppsPage(
       includeFreshness: $includeFreshness
@@ -169,13 +179,65 @@ export const LIST_APPS_PAGE = gql`
       sortBy: $sortBy
       cursor: $cursor
       limit: $limit
+      includeArchived: $includeArchived
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
     ) {
       items {
         ...AppFields
         ...AppFreshnessFields
+        topologyKind
+        clusterSlugs
       }
       nextCursor
       totalCount
+      page
+      pageSize
+    }
+  }
+`;
+
+/**
+ * ``LIST_APPS_PAGE`` narrowed to the apps the viewer's own RoleBindings
+ * reach (app, project, team or org scope). The Apps list's Mine view.
+ */
+export const LIST_MY_APPS_PAGE = gql`
+  ${APP_FIELDS}
+  ${APP_FRESHNESS_FIELDS}
+  query ListMyAppsPage(
+    $includeFreshness: Boolean = false
+    $search: String
+    $cursor: String
+    $limit: Int = 50
+    $includeArchived: Boolean = false
+    $filter: AstroliftAppsListFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftMyAppsPage(
+      includeFreshness: $includeFreshness
+      search: $search
+      cursor: $cursor
+      limit: $limit
+      includeArchived: $includeArchived
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        ...AppFields
+        ...AppFreshnessFields
+        topologyKind
+        clusterSlugs
+      }
+      nextCursor
+      totalCount
+      page
+      pageSize
     }
   }
 `;
@@ -263,9 +325,11 @@ export const LIST_WORKLOADS = gql`
  *
  * ``appSlug`` stays optional — omitted, the field pages every workload in
  * the org, which is what the fleet-wide surfaces want; passed, it scopes
- * to one app. ``search`` is the only other filter and there is no sort
- * argument, so a table over it declares no ``sortVariable`` and no
- * ``Column.sortKey``.
+ * to one app. ``kinds``, ``filter`` (kind, isPublic, app, owner), ``sort``
+ * and ``page``/``pageSize`` are the §5.1 list contract (#2155): passing
+ * any of the last three returns one numbered page with an exact
+ * ``totalCount``; without them the cursor walk runs, the filter applied
+ * first.
  *
  * ``$limit: Int`` is nullable against the schema's ``limit: Int! = 50``:
  * the argument's default is what makes that legal, and the controller
@@ -297,13 +361,35 @@ const WORKLOAD_FIELDS = gql`
 
 export const LIST_WORKLOADS_PAGE = gql`
   ${WORKLOAD_FIELDS}
-  query ListWorkloadsPage($appSlug: String, $search: String, $limit: Int, $after: String) {
-    astroliftWorkloadsPage(appSlug: $appSlug, search: $search, limit: $limit, after: $after) {
+  query ListWorkloadsPage(
+    $appSlug: String
+    $search: String
+    $limit: Int
+    $after: String
+    $kinds: [String!]
+    $filter: AstroliftWorkloadsFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    astroliftWorkloadsPage(
+      appSlug: $appSlug
+      search: $search
+      limit: $limit
+      after: $after
+      kinds: $kinds
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
       items {
         ...WorkloadFields
       }
       nextCursor
       totalCount
+      page
+      pageSize
     }
   }
 `;
@@ -541,6 +627,51 @@ export const GET_APP_DOCTOR = gql`
         status
         detail
         fix
+      }
+    }
+  }
+`;
+
+// Who may enter the app behind central auth (#2132).
+export const GET_APP_ACCESS = gql`
+  query GetAppAccess($appSlug: String!) {
+    astroliftAppAccess(appSlug: $appSlug) {
+      appSlug
+      groups
+      users
+      restricted
+      managedByManifest
+      enforcedOn
+    }
+  }
+`;
+
+export const PREVIEW_APP_ACCESS = gql`
+  query PreviewAppAccess($appSlug: String!, $groups: [String!]!, $users: [String!]!) {
+    astroliftAppAccessPreview(appSlug: $appSlug, groups: $groups, users: $users) {
+      allowed
+      total
+      losing
+    }
+  }
+`;
+
+export const SET_APP_ACCESS = gql`
+  mutation SetAppAccess($input: SetAppAccessInput!) {
+    setAppAccess(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        appSlug
+        groups
+        users
+        restricted
+        managedByManifest
+        enforcedOn
       }
     }
   }

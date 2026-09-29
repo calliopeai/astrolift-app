@@ -8,6 +8,8 @@ without any platform context.
 
 from __future__ import annotations
 
+import pytest
+
 # ---- _merge_helm_values --------------------------------------------------
 
 
@@ -867,7 +869,9 @@ def _chart_component(key, *, chart="thechart", repo="https://charts.example/", v
     )
 
 
-def _run_install_sync(monkeypatch, components, driver, selected_keys, overrides=None):  # noqa: ANN001
+def _run_install_sync(  # noqa: ANN001
+    monkeypatch, components, driver, selected_keys, overrides=None, additive=False, recipe_before=frozenset()
+):
     """Drive ``_install_cluster_prereqs_sync`` with the DB row, dispatch, driver,
     and context all mocked, returning its result dict. The IRSA-provision helpers
     short-circuit because none of the test component keys are the AWS controller
@@ -894,8 +898,11 @@ def _run_install_sync(monkeypatch, components, driver, selected_keys, overrides=
     monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)  # noqa: ARG005
     monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: fake_ctx)  # noqa: ARG005
     monkeypatch.setattr(cm, "bootstrap_components_dispatch", lambda cluster: components)  # noqa: ARG005
+    import astrolift_clusters.recipe_detection as rd
 
-    return _install_cluster_prereqs_sync(1, list(selected_keys), overrides or {})
+    monkeypatch.setattr(rd, "components_installed_by_recipe", lambda cluster: set(recipe_before))  # noqa: ARG005
+
+    return _install_cluster_prereqs_sync(1, list(selected_keys), overrides or {}, additive)
 
 
 def test_install_sync_chartless_with_post_install_applies_no_helmrelease(monkeypatch):
@@ -977,3 +984,140 @@ def test_install_sync_mixed_chartbased_and_chartless_pi(monkeypatch):
     assert ("Namespace", "pi-ns") in driver.applied_refs
     assert {"name": "chartbased", "version": "1.0.0"} in result["applied"]
     assert {"name": "chartless-pi", "version": ""} in result["applied"]
+
+
+# ---- additive runs (#2130) ----------------------------------------------
+
+
+def test_a_normal_run_deletes_the_releases_it_did_not_select(monkeypatch):
+    """The baseline an additive run departs from: deselected means removed."""
+    driver = _FakeDriver()
+
+    _run_install_sync(monkeypatch, [_chart_component("edge"), _chart_component("other")], driver, {"edge"})
+
+    deleted = {m["metadata"]["name"] for _slug, _ns, manifests in driver.deletes for m in manifests}
+    assert "astrolift-other" in deleted
+
+
+def test_an_additive_run_applies_its_selection_and_deletes_nothing(monkeypatch):
+    """The control plane's own edge install selects only the edge. Were it a
+    normal run, it would delete every other release the operator installed."""
+    driver = _FakeDriver()
+
+    result = _run_install_sync(
+        monkeypatch,
+        [_chart_component("edge"), _chart_component("other")],
+        driver,
+        {"edge"},
+        additive=True,
+    )
+
+    assert driver.deletes == []
+    assert result["deleted"] == []
+    assert ("HelmRelease", "astrolift-edge") in driver.applied_refs
+    assert ("HelmRelease", "astrolift-other") not in driver.applied_refs
+
+
+def _probe_reports(monkeypatch, capabilities):  # noqa: ANN001
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "probe_cluster_capabilities_dispatch", lambda cluster: capabilities)  # noqa: ARG005
+
+
+def _edge_recipe():
+    return [
+        _chart_component("envoy-gateway"),
+        _chart_component("aws-load-balancer-controller"),
+        _chart_component("external-dns"),
+        _chart_component("cert-manager"),
+    ]
+
+
+def test_an_additive_edge_run_brings_the_controllers_a_fresh_cluster_lacks(monkeypatch):
+    """A cluster straight from the installer runs no ALB controller and no
+    external-dns, and the edge's Gateway would sit behind no load balancer."""
+    _probe_reports(monkeypatch, {"installed_crds": [], "external_dns": {"installed": False}})
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"}, additive=True)
+
+    assert {a["name"] for a in result["applied"]} == {
+        "envoy-gateway",
+        "aws-load-balancer-controller",
+        "external-dns",
+    }
+    assert driver.deletes == []
+
+
+def test_an_additive_edge_run_never_duplicates_a_controller_already_running(monkeypatch):
+    """CONFLICT's shape: both controllers hand-installed into kube-system."""
+    _probe_reports(
+        monkeypatch,
+        {
+            "installed_crds": ["targetgroupbindings.elbv2.k8s.aws"],
+            "external_dns": {"installed": True, "provider": None},
+        },
+    )
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"}, additive=True)
+
+    assert [a["name"] for a in result["applied"]] == ["envoy-gateway"]
+
+
+def test_a_failed_probe_stops_the_additive_edge_run(monkeypatch):
+    """Guessing "absent" would install a second controller over a hand-installed one."""
+    import core.cluster_management as cm
+
+    def _boom(cluster):  # noqa: ANN001, ARG001
+        raise ConnectionError("apiserver unreachable")
+
+    monkeypatch.setattr(cm, "probe_cluster_capabilities_dispatch", _boom)
+    driver = _FakeDriver()
+
+    with pytest.raises(ConnectionError):
+        _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"}, additive=True)
+    assert driver.calls == []
+
+
+def test_an_operator_run_never_probes_or_adds_controllers(monkeypatch):
+    import core.cluster_management as cm
+
+    monkeypatch.setattr(cm, "probe_cluster_capabilities_dispatch", lambda cluster: pytest.fail("probed"))  # noqa: ARG005
+    driver = _FakeDriver()
+
+    result = _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"})
+
+    assert [a["name"] for a in result["applied"]] == ["envoy-gateway"]
+
+
+def test_an_additive_run_records_the_whole_recipe_not_just_its_own_releases(monkeypatch):
+    """Recording only the edge would make the next operator run read the rest
+    of the recipe as foreign, leave it unchecked, and delete it."""
+    _probe_reports(
+        monkeypatch,
+        {"installed_crds": ["targetgroupbindings.elbv2.k8s.aws"], "external_dns": {"installed": True}},
+    )
+    driver = _FakeDriver()
+
+    result = _run_install_sync(
+        monkeypatch,
+        _edge_recipe(),
+        driver,
+        {"envoy-gateway"},
+        additive=True,
+        recipe_before={"cert-manager", "external-dns"},
+    )
+
+    assert [a["name"] for a in result["applied"]] == ["envoy-gateway"]
+    assert {r["name"] for r in result["recorded"]} == {"envoy-gateway", "cert-manager", "external-dns"}
+
+
+def test_an_operator_run_records_what_it_applied(monkeypatch):
+    driver = _FakeDriver()
+
+    result = _run_install_sync(
+        monkeypatch, _edge_recipe(), driver, {"cert-manager"}, recipe_before={"external-dns"}
+    )
+
+    assert result["recorded"] == result["applied"]

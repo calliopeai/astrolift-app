@@ -1,23 +1,31 @@
+import { redirect } from "next/navigation";
+
 import { TasksClient } from "./tasks-client";
 
-export const metadata = { title: "Tasks · Astrolift" };
+export const metadata = { title: "Runs · Astrolift" };
+
+/** The old /tasks tabs, and where each went. */
+const FORMER_TABS: Record<string, string> = {
+  templates: "/tasks/templates",
+  recent: "/tasks?kind=task",
+  history: "/tasks?kind=task",
+  logs: "/tasks?kind=task",
+};
 
 /**
- * Tasks — one-off container task execution.
- *
- * Tasks are the third execution primitive after Jobs (scheduled/recurring)
- * and Deployments (long-running services). A Task is a single container run
- * with a defined command: database migrations, seed scripts, data exports,
- * manual interventions — anything that runs once and exits.
- *
- * Maps to Kubernetes `batch/v1 Job` with `completions=1`. Distinct from
- * CronJobs (recurring) and Deployments (persistent replicas).
- *
- * No `PreloadQuery`: both tables walk a cursor whose first request carries
- * `limit` plus a filter the controller owns, so a variable-less preload of
- * the deprecated flat list was a guaranteed cache miss — an SSR round trip
- * *and* the client fetch. DataTable's skeleton covers the first paint.
+ * Agents › Runs (spec 44 §4.1): every agent run, workflow run and container
+ * task run in one list. The task templates moved to /tasks/templates; an old
+ * `?tab=` link lands where its tab went. No `PreloadQuery`: the list merges
+ * source queries whose variables follow the chips and the viewer's modules,
+ * so a server preload could not name the cache entries the client reads.
  */
-export default function TasksPage() {
+export default async function TasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { tab } = await searchParams;
+  const former = typeof tab === "string" ? FORMER_TABS[tab] : undefined;
+  if (former) redirect(former);
   return <TasksClient />;
 }

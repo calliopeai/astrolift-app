@@ -57,6 +57,10 @@ class TenantContextMiddleware(MiddlewareMixin):
     def process_request(self, request):
         from astrolift_identity.api_tokens import token_matches_organization
 
+        # Never inherit a previous request's ABAC attributes or policy cache
+        # on a reused worker thread, even on the early-return paths below.
+        _clear_request_attributes()
+
         api_token = getattr(request, "_api_token", None)
         if api_token is not None and not token_matches_organization(
             api_token, request.META.get(ORG_HEADER, "")
@@ -81,13 +85,20 @@ class TenantContextMiddleware(MiddlewareMixin):
         )
         request.astrolift_tenant = ctx
         set_current_tenant(ctx)
+        # The request attributes ABAC conditions read (client IP, session
+        # age and factors), and the per-request policy cache (#2157).
+        from astrolift_identity.abac import attributes_from_request, set_request_attributes
+
+        set_request_attributes(attributes_from_request(request, actor_user_id))
 
     def process_response(self, request, response):
         clear_current_tenant()
+        _clear_request_attributes()
         return response
 
     def process_exception(self, request, exception):
         clear_current_tenant()
+        _clear_request_attributes()
         return None
 
     # --- resolution helpers ---------------------------------------
@@ -180,6 +191,12 @@ class TenantContextMiddleware(MiddlewareMixin):
             return Organization.objects.values_list("pk", flat=True).get(guid=raw)
         except Organization.DoesNotExist:
             return None
+
+
+def _clear_request_attributes() -> None:
+    from astrolift_identity.abac import clear_request_attributes
+
+    clear_request_attributes()
 
 
 def _resolve_single_membership_org(request) -> int | None:

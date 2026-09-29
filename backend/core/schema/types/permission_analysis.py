@@ -134,12 +134,19 @@ def _active_bindings(user, organization_id: int | None) -> list:
 
 
 def _binding_label(binding) -> str:
-    return f"{binding.role.slug}@{binding.scope_kind}:{binding.scope_id}"
+    label = getattr(binding, "label", None)
+    return label if isinstance(label, str) else f"{binding.role.slug}@{binding.scope_kind}:{binding.scope_id}"
 
 
 def _held_slugs(user, organization_id: int | None) -> dict[str, list[str]]:
-    """Slug -> the bindings that carry it, for one user in one org."""
+    """Slug -> the grants that carry it, for one user in one org.
 
+    Grants are user bindings, group bindings and group mappings (#2157);
+    a slug a policy denies everywhere in the org is left out, as the
+    resolver leaves it out of "held anywhere" answers.
+    """
+
+    from astrolift_identity.permission_resolver import _denied_everywhere
     from core.permissions import Permission
 
     if getattr(user, "is_superuser", False) and getattr(user, "is_active", True):
@@ -148,25 +155,78 @@ def _held_slugs(user, organization_id: int | None) -> dict[str, list[str]]:
     for binding in _active_bindings(user, organization_id):
         for slug in binding.role.permissions or ():
             out.setdefault(slug, []).append(_binding_label(binding))
+    if organization_id is not None and out:
+        for slug in _denied_everywhere(_tenant_for(user, organization_id), list(out)):
+            out.pop(slug, None)
     return out
 
 
-def _require_self_or_superuser(info: Info, target_pk: int | str | None) -> None:
-    """Permission analysis MUST be either self-service or superuser.
+def _is_org_manager(organization_id: int | None) -> bool:
+    """Whether the caller holds org.manage_members in the active org,
+    through the real gate (bearer ceiling and policies included)."""
+
+    from core.permissions import Permission, PermissionDenied, check_permission
+
+    if organization_id is None:
+        return False
+    try:
+        check_permission(Permission.ORG_MANAGE_MEMBERS)
+    except PermissionDenied:
+        return False
+    return True
+
+
+def _is_org_member(user_pk, organization_id: int | None) -> bool:
+    from astrolift_identity.models import Member
+
+    if organization_id is None:
+        return False
+    return Member.objects.filter(user_id=user_pk, scope_kind="ORG", scope_id=organization_id).exists()
+
+
+def _require_analysis_access(info: Info, *target_pks) -> bool:
+    """Permission analysis is self-service, superuser, or org.manage_members.
 
     #537 (tenant-isolation sweep): the prior implementation accepted any
     ``user_id`` from an unauthenticated caller and returned that user's
     full effective permission set, which is a cross-tenant role leak.
-    Gate on self-or-superuser at every resolver entry.
+    #2157 opens it to org.manage_members, still scoped to the org: every
+    target has to be a member of the active org, or the answer is empty,
+    so a manager learns nothing about anyone outside it.
+
+    Returns whether every target may be answered for; raises when the
+    caller may not ask at all.
     """
     caller = info.context.user
     if not getattr(caller, "is_authenticated", False):
         raise GraphQLError("Authentication required")
     if getattr(caller, "is_superuser", False):
-        return
-    if target_pk is not None and str(target_pk) == str(caller.pk):
-        return
-    raise GraphQLError("Permission analysis is restricted to self or superuser")
+        return True
+    if target_pks and all(pk is not None and str(pk) == str(caller.pk) for pk in target_pks):
+        return True
+    org_id = _caller_org_id()
+    if not _is_org_manager(org_id):
+        raise GraphQLError(
+            "Permission analysis is restricted to self or superuser, or to org.manage_members in the org"
+        )
+    return all(_is_org_member(pk, org_id) for pk in target_pks)
+
+
+def _target_scope(scope_type: str | None, scope_id: str | None, organization_id: int | None):
+    """``(PermissionScope | None, label, ok)`` for an optional target scope."""
+
+    from astrolift_identity.access import resolve_target
+    from core.permissions import PermissionScope, ScopeKind
+
+    if not scope_type and not scope_id:
+        return None, "", True
+    target = resolve_target(scope_type, scope_id, organization_id)
+    if target is None:
+        return None, f"{(scope_type or '').upper()} {scope_id} is not a scope of this organization", False
+    label = f"{target.kind}:{target.guid}"
+    if target.requested_kind == "AGENT":
+        label = f"AGENT {scope_id} on {label}"
+    return PermissionScope(kind=ScopeKind(target.kind), id=target.pk), label, True
 
 
 @strawberry.type
@@ -180,7 +240,8 @@ class PermissionAnalysisQuery:
         from core.schema.common import GlobalIDUtils
 
         pk = GlobalIDUtils.get_pk_flexible(user_id)
-        _require_self_or_superuser(info, pk)
+        if not _require_analysis_access(info, pk):
+            return []
         user = User.objects.filter(pk=pk).first()
         if not user:
             return []
@@ -199,16 +260,28 @@ class PermissionAnalysisQuery:
             )
         return entries
 
-    @strawberry.field(description="Diagnose why a user can or can't perform a specific permission.")
+    @strawberry.field(
+        description=(
+            "Diagnose why a user can or can't perform a specific permission, optionally on a target "
+            "scope (scopeType ORG, TEAM, PROJECT, APP or AGENT; scopeId its guid). Self, superuser "
+            "or org.manage_members; the user must be a member of the active organization."
+        )
+    )
     def permission_diagnose(
-        self, info: Info, user_id: strawberry.ID, permission: str
+        self,
+        info: Info,
+        user_id: strawberry.ID,
+        permission: str,
+        scope_type: str | None = None,
+        scope_id: str | None = None,
     ) -> PermissionDiagnosis | None:
-        from astrolift_identity.permission_resolver import resolve
+        from astrolift_identity.permission_resolver import decide
         from core.permissions import Permission
         from core.schema.common import GlobalIDUtils
 
         pk = GlobalIDUtils.get_pk_flexible(user_id)
-        _require_self_or_superuser(info, pk)
+        if not _require_analysis_access(info, pk):
+            return None
         user = User.objects.filter(pk=pk).first()
         if not user:
             return None
@@ -268,6 +341,28 @@ class PermissionAnalysisQuery:
             else "No active organization in this request — every scope resolves empty",
         )
 
+        target, target_label, target_ok = _target_scope(scope_type, scope_id, org_id)
+        if scope_type or scope_id:
+            step(
+                "target_scope",
+                target_ok,
+                f"Checked on {target_label}" if target_ok else target_label,
+            )
+            if not target_ok:
+                return finish(False)
+
+        tenant = _tenant_for(user, org_id)
+        from astrolift_identity.permission_resolver import actor_groups
+
+        groups = sorted(actor_groups(tenant)) if org_id is not None else []
+        step(
+            "idp_groups",
+            bool(groups),
+            "IdP groups at last sign-in: " + ", ".join(groups)
+            if groups
+            else "No IdP groups recorded for this user in this org",
+        )
+
         bindings = _active_bindings(user, org_id)
         labels = [_binding_label(b) for b in bindings]
         step(
@@ -287,8 +382,43 @@ class PermissionAnalysisQuery:
         # that can disagree with the thing it explains is worse than none.
         if not slug_known:
             return finish(False)
-        granted, reason = resolve(_tenant_for(user, org_id), Permission(permission), None)
-        if not granted and carriers:
+        decision = decide(tenant, Permission(permission), target)
+
+        if decision.chain and decision.chain[0][0] == "APP":
+            share_labels = [s.label for s in decision.shares]
+            carrying = [s.label for s in decision.shares if permission in _share_perms(s)]
+            step(
+                "team_shares",
+                bool(carrying),
+                (
+                    "Through team shares: " + ", ".join(carrying)
+                    if carrying
+                    else (
+                        "Team shares reach this app but none carries it: " + ", ".join(share_labels)
+                        if share_labels
+                        else "No team share on this app reaches this user"
+                    )
+                ),
+            )
+
+        step(
+            "rbac",
+            decision.rbac_granted,
+            decision.reason if not decision.rbac_granted else f"granted by {decision.reason}",
+        )
+        if decision.abac is None:
+            step("abac_policies", True, "not evaluated: RBAC did not grant it")
+        else:
+            applied = decision.abac.applied
+            detail = (
+                decision.abac.reason
+                if decision.abac.denied
+                else ("; ".join(o.detail for o in applied) if applied else "no policy of this org applies")
+            )
+            step("abac_policies", not decision.abac.denied, detail)
+
+        reason = decision.reason
+        if not decision.granted and carriers and target is None and not decision.rbac_granted:
             # The #1717 shape, and the one most worth naming: she does
             # hold it, at a scope this check did not ask about. An
             # unqualified check resolves against the tenant context, and
@@ -302,33 +432,60 @@ class PermissionAnalysisQuery:
                 f"names its target passes that scope; a collection resolver gates on "
                 f"holding the permission at any scope and filters its rows."
             )
-        step("resolver_verdict", granted, reason)
-        return finish(granted)
+        step("resolver_verdict", decision.granted, reason)
+        return finish(decision.granted)
 
-    @strawberry.field(description="Compare effective permissions between two users.")
+    @strawberry.field(
+        description=(
+            "Compare effective permissions between two users, anywhere in the active organization or "
+            "on a target scope (scopeType, scopeId). Superuser or org.manage_members; both users must "
+            "be members of the active organization."
+        )
+    )
     def permission_compare(
-        self, info: Info, user_id_a: strawberry.ID, user_id_b: strawberry.ID
+        self,
+        info: Info,
+        user_id_a: strawberry.ID,
+        user_id_b: strawberry.ID,
+        scope_type: str | None = None,
+        scope_id: str | None = None,
     ) -> PermissionComparison | None:
-        # #537: compare is meaningful across two arbitrary users — only
-        # superusers may run it.
+        # #537: compare is meaningful across two arbitrary users, so it is
+        # never self-service. #2157: an org.manage_members holder may run it
+        # for two members of the org.
         caller = info.context.user
         if not getattr(caller, "is_authenticated", False):
             raise GraphQLError("Authentication required")
-        if not getattr(caller, "is_superuser", False):
-            raise GraphQLError("permission_compare is restricted to superuser")
 
         from core.schema.common import GlobalIDUtils
 
         pk_a = GlobalIDUtils.get_pk_flexible(user_id_a)
         pk_b = GlobalIDUtils.get_pk_flexible(user_id_b)
+        org_id = _caller_org_id()
+        if not getattr(caller, "is_superuser", False):
+            if not _is_org_manager(org_id):
+                raise GraphQLError("permission_compare is restricted to superuser or org.manage_members")
+            if not (_is_org_member(pk_a, org_id) and _is_org_member(pk_b, org_id)):
+                return None
+        # tenancy: both users were confirmed members of the caller's org
+        # above (or the caller is the platform operator); User has no org.
         user_a = User.objects.filter(pk=pk_a).first()
         user_b = User.objects.filter(pk=pk_b).first()
         if not user_a or not user_b:
             return None
 
-        org_id = _caller_org_id()
-        perms_a = set(_held_slugs(user_a, org_id))
-        perms_b = set(_held_slugs(user_b, org_id))
+        target, _label, target_ok = _target_scope(scope_type, scope_id, org_id)
+        if not target_ok:
+            return None
+        if target is None:
+            perms_a = set(_held_slugs(user_a, org_id))
+            perms_b = set(_held_slugs(user_b, org_id))
+        else:
+            from astrolift_identity.permission_resolver import resolve_effective_permissions
+
+            extra = (target.kind.value, target.id)
+            perms_a = resolve_effective_permissions(_tenant_for(user_a, org_id), extra_scope=extra)
+            perms_b = resolve_effective_permissions(_tenant_for(user_b, org_id), extra_scope=extra)
 
         only_a = sorted(perms_a - perms_b)
         only_b = sorted(perms_b - perms_a)
@@ -346,3 +503,9 @@ class PermissionAnalysisQuery:
             shared=shared,
             differences=differences,
         )
+
+
+def _share_perms(share) -> set[str]:
+    from astrolift_identity.permission_resolver import _share_permissions
+
+    return _share_permissions(share)

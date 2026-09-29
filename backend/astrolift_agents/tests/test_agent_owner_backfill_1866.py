@@ -1,4 +1,4 @@
-"""Migration 0037 backfills spec and box owners where one is provable (#1866).
+"""Migration 0039 backfills spec and box owners where one is provable (#1866).
 
 Runs the migration's own function against the historical model state, as the
 #1919 backfill test does, rather than a full ``migrate`` round trip.
@@ -19,7 +19,7 @@ from core.tests.utils.scope_world import ScopeWorld
 
 pytestmark = pytest.mark.django_db
 
-NAME = "0037_backfill_agent_spec_and_box_owner"
+NAME = "0039_backfill_agent_spec_and_box_owner"
 
 
 def _backfill():

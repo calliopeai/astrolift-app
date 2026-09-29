@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -121,10 +120,17 @@ def wayfinding_ask(request: HttpRequest) -> JsonResponse:
             }
         )
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        log.warning("wayfinding: ANTHROPIC_API_KEY not set")
-        return JsonResponse({"error": "wayfinding not configured"}, status=503)
+    from astrolift_agents.services.platform_model import PlatformModelError, complete, resolve
+
+    # The install's own cloud model by default, no key needed; an operator can
+    # turn it off with ASTROLIFT_PLATFORM_MODEL_PROVIDER=off.
+    model, reason = resolve()
+    if model is None:
+        log.warning("wayfinding: no platform model: %s", reason)
+        off = reason.startswith("turned off")
+        return JsonResponse(
+            {"error": "wayfinding off" if off else "wayfinding not configured", "reason": reason}, status=503
+        )
 
     # Documentation is not entitlement-filtered: every /documentation route
     # is unscoped, so the pages are readable by anyone who can sign in. What
@@ -136,16 +142,9 @@ def wayfinding_ask(request: HttpRequest) -> JsonResponse:
         f"Question: {question}"
     )
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        answer = message.content[0].text
-    except Exception as exc:
-        log.exception("wayfinding: Anthropic call failed: %s", exc)
+        answer = complete(model, system=_SYSTEM_PROMPT, prompt=prompt, max_tokens=1024)
+    except PlatformModelError as exc:
+        log.exception("wayfinding: model call failed: %s", exc)
         return JsonResponse({"error": "wayfinding request failed"}, status=502)
 
     # Cited routes are recovered from the answer and intersected with what

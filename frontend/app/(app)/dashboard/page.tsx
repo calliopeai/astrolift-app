@@ -1,9 +1,9 @@
-import { DashboardClient } from "./dashboard-client";
+import { HomeClient } from "./home-client";
 
 export const metadata = {
-  title: "Overview · Astrolift",
+  title: "Home · Astrolift",
 };
 
 export default function DashboardPage() {
-  return <DashboardClient />;
+  return <HomeClient />;
 }

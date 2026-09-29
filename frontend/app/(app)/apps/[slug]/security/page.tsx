@@ -1,22 +1,18 @@
-import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
-import { GET_APP } from "@/graphql/registry/registry.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { AppSecurityClient } from "./security-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export const metadata = { title: "Security · App · Astrolift" };
-
-export default async function AppSecurityPage({
+/**
+ * Security scans are Access › Security scans now (spec 44 §5.2). The old URL
+ * keeps resolving, with whatever query it carried.
+ */
+export default async function AppSecurityRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <PreloadQuery query={LIST_EVENTS} variables={{ limit: 100 }}>
-        <AppSecurityClient slug={slug} />
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "access", "security", await searchParams));
 }

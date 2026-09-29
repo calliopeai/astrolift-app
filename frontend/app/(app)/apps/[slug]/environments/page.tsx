@@ -1,24 +1,18 @@
-import { PreloadQuery } from "@/lib/apollo";
-import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { redirect } from "next/navigation";
 
-import { EnvironmentsClient } from "@/app/(app)/environments/environments-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-import { AppTabs } from "../components/app-tabs";
-
-export const metadata = { title: "Environments · App · Astrolift" };
-
-export default async function AppEnvironmentsPage({
+/**
+ * Environments are Settings › Environments now (spec 44 §5.2). The old URL
+ * keeps resolving, with whatever query it carried.
+ */
+export default async function AppEnvironmentsRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: slug }}>
-      <EnvironmentsClient
-        appSlug={slug}
-        tabs={<AppTabs slug={slug} active="deployments" />}
-      />
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "settings", "environments", await searchParams));
 }

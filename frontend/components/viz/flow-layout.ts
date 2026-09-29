@@ -20,7 +20,7 @@ interface RankEdge {
 export function rankLayout(
   nodeIds: string[],
   edges: RankEdge[],
-  { colWidth = 240, rowHeight = 96 }: RankLayoutOptions = {},
+  { colWidth = 240, rowHeight = 96 }: RankLayoutOptions = {}
 ): Map<string, { x: number; y: number }> {
   const ids = new Set(nodeIds);
   const preds = new Map<string, string[]>();

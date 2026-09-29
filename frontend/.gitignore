@@ -50,3 +50,10 @@ next-env.d.ts
 # IDE
 .idea/
 .vscode/
+
+# Storybook build output
+/storybook-static
+
+# Playwright layout test output
+/test-results
+/playwright-report

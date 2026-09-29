@@ -227,6 +227,15 @@ class OrganizationMutations:
                 )
         if input.appearance_locked is not None:
             org.appearance_locked = bool(input.appearance_locked)
+        if input.restricted_settings_default is not None:
+            from astrolift_identity.ui_preferences import UiPreferenceError, validate_restricted_settings
+
+            try:
+                org.restricted_settings_default = validate_restricted_settings(
+                    input.restricted_settings_default, field="restrictedSettingsDefault"
+                )
+            except UiPreferenceError as exc:
+                return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
         org.save()
         return gql_success(organization_to_type(org))
 

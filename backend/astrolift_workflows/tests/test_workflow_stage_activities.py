@@ -349,6 +349,7 @@ def test_nested_stage_resolves_child_and_creates_linked_run(org, agent_workload)
     assert child_run.parent_stage_execution_id == int(execution_id)
     assert child_run.workflow_definition == child
     assert child_run.nesting_depth == 1
+    assert child_run.trigger_kind == "parent"  # (#2152)
     # Activity retry is idempotent because one parent execution owns one child.
     repeated = _create_nested_workflow_run_sync(
         str(parent_run.pk),
@@ -824,6 +825,9 @@ def test_dispatch_links_agent_task_to_agent_run(run, definition):
     agent_run, task = _dispatch_agent_stage(run, definition, 0)
 
     assert task.agent_run_id == agent_run.pk
+    # A stage started it, for whoever started the run (#2152).
+    assert task.trigger_kind == "parent"
+    assert task.triggered_by_user_id == run.trigger_actor_user_id
     # Reverse OneToOne accessor resolves back to the same task.
     assert agent_run.agent_task == task
 

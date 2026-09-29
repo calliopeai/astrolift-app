@@ -100,7 +100,9 @@ ALLOWED: dict[str, str] = {
     "Query.astroliftMyAppsPage": "self-service: the apps the caller's own bindings reach, paginated",
     "Query.assignableAstroliftProjects": "self-service: the projects the caller's own bindings let them assign apps to",
     "Query.astroliftMyConnectedAccounts": "self-service: the caller's own per-user source connections",
+    "Query.astroliftMyUiPreferences": "self-service: the caller's own UI preferences plus the active org's one default",
     "Mutation.updateMyProfile": "self-service: edits the caller's own profile",
+    "Mutation.updateMyUiPreferences": "self-service: saves the caller's own UI preferences, keyed on the viewer",
     "Mutation.generateInstallEnrollmentQr": "self-service: enrolls the caller's own mobile device",
     "Mutation.logoutAllSessions": "self-service: revokes the caller's own sessions",
     "Mutation.heartbeatSession": "self-service: the caller's own session liveness ping",
@@ -132,6 +134,10 @@ ALLOWED: dict[str, str] = {
     "Mutation.terminateWorkflowInstance": "workflow.trigger at the run's own app, project or org, or the operator (#1965)",
     "Mutation.signalWorkflowInstance": "workflow.trigger at the run's own app, project or org, or the operator (#1965)",
     "Mutation.submitForm": "a public form takes anonymous submissions; a private one checks form.submit in the body",
+    "Query.astroliftRunAudit": (
+        "each run kind is read under its own permission and narrowed to the caller's scopes in "
+        "run_audit_page, which refuses a caller with no run read at all"
+    ),
     "Mutation.revokeAstroliftSession": (
         "own session: self-service; another user's: org.manage_members at the explicit org scope, in the body"
     ),
@@ -243,6 +249,18 @@ GAPS: dict[str, tuple[str, ...]] = {
         "Mutation.setActiveIdentityProvider",
         "Mutation.softDeleteIdentityProvider",
         "Mutation.markOnboardingComplete",
+        "Query.astroliftRole",
+        "Query.astroliftPolicy",
+        "Query.astroliftGroupRoleMappingsPage",
+        "Query.astroliftAccessOn",
+        "Query.astroliftPrincipalSearch",
+        "Query.astroliftGrantPreview",
+        "Query.astroliftPolicySimulation",
+        "Query.astroliftPolicyConditionCatalog",
+        "Query.astroliftApiTokenScopeCatalog",
+        "Mutation.updateRoleBinding",
+        "Mutation.createGroupRoleMapping",
+        "Mutation.deleteGroupRoleMapping",
     ),
     # TODO(#2104): lifecycle routes without a scoped gate; the issue says what each checks today.
     "#2104": (
@@ -331,6 +349,8 @@ GAPS: dict[str, tuple[str, ...]] = {
         "/api/builder/v1/dev-environments/",
         "/api/builder/v1/dev-environments/<str:guid>/files/",
         "/api/builder/v1/dev-environments/<str:guid>/promote/",
+        "Query.astroliftEnvironmentsPage",
+        "Query.astroliftPreviewEnvironmentCounts",
     ),
     # TODO(#2105): registry routes without a scoped gate; the issue says what each checks today.
     "#2105": (
@@ -369,6 +389,9 @@ GAPS: dict[str, tuple[str, ...]] = {
         "Mutation.setRetentionPolicy",
         "Mutation.archiveApp",
         "Mutation.restoreApp",
+        "Query.astroliftAppAccess",
+        "Query.astroliftAppAccessPreview",
+        "Mutation.setAppAccess",
     ),
     # TODO(#2106): managed services routes without a scoped gate; the issue says what each checks today.
     "#2106": (
@@ -535,6 +558,15 @@ GAPS: dict[str, tuple[str, ...]] = {
         "Mutation.revalidateManagedDomain",
         "Mutation.reissueManagedDomainCert",
         "Mutation.configureProviderPlugin",
+        "Query.astroliftCluster",
+        "Query.astroliftClusterAuthUsers",
+        "Mutation.createClusterAuthUser",
+        "Mutation.setClusterAuthUserPassword",
+        "Mutation.resetClusterAuthUserPassword",
+        "Mutation.setClusterAuthUserEnabled",
+        "Mutation.deleteClusterAuthUser",
+        "Mutation.setClusterAuthUserGroups",
+        "Mutation.createClusterAuthGroup",
     ),
     # TODO(#2109): SCM routes without a scoped gate; the issue says what each checks today.
     "#2109": (

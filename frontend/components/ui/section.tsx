@@ -46,7 +46,7 @@ export function Section({
   const hasHeader = title || description || action;
 
   return (
-    <section className={cn("flex flex-col gap-4", className)} {...props}>
+    <section className={cn("flex min-w-0 flex-col gap-4", className)} {...props}>
       {hasHeader && (
         <div
           className={cn(
@@ -54,7 +54,7 @@ export function Section({
             divided && "border-b pb-3"
           )}
         >
-          <div className="flex flex-col gap-0.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
             {title && <Heading className="text-base font-semibold tracking-tight">{title}</Heading>}
             {description && <p className="text-muted-foreground text-sm">{description}</p>}
           </div>

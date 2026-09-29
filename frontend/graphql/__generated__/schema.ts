@@ -184,6 +184,49 @@ export type AssignAppToProjectInput = {
   projectGuid: InputMaybe<Scalars['GUID']['input']>;
 };
 
+export type AstroliftAccessEntry = {
+  /** The share level on TEAM_SHARE rows. */
+  accessLevel?: Maybe<Scalars['String']['output']>;
+  /** The RoleBinding, GroupRoleMapping or AppTeamAccess share that grants it. */
+  bindingId: Scalars['GUID']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  groupExternalId?: Maybe<Scalars['String']['output']>;
+  groupMemberCount?: Maybe<Scalars['Int']['output']>;
+  /** Held on an ancestor (or through a share), not on the object. */
+  inherited: Scalars['Boolean']['output'];
+  inherits: Scalars['Boolean']['output'];
+  /** The user's ORG membership row. */
+  memberId?: Maybe<Scalars['GUID']['output']>;
+  /** USER, GROUP or TEAM. */
+  principalKind: Scalars['String']['output'];
+  /** Null on a team's share row itself. */
+  role?: Maybe<AstroliftRole>;
+  scopeGuid?: Maybe<Scalars['GUID']['output']>;
+  /** Where the grant is held. */
+  scopeKind: Scalars['String']['output'];
+  shareId?: Maybe<Scalars['GUID']['output']>;
+  /** USER_BINDING, GROUP_BINDING, GROUP_MAPPING, or TEAM_SHARE (a team's share on the app, or a binding on that team reaching the app through the share). */
+  source: Scalars['String']['output'];
+  sourceScopeLabel: Scalars['String']['output'];
+  teamId?: Maybe<Scalars['GUID']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  teamSlug?: Maybe<Scalars['String']['output']>;
+  user?: Maybe<AstroliftUser>;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftAccessEntryPage = {
+  items: Array<AstroliftAccessEntry>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftActiveSession = {
   attestationKind: Scalars['String']['output'];
   attestationTrustLevel: Scalars['String']['output'];
@@ -299,6 +342,23 @@ export type AstroliftAgentEnvironmentSpecMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentFleetFilter = {
+  /** Cluster slugs; an agent whose app has an environment on one matches. */
+  cluster: InputMaybe<Array<Scalars['String']['input']>>;
+  /** managed, gateway or api-key (the row's modelSource). */
+  model: InputMaybe<Array<Scalars['String']['input']>>;
+  /** User ids, or "me" for the viewer (the Mine view). */
+  owner: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The run-spec pause switch. */
+  paused: InputMaybe<Scalars['Boolean']['input']>;
+  /** Project slugs. */
+  project: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The spec's runtime, or the run family (task, service). */
+  runtime: InputMaybe<Array<Scalars['String']['input']>>;
+  /** running, failing, scheduled, paused or idle (the row's status). */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type AstroliftAgentInteraction = {
   detail: Scalars['JSON']['output'];
   id: Scalars['GUID']['output'];
@@ -310,10 +370,15 @@ export type AstroliftAgentInteraction = {
 
 export type AstroliftAgentListItem = {
   appSlug: Scalars['String']['output'];
+  clusterSlugs: Array<Scalars['String']['output']>;
+  environmentSpecSlug: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastRunAt?: Maybe<Scalars['DateTime']['output']>;
   lastRunStatus?: Maybe<Scalars['String']['output']>;
+  modelSource?: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
+  ownedByMe: Scalars['Boolean']['output'];
+  ownerEmail: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
   replicas: Scalars['Int']['output'];
   runCronExpression: Scalars['String']['output'];
@@ -322,17 +387,21 @@ export type AstroliftAgentListItem = {
   runMode: Scalars['String']['output'];
   runPaused: Scalars['Boolean']['output'];
   runningCount: Scalars['Int']['output'];
+  runtime: Scalars['String']['output'];
   scaleDownCron: Scalars['String']['output'];
   scaleUpCron: Scalars['String']['output'];
   scheduledScaleTo?: Maybe<Scalars['Int']['output']>;
   slug: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
+  status: Scalars['String']['output'];
 };
 
 export type AstroliftAgentListItemPage = {
   items: Array<AstroliftAgentListItem>;
   nextCursor?: Maybe<Scalars['String']['output']>;
+  page?: Maybe<Scalars['Int']['output']>;
+  pageSize?: Maybe<Scalars['Int']['output']>;
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -373,11 +442,15 @@ export type AstroliftAgentRun = {
   workloadSlug: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftAgentRunPage = {
   items: Array<AstroliftAgentRun>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -475,10 +548,26 @@ export type AstroliftAgentSecretStatus = {
   uri: Scalars['String']['output'];
 };
 
+export type AstroliftAgentSecretStatusFilter = {
+  /** The store holds a value. */
+  exists: InputMaybe<Scalars['Boolean']['input']>;
+  /** true: the presence check reported an error. */
+  failing: InputMaybe<Scalars['Boolean']['input']>;
+  provider: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type AstroliftAgentSecretStatusMutationResult = {
   data?: Maybe<AstroliftAgentSecretStatus>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentSecretStatusPage = {
+  error?: Maybe<Scalars['String']['output']>;
+  items: Array<AstroliftAgentSecretStatus>;
+  page: Scalars['Int']['output'];
+  pageSize: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
 };
 
 export type AstroliftAgentSkill = {
@@ -506,6 +595,9 @@ export type AstroliftAgentTask = {
   snapshotUrl?: Maybe<Scalars['String']['output']>;
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  triggerKind: Scalars['String']['output'];
+  triggeredByMe: Scalars['Boolean']['output'];
+  triggeredByUserId?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
@@ -572,6 +664,21 @@ export type AstroliftAgentTaskPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftAgentTasksFilter = {
+  /** Agent (workload) slugs. */
+  agent: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Project slugs. */
+  project: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Initiator user ids (as on the row), or "me". */
+  startedBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** true: runs the viewer started. false: runs someone or something else did. */
+  startedByMe: InputMaybe<Scalars['Boolean']['input']>;
+  /** Task statuses, any of. */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+  /** manual, api, schedule, webhook, parent or unknown. */
+  trigger: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type AstroliftAgentTrigger = {
   branchPattern: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -583,11 +690,15 @@ export type AstroliftAgentTrigger = {
   slug: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftAgentTriggerPage = {
   items: Array<AstroliftAgentTrigger>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -600,6 +711,23 @@ export type AstroliftAgentTriggerResult = {
   slug?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftAgentUpcomingRun = {
+  agentId: Scalars['GUID']['output'];
+  agentName: Scalars['String']['output'];
+  agentSlug: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  cronExpression: Scalars['String']['output'];
+  projectSlug: Scalars['String']['output'];
+  scheduledAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftAgentUpcomingRunPage = {
+  items: Array<AstroliftAgentUpcomingRun>;
+  page: Scalars['Int']['output'];
+  pageSize: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
 export type AstroliftAggregatedEvent = {
   count: Scalars['Int']['output'];
   eventType: Scalars['String']['output'];
@@ -610,11 +738,15 @@ export type AstroliftAggregatedEvent = {
   resourceKind: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftAggregatedEventPage = {
   items: Array<AstroliftAggregatedEvent>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -636,11 +768,15 @@ export type AstroliftAlertEventMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftAlertEventPage = {
   items: Array<AstroliftAlertEvent>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -674,11 +810,15 @@ export type AstroliftAlertRuleMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftAlertRulePage = {
   items: Array<AstroliftAlertRule>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -703,6 +843,7 @@ export type AstroliftAnonymizeUserPayloadMutationResult = {
 
 export type AstroliftApiToken = {
   createdAt: Scalars['DateTime']['output'];
+  effectivePermissions: Array<Scalars['String']['output']>;
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   isRevoked: Scalars['Boolean']['output'];
@@ -716,11 +857,15 @@ export type AstroliftApiToken = {
   user: AstroliftUser;
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftApiTokenPage = {
   items: Array<AstroliftApiToken>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -734,6 +879,49 @@ export type AstroliftApiTokenPlaintextMutationResult = {
   data?: Maybe<AstroliftApiTokenPlaintext>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftApiTokenScope = {
+  available: Scalars['Boolean']['output'];
+  description: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+  sensitive: Scalars['Boolean']['output'];
+  surface: Scalars['String']['output'];
+  unavailableReason: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type AstroliftApiTokenScopeCatalog = {
+  presets: Array<AstroliftApiTokenScopePreset>;
+  scopes: Array<AstroliftApiTokenScope>;
+};
+
+export type AstroliftApiTokenScopePreset = {
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  scopes: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftAppAccess = {
+  appSlug: Scalars['String']['output'];
+  enforcedOn: Array<Scalars['String']['output']>;
+  groups: Array<Scalars['String']['output']>;
+  managedByManifest: Scalars['Boolean']['output'];
+  restricted: Scalars['Boolean']['output'];
+  users: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftAppAccessMutationResult = {
+  data?: Maybe<AstroliftAppAccess>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAppAccessPreview = {
+  allowed?: Maybe<Scalars['Int']['output']>;
+  losing: Array<Scalars['String']['output']>;
+  total?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftAppAutowireStatus = {
@@ -865,7 +1053,14 @@ export type AstroliftAppEnvironment = {
   domainZone?: Maybe<Scalars['String']['output']>;
   id: Scalars['GUID']['output'];
   ingressPaused: Scalars['Boolean']['output'];
+  /** production, preview or other. */
+  kind: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  ownedByMe: Scalars['Boolean']['output'];
+  /** The owner's user pk: the environment's creator, else the app's. */
+  ownerUserId?: Maybe<Scalars['String']['output']>;
+  /** The bound cluster's region; empty when unset. */
+  region: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   requiredApprovals: Scalars['Int']['output'];
   settings: Array<AstroliftEnvironmentSetting>;
@@ -876,6 +1071,19 @@ export type AstroliftAppEnvironmentMutationResult = {
   data?: Maybe<AstroliftAppEnvironment>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftAppEnvironmentPage = {
+  items: Array<AstroliftAppEnvironment>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftAppGoldenSignal = {
@@ -926,6 +1134,16 @@ export type AstroliftAppIdentityBindingResult = {
   binding?: Maybe<AstroliftAppIdentityBinding>;
   reason: AstroliftObservabilityPanelReason;
 };
+
+export type AstroliftAppListState =
+  | 'ARCHIVED'
+  | 'DEREGISTERED'
+  | 'FAILED'
+  | 'LIVE'
+  | 'PENDING'
+  | 'PROVISIONING'
+  | 'READY'
+  | 'TEARING_DOWN';
 
 export type AstroliftAppListStatusFilter =
   | 'ALL'
@@ -1118,11 +1336,15 @@ export type AstroliftAppTeamAccessMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftAppTeamAccessPage = {
   items: Array<AstroliftAppTeamAccess>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -1166,6 +1388,25 @@ export type AstroliftApproverUser = {
   displayName: Scalars['String']['output'];
   email: Scalars['String']['output'];
   id: Scalars['String']['output'];
+};
+
+export type AstroliftAppsListFilter = {
+  /** true: archived apps only. false: active only. null: includeArchived decides. */
+  archived: InputMaybe<Scalars['Boolean']['input']>;
+  /** Cluster slugs, case-insensitive; any environment on one matches. */
+  cluster: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The last-deploy health pulse (the row's healthPulse.status). */
+  deploy: InputMaybe<Array<AstroliftAppHealthPulseStatus>>;
+  /** true: provisioning failed or the latest deploy failed. false: neither. */
+  failing: InputMaybe<Scalars['Boolean']['input']>;
+  /** Topology kinds, as topologyKind. */
+  kind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Project slug or name, case-insensitive. */
+  project: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The header status. */
+  status: InputMaybe<Array<AstroliftAppListState>>;
+  /** Team slugs. */
+  team: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftAssembleBriefResult = {
@@ -1226,6 +1467,26 @@ export type AstroliftAuditEventPage = {
   items: Array<AstroliftAuditEvent>;
   nextCursor?: Maybe<Scalars['String']['output']>;
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+/** The audit trail's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftAuditEventsFilter = {
+  /** Exact actions, e.g. team.create. */
+  action: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Actor ids (a user's pk as a string); "me" is the viewer. */
+  actor: InputMaybe<Array<Scalars['String']['input']>>;
+  /** ALLOW, DENY or UNKNOWN. */
+  decision: InputMaybe<Array<Scalars['String']['input']>>;
+  /** occurredAt >= since. */
+  since: InputMaybe<Scalars['DateTime']['input']>;
+  /** Events about one person: a user pk, or "me". Matches events targeting the user, any of the user's role bindings (granted or revoked), or naming the user in the event data (bulk revokes, team role assignments). */
+  subjectUser: InputMaybe<Scalars['String']['input']>;
+  /** The target's id, exact. */
+  targetId: InputMaybe<Scalars['String']['input']>;
+  /** Target kinds, case-insensitive, e.g. user, role_binding. */
+  targetKind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** occurredAt <= until. */
+  until: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 export type AstroliftAuditExport = {
@@ -1386,13 +1647,50 @@ export type AstroliftCiWorkflowSyncStatusMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftClusterAuthUser = {
+  createdAt?: Maybe<Scalars['DateTime']['output']>;
+  email: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  groups: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  username: Scalars['String']['output'];
+};
+
+export type AstroliftClusterAuthUserChange = {
+  done: Scalars['Boolean']['output'];
+  username: Scalars['String']['output'];
+};
+
+export type AstroliftClusterAuthUserChangeMutationResult = {
+  data?: Maybe<AstroliftClusterAuthUserChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterAuthUserMutationResult = {
+  data?: Maybe<AstroliftClusterAuthUser>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterAuthUsers = {
+  groups: Array<Scalars['String']['output']>;
+  provider: Scalars['String']['output'];
+  reachNote: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  supported: Scalars['Boolean']['output'];
+  users: Array<AstroliftClusterAuthUser>;
+};
+
 export type AstroliftClusterBootstrapComponent = {
   defaultEnabled: Scalars['Boolean']['output'];
   helmValues: Scalars['JSON']['output'];
+  installedByRecipe: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
   options: Array<AstroliftClusterBootstrapOption>;
   rationale: Scalars['String']['output'];
   requires: Array<Scalars['String']['output']>;
+  runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
 };
 
@@ -1562,6 +1860,17 @@ export type AstroliftClusterWorkloadHealth = {
   workloadName: Scalars['String']['output'];
 };
 
+export type AstroliftClustersListFilter = {
+  /** Heartbeat statuses, as heartbeatStatus: never_seen, connected, degraded, offline. */
+  live: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Provider plugin slugs, as providerPluginSlug. */
+  provider: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Usernames of who registered the cluster; "me" is the viewer. */
+  registeredBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Management lifecycles, as lifecycle (registered, managing, managed, ...). */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type AstroliftCognitoUserPool = {
   domain: Scalars['String']['output'];
   name: Scalars['String']['output'];
@@ -1581,6 +1890,8 @@ export type AstroliftCommandRun = {
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   exitCode?: Maybe<Scalars['Int']['output']>;
   id: Scalars['GUID']['output'];
+  invokedByMe: Scalars['Boolean']['output'];
+  invokedByUserId?: Maybe<Scalars['String']['output']>;
   invokedByUsername?: Maybe<Scalars['String']['output']>;
   logExcerpt: Scalars['String']['output'];
   output: Scalars['String']['output'];
@@ -1589,13 +1900,23 @@ export type AstroliftCommandRun = {
   workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftCommandRunPage = {
   items: Array<AstroliftCommandRun>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+/** The command runs list's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftCommandRunsFilter = {
+  /** Who ran the command, as invokedByUserId; "me" is the viewer. */
+  invokedBy: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftConnectUserSourceProviderPayload = {
@@ -1696,6 +2017,17 @@ export type AstroliftCostTrendPoint = {
   isAnomaly: Scalars['Boolean']['output'];
 };
 
+export type AstroliftCronJobLastRun = {
+  createdAt: Scalars['DateTime']['output'];
+  durationSeconds?: Maybe<Scalars['Int']['output']>;
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  exitCode?: Maybe<Scalars['Int']['output']>;
+  id: Scalars['GUID']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  triggerKind: Scalars['String']['output'];
+};
+
 export type AstroliftDeelevatePayload = {
   previouslyElevated: Scalars['Boolean']['output'];
 };
@@ -1721,11 +2053,15 @@ export type AstroliftDeployToken = {
   scopes: Array<Scalars['String']['output']>;
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftDeployTokenPage = {
   items: Array<AstroliftDeployToken>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -1763,6 +2099,7 @@ export type AstroliftDeployment = {
   requiredApproverCount: Scalars['Int']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  statusReason: Scalars['String']['output'];
   strategy: Scalars['String']['output'];
   succeededAt?: Maybe<Scalars['DateTime']['output']>;
   triggerKind: Scalars['String']['output'];
@@ -1838,13 +2175,29 @@ export type AstroliftDeploymentMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftDeploymentPage = {
   items: Array<AstroliftDeployment>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+/** The deployments list's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftDeploymentsFilter = {
+  /** Started at or after, reading createdAt for a deploy not started yet. */
+  startedAfter: InputMaybe<Scalars['DateTime']['input']>;
+  /** Started at or before, reading createdAt for a deploy not started yet. */
+  startedBefore: InputMaybe<Scalars['DateTime']['input']>;
+  /** push, manual, ci, scheduled, rollback or promotion. */
+  triggerKind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Who started the deploy, as triggeredByUserId; "me" is the viewer. */
+  triggeredBy: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftDeregisterAppPayload = {
@@ -2146,6 +2499,20 @@ export type AstroliftEnvironmentSettingMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+/** The environments list's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftEnvironmentsFilter = {
+  /** App slugs. */
+  app: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Cluster slugs, case-insensitive. */
+  cluster: InputMaybe<Array<Scalars['String']['input']>>;
+  /** production, preview or other. */
+  kind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The owner, as ownerUserId; "me" is the viewer. */
+  owner: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The bound cluster's region, case-insensitive. */
+  region: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type AstroliftEvent = {
   eventType: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -2254,6 +2621,110 @@ export type AstroliftFormSubmissionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftGrantPreview = {
+  action: Scalars['String']['output'];
+  /** Whether the caller's grant ceiling allows it. */
+  allowed: Scalars['Boolean']['output'];
+  errors: Array<Scalars['String']['output']>;
+  gaining: Array<AstroliftGrantPreviewPerson>;
+  gainingCount: Scalars['Int']['output'];
+  groups: Array<AstroliftGrantPreviewGroup>;
+  losing: Array<AstroliftGrantPreviewPerson>;
+  losingCount: Scalars['Int']['output'];
+  notes: Array<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+  /** The permissions in play. */
+  permissions: Array<Scalars['String']['output']>;
+  refusal?: Maybe<Scalars['String']['output']>;
+  scopeGuid?: Maybe<Scalars['GUID']['output']>;
+  scopeKind?: Maybe<Scalars['String']['output']>;
+  sourceScopeLabel: Scalars['String']['output'];
+  summary: Scalars['String']['output'];
+  unchanged: Array<AstroliftGrantPreviewPerson>;
+  unchangedCount: Scalars['Int']['output'];
+};
+
+export type AstroliftGrantPreviewGroup = {
+  groupExternalId: Scalars['String']['output'];
+  memberCount: Scalars['Int']['output'];
+};
+
+export type AstroliftGrantPreviewInput = {
+  /** GRANT, CHANGE or REMOVE. */
+  action: Scalars['String']['input'];
+  /** The RoleBinding to change or remove. */
+  bindingId: InputMaybe<Scalars['GUID']['input']>;
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  principals: InputMaybe<Array<AstroliftPrincipalRef>>;
+  roleId: InputMaybe<Scalars['GUID']['input']>;
+  /** The scope's id. */
+  scopeId: InputMaybe<Scalars['String']['input']>;
+  /** ORG, TEAM, PROJECT, APP or AGENT. */
+  scopeKind: InputMaybe<Scalars['String']['input']>;
+};
+
+export type AstroliftGrantPreviewPerson = {
+  /** Permissions in play they would get. */
+  gained: Array<Scalars['String']['output']>;
+  /** Permissions in play they hold through another grant. */
+  kept: Array<Scalars['String']['output']>;
+  /** Permissions in play they would no longer hold. */
+  lost: Array<Scalars['String']['output']>;
+  memberId?: Maybe<Scalars['GUID']['output']>;
+  /** How the change reaches them: "direct", "group <id>" or "team <slug>". */
+  through: Array<Scalars['String']['output']>;
+  user: AstroliftUser;
+  /** Their other grants that carry permissions in play, excluding the one being changed. */
+  via: Array<AstroliftGrantPreviewSource>;
+};
+
+export type AstroliftGrantPreviewSource = {
+  bindingId?: Maybe<Scalars['GUID']['output']>;
+  groupExternalId?: Maybe<Scalars['String']['output']>;
+  /** Held on an ancestor of the scope, or through a share. */
+  inherited: Scalars['Boolean']['output'];
+  /** The permissions in play it carries. */
+  permissions: Array<Scalars['String']['output']>;
+  roleName?: Maybe<Scalars['String']['output']>;
+  roleSlug?: Maybe<Scalars['String']['output']>;
+  scopeGuid?: Maybe<Scalars['GUID']['output']>;
+  scopeKind?: Maybe<Scalars['String']['output']>;
+  /** USER_BINDING, GROUP_BINDING, GROUP_MAPPING, TEAM_SHARE, or SUPERUSER. */
+  source: Scalars['String']['output'];
+  sourceScopeLabel: Scalars['String']['output'];
+  teamSlug?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftGroupRoleMapping = {
+  createdAt: Scalars['DateTime']['output'];
+  groupExternalId: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  memberCount: Scalars['Int']['output'];
+  role: AstroliftRole;
+  scopeGuid?: Maybe<Scalars['GUID']['output']>;
+  scopeKind: Scalars['String']['output'];
+  sourceScopeLabel: Scalars['String']['output'];
+};
+
+export type AstroliftGroupRoleMappingMutationResult = {
+  data?: Maybe<AstroliftGroupRoleMapping>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftGroupRoleMappingPage = {
+  items: Array<AstroliftGroupRoleMapping>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftHeartbeatSessionPayload = {
   id: Scalars['GUID']['output'];
   lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
@@ -2348,13 +2819,26 @@ export type AstroliftInvitationMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftInvitationPage = {
   items: Array<AstroliftInvitation>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftInvitationsListFilter = {
+  /** Usernames of who sent it; "me" is the viewer. */
+  invitedBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Slugs of the role the invitation grants. */
+  role: InputMaybe<Array<Scalars['String']['input']>>;
+  /** pending, accepted, expired, revoked. */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftJob = {
@@ -2439,6 +2923,8 @@ export type AstroliftManagedService = {
   clusterSlug: Scalars['String']['output'];
   config: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
+  deployedByEmail: Scalars['String']['output'];
+  deployedByMe: Scalars['Boolean']['output'];
   editableFields: Array<Scalars['String']['output']>;
   environmentName: Scalars['String']['output'];
   grantState: Scalars['String']['output'];
@@ -2568,11 +3054,15 @@ export type AstroliftManagedServiceObjects = {
   truncated: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftManagedServicePage = {
   items: Array<AstroliftManagedService>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -2654,16 +3144,49 @@ export type AstroliftMember = {
   lifecycle: Scalars['String']['output'];
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
+  /** The team a TEAM-scope row is on. */
+  teamId?: Maybe<Scalars['GUID']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  teamSlug?: Maybe<Scalars['String']['output']>;
+  /** Every team in the organization the row's user is on. Set by astroliftMembersPage; null where the row is read elsewhere. */
+  teams?: Maybe<Array<AstroliftMemberTeam>>;
   user: AstroliftUser;
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftMemberPage = {
   items: Array<AstroliftMember>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftMemberTeam = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+};
+
+export type AstroliftMembersListFilter = {
+  /** Last active: 7d, 30d, 90d (within), stale (not in 90 days) or never. */
+  active: InputMaybe<Scalars['String']['input']>;
+  /** true: people holding, at organization scope, a role that can manage members. */
+  admin: InputMaybe<Scalars['Boolean']['input']>;
+  /** active, pending_invite, pending_first_login, suspended, deactivated. */
+  lifecycle: InputMaybe<Array<Scalars['String']['input']>>;
+  /** true: people who share a team with the viewer. false: everyone else. */
+  mine: InputMaybe<Scalars['Boolean']['input']>;
+  /** Role slugs the person holds on any scope of the organization. */
+  role: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The row's own scope: ORG, TEAM, PROJECT, APP. ORG gives one row per person. */
+  scopeKind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Team slugs or ids the person is on. */
+  team: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftModelEndpointTest = {
@@ -2680,6 +3203,23 @@ export type AstroliftModelEndpointTestMutationResult = {
   data?: Maybe<AstroliftModelEndpointTest>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftModelEndpointsFilter = {
+  /** Owning app slugs. */
+  app: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Cluster slugs it runs on. */
+  cluster: InputMaybe<Array<Scalars['String']['input']>>;
+  /** User ids, or "me". */
+  deployedBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** app or project. */
+  ownerScope: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Project slugs: the owning project, or the owning app's project. */
+  project: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Service statuses, any of. */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Engines and providers: vllm, kserve, bedrock, azure_openai... */
+  variant: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftModuleEntitlement = {
@@ -2834,6 +3374,7 @@ export type AstroliftOrganization = {
   name: Scalars['String']['output'];
   onboardingCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   previewMaxActiveDefault: Scalars['Int']['output'];
+  restrictedSettingsDefault: Scalars['String']['output'];
   scimEnabled: Scalars['Boolean']['output'];
   slug: Scalars['String']['output'];
   traceRetentionDaysDefault: Scalars['Int']['output'];
@@ -2891,11 +3432,15 @@ export type AstroliftPipelineMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftPipelinePage = {
   items: Array<AstroliftPipeline>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -2919,11 +3464,15 @@ export type AstroliftPipelineRunMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftPipelineRunPage = {
   items: Array<AstroliftPipelineRun>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -2941,6 +3490,15 @@ export type AstroliftPodResourceUsagePoint = {
   cpuCores: Scalars['Float']['output'];
   memoryBytes: Scalars['Float']['output'];
   ts: Scalars['DateTime']['output'];
+};
+
+export type AstroliftPoliciesListFilter = {
+  /** Usernames of who created the policy; "me" is the viewer. */
+  createdBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** ALLOW or DENY. */
+  effect: InputMaybe<Array<Scalars['String']['input']>>;
+  /** ORG, TEAM, PROJECT, APP. */
+  scopeLevel: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftPolicy = {
@@ -2963,19 +3521,119 @@ export type AstroliftPolicy = {
   version: Scalars['Int']['output'];
 };
 
+export type AstroliftPolicyConditionCatalog = {
+  actorKeys: Array<AstroliftPolicyPatternKey>;
+  conditions: Array<AstroliftPolicyConditionKind>;
+  effects: Array<Scalars['String']['output']>;
+  resourceKeys: Array<AstroliftPolicyPatternKey>;
+  scopeLevels: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftPolicyConditionField = {
+  default?: Maybe<Scalars['JSON']['output']>;
+  description: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  minimum?: Maybe<Scalars['Int']['output']>;
+  name: Scalars['String']['output'];
+  options: Array<Scalars['String']['output']>;
+  required: Scalars['Boolean']['output'];
+  /** weekdays, time_ranges, time_zone, cidrs, strings or integer. */
+  type: Scalars['String']['output'];
+};
+
+export type AstroliftPolicyConditionKind = {
+  description: Scalars['String']['output'];
+  example: Scalars['JSON']['output'];
+  fields: Array<AstroliftPolicyConditionField>;
+  kind: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  /** What a check must carry to evaluate it: clock, client_ip, session (the request's own user only) or operation (supplied by the call site). */
+  needs: Scalars['String']['output'];
+};
+
+export type AstroliftPolicyDraftInput = {
+  actionPattern: Scalars['String']['input'];
+  actorPattern: InputMaybe<Scalars['JSON']['input']>;
+  conditions: InputMaybe<Scalars['JSON']['input']>;
+  effect: Scalars['String']['input'];
+  resourcePattern: InputMaybe<Scalars['JSON']['input']>;
+  /** The scope's id, or its numeric id. */
+  scopeId: InputMaybe<Scalars['String']['input']>;
+  scopeLevel: Scalars['String']['input'];
+};
+
 export type AstroliftPolicyMutationResult = {
   data?: Maybe<AstroliftPolicy>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftPolicyPage = {
   items: Array<AstroliftPolicy>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftPolicyPatternKey = {
+  description: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
+export type AstroliftPolicySimulation = {
+  /** Catalog permissions the action pattern matches. */
+  actions: Array<Scalars['String']['output']>;
+  /** Whether the org has recorded decisions in the window. */
+  auditRecorded: Scalars['Boolean']['output'];
+  decisions: Array<AstroliftPolicySimulationDecision>;
+  decisionsDeniedCount: Scalars['Int']['output'];
+  decisionsEvaluated: Scalars['Int']['output'];
+  decisionsUnknownCount: Scalars['Int']['output'];
+  errors: Array<Scalars['String']['output']>;
+  holders: Array<AstroliftPolicySimulationHolder>;
+  holdersCount: Scalars['Int']['output'];
+  holdersDeniedCount: Scalars['Int']['output'];
+  holdersUnknownCount: Scalars['Int']['output'];
+  notes: Array<Scalars['String']['output']>;
+  ok: Scalars['Boolean']['output'];
+  sources: Array<Scalars['String']['output']>;
+  windowDays: Scalars['Int']['output'];
+};
+
+export type AstroliftPolicySimulationDecision = {
+  action: Scalars['String']['output'];
+  actorDisplay: Scalars['String']['output'];
+  actorId: Scalars['String']['output'];
+  detail: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  occurredAt: Scalars['DateTime']['output'];
+  /** DENIED or UNKNOWN. */
+  outcome: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftPolicySimulationHolder = {
+  /** Actions it would not deny. */
+  allowed: Array<Scalars['String']['output']>;
+  /** Actions it would definitely deny them. */
+  denied: Array<Scalars['String']['output']>;
+  detail: Scalars['String']['output'];
+  memberId?: Maybe<Scalars['GUID']['output']>;
+  /** DENIED, UNKNOWN (fail-closed guess) or NOT_DENIED. */
+  outcome: Scalars['String']['output'];
+  scopeGuid?: Maybe<Scalars['GUID']['output']>;
+  scopeKind: Scalars['String']['output'];
+  sourceScopeLabel: Scalars['String']['output'];
+  /** Actions it would deny for want of an attribute a simulation cannot know. */
+  unknown: Array<Scalars['String']['output']>;
+  user: AstroliftUser;
 };
 
 export type AstroliftPreviewAggregateResources = {
@@ -2991,12 +3649,17 @@ export type AstroliftPreviewEnvironment = {
   estimatedCostApproximate: Scalars['Boolean']['output'];
   estimatedCostNotes: Array<Scalars['String']['output']>;
   estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
+  /** Why a failed preview failed, in one line: the build's recorded reason, else its latest deployment's. Empty unless status is failed. */
+  failureReason: Scalars['String']['output'];
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isManual: Scalars['Boolean']['output'];
   isPinned: Scalars['Boolean']['output'];
   lastDeployedAt?: Maybe<Scalars['DateTime']['output']>;
   namespace: Scalars['String']['output'];
+  openedByLogin: Scalars['String']['output'];
+  openedByMe: Scalars['Boolean']['output'];
+  openedByUserId?: Maybe<Scalars['String']['output']>;
   pinReason: Scalars['String']['output'];
   pinnedAt?: Maybe<Scalars['DateTime']['output']>;
   pinnedByEmail?: Maybe<Scalars['String']['output']>;
@@ -3009,19 +3672,98 @@ export type AstroliftPreviewEnvironment = {
   ttlUntil: Scalars['DateTime']['output'];
 };
 
+export type AstroliftPreviewEnvironmentCounts = {
+  building: Scalars['Int']['output'];
+  failed: Scalars['Int']['output'];
+  running: Scalars['Int']['output'];
+  tornDown: Scalars['Int']['output'];
+  total: Scalars['Int']['output'];
+};
+
 export type AstroliftPreviewEnvironmentMutationResult = {
   data?: Maybe<AstroliftPreviewEnvironment>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftPreviewEnvironmentPage = {
   items: Array<AstroliftPreviewEnvironment>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+/** The previews list's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftPreviewEnvironmentsFilter = {
+  /** true: branch previews started by hand. false: pull request previews. */
+  manual: InputMaybe<Scalars['Boolean']['input']>;
+  /** Who opened it: an SCM or platform login, case-insensitive; "me" is the viewer. */
+  openedBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** building, running, failed or torn_down. */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+export type AstroliftPrincipal = {
+  avatarUrl?: Maybe<Scalars['String']['output']>;
+  /** A group's role bindings here. */
+  bindingsCount?: Maybe<Scalars['Int']['output']>;
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  groupExternalId?: Maybe<Scalars['String']['output']>;
+  invitationId?: Maybe<Scalars['GUID']['output']>;
+  invitationStatus?: Maybe<Scalars['String']['output']>;
+  /** A stable id for the row: user:<userId>, group:<externalId>, team:<teamId> or invitation:<invitationId>. */
+  key: Scalars['String']['output'];
+  /** USER, GROUP, TEAM or INVITATION. */
+  kind: Scalars['String']['output'];
+  lifecycle?: Maybe<Scalars['String']['output']>;
+  /** A group's role mappings here. */
+  mappingsCount?: Maybe<Scalars['Int']['output']>;
+  /** Members of a group (active, carrying it) or of a team. */
+  memberCount?: Maybe<Scalars['Int']['output']>;
+  /** The user's ORG membership row. */
+  memberId?: Maybe<Scalars['GUID']['output']>;
+  /** What to show: display name, group id, team or email. */
+  name: Scalars['String']['output'];
+  /** Email for a user, slug for a team, else empty. */
+  secondary: Scalars['String']['output'];
+  teamId?: Maybe<Scalars['GUID']['output']>;
+  teamSlug?: Maybe<Scalars['String']['output']>;
+  user?: Maybe<AstroliftUser>;
+  /** The value grantRole takes as userId. */
+  userId?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftPrincipalKindCount = {
+  count: Scalars['Int']['output'];
+  kind: Scalars['String']['output'];
+};
+
+export type AstroliftPrincipalPage = {
+  /** Matches per kind searched, for the view tabs. */
+  counts: Array<AstroliftPrincipalKindCount>;
+  items: Array<AstroliftPrincipal>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  page: Scalars['Int']['output'];
+  pageSize: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftPrincipalRef = {
+  /** USER: the user id grantRole takes. GROUP: the external id. TEAM: the team id. */
+  id: Scalars['String']['input'];
+  /** USER, GROUP or TEAM. */
+  kind: Scalars['String']['input'];
+};
+
+export type AstroliftPrincipalSearchFilter = {
+  /** USER, GROUP, TEAM, INVITATION. Unset searches every kind. */
+  kind: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftProject = {
@@ -3041,11 +3783,15 @@ export type AstroliftProjectMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftProjectPage = {
   items: Array<AstroliftProject>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -3178,6 +3924,8 @@ export type AstroliftRegisteredApp = {
   buildMode: Scalars['String']['output'];
   buildStrategy: Scalars['String']['output'];
   ciWorkflowSyncStatus?: Maybe<AstroliftCiWorkflowSyncStatus>;
+  /** Clusters the app's environments deploy to, in environment-name order. Filled on astroliftAppsPage and astroliftMyAppsPage (#2149). */
+  clusterSlugs: Array<Scalars['String']['output']>;
   configDrift?: Maybe<AstroliftAppConfigDrift>;
   createdAt: Scalars['DateTime']['output'];
   cronExpression: Scalars['String']['output'];
@@ -3238,6 +3986,8 @@ export type AstroliftRegisteredApp = {
   teamId?: Maybe<Scalars['GUID']['output']>;
   teamName: Scalars['String']['output'];
   teamSlug: Scalars['String']['output'];
+  /** The app's shape (service, service-data, service-worker, microservices, service-agent, agent, functions, scheduled, task, workflow, mixed), classified from its workloads; null when it has none. Filled on astroliftAppsPage and astroliftMyAppsPage (#2149). */
+  topologyKind?: Maybe<Scalars['String']['output']>;
   triggerMode: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   version: Scalars['Int']['output'];
@@ -3265,6 +4015,10 @@ export type AstroliftRegisteredAppMutationResult = {
 export type AstroliftRegisteredAppPage = {
   items: Array<AstroliftRegisteredApp>;
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page (#2149); null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page (#2149); null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   totalCount: Scalars['Int']['output'];
 };
 
@@ -3399,7 +4153,11 @@ export type AstroliftRevokeAstroliftSessionPayloadMutationResult = {
 };
 
 export type AstroliftRole = {
+  /** Role bindings on this role inside the viewer's organization. Set by astroliftRolesPage; null where the role is read elsewhere. */
+  bindingsCount?: Maybe<Scalars['Int']['output']>;
   description: Scalars['String']['output'];
+  /** The role this one was duplicated from. Set by astroliftRole and astroliftRolesPage; null where the role is read elsewhere, and for a role not made by duplicating. */
+  duplicatedFrom?: Maybe<AstroliftRoleLineage>;
   id: Scalars['GUID']['output'];
   isSystem: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
@@ -3427,13 +4185,38 @@ export type AstroliftRoleBindingMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftRoleBindingPage = {
   items: Array<AstroliftRoleBinding>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftRoleBindingsListFilter = {
+  /** Who holds the binding: a username, "group:<external id>", or "me": the viewer's own bindings and those on the IdP groups the viewer is in. */
+  holder: InputMaybe<Array<Scalars['String']['input']>>;
+  /** user or group. */
+  kind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Role slugs. */
+  role: InputMaybe<Array<Scalars['String']['input']>>;
+  /** ORG, TEAM, PROJECT, APP. */
+  scopeKind: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+export type AstroliftRoleLineage = {
+  /** The source role has since been deleted. */
+  deleted: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  isSystem: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+  slug: Scalars['String']['output'];
 };
 
 export type AstroliftRoleMutationResult = {
@@ -3442,11 +4225,101 @@ export type AstroliftRoleMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftRolePage = {
   items: Array<AstroliftRole>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftRolesListFilter = {
+  /** Usernames of who created the role; "me" is the viewer. */
+  createdBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** true: the platform's system roles. false: this organization's custom roles. */
+  isSystem: InputMaybe<Scalars['Boolean']['input']>;
+  /** ORG, TEAM, PROJECT, APP. */
+  scopeLevel: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+/** The run audit's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftRunAuditFilter = {
+  /** Agent workload slugs. Only agent runs carry one; other kinds drop out. */
+  agent: InputMaybe<Array<Scalars['String']['input']>>;
+  /** App slugs. */
+  app: InputMaybe<Array<Scalars['String']['input']>>;
+  /** agent, workflow, deployment, job, task. */
+  kind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** running, waiting, succeeded, failed, cancelled, unknown (each kind's status, normalised). */
+  outcome: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Project slugs: the run's own project, else its app's. */
+  project: InputMaybe<Array<Scalars['String']['input']>>;
+  /** at >= since. */
+  since: InputMaybe<Scalars['DateTime']['input']>;
+  /** The initiator: user pks as strings, or "me". */
+  startedBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The source's own status word. */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+  /** manual, api, schedule, webhook, parent, unknown. */
+  trigger: InputMaybe<Array<Scalars['String']['input']>>;
+  /** at <= until. */
+  until: InputMaybe<Scalars['DateTime']['input']>;
+  /** Workflow definition slugs. Only workflow runs carry one; other kinds drop out. */
+  workflow: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+/** One run of any kind, as the run audit lists it. */
+export type AstroliftRunAuditItem = {
+  agentSlug: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  /** When it started, or was created if it has not yet. */
+  at: Scalars['DateTime']['output'];
+  durationSeconds?: Maybe<Scalars['Int']['output']>;
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName: Scalars['String']['output'];
+  /** The run's guid, as its own detail query takes it. */
+  id: Scalars['String']['output'];
+  /** agent, workflow, deployment, job, task. */
+  kind: Scalars['String']['output'];
+  /** running, waiting, succeeded, failed, cancelled, unknown. */
+  outcome: Scalars['String']['output'];
+  projectSlug: Scalars['String']['output'];
+  /** The project or app it belongs to. */
+  scope: Scalars['String']['output'];
+  /** The source's own trigger word (a deployment's push, ci, rollback, ...). */
+  sourceTrigger: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** The initiator's name, else a deployment's commit author, else empty. */
+  startedByDisplay: Scalars['String']['output'];
+  /** The initiator's user pk, when a person started it. */
+  startedById?: Maybe<Scalars['String']['output']>;
+  /** user, token, schedule, ci, webhook, parent_run or system. */
+  startedByKind: Scalars['String']['output'];
+  startedByMe: Scalars['Boolean']['output'];
+  /** The source's own status word. */
+  status: Scalars['String']['output'];
+  /** What ran: the agent, workflow, app and environment, job, task. */
+  subject: Scalars['String']['output'];
+  /** manual, api, schedule, webhook, parent, unknown. */
+  trigger: Scalars['String']['output'];
+  /** The definition slug; a workflow run's page is keyed on it. */
+  workflowSlug: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftRunAuditItemPage = {
+  items: Array<AstroliftRunAuditItem>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -3488,16 +4361,33 @@ export type AstroliftScheduledJobRun = {
   registeredAppSlug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  triggerKind: Scalars['String']['output'];
+  triggeredByMe: Scalars['Boolean']['output'];
+  triggeredByUserId?: Maybe<Scalars['String']['output']>;
   workloadSlug: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftScheduledJobRunPage = {
   items: Array<AstroliftScheduledJobRun>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+/** The job runs list's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftScheduledJobRunsFilter = {
+  /** running, succeeded, failed or superseded. */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+  /** scheduled (the cron fired it) or manual (someone ran it now). */
+  trigger: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Who ran it now, as triggeredByUserId; "me" is the viewer. */
+  triggeredBy: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftScmPushCiWorkflowResult = {
@@ -3674,13 +4564,18 @@ export type AstroliftServerInfo = {
 export type AstroliftSkill = {
   content: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  createdByEmail: Scalars['String']['output'];
+  createdByMe: Scalars['Boolean']['output'];
   description: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
   isGlobal: Scalars['Boolean']['output'];
+  isImported: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
   skillVersion: Scalars['Int']['output'];
   slug: Scalars['String']['output'];
+  sourceKind: Scalars['String']['output'];
+  sourceRef: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
 };
 
@@ -3688,6 +4583,27 @@ export type AstroliftSkillMutationResult = {
   data?: Maybe<AstroliftSkill>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftSkillPage = {
+  items: Array<AstroliftSkill>;
+  page: Scalars['Int']['output'];
+  pageSize: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftSkillsFilter = {
+  active: InputMaybe<Scalars['Boolean']['input']>;
+  /** claude, codex or any. */
+  agentType: InputMaybe<Array<Scalars['String']['input']>>;
+  /** User ids, or "me". */
+  createdBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** true: has an import source. */
+  imported: InputMaybe<Scalars['Boolean']['input']>;
+  /** org (the org's own) or global (the platform catalog). */
+  scope: InputMaybe<Array<Scalars['String']['input']>>;
+  /** repo_import, agent_repo, org_repo or catalogue. */
+  sourceKind: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftSourceConnection = {
@@ -3720,11 +4636,15 @@ export type AstroliftSourceConnectionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftSourceConnectionPage = {
   items: Array<AstroliftSourceConnection>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -3766,11 +4686,15 @@ export type AstroliftSshDeployKeyMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftSshDeployKeyPage = {
   items: Array<AstroliftSshDeployKey>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -3826,11 +4750,15 @@ export type AstroliftTaskRun = {
   workloadSlug: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftTaskRunPage = {
   items: Array<AstroliftTaskRun>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -3865,13 +4793,22 @@ export type AstroliftTeamMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftTeamPage = {
   items: Array<AstroliftTeam>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamsListFilter = {
+  /** true: teams the viewer is on. false: teams the viewer is not on. */
+  mine: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type AstroliftTemplateSendStatPoint = {
@@ -3890,6 +4827,7 @@ export type AstroliftTenantCluster = {
   capabilities: Scalars['JSON']['output'];
   capabilitiesProbedAt?: Maybe<Scalars['DateTime']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  createdByUsername?: Maybe<Scalars['String']['output']>;
   endpoint: Scalars['String']['output'];
   heartbeatAgeSeconds?: Maybe<Scalars['Float']['output']>;
   heartbeatIntervalSeconds: Scalars['Int']['output'];
@@ -3923,11 +4861,15 @@ export type AstroliftTenantClusterMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftTenantClusterPage = {
   items: Array<AstroliftTenantCluster>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -3939,13 +4881,21 @@ export type AstroliftTimeSeriesPoint = {
 
 export type AstroliftToolDef = {
   adapter: Scalars['String']['output'];
+  capabilityGroup: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  createdByEmail: Scalars['String']['output'];
+  createdByMe: Scalars['Boolean']['output'];
   description: Scalars['String']['output'];
   handlerRef: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   inputSchema: Scalars['JSON']['output'];
+  isBuiltin: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
   outputSchema: Scalars['JSON']['output'];
+  skillId?: Maybe<Scalars['GUID']['output']>;
+  skillIsGlobal: Scalars['Boolean']['output'];
+  skillName: Scalars['String']['output'];
+  skillSlug: Scalars['String']['output'];
   slug: Scalars['String']['output'];
 };
 
@@ -3953,6 +4903,27 @@ export type AstroliftToolDefMutationResult = {
   data?: Maybe<AstroliftToolDef>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftToolDefPage = {
+  items: Array<AstroliftToolDef>;
+  page: Scalars['Int']['output'];
+  pageSize: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftToolDefsFilter = {
+  /** python_fn, http_endpoint or mcp_server. */
+  adapter: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Pre-installed in the image. */
+  builtin: InputMaybe<Scalars['Boolean']['input']>;
+  capabilityGroup: InputMaybe<Array<Scalars['String']['input']>>;
+  /** User ids, or "me". */
+  createdBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** org or global (the parent skill's). */
+  scope: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Parent skill slugs. */
+  skill: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftTraceSpan = {
@@ -3988,6 +4959,32 @@ export type AstroliftTriggerDeployWorkflowPayloadMutationResult = {
 
 export type AstroliftTriggerMutationResult = {
   data?: Maybe<AstroliftTrigger>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftUiPreferences = {
+  appView: Scalars['String']['output'];
+  /** The person's own partial appearance (ground, accent, density, corners). */
+  appearance: Scalars['JSON']['output'];
+  fleetView: Scalars['String']['output'];
+  flowParticles: Scalars['Boolean']['output'];
+  /** The chosen Home layout key; null means the default from access. */
+  homeLayout?: Maybe<Scalars['String']['output']>;
+  /** The first-sign-in layout question was answered, so it is not asked again. */
+  homeLayoutAsked: Scalars['Boolean']['output'];
+  /** system, full or reduced. */
+  motion: Scalars['String']['output'];
+  /** show or hide: the person's choice, else the organization's default. */
+  restrictedSettings: Scalars['String']['output'];
+  /** The person's own show or hide; null follows the organization. */
+  restrictedSettingsChoice?: Maybe<Scalars['String']['output']>;
+  restrictedSettingsOrgDefault: Scalars['String']['output'];
+  workflowView: Scalars['String']['output'];
+};
+
+export type AstroliftUiPreferencesMutationResult = {
+  data?: Maybe<AstroliftUiPreferences>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -4045,11 +5042,15 @@ export type AstroliftWebhookDelivery = {
   success: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftWebhookDeliveryPage = {
   items: Array<AstroliftWebhookDelivery>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -4074,11 +5075,15 @@ export type AstroliftWebhookSubscriptionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftWebhookSubscriptionPage = {
   items: Array<AstroliftWebhookSubscription>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -4155,9 +5160,13 @@ export type AstroliftWorkload = {
   inClusterServiceFqdn: Scalars['String']['output'];
   isPublic: Scalars['Boolean']['output'];
   kind: Scalars['String']['output'];
+  /** A cron job's most recent run. Null for other kinds, for a job that never ran, and on reads that do not load it (astroliftWorkloads). */
+  lastRun?: Maybe<AstroliftCronJobLastRun>;
   memoryLimit: Scalars['String']['output'];
   memoryRequest: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  ownedByMe: Scalars['Boolean']['output'];
+  ownerUserId?: Maybe<Scalars['String']['output']>;
   registeredAppSlug: Scalars['String']['output'];
   replicas: Scalars['Int']['output'];
   schedule: Scalars['String']['output'];
@@ -4212,11 +5221,15 @@ export type AstroliftWorkloadOpPayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AstroliftWorkloadPage = {
   items: Array<AstroliftWorkload>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -4260,6 +5273,18 @@ export type AstroliftWorkloadScalingStatus = {
   replicaLowerBound: Scalars['Int']['output'];
   replicaUpperBound: Scalars['Int']['output'];
   sourcedAt: Scalars['DateTime']['output'];
+};
+
+/** The workloads list's declared filters. Unset fields do not filter; list values match any. */
+export type AstroliftWorkloadsFilter = {
+  /** App slugs. */
+  app: InputMaybe<Array<Scalars['String']['input']>>;
+  /** true: workloads with an ingress. false: internal only. */
+  isPublic: InputMaybe<Scalars['Boolean']['input']>;
+  /** Workload kinds: deployment, cronjob, task, agent, workflow, function, ... */
+  kind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** The owner, as ownerUserId; "me" is the viewer. */
+  owner: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftZentinelleClusterGateway = {
@@ -4355,11 +5380,15 @@ export type AuditLogEntry = {
   variables: Scalars['JSON']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type AuditLogEntryPage = {
   items: Array<AuditLogEntry>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -4504,6 +5533,11 @@ export type CloudOrphanType = {
   reason: Scalars['String']['output'];
 };
 
+export type ClusterAuthUserRefInput = {
+  clusterId: Scalars['GUID']['input'];
+  username: Scalars['String']['input'];
+};
+
 export type Clusteragentkeyissuedpayload = {
   agentKey: Scalars['String']['output'];
   clusterId: Scalars['GUID']['output'];
@@ -4543,11 +5577,15 @@ export type ConfiguredWorkflow = {
   triggerKind: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type ConfiguredWorkflowPage = {
   items: Array<ConfiguredWorkflow>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -4638,6 +5676,20 @@ export type CreateApiTokenInput = {
   teamSlug: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateClusterAuthGroupInput = {
+  clusterId: Scalars['GUID']['input'];
+  description: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+};
+
+export type CreateClusterAuthUserInput = {
+  clusterId: Scalars['GUID']['input'];
+  email: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  password: InputMaybe<Scalars['String']['input']>;
+  permanent: Scalars['Boolean']['input'];
+};
+
 export type CreateDeployTokenInput = {
   appSlug: Scalars['String']['input'];
   expiresAtIso: InputMaybe<Scalars['String']['input']>;
@@ -4651,6 +5703,13 @@ export type CreateEmailTemplateInput = {
   name: Scalars['String']['input'];
   subject: Scalars['String']['input'];
   textBody: Scalars['String']['input'];
+};
+
+export type CreateGroupRoleMappingInput = {
+  groupExternalId: Scalars['String']['input'];
+  roleId: Scalars['GUID']['input'];
+  scopeGuid: Scalars['GUID']['input'];
+  scopeKind: Scalars['String']['input'];
 };
 
 export type CreateIdentityProviderInput = {
@@ -4728,6 +5787,7 @@ export type CreateProjectSecretBundleInput = {
 
 export type CreateRoleInput = {
   description: Scalars['String']['input'];
+  duplicatedFromId: InputMaybe<Scalars['GUID']['input']>;
   name: Scalars['String']['input'];
   permissions: Array<Scalars['String']['input']>;
   scopeLevel: Scalars['String']['input'];
@@ -4817,6 +5877,10 @@ export type DeleteEmailTemplateInput = {
 
 export type DeleteFormDefinitionInput = {
   slug: Scalars['String']['input'];
+};
+
+export type DeleteGroupRoleMappingInput = {
+  id: Scalars['GUID']['input'];
 };
 
 export type DeleteRoleInput = {
@@ -4990,7 +6054,12 @@ export type ExportAuditEventsInput = {
   createdAtGte: InputMaybe<Scalars['DateTime']['input']>;
   createdAtLte: InputMaybe<Scalars['DateTime']['input']>;
   decision: InputMaybe<Scalars['String']['input']>;
+  filter: InputMaybe<AstroliftAuditEventsFilter>;
   format: Scalars['String']['input'];
+  search: InputMaybe<Scalars['String']['input']>;
+  subjectUserId: InputMaybe<Scalars['String']['input']>;
+  targetId: InputMaybe<Scalars['String']['input']>;
+  targetKind: InputMaybe<Scalars['String']['input']>;
 };
 
 export type ExtendPreviewTtlInputGql = {
@@ -5073,10 +6142,12 @@ export type GoldenSignalKind =
   | 'TRAFFIC';
 
 export type GrantRoleInput = {
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  groupExternalId: InputMaybe<Scalars['String']['input']>;
   roleId: Scalars['GUID']['input'];
   scopeGuid: Scalars['GUID']['input'];
   scopeKind: Scalars['String']['input'];
-  userId: Scalars['String']['input'];
+  userId: InputMaybe<Scalars['String']['input']>;
 };
 
 export type GrantTeamAccessInput = {
@@ -5323,9 +6394,12 @@ export type Mutation = {
   createAgentTrigger: AstroliftAgentTriggerResult;
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
+  createClusterAuthGroup: AstroliftClusterAuthUserChangeMutationResult;
+  createClusterAuthUser: AstroliftClusterAuthUserMutationResult;
   createDeployToken: DeployTokenSecretRevealMutationResult;
   createEmailTemplate: AstroliftEmailTemplateMutationResult;
   createFormDefinition: AstroliftFormDefinitionMutationResult;
+  createGroupRoleMapping: AstroliftGroupRoleMappingMutationResult;
   createIdentityProvider: AstroliftIdentityProviderMutationResult;
   createInvitation: AstroliftInvitationCreatedMutationResult;
   createManagedDomain: AstroliftManagedDomainMutationResult;
@@ -5362,9 +6436,11 @@ export type Mutation = {
   deleteAppIdentityRole: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppIngress: AstroliftCapabilityDeprovisionPayloadMutationResult;
   deleteAppSecret: AppsecretwritepayloadMutationResult;
+  deleteClusterAuthUser: AstroliftClusterAuthUserChangeMutationResult;
   deleteDeployment: AstroliftDeploymentMutationResult;
   deleteEmailTemplate: EmailtemplatedeletedpayloadMutationResult;
   deleteFormDefinition: AstroliftFormDefinitionMutationResult;
+  deleteGroupRoleMapping: SoftdeletepayloadMutationResult;
   deleteInvitation: AstroliftInvitationMutationResult;
   deletePipeline: AstroliftPipelineMutationResult;
   deleteProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
@@ -5512,6 +6588,7 @@ export type Mutation = {
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
+  resetClusterAuthUserPassword: AstroliftClusterAuthUserChangeMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   restoreApp: AstroliftRegisteredAppMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
@@ -5520,6 +6597,7 @@ export type Mutation = {
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult;
   resyncAstroliftCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
+  retryAgentTask: AstroliftAgentTaskMutationResult;
   retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;
   revalidateManagedDomain: RevalidateManagedDomainPayloadMutationResult;
   revealAgentBundleSecretValue: AstroliftAgentSecretRevealMutationResult;
@@ -5557,9 +6635,13 @@ export type Mutation = {
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
   setAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
+  setAppAccess: AstroliftAppAccessMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
+  setClusterAuthUserEnabled: AstroliftClusterAuthUserChangeMutationResult;
+  setClusterAuthUserGroups: AstroliftClusterAuthUserChangeMutationResult;
+  setClusterAuthUserPassword: AstroliftClusterAuthUserChangeMutationResult;
   setDomainPathRoutes: AstroliftAppDomainMutationResult;
   setDomainRedirects: AstroliftAppDomainMutationResult;
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
@@ -5623,6 +6705,7 @@ export type Mutation = {
   updateManagedService: AstroliftManagedServiceMutationResult;
   updateManifest: ManifeststagepayloadMutationResult;
   updateMyProfile: AstroliftMyProfileMutationResult;
+  updateMyUiPreferences: AstroliftUiPreferencesMutationResult;
   updateOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   updateOrganization: AstroliftOrganizationMutationResult;
   updatePipeline: AstroliftPipelineMutationResult;
@@ -5631,6 +6714,7 @@ export type Mutation = {
   updateProjectManagedService: AstroliftManagedServiceMutationResult;
   updateProjectSecretBundle: AstroliftSecretBundleMutationResult;
   updateRole: AstroliftRoleMutationResult;
+  updateRoleBinding: AstroliftRoleBindingMutationResult;
   updateSkill: AstroliftSkillMutationResult;
   updateSourceConnection: AstroliftSourceConnectionMutationResult;
   updateSubmissionStatus: AstroliftFormSubmissionMutationResult;
@@ -5950,6 +7034,16 @@ export type MutationCreateApiTokenArgs = {
 };
 
 
+export type MutationCreateClusterAuthGroupArgs = {
+  input: CreateClusterAuthGroupInput;
+};
+
+
+export type MutationCreateClusterAuthUserArgs = {
+  input: CreateClusterAuthUserInput;
+};
+
+
 export type MutationCreateDeployTokenArgs = {
   input: CreateDeployTokenInput;
 };
@@ -5962,6 +7056,11 @@ export type MutationCreateEmailTemplateArgs = {
 
 export type MutationCreateFormDefinitionArgs = {
   input: FormDefinitionInput;
+};
+
+
+export type MutationCreateGroupRoleMappingArgs = {
+  input: CreateGroupRoleMappingInput;
 };
 
 
@@ -6150,6 +7249,11 @@ export type MutationDeleteAppSecretArgs = {
 };
 
 
+export type MutationDeleteClusterAuthUserArgs = {
+  input: ClusterAuthUserRefInput;
+};
+
+
 export type MutationDeleteDeploymentArgs = {
   input: DeploymentByIdInput;
 };
@@ -6162,6 +7266,11 @@ export type MutationDeleteEmailTemplateArgs = {
 
 export type MutationDeleteFormDefinitionArgs = {
   input: DeleteFormDefinitionInput;
+};
+
+
+export type MutationDeleteGroupRoleMappingArgs = {
+  input: DeleteGroupRoleMappingInput;
 };
 
 
@@ -6787,6 +7896,11 @@ export type MutationResendInvitationArgs = {
 };
 
 
+export type MutationResetClusterAuthUserPasswordArgs = {
+  input: ClusterAuthUserRefInput;
+};
+
+
 export type MutationRestartAstroliftWorkloadArgs = {
   input: RestartWorkloadInput;
 };
@@ -6819,6 +7933,11 @@ export type MutationResyncAstroliftCiWorkflowArgs = {
 
 export type MutationResyncAstroliftManifestFromRepoArgs = {
   input: ResyncManifestFromRepoInput;
+};
+
+
+export type MutationRetryAgentTaskArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -7012,6 +8131,11 @@ export type MutationSetAlertSubscriptionArgs = {
 };
 
 
+export type MutationSetAppAccessArgs = {
+  input: SetAppAccessInput;
+};
+
+
 export type MutationSetAppSecretArgs = {
   input: SetAppSecretInput;
 };
@@ -7024,6 +8148,21 @@ export type MutationSetAppSecretMetadataArgs = {
 
 export type MutationSetAppSubdomainArgs = {
   input: SetAppSubdomainInput;
+};
+
+
+export type MutationSetClusterAuthUserEnabledArgs = {
+  input: SetClusterAuthUserEnabledInput;
+};
+
+
+export type MutationSetClusterAuthUserGroupsArgs = {
+  input: SetClusterAuthUserGroupsInput;
+};
+
+
+export type MutationSetClusterAuthUserPasswordArgs = {
+  input: SetClusterAuthUserPasswordInput;
 };
 
 
@@ -7319,6 +8458,11 @@ export type MutationUpdateMyProfileArgs = {
 };
 
 
+export type MutationUpdateMyUiPreferencesArgs = {
+  input: UpdateMyUiPreferencesInput;
+};
+
+
 export type MutationUpdateOrgSkillRepoArgs = {
   input: UpdateOrgSkillRepoInput;
 };
@@ -7357,6 +8501,11 @@ export type MutationUpdateProjectSecretBundleArgs = {
 
 export type MutationUpdateRoleArgs = {
   input: UpdateRoleInput;
+};
+
+
+export type MutationUpdateRoleBindingArgs = {
+  input: UpdateRoleBindingInput;
 };
 
 
@@ -7558,11 +8707,15 @@ export type OrganizationMemberType = {
   version: Scalars['Int']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type OrganizationMemberTypePage = {
   items: Array<OrganizationMemberType>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -7585,11 +8738,15 @@ export type OrganizationType = {
   website?: Maybe<Scalars['String']['output']>;
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type OrganizationTypePage = {
   items: Array<OrganizationType>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -7804,6 +8961,7 @@ export type Query = {
   agentEnvironmentSpec?: Maybe<AstroliftAgentEnvironmentSpec>;
   agentEnvironmentSpecSecretBundleAttachments: Array<AstroliftAgentSecretBundleAttachment>;
   agentEnvironmentSpecSecretStatus: Array<AstroliftAgentSecretStatus>;
+  agentEnvironmentSpecSecretStatusPage: AstroliftAgentSecretStatusPage;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
   agentFleet: Array<AstroliftAgentListItem>;
   agentFleetPage: AstroliftAgentListItemPage;
@@ -7823,8 +8981,10 @@ export type Query = {
   /** @deprecated Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead. */
   agentTriggers: Array<AstroliftAgentTrigger>;
   agentTriggersPage: AstroliftAgentTriggerPage;
+  agentUpcomingRuns: AstroliftAgentUpcomingRunPage;
   agentWorkloads: Array<AstroliftAgentListItem>;
   assignableAstroliftProjects: Array<AstroliftProject>;
+  astroliftAccessOn: AstroliftAccessEntryPage;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
@@ -7836,10 +8996,13 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage. */
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftAlertRulesPage: AstroliftAlertRulePage;
+  astroliftApiTokenScopeCatalog: AstroliftApiTokenScopeCatalog;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage. */
   astroliftApiTokens: Array<AstroliftApiToken>;
   astroliftApiTokensPage: AstroliftApiTokenPage;
   astroliftApp?: Maybe<AstroliftRegisteredApp>;
+  astroliftAppAccess?: Maybe<AstroliftAppAccess>;
+  astroliftAppAccessPreview?: Maybe<AstroliftAppAccessPreview>;
   astroliftAppCertificates: AstroliftAppCertificatesResult;
   astroliftAppCountForCluster: Scalars['Int']['output'];
   /** @deprecated Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage. */
@@ -7875,6 +9038,8 @@ export type Query = {
   astroliftAuditRetention: AstroliftAuditRetention;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   astroliftBudgets: Array<AstroliftBudget>;
+  astroliftCluster?: Maybe<AstroliftTenantCluster>;
+  astroliftClusterAuthUsers?: Maybe<AstroliftClusterAuthUsers>;
   astroliftClusterBootstrapPlan?: Maybe<AstroliftClusterBootstrapPlan>;
   astroliftClusterCertificates: AstroliftClusterCertificates;
   astroliftClusterCount: Scalars['Int']['output'];
@@ -7918,6 +9083,7 @@ export type Query = {
   astroliftEmailTemplateStats: Array<AstroliftTemplateSendStatPoint>;
   astroliftEmailTemplates: Array<AstroliftEmailTemplate>;
   astroliftEnvironments: Array<AstroliftAppEnvironment>;
+  astroliftEnvironmentsPage: AstroliftAppEnvironmentPage;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage. */
   astroliftEvents: Array<AstroliftEvent>;
   /** @deprecated Caps at 500 buckets folded from a bounded 10k-row scan, so activity older than the scan window is unreachable. Use astroliftEventsAggregatedPage. */
@@ -7925,6 +9091,8 @@ export type Query = {
   astroliftEventsAggregatedPage: AstroliftAggregatedEventPage;
   astroliftEventsPage: AstroliftEventPage;
   astroliftExecutePromql: AstroliftExecutePromqlResult;
+  astroliftGrantPreview: AstroliftGrantPreview;
+  astroliftGroupRoleMappingsPage: AstroliftGroupRoleMappingPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
@@ -7939,7 +9107,9 @@ export type Query = {
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage. */
   astroliftMembers: Array<AstroliftMember>;
   astroliftMembersPage: AstroliftMemberPage;
+  astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
+  astroliftModelEndpointsPage: AstroliftManagedServicePage;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -7950,6 +9120,7 @@ export type Query = {
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
+  astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
   astroliftOrgMembersForApprovalPicker: Array<AstroliftApproverUser>;
@@ -7969,9 +9140,14 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage. */
   astroliftPolicies: Array<AstroliftPolicy>;
   astroliftPoliciesPage: AstroliftPolicyPage;
+  astroliftPolicy?: Maybe<AstroliftPolicy>;
+  astroliftPolicyConditionCatalog: AstroliftPolicyConditionCatalog;
+  astroliftPolicySimulation: AstroliftPolicySimulation;
+  astroliftPreviewEnvironmentCounts: AstroliftPreviewEnvironmentCounts;
   /** @deprecated Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage. */
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentsPage: AstroliftPreviewEnvironmentPage;
+  astroliftPrincipalSearch: AstroliftPrincipalPage;
   astroliftProjectManagedServiceCatalog: Array<AstroliftManagedServiceCatalogEntry>;
   astroliftProjectManagedServices: Array<AstroliftManagedService>;
   astroliftProjectResourceClusters: Array<AstroliftTenantCluster>;
@@ -7987,6 +9163,7 @@ export type Query = {
   astroliftRecentActivity: AstroliftActivityPage;
   astroliftRecentClusterWorkflows: Array<AstroliftClusterWorkflowRun>;
   astroliftRenderedManifest?: Maybe<AstroliftRenderedManifest>;
+  astroliftRole?: Maybe<AstroliftRole>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage. */
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
   astroliftRoleBindingsPage: AstroliftRoleBindingPage;
@@ -7994,6 +9171,8 @@ export type Query = {
   astroliftRoles: Array<AstroliftRole>;
   astroliftRolesICanGrant: Array<AstroliftRole>;
   astroliftRolesPage: AstroliftRolePage;
+  /** Everything that ran, of every kind, in one cursor list (#2152): agent tasks, workflow runs, deployments, job runs and task runs, newest first. Each kind is read under its own permission and narrowed to the caller's scopes. */
+  astroliftRunAudit: AstroliftRunAuditItemPage;
   astroliftScheduledJobRun?: Maybe<AstroliftScheduledJobRun>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftScheduledJobRunsPage. */
   astroliftScheduledJobRuns: Array<AstroliftScheduledJobRun>;
@@ -8064,6 +9243,7 @@ export type Query = {
   membersPage: OrganizationMemberTypePage;
   orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
+  orgToolDefsPage: AstroliftToolDefPage;
   organization?: Maybe<OrganizationType>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use organizationsPage. */
   organizations: Array<OrganizationType>;
@@ -8071,9 +9251,9 @@ export type Query = {
   organizationsPage: OrganizationTypePage;
   /** Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820). */
   pendingHumanGates: Array<PendingHumanGate>;
-  /** Compare effective permissions between two users. */
+  /** Compare effective permissions between two users, anywhere in the active organization or on a target scope (scopeType, scopeId). Superuser or org.manage_members; both users must be members of the active organization. */
   permissionCompare?: Maybe<PermissionComparison>;
-  /** Diagnose why a user can or can't perform a specific permission. */
+  /** Diagnose why a user can or can't perform a specific permission, optionally on a target scope (scopeType ORG, TEAM, PROJECT, APP or AGENT; scopeId its guid). Self, superuser or org.manage_members; the user must be a member of the active organization. */
   permissionDiagnose?: Maybe<PermissionDiagnosis>;
   previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
   previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
@@ -8083,13 +9263,19 @@ export type Query = {
   scanCloudOrphans: CloudOrphanReportType;
   skill?: Maybe<AstroliftSkill>;
   skills: Array<AstroliftSkill>;
+  skillsPage: AstroliftSkillPage;
+  toolDef?: Maybe<AstroliftToolDef>;
   toolDefs: Array<AstroliftToolDef>;
   /** One configured Workflow by slug, with its recent runs. */
   workflow?: Maybe<ConfiguredWorkflow>;
   /** One visible workflow definition by slug (prefers the org's over a global). */
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
+  /** One run of a workflow definition by guid, or null (#2155). */
+  workflowDefinitionRun?: Maybe<WorkflowDefinitionRun>;
   /** Recent runs of workflow definitions visible in the caller's organization. */
   workflowDefinitionRuns: Array<WorkflowDefinitionRun>;
+  /** Runs of workflow definitions visible in the caller's organization, cursor-paged, with search and filters (#2155). */
+  workflowDefinitionRunsPage: WorkflowDefinitionRunPage;
   /**
    * Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
    * @deprecated Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage.
@@ -8158,6 +9344,16 @@ export type QueryAgentEnvironmentSpecSecretStatusArgs = {
 };
 
 
+export type QueryAgentEnvironmentSpecSecretStatusPageArgs = {
+  filter?: InputMaybe<AstroliftAgentSecretStatusFilter>;
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  slug: Scalars['String']['input'];
+  sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAgentEnvironmentSpecsArgs = {
   orgId: Scalars['ID']['input'];
 };
@@ -8170,9 +9366,13 @@ export type QueryAgentFleetArgs = {
 
 export type QueryAgentFleetPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftAgentFleetFilter>;
   limit?: Scalars['Int']['input'];
   orgId: Scalars['ID']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -8248,9 +9448,11 @@ export type QueryAgentTasksArgs = {
 
 export type QueryAgentTasksPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftAgentTasksFilter>;
   limit?: Scalars['Int']['input'];
   orgId: Scalars['ID']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   workloadId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -8271,10 +9473,31 @@ export type QueryAgentTriggersPageArgs = {
 };
 
 
+export type QueryAgentUpcomingRunsArgs = {
+  agent?: InputMaybe<Array<Scalars['String']['input']>>;
+  orgId: Scalars['ID']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  perAgent?: Scalars['Int']['input'];
+  project?: InputMaybe<Array<Scalars['String']['input']>>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  withinHours?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryAgentWorkloadsArgs = {
   dispatchable?: Scalars['Boolean']['input'];
   orgId: Scalars['ID']['input'];
   projectSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAccessOnArgs = {
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  scopeId: Scalars['String']['input'];
+  scopeKind: Scalars['String']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -8342,6 +9565,18 @@ export type QueryAstroliftApiTokensPageArgs = {
 export type QueryAstroliftAppArgs = {
   includeDrift?: Scalars['Boolean']['input'];
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppAccessArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppAccessPreviewArgs = {
+  appSlug: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  users: Array<Scalars['String']['input']>;
 };
 
 
@@ -8531,11 +9766,15 @@ export type QueryAstroliftAppsArgs = {
 
 export type QueryAstroliftAppsPageArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftAppsListFilter>;
   includeArchived?: Scalars['Boolean']['input'];
   includeFreshness?: Scalars['Boolean']['input'];
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   projectSlug?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   sortBy?: AppsListSortKey;
   sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
   status?: InputMaybe<AstroliftAppListStatusFilter>;
@@ -8560,8 +9799,14 @@ export type QueryAstroliftAuditEventsPageArgs = {
   createdAtGte?: InputMaybe<Scalars['DateTime']['input']>;
   createdAtLte?: InputMaybe<Scalars['DateTime']['input']>;
   decision?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftAuditEventsFilter>;
   includeTotal?: Scalars['Boolean']['input'];
   limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+  subjectUserId?: InputMaybe<Scalars['String']['input']>;
+  targetId?: InputMaybe<Scalars['String']['input']>;
+  targetKind?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -8569,6 +9814,17 @@ export type QueryAstroliftAvailableReposArgs = {
   connectionId: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftClusterArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftClusterAuthUsersArgs = {
+  clusterId: Scalars['GUID']['input'];
+  search?: Scalars['String']['input'];
 };
 
 
@@ -8626,8 +9882,12 @@ export type QueryAstroliftClusterWorkloadHealthArgs = {
 
 export type QueryAstroliftClustersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftClustersListFilter>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -8656,6 +9916,7 @@ export type QueryAstroliftCommandRunsArgs = {
 export type QueryAstroliftCommandRunsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftCommandRunsFilter>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
 };
@@ -8728,9 +9989,11 @@ export type QueryAstroliftDeploymentsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftDeploymentsFilter>;
   isPreview?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   statuses?: InputMaybe<Array<Scalars['String']['input']>>;
 };
@@ -8788,6 +10051,16 @@ export type QueryAstroliftEnvironmentsArgs = {
 };
 
 
+export type QueryAstroliftEnvironmentsPageArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftEnvironmentsFilter>;
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftEventsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   eventType?: InputMaybe<Scalars['String']['input']>;
@@ -8836,6 +10109,20 @@ export type QueryAstroliftExecutePromqlArgs = {
 };
 
 
+export type QueryAstroliftGrantPreviewArgs = {
+  input: AstroliftGrantPreviewInput;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryAstroliftGroupRoleMappingsPageArgs = {
+  groupExternalId?: InputMaybe<Scalars['String']['input']>;
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftInvitationsArgs = {
   status?: InputMaybe<Scalars['String']['input']>;
 };
@@ -8843,8 +10130,12 @@ export type QueryAstroliftInvitationsArgs = {
 
 export type QueryAstroliftInvitationsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftInvitationsListFilter>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -8887,8 +10178,26 @@ export type QueryAstroliftMembersArgs = {
 
 export type QueryAstroliftMembersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftMembersListFilter>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftModelEndpointArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftModelEndpointsPageArgs = {
+  filter?: InputMaybe<AstroliftModelEndpointsFilter>;
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -8909,11 +10218,15 @@ export type QueryAstroliftMyAppsArgs = {
 
 export type QueryAstroliftMyAppsPageArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftAppsListFilter>;
   includeArchived?: Scalars['Boolean']['input'];
   includeFreshness?: Scalars['Boolean']['input'];
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   projectSlug?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   sortBy?: AppsListSortKey;
   sourceKind?: InputMaybe<AstroliftAppSourceKindFilter>;
   status?: InputMaybe<AstroliftAppListStatusFilter>;
@@ -8988,9 +10301,31 @@ export type QueryAstroliftPodResourceUsageArgs = {
 
 export type QueryAstroliftPoliciesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftPoliciesListFilter>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   sortBy?: InputMaybe<AstroliftListSortKey>;
+};
+
+
+export type QueryAstroliftPolicyArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftPolicySimulationArgs = {
+  days?: InputMaybe<Scalars['Int']['input']>;
+  draft: AstroliftPolicyDraftInput;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryAstroliftPreviewEnvironmentCountsArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9002,9 +10337,19 @@ export type QueryAstroliftPreviewEnvironmentsArgs = {
 export type QueryAstroliftPreviewEnvironmentsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftPreviewEnvironmentsFilter>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   statuses?: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+
+export type QueryAstroliftPrincipalSearchArgs = {
+  filter?: InputMaybe<AstroliftPrincipalSearchFilter>;
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9074,19 +10419,42 @@ export type QueryAstroliftRenderedManifestArgs = {
 };
 
 
+export type QueryAstroliftRoleArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftRoleBindingsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftRoleBindingsListFilter>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
 export type QueryAstroliftRolesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftRolesListFilter>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   sortBy?: InputMaybe<AstroliftListSortKey>;
+};
+
+
+export type QueryAstroliftRunAuditArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftRunAuditFilter>;
+  first?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9106,6 +10474,7 @@ export type QueryAstroliftScheduledJobRunsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftScheduledJobRunsFilter>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
@@ -9192,8 +10561,12 @@ export type QueryAstroliftTeamSlugAvailableArgs = {
 
 export type QueryAstroliftTeamsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftTeamsListFilter>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
   sortBy?: InputMaybe<AstroliftListSortKey>;
 };
 
@@ -9305,9 +10678,13 @@ export type QueryAstroliftWorkloadsArgs = {
 export type QueryAstroliftWorkloadsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   appSlug?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftWorkloadsFilter>;
   kinds?: InputMaybe<Array<Scalars['String']['input']>>;
   limit?: Scalars['Int']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9375,6 +10752,16 @@ export type QueryOrgToolDefsArgs = {
 };
 
 
+export type QueryOrgToolDefsPageArgs = {
+  filter?: InputMaybe<AstroliftToolDefsFilter>;
+  orgId: Scalars['ID']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryOrganizationArgs = {
   id: Scalars['ID']['input'];
 };
@@ -9399,6 +10786,8 @@ export type QueryPendingHumanGatesArgs = {
 
 
 export type QueryPermissionCompareArgs = {
+  scopeId?: InputMaybe<Scalars['String']['input']>;
+  scopeType?: InputMaybe<Scalars['String']['input']>;
   userIdA: Scalars['ID']['input'];
   userIdB: Scalars['ID']['input'];
 };
@@ -9406,6 +10795,8 @@ export type QueryPermissionCompareArgs = {
 
 export type QueryPermissionDiagnoseArgs = {
   permission: Scalars['String']['input'];
+  scopeId?: InputMaybe<Scalars['String']['input']>;
+  scopeType?: InputMaybe<Scalars['String']['input']>;
   userId: Scalars['ID']['input'];
 };
 
@@ -9452,6 +10843,21 @@ export type QuerySkillsArgs = {
 };
 
 
+export type QuerySkillsPageArgs = {
+  filter?: InputMaybe<AstroliftSkillsFilter>;
+  orgId: Scalars['ID']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryToolDefArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type QueryToolDefsArgs = {
   skillId: Scalars['ID']['input'];
 };
@@ -9469,11 +10875,27 @@ export type QueryWorkflowDefinitionArgs = {
 };
 
 
+export type QueryWorkflowDefinitionRunArgs = {
+  guid: Scalars['String']['input'];
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
 export type QueryWorkflowDefinitionRunsArgs = {
   limit?: Scalars['Int']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
   projectId?: InputMaybe<Scalars['ID']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryWorkflowDefinitionRunsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<WorkflowDefinitionRunsFilter>;
+  limit?: Scalars['Int']['input'];
+  orgId?: InputMaybe<Scalars['ID']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9936,6 +11358,12 @@ export type SetAlertSubscriptionInput = {
   enabled: Scalars['Boolean']['input'];
 };
 
+export type SetAppAccessInput = {
+  appSlug: Scalars['String']['input'];
+  groups: Array<Scalars['String']['input']>;
+  users: Array<Scalars['String']['input']>;
+};
+
 export type SetAppSecretInput = {
   appSlug: Scalars['String']['input'];
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
@@ -9958,6 +11386,26 @@ export type SetAppSecretMetadataInput = {
 export type SetAppSubdomainInput = {
   id: Scalars['GUID']['input'];
   subdomain: Scalars['String']['input'];
+};
+
+export type SetClusterAuthUserEnabledInput = {
+  clusterId: Scalars['GUID']['input'];
+  enabled: Scalars['Boolean']['input'];
+  username: Scalars['String']['input'];
+};
+
+export type SetClusterAuthUserGroupsInput = {
+  add: Array<Scalars['String']['input']>;
+  clusterId: Scalars['GUID']['input'];
+  remove: Array<Scalars['String']['input']>;
+  username: Scalars['String']['input'];
+};
+
+export type SetClusterAuthUserPasswordInput = {
+  clusterId: Scalars['GUID']['input'];
+  password: Scalars['String']['input'];
+  permanent: Scalars['Boolean']['input'];
+  username: Scalars['String']['input'];
 };
 
 export type SetDomainPathRoutesInput = {
@@ -10281,6 +11729,18 @@ export type UpdateMyProfileInput = {
   timezone: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateMyUiPreferencesInput = {
+  appView: InputMaybe<Scalars['String']['input']>;
+  appearance: InputMaybe<Scalars['JSON']['input']>;
+  fleetView: InputMaybe<Scalars['String']['input']>;
+  flowParticles: InputMaybe<Scalars['Boolean']['input']>;
+  homeLayout: InputMaybe<Scalars['String']['input']>;
+  homeLayoutAsked: InputMaybe<Scalars['Boolean']['input']>;
+  motion: InputMaybe<Scalars['String']['input']>;
+  restrictedSettings: InputMaybe<Scalars['String']['input']>;
+  workflowView: InputMaybe<Scalars['String']['input']>;
+};
+
 export type UpdateOrgSkillRepoInput = {
   defaultRef: InputMaybe<Scalars['String']['input']>;
   detachSourceConnection: Scalars['Boolean']['input'];
@@ -10304,6 +11764,7 @@ export type UpdateOrganizationInput = {
   metricsRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   metricsRollupRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   name: InputMaybe<Scalars['String']['input']>;
+  restrictedSettingsDefault: InputMaybe<Scalars['String']['input']>;
   traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
@@ -10338,6 +11799,12 @@ export type UpdateProjectSecretBundleInput = {
   backendRef: Scalars['String']['input'];
   id: Scalars['GUID']['input'];
   name: Scalars['String']['input'];
+};
+
+export type UpdateRoleBindingInput = {
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  id: Scalars['GUID']['input'];
+  roleId: InputMaybe<Scalars['GUID']['input']>;
 };
 
 export type UpdateRoleInput = {
@@ -10379,6 +11846,7 @@ export type UpdateTenantClusterInput = {
   isActive: InputMaybe<Scalars['Boolean']['input']>;
   oidcAuthConfig: InputMaybe<Scalars['JSON']['input']>;
   region: InputMaybe<Scalars['String']['input']>;
+  syncManifests: Scalars['Boolean']['input'];
 };
 
 export type UpdateWebhookSubscriptionInput = {
@@ -10503,6 +11971,37 @@ export type WorkflowDefinitionRun = {
   status: Scalars['String']['output'];
   temporalRunId?: Maybe<Scalars['String']['output']>;
   temporalWorkflowId: Scalars['String']['output'];
+  triggerKind: Scalars['String']['output'];
+  triggeredByMe: Scalars['Boolean']['output'];
+  triggeredByUserId?: Maybe<Scalars['String']['output']>;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type WorkflowDefinitionRunPage = {
+  items: Array<WorkflowDefinitionRun>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type WorkflowDefinitionRunsFilter = {
+  /** Definition slugs. */
+  definition: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Project slugs. */
+  project: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Initiator user ids (as on the row), or "me". */
+  startedBy: InputMaybe<Array<Scalars['String']['input']>>;
+  /** true: runs the viewer started. false: runs someone or something else did. */
+  startedByMe: InputMaybe<Scalars['Boolean']['input']>;
+  /** Run statuses, any of. */
+  status: InputMaybe<Array<Scalars['String']['input']>>;
+  /** manual, api, schedule, webhook, parent or unknown. */
+  trigger: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type WorkflowDefinitionSummary = {
@@ -10525,11 +12024,15 @@ export type WorkflowDefinitionSummary = {
   stages: Array<WorkflowTopologyStage>;
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type WorkflowDefinitionSummaryPage = {
   items: Array<WorkflowDefinitionSummary>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
@@ -10673,11 +12176,15 @@ export type WorkflowStageExecutionType = {
   status: Scalars['String']['output'];
 };
 
-/** One page of a cursor-paginated list. */
+/** One page of a cursor-paginated or numbered list. */
 export type WorkflowStageExecutionTypePage = {
   items: Array<WorkflowStageExecutionType>;
   /** Opaque token for the next page; null when the list is exhausted. */
   nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };

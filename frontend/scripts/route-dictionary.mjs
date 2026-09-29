@@ -7,8 +7,9 @@
 //   redirect → /x    — a thin server alias (page.tsx calls redirect())
 //   flagged          — parked via lib/route-flags.ts (on disk, 404s)
 //
-// Cross-references the nav-chrome surfaces (components/AstroliftNav.tsx's
-// module switcher, NavTree.tsx, NavUser.tsx, KeyboardShortcuts.tsx) and
+// Cross-references the nav-chrome surfaces (the rail model in
+// lib/shell/nav-model.ts, the shell's user and org menus,
+// KeyboardShortcuts.tsx) and
 // components/CommandPalette.tsx so the table shows where each route is
 // reachable from. Output is deterministic (sorted, no timestamps) — run
 // it twice, get the same bytes.
@@ -22,10 +23,10 @@ import { fileURLToPath } from "node:url";
 const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const APP_DIR = join(FRONTEND, "app", "(app)");
 const FLAGS_FILE = join(FRONTEND, "lib", "route-flags.ts");
-const NAV_FILE = join(FRONTEND, "components", "AstroliftNav.tsx");
+const NAV_FILE = join(FRONTEND, "lib", "shell", "nav-model.ts");
 const PALETTE_FILE = join(FRONTEND, "components", "CommandPalette.tsx");
-const NAV_TREE_FILE = join(FRONTEND, "components", "NavTree.tsx");
-const NAV_USER_FILE = join(FRONTEND, "components", "NavUser.tsx");
+const USER_MENU_FILE = join(FRONTEND, "components", "shell", "UserMenu.tsx");
+const ORG_MENU_FILE = join(FRONTEND, "components", "shell", "OrgMenu.tsx");
 const KEYBOARD_FILE = join(FRONTEND, "components", "KeyboardShortcuts.tsx");
 const OUT_FILE = join(FRONTEND, "ROUTES.md");
 // The backend serves this dictionary to the wayfinding assistant (#1101)
@@ -78,18 +79,9 @@ function flagFor(route, flags) {
 
 // ─── nav-surface hrefs ──────────────────────────────────────────────────────
 
-/**
- * Pull href strings out of a nav component. For AstroliftNav, only the
- * live module switcher counts — the file keeps flag-off deferred section
- * definitions above the `const modules` marker for re-enable reference,
- * and those must not read as "on nav".
- */
-function hrefsOf(file, { fromMarker } = {}) {
-  let src = readFileSync(file, "utf8");
-  if (fromMarker) {
-    const at = src.indexOf(fromMarker);
-    if (at !== -1) src = src.slice(at);
-  }
+/** Pull the literal href strings out of a nav file. */
+function hrefsOf(file) {
+  const src = readFileSync(file, "utf8");
   const out = new Set();
   for (const m of src.matchAll(/href(?::\s*|=)"([^"]+)"/g)) {
     out.add(m[1].split("#")[0]); // fragment-insensitive
@@ -101,14 +93,13 @@ function hrefsOf(file, { fromMarker } = {}) {
 
 const flags = parseFlags();
 // Every sidebar / nav-chrome surface that emits route hrefs counts as a
-// "nav" home: the module switcher (AstroliftNav), the workspace tree
-// (NavTree), the user menu (NavUser), and the keyboard-shortcut map
-// (KeyboardShortcuts). Only literal string hrefs are captured — template
+// "nav" home: the rail (nav-model), the user and org menus, and the
+// keyboard-shortcut map (KeyboardShortcuts). Only literal string hrefs are captured — template
 // -literal detail links (e.g. /teams/${slug}) are excluded by construction.
 const navHrefs = new Set([
-  ...hrefsOf(NAV_FILE, { fromMarker: "const modules" }),
-  ...hrefsOf(NAV_TREE_FILE),
-  ...hrefsOf(NAV_USER_FILE),
+  ...hrefsOf(NAV_FILE),
+  ...hrefsOf(USER_MENU_FILE),
+  ...hrefsOf(ORG_MENU_FILE),
   ...hrefsOf(KEYBOARD_FILE),
 ]);
 const paletteHrefs = hrefsOf(PALETTE_FILE);
@@ -156,7 +147,7 @@ const lines = [
   "",
   `Covers every \`page.tsx\` under \`app/(app)/\` (${rows.length} routes). "Nav home" says`,
   "which chrome surface links to the route: the sidebar nav chrome",
-  "(components/AstroliftNav.tsx, NavTree.tsx, NavUser.tsx,",
+  "(lib/shell/nav-model.ts, components/shell/UserMenu.tsx, OrgMenu.tsx,",
   "KeyboardShortcuts.tsx) and/or the Cmd-K palette",
   "(components/CommandPalette.tsx). Routes reachable only by in-page links or",
   "direct URL show `—`.",

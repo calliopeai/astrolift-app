@@ -195,6 +195,15 @@ class Organization(NamedBaseCoreModel):
     # an org can publish a default it wants people to be able to override.
     appearance_locked = models.BooleanField(default=False)
 
+    # Settings a person lacks the permission to change (spec 44 §5.3): shown
+    # read-only or hidden, for everyone who has not chosen for themselves
+    # (#2154). A person's own UserPreferences.restricted_settings wins.
+    restricted_settings_default = models.CharField(
+        max_length=8,
+        choices=[("show", "Show read-only"), ("hide", "Hide")],
+        default="show",
+    )
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

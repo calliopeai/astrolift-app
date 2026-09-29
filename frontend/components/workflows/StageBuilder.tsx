@@ -1,40 +1,37 @@
 "use client";
 
 /**
- * Stage-based workflow definition builder (spec 40 §5.1, #970).
+ * Stage-based workflow definition builder (spec 40 §5.1, #970), the
+ * workflow's Builder tab (spec 44 §5.2).
  *
- * The persisted model is an ORDERED pipeline with fan-out — not a free
- * DAG. Edges are always DERIVED from stage order + fan_out + aggregation;
- * nothing is user-drawable. Three views over the same ordered stage cards:
+ * The persisted model is an ORDERED pipeline with fan-out, not a free DAG.
+ * Edges are always DERIVED from stage order + fan_out + aggregation;
+ * nothing is user-drawable. Two views over the same ordered stages:
  *
- *  - **List**  — ordered stack, inline per-stage editors, up/down reorder.
- *  - **Graph** — React Flow render of the same cards; auto-layout from
- *    order via the shared rankLayout helper.
- *  - **Code**  — the canonical TOML manifest (exportWorkflowManifest /
+ *  - **Stages**: the workflow drawn in the person's chosen workflow view
+ *    (WorkflowView: loops, fan-out, supervisors and nested workflows from
+ *    definition-line.ts) beside the ordered stage cards. One card is open
+ *    at a time, picked in the list or by clicking its station, so the
+ *    page stays within about two screens.
+ *  - **Code**: the canonical TOML manifest (exportWorkflowManifest /
  *    previewWorkflowManifest). In-place apply is intentionally disabled:
  *    TOML stages carry no stable identity, so edits cannot be mapped
- *    safely onto existing stage guids — Export + Import-as-new instead.
+ *    safely onto existing stage guids; Export + Import-as-new instead.
  *
  * Global (organization == null) and repository-managed definitions render
  * read-only with an ownership banner. All affordances are gated on the
  * server-authoritative `me.modules` workflows entry.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  ReactFlow,
-  Controls,
-  Background,
-  MiniMap,
-  Handle,
-  Position,
-  MarkerType,
-  type Edge,
-  type Node,
-  type NodeTypes,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertTriangleIcon,
   ArrowDownIcon,
@@ -52,14 +49,12 @@ import {
   Loader2Icon,
   LockIcon,
   MergeIcon,
-  NetworkIcon,
   PlusIcon,
   SaveIcon,
   TrashIcon,
   UserCheckIcon,
   WorkflowIcon,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -79,27 +74,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { TagInput } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
-import { rankLayout } from "@/components/viz/flow-layout";
+import { WorkflowView } from "@/components/viz/WorkflowView";
 import { AgentWorkloadPicker, SkillRefsPicker } from "@/components/workflows/pickers";
-import { useActiveOrg } from "@/graphql/identity/identity.hooks";
-import {
-  useCloneDefinition,
-  useCreateWorkflowStage,
-  useDeleteWorkflowStage,
-  useManifestExport,
-  useManifestImport,
-  useManifestPreview,
-  useReorderWorkflowStages,
-  useUpdateWorkflowStage,
-  useWorkflowDefinition,
-  useWorkflowsEntitlement,
-  useWorkflowStages,
-} from "@/graphql/workflows/tiered.hooks";
-import type {
-  TieredMutationResult,
-  WorkflowManifestPreview,
-  WorkflowStage,
-} from "@/graphql/workflows/tiered.types";
+
+import { definitionLine, definitionSnapshot, lineShape } from "./definition-line";
+
+import type { useStageBuilder } from "./use-stage-builder";
+import type { WorkflowManifestPreview, WorkflowStage } from "@/graphql/workflows/tiered.types";
 
 // ─── Domain constants ────────────────────────────────────────────────────
 
@@ -139,7 +120,7 @@ const STAGE_KINDS: {
     value: "checkpoint",
     label: "Checkpoint",
     icon: FlagIcon,
-    hint: "Snapshots state at this point — no external dispatch.",
+    hint: "Snapshots state at this point, with no external dispatch.",
   },
 ];
 
@@ -163,7 +144,7 @@ function stageKindMeta(kind: string) {
 
 // ─── Draft model ─────────────────────────────────────────────────────────
 
-type StageDraft = {
+export type StageDraft = {
   kind: string;
   /** Also doubles as the checkpoint label. */
   role: string;
@@ -221,18 +202,18 @@ function emptyDraft(): StageDraft {
   };
 }
 
-function reportResult(result: TieredMutationResult | null | undefined, fallback: string): boolean {
-  if (result?.ok) return true;
-  const errors = result?.errors ?? [];
-  if (errors.length > 0) {
-    for (const e of errors) toast.error(`${e.field}: ${e.messages.join(", ")}`);
-  } else {
-    toast.error(fallback);
-  }
-  return false;
-}
-
 // ─── Stage editor fields (shared: list card, graph node, add form) ──────
+
+type PickerOptions = ReturnType<typeof useStageBuilder>["pickerOptions"];
+
+// The pickers' options, provided once by StageBuilder so the stage cards
+// and the add form all read the same listings.
+const PickerOptionsContext = createContext<PickerOptions>({
+  workloads: [],
+  workloadsLoading: false,
+  skills: [],
+  skillsLoading: false,
+});
 
 function StageEditorFields({
   draft,
@@ -246,6 +227,7 @@ function StageEditorFields({
   disabled: boolean;
 }) {
   const kindMeta = stageKindMeta(draft.kind);
+  const options = useContext(PickerOptionsContext);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
@@ -305,6 +287,8 @@ function StageEditorFields({
               value={draft.agentDefinitionGuid}
               onChange={(id) => onPatch({ agentDefinitionGuid: id })}
               orgScoped={orgScoped}
+              workloads={options.workloads}
+              loading={options.workloadsLoading}
               disabled={disabled}
             />
           </div>
@@ -324,6 +308,8 @@ function StageEditorFields({
               value={draft.skillRefs}
               onChange={(refs) => onPatch({ skillRefs: refs })}
               orgScoped={orgScoped}
+              options={options.skills}
+              loading={options.skillsLoading}
               disabled={disabled}
             />
           </div>
@@ -460,7 +446,7 @@ function StageEditorFields({
   );
 }
 
-// ─── Stage card (one node — collapsed header + expandable editor) ───────
+// ─── Stage card (collapsed header + expandable editor) ─────────────────
 
 type StageCardProps = {
   stage: WorkflowStage;
@@ -474,7 +460,6 @@ type StageCardProps = {
   onSave: (guid: string, draft: StageDraft) => Promise<void>;
   onDelete: (guid: string) => void;
   onMove: (index: number, dir: -1 | 1) => void;
-  inGraph?: boolean;
 };
 
 function StageCard({
@@ -489,17 +474,14 @@ function StageCard({
   onSave,
   onDelete,
   onMove,
-  inGraph = false,
 }: StageCardProps) {
   const [draft, setDraft] = useState<StageDraft>(() => draftFromStage(stage));
   const meta = stageKindMeta(stage.kind);
   const KindIcon = meta.icon;
 
   return (
-    <Card className={inGraph ? "w-80 shadow-md" : undefined}>
-      <CardContent
-        className={inGraph ? "nodrag nowheel flex flex-col gap-3 p-4" : "flex flex-col gap-3"}
-      >
+    <Card className={expanded ? "border-primary/60" : undefined}>
+      <CardContent className="flex min-w-0 flex-col gap-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -614,22 +596,6 @@ function StageCard({
   );
 }
 
-// ─── Graph node wrapper ──────────────────────────────────────────────────
-
-function StageFlowNode({ data }: { data: StageCardProps }) {
-  return (
-    <div>
-      <Handle type="target" position={Position.Left} className="!bg-muted-foreground" />
-      <StageCard {...data} inGraph />
-      <Handle type="source" position={Position.Right} className="!bg-muted-foreground" />
-    </div>
-  );
-}
-
-const stageNodeTypes: NodeTypes = {
-  stageNode: StageFlowNode as unknown as NodeTypes[string],
-};
-
 // ─── Add-stage form ──────────────────────────────────────────────────────
 
 function AddStageCard({
@@ -680,36 +646,32 @@ function AddStageCard({
 
 function CodeView({
   slug,
-  orgId,
   canCreate,
+  manifest,
 }: {
   slug: string;
-  orgId: string | null;
   canCreate: boolean;
+  manifest: StageBuilderProps["manifest"];
 }) {
-  const router = useRouter();
-  // null = "not user-edited yet" — the export result seeds the editor.
+  // null = "not user-edited yet": the export result seeds the editor.
   const [editedToml, setEditedToml] = useState<string | null>(null);
   const [preview, setPreview] = useState<WorkflowManifestPreview | null>(null);
   const [validating, setValidating] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [exportManifest, exportResult] = useManifestExport();
-  const [previewManifest] = useManifestPreview();
-  const [importManifest] = useManifestImport();
+  const { load, exported } = manifest;
 
   // Fetch the canonical TOML once per definition.
   useEffect(() => {
-    void exportManifest({ variables: { definitionSlug: slug } });
-  }, [exportManifest, slug]);
+    load();
+  }, [load]);
 
-  const exported = exportResult.data?.exportWorkflowManifest;
   const toml = editedToml ?? (exported?.ok ? (exported.toml ?? "") : "");
-  const loading = editedToml == null && !exported && (exportResult.loading || !exportResult.called);
+  const loading = editedToml == null && !exported && manifest.loading;
   const exportFailed =
     editedToml == null &&
-    ((exported != null && !exported.ok) || (exported == null && exportResult.error != null));
+    ((exported != null && !exported.ok) || (exported == null && manifest.error != null));
   const ready = !loading && !exportFailed;
 
   const setToml = (value: string) => setEditedToml(value);
@@ -717,8 +679,7 @@ function CodeView({
   const handleValidate = async (source?: string) => {
     setValidating(true);
     try {
-      const { data } = await previewManifest({ variables: { toml: source ?? toml } });
-      setPreview(data?.previewWorkflowManifest ?? null);
+      setPreview(await manifest.preview(source ?? toml));
     } finally {
       setValidating(false);
     }
@@ -743,19 +704,8 @@ function CodeView({
   const handleImportAsNew = async () => {
     setImporting(true);
     try {
-      const { data } = await importManifest({
-        variables: { toml, preview: false, orgId },
-      });
-      const res = data?.importWorkflowManifest;
-      if (res?.ok && res.createdSlug) {
-        toast.success("Definition imported", { description: res.createdSlug });
-        router.push(`/workflows/${res.createdSlug}/builder`);
-        return;
-      }
-      if (res?.manifest && !res.manifest.ok && res.manifest.error) {
-        setPreview(res.manifest);
-      }
-      reportResult(res, "Import failed");
+      const invalid = await manifest.importAsNew(toml);
+      if (invalid) setPreview(invalid);
     } finally {
       setImporting(false);
     }
@@ -833,9 +783,7 @@ function CodeView({
       ) : exportFailed ? (
         <div className="border-danger/40 bg-danger/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
           <AlertTriangleIcon className="text-danger-fg mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            {exported?.error ?? exportResult.error?.message ?? "Failed to export the manifest."}
-          </p>
+          <p>{exported?.error ?? manifest.error ?? "Failed to export the manifest."}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -872,14 +820,14 @@ function CodeView({
             <div className="border-success/40 bg-success/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
               <CheckCircle2Icon className="text-success-fg mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                Valid — <span className="font-medium">{preview.definition.name}</span> (
+                Valid: <span className="font-medium">{preview.definition.name}</span> (
                 {preview.definition.pattern}), {preview.stages.length} stage
                 {preview.stages.length === 1 ? "" : "s"}.
               </p>
             </div>
           )}
           <p className="text-muted-foreground text-xs">
-            Applying code edits to this definition in place isn&apos;t supported yet — TOML stages
+            Applying code edits to this definition in place isn&apos;t supported yet: TOML stages
             carry no stable identity, so edits can&apos;t be mapped safely onto existing stages.
             Export, edit, and use &quot;Import as new&quot; to create a definition from the edited
             manifest.
@@ -892,39 +840,43 @@ function CodeView({
 
 // ─── Main builder ────────────────────────────────────────────────────────
 
-type BuilderView = "list" | "graph" | "code";
+type BuilderView = "stages" | "code";
 
 const VIEW_OPTIONS: {
   value: BuilderView;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { value: "list", label: "List", icon: ListIcon },
-  { value: "graph", label: "Graph", icon: NetworkIcon },
+  { value: "stages", label: "Stages", icon: ListIcon },
   { value: "code", label: "Code", icon: CodeIcon },
 ];
 
-export function StageBuilder({ slug }: { slug: string }) {
-  const router = useRouter();
-  const { org } = useActiveOrg();
-  const orgId = org?.id ?? null;
-  const { canCreate, canManage } = useWorkflowsEntitlement();
+export type StageBuilderProps = ReturnType<typeof useStageBuilder>;
 
-  const { definition, loading: defLoading } = useWorkflowDefinition(slug, orgId);
-  const { stages, loading: stagesLoading, refetch: refetchStages } = useWorkflowStages(slug);
-
-  const [view, setView] = useState<BuilderView>("list");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+export function StageBuilder({
+  slug,
+  orgId,
+  canCreate,
+  canManage,
+  definition,
+  defLoading,
+  stages: sorted,
+  stagesLoading,
+  busyGuid,
+  creating,
+  cloning,
+  onSaveStage: handleSaveStage,
+  onDeleteStage: handleDeleteStage,
+  onMoveStage: handleMoveStage,
+  onCreateStage,
+  onClone: handleClone,
+  manifest,
+  pickerOptions,
+}: StageBuilderProps) {
+  const [view, setView] = useState<BuilderView>("stages");
+  // One open card at a time keeps the tab within about two screens.
+  const [openGuid, setOpenGuid] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [busyGuid, setBusyGuid] = useState<string | null>(null);
-
-  const [createStage, { loading: creating }] = useCreateWorkflowStage();
-  const [updateStage] = useUpdateWorkflowStage();
-  const [deleteStage] = useDeleteWorkflowStage();
-  const [reorderStages] = useReorderWorkflowStages();
-  const [cloneDefinition, { loading: cloning }] = useCloneDefinition();
-
-  const sorted = useMemo(() => [...stages].sort((a, b) => a.order - b.order), [stages]);
 
   const isGlobal =
     definition != null && (definition.isGlobal || definition.organizationGuid == null);
@@ -932,171 +884,25 @@ export function StageBuilder({ slug }: { slug: string }) {
   const readOnly = isGlobal || isSourceManaged || !canManage;
 
   const toggleExpanded = useCallback((guid: string) => {
-    setExpanded((prev) => ({ ...prev, [guid]: !prev[guid] }));
+    setOpenGuid((prev) => (prev === guid ? null : guid));
   }, []);
 
-  const handleSaveStage = useCallback(
-    async (guid: string, draft: StageDraft) => {
-      setBusyGuid(guid);
-      try {
-        const { data } = await updateStage({
-          variables: {
-            stageGuid: guid,
-            kind: draft.kind,
-            role: draft.role.trim() !== "" ? draft.role.trim() : null,
-            onFailure: draft.onFailure,
-            timeoutSeconds: draft.timeoutSeconds,
-            agentDefinitionGuid: draft.agentDefinitionGuid,
-            agentRef: draft.agentRef.trim(),
-            workflowRef: draft.workflowRef.trim(),
-            environmentSpecSlug: draft.environmentSpecSlug.trim(),
-            skillRefs: draft.skillRefs,
-            fanOutCount: draft.fanOutCount,
-            prompt: draft.prompt,
-            outputKey: draft.outputKey.trim(),
-            approvers: draft.approvers,
-          },
-        });
-        if (reportResult(data?.updateWorkflowStage, "Failed to save the stage")) {
-          toast.success("Stage saved");
-          await refetchStages();
-        }
-      } finally {
-        setBusyGuid(null);
-      }
-    },
-    [updateStage, refetchStages]
+  const handleCreateStage = async (draft: StageDraft) => {
+    if (await onCreateStage(draft)) setAdding(false);
+  };
+
+  // The definition as one line of the workflow views: stations in stage
+  // order, fan-out and its join, supervisors, nested workflows and retries.
+  const line = useMemo(
+    () =>
+      definition
+        ? definitionLine(
+            definition,
+            sorted.map((stage) => ({ ...stage, agentName: stage.agentDefinitionName }))
+          )
+        : null,
+    [definition, sorted]
   );
-
-  const handleDeleteStage = useCallback(
-    async (guid: string) => {
-      setBusyGuid(guid);
-      try {
-        const { data } = await deleteStage({ variables: { stageGuid: guid } });
-        if (reportResult(data?.deleteWorkflowStage, "Failed to delete the stage")) {
-          toast.success("Stage deleted");
-          await refetchStages();
-        }
-      } finally {
-        setBusyGuid(null);
-      }
-    },
-    [deleteStage, refetchStages]
-  );
-
-  const handleMoveStage = useCallback(
-    async (index: number, dir: -1 | 1) => {
-      const target = index + dir;
-      if (target < 0 || target >= sorted.length) return;
-      const guids = sorted.map((s) => s.guid);
-      [guids[index], guids[target]] = [guids[target], guids[index]];
-      const { data } = await reorderStages({
-        variables: { definitionSlug: slug, stageGuids: guids },
-      });
-      if (reportResult(data?.reorderWorkflowStages, "Failed to reorder stages")) {
-        await refetchStages();
-      }
-    },
-    [sorted, reorderStages, slug, refetchStages]
-  );
-
-  const handleCreateStage = useCallback(
-    async (draft: StageDraft) => {
-      const nextOrder = sorted.length > 0 ? Math.max(...sorted.map((s) => s.order)) + 1 : 0;
-      const { data } = await createStage({
-        variables: {
-          workflowSlug: slug,
-          kind: draft.kind,
-          order: nextOrder,
-          role: draft.role.trim() !== "" ? draft.role.trim() : null,
-          onFailure: draft.onFailure,
-          timeoutSeconds: draft.timeoutSeconds,
-          agentDefinitionGuid: draft.agentDefinitionGuid,
-          agentRef: draft.agentRef.trim() || null,
-          workflowRef: draft.workflowRef.trim() || null,
-          environmentSpecSlug: draft.environmentSpecSlug.trim() || null,
-          skillRefs: draft.skillRefs,
-          fanOutCount: draft.fanOutCount,
-          prompt: draft.prompt.trim() !== "" ? draft.prompt : null,
-          outputKey: draft.outputKey.trim() || null,
-          approvers: draft.approvers.length > 0 ? draft.approvers : null,
-        },
-      });
-      if (reportResult(data?.createWorkflowStage, "Failed to add the stage")) {
-        toast.success("Stage added");
-        setAdding(false);
-        await refetchStages();
-      }
-    },
-    [createStage, slug, sorted, refetchStages]
-  );
-
-  const handleClone = useCallback(async () => {
-    const { data } = await cloneDefinition({ variables: { slug, orgId } });
-    const res = data?.cloneWorkflowDefinition;
-    if (res?.ok && res.slug) {
-      toast.success("Template cloned", { description: res.slug });
-      router.push(`/workflows/${res.slug}/builder`);
-      return;
-    }
-    reportResult(res, "Failed to clone the template");
-  }, [cloneDefinition, slug, orgId, router]);
-
-  // Graph derivation: nodes from stage order (rankLayout over the ordered
-  // chain), edges strictly consecutive — fan-out and aggregation annotate
-  // the derived edges, they never add user-drawable ones.
-  const { flowNodes, flowEdges } = useMemo(() => {
-    const ids = sorted.map((s) => s.guid);
-    const chain = ids.slice(1).map((id, i) => ({ source: ids[i], target: id }));
-    const pos = rankLayout(ids, chain, { colWidth: 400, rowHeight: 260 });
-    const nodes: Node[] = sorted.map((stage, index) => ({
-      id: stage.guid,
-      type: "stageNode",
-      position: pos.get(stage.guid) ?? { x: index * 400, y: 0 },
-      draggable: false,
-      data: {
-        stage,
-        index,
-        total: sorted.length,
-        orgScoped: orgId,
-        readOnly,
-        expanded: !!expanded[stage.guid],
-        saving: busyGuid === stage.guid,
-        onToggle: toggleExpanded,
-        onSave: handleSaveStage,
-        onDelete: handleDeleteStage,
-        onMove: handleMoveStage,
-      } satisfies StageCardProps,
-    }));
-    const edges: Edge[] = sorted.slice(1).map((stage, i) => {
-      const prev = sorted[i];
-      const fanned = prev.fanOutCount != null && prev.fanOutCount > 1;
-      return {
-        id: `${prev.guid}-${stage.guid}`,
-        source: prev.guid,
-        target: stage.guid,
-        animated: fanned,
-        label: fanned
-          ? `fan-out ×${prev.fanOutCount}`
-          : stage.kind === "aggregation"
-            ? "merge"
-            : undefined,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { strokeWidth: 2 },
-      };
-    });
-    return { flowNodes: nodes, flowEdges: edges };
-  }, [
-    sorted,
-    orgId,
-    readOnly,
-    expanded,
-    busyGuid,
-    toggleExpanded,
-    handleSaveStage,
-    handleDeleteStage,
-    handleMoveStage,
-  ]);
 
   if (defLoading && !definition) {
     return (
@@ -1121,160 +927,154 @@ export function StageBuilder({ slug }: { slug: string }) {
   }
 
   return (
-    <PageShell
-      title={`${definition.name} — Builder`}
-      description={definition.description || `Ordered stage pipeline (${definition.patternKind}).`}
-      actions={
-        <div className="flex items-center gap-1 rounded-md border p-0.5">
-          {VIEW_OPTIONS.map((opt) => {
-            const OptIcon = opt.icon;
-            return (
-              <Button
-                key={opt.value}
-                type="button"
-                variant={view === opt.value ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 px-2.5"
-                onClick={() => setView(opt.value)}
-              >
-                <OptIcon className="mr-1 h-3.5 w-3.5" />
-                {opt.label}
-              </Button>
-            );
-          })}
-        </div>
-      }
-    >
-      {isGlobal && (
-        <div className="border-info/40 bg-info/10 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3">
-          <div className="flex items-center gap-2 text-sm">
+    <PickerOptionsContext.Provider value={pickerOptions}>
+      <PageShell
+        title={`Builder · ${definition.name}`}
+        description={
+          definition.description || `Ordered stage pipeline (${definition.patternKind}).`
+        }
+        actions={
+          <div className="flex items-center gap-1 rounded-md border p-0.5">
+            {VIEW_OPTIONS.map((opt) => {
+              const OptIcon = opt.icon;
+              return (
+                <Button
+                  key={opt.value}
+                  type="button"
+                  variant={view === opt.value ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2.5"
+                  onClick={() => setView(opt.value)}
+                >
+                  <OptIcon className="mr-1 h-3.5 w-3.5" />
+                  {opt.label}
+                </Button>
+              );
+            })}
+          </div>
+        }
+      >
+        {isGlobal && (
+          <div className="border-info/40 bg-info/10 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3">
+            <div className="flex items-center gap-2 text-sm">
+              <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
+              <span>
+                <span className="font-medium">Platform template</span>, read-only. Clone it to
+                create an editable copy in your organization.
+              </span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!canCreate || cloning}
+              onClick={handleClone}
+              title={canCreate ? undefined : "You don't have create access"}
+            >
+              {cloning ? (
+                <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CopyIcon className="mr-1 h-3.5 w-3.5" />
+              )}
+              Clone to edit
+            </Button>
+          </div>
+        )}
+
+        {isSourceManaged && (
+          <div className="border-info/40 bg-info/10 flex items-center gap-2 rounded-md border px-4 py-3 text-sm">
             <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
             <span>
-              <span className="font-medium">Platform template</span> — read-only. Clone it to create
-              an editable copy in your organization.
+              <span className="font-medium">Repository managed</span>: edit{" "}
+              <code>
+                {definition.sourceRepo}/{definition.sourcePath}
+              </code>{" "}
+              and sync the agent repository.
+              {definition.sourceRef
+                ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.`
+                : ""}
             </span>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            disabled={!canCreate || cloning}
-            onClick={handleClone}
-            title={canCreate ? undefined : "You don't have create access"}
+        )}
+
+        {view === "code" ? (
+          <CodeView slug={slug} canCreate={canCreate} manifest={manifest} />
+        ) : (
+          <Section
+            title="Stages"
+            description="An ordered pipeline: stages run in sequence; fan-out runs parallel copies merged by a later aggregation stage."
+            action={
+              !readOnly && !adding ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
+                  <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add stage
+                </Button>
+              ) : undefined
+            }
           >
-            {cloning ? (
-              <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <CopyIcon className="mr-1 h-3.5 w-3.5" />
-            )}
-            Clone to edit
-          </Button>
-        </div>
-      )}
-
-      {isSourceManaged && (
-        <div className="border-info/40 bg-info/10 flex items-center gap-2 rounded-md border px-4 py-3 text-sm">
-          <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
-          <span>
-            <span className="font-medium">Repository managed</span> — edit{" "}
-            <code>
-              {definition.sourceRepo}/{definition.sourcePath}
-            </code>{" "}
-            and sync the agent repository.
-            {definition.sourceRef
-              ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.`
-              : ""}
-          </span>
-        </div>
-      )}
-
-      {view === "code" ? (
-        <CodeView slug={slug} orgId={orgId} canCreate={canCreate} />
-      ) : (
-        <Section
-          title="Stages"
-          description="An ordered pipeline — stages run in sequence; fan-out runs parallel copies merged by a later aggregation stage."
-          action={
-            !readOnly && !adding ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
-                <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add stage
-              </Button>
-            ) : undefined
-          }
-        >
-          {stagesLoading && sorted.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2Icon className="text-muted-foreground h-5 w-5 animate-spin" />
-            </div>
-          ) : sorted.length === 0 && !adding ? (
-            <EmptyState
-              icon={<WorkflowIcon className="size-5" />}
-              title="No stages yet"
-              description={
-                readOnly
-                  ? "This definition has no stages."
-                  : "Add stages to define what this workflow does."
-              }
-              secondary={
-                !readOnly ? (
-                  <Button size="sm" onClick={() => setAdding(true)}>
-                    <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add first stage
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : view === "graph" ? (
-            <div className="flex flex-col gap-3">
-              <div className="bg-card h-[560px] rounded-lg border">
-                <ReactFlow
-                  nodes={flowNodes}
-                  edges={flowEdges}
-                  nodeTypes={stageNodeTypes}
-                  nodesDraggable={false}
-                  nodesConnectable={false}
-                  fitView
-                  className="bg-dots-pattern"
-                >
-                  <Controls />
-                  <Background />
-                  <MiniMap />
-                </ReactFlow>
+            {stagesLoading && sorted.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2Icon className="text-muted-foreground h-5 w-5 animate-spin" />
               </div>
-              <p className="text-muted-foreground text-xs">
-                Edges are derived from stage order, fan-out and aggregation — the pipeline is
-                ordered, not a free-form graph. Expand a stage card to edit it.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {sorted.map((stage, index) => (
-                <StageCard
-                  key={stage.guid}
-                  stage={stage}
-                  index={index}
-                  total={sorted.length}
-                  orgScoped={orgId}
-                  readOnly={readOnly}
-                  expanded={!!expanded[stage.guid]}
-                  saving={busyGuid === stage.guid}
-                  onToggle={toggleExpanded}
-                  onSave={handleSaveStage}
-                  onDelete={handleDeleteStage}
-                  onMove={handleMoveStage}
-                />
-              ))}
-            </div>
-          )}
+            ) : sorted.length === 0 && !adding ? (
+              <EmptyState
+                icon={<WorkflowIcon className="size-5" />}
+                title="No stages yet"
+                description={
+                  readOnly
+                    ? "This definition has no stages."
+                    : "Add stages to define what this workflow does."
+                }
+                secondary={
+                  !readOnly ? (
+                    <Button size="sm" onClick={() => setAdding(true)}>
+                      <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add first stage
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                {line && (
+                  <WorkflowView
+                    snapshot={definitionSnapshot(line)}
+                    title="Shape"
+                    description={`${lineShape(line)}. Pick a station to open its stage.`}
+                    onSelectStation={(_, stationId) => setOpenGuid(stationId)}
+                    className="min-w-0 self-start xl:sticky xl:top-4"
+                  />
+                )}
+                <ol className="flex min-w-0 flex-col gap-3" aria-label="Stages">
+                  {sorted.map((stage, index) => (
+                    <li key={stage.guid} className="min-w-0">
+                      <StageCard
+                        stage={stage}
+                        index={index}
+                        total={sorted.length}
+                        orgScoped={orgId}
+                        readOnly={readOnly}
+                        expanded={openGuid === stage.guid}
+                        saving={busyGuid === stage.guid}
+                        onToggle={toggleExpanded}
+                        onSave={handleSaveStage}
+                        onDelete={handleDeleteStage}
+                        onMove={handleMoveStage}
+                      />
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
 
-          {adding && (
-            <AddStageCard
-              orgScoped={orgId}
-              creating={creating}
-              onCreate={handleCreateStage}
-              onCancel={() => setAdding(false)}
-            />
-          )}
-        </Section>
-      )}
-    </PageShell>
+            {adding && (
+              <AddStageCard
+                orgScoped={orgId}
+                creating={creating}
+                onCreate={handleCreateStage}
+                onCancel={() => setAdding(false)}
+              />
+            )}
+          </Section>
+        )}
+      </PageShell>
+    </PickerOptionsContext.Provider>
   );
 }

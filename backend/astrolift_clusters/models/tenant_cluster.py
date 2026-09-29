@@ -157,6 +157,11 @@ class TenantCluster(NamedBaseCoreModel):
             "been installed via the bootstrap recipe for this to function."
         ),
     )
+    # Per-app access on the Envoy edge (#2132), keyed ``<app guid>/<namespace>``:
+    # ``{name, hosts, groups, users}``. Written by the control plane when an
+    # app's access or an environment's hostnames change; the edge's shared
+    # SecurityPolicy renders its authorization rules from it.
+    edge_access_rules = models.JSONField(default=dict, blank=True)
     default_namespace_prefix = models.CharField(max_length=64, blank=True, default="")
     capabilities = models.JSONField(default=dict, blank=True)
     capabilities_probed_at = models.DateTimeField(null=True, blank=True)

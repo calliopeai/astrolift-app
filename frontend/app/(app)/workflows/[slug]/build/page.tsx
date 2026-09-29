@@ -1,12 +1,4 @@
-import { WorkflowPillarPage } from "../components/workflow-pillar-page";
+import { formerWorkflowRoute } from "../components/former-route";
 
-export const metadata = { title: "Build · Workflow · Astrolift" };
-
-export default async function WorkflowBuildPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  return <WorkflowPillarPage slug={slug} pillar="build" />;
-}
+/** Absorbed by the workflow's tab row; redirects to where it lives now (WORKFLOW_FORMER_ROUTES). */
+export default formerWorkflowRoute("build");

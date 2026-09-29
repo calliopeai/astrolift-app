@@ -21,6 +21,12 @@ export interface AppChrome {
    * page chrome (no duplicated headers or tab bars).
    */
   agentShell: boolean;
+  /**
+   * True inside the app frame (`/apps/[slug]/layout.tsx`): the frame draws
+   * the header and the one row of tabs, so each client's `PageShell` drops
+   * its title and its `AppTabs` render nothing. Actions and description stay.
+   */
+  framed: boolean;
 }
 
 /**
@@ -28,29 +34,32 @@ export interface AppChrome {
  * `useAppChrome()` returns this and all existing app usage is byte-identical
  * (base `/apps`, full per-client chrome).
  */
-const DEFAULT_CHROME: AppChrome = { basePath: "/apps", agentShell: false };
+const DEFAULT_CHROME: AppChrome = { basePath: "/apps", agentShell: false, framed: false };
 
 const AppChromeContext = React.createContext<AppChrome>(DEFAULT_CHROME);
 
 interface AppChromeProviderProps {
   basePath?: AppChromeBasePath;
   agentShell?: boolean;
+  framed?: boolean;
   children: React.ReactNode;
 }
 
 /**
- * Provide app-chrome context to a subtree. Mounted only by the agent shell
- * around a shared app client; the `/apps/*` surface never mounts it, so those
- * routes fall through to {@link DEFAULT_CHROME}.
+ * Provide app-chrome context to a subtree. Mounted by the agent shell
+ * around a shared app client (`agentShell`), and by the app frame around
+ * every `/apps/[slug]/*` route (`framed`). Anything outside both falls
+ * through to {@link DEFAULT_CHROME}.
  */
 export function AppChromeProvider({
   basePath = "/apps",
   agentShell = false,
+  framed = false,
   children,
 }: AppChromeProviderProps) {
   const value = React.useMemo<AppChrome>(
-    () => ({ basePath, agentShell }),
-    [basePath, agentShell]
+    () => ({ basePath, agentShell, framed }),
+    [basePath, agentShell, framed]
   );
   return <AppChromeContext.Provider value={value}>{children}</AppChromeContext.Provider>;
 }

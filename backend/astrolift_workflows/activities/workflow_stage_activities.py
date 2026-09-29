@@ -250,6 +250,7 @@ def _create_nested_workflow_run_sync(
     from django.utils import timezone
 
     from astrolift_operations.models import WorkflowRun
+    from core.run_trigger import RunTrigger
     from workflows.composition import MAX_WORKFLOW_NESTING_DEPTH, resolve_child_definition
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
@@ -290,6 +291,7 @@ def _create_nested_workflow_run_sync(
                 trigger_actor_user_id=parent.trigger_actor_user_id,
                 trigger_actor_token_kind=parent.trigger_actor_token_kind,
                 trigger_actor_token_id=parent.trigger_actor_token_id,
+                trigger_kind=RunTrigger.PARENT,
             )
             child.workflow_id = f"WorkflowDefinitionRunWorkflow-{child.pk}"
             child.save(update_fields=["workflow_id", "updated_at", "version"])
@@ -486,6 +488,7 @@ def _dispatch_agent_for_stage_sync(
     from astrolift_dispatch.spawners.registry import get_spawner
     from astrolift_lifecycle.models import AgentRun
     from astrolift_registry.models import Workload
+    from core.run_trigger import RunTrigger
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
     stage = WorkflowStage.objects.select_related("agent_definition", "definition").get(pk=int(stage_id))
@@ -590,6 +593,9 @@ def _dispatch_agent_for_stage_sync(
                 status=AgentTask.Status.DRAFT,
                 timeout_seconds=int(stage.timeout_seconds),
                 dispatch_input=trigger_payload or None,
+                # A workflow stage started it, on behalf of whoever started the run.
+                triggered_by_user_id=run.trigger_actor_user_id,
+                trigger_kind=RunTrigger.PARENT,
             )
 
     from astrolift_agents.services.task_target import (

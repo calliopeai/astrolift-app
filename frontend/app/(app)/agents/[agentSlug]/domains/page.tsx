@@ -1,24 +1,4 @@
-import { AppDomainsClient } from "@/app/(app)/apps/[slug]/domains/domains-client";
-import { LIST_APP_DOMAINS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { formerAgentRoute } from "../components/former-route";
 
-import { AgentAppSurface } from "../components/agent-app-surface";
-
-export const metadata = { title: "Domains · Agent · Astrolift" };
-
-export default async function AgentDomainsPage({
-  params,
-}: {
-  params: Promise<{ agentSlug: string }>;
-}) {
-  const { agentSlug } = await params;
-  return (
-    <PreloadQuery query={LIST_APP_DOMAINS} variables={{ appSlug: agentSlug }}>
-      <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: agentSlug }}>
-        <AgentAppSurface agentSlug={agentSlug}>
-          <AppDomainsClient slug={agentSlug} />
-        </AgentAppSurface>
-      </PreloadQuery>
-    </PreloadQuery>
-  );
-}
+/** Absorbed by the agent's tab row; redirects to where it lives now (AGENT_FORMER_ROUTES). */
+export default formerAgentRoute("domains");

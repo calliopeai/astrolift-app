@@ -1,5 +1,5 @@
 import { PreloadQuery } from "@/lib/apollo";
-import { LIST_COMMAND_RUNS } from "@/graphql/lifecycle/lifecycle.queries";
+import { GET_COMMAND_RUN } from "@/graphql/lifecycle/lifecycle.queries";
 
 import { CommandRunDetailClient } from "./command-run-detail-client";
 
@@ -7,7 +7,8 @@ export const metadata = { title: "Command run · Astrolift" };
 
 /**
  * Command run detail (#1106) — drill-in target for a /jobs Commands row.
- * Reuses the global LIST_COMMAND_RUNS window (no singular query exists).
+ * Preloads the run itself, the query the page reads first; the 100-run list
+ * window is only an instant-paint fallback when the cache already has it.
  */
 export default async function CommandRunDetailPage({
   params,
@@ -16,7 +17,7 @@ export default async function CommandRunDetailPage({
 }) {
   const { id } = await params;
   return (
-    <PreloadQuery query={LIST_COMMAND_RUNS} variables={{ limit: 100 }}>
+    <PreloadQuery query={GET_COMMAND_RUN} variables={{ id }}>
       <CommandRunDetailClient id={id} />
     </PreloadQuery>
   );

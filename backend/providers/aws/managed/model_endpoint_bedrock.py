@@ -35,6 +35,7 @@ Deprovision matrix:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -66,6 +67,19 @@ from aws.managed._base import (
 from aws.session import aws_client
 
 KIND = "model_endpoint"
+
+# A system-defined cross-region inference profile id: a geography prefix
+# before the model id, e.g. ``us.anthropic.claude-sonnet-4-6`` (#2137). An
+# application profile or a system profile may also be named by its ARN.
+_PROFILE_ID = re.compile(r"^(?:us|eu|apac|us-gov|ca|jp|au|global)\.[a-z0-9-]+\.")
+_PROFILE_ARN = re.compile(r"^arn:aws[a-z-]*:bedrock:[a-z0-9-]+:\d{12}:(?:application-)?inference-profile/")
+
+_INVOKE_ACTIONS = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+
+
+def is_inference_profile(model_id: str) -> bool:
+    """Whether ``model_id`` names an inference profile, not a foundation model."""
+    return bool(_PROFILE_ID.match(model_id) or _PROFILE_ARN.match(model_id))
 
 
 # Size -> default foundation model id. Operators override per spec
@@ -415,15 +429,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                     literal=invoke_endpoint,
                 ),
             },
-            iam_grants=[
-                Grant(
-                    resource=(f"arn:aws:bedrock:{self._config.region}::foundation-model/{model_id}"),
-                    actions=[
-                        "bedrock:InvokeModel",
-                        "bedrock:InvokeModelWithResponseStream",
-                    ],
-                ),
-            ],
+            iam_grants=self._invoke_grants(model_id),
             notes=(
                 f"IRSA role lookup uses tag "
                 f"{self._config.irsa_role_tag_key}="
@@ -432,6 +438,40 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 f"governed by deprovision delete_data flag."
             ),
         )
+
+    def _invoke_grants(self, model_id: str) -> list[Grant]:
+        """The exact resources invoking ``model_id`` needs.
+
+        A foundation model is one ARN. An inference profile is the profile
+        plus every foundation model it routes to, in each region it routes to
+        (#2137): Bedrock authorizes the call against all of them, so a grant
+        on ``foundation-model/us.anthropic...`` (which is not a resource)
+        authorizes nothing. Resolved live and fails closed: a profile that
+        cannot be read is an error, never a grant that silently does nothing.
+        """
+        if not is_inference_profile(model_id):
+            return [
+                Grant(
+                    resource=f"arn:aws:bedrock:{self._config.region}::foundation-model/{model_id}",
+                    actions=list(_INVOKE_ACTIONS),
+                )
+            ]
+        try:
+            profile = self._bedrock.get_inference_profile(inferenceProfileIdentifier=model_id)
+        except Exception as exc:
+            raise ManagedServiceError(
+                f"Bedrock inference profile {model_id!r} could not be resolved in "
+                f"{self._config.region}: {exc}. The binding needs the profile's destination "
+                "models to grant, so it is refused rather than granted on a resource that "
+                "does not exist."
+            ) from exc
+        profile_arn = str(profile.get("inferenceProfileArn") or "")
+        model_arns = sorted({str(m.get("modelArn") or "") for m in profile.get("models") or []} - {""})
+        if not profile_arn or not model_arns:
+            raise ManagedServiceError(
+                f"Bedrock inference profile {model_id!r} returned no ARN or no destination models"
+            )
+        return [Grant(resource=arn, actions=list(_INVOKE_ACTIONS)) for arn in [profile_arn, *model_arns]]
 
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:

@@ -30,8 +30,7 @@ export const DEFAULT_TIME_RANGE: TimeRangeKey = "1h";
  * or PromQL failure). The platform docs surface the bootstrap-recipe
  * Prometheus install steps; the URL is kept here so the cards share it.
  */
-export const PROMETHEUS_DOC_LINK =
-  "https://docs.astrolift.io/runtime/observability/prometheus";
+export const PROMETHEUS_DOC_LINK = "https://docs.astrolift.io/runtime/observability/prometheus";
 
 export type GoldenSignalUnit = "rps" | "ratio" | "seconds" | "percent";
 
@@ -46,9 +45,7 @@ export function formatSignalValue(value: number, unit: string): string {
     case "ratio":
       return `${(value * 100).toFixed(2)}%`;
     case "seconds":
-      return value < 1
-        ? `${(value * 1000).toFixed(0)} ms`
-        : `${value.toFixed(2)} s`;
+      return value < 1 ? `${(value * 1000).toFixed(0)} ms` : `${value.toFixed(2)} s`;
     case "percent":
       return `${value.toFixed(1)}%`;
     default:

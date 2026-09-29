@@ -6,6 +6,7 @@ import contextlib
 import hashlib
 import re
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -42,6 +43,15 @@ _DATABASE_STATE = {
 }
 _OWNERSHIP_TABLE = "AstroliftGraphMetadata"
 _OWNERSHIP_DDL = f"CREATE TABLE {_OWNERSHIP_TABLE} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)"
+#: The identity marker (#2086). ``AstroliftGraphMetadata`` says only that
+#: Astrolift made the database, and with a shared instance two orgs' derived
+#: database ids collide, so the managed-service id rides in a table name: a
+#: Spanner database has no labels. New databases carry both tables; the old one
+#: stays so a rollback still recognises them.
+_OWNER_TABLE_PREFIX = "AstroliftGraphOwner_"
+_OWNER_TABLE = re.compile(rf"\bCREATE\s+TABLE\s+`?{_OWNER_TABLE_PREFIX}([0-9a-f]{{32}})`?", re.I)
+#: Tenant DDL may not name either marker table, or it could write one.
+_MARKER_REFERENCE = re.compile(rf"{_OWNERSHIP_TABLE}|{_OWNER_TABLE_PREFIX}", re.I)
 
 
 class SpannerGraphError(RuntimeError):
@@ -227,26 +237,30 @@ class SpannerGraphDriver(ManagedServiceDriver):
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cfg = dict(spec.config or {})
-        error = self._validate_config(cfg)
+        error = self._validate_config(cfg) or _identity_error(spec.managed_service_id)
         if error:
             return ProvisionResult(False, "", error, ["invalid_spanner_graph_config"])
         instance_id = self._instance_id(spec, cfg)
-        database_id = self._database_id(spec, cfg)
+        database_id = self._database_id(spec, cfg, instance_id)
         handle = _handle(instance_id, database_id)
         try:
             instance = self._ensure_instance(instance_id, cfg)
             self._assert_instance_compatible(instance, cfg)
             database = self._get_database(instance_id, database_id)
-            created = database is None
             if database is None:
-                body = self._database_create_body(database_id, cfg)
+                body = self._database_create_body(database_id, cfg, spec.managed_service_id)
                 self._wait_operation(self._spanner.create_database(self._instance_name(instance_id), body))
                 database = self._spanner.get_database(self._database_name(instance_id, database_id))
+            # Before anything is mutated: a refused provision must leave both
+            # the database and the instance it shares exactly as it found them.
             self._ensure_database_owned(
                 instance_id,
                 database_id,
-                allow_mark_unconditionally=created,
+                managed_service_id=spec.managed_service_id,
+                record_proves=spec.recorded_handle_exclusive and spec.recorded_handle == handle,
+                backfill=True,
             )
+            self._reconcile_instance_capacity(instance, cfg)
             self._reconcile_database(database, cfg)
             self._apply_schema_updates(instance_id, database_id, cfg)
             self._assert_graph_exists(instance_id, database_id, self._graph_name(cfg))
@@ -273,9 +287,15 @@ class SpannerGraphDriver(ManagedServiceDriver):
             instance = self._spanner.get_instance(self._instance_name(instance_id))
             self._assert_owned_instance(instance)
             self._assert_instance_compatible(instance, cfg)
-            self._reconcile_instance_capacity(instance, cfg)
             database = self._spanner.get_database(self._database_name(instance_id, database_id))
-            self._ensure_database_owned(instance_id, database_id)
+            self._ensure_database_owned(
+                instance_id,
+                database_id,
+                managed_service_id=spec.managed_service_id,
+                record_proves=spec.recorded_handle_exclusive,
+                backfill=True,
+            )
+            self._reconcile_instance_capacity(instance, cfg)
             self._reconcile_database(database, cfg)
             self._apply_schema_updates(instance_id, database_id, cfg)
             self._assert_graph_exists(instance_id, database_id, self._graph_name(cfg))
@@ -311,8 +331,20 @@ class SpannerGraphDriver(ManagedServiceDriver):
             return _deprovision_error(spec.handle, "describe Spanner Graph", exc)
         if database is None:
             return DeprovisionResult(True, spec.handle, f"Spanner Graph database {database_id} already gone")
+        try:
+            statements = self._spanner.get_ddl(database_name)
+        except Exception as exc:
+            return _deprovision_error(spec.handle, "describe Spanner Graph", exc)
+        refusal = _ownership_refusal(
+            statements,
+            spec.managed_service_id,
+            record_proves=spec.recorded_handle_exclusive,
+            unmarked_ok=True,
+        )
+        if refusal:
+            return DeprovisionResult(False, spec.handle, refusal, ["resource_not_owned"], retryable=False)
         instance_owned = (instance.get("labels") or {}).get("astrolift-managed-by") == "platform"
-        database_owned = self._database_has_ownership_marker(instance_id, database_id)
+        database_owned = bool(_database_owners(statements)) or _ddl_has_ownership_marker(statements)
         if (not instance_owned or not database_owned) and not cfg.get("delete_adopted_database"):
             return DeprovisionResult(
                 False,
@@ -333,7 +365,13 @@ class SpannerGraphDriver(ManagedServiceDriver):
         retained = ""
         if not delete_data:
             try:
-                retained = self.snapshot(ServiceHandle(spec.handle)).snapshot_id
+                retained = self.snapshot(
+                    ServiceHandle(
+                        spec.handle,
+                        managed_service_id=spec.managed_service_id,
+                        recorded_handle_exclusive=spec.recorded_handle_exclusive,
+                    ),
+                ).snapshot_id
             except Exception as exc:
                 return DeprovisionResult(
                     False,
@@ -390,6 +428,14 @@ class SpannerGraphDriver(ManagedServiceDriver):
         graph_name = self._graph_name(cfg)
         database_name = self._database_name(instance_id, database_id)
         self._spanner.get_database(database_name)
+        # The grant below is the payoff of a collision, so the database must be
+        # this service's before its URL and databaseUser leave the driver.
+        self._ensure_database_owned(
+            instance_id,
+            database_id,
+            managed_service_id=handle.managed_service_id,
+            record_proves=handle.recorded_handle_exclusive,
+        )
         self._assert_graph_exists(instance_id, database_id, graph_name)
         graph_url = f"spanner://{database_name}/graphs/{quote(graph_name, safe='')}"
         return Binding(
@@ -418,6 +464,15 @@ class SpannerGraphDriver(ManagedServiceDriver):
         instance_id, database_id = _parse_handle(handle.handle)
         database_name = self._database_name(instance_id, database_id)
         self._spanner.get_database(database_name)
+        # A backup is a copy of the data, retained under this service's record.
+        # Held to what deprovision accepts, since teardown takes one first.
+        self._ensure_database_owned(
+            instance_id,
+            database_id,
+            managed_service_id=handle.managed_service_id,
+            record_proves=handle.recorded_handle_exclusive,
+            unmarked_ok=True,
+        )
         created = datetime.now(UTC)
         backup_id = _backup_id(database_id, created)
         expire = created + timedelta(days=self._config.backup_retention_days)
@@ -441,11 +496,11 @@ class SpannerGraphDriver(ManagedServiceDriver):
         if not re.fullmatch(r"projects/[^/]+/instances/[^/]+/backups/[^/]+", snapshot.snapshot_id):
             return ProvisionResult(False, "", "invalid Spanner backup resource name", ["invalid_snapshot"])
         cfg = dict(target.config or {})
-        error = self._validate_config(cfg)
+        error = self._validate_config(cfg) or _identity_error(target.managed_service_id)
         if error:
             return ProvisionResult(False, "", error, ["invalid_spanner_graph_config"])
         instance_id = self._instance_id(target, cfg)
-        database_id = self._database_id(target, cfg)
+        database_id = self._database_id(target, cfg, instance_id)
         handle = _handle(instance_id, database_id)
         try:
             if self._get_database(instance_id, database_id) is not None:
@@ -460,11 +515,7 @@ class SpannerGraphDriver(ManagedServiceDriver):
                 }
             self._wait_operation(self._spanner.restore_database(self._instance_name(instance_id), body))
             database = self._spanner.get_database(self._database_name(instance_id, database_id))
-            self._ensure_database_owned(
-                instance_id,
-                database_id,
-                allow_mark_unconditionally=True,
-            )
+            self._stamp_restored_owner(instance_id, database_id, target.managed_service_id)
             self._reconcile_database(database, cfg)
             self._assert_graph_exists(instance_id, database_id, self._graph_name(cfg))
         except Exception as exc:
@@ -532,7 +583,6 @@ class SpannerGraphDriver(ManagedServiceDriver):
             self._wait_operation(operation)
             return self._spanner.get_instance(name)
         self._assert_owned_instance(current)
-        self._reconcile_instance_capacity(current, cfg)
         return current
 
     def _instance_body(self, instance_id: str, cfg: dict[str, Any]) -> dict[str, Any]:
@@ -555,10 +605,12 @@ class SpannerGraphDriver(ManagedServiceDriver):
             body["processingUnits"] = int(cfg.get("processing_units", self._config.processing_units))
         return body
 
-    def _database_create_body(self, database_id: str, cfg: dict[str, Any]) -> dict[str, Any]:
-        statements = list(cfg.get("ddl_statements") or _dynamic_graph_ddl(self._graph_name(cfg)))
-        if not _ddl_has_ownership_marker(statements):
-            statements.insert(0, _OWNERSHIP_DDL)
+    def _database_create_body(self, database_id: str, cfg: dict[str, Any], managed_service_id: str) -> dict[str, Any]:
+        statements = [
+            _OWNERSHIP_DDL,
+            _owner_ddl(managed_service_id),
+            *(cfg.get("ddl_statements") or _dynamic_graph_ddl(self._graph_name(cfg))),
+        ]
         body: dict[str, Any] = {
             "createStatement": f"CREATE DATABASE `{database_id}`",
             "extraStatements": statements,
@@ -620,30 +672,47 @@ class SpannerGraphDriver(ManagedServiceDriver):
             operation = self._spanner.get_operation(f"{database_name}/operations/{operation_id}")
         self._wait_operation(operation)
 
-    def _database_has_ownership_marker(self, instance_id: str, database_id: str) -> bool:
-        statements = self._spanner.get_ddl(self._database_name(instance_id, database_id))
-        return _ddl_has_ownership_marker(statements)
-
     def _ensure_database_owned(
         self,
         instance_id: str,
         database_id: str,
         *,
-        allow_mark_unconditionally: bool = False,
+        managed_service_id: str,
+        record_proves: bool,
+        backfill: bool = False,
+        unmarked_ok: bool = False,
     ) -> None:
-        if self._database_has_ownership_marker(instance_id, database_id):
-            return
-        if not allow_mark_unconditionally:
-            # Only a database this same call created or restored may be
-            # stamped. One that already existed without the marker was not
-            # provisioned by Astrolift; adoption of an existing resource is a
-            # separate, operator-authorized operation (#1365) that no tenant
-            # config flag may grant (#2021).
-            raise SpannerGraphError(
-                "existing Spanner database carries no Astrolift ownership marker; adoption is a "
-                "separate, operator-authorized operation and cannot be granted by tenant config",
-            )
-        self._apply_ddl(self._database_name(instance_id, database_id), [_OWNERSHIP_DDL])
+        database_name = self._database_name(instance_id, database_id)
+        statements = self._spanner.get_ddl(database_name)
+        refusal = _ownership_refusal(
+            statements,
+            managed_service_id,
+            record_proves=record_proves,
+            unmarked_ok=unmarked_ok,
+        )
+        if refusal:
+            raise SpannerGraphError(refusal)
+        if backfill and _ddl_has_ownership_marker(statements) and not _database_owners(statements):
+            # Made by Astrolift before #2086, and the platform's own exclusive
+            # record says it is this service's: stamp the identity once, so
+            # every later check reads the marker instead of the record.
+            self._apply_ddl(database_name, [_owner_ddl(managed_service_id)])
+
+    def _stamp_restored_owner(self, instance_id: str, database_id: str, managed_service_id: str) -> None:
+        # A restore copies the source's schema, and with it the source's owner
+        # table. The database was created by this same call, so it is the
+        # target's: replace any other identity rather than inherit it.
+        database_name = self._database_name(instance_id, database_id)
+        statements = self._spanner.get_ddl(database_name)
+        ours = _owner_suffix(managed_service_id)
+        owners = _database_owners(statements)
+        changes = [f"DROP TABLE {_OWNER_TABLE_PREFIX}{owner}" for owner in sorted(owners - {ours})]
+        if not _ddl_has_ownership_marker(statements):
+            changes.append(_OWNERSHIP_DDL)
+        if ours not in owners:
+            changes.append(_owner_ddl(managed_service_id))
+        if changes:
+            self._apply_ddl(database_name, changes)
 
     def _assert_graph_exists(self, instance_id: str, database_id: str, graph_name: str) -> None:
         statements = self._spanner.get_ddl(self._database_name(instance_id, database_id))
@@ -752,6 +821,8 @@ class SpannerGraphDriver(ManagedServiceDriver):
             for statement in cfg.get(key) or []:
                 if not re.match(r"^\s*(?:CREATE|ALTER|RENAME)\b", str(statement), re.I):
                     return f"{key} permits only CREATE, ALTER, or RENAME DDL"
+                if _MARKER_REFERENCE.search(str(statement)):
+                    return f"{key} cannot name Astrolift's ownership tables"
         minimum = cfg.get("autoscaling_min_processing_units")
         maximum = cfg.get("autoscaling_max_processing_units")
         if (minimum is None) != (maximum is None):
@@ -795,12 +866,21 @@ class SpannerGraphDriver(ManagedServiceDriver):
         raw = f"{self._config.instance_name_prefix}-{spec.organization_slug}-{spec.app_slug}-{spec.environment_name}"
         return _resource_id(raw, maximum=64)
 
-    def _database_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
+    def _database_id(self, spec: ProvisionSpec, cfg: dict[str, Any], instance_id: str) -> str:
         explicit = str(cfg.get("database_id") or "")
         if explicit:
             return explicit
         raw = f"{spec.app_slug}-{spec.environment_name}-{spec.service_handle_hint or 'graph'}"
-        return _resource_id(raw, maximum=30)
+        legacy = _resource_id(raw, maximum=30)
+        if spec.recorded_handle == _handle(instance_id, legacy):
+            # Named before #2086 and recorded that way: keep it, rather than
+            # derive a new name and create an empty database beside it.
+            return legacy
+        # No org in the slug-joined name, so on a shared instance two orgs with
+        # the same app, environment and hint derived one database. The digest
+        # of the managed-service id keeps new names apart.
+        digest = hashlib.sha256(spec.managed_service_id.encode()).hexdigest()[:8]
+        return f"{_resource_id(raw, maximum=30 - len(digest) - 1)}-{digest}"
 
     def _graph_name(self, cfg: dict[str, Any]) -> str:
         return str(cfg.get("graph_name") or "Graph")
@@ -890,6 +970,67 @@ def _labels() -> dict[str, str]:
 def _ddl_has_ownership_marker(statements: list[str]) -> bool:
     pattern = re.compile(rf"\bCREATE\s+TABLE\s+`?{re.escape(_OWNERSHIP_TABLE)}`?\b", re.I)
     return any(pattern.search(str(statement)) for statement in statements)
+
+
+def _owner_suffix(managed_service_id: str) -> str:
+    return uuid.UUID(managed_service_id).hex
+
+
+def _identity_error(managed_service_id: str) -> str:
+    try:
+        _owner_suffix(managed_service_id)
+    except (TypeError, ValueError):
+        return "Spanner Graph needs the managed-service id (a UUID) to mark the database it owns"
+    return ""
+
+
+def _owner_ddl(managed_service_id: str) -> str:
+    table = f"{_OWNER_TABLE_PREFIX}{_owner_suffix(managed_service_id)}"
+    return f"CREATE TABLE {table} (marker STRING(1) NOT NULL) PRIMARY KEY (marker)"
+
+
+def _database_owners(statements: list[str]) -> set[str]:
+    return {match.group(1).lower() for statement in statements for match in _OWNER_TABLE.finditer(str(statement))}
+
+
+def _ownership_refusal(
+    statements: list[str],
+    managed_service_id: str,
+    *,
+    record_proves: bool,
+    unmarked_ok: bool = False,
+) -> str:
+    """Why this service may not act on the database with ``statements``, or ``""``.
+
+    The owner table decides whenever there is one. Without it the database
+    predates #2086, and only the platform's exclusive record of the handle can
+    say whose it is: ``AstroliftGraphMetadata`` proves Astrolift made it, not
+    for whom. ``unmarked_ok`` is teardown's allowance for a recorded database
+    carrying neither table, which ``delete_adopted_database`` still gates.
+    """
+    error = _identity_error(managed_service_id)
+    if error:
+        return error
+    ours = _owner_suffix(managed_service_id)
+    owners = _database_owners(statements)
+    if owners == {ours}:
+        return ""
+    if ours in owners:
+        return "Spanner database is marked for more than one managed service; an operator must decide which owns it"
+    if owners:
+        return "Spanner database belongs to another managed service; refusing to act on it"
+    if not _ddl_has_ownership_marker(statements) and not unmarked_ok:
+        return (
+            "existing Spanner database carries no Astrolift ownership marker; adoption is a "
+            "separate, operator-authorized operation and cannot be granted by tenant config"
+        )
+    if record_proves:
+        return ""
+    return (
+        "Spanner database predates the managed-service ownership marker, and no exclusive platform record "
+        "says it is this service's (another live service records it, or this one does not); an operator "
+        f"who confirms it is must create table {_OWNER_TABLE_PREFIX}{ours} in it"
+    )
 
 
 def _deprovision_error(handle: str, action: str, exc: Exception) -> DeprovisionResult:

@@ -6,12 +6,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type ConnectionState =
-  | "connecting"
-  | "connected"
-  | "closed"
-  | "denied"
-  | "error";
+type ConnectionState = "connecting" | "connected" | "closed" | "denied" | "error";
 
 /**
  * How the fixed-size agent framebuffer (1280x800, see images/vnc) is fitted
@@ -149,8 +144,7 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
   // Track fullscreen so the toggle button reflects the real document state
   // (Esc exits fullscreen without going through our handler).
   React.useEffect(() => {
-    const onChange = () =>
-      setIsFullscreen(document.fullscreenElement === wrapperRef.current);
+    const onChange = () => setIsFullscreen(document.fullscreenElement === wrapperRef.current);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
@@ -227,13 +221,7 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
   );
 }
 
-function ConnectionBanner({
-  state,
-  message,
-}: {
-  state: ConnectionState;
-  message: string | null;
-}) {
+function ConnectionBanner({ state, message }: { state: ConnectionState; message: string | null }) {
   if (state === "connected") return null;
 
   let tone: "info" | "warn" | "error" = "info";

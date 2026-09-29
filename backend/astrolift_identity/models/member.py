@@ -45,6 +45,13 @@ class Member(BaseCoreModel):
     )
     joined_at = models.DateTimeField(null=True, blank=True)
     last_seen_at = models.DateTimeField(null=True, blank=True)
+    # The IdP groups the user was in at their last SSO sign-in (#2157),
+    # kept on the ORG row so they only ever count inside that org. Group
+    # role bindings and GroupRoleMappings match against these. Replaced
+    # wholesale on every sign-in, so a group the IdP drops stops granting
+    # at the next sign-in.
+    idp_groups = models.JSONField(default=list, blank=True)
+    idp_groups_synced_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [

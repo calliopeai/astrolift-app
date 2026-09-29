@@ -47,6 +47,9 @@ class OrganizationType:
 
     appearance_default: strawberry.scalars.JSON
     appearance_locked: bool
+    # Settings a person cannot change: "show" read-only or "hide", for
+    # everyone who has not chosen for themselves (#2154).
+    restricted_settings_default: str
     # Non-null once the first-run wizard has been completed or
     # explicitly skipped. The FE opens the onboarding wizard when
     # this is null AND the operator has zero team memberships.
@@ -122,6 +125,7 @@ def organization_to_type(org) -> OrganizationType:
         managed_service_isolation_policy=dict(org.managed_service_isolation_policy or {}),
         appearance_default=dict(org.appearance_default or {}),
         appearance_locked=bool(org.appearance_locked),
+        restricted_settings_default=org.restricted_settings_default or "show",
         onboarding_completed_at=org.onboarding_completed_at,
         created_at=org.created_at,
         updated_at=org.updated_at,
@@ -165,6 +169,18 @@ class UserType:
     is_active: bool
 
 
+@strawberry.type(name="AstroliftRoleLineage")
+class RoleLineageType:
+    """The role a custom role was duplicated from (#2126), for the diff."""
+
+    id: GUID
+    slug: str
+    name: str
+    is_system: bool
+    permissions: list[str]
+    deleted: bool = strawberry.field(description="The source role has since been deleted.")
+
+
 @strawberry.type(name="AstroliftRole")
 class RoleType:
     id: GUID
@@ -174,6 +190,29 @@ class RoleType:
     scope_level: str
     permissions: list[str]
     is_system: bool
+    bindings_count: int | None = strawberry.field(
+        default=None,
+        description=(
+            "Role bindings on this role inside the viewer's organization. Set by "
+            "astroliftRolesPage; null where the role is read elsewhere."
+        ),
+    )
+    duplicated_from: RoleLineageType | None = strawberry.field(
+        default=None,
+        description=(
+            "The role this one was duplicated from. Set by astroliftRole and astroliftRolesPage; "
+            "null where the role is read elsewhere, and for a role not made by duplicating."
+        ),
+    )
+
+
+@strawberry.type(name="AstroliftMemberTeam")
+class MemberTeamType:
+    """A team a member row names or a member is on (#2153)."""
+
+    id: GUID
+    slug: str
+    name: str
 
 
 @strawberry.type(name="AstroliftMember")
@@ -195,6 +234,19 @@ class MemberType:
     last_active_at: dt.datetime | None
     created_at: dt.datetime
     deleted_at: dt.datetime | None
+    # The team a TEAM-scope row points at (#2153): ``scope_id`` is the team's
+    # integer pk, which no other query exposes, so the row names it here.
+    # Null on other scopes and when the team is gone.
+    team_id: GUID | None = strawberry.field(default=None, description="The team a TEAM-scope row is on.")
+    team_slug: str | None = None
+    team_name: str | None = None
+    teams: list[MemberTeamType] | None = strawberry.field(
+        default=None,
+        description=(
+            "Every team in the organization the row's user is on. Set by astroliftMembersPage; "
+            "null where the row is read elsewhere."
+        ),
+    )
 
 
 @strawberry.type(name="AstroliftRoleBinding")
@@ -215,6 +267,57 @@ class RoleBindingType:
     inherits: bool
 
 
+@strawberry.type(name="AstroliftGroupRoleMapping")
+class GroupRoleMappingType:
+    """An IdP group mapped to a role on a scope of the org (#2157). It
+    grants exactly like a group role binding."""
+
+    id: GUID
+    group_external_id: str
+    role: RoleType
+    scope_kind: str
+    scope_guid: GUID | None
+    source_scope_label: str
+    # Active members of the org the IdP last put in the group.
+    member_count: int
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftAccessEntry")
+class AccessEntryType:
+    """One grant that reaches an object (#2157): who, through what, from
+    where."""
+
+    principal_kind: str = strawberry.field(description="USER, GROUP or TEAM.")
+    source: str = strawberry.field(
+        description=(
+            "USER_BINDING, GROUP_BINDING, GROUP_MAPPING, or TEAM_SHARE (a team's share on the app, "
+            "or a binding on that team reaching the app through the share)."
+        )
+    )
+    binding_id: GUID = strawberry.field(
+        description="The RoleBinding, GroupRoleMapping or AppTeamAccess share that grants it."
+    )
+    user: UserType | None
+    member_id: GUID | None = strawberry.field(description="The user's ORG membership row.")
+    group_external_id: str | None
+    group_member_count: int | None
+    team_id: GUID | None
+    team_slug: str | None
+    team_name: str | None
+    role: RoleType | None = strawberry.field(description="Null on a team's share row itself.")
+    access_level: str | None = strawberry.field(description="The share level on TEAM_SHARE rows.")
+    share_id: GUID | None
+    scope_kind: str = strawberry.field(description="Where the grant is held.")
+    scope_guid: GUID | None
+    source_scope_label: str
+    inherited: bool = strawberry.field(
+        description="Held on an ancestor (or through a share), not on the object."
+    )
+    inherits: bool
+    expires_at: dt.datetime | None
+
+
 def user_to_type(user) -> UserType:
     return UserType(
         id=str(user.pk),
@@ -224,7 +327,27 @@ def user_to_type(user) -> UserType:
     )
 
 
-def role_to_type(role) -> RoleType:
+def _role_lineage(role) -> RoleLineageType | None:
+    """The source role, only when the caller loaded it (``select_related``),
+    so a list of roles never costs one query per row."""
+    if getattr(role, "duplicated_from_id", None) is None:
+        return None
+    if not type(role)._meta.get_field("duplicated_from").is_cached(role):
+        return None
+    source = role.duplicated_from
+    if source is None:
+        return None
+    return RoleLineageType(
+        id=GUID(str(source.guid)),
+        slug=source.slug,
+        name=source.name,
+        is_system=source.is_system,
+        permissions=list(source.permissions or []),
+        deleted=source.deleted_at is not None,
+    )
+
+
+def role_to_type(role, *, bindings_count: int | None = None) -> RoleType:
     return RoleType(
         id=GUID(str(role.guid)),
         slug=role.slug,
@@ -233,10 +356,24 @@ def role_to_type(role) -> RoleType:
         scope_level=role.scope_level,
         permissions=list(role.permissions or []),
         is_system=role.is_system,
+        bindings_count=bindings_count,
+        duplicated_from=_role_lineage(role),
     )
 
 
-def member_to_type(member, *, last_active_at: dt.datetime | None = None) -> MemberType:
+def member_team_to_type(team) -> MemberTeamType:
+    return MemberTeamType(id=GUID(str(team.guid)), slug=team.slug, name=team.name)
+
+
+def member_to_type(
+    member,
+    *,
+    last_active_at: dt.datetime | None = None,
+    team=None,
+    teams: list[MemberTeamType] | None = None,
+) -> MemberType:
+    """``team`` is the Team a TEAM-scope row points at, resolved by the caller
+    in one batch per page; ``teams`` the user's teams, where the caller has them."""
     return MemberType(
         id=GUID(str(member.guid)),
         user=user_to_type(member.user),
@@ -249,6 +386,10 @@ def member_to_type(member, *, last_active_at: dt.datetime | None = None) -> Memb
         last_active_at=last_active_at,
         created_at=member.created_at,
         deleted_at=member.deleted_at,
+        team_id=GUID(str(team.guid)) if team is not None else None,
+        team_slug=team.slug if team is not None else None,
+        team_name=team.name if team is not None else None,
+        teams=teams,
     )
 
 
@@ -281,6 +422,38 @@ class ApiTokenType:
     last_used_agent: str | None
     is_revoked: bool
     created_at: dt.datetime
+    # What the token can actually do: the permissions its scopes allow that
+    # its owner's roles also grant (#2120). Scopes only ever narrow the owner.
+    effective_permissions: list[str] = strawberry.field(default_factory=list)
+
+
+@strawberry.type(name="AstroliftApiTokenScope")
+class ApiTokenScopeType:
+    """One scope, as the token picker explains it (#2120)."""
+
+    value: str
+    label: str
+    surface: str
+    description: str
+    sensitive: bool
+    permissions: list[str]
+    # Whether the caller's roles grant anything this scope unlocks. A scope
+    # they can never exercise is shown greyed with the reason, not offered.
+    available: bool
+    unavailable_reason: str
+
+
+@strawberry.type(name="AstroliftApiTokenScopePreset")
+class ApiTokenScopePresetType:
+    key: str
+    label: str
+    scopes: list[str]
+
+
+@strawberry.type(name="AstroliftApiTokenScopeCatalog")
+class ApiTokenScopeCatalogType:
+    scopes: list[ApiTokenScopeType]
+    presets: list[ApiTokenScopePresetType]
 
 
 @strawberry.type(name="AstroliftApiTokenPlaintext")
@@ -305,7 +478,17 @@ def api_token_to_type(token) -> ApiTokenType:
         last_used_agent=token.last_used_agent or None,
         is_revoked=token.is_revoked,
         created_at=token.created_at,
+        effective_permissions=token_effective_permissions(token),
     )
+
+
+def token_effective_permissions(token) -> list[str]:
+    """Scopes ∩ the owner's roles in the token's org, sorted."""
+    from astrolift_identity.api_tokens import permissions_for_scopes
+    from core.schema.types.permission_analysis import _held_slugs
+
+    held = set(_held_slugs(token.user, token.organization_id))
+    return sorted(permissions_for_scopes(token.scopes or []) & held)
 
 
 @strawberry.type(name="AstroliftEnrollmentQrPayload")
@@ -789,3 +972,64 @@ class SearchableUserType:
     invitation_id: GUID | None
     invitation_status: str | None
     expires_at: dt.datetime | None
+
+
+# ---- UI preferences (#2154) ------------------------------------------
+
+
+@strawberry.type(name="AstroliftUiPreferences")
+class UiPreferencesType:
+    """The viewer's UI preferences, as the UI should apply them.
+
+    Every choice is resolved: a person who never chose reads the default
+    (or, for ``restrictedSettings``, the org's default), so the client never
+    needs its own copy of the fallbacks. ``restrictedSettingsChoice`` is the
+    person's own choice, null when they follow the org.
+    """
+
+    home_layout: str | None = strawberry.field(
+        description="The chosen Home layout key; null means the default from access."
+    )
+    home_layout_asked: bool = strawberry.field(
+        description="The first-sign-in layout question was answered, so it is not asked again."
+    )
+    fleet_view: str
+    workflow_view: str
+    app_view: str
+    flow_particles: bool
+    motion: str = strawberry.field(description="system, full or reduced.")
+    restricted_settings: str = strawberry.field(
+        description="show or hide: the person's choice, else the organization's default."
+    )
+    restricted_settings_choice: str | None = strawberry.field(
+        description="The person's own show or hide; null follows the organization."
+    )
+    restricted_settings_org_default: str
+    appearance: strawberry.scalars.JSON = strawberry.field(
+        description="The person's own partial appearance (ground, accent, density, corners)."
+    )
+
+
+def ui_preferences_to_type(prefs, *, org_default: str) -> UiPreferencesType:
+    """Resolve a ``UserPreferences`` row (or ``None``: never saved) for the UI."""
+    from astrolift_identity import ui_preferences as ui
+
+    def chosen(column: str, fallback: str) -> str:
+        value = getattr(prefs, column, "") if prefs is not None else ""
+        return value or fallback
+
+    own_restricted = (prefs.restricted_settings if prefs is not None else "") or None
+    particles = prefs.flow_particles if prefs is not None else None
+    return UiPreferencesType(
+        home_layout=(prefs.home_layout if prefs is not None else "") or None,
+        home_layout_asked=bool(prefs.home_layout_asked) if prefs is not None else False,
+        fleet_view=chosen("fleet_view", ui.DEFAULT_FLEET_VIEW),
+        workflow_view=chosen("workflow_view", ui.DEFAULT_WORKFLOW_VIEW),
+        app_view=chosen("app_view", ui.DEFAULT_APP_VIEW),
+        flow_particles=ui.DEFAULT_FLOW_PARTICLES if particles is None else bool(particles),
+        motion=chosen("motion", ui.DEFAULT_MOTION),
+        restricted_settings=own_restricted or org_default,
+        restricted_settings_choice=own_restricted,
+        restricted_settings_org_default=org_default,
+        appearance=dict(prefs.appearance or {}) if prefs is not None else {},
+    )

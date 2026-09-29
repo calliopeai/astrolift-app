@@ -23,11 +23,14 @@ from typing import Any
 
 import strawberry
 from _sdk.k8s_naming import agent_namespace
+from django.db.models import Case, Q, Value, When
+from django.db.models.functions import Lower
 from graphql import GraphQLError
 from strawberry.types import Info
 
 from astrolift_agents.models import (
     AgentBox,
+    AgentEnvironmentSpec,
     AgentInteraction,
     AgentSecretBundleRef,
     AgentTask,
@@ -43,6 +46,7 @@ from astrolift_agents.schema.types import (
     AgentBoxType,
     AgentDetailType,
     AgentEnvironmentSpecType,
+    AgentFleetFilterInput,
     AgentInteractionType,
     AgentListItemPageType,
     AgentListItemType,
@@ -50,18 +54,27 @@ from astrolift_agents.schema.types import (
     AgentRuntimeType,
     AgentSecretBundleAttachmentType,
     AgentSecretBundleType,
+    AgentSecretStatusFilterInput,
+    AgentSecretStatusPageType,
     AgentSecretStatusType,
     AgentTaskEventType,
     AgentTaskInputMessageType,
     AgentTaskPageType,
+    AgentTasksFilterInput,
     AgentTaskType,
     AgentTriggerType,
+    AgentUpcomingRunPageType,
+    AgentUpcomingRunType,
     BriefType,
     DiscoveredAgentManifestType,
     DispatcherInstanceType,
     OrgSkillRepoType,
     ScanAgentManifestsResultType,
+    SkillPageType,
+    SkillsFilterInput,
     SkillType,
+    ToolDefPageType,
+    ToolDefsFilterInput,
     ToolDefType,
     agent_box_to_type,
     agent_detail_to_type,
@@ -91,7 +104,23 @@ from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
 from astrolift_agents.visibility import dispatchable_agent_workloads
 from astrolift_agents.visibility import environment_specs as visible_environment_specs
-from astrolift_graphql import GUID, PageType, keyset_page, search_q
+from astrolift_graphql import (
+    DEFAULT_PAGE_SIZE,
+    GUID,
+    MAX_PAGE_LIMIT,
+    FilterField,
+    PageType,
+    SortKey,
+    UnsupportedSort,
+    clamp_limit,
+    filter_q,
+    filter_values,
+    keyset_page,
+    numbered_page,
+    parse_sort_spec,
+    resolve_list_sort,
+    search_q,
+)
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission, require_platform_operator
 from core.tenancy import get_current_tenant
@@ -298,7 +327,9 @@ def _agent_workload_qs(org_pk: int, *, project_slug: str | None = None, dispatch
     list matches exactly what ``runAstroliftAgent`` would accept.
     """
     qs = dispatchable_agent_workloads(org_pk) if dispatchable else visible_agent_workloads(org_pk)
-    qs = qs.select_related("registered_app", "registered_app__project")
+    qs = qs.select_related(
+        "registered_app", "registered_app__project", "created_by", "registered_app__created_by"
+    )
     if project_slug:
         qs = qs.filter(registered_app__project__slug=project_slug)
     return qs.order_by("-created_at")
@@ -352,12 +383,24 @@ def _agent_list_rows(
 
 
 def _agent_list_rows_for_workloads(workloads) -> list[AgentListItemType]:
+    """List rows for ``workloads``, with every column fetched in bulk.
+
+    One query per source regardless of the page size: the run rollup (two),
+    the environment specs that share the agents' slugs, and the clusters
+    their apps' environments sit on. Owners ride on the workload query
+    (``_agent_workload_qs`` select_relates both creators).
+    """
     workloads = list(workloads)
     rollup = _agent_run_rollup([w.pk for w in workloads])
+    specs = _fleet_specs(workloads)
+    clusters = _fleet_clusters(workloads)
+    viewer = _viewer_id()
     rows: list[AgentListItemType] = []
     for w in workloads:
         stats = rollup.get(w.pk, {})
         app = w.registered_app
+        spec = specs.get((app.organization_id, w.slug))
+        owner = w.created_by if w.created_by_id is not None else app.created_by
         rows.append(
             AgentListItemType(
                 id=GUID(str(w.guid)),
@@ -379,9 +422,370 @@ def _agent_list_rows_for_workloads(workloads) -> list[AgentListItemType]:
                 scheduled_scale_to=w.scheduled_scale_to,
                 scale_up_cron=w.scale_up_cron or "",
                 scale_down_cron=w.scale_down_cron or "",
+                status=getattr(w, "_fleet_status", None) or _fleet_status(w, stats),
+                model_source=_model_source(spec),
+                runtime=(spec.runtime or "") if spec is not None else "",
+                environment_spec_slug=spec.slug if spec is not None else "",
+                cluster_slugs=clusters.get(app.pk, []),
+                owner_email=(getattr(owner, "email", "") or "") if owner is not None else "",
+                owned_by_me=owner is not None and viewer is not None and owner.pk == viewer,
             )
         )
     return rows
+
+
+# ---------------------------------------------------------------------------
+# The list contract on the Agents list (spec 44 §5.1, #2155)
+# ---------------------------------------------------------------------------
+#
+# Everything the Agents screen used to join in the browser (status, model,
+# runtime, cluster, owner) is a column or an annotation here, so a numbered
+# page's OFFSET and totalCount are exact. The status is the screen's own
+# ``agentStatusKey``, in SQL: running beats paused beats a failed last run
+# beats a schedule beats idle. "scheduled" is a schedule-mode agent with a
+# cron expression; an expression the cron parser rejects still reads as
+# scheduled here, and ``agentLiveStatus`` reports no next firing for it.
+
+_FLEET_STATUS_ORDER = ["running", "failing", "scheduled", "paused", "idle"]
+
+
+def _viewer_id() -> int | None:
+    tenant = get_current_tenant()
+    return tenant.actor_user_id if tenant else None
+
+
+def _user_ids(values, viewer_id: int | None) -> list[int]:
+    """``["me", "12"]`` as user pks; "me" is the viewer, junk is dropped."""
+    out: list[int] = []
+    for value in values if isinstance(values, list) else [values]:
+        if value == "me":
+            if viewer_id is not None:
+                out.append(viewer_id)
+            continue
+        try:
+            out.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _iexact_any(path: str, values) -> Q:
+    """Case-insensitive "is one of"; an empty list matches nothing."""
+    query = Q(pk__in=[])
+    for value in values if isinstance(values, list) else [values]:
+        query |= Q(**{f"{path}__iexact": value})
+    return query
+
+
+def _fleet_status(w, stats: dict) -> str:
+    """The row status from the Python rollup, for the unannotated lists."""
+    from astrolift_lifecycle.models import AgentRun
+    from astrolift_registry.models import Workload
+
+    if stats.get("running", 0) > 0:
+        return "running"
+    if w.run_paused:
+        return "paused"
+    if stats.get("last_status") == AgentRun.Status.FAILED:
+        return "failing"
+    if w.run_mode == Workload.RunMode.SCHEDULE and (w.run_cron_expression or "").strip():
+        return "scheduled"
+    return "idle"
+
+
+def _model_source(spec) -> str | None:
+    if spec is None:
+        return None
+    if spec.managed_model:
+        return "managed"
+    if spec.model_gateway:
+        return "gateway"
+    return "api-key"
+
+
+def _fleet_specs(workloads) -> dict[tuple[int, str], AgentEnvironmentSpec]:
+    """The environment spec that shares each agent's slug, keyed ``(org, slug)``."""
+    orgs = {w.registered_app.organization_id for w in workloads}
+    slugs = {w.slug for w in workloads}
+    if not orgs:
+        return {}
+    rows = AgentEnvironmentSpec.objects.filter(
+        organization_id__in=orgs, slug__in=slugs, deleted_at__isnull=True
+    ).only("organization_id", "slug", "runtime", "managed_model", "model_gateway")
+    return {(r.organization_id, r.slug): r for r in rows}
+
+
+def _fleet_clusters(workloads) -> dict[int, list[str]]:
+    """Distinct cluster slugs per app, in environment-name order, in one query."""
+    from astrolift_lifecycle.models import AppEnvironment
+
+    app_ids = {w.registered_app_id for w in workloads}
+    if not app_ids:
+        return {}
+    rows = (
+        AppEnvironment.objects.filter(
+            registered_app_id__in=app_ids, deleted_at__isnull=True, tenant_cluster__isnull=False
+        )
+        .order_by("registered_app_id", "name", "pk")
+        .values_list("registered_app_id", "tenant_cluster__slug")
+    )
+    out: dict[int, list[str]] = {}
+    for app_id, slug in rows:
+        seen = out.setdefault(app_id, [])
+        if slug not in seen:
+            seen.append(slug)
+    return out
+
+
+def _annotate_fleet(qs, org_pk: int):
+    """Annotate the columns the Agents list filters and sorts on."""
+    from django.db.models import CharField, Exists, IntegerField, OuterRef, Subquery
+    from django.db.models.functions import Coalesce
+
+    from astrolift_lifecycle.models import AgentRun
+    from astrolift_registry.models import Workload
+
+    runs = AgentRun.objects.filter(workload=OuterRef("pk")).order_by("-created_at", "-pk")
+    specs = AgentEnvironmentSpec.objects.filter(
+        organization_id=org_pk, slug=OuterRef("slug"), deleted_at__isnull=True
+    ).order_by("pk")
+    qs = qs.annotate(
+        _last_run_status=Subquery(runs.values("status")[:1]),
+        _last_run_at=Subquery(runs.annotate(_at=Coalesce("started_at", "created_at")).values("_at")[:1]),
+        _running=Exists(AgentRun.objects.filter(workload=OuterRef("pk"), status=AgentRun.Status.RUNNING)),
+        _spec_runtime=Subquery(specs.values("runtime")[:1]),
+        _model_source=Subquery(
+            specs.annotate(
+                _src=Case(
+                    When(managed_model=True, then=Value("managed")),
+                    When(model_gateway=True, then=Value("gateway")),
+                    default=Value("api-key"),
+                    output_field=CharField(),
+                )
+            ).values("_src")[:1]
+        ),
+    )
+    qs = qs.annotate(
+        _fleet_status=Case(
+            When(_running=True, then=Value("running")),
+            When(run_paused=True, then=Value("paused")),
+            When(_last_run_status=AgentRun.Status.FAILED, then=Value("failing")),
+            When(
+                Q(run_mode=Workload.RunMode.SCHEDULE) & ~Q(run_cron_expression=""),
+                then=Value("scheduled"),
+            ),
+            default=Value("idle"),
+            output_field=CharField(),
+        )
+    )
+    return qs.annotate(
+        _status_rank=Case(
+            *(
+                When(_fleet_status=status, then=Value(rank))
+                for rank, status in enumerate(_FLEET_STATUS_ORDER)
+            ),
+            default=Value(len(_FLEET_STATUS_ORDER)),
+            output_field=IntegerField(),
+        )
+    )
+
+
+def _agents_on_clusters(slugs) -> Q:
+    from astrolift_lifecycle.models import AppEnvironment
+
+    envs = AppEnvironment.objects.filter(_iexact_any("tenant_cluster__slug", slugs), deleted_at__isnull=True)
+    return Q(registered_app_id__in=envs.values("registered_app_id"))
+
+
+def _runtime_q(values) -> Q:
+    return _iexact_any("_spec_runtime", values) | _iexact_any("run_family", values)
+
+
+_FLEET_SORTS: dict[str, SortKey] = {
+    "name": SortKey(Lower("name")),
+    "slug": SortKey("slug"),
+    "status": SortKey("_status_rank"),
+    # Never run sorts below the oldest run, as it did in the browser.
+    "lastRun": SortKey("_last_run_at", nulls_low=True),
+    "project": SortKey(Lower("registered_app__project__slug"), nulls_low=True),
+    "created": SortKey("created_at"),
+}
+
+_FLEET_FILTERS: dict[str, FilterField] = {
+    "project": FilterField(q=lambda v: _iexact_any("registered_app__project__slug", v)),
+    "status": FilterField("_fleet_status"),
+    "model": FilterField("_model_source"),
+    "runtime": FilterField(q=_runtime_q),
+    "cluster": FilterField(q=_agents_on_clusters),
+    "paused": FilterField("run_paused"),
+    # ``owner`` needs the viewer; the resolver applies it.
+}
+
+
+def _fleet_owner_q(values, viewer_id: int | None) -> Q:
+    ids = _user_ids(values, viewer_id)
+    return Q(created_by_id__in=ids) | Q(created_by__isnull=True, registered_app__created_by_id__in=ids)
+
+
+def _fleet_search_q(search: str) -> Q:
+    return search_q(
+        search,
+        "name",
+        "slug",
+        "registered_app__slug",
+        "registered_app__project__slug",
+        "registered_app__source_repo",
+    )
+
+
+# ---------------------------------------------------------------------------
+# agentTasksPage: filters and sort (#2155)
+# ---------------------------------------------------------------------------
+
+_TASK_FILTERS: dict[str, FilterField] = {
+    "status": FilterField("status"),
+    "trigger": FilterField("trigger_kind"),
+    "agent": FilterField(q=lambda v: _iexact_any("agent_definition__slug", v)),
+    "project": FilterField(q=lambda v: _iexact_any("project__slug", v)),
+    # ``started_by`` / ``started_by_me`` need the viewer; the resolver applies them.
+}
+
+#: A cursor list sorts on one NOT NULL key (README, "Multi-key sort on a
+#: cursor list is not built yet"): created or updated, either direction.
+_TASK_SORT_FIELDS = {"created": "created_at", "updated": "updated_at"}
+
+
+def _task_sort(sort: str | None, org_pk: int) -> tuple[str, bool, str]:
+    """``(sort_field, descending, cursor_scope)``; newest created first by default.
+
+    The default keeps the scope the page has always issued, so a cursor from
+    before ``sort`` existed keeps walking; any other order is scoped apart.
+    """
+    pairs = parse_sort_spec(sort) or [("created", True)]
+    if len(pairs) > 1 or pairs[0][0] not in _TASK_SORT_FIELDS:
+        raise UnsupportedSort(f"sort {sort!r} is not available on agent tasks; supported: created, updated")
+    key, descending = pairs[0]
+    scope = f"agent-tasks:{org_pk}"
+    if (key, descending) != ("created", True):
+        scope = f"{scope}:{'-' if descending else ''}{key}"
+    return _TASK_SORT_FIELDS[key], descending, scope
+
+
+def _apply_task_filter(qs, values: dict, viewer_id: int | None):
+    qs = qs.filter(filter_q(values, _TASK_FILTERS))
+    if "started_by" in values:
+        qs = qs.filter(triggered_by_user_id__in=_user_ids(values["started_by"], viewer_id))
+    mine = values.get("started_by_me")
+    if mine is True:
+        qs = qs.filter(triggered_by_user_id=viewer_id) if viewer_id is not None else qs.none()
+    elif mine is False and viewer_id is not None:
+        qs = qs.filter(Q(triggered_by_user_id__isnull=True) | ~Q(triggered_by_user_id=viewer_id))
+    return qs
+
+
+# ---------------------------------------------------------------------------
+# Upcoming scheduled runs (#2155)
+# ---------------------------------------------------------------------------
+
+#: Firings per agent the upcoming-runs list will compute.
+_UPCOMING_PER_AGENT_MAX = 10
+
+
+def _upcoming_firings(expression: str, *, after, count: int, until=None) -> list:
+    """The next ``count`` firings of a valid ``expression`` after ``after``."""
+    out = []
+    cursor = after
+    for _ in range(count):
+        nxt = _next_cron_fire(expression, after=cursor)
+        if nxt is None or (until is not None and nxt > until):
+            break
+        out.append(nxt)
+        cursor = nxt
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Catalog lists: skills and tool definitions (#2155)
+# ---------------------------------------------------------------------------
+
+
+def _scope_q(values, *, org_field: str, global_field: str, org_pk: int) -> Q:
+    query = Q(pk__in=[])
+    for value in values if isinstance(values, list) else [values]:
+        if value == "org":
+            query |= Q(**{org_field: org_pk})
+        elif value == "global":
+            query |= Q(**{global_field: True})
+    return query
+
+
+_SKILL_SORTS: dict[str, SortKey] = {
+    "name": SortKey(Lower("name")),
+    "slug": SortKey("slug"),
+    "created": SortKey("created_at"),
+    "updated": SortKey("updated_at"),
+    "version": SortKey("skill_version"),
+}
+
+_SKILL_FILTERS: dict[str, FilterField] = {
+    "active": FilterField("is_active"),
+    "source_kind": FilterField("source_kind"),
+    "agent_type": FilterField("agent_type"),
+    # ``scope``, ``imported`` and ``created_by`` are applied by the resolver.
+}
+
+_TOOL_SORTS: dict[str, SortKey] = {
+    "name": SortKey(Lower("name")),
+    "slug": SortKey("slug"),
+    "skill": SortKey(Lower("skill__slug")),
+    "adapter": SortKey("adapter"),
+    "created": SortKey("created_at"),
+}
+
+_TOOL_FILTERS: dict[str, FilterField] = {
+    "skill": FilterField(q=lambda v: _iexact_any("skill__slug", v)),
+    "adapter": FilterField("adapter"),
+    "builtin": FilterField("is_builtin"),
+    "capability_group": FilterField(q=lambda v: _iexact_any("capability_group", v)),
+    # ``scope`` and ``created_by`` are applied by the resolver.
+}
+
+# ---------------------------------------------------------------------------
+# Secret status page (#2155)
+# ---------------------------------------------------------------------------
+
+_SECRET_STATUS_SORTS = {
+    "envVar": lambda r: (r.env_var or "").lower(),
+    "uri": lambda r: (r.uri or "").lower(),
+    "exists": lambda r: r.exists,
+    "provider": lambda r: (r.provider or "").lower(),
+}
+
+
+def _sorted_rows(rows: list, sort: str | None, keys: dict, *, default: str, list_name: str) -> list:
+    """Sort rows only Python holds (a secret-store probe) by a declared spec.
+
+    Stable sorts applied from the last key to the first give the multi-key
+    order; an undeclared key is refused exactly as ``resolve_list_sort``
+    refuses one.
+    """
+    pairs = parse_sort_spec(sort) or parse_sort_spec(default)
+    unknown = [key for key, _ in pairs if key not in keys]
+    if unknown:
+        offered = ", ".join(sorted(keys))
+        raise UnsupportedSort(f"sort {unknown[0]!r} is not available on {list_name}; supported: {offered}")
+    out = list(rows)
+    for key, descending in reversed(pairs):
+        out.sort(key=keys[key], reverse=descending)
+    return out
+
+
+def _slice_page(rows: list, page: int | None, page_size: int | None) -> tuple[list, int, int]:
+    """``(rows on the page, page, page_size)`` with ``numbered_page``'s clamping."""
+    size = clamp_limit(page_size, default=DEFAULT_PAGE_SIZE, maximum=MAX_PAGE_LIMIT)
+    number = page if page is not None and page > 0 else 1
+    start = (number - 1) * size
+    return rows[start : start + size], number, size
 
 
 @strawberry.type
@@ -403,7 +807,11 @@ class AgentsQuery:
             scope = Q(is_global=True)
         else:
             scope = Q(organization_id=org_pk) | Q(is_global=True)
-        qs = Skill.objects.filter(scope, deleted_at__isnull=True).order_by("-is_global", "slug")[:200]
+        qs = (
+            Skill.objects.filter(scope, deleted_at__isnull=True)
+            .select_related("created_by")
+            .order_by("-is_global", "slug")[:200]
+        )
         return [skill_to_type(s) for s in qs]
 
     @strawberry.field
@@ -441,7 +849,11 @@ class AgentsQuery:
         ).first()
         if skill is None:
             return []
-        qs = ToolDef.objects.filter(skill=skill, deleted_at__isnull=True).order_by("slug")[:200]
+        qs = (
+            ToolDef.objects.filter(skill=skill, deleted_at__isnull=True)
+            .select_related("skill", "created_by")
+            .order_by("slug")[:200]
+        )
         return [tool_def_to_type(t) for t in qs]
 
     @strawberry.field
@@ -457,10 +869,146 @@ class AgentsQuery:
         skill_scope = Q(skill__organization_id=org_pk) | Q(skill__is_global=True)
         qs = (
             ToolDef.objects.filter(skill_scope, deleted_at__isnull=True)
-            .select_related("skill")
+            .select_related("skill", "created_by")
             .order_by("skill__slug", "slug")[:500]
         )
         return [tool_def_to_type(t) for t in qs]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
+    @tenant_scoped()
+    def skills_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        search: str | None = None,
+        filter: SkillsFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> SkillPageType:
+        """The org's skills plus the global catalog, on the list contract (#2155).
+
+        The numbered sibling of ``skills`` without its 200-row cap.
+        ``filter``: scope (org, global), active, imported, sourceKind,
+        createdBy (user ids or "me", the Mine view) and agentType.
+        ``search`` matches the name, slug, description and import source;
+        ``sort`` is a multi-key spec over name, slug, created, updated and
+        version (``name`` by default).
+
+        Org-scoped like ``skills``: ``orgId`` must be the caller's org
+        (``_caller_org_id`` raises otherwise) and the rows are that org's
+        own plus the global catalog, never another org's.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        qs = Skill.objects.filter(
+            Q(organization_id=org_pk) | Q(is_global=True), deleted_at__isnull=True
+        ).select_related("created_by")
+        if search and search.strip():
+            qs = qs.filter(search_q(search.strip(), "name", "slug", "description", "source_ref"))
+        values = filter_values(filter)
+        qs = qs.filter(filter_q(values, _SKILL_FILTERS))
+        if "scope" in values:
+            qs = qs.filter(
+                _scope_q(
+                    values["scope"], org_field="organization_id", global_field="is_global", org_pk=org_pk
+                )
+            )
+        if values.get("imported") is True:
+            qs = qs.exclude(source_kind="")
+        elif values.get("imported") is False:
+            qs = qs.filter(source_kind="")
+        if "created_by" in values:
+            qs = qs.filter(created_by_id__in=_user_ids(values["created_by"], _viewer_id()))
+        order_by = resolve_list_sort(sort, _SKILL_SORTS, default="name")
+        result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        return SkillPageType(
+            items=[skill_to_type(row) for row in result.rows],
+            total_count=result.total_count,
+            page=result.page,
+            page_size=result.page_size,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
+    @tenant_scoped()
+    def org_tool_defs_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        search: str | None = None,
+        filter: ToolDefsFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> ToolDefPageType:
+        """Every tool on a skill the org can read, on the list contract (#2155).
+
+        The numbered sibling of ``orgToolDefs`` without its 500-row cap. A
+        tool whose skill is deleted is left out. ``filter``: skill (slugs),
+        adapter, builtin, capabilityGroup, scope (org, global: the parent
+        skill's) and createdBy (user ids or "me"). ``search`` matches the
+        name, slug, description, handler and skill slug; ``sort`` is a
+        multi-key spec over name, slug, skill, adapter and created.
+
+        Org-scoped like ``orgToolDefs``: the parent skill is the org's own
+        or global, and ``orgId`` must be the caller's org.
+        """
+        org_pk = _caller_org_id(info, org_id)
+        qs = ToolDef.objects.filter(
+            Q(skill__organization_id=org_pk) | Q(skill__is_global=True),
+            deleted_at__isnull=True,
+            skill__deleted_at__isnull=True,
+        ).select_related("skill", "created_by")
+        if search and search.strip():
+            qs = qs.filter(
+                search_q(search.strip(), "name", "slug", "description", "handler_ref", "skill__slug")
+            )
+        values = filter_values(filter)
+        qs = qs.filter(filter_q(values, _TOOL_FILTERS))
+        if "scope" in values:
+            qs = qs.filter(
+                _scope_q(
+                    values["scope"],
+                    org_field="skill__organization_id",
+                    global_field="skill__is_global",
+                    org_pk=org_pk,
+                )
+            )
+        if "created_by" in values:
+            qs = qs.filter(created_by_id__in=_user_ids(values["created_by"], _viewer_id()))
+        order_by = resolve_list_sort(sort, _TOOL_SORTS, default="skill,name")
+        result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        return ToolDefPageType(
+            items=[tool_def_to_type(row) for row in result.rows],
+            total_count=result.total_count,
+            page=result.page,
+            page_size=result.page_size,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
+    @tenant_scoped()
+    def tool_def(self, info: Info, id: strawberry.ID) -> ToolDefType | None:
+        """One tool by GUID, on a skill of the caller's org or the global
+        catalog (#2155). Another org's tool, a tool on a deleted skill and a
+        malformed id all resolve to null, so the surface leaks no existence."""
+        guid = _valid_guid(id)
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if guid is None or org_pk is None:
+            return None
+        row = (
+            ToolDef.objects.filter(
+                Q(skill__organization_id=org_pk) | Q(skill__is_global=True),
+                guid=guid,
+                deleted_at__isnull=True,
+                skill__deleted_at__isnull=True,
+            )
+            .select_related("skill", "created_by")
+            .first()
+        )
+        return tool_def_to_type(row) if row is not None else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ, scope=agent_org_scope)
@@ -1085,6 +1633,96 @@ class AgentsQuery:
         return [agent_secret_status_to_type(r) for r in rows]
 
     @strawberry.field
+    @require_permission(Permission.SECRET_LIST, any_scope=True)
+    @tenant_scoped()
+    def agent_environment_spec_secret_status_page(
+        self,
+        info: Info,
+        slug: str,
+        search: str | None = None,
+        filter: AgentSecretStatusFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> AgentSecretStatusPageType:
+        """``agentEnvironmentSpecSecretStatus`` on the list contract, with an
+        error for the read (#2155).
+
+        ``search`` matches the env var and uri; ``filter``: exists, failing
+        (the per-ref check reported an error) and provider; ``sort`` is a
+        multi-key spec over envVar, uri, exists and provider (``envVar`` by
+        default). The rows come from probing the secret store, not from a
+        table, so every ref is probed and the page is cut after filtering
+        and sorting; a spec carries a handful of refs.
+
+        ``error`` says why the whole read could not answer: the spec is not
+        one the caller reaches at ``secret.list`` (no rows, #1866), or the
+        org has no agent cluster or secret store (rows report ``exists:
+        false``). A spec in another org or another team reads exactly like
+        one that does not exist.
+        """
+        from astrolift_agents.services.agent_cluster import (
+            NoAgentClusterError,
+            resolve_agent_cluster,
+        )
+        from astrolift_dispatch.agent_secrets import (
+            effective_secret_refs,
+            probe_ref_statuses,
+            resolve_secrets_backend,
+            unscoped_secret_refs,
+        )
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        spec = (
+            visible_environment_specs(org_pk, Permission.SECRET_LIST)
+            .filter(slug=slug, organization_id=org_pk)
+            .first()
+        )
+        if spec is None:
+            _, number, size = _slice_page([], page, page_size)
+            return AgentSecretStatusPageType(
+                items=[], total_count=0, page=number, page_size=size, error="environment spec not found"
+            )
+        error = None
+        try:
+            cluster = resolve_agent_cluster(spec.organization)
+        except NoAgentClusterError as exc:
+            cluster = None
+            error = str(exc) or "the organization has no agent cluster"
+        if cluster is not None:
+            try:
+                resolve_secrets_backend(cluster)
+            except Exception:  # noqa: BLE001 - never reflect provider response bodies
+                error = "secret store unavailable; inspect the provider audit log"
+        rows = [
+            agent_secret_status_to_type(r)
+            for r in probe_ref_statuses(
+                cluster=cluster,
+                refs=effective_secret_refs(spec),
+                unscoped=unscoped_secret_refs(spec),
+            )
+        ]
+        if search and search.strip():
+            needle = search.strip().lower()
+            rows = [r for r in rows if needle in r.env_var.lower() or needle in r.uri.lower()]
+        values = filter_values(filter)
+        if "exists" in values:
+            rows = [r for r in rows if r.exists is values["exists"]]
+        if "failing" in values:
+            rows = [r for r in rows if bool(r.error) is values["failing"]]
+        if "provider" in values:
+            wanted = {p.lower() for p in values["provider"]}
+            rows = [r for r in rows if (r.provider or "").lower() in wanted]
+        rows = _sorted_rows(
+            rows, sort, _SECRET_STATUS_SORTS, default="envVar", list_name="agent secret status"
+        )
+        items, number, size = _slice_page(rows, page, page_size)
+        return AgentSecretStatusPageType(
+            items=items, total_count=len(rows), page=number, page_size=size, error=error
+        )
+
+    @strawberry.field
     @require_permission(Permission.SECRET_LIST, scope=agent_org_scope)
     @tenant_scoped()
     def agent_secret_bundles(self, info: Info, env_spec_slug: str) -> list[AgentSecretBundleType]:
@@ -1227,17 +1865,52 @@ class AgentsQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: AgentFleetFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> AgentListItemPageType:
-        """Cursor-paginated organization-wide agent fleet."""
+        """The organization-wide agent fleet, on the list contract (#2155).
+
+        ``filter`` takes the declared filters (project, status, model,
+        runtime, cluster, paused, owner), ``search`` matches the name, slug,
+        app, project and source repo, and ``sort`` is a multi-key spec over
+        ``name``, ``slug``, ``status``, ``lastRun``, ``project`` and
+        ``created`` (``-lastRun,name``). Any of ``sort``, ``page`` or
+        ``pageSize`` selects a numbered page with an exact ``totalCount``;
+        otherwise the cursor walk (``limit`` / ``after``, newest first) runs
+        as before, with ``filter`` applied first. Search used to match the
+        slug and name only; it now matches the wider set on both paths.
+
+        Org-scoped through ``_caller_org_id`` and the ``agent.read``
+        visibility set, so a foreign ``orgId`` raises and a foreign agent
+        never reaches the filter.
+        """
         org_pk = _caller_org_id(info, org_id)
-        qs = _agent_workload_qs(org_pk)
-        if search:
-            qs = qs.filter(search_q(search, "slug", "name"))
-        page = keyset_page(qs, cursor=after, limit=limit, cursor_scope=f"agent-fleet:{org_pk}")
+        viewer = _viewer_id()
+        qs = _annotate_fleet(_agent_workload_qs(org_pk), org_pk)
+        if search and search.strip():
+            qs = qs.filter(_fleet_search_q(search.strip()))
+        values = filter_values(filter)
+        qs = qs.filter(filter_q(values, _FLEET_FILTERS))
+        if "owner" in values:
+            qs = qs.filter(_fleet_owner_q(values["owner"], viewer))
+
+        if page is None and page_size is None and sort is None:
+            walk = keyset_page(qs, cursor=after, limit=limit, cursor_scope=f"agent-fleet:{org_pk}")
+            return AgentListItemPageType(
+                items=_agent_list_rows_for_workloads(walk.rows),
+                next_cursor=walk.next_cursor,
+                total_count=walk.total_count,
+            )
+        order_by = resolve_list_sort(sort, _FLEET_SORTS, default="name")
+        result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
         return AgentListItemPageType(
-            items=_agent_list_rows_for_workloads(page.rows),
-            next_cursor=page.next_cursor,
-            total_count=page.total_count,
+            items=_agent_list_rows_for_workloads(result.rows),
+            next_cursor=None,
+            total_count=result.total_count,
+            page=result.page,
+            page_size=result.page_size,
         )
 
     @strawberry.field
@@ -1252,12 +1925,23 @@ class AgentsQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        filter: AgentTasksFilterInput | None = None,
+        sort: str | None = None,
     ) -> AgentTaskPageType:
-        """Cursor-paginated task history for the organization."""
+        """Cursor-paginated task history for the organization.
+
+        #2155: ``filter`` narrows by status (any of), trigger kind, agent,
+        project and initiator (``startedBy`` user ids or "me", and
+        ``startedByMe``), and ``sort`` orders by ``created`` or ``updated``
+        in either direction (``-created`` by default). ``status`` (one
+        value) still works and combines with the filter.
+        """
         org_pk = _caller_org_id(info, org_id)
+        sort_field, descending, cursor_scope = _task_sort(sort, org_pk)
         qs = visible_agent_tasks(org_pk, Permission.AGENT_READ)
         if status:
             qs = qs.filter(status=status)
+        qs = _apply_task_filter(qs, filter_values(filter), _viewer_id())
         if workload_id:
             workload_guid = _valid_guid(workload_id)
             if workload_guid is None:
@@ -1285,7 +1969,14 @@ class AgentsQuery:
         qs = qs.select_related(
             "organization", "project", "agent_definition", "dispatcher", "dispatcher__tenant_cluster"
         )
-        page = keyset_page(qs, cursor=after, limit=limit, cursor_scope=f"agent-tasks:{org_pk}")
+        page = keyset_page(
+            qs,
+            cursor=after,
+            limit=limit,
+            sort_field=sort_field,
+            descending=descending,
+            cursor_scope=cursor_scope,
+        )
         return AgentTaskPageType(
             items=agent_tasks_to_types(page.rows),
             next_cursor=page.next_cursor,
@@ -1523,6 +2214,82 @@ class AgentsQuery:
                 )
             )
         return rows
+
+    @strawberry.field
+    @require_permission(Permission.AGENT_READ, any_scope=True)
+    @tenant_scoped()
+    def agent_upcoming_runs(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        search: str | None = None,
+        project: list[str] | None = None,
+        agent: list[str] | None = None,
+        per_agent: int = 1,
+        within_hours: int | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> AgentUpcomingRunPageType:
+        """Upcoming scheduled firings across the fleet, soonest first (#2155).
+
+        For Runs › Scheduled: every unpaused schedule-mode agent the caller
+        can read, with its next ``perAgent`` firings (1 to 10) computed from
+        its cron expression by the platform evaluator ``agentLiveStatus``
+        uses, optionally only those inside ``withinHours``. An expression
+        the cron parser rejects contributes nothing.
+
+        The times exist only in Python, so the whole filtered set is computed
+        once, sorted by time (then agent slug), and cut into a numbered page;
+        ``totalCount`` counts firings, not agents. ``search`` matches the
+        agent name and slug; ``project`` and ``agent`` take slugs.
+
+        Org-scoped like ``agentFleet``: ``orgId`` must be the caller's org
+        and the agents are its ``agent.read`` visibility set.
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from astrolift_registry.cron import CronValidationError, validate_cron_expression
+        from astrolift_registry.models import Workload
+
+        org_pk = _caller_org_id(info, org_id)
+        qs = (
+            _agent_workload_qs(org_pk)
+            .filter(run_mode=Workload.RunMode.SCHEDULE, run_paused=False)
+            .exclude(run_cron_expression="")
+        )
+        if search and search.strip():
+            qs = qs.filter(search_q(search.strip(), "name", "slug"))
+        if project:
+            qs = qs.filter(_iexact_any("registered_app__project__slug", project))
+        if agent:
+            qs = qs.filter(_iexact_any("slug", agent))
+        count = max(1, min(int(per_agent), _UPCOMING_PER_AGENT_MAX))
+        now = timezone.now()
+        until = now + timedelta(hours=within_hours) if within_hours is not None and within_hours > 0 else None
+        firings: list[AgentUpcomingRunType] = []
+        for w in qs:
+            try:
+                expression = validate_cron_expression(w.run_cron_expression)
+            except CronValidationError:
+                continue
+            app = w.registered_app
+            for at in _upcoming_firings(expression, after=now, count=count, until=until):
+                firings.append(
+                    AgentUpcomingRunType(
+                        agent_id=GUID(str(w.guid)),
+                        agent_slug=w.slug,
+                        agent_name=w.name,
+                        app_slug=app.slug,
+                        project_slug=app.project.slug if app.project_id else "",
+                        cron_expression=w.run_cron_expression,
+                        scheduled_at=at,
+                    )
+                )
+        firings.sort(key=lambda f: (f.scheduled_at, f.agent_slug, str(f.agent_id)))
+        items, number, size = _slice_page(firings, page, page_size)
+        return AgentUpcomingRunPageType(items=items, total_count=len(firings), page=number, page_size=size)
 
     @strawberry.field
     def agent_runtimes(self, info: Info) -> list[AgentRuntimeType]:

@@ -10,13 +10,12 @@
  *    skills union platform-global skills (`skills(orgId, isGlobal)`);
  *    the selected slugs feed a stage's `skillRefs`.
  *
- * Both are controlled: `{ value, onChange, orgScoped }` where
- * `orgScoped` is the org GUID the listings are scoped to (`null` while
- * the org context is still resolving — the picker renders disabled and
- * skips the query).
+ * Both are controlled and pure: `{ value, onChange, orgScoped }` plus the
+ * options, which {@link useAgentWorkloadOptions} and {@link useSkillOptions}
+ * fetch. `orgScoped` is the org GUID the listings are scoped to (`null`
+ * while the org context is still resolving — the picker renders disabled).
  */
 
-import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
 import {
@@ -32,21 +31,19 @@ import {
   ComboboxValue,
   useComboboxAnchor,
 } from "@/components/ui/combobox";
-import { LIST_AGENT_WORKLOADS, LIST_SKILLS } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentListItem, AstroliftSkill } from "@/graphql/agents/agents.types";
 
 // ─── AgentWorkloadPicker ─────────────────────────────────────────────────
-
-interface AgentWorkloadsResp {
-  agentWorkloads: AstroliftAgentListItem[];
-}
 
 export interface AgentWorkloadPickerProps {
   /** Selected agent workload GUID (stage `agentDefinitionGuid`), or null. */
   value: string | null;
   onChange: (workloadId: string | null) => void;
-  /** Org GUID to scope the listing to; null skips the query. */
+  /** Org GUID the listing is scoped to; null renders the picker disabled. */
   orgScoped: string | null;
+  /** The org's agent workloads, sorted by name. */
+  workloads: AstroliftAgentListItem[];
+  loading: boolean;
   disabled?: boolean;
 }
 
@@ -54,19 +51,10 @@ export function AgentWorkloadPicker({
   value,
   onChange,
   orgScoped,
+  workloads,
+  loading,
   disabled = false,
 }: AgentWorkloadPickerProps) {
-  const { data, loading } = useQuery<AgentWorkloadsResp>(LIST_AGENT_WORKLOADS, {
-    variables: { orgId: orgScoped },
-    fetchPolicy: "cache-and-network",
-    skip: !orgScoped,
-  });
-
-  const workloads = React.useMemo(() => {
-    const rows = data?.agentWorkloads ?? [];
-    return [...rows].sort((a, b) => a.name.localeCompare(b.name));
-  }, [data?.agentWorkloads]);
-
   const selected = workloads.find((w) => w.id === value) ?? null;
 
   return (
@@ -107,18 +95,17 @@ export function AgentWorkloadPicker({
 
 // The chip/list option — a lightweight facade over AstroliftSkill so refs
 // not present in the listing (e.g. from an imported manifest) still render.
-type SkillOption = Pick<AstroliftSkill, "slug" | "name" | "isGlobal">;
-
-interface SkillsResp {
-  skills: AstroliftSkill[];
-}
+export type SkillOption = Pick<AstroliftSkill, "slug" | "name" | "isGlobal">;
 
 export interface SkillRefsPickerProps {
   /** Selected skill slugs (stage `skillRefs`). */
   value: string[];
   onChange: (skillRefs: string[]) => void;
-  /** Org GUID to scope the listing to; null skips the query. */
+  /** Org GUID the listing is scoped to; null renders the picker disabled. */
   orgScoped: string | null;
+  /** Org skills union platform-global skills, sorted by name. */
+  options: SkillOption[];
+  loading: boolean;
   disabled?: boolean;
 }
 
@@ -126,43 +113,19 @@ export function SkillRefsPicker({
   value,
   onChange,
   orgScoped,
+  options,
+  loading,
   disabled = false,
 }: SkillRefsPickerProps) {
   const anchor = useComboboxAnchor();
 
-  const orgSkills = useQuery<SkillsResp>(LIST_SKILLS, {
-    variables: { orgId: orgScoped, isGlobal: false },
-    fetchPolicy: "cache-and-network",
-    skip: !orgScoped,
-  });
-  const globalSkills = useQuery<SkillsResp>(LIST_SKILLS, {
-    variables: { orgId: orgScoped, isGlobal: true },
-    fetchPolicy: "cache-and-network",
-    skip: !orgScoped,
-  });
-
-  // Org skills union platform-global skills, deduped by slug (org wins).
-  const options = React.useMemo<SkillOption[]>(() => {
-    const bySlug = new Map<string, SkillOption>();
-    for (const s of globalSkills.data?.skills ?? []) {
-      bySlug.set(s.slug, { slug: s.slug, name: s.name, isGlobal: s.isGlobal });
-    }
-    for (const s of orgSkills.data?.skills ?? []) {
-      bySlug.set(s.slug, { slug: s.slug, name: s.name, isGlobal: s.isGlobal });
-    }
-    return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [orgSkills.data?.skills, globalSkills.data?.skills]);
-
   const selected = React.useMemo<SkillOption[]>(
     () =>
       value.map(
-        (slug) =>
-          options.find((o) => o.slug === slug) ?? { slug, name: slug, isGlobal: false }
+        (slug) => options.find((o) => o.slug === slug) ?? { slug, name: slug, isGlobal: false }
       ),
     [value, options]
   );
-
-  const loading = orgSkills.loading || globalSkills.loading;
 
   return (
     <Combobox<SkillOption, true>
@@ -184,9 +147,7 @@ export function SkillRefsPicker({
                 </ComboboxChip>
               ))}
               <ComboboxChipsInput
-                placeholder={
-                  vals.length > 0 ? "" : loading ? "Loading skills…" : "Add skills"
-                }
+                placeholder={vals.length > 0 ? "" : loading ? "Loading skills…" : "Add skills"}
                 disabled={disabled || !orgScoped}
               />
             </React.Fragment>

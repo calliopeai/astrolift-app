@@ -5,16 +5,21 @@
  * detail observability subroute (#377). Lists certs the cluster's
  * TlsDriver knows about for this app, with an expiry chip
  * (red < 30 days, amber < 90, otherwise muted) and renewal-status
- * badge.
+ * badge, as the card's embedded list (search, renewal and expiry filters,
+ * sort, numbered pages over the driver's answer), with its list state kept
+ * in the card.
  */
 
-import { useQuery } from "@apollo/client/react";
 import { RefreshCwIcon, RotateCcwIcon, ShieldCheckIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
+import type { Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
+import { ListPage } from "@/components/list/ListPage";
+import { selectRows } from "@/components/list/select-rows";
+import { useLocalListState } from "@/components/list/use-list-state";
 import {
   type ObservabilityPanelReason,
   panelEmptyState,
@@ -23,21 +28,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { LIST_APP_CERTIFICATES } from "@/graphql/lifecycle/lifecycle.queries";
 import type {
   AstroliftAppCertificate,
   CertificateRenewalStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 
-interface Resp {
+import { TLS_CERTIFICATES_LIST, TLS_CERTIFICATES_SELECT } from "./network-lists";
+
+export interface TlsCertificatesCardData {
   astroliftAppCertificates: {
     reason: ObservabilityPanelReason;
     certificates: AstroliftAppCertificate[];
@@ -87,16 +85,19 @@ function formatNotAfter(iso: string): string {
 
 export interface TlsCertificatesCardProps {
   appSlug: string;
-  environmentName?: string;
 }
 
-export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificatesCardProps) {
-  const { data, loading, refetch } = useQuery<Resp>(LIST_APP_CERTIFICATES, {
-    variables: { appSlug, environmentName: environmentName ?? null },
-    fetchPolicy: "cache-and-network",
-    notifyOnNetworkStatusChange: true,
-  });
-
+/** Pure (Storybook first): the data comes from useTlsCertificates. */
+export function TlsCertificatesCard({
+  appSlug,
+  data,
+  loading,
+  onRefresh,
+}: TlsCertificatesCardProps & {
+  data: TlsCertificatesCardData | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
   const certs = data?.astroliftAppCertificates?.certificates ?? [];
   const reason = data?.astroliftAppCertificates?.reason;
   const isEmptyAfterLoad = !loading && certs.length === 0;
@@ -107,6 +108,69 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
     provider: "this cloud",
   });
   const showIssueAction = reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
+
+  const list = useLocalListState(TLS_CERTIFICATES_LIST);
+  const page = selectRows(
+    certs,
+    {
+      filters: list.filters,
+      q: list.state.q,
+      sort: list.state.sort,
+      page: list.state.page,
+      pageSize: list.state.pageSize,
+    },
+    TLS_CERTIFICATES_SELECT
+  );
+  const columns: Column<AstroliftAppCertificate>[] = [
+    {
+      id: "hostname",
+      header: "Hostname",
+      sortKey: "hostname",
+      cellClassName: "max-w-72",
+      cell: (c) => (
+        <span className="block truncate font-mono text-xs" title={c.hostname}>
+          {c.hostname}
+        </span>
+      ),
+    },
+    {
+      id: "issuer",
+      header: "Issuer",
+      cellClassName: "text-muted-foreground max-w-56",
+      cell: (c) => (
+        <span className="block truncate font-mono text-xs" title={c.issuer || undefined}>
+          {c.issuer || "—"}
+        </span>
+      ),
+    },
+    {
+      id: "notAfter",
+      header: "Not after",
+      cellClassName: "font-mono text-xs",
+      cell: (c) => formatNotAfter(c.notAfter),
+    },
+    {
+      id: "expires",
+      header: "Expires in",
+      sortKey: "expires",
+      cell: (c) => (
+        <span
+          className={`text-2xs inline-flex items-center rounded border px-2 py-0.5 font-mono ${expiryChipClass(c.daysUntilExpiry)}`}
+        >
+          {formatDays(c.daysUntilExpiry)}
+        </span>
+      ),
+    },
+    {
+      id: "renewal",
+      header: "Renewal",
+      cell: (c) => (
+        <Badge variant={RENEWAL_TONE[c.renewalStatus]} className="font-mono text-xs">
+          {RENEWAL_LABEL[c.renewalStatus]}
+        </Badge>
+      ),
+    },
+  ];
 
   return (
     <Card>
@@ -125,7 +189,7 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
             size="sm"
             variant="outline"
             onClick={() => {
-              void refetch();
+              onRefresh();
             }}
             disabled={loading}
           >
@@ -167,7 +231,7 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
               actionLabel={showIssueAction ? "Issue cert" : undefined}
               secondary={
                 reason === "ERROR" ? (
-                  <Button size="sm" variant="outline" onClick={() => void refetch()}>
+                  <Button size="sm" variant="outline" onClick={() => onRefresh()}>
                     Try again
                   </Button>
                 ) : undefined
@@ -175,40 +239,18 @@ export function TlsCertificatesCard({ appSlug, environmentName }: TlsCertificate
             />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Hostname</TableHead>
-                <TableHead>Issuer</TableHead>
-                <TableHead>Not after</TableHead>
-                <TableHead>Expires in</TableHead>
-                <TableHead>Renewal</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {certs.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono text-xs">{c.hostname}</TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">
-                    {c.issuer || "—"}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{formatNotAfter(c.notAfter)}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center rounded border px-2 py-0.5 font-mono text-2xs ${expiryChipClass(c.daysUntilExpiry)}`}
-                    >
-                      {formatDays(c.daysUntilExpiry)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={RENEWAL_TONE[c.renewalStatus]} className="font-mono text-xs">
-                      {RENEWAL_LABEL[c.renewalStatus]}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="px-4 pb-4">
+            <ListPage<AstroliftAppCertificate>
+              embedded
+              list={list}
+              label="TLS certificates"
+              columns={columns}
+              rows={page.rows}
+              getRowId={(c) => c.id}
+              totalCount={page.totalCount}
+              empty={{ icon: <ShieldCheckIcon className="size-5" />, title: empty.title }}
+            />
+          </div>
         )}
       </CardContent>
     </Card>

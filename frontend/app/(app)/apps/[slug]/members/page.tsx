@@ -1,27 +1,18 @@
-import {
-  LIST_ROLES,
-  LIST_ROLE_BINDINGS,
-} from "@/graphql/identity/identity.queries";
-import { GET_APP } from "@/graphql/registry/registry.queries";
-import { PreloadQuery } from "@/lib/apollo";
+import { redirect } from "next/navigation";
 
-import { AppMembersClient } from "./app-members-client";
+import { redirectTarget, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 
-export const metadata = { title: "Members · App · Astrolift" };
-
-export default async function AppMembersPage({
+/**
+ * Members are Access › Members now (spec 44 §5.2). The old URL keeps
+ * resolving, with whatever query it carried.
+ */
+export default async function AppMembersRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { slug } = await params;
-  return (
-    <PreloadQuery query={GET_APP} variables={{ slug }}>
-      <PreloadQuery query={LIST_ROLE_BINDINGS}>
-        <PreloadQuery query={LIST_ROLES}>
-          <AppMembersClient slug={slug} />
-        </PreloadQuery>
-      </PreloadQuery>
-    </PreloadQuery>
-  );
+  redirect(redirectTarget(slug, "access", "members", await searchParams));
 }

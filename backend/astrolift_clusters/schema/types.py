@@ -67,6 +67,13 @@ class TenantClusterType:
     Surfaced (not the key itself) so the settings UI can show
     issue-vs-rotate affordances."""
 
+    created_by_username: str | None = None
+    """Who registered the cluster (#2150), the list's Registered by column
+    and what its Mine view matches. Null when registered before the
+    platform recorded it, by the CLI with no user, and on a shared
+    cluster: that row belongs to the platform, not to anyone in the
+    viewer's org."""
+
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
         """Most recent ``astro cluster bootstrap`` invocation for this
@@ -140,6 +147,29 @@ class TenantClusterType:
             .order_by("-ended_at")[:capped]
         )
         return [bootstrap_run_to_type(r) for r in qs]
+
+
+@strawberry.input(name="AstroliftClustersListFilter")
+class ClustersListFilterInput:
+    """The Clusters list's declared filters (spec 44 §5.1, #2150).
+
+    Unset fields do not filter; set fields combine with AND, and the
+    values of one list field with OR.
+    """
+
+    provider: list[str] | None = strawberry.field(
+        default=None, description="Provider plugin slugs, as providerPluginSlug."
+    )
+    status: list[str] | None = strawberry.field(
+        default=None, description="Management lifecycles, as lifecycle (registered, managing, managed, ...)."
+    )
+    live: list[str] | None = strawberry.field(
+        default=None,
+        description="Heartbeat statuses, as heartbeatStatus: never_seen, connected, degraded, offline.",
+    )
+    registered_by: list[str] | None = strawberry.field(
+        default=None, description='Usernames of who registered the cluster; "me" is the viewer.'
+    )
 
 
 @strawberry.type(name="AstroliftManagedDomain")
@@ -254,10 +284,18 @@ class ProviderPluginType:
 
 # Keys of oidc_auth_config that are safe to read back. cookie_secret is not
 # one of them: it is the signing key for the oauth2-proxy session cookie, so
-# anyone who can read it can mint a session. alb_auth_config needs no
-# equivalent -- its keys (user_pool_arn, user_pool_client_id,
-# user_pool_domain) are identifiers, not credentials.
-_OIDC_PUBLIC_KEYS = ("discovery_url", "client_id", "upstream_connector", "auth_proxy_host", "logout_url")
+# anyone who can read it can mint a session. Nor is client_secret, which
+# lets its holder complete the OIDC flow as the auth host (#2055).
+# alb_auth_config needs no equivalent -- its keys (user_pool_arn,
+# user_pool_client_id, user_pool_domain) are identifiers, not credentials.
+_OIDC_PUBLIC_KEYS = (
+    "discovery_url",
+    "client_id",
+    "upstream_connector",
+    "auth_proxy_host",
+    "logout_url",
+    "jwks_uri",
+)
 
 
 def redact_oidc_auth_config(config: dict | None) -> dict | None:
@@ -265,13 +303,15 @@ def redact_oidc_auth_config(config: dict | None) -> dict | None:
 
     An operator needs to know whether the gate is configured and where it
     points, which is what makes a class flip safe to attempt (#1616). They
-    do not need the cookie secret, so it is reported as set or unset rather
-    than returned.
+    do not need the cookie or client secret, so each is reported as set or
+    unset rather than returned.
     """
     if not config:
         return None
     view = {k: config[k] for k in _OIDC_PUBLIC_KEYS if k in config}
     view["cookie_secret_set"] = bool(config.get("cookie_secret"))
+    view["client_secret_set"] = bool(config.get("client_secret"))
+    view["gateway_secret_set"] = bool(config.get("gateway_secret"))
     return view
 
 
@@ -320,6 +360,11 @@ def cluster_to_type(cluster) -> TenantClusterType:
             now=now,
         ),
         agent_provisioned=bool(cluster.agent_key_hash),
+        created_by_username=(
+            cluster.created_by.get_username()
+            if cluster.organization_id is not None and cluster.created_by_id is not None
+            else None
+        ),
     )
 
 
@@ -411,6 +456,13 @@ class BootstrapComponentType:
     helm_values: JSON
     requires: list[str]
     options: list[BootstrapOptionType]
+    # The last successful recipe run applied it. It must stay selected: an
+    # operator run deletes the release of every component it is not given.
+    installed_by_recipe: bool = False
+    # The capability probe found it running, and the recipe did not install
+    # it (for example the ALB controller installed by hand into kube-system).
+    # Never pre-selected: a second copy fights the first (#2119).
+    running_outside_recipe: bool = False
 
 
 @strawberry.type(name="AstroliftClusterBootstrapPlan")
@@ -438,8 +490,12 @@ def _bootstrap_option_to_type(opt) -> BootstrapOptionType:
     )
 
 
-def _bootstrap_component_to_type(component) -> BootstrapComponentType:
+def _bootstrap_component_to_type(
+    component, *, installed_by_recipe: bool = False, running_outside_recipe: bool = False
+) -> BootstrapComponentType:
     return BootstrapComponentType(
+        installed_by_recipe=installed_by_recipe,
+        running_outside_recipe=running_outside_recipe,
         key=component.key,
         title=component.title,
         default_enabled=component.default_enabled,
@@ -451,10 +507,19 @@ def _bootstrap_component_to_type(component) -> BootstrapComponentType:
 
 
 def bootstrap_plan_to_type(cluster, components) -> BootstrapPlanType:
+    from astrolift_clusters.recipe_detection import components_installed_by_recipe, components_running
+
+    recipe = components_installed_by_recipe(cluster)
+    outside = components_running(getattr(cluster, "capabilities", None)) - recipe
     return BootstrapPlanType(
         cluster_id=GUID(str(cluster.guid)),
         provider_plugin_slug=cluster.provider_plugin.slug if cluster.provider_plugin_id else "",
-        components=[_bootstrap_component_to_type(c) for c in components],
+        components=[
+            _bootstrap_component_to_type(
+                c, installed_by_recipe=c.key in recipe, running_outside_recipe=c.key in outside
+            )
+            for c in components
+        ],
     )
 
 
