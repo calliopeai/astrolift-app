@@ -99,7 +99,7 @@ export function IdentityProvidersDoc({ kinds }: IdentityProvidersDocProps) {
               href="/administration/organization"
               className="text-foreground underline-offset-2 hover:underline"
             >
-              Settings · Organization
+              Administration · Organization
             </Link>
             .
           </li>

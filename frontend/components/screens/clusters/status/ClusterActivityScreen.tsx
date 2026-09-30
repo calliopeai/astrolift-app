@@ -66,7 +66,7 @@ function ActivityWorkflowsCard({
       span={6}
       icon={<GitBranchIcon className="size-4" />}
       title="Recent workflows"
-      description="Temporal runs targeting this cluster — BringClusterInto- Management, Refresh, Decommission, InstallClusterPrereqs, DriftDetection. Polls every 15s while a run is in flight."
+      description="Temporal runs targeting this cluster — BringClusterIntoManagement, Refresh, Decommission, InstallClusterPrereqs, DriftDetection. Polls every 15s while a run is in flight."
       flush
     >
       <Feed<WorkflowRun>

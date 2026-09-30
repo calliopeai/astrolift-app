@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Config editor section links recognize the manifest codec's managed-service
+  headers. Workload links navigate within the app; identity-provider labels show
+  ellipses only for truncated identifiers and report activation dates only when
+  observed. Correct organization paths, missing-form copy and prerequisite
+  documentation spacing (#2148).
+
 - Approval queue counts and select-all follow currently visible rows after
   polling. Invalid invitation expiries remain unavailable, alert mute submissions
   enforce whole hours from 1 through 168 and block pending repeats, manifest

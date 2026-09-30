@@ -42,6 +42,18 @@ export const CodeView: Story = {
   },
 };
 
+export const ManagedServicesSection: Story = {
+  play: async ({ canvasElement }) => {
+    await openCodeView(canvasElement);
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Managed services", exact: true }));
+    const editor = canvas.getByPlaceholderText("# astrolift.toml") as HTMLTextAreaElement;
+    await expect(editor.value.slice(editor.selectionStart, editor.selectionEnd)).toBe(
+      "[[managed_services]]"
+    );
+  },
+};
+
 export const Loading: Story = {
   args: { app: null, loading: true },
 };
