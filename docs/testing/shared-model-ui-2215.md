@@ -37,6 +37,30 @@ copy. This is not yet proof of #2215 production HF/cluster/subscription journeys
 shared playground dispatch or metrics availability. Those acceptance items remain
 open until their actual API adapters and browser checks land.
 
+## Shared cluster placement review
+
+The placement screen is a pure Storybook surface until the #2213 runtime
+admission and provision documents are exported. It requires a verified immutable
+Hugging Face revision, an eligible current-page cluster and an explicit CPU or
+GPU request. The complete review binds organization, cluster and provider IDs,
+resource requests, CPU KV-cache allocation and subscription enablement. Replacing
+the provider under the same cluster ID invalidates the review permanently.
+
+Only admission for the identical complete request enables deployment review.
+Configured runtime admission does not establish node capacity, model fit or live
+readiness. CPU is never inferred from zero GPU devices. Subscription enablement
+warns about later Recreate restarts and availability impact for all consumers.
+The server must recheck permission, placement and runtime admission during create.
+
+Handled refusals keep the confirmation and draft open. Missing deployment identity
+cannot render success. Late replies for changed contexts are ignored; an accepted
+request has a detail link but no readiness claim, and changing the request clears
+that completion permanently. React tests exercise exact payloads, CPU/GPU
+admission, provider replacement, changed-back requests, late replies, refusal and
+all eight locales. Portable stories cover admission/loading/error states,
+translated reviews and long content at 768 pixels. Actual create and route
+journeys remain separate acceptance work.
+
 ## Hugging Face catalogue view and adapter
 
 The catalogue uses the real `SearchHuggingFaceModels` and

@@ -132,3 +132,57 @@ export const hfCatalogueProps: HuggingFaceCataloguePanelProps = {
   onRetryResolution: () => {},
   onUseRevision: () => {},
 };
+
+import { sharedModelRequest } from "./shared-model-form";
+import type { SharedModelDeploymentScreenProps } from "./SharedModelDeploymentScreen";
+const placementDraft = {
+  name: "qwen-shared",
+  computeMode: "gpu" as const,
+  cpuRequest: "2",
+  memoryRequest: "8Gi",
+  gpuCount: "1",
+  cpuKvCacheGiB: "",
+  allowSubscriptions: true,
+};
+const placementModel = { repoId: "Qwen/Qwen3-8B", revisionSha: "a".repeat(40) };
+export const sharedDeploymentProps: SharedModelDeploymentScreenProps = {
+  organizationId: "org",
+  catalogue: null,
+  model: placementModel,
+  onClearModel: () => {},
+  clusters: fakeModelPage({
+    rows: [
+      {
+        id: "cluster-one",
+        providerId: "provider-one",
+        slug: "production",
+        name: "Production",
+        active: true,
+        reason: null,
+      },
+    ],
+  }),
+  selectedClusterId: "cluster-one",
+  onSelectCluster: () => {},
+  draft: placementDraft,
+  onDraftChange: () => {},
+  admission: {
+    requestKey: JSON.stringify(
+      sharedModelRequest(
+        "org",
+        { id: "cluster-one", providerId: "provider-one" },
+        placementModel,
+        placementDraft
+      )
+    ),
+    eligible: true,
+    reason: null,
+    runtimeVersion: null,
+    architecture: "x86_64",
+    hardwareAdmission: "operator_declared",
+  },
+  admissionLoading: false,
+  admissionError: null,
+  onRetryAdmission: () => {},
+  onDeploy: async () => ({ accepted: true, deploymentId: "created-model" }),
+};

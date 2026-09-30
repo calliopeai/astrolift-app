@@ -41,6 +41,11 @@
   not yet expose deployment or subscription operations; unavailable placements
   remain inspectable while infrastructure transport requires managed, active
   clusters and enabled providers (#2213).
+- Add translated shared-cluster CPU/GPU deployment reviews with immutable model
+  revisions, exact provider-bound runtime admission, explicit resource requests
+  and restart-impact warnings. Accepted requests remain distinct from observed
+  readiness; actual API and route integration follows the typed contract (#2215).
+
 - Add translated Hugging Face catalogue and immutable revision-selection views
   backed by the actual paged API, with honest unavailable/unknown metadata and
   no inferred CPU/GPU fit or catalogue fallback rows (#2215).
