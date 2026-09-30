@@ -4,6 +4,7 @@ import { QueryError } from "@/components/QueryError";
 
 import { AlertTriangleIcon, FileCodeIcon } from "lucide-react";
 import type * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -44,20 +45,20 @@ export function ManifestPreviewScreen({
   onRetryEnvironments,
   result,
 }: ManifestPreviewScreenProps) {
+  const t = useTranslations("apps.config.preview");
   return (
     <PageShell
-      title="Manifest preview"
+      title={t("title")}
       description={
         <span className="text-muted-foreground font-mono text-xs">
-          Renders the stored TOML for {slug} into the Kubernetes resources the deploy activity would
-          apply. The view is purely a preview — no cluster traffic happens here.
+          {t("description", { slug })}
         </span>
       }
     >
       {tabs}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <Label className="text-xs tracking-wide uppercase">Environment</Label>
+          <Label className="text-xs tracking-wide uppercase">{t("environment")}</Label>
           <Select
             value={envName}
             onValueChange={setEnvName}
@@ -67,7 +68,7 @@ export function ManifestPreviewScreen({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={PREVIEW_SENTINEL}>preview (no env required)</SelectItem>
+              <SelectItem value={PREVIEW_SENTINEL}>{t("defaultEnvironment")}</SelectItem>
               {environments.map((e) => (
                 <SelectItem key={e.id} value={e.name}>
                   {e.name}
@@ -78,11 +79,11 @@ export function ManifestPreviewScreen({
         </div>
         <div>
           <Label className="text-xs tracking-wide uppercase" htmlFor="manifest-image-tag">
-            Image tag (optional)
+            {t("imageTag")}
           </Label>
           <Input
             id="manifest-image-tag"
-            placeholder="defaults to 'preview'"
+            placeholder={t("imagePlaceholder")}
             value={imageTag}
             onChange={(e) => setImageTag(e.target.value)}
           />
@@ -90,79 +91,76 @@ export function ManifestPreviewScreen({
       </div>
 
       <QueryError
-        title="Could not load environments"
+        title={t("environmentsError")}
         error={environmentsError}
         onRetry={onRetryEnvironments}
       />
       {environmentsLoading && (
         <p role="status" className="text-muted-foreground text-sm">
-          Loading environments…
+          {t("loadingEnvironments")}
         </p>
       )}
       {error ? (
-        <QueryError title="Could not load manifest preview" error={error} onRetry={onRetry} />
+        <QueryError title={t("queryError")} error={error} onRetry={onRetry} />
       ) : loading && !result ? (
         <Skeleton className="h-64 w-full" />
       ) : !result ? (
         <Card>
-          <CardContent className="text-muted-foreground p-6 text-sm">App not found.</CardContent>
+          <CardContent className="text-muted-foreground p-6 text-sm">{t("notFound")}</CardContent>
         </Card>
       ) : result.error ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2">
               <AlertTriangleIcon className="size-5" />
-              Manifest could not be rendered
+              {t("renderError")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <pre className="bg-muted overflow-auto rounded-md p-3 text-xs">{result.error}</pre>
             {result.errorPath && (
               <p className="text-muted-foreground text-xs">
-                offending key: <span className="font-mono">{result.errorPath}</span>
+                {t("offendingKey")} <span className="font-mono">{result.errorPath}</span>
                 {result.errorLine != null && (
                   <>
                     {" "}
-                    — line <span className="font-mono">{result.errorLine}</span>
+                    — <span className="font-mono">{t("line", { line: result.errorLine })}</span>
                     {result.errorColumn != null && (
                       <>
-                        , col <span className="font-mono">{result.errorColumn}</span>
+                        ,{" "}
+                        <span className="font-mono">
+                          {t("column", { column: result.errorColumn })}
+                        </span>
                       </>
                     )}
                   </>
                 )}
               </p>
             )}
-            <p className="text-muted-foreground text-xs">
-              Fix the TOML in your repo and push; the next sync will re-parse.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("fixHint")}</p>
           </CardContent>
         </Card>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Badge variant="secondary">
-              env <span className="ml-1 font-mono">{result.environmentName}</span>
+              {t("environment")} <span className="ml-1 font-mono">{result.environmentName}</span>
             </Badge>
             <Badge variant="secondary">
-              ns <span className="ml-1 font-mono">{result.namespace}</span>
+              {t("namespace")} <span className="ml-1 font-mono">{result.namespace}</span>
             </Badge>
             <Badge variant="secondary">
-              image tag <span className="ml-1 font-mono">{result.imageTag}</span>
+              {t("imageBadge")} <span className="ml-1 font-mono">{result.imageTag}</span>
             </Badge>
             <Badge variant="outline">
-              {result.resources.length} resource
-              {result.resources.length === 1 ? "" : "s"}
+              {t("resourceCount", { count: result.resources.length })}
             </Badge>
           </div>
 
           {result.resources.length === 0 ? (
             <Card>
               <CardContent className="p-6">
-                <p className="text-muted-foreground text-sm">
-                  No resources rendered. Either the manifest is empty or every workload is of an
-                  unsupported kind.
-                </p>
+                <p className="text-muted-foreground text-sm">{t("noResources")}</p>
               </CardContent>
             </Card>
           ) : (

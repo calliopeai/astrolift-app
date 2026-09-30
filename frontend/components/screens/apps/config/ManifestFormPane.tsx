@@ -15,6 +15,7 @@
 
 import { AlertTriangleIcon, CheckCircle2Icon, CopyIcon, GripVerticalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { toast } from "sonner";
@@ -35,6 +36,7 @@ export function ManifestFormPane({
   onSwitchToCode: () => void;
 }) {
   const t = useTranslations("apps.config.builder");
+  const copy = useConfigCopy();
   const [parsed, setParsed] = React.useState(() => tomlToModel(draft));
   const lastEmitted = React.useRef<string | null>(null);
 
@@ -47,7 +49,11 @@ export function ManifestFormPane({
     lastEmitted.current = draft;
   }, [draft]);
 
-  const errors = React.useMemo(() => (parsed.safe ? validateManifest(parsed.model) : []), [parsed]);
+  const rawErrors = React.useMemo(
+    () => (parsed.safe ? validateManifest(parsed.model) : []),
+    [parsed]
+  );
+  const errors = copy.errors(rawErrors);
   const previewToml = React.useMemo(() => (parsed.safe ? modelToToml(parsed.model) : ""), [parsed]);
 
   const handleModelChange = React.useCallback(
@@ -72,7 +78,9 @@ export function ManifestFormPane({
           <AlertTriangleIcon className="text-warning-fg size-4" />
           <span className="font-medium">{t("unsafeTitle")}</span>
         </div>
-        <p className="text-muted-foreground">{t("unsafeBody", { reason: parsed.reason ?? "" })}</p>
+        <p className="text-muted-foreground">
+          {t("unsafeBody", { reason: copy.reason(parsed.reason) })}
+        </p>
         <Button variant="outline" size="sm" className="self-start" onClick={onSwitchToCode}>
           {t("switchToCode")}
         </Button>
@@ -87,7 +95,7 @@ export function ManifestFormPane({
           <div className="h-full overflow-y-auto p-5">
             <ManifestFormBuilder
               model={parsed.model}
-              errors={errors}
+              errors={rawErrors}
               onChange={handleModelChange}
             />
           </div>

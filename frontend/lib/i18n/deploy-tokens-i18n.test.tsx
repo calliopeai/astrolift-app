@@ -398,3 +398,74 @@ describe("app preview translations", () => {
     }
   });
 });
+
+describe("app configuration translations", () => {
+  const same = new Set([
+    "fr:pills.volumes",
+    "de:pills.volumes",
+    "pt-BR:pills.volumes",
+    "de:pills.workloads",
+    "de:builder.workloads",
+    "fr:builder.isPublic",
+    "fr:builder.hcPort",
+    "de:builder.hcPort",
+    "builder.astroliftVersion",
+    "builder.slug",
+    "validation.jsonDiagnostic",
+    ...["es", "fr", "de", "pt-BR"].map((locale) => `${locale}:builder.appSection`),
+    "fr:loadingTitle",
+    "fr:view.code",
+    "de:view.code",
+    "fr:builder.public",
+    "de:builder.workloadName",
+    "de:builder.containerName",
+    "de:builder.serviceName",
+    "de:builder.skillName",
+    "de:builder.toolName",
+    "de:builder.adapter",
+    "fr:builder.description",
+    "fr:fields.image_ref",
+    "de:fields.image_ref",
+    "fr:fields.port",
+    "de:fields.port",
+    "de:fields.faas_handler",
+    "pt-BR:fields.faas_handler",
+    "fr:fields.faas_architecture",
+  ]);
+  it.each(locales)(
+    "%s translates all configuration messages and retains ICU arguments",
+    (locale) => {
+      const source = leaves(catalogs.en.apps.config);
+      const translated = leaves(catalogs[locale].apps.config);
+      expect(Object.keys(translated).sort()).toEqual(Object.keys(source).sort());
+      for (const [key, text] of Object.entries(source)) {
+        expect(argumentsOf(parse(translated[key])), `${locale}:${key}`).toEqual(
+          argumentsOf(parse(text))
+        );
+        if (locale !== "en" && !same.has(key) && !same.has(`${locale}:${key}`))
+          expect(translated[key], `${locale}:${key}`).not.toBe(text);
+        for (const technical of [
+          "TOML",
+          "JSON",
+          "Kubernetes",
+          "[env]",
+          "[environment]",
+          "astrolift_version",
+          "dev+cloud",
+          "Deployment",
+          "StatefulSet",
+          "handler/runtime",
+          "FaaS",
+          "CPU",
+          "HPA",
+          "Dockerfile",
+          "Temporal",
+          "SPA",
+          "null",
+        ])
+          if (text.includes(technical))
+            expect(translated[key], `${locale}:${key}`).toContain(technical);
+      }
+    }
+  );
+});

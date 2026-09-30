@@ -85,6 +85,10 @@
   language in all eight supported locales, including rich environment-variable
   hints. Failed confirmations remain open for retry (#2145; remaining domains
   are still being translated).
+- App and agent configuration forms, manifest previews, local validation and
+  save feedback use all eight locales. Generated TOML and technical diagnostic
+  paths retain their original identifiers (#2145).
+
 - App preview dialogs, countdowns, statuses and spend warnings use all eight
   locales. Currency follows the selected locale; unpriced and approximate
   estimates retain their qualifications (#2145).
