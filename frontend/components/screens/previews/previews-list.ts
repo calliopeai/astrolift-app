@@ -30,6 +30,20 @@ export const PREVIEWS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+/** Translate labels while keeping status values, Mine ownership and cursors stable. */
+export function localizedPreviewsList(t: (key: string) => string): ListDefinition {
+  return {
+    ...PREVIEWS_LIST,
+    searchPlaceholder: t("searchPlaceholder"),
+    fields: PREVIEWS_LIST.fields.map((field) => ({
+      ...field,
+      label: t(`columns.${field.key}`),
+      options: field.options?.map((option) => ({ ...option, label: t(`status.${option.value}`) })),
+    })),
+    views: PREVIEWS_LIST.views.map((view) => ({ ...view, label: t(`views.${view.key}`) })),
+  };
+}
+
 export function previewsVariables(
   filters: Record<string, string>,
   {

@@ -19,6 +19,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Global preview lists, detail panels, states and teardown warnings use all
+  eight locales. Resource numbers and USD costs respect the locale; actual PR
+  targets, hostname patterns and driver cost caveats remain intact (#2145).
+
 - Environment list views, filters, pause confirmations, outcomes and detail
   panels use all eight locales. Ownership/kind filter values, target links and
   actual settings remain unchanged; failed pauses require a confirmed retry (#2145).

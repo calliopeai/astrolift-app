@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import german from "@/messages/de.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { LONG_PREVIEW, PREVIEWS, previewDetailProps } from "./previews.fixtures";
@@ -54,5 +57,15 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <PreviewDetailScreen {...previewDetailProps({ preview: LONG_PREVIEW })} />
     </div>
+  ),
+};
+
+export const GermanWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={german}>
+      <div style={{ width: 768 }}>
+        <PreviewDetailScreen {...previewDetailProps({ preview: LONG_PREVIEW })} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

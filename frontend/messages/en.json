@@ -2557,7 +2557,7 @@
     },
     "previews": {
       "title": "Preview environments",
-      "description": "Per-PR ephemeral deploys. Hostnames follow pr-<n>-<app>.pr.<org>.<base-zone>; tear-down on PR close.",
+      "description": "Per-PR ephemeral deploys. Hostnames follow pr-'<n>'-'<app>'.pr.'<org>'.'<base-zone>'; tear-down on PR close.",
       "columns": {
         "app": "App",
         "pr": "PR",
@@ -2574,7 +2574,54 @@
       "confirmTitle": "Tear down preview for PR #{pr}?",
       "confirmFallback": "Tear down preview?",
       "confirmDescription": "Namespace {namespace} is deleted and the hostname {hostname} is released. The preview re-spins automatically on the next push to {branch}.",
-      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released."
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "pluralLabel": "Previews",
+      "openPreview": "Open preview",
+      "openPullRequest": "Open pull request",
+      "openRepository": "Open repository",
+      "openApp": "Open app",
+      "searchPlaceholder": "Search apps, branches, hosts, commits…",
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "status": {
+        "building": "Building",
+        "running": "Running",
+        "failed": "Failed",
+        "torn_down": "Torn down"
+      },
+      "toastEnqueued": "Teardown enqueued",
+      "toastFailed": "Teardown failed",
+      "detail": {
+        "previewLabel": "preview {id}",
+        "title": "Preview",
+        "notFound": "Preview not found",
+        "notFoundDescription": "No preview environment has this id in the recent window, or you do not have permission to see it.",
+        "openPreviews": "Open previews",
+        "resources": "Resources",
+        "moreActions": "More actions",
+        "overview": "Overview",
+        "failed": "Preview failed",
+        "failureReason": "The preview did not build or deploy. Its app's logs hold the reason.",
+        "openLogs": "Open logs",
+        "namespace": "Namespace",
+        "commit": "Commit",
+        "trigger": "Trigger",
+        "manual": "Manual",
+        "automatic": "Automatic",
+        "pinned": "Pinned",
+        "yes": "yes",
+        "no": "No",
+        "ttlUntil": "TTL until",
+        "lastDeployed": "Last deployed",
+        "tornDown": "Torn down",
+        "cpu": "vCPU (aggregate)",
+        "memory": "Memory (aggregate)",
+        "pods": "Pods",
+        "dailyCost": "Est. daily cost",
+        "approximate": "approximate"
+      }
     },
     "approval": {
       "title": "Approve deployment",

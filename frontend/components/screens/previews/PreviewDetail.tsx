@@ -9,6 +9,7 @@ import {
   MoreHorizontalIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
 import { Identifier } from "@/components/Identifier";
@@ -30,18 +31,21 @@ import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.
 import { PREVIEW_DOT } from "./previews-list";
 import type { usePreviewDetail } from "./use-preview-detail";
 
-function formatMemory(bytes: number): string {
-  if (!bytes) return "0 MiB";
+function formatMemory(
+  bytes: number,
+  formatNumber: (value: number, places: number) => string
+): string {
+  if (!bytes) return `${formatNumber(0, 0)} MiB`;
   const gib = bytes / (1024 * 1024 * 1024);
-  if (gib >= 1) return `${gib.toFixed(2)} GiB`;
-  return `${Math.round(bytes / (1024 * 1024))} MiB`;
+  if (gib >= 1) return `${formatNumber(gib, 2)} GiB`;
+  return `${formatNumber(Math.round(bytes / (1024 * 1024)), 0)} MiB`;
 }
 
 export type PreviewDetailScreenProps = ReturnType<typeof usePreviewDetail>;
 
 /** Previews ▾ › checkout-api › PR #412 (spec 44 §4.4). */
-function crumbs(id: string, p: AstroliftPreviewEnvironment | null) {
-  if (!p) return appsDetailCrumbs("previews", { label: `preview ${id.slice(0, 8)}` });
+function crumbs(p: AstroliftPreviewEnvironment | null, fallback: string) {
+  if (!p) return appsDetailCrumbs("previews", { label: fallback });
   return appsDetailCrumbs(
     "previews",
     { label: p.registeredAppSlug, href: `/apps/${p.registeredAppSlug}/deployments?view=previews` },
@@ -62,14 +66,19 @@ export function PreviewDetailScreen({
   error,
   onRetry,
 }: PreviewDetailScreenProps) {
+  const t = useTranslations("lists.previews");
+  const fmt = useFormatter();
+  const fallback = t("detail.previewLabel", { id: id.slice(0, 8) });
+  const formatNumber = (value: number, places: number) =>
+    fmt.number(value, { minimumFractionDigits: places, maximumFractionDigits: places });
   if (!p) {
-    const title = loading || error ? "Preview" : "Preview not found";
+    const title = loading || error ? t("detail.title") : t("detail.notFound");
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <ShellHeader crumbs={crumbs(id, null)} title={title} />
+        <ShellHeader crumbs={crumbs(null, fallback)} title={title} />
         <PanelGrid>
           <Panel
-            title="Preview"
+            title={t("detail.title")}
             icon={<GitPullRequestIcon className="size-4" />}
             span={6}
             loading={loading}
@@ -77,15 +86,19 @@ export function PreviewDetailScreen({
             onRetry={onRetry}
             empty={{
               icon: <GitPullRequestIcon className="size-5" />,
-              title: "Preview not found",
-              description:
-                "No preview environment has this id in the recent window, or you do not have permission to see it.",
+              title: t("detail.notFound"),
+              description: t("detail.notFoundDescription"),
               actionHref: "/previews",
-              actionLabel: "Open previews",
+              actionLabel: t("detail.openPreviews"),
             }}
           />
           {loading && (
-            <Panel title="Resources" icon={<CpuIcon className="size-4" />} span={6} loading />
+            <Panel
+              title={t("detail.resources")}
+              icon={<CpuIcon className="size-4" />}
+              span={6}
+              loading
+            />
           )}
         </PanelGrid>
       </div>
@@ -97,12 +110,12 @@ export function PreviewDetailScreen({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
       <ShellHeader
-        crumbs={crumbs(id, p)}
+        crumbs={crumbs(p, fallback)}
         title={`PR #${p.prNumber}`}
         status={
           <span className="inline-flex shrink-0 items-center gap-1.5 text-sm capitalize">
             <StatusDot status={PREVIEW_DOT[p.status]} />
-            {p.status.replace(/_/g, " ")}
+            {t(`status.${p.status}`)}
           </span>
         }
         context={
@@ -121,7 +134,7 @@ export function PreviewDetailScreen({
             <Button size="sm" variant="outline" asChild>
               <a href={`https://${p.hostname}`} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-4" />
-                Open preview
+                {t("openPreview")}
               </a>
             </Button>
           ) : undefined
@@ -129,7 +142,12 @@ export function PreviewDetailScreen({
         menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                aria-label={t("detail.moreActions")}
+              >
                 <MoreHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -137,19 +155,19 @@ export function PreviewDetailScreen({
               {p.prUrl && (
                 <DropdownMenuItem asChild>
                   <a href={p.prUrl} target="_blank" rel="noreferrer">
-                    Open pull request
+                    {t("openPullRequest")}
                   </a>
                 </DropdownMenuItem>
               )}
               {p.sourceUrl && (
                 <DropdownMenuItem asChild>
                   <a href={p.sourceUrl} target="_blank" rel="noreferrer">
-                    Open repository
+                    {t("openRepository")}
                   </a>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem asChild>
-                <Link href={`/apps/${p.registeredAppSlug}`}>Open app</Link>
+                <Link href={`/apps/${p.registeredAppSlug}`}>{t("openApp")}</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -158,18 +176,18 @@ export function PreviewDetailScreen({
 
       <PanelGrid className="items-start">
         <Panel
-          title="Overview"
+          title={t("detail.overview")}
           icon={<InfoIcon className="size-4" />}
           span={6}
           // No reason field on a preview yet: say where to look.
           failure={
             p.status === "failed"
               ? {
-                  title: "Preview failed",
-                  reason: "The preview did not build or deploy. Its app's logs hold the reason.",
+                  title: t("detail.failed"),
+                  reason: t("detail.failureReason"),
                   action: (
                     <Button size="sm" variant="outline" asChild>
-                      <Link href={`/apps/${p.registeredAppSlug}/logs`}>Open logs</Link>
+                      <Link href={`/apps/${p.registeredAppSlug}/logs`}>{t("detail.openLogs")}</Link>
                     </Button>
                   ),
                 }
@@ -179,7 +197,7 @@ export function PreviewDetailScreen({
           <DefinitionList
             items={[
               {
-                term: "App",
+                term: t("columns.app"),
                 description: (
                   <Link href={`/apps/${p.registeredAppSlug}`} className="hover:underline">
                     {p.registeredAppSlug}
@@ -187,67 +205,75 @@ export function PreviewDetailScreen({
                 ),
               },
               {
-                term: "Hostname",
+                term: t("columns.hostname"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">{p.hostname}</span>
                 ),
               },
               {
-                term: "Namespace",
+                term: t("detail.namespace"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">{p.namespace}</span>
                 ),
               },
               {
-                term: "Commit",
+                term: t("detail.commit"),
                 description: p.commitSha ? (
                   <Identifier value={p.commitSha} kind="sha" form="full" />
                 ) : (
                   "—"
                 ),
               },
-              { term: "Trigger", description: p.isManual ? "Manual" : "Automatic" },
               {
-                term: "Pinned",
+                term: t("detail.trigger"),
+                description: p.isManual ? t("detail.manual") : t("detail.automatic"),
+              },
+              {
+                term: t("detail.pinned"),
                 description: p.isPinned ? (
                   <span className="[overflow-wrap:anywhere]">
-                    {p.pinnedByEmail ?? "yes"}
+                    {p.pinnedByEmail ?? t("detail.yes")}
                     {p.pinReason && ` · ${p.pinReason}`}
                   </span>
                 ) : (
-                  "No"
+                  t("detail.no")
                 ),
               },
-              { term: "TTL until", description: <DetailTimestamp iso={p.ttlUntil} /> },
-              { term: "Last deployed", description: <DetailTimestamp iso={p.lastDeployedAt} /> },
-              { term: "Torn down", description: <DetailTimestamp iso={p.tornDownAt} /> },
+              { term: t("detail.ttlUntil"), description: <DetailTimestamp iso={p.ttlUntil} /> },
+              {
+                term: t("detail.lastDeployed"),
+                description: <DetailTimestamp iso={p.lastDeployedAt} />,
+              },
+              { term: t("detail.tornDown"), description: <DetailTimestamp iso={p.tornDownAt} /> },
             ]}
           />
         </Panel>
 
-        <Panel title="Resources" icon={<CpuIcon className="size-4" />} span={6}>
+        <Panel title={t("detail.resources")} icon={<CpuIcon className="size-4" />} span={6}>
           <DefinitionList
             items={[
               {
-                term: "vCPU (aggregate)",
-                description: (
-                  <span className="font-mono">{p.aggregateResources.cpuCores.toFixed(2)}</span>
-                ),
-              },
-              {
-                term: "Memory (aggregate)",
+                term: t("detail.cpu"),
                 description: (
                   <span className="font-mono">
-                    {formatMemory(p.aggregateResources.memoryBytes)}
+                    {formatNumber(p.aggregateResources.cpuCores, 2)}
                   </span>
                 ),
               },
               {
-                term: "Pods",
+                term: t("detail.memory"),
+                description: (
+                  <span className="font-mono">
+                    {formatMemory(p.aggregateResources.memoryBytes, formatNumber)}
+                  </span>
+                ),
+              },
+              {
+                term: t("detail.pods"),
                 description: <span className="font-mono">{p.aggregateResources.podCount}</span>,
               },
               {
-                term: "Est. daily cost",
+                term: t("detail.dailyCost"),
                 // The figure and what the driver said about it (#1509): a
                 // GCP variant's total is an over-count by construction, and
                 // an operator must not read it as exact.
@@ -257,11 +283,16 @@ export function PreviewDetailScreen({
                   ) : (
                     <span className="flex min-w-0 flex-col gap-1">
                       <span className="flex items-center gap-1.5">
-                        <span className="font-mono">{`$${p.estimatedDailyCostUsd.toFixed(2)}`}</span>
+                        <span className="font-mono">
+                          {fmt.number(p.estimatedDailyCostUsd, {
+                            style: "currency",
+                            currency: "USD",
+                          })}
+                        </span>
                         {p.estimatedCostApproximate && (
                           <Badge variant="outline" className="text-2xs gap-1 uppercase">
                             <AlertTriangleIcon className="size-3" />
-                            approximate
+                            {t("detail.approximate")}
                           </Badge>
                         )}
                       </span>
