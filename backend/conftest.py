@@ -107,6 +107,22 @@ def _reset_abac_attributes():
 
 
 @pytest.fixture(autouse=True)
+def _reset_request_identity():
+    """A direct middleware/consumer test cannot leave an actor or token in
+    the next test, whose transaction may have deleted that identity."""
+    from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token
+    from core.tenancy import clear_current_tenant, set_current_tenant
+
+    tenant = set_current_tenant(None)
+    bearer = set_current_api_token(None)
+    try:
+        yield
+    finally:
+        reset_current_api_token(bearer)
+        clear_current_tenant(tenant)
+
+
+@pytest.fixture(autouse=True)
 def _reset_request_id():
     rid = generate_ulid()
     token = set_request_id(rid)
