@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import localizedMessages from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import {
@@ -65,4 +67,15 @@ export const W768: Story = {
       <DomainHandshakeCard {...HANDSHAKE_CARD} domain={DOMAIN_LONG} />
     </div>
   ),
+};
+
+export const Localized: Story = {
+  render: () => <DomainHandshakeCard {...HANDSHAKE_CARD} />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={localizedMessages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

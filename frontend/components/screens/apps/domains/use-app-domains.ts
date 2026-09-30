@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { usePathname, useSearchParams } from "next/navigation";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
@@ -122,6 +123,7 @@ interface EnvsResp {
  * sheet's open / wildcard state, which drive the SNI cert picker query.
  */
 export function useAppDomains(slug: string) {
+  const t = useTranslations("apps.domains.toasts");
   const variables = { appSlug: slug };
   const domains = useQuery<Resp>(LIST_APP_DOMAINS, {
     variables,
@@ -280,11 +282,11 @@ export function useAppDomains(slug: string) {
         },
       });
       if (data?.addWildcardDomain.ok) {
-        toast.success(`Added wildcard *.${hostname}`);
+        toast.success(t("addedWildcard", { hostname: hostname }));
         setAddOpen(false);
         return true;
       }
-      toast.error(data?.addWildcardDomain.errors?.[0]?.message ?? "Add failed");
+      toast.error(data?.addWildcardDomain.errors?.[0]?.message ?? t("addFailed"));
       return false;
     }
     const { data } = await add({
@@ -297,11 +299,11 @@ export function useAppDomains(slug: string) {
       },
     });
     if (data?.addAppDomain.ok) {
-      toast.success(`Added ${hostname}`);
+      toast.success(t("added", { hostname: hostname }));
       setAddOpen(false);
       return true;
     }
-    toast.error(data?.addAppDomain.errors?.[0]?.message ?? "Add failed");
+    toast.error(data?.addAppDomain.errors?.[0]?.message ?? t("addFailed"));
     return false;
   }
 
@@ -316,10 +318,10 @@ export function useAppDomains(slug: string) {
       },
     });
     if (data?.uploadCustomDomainCertificate.ok) {
-      toast.success(`Certificate uploaded for ${d.hostname}`);
+      toast.success(t("uploaded", { hostname: d.hostname }));
       return true;
     }
-    toast.error(data?.uploadCustomDomainCertificate.errors?.[0]?.message ?? "Upload failed");
+    toast.error(data?.uploadCustomDomainCertificate.errors?.[0]?.message ?? t("uploadFailed"));
     return false;
   }
 
@@ -327,18 +329,18 @@ export function useAppDomains(slug: string) {
   async function removeDomain(d: AppDomain): Promise<void> {
     const { data } = await remove({ variables: { input: { id: d.id } } });
     if (data?.removeAppDomain.ok) {
-      toast.success(`Removed ${d.hostname}`);
+      toast.success(t("removed", { hostname: d.hostname }));
     } else {
-      throw new Error(data?.removeAppDomain.errors?.[0]?.message ?? "Remove failed");
+      throw new Error(data?.removeAppDomain.errors?.[0]?.message ?? t("removeFailed"));
     }
   }
 
   async function recheckDomain(d: AppDomain): Promise<void> {
     const { data } = await recheck({ variables: { input: { id: d.id } } });
     if (data?.recheckDomainValidation.ok) {
-      toast.success(`Recheck queued for ${d.hostname}`);
+      toast.success(t("recheckQueued", { hostname: d.hostname }));
     } else {
-      toast.error(data?.recheckDomainValidation.errors?.[0]?.message ?? "Recheck failed");
+      toast.error(data?.recheckDomainValidation.errors?.[0]?.message ?? t("recheckFailed"));
     }
   }
 
@@ -359,10 +361,10 @@ export function useAppDomains(slug: string) {
       },
     });
     if (data?.setDomainRedirects.ok) {
-      toast.success(`Redirects updated for ${d.hostname}`);
+      toast.success(t("redirectsSaved", { hostname: d.hostname }));
       return true;
     }
-    toast.error(data?.setDomainRedirects.errors?.[0]?.message ?? "Save failed");
+    toast.error(data?.setDomainRedirects.errors?.[0]?.message ?? t("saveFailed"));
     return false;
   }
 
@@ -382,10 +384,10 @@ export function useAppDomains(slug: string) {
       },
     });
     if (data?.setDomainPathRoutes.ok) {
-      toast.success(`Path routes updated for ${d.hostname}`);
+      toast.success(t("routesSaved", { hostname: d.hostname }));
       return true;
     }
-    toast.error(data?.setDomainPathRoutes.errors?.[0]?.message ?? "Save failed");
+    toast.error(data?.setDomainPathRoutes.errors?.[0]?.message ?? t("saveFailed"));
     return false;
   }
 
@@ -395,18 +397,18 @@ export function useAppDomains(slug: string) {
         variables: { input: { id: env.id } },
       });
       if (data?.resumeAppIngress.ok) {
-        toast.success(`Ingress resumed for ${env.name}.`);
+        toast.success(t("ingressResumed", { environment: env.name }));
       } else {
-        toast.error(data?.resumeAppIngress.errors?.[0]?.message ?? "Resume failed.");
+        toast.error(data?.resumeAppIngress.errors?.[0]?.message ?? t("resumeFailed"));
       }
     } else {
       const { data } = await pauseIngress({
         variables: { input: { id: env.id } },
       });
       if (data?.pauseAppIngress.ok) {
-        toast.success(`Ingress paused for ${env.name}.`);
+        toast.success(t("ingressPaused", { environment: env.name }));
       } else {
-        toast.error(data?.pauseAppIngress.errors?.[0]?.message ?? "Pause failed.");
+        toast.error(data?.pauseAppIngress.errors?.[0]?.message ?? t("pauseFailed"));
       }
     }
   }

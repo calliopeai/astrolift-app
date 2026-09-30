@@ -15,6 +15,7 @@ import {
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { Can } from "@/components/Can";
 import { Panel } from "@/components/panel/Panel";
@@ -68,28 +69,30 @@ export function CertExpiryBadge({
   expiresAt: string | null;
   status: string;
 }) {
+  const t = useTranslations("apps.domains.cert");
   const [now] = React.useState(() => Date.now());
   if (status === "failed") {
     return (
       <Badge variant="destructive" className="text-2xs">
-        Renewal failed
+        {t("renewalFailed")}
       </Badge>
     );
   }
   if (!expiresAt) return null;
   const ms = new Date(expiresAt).getTime() - now;
+  if (!Number.isFinite(ms)) return null;
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
   if (days < 0) {
     return (
       <Badge variant="destructive" className="text-2xs">
-        Expired {Math.abs(days)}d ago
+        {t("expired", { days: Math.abs(days) })}
       </Badge>
     );
   }
   if (days <= 7) {
     return (
       <Badge variant="destructive" className="text-2xs">
-        Expires in {days}d
+        {t("expires", { days })}
       </Badge>
     );
   }
@@ -99,13 +102,13 @@ export function CertExpiryBadge({
         variant="outline"
         className="border-warning-border bg-warning/10 text-2xs text-warning-fg"
       >
-        Expires in {days}d
+        {t("expires", { days })}
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="text-muted-foreground text-2xs">
-      Expires in {days}d
+      {t("expires", { days })}
     </Badge>
   );
 }
@@ -164,6 +167,8 @@ export function DomainHandshakeCard({
   onSavePathRoutes,
 }: DomainHandshakeCardProps) {
   const t = useTranslations("apps.domains.cert");
+  const fmt = useFormatters();
+  const tRoot = useTranslations("apps.domains");
   const tone = CERT_TONE[domain.certState] ?? "pending";
   const labelKey = CERT_LABEL_KEYS[domain.certState];
   const label = labelKey ? t(labelKey) : domain.certState;
@@ -184,7 +189,7 @@ export function DomainHandshakeCard({
           {/* #682: wildcard, apart from the cert state, so a subtree reads at a glance. */}
           {domain.isWildcard && (
             <Badge variant="outline" className="text-2xs">
-              wildcard
+              {tRoot("wildcard")}
             </Badge>
           )}
           {domain.isPlatformManagedZone && (
@@ -201,7 +206,7 @@ export function DomainHandshakeCard({
           <EdgeAuthBadge state={domain.edgeAuthState} />
           <span className="font-mono">
             {domain.lastCheckedAt
-              ? t("lastChecked", { at: new Date(domain.lastCheckedAt).toLocaleString() })
+              ? t("lastChecked", { at: fmt.formatDateTime(domain.lastCheckedAt) })
               : t("notChecked")}
           </span>
         </span>
@@ -236,7 +241,7 @@ export function DomainHandshakeCard({
             which CertStateBlock already says, so the row is left out. */}
         {domain.sniCertRef && domain.sniCertRef.length > 0 && (
           <div className="text-muted-foreground flex min-w-0 items-baseline gap-2 text-xs">
-            <span className="shrink-0">SNI cert ref:</span>
+            <span className="shrink-0">{t("sniLabel")}</span>
             <code className="text-foreground min-w-0 font-mono [overflow-wrap:anywhere]">
               {domain.sniCertRef}
             </code>
@@ -267,15 +272,21 @@ export function DomainHandshakeCard({
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
                       <span className="font-mono font-medium">{r.kind}</span>
                       <span className="text-muted-foreground font-mono">
-                        {t("dnsColumns.ttl")} {r.ttl}s
+                        {t("dnsColumns.ttl")} {t("ttlSeconds", { seconds: r.ttl })}
                       </span>
                     </div>
                     <div className="grid min-w-0 gap-2 md:grid-cols-2">
                       <RecordField label={t("dnsColumns.name")}>
-                        <CopyValue value={r.name} label={`${r.kind} name`} />
+                        <CopyValue
+                          value={r.name}
+                          label={t("recordLabel", { kind: r.kind, label: t("dnsColumns.name") })}
+                        />
                       </RecordField>
                       <RecordField label={t("dnsColumns.value")}>
-                        <CopyValue value={r.value} label={`${r.kind} value`} />
+                        <CopyValue
+                          value={r.value}
+                          label={t("recordLabel", { kind: r.kind, label: t("dnsColumns.value") })}
+                        />
                       </RecordField>
                     </div>
                   </div>
@@ -314,6 +325,7 @@ function RecordField({ label, children }: { label: string; children: React.React
 }
 
 function CopyValue({ value, label }: { value: string; label: string }) {
+  const t = useTranslations("apps.domains.copy");
   return (
     <span className="flex min-w-0 items-start gap-1">
       <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{value}</span>
@@ -321,11 +333,11 @@ function CopyValue({ value, label }: { value: string; label: string }) {
         type="button"
         onClick={() => {
           navigator.clipboard.writeText(value);
-          toast.success(`${label} copied`);
+          toast.success(t("copied", { label }));
         }}
         className="hover:bg-muted shrink-0 rounded p-1"
-        aria-label={`Copy ${label}`}
-        title={`Copy ${label}`}
+        aria-label={t("action", { label })}
+        title={t("action", { label })}
       >
         <CopyIcon className="size-3.5" />
       </button>
@@ -340,9 +352,9 @@ function CopyValue({ value, label }: { value: string; label: string }) {
 // per-row delete is a local mutation only until Save is pressed.
 
 const REDIRECT_KINDS = [
-  { value: "http_to_https", label: "HTTP → HTTPS" },
-  { value: "apex_to_www", label: "Apex → www" },
-  { value: "custom", label: "Custom" },
+  { value: "http_to_https" },
+  { value: "apex_to_www" },
+  { value: "custom" },
 ] as const;
 
 type RedirectKind = (typeof REDIRECT_KINDS)[number]["value"];
@@ -356,6 +368,7 @@ function DomainRedirectsSection({
   busy: boolean;
   onSave: (rules: DomainRedirectRule[]) => Promise<boolean>;
 }) {
+  const t = useTranslations("apps.domains.routing");
   const [rules, setRules] = React.useState<DomainRedirectRule[]>(domain.redirectRules ?? []);
   const [addOpen, setAddOpen] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
@@ -421,7 +434,7 @@ function DomainRedirectsSection({
   return (
     <section className="border-border space-y-2 rounded-md border p-3">
       <div className="flex items-center gap-2">
-        <h4 className="text-sm font-semibold">Redirects</h4>
+        <h4 className="text-sm font-semibold">{t("redirects")}</h4>
         <Badge variant="outline" className="text-2xs">
           {rules.length}
         </Badge>
@@ -429,7 +442,7 @@ function DomainRedirectsSection({
           {dirty && (
             <Can permission="app.deploy">
               <Button size="sm" onClick={save} disabled={busy}>
-                Save
+                {t("save")}
               </Button>
             </Can>
           )}
@@ -441,7 +454,7 @@ function DomainRedirectsSection({
               disabled={busy}
             >
               <PlusIcon className="size-3.5" />
-              Add redirect
+              {t("addRedirect")}
             </Button>
           </Can>
         </div>
@@ -453,19 +466,21 @@ function DomainRedirectsSection({
             <li key={r.id} className="flex min-w-0 items-start gap-3 px-3 py-2">
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
-                  <span className="font-mono font-medium">{r.kind}</span>
+                  <span className="font-mono font-medium" title={r.kind}>
+                    {t.has(`kinds.${r.kind}`) ? t(`kinds.${r.kind}`) : r.kind}
+                  </span>
                   <span className="text-muted-foreground font-mono">{r.httpStatus}</span>
                   <span className="text-muted-foreground">
-                    Query string {r.preserveQueryString ? "preserve" : "drop"}
+                    {r.preserveQueryString ? t("queryPreserve") : t("queryDrop")}
                   </span>
                 </div>
                 <div className="grid min-w-0 gap-2 md:grid-cols-2">
-                  <RecordField label="Source pattern">
+                  <RecordField label={t("sourcePattern")}>
                     <span className="font-mono text-xs [overflow-wrap:anywhere]">
                       {r.sourcePattern || "—"}
                     </span>
                   </RecordField>
-                  <RecordField label="Destination">
+                  <RecordField label={t("destination")}>
                     <span className="font-mono text-xs [overflow-wrap:anywhere]">
                       {r.destinationUrl || "—"}
                     </span>
@@ -477,8 +492,8 @@ function DomainRedirectsSection({
                   type="button"
                   onClick={() => deleteRule(r.id)}
                   className="hover:bg-muted text-muted-foreground hover:text-destructive shrink-0 rounded p-1"
-                  title="Remove rule"
-                  aria-label="Remove rule"
+                  title={t("removeRule")}
+                  aria-label={t("removeRule")}
                   disabled={busy}
                 >
                   <Trash2Icon className="size-3.5" />
@@ -488,54 +503,51 @@ function DomainRedirectsSection({
           ))}
         </ul>
       ) : (
-        !addOpen && (
-          <p className="text-muted-foreground text-xs">
-            No redirects configured. Add one to send HTTP traffic to HTTPS or fold an apex into www.
-          </p>
-        )
+        !addOpen && <p className="text-muted-foreground text-xs">{t("noRedirects")}</p>
       )}
 
       {addOpen && (
         <div className="bg-muted/30 border-border space-y-2 rounded-md border p-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label className="text-xs">Kind</Label>
+              <Label className="text-xs">{t("kind")}</Label>
               <Select
                 value={draft.kind}
                 onValueChange={(v) => setDraft((d) => ({ ...d, kind: v as RedirectKind }))}
               >
-                <SelectTrigger className="h-8">
+                <SelectTrigger className="h-8" aria-label={t("kind")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {REDIRECT_KINDS.map((k) => (
                     <SelectItem key={k.value} value={k.value}>
-                      {k.label}
+                      {t(`kinds.${k.value}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Status code</Label>
+              <Label className="text-xs">{t("statusCode")}</Label>
               <Select
                 value={String(draft.httpStatus)}
                 onValueChange={(v) => setDraft((d) => ({ ...d, httpStatus: Number(v) }))}
               >
-                <SelectTrigger className="h-8">
+                <SelectTrigger className="h-8" aria-label={t("statusCode")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="301">301 (permanent)</SelectItem>
-                  <SelectItem value="302">302 (temporary)</SelectItem>
+                  <SelectItem value="301">{t("permanent")}</SelectItem>
+                  <SelectItem value="302">{t("temporary")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {draft.kind === "custom" && (
               <>
                 <div className="space-y-1">
-                  <Label className="text-xs">Source pattern</Label>
+                  <Label className="text-xs">{t("sourcePattern")}</Label>
                   <Input
+                    aria-label={t("sourcePattern")}
                     value={draft.sourcePattern}
                     onChange={(e) => setDraft((d) => ({ ...d, sourcePattern: e.target.value }))}
                     placeholder="/old-path"
@@ -543,8 +555,9 @@ function DomainRedirectsSection({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Destination URL</Label>
+                  <Label className="text-xs">{t("destinationUrl")}</Label>
                   <Input
+                    aria-label={t("destinationUrl")}
                     value={draft.destinationUrl}
                     onChange={(e) => setDraft((d) => ({ ...d, destinationUrl: e.target.value }))}
                     placeholder="https://example.com/new"
@@ -560,7 +573,7 @@ function DomainRedirectsSection({
               checked={draft.preserveQueryString}
               onChange={(e) => setDraft((d) => ({ ...d, preserveQueryString: e.target.checked }))}
             />
-            Preserve query string
+            {t("preserveQuery")}
           </label>
           <div className="flex justify-end gap-2">
             <Button
@@ -571,7 +584,7 @@ function DomainRedirectsSection({
                 resetDraft();
               }}
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               size="sm"
@@ -581,12 +594,10 @@ function DomainRedirectsSection({
                 (!draft.sourcePattern.trim() || !draft.destinationUrl.trim())
               }
             >
-              Add to list
+              {t("addToList")}
             </Button>
           </div>
-          <p className="text-muted-foreground text-2xs">
-            New rules apply after you click Save above.
-          </p>
+          <p className="text-muted-foreground text-2xs">{t("rulesHint")}</p>
         </div>
       )}
     </section>
@@ -609,6 +620,7 @@ function DomainPathRoutesSection({
   workloadOptions: WorkloadOption[];
   onSave: (routes: DomainPathRoute[]) => Promise<boolean>;
 }) {
+  const t = useTranslations("apps.domains.routing");
   const [routes, setRoutes] = React.useState<DomainPathRoute[]>(domain.pathRoutes ?? []);
   const [addOpen, setAddOpen] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
@@ -672,7 +684,7 @@ function DomainPathRoutesSection({
   return (
     <section className="border-border space-y-2 rounded-md border p-3">
       <div className="flex items-center gap-2">
-        <h4 className="text-sm font-semibold">Path routing</h4>
+        <h4 className="text-sm font-semibold">{t("pathTitle")}</h4>
         <Badge variant="outline" className="text-2xs">
           {routes.length}
         </Badge>
@@ -680,7 +692,7 @@ function DomainPathRoutesSection({
           {dirty && (
             <Can permission="app.deploy">
               <Button size="sm" onClick={save} disabled={busy}>
-                Save
+                {t("save")}
               </Button>
             </Can>
           )}
@@ -692,7 +704,7 @@ function DomainPathRoutesSection({
               disabled={busy}
             >
               <PlusIcon className="size-3.5" />
-              Add route
+              {t("addRoute")}
             </Button>
           </Can>
         </div>
@@ -708,15 +720,15 @@ function DomainPathRoutesSection({
                 </p>
                 <p className="text-muted-foreground flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs">
                   <span className="min-w-0 [overflow-wrap:anywhere]">
-                    Workload{" "}
+                    {t("workload")}{" "}
                     <span className="text-foreground font-mono">{r.targetWorkloadSlug}</span>
                   </span>
                   <span>
-                    Port <span className="text-foreground font-mono">{r.targetPort}</span>
+                    {t("port")} <span className="text-foreground font-mono">{r.targetPort}</span>
                   </span>
-                  <span>Strip {r.stripPrefix ? "yes" : "no"}</span>
+                  <span>{r.stripPrefix ? t("stripYes") : t("stripNo")}</span>
                   <span>
-                    Priority <span className="text-foreground font-mono">{r.priority}</span>
+                    {t("priority")} <span className="text-foreground font-mono">{r.priority}</span>
                   </span>
                 </p>
               </div>
@@ -725,8 +737,8 @@ function DomainPathRoutesSection({
                   type="button"
                   onClick={() => deleteRoute(r.id)}
                   className="hover:bg-muted text-muted-foreground hover:text-destructive shrink-0 rounded p-1"
-                  title="Remove route"
-                  aria-label="Remove route"
+                  title={t("removeRoute")}
+                  aria-label={t("removeRoute")}
                   disabled={busy}
                 >
                   <Trash2Icon className="size-3.5" />
@@ -736,20 +748,16 @@ function DomainPathRoutesSection({
           ))}
         </ul>
       ) : (
-        !addOpen && (
-          <p className="text-muted-foreground text-xs">
-            All traffic falls through to the default workload. Add a path prefix to send /api or
-            /static elsewhere.
-          </p>
-        )
+        !addOpen && <p className="text-muted-foreground text-xs">{t("defaultRoute")}</p>
       )}
 
       {addOpen && (
         <div className="bg-muted/30 border-border space-y-2 rounded-md border p-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label className="text-xs">Path prefix</Label>
+              <Label className="text-xs">{t("pathPrefix")}</Label>
               <Input
+                aria-label={t("pathPrefix")}
                 value={draft.pathPrefix}
                 onChange={(e) => setDraft((d) => ({ ...d, pathPrefix: e.target.value }))}
                 placeholder="/api"
@@ -757,18 +765,18 @@ function DomainPathRoutesSection({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Workload</Label>
+              <Label className="text-xs">{t("workload")}</Label>
               <Select
                 value={draft.targetWorkloadSlug}
                 onValueChange={(v) => setDraft((d) => ({ ...d, targetWorkloadSlug: v }))}
               >
-                <SelectTrigger className="h-8">
-                  <SelectValue placeholder="Select workload" />
+                <SelectTrigger className="h-8" aria-label={t("workload")}>
+                  <SelectValue placeholder={t("selectWorkload")} />
                 </SelectTrigger>
                 <SelectContent>
                   {workloadOptions.length === 0 ? (
                     <SelectItem value="__empty" disabled>
-                      No workloads registered
+                      {t("noWorkloads")}
                     </SelectItem>
                   ) : (
                     workloadOptions.map((w) => (
@@ -781,9 +789,10 @@ function DomainPathRoutesSection({
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Target port</Label>
+              <Label className="text-xs">{t("targetPort")}</Label>
               <Input
                 type="number"
+                aria-label={t("targetPort")}
                 value={draft.targetPort}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, targetPort: Number(e.target.value) || 0 }))
@@ -794,9 +803,10 @@ function DomainPathRoutesSection({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Priority</Label>
+              <Label className="text-xs">{t("priority")}</Label>
               <Input
                 type="number"
+                aria-label={t("priority")}
                 value={draft.priority}
                 onChange={(e) => setDraft((d) => ({ ...d, priority: Number(e.target.value) || 0 }))}
                 className="h-8 font-mono text-xs"
@@ -809,7 +819,7 @@ function DomainPathRoutesSection({
               checked={draft.stripPrefix}
               onChange={(e) => setDraft((d) => ({ ...d, stripPrefix: e.target.checked }))}
             />
-            Strip prefix before forwarding to workload
+            {t("stripPrefix")}
           </label>
           <div className="flex justify-end gap-2">
             <Button
@@ -820,15 +830,13 @@ function DomainPathRoutesSection({
                 resetDraft();
               }}
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button size="sm" onClick={addRoute} disabled={!canAdd}>
-              Add to list
+              {t("addToList")}
             </Button>
           </div>
-          <p className="text-muted-foreground text-2xs">
-            New routes apply after you click Save above.
-          </p>
+          <p className="text-muted-foreground text-2xs">{t("routesHint")}</p>
         </div>
       )}
     </section>
@@ -853,6 +861,7 @@ function CertStateBlock({
   onUploadCert: () => void;
 }) {
   const t = useTranslations("apps.domains.cert");
+  const fmt = useFormatters();
   const state = domain.certificateState || "not_requested";
   // not_requested with un-validated DNS: don't render — the DNS card
   // already tells the story. Once DNS validates, the worker fires
@@ -890,7 +899,7 @@ function CertStateBlock({
             {domain.byoCertificateUploadedAt && (
               <span className="text-muted-foreground ml-2">
                 {t("byoUploaded", {
-                  at: new Date(domain.byoCertificateUploadedAt).toLocaleString(),
+                  at: fmt.formatDateTime(domain.byoCertificateUploadedAt),
                 })}
               </span>
             )}

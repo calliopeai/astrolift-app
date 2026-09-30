@@ -1189,11 +1189,21 @@
           "byo_cert": "Bring your own certificate"
         },
         "methodHints": {
-          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
+          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.'<hostname>'.",
           "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
           "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
           "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
-        }
+        },
+        "coverage": "Cert will cover <host>{hostname}</host>",
+        "wildcardTitle": "Wildcard domain",
+        "wildcardHelp": "Cover every subdomain under <code>*.hostname</code>. Requires DNS-01 validation.",
+        "sniLabel": "SNI cert ref (optional)",
+        "loadingCertificates": "Loading certificates…",
+        "searchCertificates": "Search {count, plural, one {# certificate} other {# certificates}}…",
+        "noCertificates": "No matching certificates — type an ARN to use it directly.",
+        "providerCertificateHelp": "Pick an issued certificate from the {provider} cluster, or paste a ref. Leave blank for platform-managed.",
+        "certificateRefHelp": "ACM ARN, GCP cert name, Azure cert ID, or k8s Secret ref. Leave blank for platform-managed.",
+        "wildcardMethodHelp": "DNS-01 is required for wildcard certificates."
       },
       "remove": {
         "title": "Remove {hostname}?",
@@ -1241,7 +1251,13 @@
           "name": "Name",
           "value": "Value",
           "ttl": "TTL"
-        }
+        },
+        "sniLabel": "SNI cert ref:",
+        "renewalFailed": "Renewal failed",
+        "expired": "Expired {days, plural, one {# day} other {# days}} ago",
+        "expires": "Expires in {days, plural, one {# day} other {# days}}",
+        "recordLabel": "{kind} {label}",
+        "ttlSeconds": "{seconds, number}s"
       },
       "upload": {
         "title": "Upload certificate for {hostname}",
@@ -1266,6 +1282,78 @@
         "noneBound": "No hostnames bound yet.",
         "maintenance": "Maintenance mode active.",
         "maintenanceDesc": "Every bound hostname is returning 503. Health probes that hit ingress will fail; in-cluster probes are unaffected."
+      },
+      "orgZones": "Org DNS zones",
+      "wildcard": "wildcard",
+      "copy": {
+        "action": "Copy {label}",
+        "copied": "{label} copied"
+      },
+      "routing": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "addToList": "Add to list",
+        "kind": "Kind",
+        "redirects": "Redirects",
+        "addRedirect": "Add redirect",
+        "queryPreserve": "Query string preserved",
+        "queryDrop": "Query string dropped",
+        "preserveQuery": "Preserve query string",
+        "sourcePattern": "Source pattern",
+        "destination": "Destination",
+        "destinationUrl": "Destination URL",
+        "removeRule": "Remove rule",
+        "noRedirects": "No redirects configured. Add one to send HTTP traffic to HTTPS or fold an apex into www.",
+        "statusCode": "Status code",
+        "permanent": "301 (permanent)",
+        "temporary": "302 (temporary)",
+        "rulesHint": "New rules apply after you click Save above.",
+        "pathTitle": "Path routing",
+        "addRoute": "Add route",
+        "workload": "Workload",
+        "port": "Port",
+        "stripYes": "Strip prefix: yes",
+        "stripNo": "Strip prefix: no",
+        "priority": "Priority",
+        "removeRoute": "Remove route",
+        "defaultRoute": "All traffic falls through to the default workload. Add a path prefix to send /api or /static elsewhere.",
+        "pathPrefix": "Path prefix",
+        "selectWorkload": "Select workload",
+        "noWorkloads": "No workloads registered",
+        "targetPort": "Target port",
+        "stripPrefix": "Strip prefix before forwarding to workload",
+        "routesHint": "New routes apply after you click Save above.",
+        "kinds": {
+          "http_to_https": "HTTP → HTTPS",
+          "apex_to_www": "Apex → www",
+          "custom": "Custom"
+        }
+      },
+      "list": {
+        "search": "Search hostnames…",
+        "status": "Status",
+        "kind": "Kind",
+        "exact": "Exact host",
+        "all": "All",
+        "clientNote": "All rows loaded; search, filters, sort and pagination run in the browser."
+      },
+      "toasts": {
+        "addedWildcard": "Added wildcard *.{hostname}",
+        "added": "Added {hostname}",
+        "addFailed": "Add failed",
+        "uploaded": "Certificate uploaded for {hostname}",
+        "uploadFailed": "Upload failed",
+        "removed": "Removed {hostname}",
+        "removeFailed": "Remove failed",
+        "recheckQueued": "Recheck queued for {hostname}",
+        "recheckFailed": "Recheck failed",
+        "redirectsSaved": "Redirects updated for {hostname}",
+        "routesSaved": "Path routes updated for {hostname}",
+        "saveFailed": "Save failed",
+        "ingressResumed": "Ingress resumed for {environment}.",
+        "resumeFailed": "Resume failed.",
+        "ingressPaused": "Ingress paused for {environment}.",
+        "pauseFailed": "Pause failed."
       }
     },
     "secrets": {

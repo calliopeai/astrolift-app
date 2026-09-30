@@ -469,3 +469,75 @@ describe("app configuration translations", () => {
     }
   );
 });
+
+describe("app domain translations", () => {
+  const same = new Set([
+    "columns.status",
+    "addSheet.methodLabels.http_01",
+    "addSheet.methodLabels.dns_01",
+    "cert.dnsColumns.ttl",
+    "ingress.label",
+    "routing.kinds.http_to_https",
+    ...["es", "de", "pt-BR"].flatMap((locale) => [
+      `${locale}:columns.hostname`,
+      `${locale}:addSheet.hostname`,
+    ]),
+    ...["es", "fr", "de", "pt-BR"].map((locale) => `${locale}:cert.ttlSeconds`),
+    ...["ja", "ko", "zh-Hans"].map((locale) => `${locale}:cert.recordLabel`),
+    "fr:columns.actions",
+    "fr:cert.dnsColumns.type",
+    "fr:routing.destination",
+    "fr:routing.permanent",
+    "fr:routing.port",
+    "de:listTitle",
+    "de:cert.dnsColumns.name",
+    "de:routing.workload",
+    "de:routing.port",
+    "de:list.status",
+    "pt-BR:list.status",
+  ]);
+  it.each(locales)(
+    "%s covers all domain copy, including rich text, ICU and DNS identifiers",
+    (locale) => {
+      const source = leaves(catalogs.en.apps.domains);
+      const translated = leaves(catalogs[locale].apps.domains);
+      expect(Object.keys(translated).sort()).toEqual(Object.keys(source).sort());
+      for (const [key, text] of Object.entries(source)) {
+        expect(argumentsOf(parse(translated[key])), `${locale}:${key}`).toEqual(
+          argumentsOf(parse(text))
+        );
+        if (locale !== "en" && !same.has(key) && !same.has(`${locale}:${key}`))
+          expect(translated[key], `${locale}:${key}`).not.toBe(text);
+        for (const technical of [
+          "TXT",
+          "DNS",
+          "HTTP",
+          "HTTPS",
+          "503",
+          "ACME",
+          "ACM",
+          "PEM",
+          "CNAME",
+          "SNI",
+          "GCP",
+          "Azure",
+          "AWS",
+          "ARN",
+          "TLS",
+          "Secret",
+          "Kubernetes",
+          "Let's Encrypt",
+          "_astrolift-challenge.",
+          "'<hostname>'",
+          "*.hostname",
+          "checkout.acme.com",
+          "/api",
+          "/static",
+          "www",
+        ])
+          if (text.includes(technical))
+            expect(translated[key], `${locale}:${key}`).toContain(technical);
+      }
+    }
+  );
+});

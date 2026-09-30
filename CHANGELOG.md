@@ -93,6 +93,10 @@
   language in all eight supported locales, including rich environment-variable
   hints. Failed confirmations remain open for retry (#2145; remaining domains
   are still being translated).
+- Custom-domain DNS, certificate, routing and ingress controls use all eight
+  locales. Certificate dates follow the locale; DNS records, PEM values and
+  the existing external-domain cookie limitation are preserved (#2145).
+
 - App and agent configuration forms, manifest previews, local validation and
   save feedback use all eight locales. Generated TOML and technical diagnostic
   paths retain their original identifiers (#2145).

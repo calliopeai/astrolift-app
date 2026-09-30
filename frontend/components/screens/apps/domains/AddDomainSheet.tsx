@@ -148,8 +148,10 @@ export function AddDomainSheet({
             />
             {isWildcard && hostname.trim() && (
               <p className="text-muted-foreground font-mono text-xs">
-                Cert will cover{" "}
-                <span className="text-foreground">*.{hostname.trim().toLowerCase()}</span>
+                {t.rich("addSheet.coverage", {
+                  hostname: `*.${hostname.trim().toLowerCase()}`,
+                  host: (chunks) => <span className="text-foreground">{chunks}</span>,
+                })}
               </p>
             )}
           </div>
@@ -174,17 +176,18 @@ export function AddDomainSheet({
                 className="mt-0.5"
               />
               <span className="flex-1">
-                <span className="font-medium">Wildcard domain</span>
+                <span className="font-medium">{t("addSheet.wildcardTitle")}</span>
                 <span className="text-muted-foreground block text-xs">
-                  Cover every subdomain under <code className="font-mono">*.hostname</code>.
-                  Requires DNS-01 validation.
+                  {t.rich("addSheet.wildcardHelp", {
+                    code: (chunks) => <code className="font-mono">{chunks}</code>,
+                  })}
                 </span>
               </span>
             </label>
             {isWildcard && (
               <div className="space-y-2 pt-2">
                 <Label htmlFor="d-sni-ref" className="text-xs">
-                  SNI cert ref <span className="text-muted-foreground font-normal">(optional)</span>
+                  {t("addSheet.sniLabel")}
                 </Label>
                 {showCertCombobox ? (
                   // #858 — provider-backed cert picker. The combobox's
@@ -211,16 +214,14 @@ export function AddDomainSheet({
                         id="d-sni-ref"
                         placeholder={
                           certsLoading && certs.length === 0
-                            ? "Loading certificates…"
-                            : `Search ${certs.length} certificate${certs.length === 1 ? "" : "s"}…`
+                            ? t("addSheet.loadingCertificates")
+                            : t("addSheet.searchCertificates", { count: certs.length })
                         }
                         spellCheck={false}
                         className="font-mono text-xs"
                       />
                       <ComboboxContent>
-                        <ComboboxEmpty>
-                          No matching certificates — type an ARN to use it directly.
-                        </ComboboxEmpty>
+                        <ComboboxEmpty>{t("addSheet.noCertificates")}</ComboboxEmpty>
                         <ComboboxList>
                           {(item) => {
                             const c = item as {
@@ -244,8 +245,9 @@ export function AddDomainSheet({
                       </ComboboxContent>
                     </Combobox>
                     <p className="text-muted-foreground text-xs">
-                      Pick an issued certificate from the {clusterProviderSlug?.toUpperCase()}{" "}
-                      cluster, or paste a ref. Leave blank for platform-managed.
+                      {t("addSheet.providerCertificateHelp", {
+                        provider: clusterProviderSlug?.toUpperCase() ?? "",
+                      })}
                     </p>
                   </>
                 ) : (
@@ -259,8 +261,7 @@ export function AddDomainSheet({
                       className="font-mono text-xs"
                     />
                     <p className="text-muted-foreground text-xs">
-                      ACM ARN, GCP cert name, Azure cert ID, or k8s Secret ref. Leave blank for
-                      platform-managed.
+                      {t("addSheet.certificateRefHelp")}
                     </p>
                   </>
                 )}
@@ -287,9 +288,7 @@ export function AddDomainSheet({
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-xs">
-              {isWildcard
-                ? "DNS-01 is required for wildcard certificates."
-                : t(`addSheet.methodHints.${method}`)}
+              {isWildcard ? t("addSheet.wildcardMethodHelp") : t(`addSheet.methodHints.${method}`)}
             </p>
             {isByo && !isWildcard && (
               <div className="border-info-border bg-info/5 rounded-md border p-2 text-xs">
