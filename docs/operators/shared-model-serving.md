@@ -110,6 +110,18 @@ The check passed on 2026-09-30. Kind's default CNI does not establish enforcemen
 of that network policy, and this check does not establish vLLM engine startup,
 model downloads, hardware compatibility or inference.
 
+The optional enforcing-CNI case also passed on 2026-09-30, using a separate
+disposable kind cluster with Calico 3.32.2. Actual client pods in both subscribed
+app namespaces reached the ClusterIP. A different environment in the same app
+namespace, a different app in that namespace, and matching app/environment labels
+in a foreign namespace were blocked. Subscriber `/metrics` requests reached the
+server but failed authorization. After revocation and the actual model rollout,
+the revoked namespace was blocked even with the remaining app's valid key; the
+remaining app still connected, and its use of the revoked key returned 401.
+These checks prove the rendered ingress policy and mounted guard against the
+controlled server. They do not establish a production cluster's CNI configuration
+or actual model inference.
+
 Run it only with an expendable local kind kubeconfig and the controlled image
 `python:3.12-alpine` preloaded on the node:
 
@@ -118,6 +130,14 @@ ASTROLIFT_MODEL_TEST_KUBECONFIG=/path/to/expendable-kind.kubeconfig \
 PYTHONPATH=backend/providers:backend \
 python -m pytest backend/providers/tests/k8s_native/test_shared_model_kind.py -q
 ```
+
+For the enforcing case, create a separate expendable kind cluster with
+`disableDefaultCNI: true` and an enforcing Calico installation, following the
+[official kind installation guide](https://docs.tigera.io/calico/latest/getting-started/kubernetes/kind).
+Select that cluster's kubeconfig explicitly, preload the controlled Python image,
+and add `ASTROLIFT_MODEL_TEST_NETWORK_POLICY=1` to the command above. The case
+requires ready Calico nodes and verifies allowed and denied connections itself;
+setting the variable does not replace the enforcement check.
 
 ## Density and operational statistics
 

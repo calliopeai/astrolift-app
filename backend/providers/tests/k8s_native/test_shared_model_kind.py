@@ -1,7 +1,7 @@
 """Opt-in Kubernetes rollout proof with the mounted guard and a controlled server.
 
-This does not download model weights, certify vLLM inference or prove CNI policy
-enforcement. Only an explicitly selected expendable kind cluster is modified.
+This does not download model weights or certify vLLM inference. The optional
+network-policy case requires an enforcing CNI in an expendable kind cluster.
 """
 
 from __future__ import annotations
@@ -113,16 +113,18 @@ def eventually(check, timeout=45):
         time.sleep(0.1)
 
 
-def status_from_pod(core, namespace, pod_name, token, path):
+def status_from_pod(core, namespace, pod_name, token, path, *, base_url="http://127.0.0.1:8000"):
     """Keep the token out of process argv and exec through stdin into the pod."""
     code = """import json,sys,urllib.request,urllib.error
 data=json.load(sys.stdin)
-request=urllib.request.Request('http://127.0.0.1:8000'+data['path'],headers={'Authorization':'Bearer '+data['token']})
+request=urllib.request.Request(data['base_url']+data['path'],headers={'Authorization':'Bearer '+data['token']})
 try:
     response=urllib.request.urlopen(request,timeout=3)
     print(response.status)
 except urllib.error.HTTPError as error:
     print(error.code)
+except (urllib.error.URLError, TimeoutError):
+    print('blocked')
 """
     outcome = subprocess.run(
         [
@@ -139,17 +141,77 @@ except urllib.error.HTTPError as error:
             "-c",
             code,
         ],
-        input=json.dumps({"path": path, "token": token}),
+        input=json.dumps({"path": path, "token": token, "base_url": base_url}),
         text=True,
         capture_output=True,
         timeout=10,
         check=False,
     )
     assert outcome.returncode == 0, "Controlled pod request failed"
-    return int(outcome.stdout.strip())
+    result = outcome.stdout.strip()
+    return result if result == "blocked" else int(result)
 
 
-def test_actual_pod_snapshot_and_independent_revocation():
+def network_clients(core, consumers, suffix):
+    from kubernetes import client
+
+    foreign_namespace = f"proof-foreign-{suffix}"
+    namespaces = [*(consumer.namespace for consumer in consumers), foreign_namespace]
+    for namespace in namespaces:
+        core.create_namespace(client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace)))
+    targets = {
+        "app_a": (consumers[0].namespace, "app-a", "production"),
+        "app_b": (consumers[1].namespace, "app-b", "production"),
+        "wrong_environment": (consumers[0].namespace, "app-a", "staging"),
+        "wrong_app": (consumers[0].namespace, "unsubscribed-app", "production"),
+        "foreign_namespace": (foreign_namespace, "app-a", "production"),
+    }
+    for key, (namespace, app, environment) in targets.items():
+        name = key.replace("_", "-")
+        core.create_namespaced_pod(
+            namespace,
+            {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": name,
+                    "labels": {"astrolift.dev/app": app, "astrolift.dev/environment": environment},
+                },
+                "spec": {
+                    "containers": [
+                        {
+                            "name": "client",
+                            "image": "python:3.12-alpine",
+                            "imagePullPolicy": "Never",
+                            "command": ["python3", "-c", "import time; time.sleep(1800)"],
+                        }
+                    ]
+                },
+            },
+        )
+        eventually(
+            lambda name=name, namespace=namespace: any(
+                condition.type == "Ready" and condition.status == "True"
+                for condition in core.read_namespaced_pod(name, namespace).status.conditions or ()
+            )
+        )
+    return targets, namespaces
+
+
+@pytest.mark.parametrize(
+    "enforce_network",
+    [
+        False,
+        pytest.param(
+            True,
+            marks=pytest.mark.skipif(
+                os.environ.get("ASTROLIFT_MODEL_TEST_NETWORK_POLICY") != "1",
+                reason="requires an enforcing Calico CNI in the selected expendable cluster",
+            ),
+        ),
+    ],
+)
+def test_actual_pod_snapshot_and_independent_revocation(enforce_network):
     from kubernetes import client, config
 
     kubeconfig = os.environ["ASTROLIFT_MODEL_TEST_KUBECONFIG"]
@@ -158,6 +220,12 @@ def test_actual_pod_snapshot_and_independent_revocation():
     config.load_kube_config(config_file=kubeconfig)
     api = client.ApiClient()
     core = client.CoreV1Api(api)
+    if enforce_network:
+        calico = core.list_namespaced_pod("kube-system", label_selector="k8s-app=calico-node").items
+        assert calico and all(
+            any(condition.type == "Ready" and condition.status == "True" for condition in pod.status.conditions or ())
+            for pod in calico
+        ), "The policy proof requires ready Calico nodes"
     node = core.list_node().items[0]
     architecture = node.metadata.labels["kubernetes.io/arch"]
     core.patch_node(node.metadata.name, {"metadata": {"labels": {"astrolift.dev/model-proof": "2213"}}})
@@ -167,15 +235,16 @@ def test_actual_pod_snapshot_and_independent_revocation():
     cluster, secrets = ControlledCluster(native), MemorySecrets()
     org, cid, sid = (str(uuid4()) for _ in range(3))
     consumers = []
+    suffix = uuid4().hex[:8]
     for app in ("app-a", "app-b"):
         subscription = str(uuid4())
         ref = f"services/{org}/{sid}/subscriptions/{subscription}#api_key"
         secrets.upsert(ref.partition("#")[0], {"api_key": uuid4().hex + uuid4().hex})
-        consumers.append(ModelConsumer(subscription, f"proof-{app}", app, "production", ref))
+        consumers.append(ModelConsumer(subscription, f"proof-{suffix}-{app}", app, "production", ref))
     placement = ClusterModelPlacement(org, cid, sid, 1, tuple(consumers))
     spec = ProvisionSpec(
         org,
-        "proof",
+        f"proof-{suffix}",
         "",
         "",
         "",
@@ -212,6 +281,7 @@ def test_actual_pod_snapshot_and_independent_revocation():
         )
     )
     namespace = driver._namespace(spec)
+    client_namespaces = []
     try:
         result = driver.provision(spec)
         assert result.ok, result.message
@@ -229,6 +299,23 @@ def test_actual_pod_snapshot_and_independent_revocation():
 
         snapshot = json.loads(base64.b64decode(stored_secret.data["keys.json"]))
         assert status_from_pod(core, namespace, original_pod, snapshot["operator_key"], "/metrics") == 200
+        if enforce_network:
+            client_namespaces = [*(consumer.namespace for consumer in consumers), f"proof-foreign-{suffix}"]
+            clients, client_namespaces = network_clients(core, consumers, suffix)
+            service_name = driver._resource_name(spec)
+            service = core.read_namespaced_service(service_name, namespace)
+            base_url = f"http://{service.spec.cluster_ip}:8000"
+
+            def probe(key, token, path="/v1/models"):
+                client_namespace = clients[key][0]
+                return status_from_pod(core, client_namespace, key.replace("_", "-"), token, path, base_url=base_url)
+
+            eventually(lambda: probe("app_a", first) == 200)
+            eventually(lambda: probe("app_b", second) == 200)
+            assert probe("app_a", first, "/metrics") == 401
+            for key in ("wrong_environment", "wrong_app", "foreign_namespace"):
+                eventually(lambda key=key: probe(key, first) == "blocked")
+            assert probe("app_b", second) == 200
         # Updating projected credentials alone must not pretend the old process restarted.
         snapshot.update(revision=2, subscription_keys=[second])
         core.patch_namespaced_secret(
@@ -259,6 +346,21 @@ def test_actual_pod_snapshot_and_independent_revocation():
             if peer.pod_selector
         ]
         assert allowed == ["app-b"]
+        if enforce_network:
+            eventually(lambda: probe("app_b", second) == 200)
+            assert probe("app_b", first) == 401
+            eventually(lambda: probe("app_a", second) == "blocked")
+            assert probe("app_b", second) == 200
     finally:
-        core.delete_namespace(namespace)
+        try:
+            core.delete_namespace(namespace)
+        except client.ApiException as error:
+            if error.status != 404:
+                raise
+        for client_namespace in client_namespaces:
+            try:
+                core.delete_namespace(client_namespace)
+            except client.ApiException as error:
+                if error.status != 404:
+                    raise
         api.close()
