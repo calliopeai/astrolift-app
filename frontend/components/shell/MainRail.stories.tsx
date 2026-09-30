@@ -44,19 +44,29 @@ function Frame({
 }
 
 export const Everything: StoryObj = {
-  render: () => <Frame modules={["apps", "agents", "workflows", "admin"]} />,
+  render: () => <Frame modules={["apps", "agents", "workflows", "models", "admin"]} />,
 };
 export const AppsOnly: StoryObj = {
   render: () => <Frame modules={["apps"]} area="apps" activeFn="deployments" />,
 };
 export const AgentsOnly: StoryObj = { render: () => <Frame modules={["agents"]} /> };
+export const ModelsOnly: StoryObj = {
+  render: () => <Frame modules={["models"]} activeFn="models" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "Models" })).toHaveAttribute("href", "/models");
+    await expect(canvas.queryByRole("link", { name: "Workloads" })).not.toBeInTheDocument();
+  },
+};
 export const Collapsed: StoryObj = {
-  render: () => <Frame modules={["apps", "agents", "workflows", "admin"]} startCollapsed />,
+  render: () => (
+    <Frame modules={["apps", "agents", "workflows", "models", "admin"]} startCollapsed />
+  ),
 };
 
 /** Operational pages must have a home instead of requiring a remembered URL. */
 export const OperationalPages: StoryObj = {
-  render: () => <Frame modules={["apps", "agents", "workflows", "admin"]} />,
+  render: () => <Frame modules={["apps", "agents", "workflows", "models", "admin"]} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     for (const name of [

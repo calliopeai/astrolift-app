@@ -14561,6 +14561,67 @@ export type GetClusterModelDensityQueryVariables = Exact<{
 
 export type GetClusterModelDensityQuery = { astroliftClusterModelDensity?: { clusterId: string, start: string, end: string, retrievedAt: string, modelCount: number, returnedCount: number, scope: string, source: string, inventoryLimit: number, truncated: boolean, capacity: { state: ModelObservationState, source: string, observedAt?: string | null, cpuCores?: number | null, memoryBytes?: number | null, vramBytes?: number | null, freshnessSeconds: number, gpuDevices: Array<{ resource: string, devices: number }> }, items: Array<{ serviceId: string, name: string, status: string, desired: { source: string, observedAt?: string | null, replicas?: number | null, cpuCoresPerReplica?: number | null, memoryBytesPerReplica?: number | null, gpuDevicesPerReplica?: number | null, gpuResource?: string | null, totalCpuCores?: number | null, totalMemoryBytes?: number | null, totalGpuDevices?: number | null }, applied?: { source: string, observedAt?: string | null, replicas?: number | null, cpuCoresPerReplica?: number | null, memoryBytesPerReplica?: number | null, gpuDevicesPerReplica?: number | null, gpuResource?: string | null, totalCpuCores?: number | null, totalMemoryBytes?: number | null, totalGpuDevices?: number | null } | null, observations: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> }> } | null };
 
+export type ClusterModelFieldsFragment = { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null };
+
+export type ListClusterModelsPageQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+  filter?: InputMaybe<ClusterModelsFilterInput>;
+}>;
+
+
+export type ListClusterModelsPageQuery = { clusterModelDeploymentsPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null }> } };
+
+export type GetClusterModelDeploymentQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+}>;
+
+
+export type GetClusterModelDeploymentQuery = { clusterModelDeployment?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null } | null };
+
+export type ListModelPlacementClustersQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListModelPlacementClustersQuery = { clusterModelPlacementClustersPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, providerId: string, name: string, slug: string, region?: string | null }> } };
+
+export type GetClusterModelRuntimeAdmissionQueryVariables = Exact<{
+  input: ProvisionClusterModelInput;
+}>;
+
+
+export type GetClusterModelRuntimeAdmissionQuery = { clusterModelRuntimeAdmission: { eligible: boolean, reason?: string | null, runtimeVersion?: string | null, architecture?: string | null, hardwareAdmission: string } };
+
+export type ListModelSubscriptionTargetsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListModelSubscriptionTargetsQuery = { clusterModelSubscriptionTargetsPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ environmentId: string, environmentVersion: number, appId: string, appSlug: string, appName: string, environmentName: string, clusterId: string, eligible: boolean, reason?: string | null }> } };
+
+export type ListClusterModelSubscriptionsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  appEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListClusterModelSubscriptionsQuery = { clusterModelSubscriptionsPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, modelDeploymentId: string, appId: string, appSlug: string, appName: string, environmentId: string, environmentName: string, alias: string, bindingPrefix: string, status: string, canRevoke: boolean, desiredEnabled: boolean, desiredRevision: number, appliedRevision: number, reason?: string | null, reconcileStartedAt?: string | null, reconciledAt?: string | null }> } };
+
 export type GetSharedModelPromptReadinessQueryVariables = Exact<{
   id: Scalars['GUID']['input'];
   expectedClusterId: Scalars['GUID']['input'];

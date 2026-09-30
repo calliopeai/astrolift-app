@@ -1,8 +1,9 @@
 /**
  * Agents › Models (spec 44 §4.4, §5.1): views All · Mine · Endpoints ·
- * Hosted (GPU), serving, status, owner and cluster filters, numbered pages.
+ * Self-hosted runtimes, serving, status, owner and cluster filters, numbered pages.
  * Endpoints are the cloud-served models (Bedrock, Azure OpenAI, Foundry,
- * Vertex); Hosted (GPU) run on the org's own GPUs (vLLM, KServe).
+ * Vertex); self-hosted variants identify vLLM or KServe, without establishing
+ * their CPU/GPU mode or capacity.
  *
  * The server answers every view, chip, search, sort and page
  * (`astroliftModelEndpointsPage`, #2155): Mine is the endpoints the viewer
@@ -34,7 +35,7 @@ export type ModelEndpoint = Pick<
   | "deployedByMe"
 >;
 
-/** Self-hosted variants run on the org's own GPUs. */
+/** Variants identify the serving runtime, not its compute mode. */
 export const HOSTED_VARIANTS = ["vllm", "kserve"];
 
 /** The cloud-served variants, one per provider driver. */
@@ -56,10 +57,19 @@ export function modelId(m: Pick<ModelEndpoint, "config">): string {
 export function gpuLabel(m: Pick<ModelEndpoint, "variant" | "config">): string {
   if (!isHosted(m)) return "cloud";
   const config = configOf(m);
-  const gpu = Number(config.gpu ?? (m.variant === "vllm" ? 1 : 0));
-  if (!gpu) return "CPU";
+  const gpu = config.gpu;
+  if (typeof gpu !== "number" || !Number.isInteger(gpu) || gpu < 0) return "Unknown";
   const mig = typeof config.mig_profile === "string" ? ` × ${config.mig_profile}` : "";
   return `${gpu} GPU${gpu === 1 ? "" : "s"}${mig}`;
+}
+
+/** Only explicit persisted compute facts establish CPU or GPU mode. */
+export function computeModeOf(
+  m: Pick<ModelEndpoint, "variant" | "config">
+): "cpu" | "gpu" | "unknown" | "notApplicable" {
+  if (!isHosted(m)) return "notApplicable";
+  const mode = configOf(m).compute_mode;
+  return mode === "cpu" || mode === "gpu" ? mode : "unknown";
 }
 
 /** Where the endpoint is declared: the project's resources, or the app's managed services. */
@@ -108,7 +118,7 @@ export const MODELS_LIST: ListDefinition = {
     { deployedBy: "me" },
     [
       { key: "endpoints", label: "Endpoints", filters: { hosted: "0" } },
-      { key: "hosted", label: "Hosted (GPU)", filters: { hosted: "1" } },
+      { key: "hosted", label: "Self-hosted runtimes", filters: { hosted: "1" } },
     ],
     {
       mineNote:
@@ -118,6 +128,46 @@ export const MODELS_LIST: ListDefinition = {
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
+
+export type ModelEndpointsCopy = {
+  serving: string;
+  status: string;
+  owner: string;
+  app: string;
+  project: string;
+  cluster: string;
+  searchLegacy: string;
+  all: string;
+  mine: string;
+  endpoints: string;
+  hosted: string;
+  mineLegacyNote: string;
+};
+export function localizedModelEndpointsList(copy: ModelEndpointsCopy): ListDefinition {
+  return {
+    ...MODELS_LIST,
+    fields: [
+      { key: "serving", label: copy.serving },
+      { key: "status", label: copy.status },
+      {
+        key: "owner",
+        label: copy.owner,
+        options: [
+          { value: "app", label: copy.app },
+          { value: "project", label: copy.project },
+        ],
+      },
+      { key: "cluster", label: copy.cluster },
+    ],
+    searchPlaceholder: copy.searchLegacy,
+    views: [
+      { key: "all", label: copy.all, filters: {} },
+      { key: "mine", label: copy.mine, filters: { deployedBy: "me" }, note: copy.mineLegacyNote },
+      { key: "endpoints", label: copy.endpoints, filters: { hosted: "0" } },
+      { key: "hosted", label: copy.hosted, filters: { hosted: "1" } },
+    ],
+  };
+}
 
 export interface ModelEndpointsFilter {
   status?: string[];

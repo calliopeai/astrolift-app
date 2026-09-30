@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Make shared cluster deployments the primary Models catalogue, with actual
+  organization-bound server search, filters, Mine and pagination. Preserve a
+  visible app/project/cloud endpoint view and its existing deployment flow;
+  missing legacy compute facts stay unknown instead of implying CPU/GPU (#2215).
+
 - Shared-model operator playground reads and invocations check exact model,
   cluster, provider and version identities under owner permissions and current
   region policy. The bounded in-cluster relay derives its private target from

@@ -6,13 +6,12 @@ import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import {
-  gpuLabel,
+  computeModeOf,
   isHosted,
   type ModelEndpoint,
   modelId,
@@ -31,83 +30,90 @@ export type ModelsScreenProps = ModelsState;
 // link in a cell has to sit above it to be reachable.
 const ABOVE_ROW_LINK = "relative z-10";
 
-const columns: Column<ModelEndpoint>[] = [
-  {
-    id: "model",
-    header: "Model",
-    sortKey: "name",
-    cellClassName: "max-w-80",
-    cell: (m) => (
-      <span className="block min-w-0">
-        <span className="block truncate font-medium" title={m.name}>
-          {m.name}
+function modelColumns(
+  t: ReturnType<typeof useTranslations<"models.shared.deployments">>
+): Column<ModelEndpoint>[] {
+  return [
+    {
+      id: "model",
+      header: t("model"),
+      sortKey: "name",
+      cellClassName: "max-w-80",
+      cell: (m) => (
+        <span className="block min-w-0">
+          <span className="block truncate font-medium" title={m.name}>
+            {m.name}
+          </span>
+          <span
+            className="text-muted-foreground block truncate font-mono text-xs"
+            title={modelId(m)}
+          >
+            {modelId(m) || t("noModelId")}
+          </span>
         </span>
-        <span className="text-muted-foreground block truncate font-mono text-xs" title={modelId(m)}>
-          {modelId(m) || "no model id"}
-        </span>
-      </span>
-    ),
-  },
-  {
-    id: "serving",
-    header: "Serving",
-    sortKey: "variant",
-    cell: (m) => <Badge variant={isHosted(m) ? "default" : "secondary"}>{m.variant}</Badge>,
-  },
-  {
-    id: "hardware",
-    header: "Hardware",
-    cell: (m) => <span className="text-muted-foreground font-mono text-xs">{gpuLabel(m)}</span>,
-  },
-  {
-    id: "owner",
-    header: "Owner",
-    cellClassName: `${ABOVE_ROW_LINK} max-w-64`,
-    cell: (m) => (
-      <Link
-        className="block truncate font-mono text-xs hover:underline"
-        href={ownerHref(m)}
-        title={ownerLabel(m)}
-      >
-        {ownerLabel(m)}
-      </Link>
-    ),
-  },
-  {
-    id: "status",
-    header: "Status",
-    sortKey: "status",
-    cell: (m) => (
-      <span
-        className="inline-flex min-w-0 items-center gap-1.5 text-sm"
-        title={m.statusError || undefined}
-      >
-        <StatusDot status={modelStatusDot(m.status)} />
-        <span className="truncate">{m.status}</span>
-      </span>
-    ),
-  },
-  {
-    id: "replicas",
-    header: "Replicas",
-    align: "right",
-    cell: (m) =>
-      m.variant === "vllm" ? (
-        <span className="font-mono text-xs">
-          {replicasOf((m.config ?? {}) as Record<string, unknown>)}
-        </span>
-      ) : (
-        <span className="text-muted-foreground text-xs">provider</span>
       ),
-  },
-];
+    },
+    {
+      id: "serving",
+      header: t("serving"),
+      sortKey: "variant",
+      cell: (m) => <Badge variant={isHosted(m) ? "default" : "secondary"}>{m.variant}</Badge>,
+    },
+    {
+      id: "hardware",
+      header: t("compute"),
+      cell: (m) => (
+        <span className="text-muted-foreground font-mono text-xs">{t(computeModeOf(m))}</span>
+      ),
+    },
+    {
+      id: "owner",
+      header: t("owner"),
+      cellClassName: `${ABOVE_ROW_LINK} max-w-64`,
+      cell: (m) => (
+        <Link
+          className="block truncate font-mono text-xs hover:underline"
+          href={ownerHref(m)}
+          title={ownerLabel(m)}
+        >
+          {ownerLabel(m)}
+        </Link>
+      ),
+    },
+    {
+      id: "status",
+      header: t("status"),
+      sortKey: "status",
+      cell: (m) => (
+        <span
+          className="inline-flex min-w-0 items-center gap-1.5 text-sm"
+          title={m.statusError || undefined}
+        >
+          <StatusDot status={modelStatusDot(m.status)} />
+          <span className="truncate">{m.status}</span>
+        </span>
+      ),
+    },
+    {
+      id: "replicas",
+      header: t("desiredReplicas"),
+      align: "right",
+      cell: (m) =>
+        m.variant === "vllm" ? (
+          <span className="font-mono text-xs">
+            {replicasOf((m.config ?? {}) as Record<string, unknown>)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">{t("providerManaged")}</span>
+        ),
+    },
+  ];
+}
 
 /**
- * Agents › Models (spec 44 §4.4, §5.1): every model endpoint the org runs
- * (#2040), hosted on its own GPUs (vLLM, KServe) or served by a cloud
- * (Bedrock, Azure OpenAI, Foundry, Vertex), on the shared list. Each row
- * opens the model, where its replicas and the test prompt are; Deploy model
- * is a stepped page. Pure view; the data half is useModels.
+ * Existing app/project endpoints remain a separate, server-paged surface.
+ * Variant names do not establish compute mode; that needs an explicit stored
+ * fact. Existing ownership links and deployment contracts remain unchanged.
  */
 export function ModelsScreen({
   list,
@@ -118,31 +124,30 @@ export function ModelsScreen({
   error,
   onRetry,
 }: ModelsScreenProps) {
-  const t = useTranslations("playground");
+  const t = useTranslations("models.shared.deployments");
   return (
     <ListPage<ModelEndpoint>
       header={{
-        crumbs: agentsCrumbs("models"),
-        title: "Models",
-        context:
-          "Hosted on your own GPUs or served by your cloud; every one binds through the same MODEL_* variables.",
+        crumbs: [{ label: t("title"), href: "/models" }, { label: t("legacy") }],
+        title: t("legacy"),
+        context: t("legacyDescription"),
         primaryAction: (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" asChild>
-              <Link href="/playground">{t("title")}</Link>
+              <Link href="/models">{t("title")}</Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href="/models/deploy">
+              <Link href="/models/deploy/legacy">
                 <RocketIcon className="size-4" />
-                Deploy model
+                {t("legacyDeploy")}
               </Link>
             </Button>
           </div>
         ),
       }}
       list={list}
-      label="Models"
-      columns={columns}
+      label={t("legacy")}
+      columns={modelColumns(t)}
       rows={rows}
       getRowId={(m) => m.id}
       rowHref={(m) => `/models/${m.id}`}
@@ -152,11 +157,10 @@ export function ModelsScreen({
       onRetry={onRetry}
       empty={{
         icon: <BrainCircuitIcon className="size-5" />,
-        title: "No models yet",
-        description:
-          "Add a model_endpoint service to an app or project: vllm to host an open-weight model on your GPUs, or your cloud's managed model service.",
-        actionHref: "/models/deploy",
-        actionLabel: "Deploy model",
+        title: t("legacyEmptyTitle"),
+        description: t("legacyEmptyDescription"),
+        actionHref: "/models/deploy/legacy",
+        actionLabel: t("legacyDeploy"),
       }}
       totalCount={totalCount}
     />

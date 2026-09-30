@@ -89,3 +89,32 @@ Both operation documents validate against the backend-produced SDL. Portable
 stories cover loading, empty, unavailable, rate-limited, resolving, pinned,
 translated and long/narrow frames. Production route wiring and the CPU/GPU
 placement/subscription browser journeys still remain open.
+
+## Primary shared deployment catalogue
+
+`/models` now reads `clusterModelDeploymentsPage` for the active organization.
+Search, cluster ID, explicit compute mode, status, recorded readiness and
+subscription enablement are server filters applied before numbered pagination.
+Mine uses the server's actual creator relation. Invalid Boolean filters refuse
+the read rather than silently widening it. Missing totals remain unknown;
+foreign-organization response identities cannot supply rows or counts.
+
+The Models rail entry consumes the server's dedicated `models` entitlement;
+agent-read permission is not inferred as model-read authority. Backend module
+ownership and credential-ceiling proof lives with #2213/#2214. Frontend tests
+exercise the exact row contract and rendered Models-only rail.
+
+`/models/endpoints` preserves the existing app/project/cloud endpoint contract,
+owner links and server paging. Its existing create flow remains reachable at
+`/models/deploy/legacy`. Hosted variants no longer imply GPU mode or capacity;
+legacy CPU/GPU mode requires explicit persisted `compute_mode`. Cloud compute is
+not applicable and missing hosted compute is unknown. Device summaries no longer
+invent a GPU count or interpret zero devices as CPU runtime support.
+
+All six new read documents validate against the combined exported SDL. Apollo
+HTTP tests prove exact organization/filter/page variables, later-page access,
+transport failure/retry, no inspection mutations and foreign-identity refusal.
+The list and translated filter callbacks render in all eight locales. Pure
+stories retain long/narrow, loading, stale, empty, failed and unknown states.
+The primary read route is wired; shared detail/create/subscription/playground
+adapters and complete production browser journeys remain separate acceptance.
