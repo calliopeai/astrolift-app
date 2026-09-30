@@ -98,14 +98,14 @@ function ConflictResolverModal({
   ours,
   theirs,
   serverUpdatedAt,
-  onForceOverwrite,
+  onKeepMine,
   onAcceptTheirs,
   onClose,
 }: {
   ours: string;
   theirs: string;
   serverUpdatedAt: string;
-  onForceOverwrite: () => void;
+  onKeepMine: () => void;
   onAcceptTheirs: () => void;
   onClose: () => void;
 }) {
@@ -149,9 +149,7 @@ function ConflictResolverModal({
           <Button variant="outline" onClick={onAcceptTheirs}>
             {t("loadTheirs")}
           </Button>
-          <Button variant="destructive" onClick={onForceOverwrite}>
-            {t("forceOverwrite")}
-          </Button>
+          <Button onClick={onKeepMine}>{t("keepMine")}</Button>
         </div>
       </div>
     </div>
@@ -465,7 +463,7 @@ export function ConfigEditorScreen({
           ours={draft}
           theirs={conflict.theirs}
           serverUpdatedAt={conflict.serverUpdatedAt}
-          onForceOverwrite={dismissConflictKeepMine}
+          onKeepMine={dismissConflictKeepMine}
           onAcceptTheirs={adoptTheirs}
           onClose={closeConflict}
         />

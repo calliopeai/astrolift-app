@@ -242,8 +242,8 @@ export function useConfigEditor(slug: string) {
 
   function dismissConflictKeepMine() {
     if (!conflict) return;
-    // Treat our current draft as the new baseline so the next refetch
-    // doesn't immediately re-fire. The next Save will write our draft.
+    // Compare future refetches with this server version while retaining our
+    // unsaved local draft. Only the separate Save action writes the draft.
     baselineRef.current = conflict.theirs;
     setConflict(null);
   }

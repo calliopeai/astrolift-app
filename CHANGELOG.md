@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Manifest conflict resolution labels the unsaved local-draft choice as “Keep
+  mine”; saving remains a separate action. Workload controls show pod readiness
+  as unknown instead of treating desired replicas as healthy pods (#2148).
+
 - Managed AWS CI previews use the backend workflow and the private ECR registry
   region. Unconfigured deploy-only workflows omit AWS authentication; invalid
   owner/registry coordinates refuse before driver or repository writes. Reference
