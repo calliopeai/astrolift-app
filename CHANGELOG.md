@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Audit managed runtime reservation and revocation, and redact provider failures
+  during managed Stop without losing retry or retained-storage recovery (#1971).
+
 - Provision explicit managed IDE boxes with a supervised server/browser, retained
   CSI storage and projected, renewable runtime credentials (#1971). Failed starts
   and Stop revoke ownership; private resource creation and deletion honor Kubernetes

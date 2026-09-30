@@ -137,12 +137,12 @@ def authenticated_runtime(box_id, token):
     ).first()
 
 
-def _audit(runtime, decision, reason):
+def _audit(runtime, decision, reason, *, action="agent_box.runtime.validate"):
     AuditEvent.objects.create(
         organization_id=runtime.box.organization_id,
         actor_kind="system",
         actor_id=str(runtime.guid),
-        action="agent_box.runtime.validate",
+        action=action,
         decision=decision,
         target_kind="agent_box",
         target_id=str(runtime.box.guid),

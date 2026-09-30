@@ -753,6 +753,7 @@ def stop_agent_box(
         delete_managed_runtime_objects,
         revoke_managed_runtime,
     )
+    from astrolift_agents.services.managed_runtime_authority import RuntimeAuthorityError
 
     cancel_managed_box_start(box)
     managed_runtime = revoke_managed_runtime(box)
@@ -764,13 +765,22 @@ def stop_agent_box(
                 cluster = resolve_agent_cluster(box.organization)
                 _delete_box_objects(cluster, box.namespace or box_namespace(box), box.external_id)
         except Exception as exc:  # noqa: BLE001
-            error = f"cluster teardown did not complete: {exc}"
+            # Ownership errors are our fixed safe diagnostics. Opaque provider
+            # exceptions may contain credentials; never persist or log them.
+            detail = (
+                "managed runtime provider operation failed; retry Stop"
+                if managed_runtime is not None and not isinstance(exc, RuntimeAuthorityError)
+                else str(exc)
+            )
+            error = f"cluster teardown did not complete: {detail}"
             log.warning("agent_box: %s for box %s", error, box.slug)
             if require_teardown:
                 # A pod left behind loses its model access all the same.
                 _revoke_box_gateway_key(box)
                 box.last_error = error[:LAST_ERROR_MAX_CHARS]
                 box.save(update_fields=["last_error", "updated_at", "version"])
+                if managed_runtime is not None:
+                    raise AgentBoxError(error) from None
                 raise AgentBoxError(error) from exc
     _revoke_box_gateway_key(box)
 

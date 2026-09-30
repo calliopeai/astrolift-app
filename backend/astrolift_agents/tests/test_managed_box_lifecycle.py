@@ -23,6 +23,7 @@ from astrolift_agents.services.managed_runtime_authority import (
 )
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization
+from astrolift_operations.models import AuditEvent
 
 pytestmark = pytest.mark.django_db
 
@@ -320,6 +321,14 @@ def test_partial_apply_failure_revocation_survives_transaction_rollback(world, f
     world.box.refresh_from_db()
     assert runtime.phase == "revoked" and runtime.token_hash == ""
     assert world.box.status == "failed"
+    assert list(
+        AuditEvent.objects.filter(
+            actor_id=str(runtime.guid),
+            action__in=["agent_box.runtime.reserve", "agent_box.runtime.revoke"],
+        )
+        .order_by("occurred_at")
+        .values_list("action", flat=True)
+    ) == ["agent_box.runtime.reserve", "agent_box.runtime.revoke"]
     assert not reconcile_managed_runtime(runtime.pk)
     assert ("PersistentVolumeClaim", runtime.claim_name) in world.driver.objects
     assert ("Job", runtime.job_name) not in world.driver.objects
@@ -420,3 +429,69 @@ def test_concurrent_stop_without_runtime_fences_inflight_preflight(world, monkey
     assert world.box.status == "stopped"
     assert not world.driver.applied
     assert not ManagedBoxRuntime.objects.exists()
+
+
+def test_reserve_and_revoke_audit_exact_owner_once_without_credentials(world):
+    runtime = ready(world)
+    token = credential(world, runtime)["token"]
+    stop_agent_box(world.box)
+    stop_agent_box(world.box)
+    events = list(
+        AuditEvent.objects.filter(
+            action__in=["agent_box.runtime.reserve", "agent_box.runtime.revoke"]
+        ).order_by("occurred_at")
+    )
+    assert [event.action for event in events] == ["agent_box.runtime.reserve", "agent_box.runtime.revoke"]
+    for event in events:
+        assert event.organization_id == world.box.organization_id
+        assert event.actor_kind == "system" and event.actor_id == str(runtime.guid)
+        assert event.target_kind == "agent_box" and event.target_id == str(world.box.guid)
+        assert event.decision == "ALLOW"
+        assert token not in str(event.__dict__)
+        assert "model-fixture" not in str(event.__dict__)
+
+
+@pytest.mark.parametrize("operation", ["get_manifest", "delete_manifests"])
+@pytest.mark.parametrize("require_teardown", [False, True])
+def test_managed_stop_sanitizes_provider_failure_and_allows_retry(
+    world, monkeypatch, caplog, operation, require_teardown
+):
+    runtime = ready(world)
+    token = credential(world, runtime)["token"]
+    original = getattr(world.driver, operation)
+    observations = []
+
+    def failed(*args, **kwargs):
+        runtime.refresh_from_db()
+        observations.append(
+            (
+                runtime.phase,
+                runtime.token_hash,
+                AuditEvent.objects.filter(
+                    action="agent_box.runtime.revoke", actor_id=str(runtime.guid)
+                ).count(),
+            )
+        )
+        raise RuntimeError(f"provider credential {token} model-fixture")
+
+    monkeypatch.setattr(world.driver, operation, failed)
+    expected = "cluster teardown did not complete: managed runtime provider operation failed; retry Stop"
+    if require_teardown:
+        with pytest.raises(AgentBoxError) as error:
+            stop_agent_box(world.box, require_teardown=True)
+        assert str(error.value) == expected
+        assert error.value.__cause__ is None and error.value.__suppress_context__
+    else:
+        stop_agent_box(world.box)
+    world.box.refresh_from_db()
+    assert world.box.last_error == expected
+    assert observations == [("revoked", "", 1)]
+    assert token not in caplog.text and "model-fixture" not in caplog.text
+    assert ("PersistentVolumeClaim", runtime.claim_name) in world.driver.objects
+    assert ("Job", runtime.job_name) in world.driver.objects
+    monkeypatch.setattr(world.driver, operation, original)
+    stop_agent_box(world.box, require_teardown=True)
+    world.box.refresh_from_db()
+    assert world.box.last_error == ""
+    assert ("Job", runtime.job_name) not in world.driver.objects
+    assert ("PersistentVolumeClaim", runtime.claim_name) in world.driver.objects

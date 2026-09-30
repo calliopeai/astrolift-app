@@ -194,6 +194,7 @@ def prepare_managed_box(*, box, cluster, image, namespace, job_name, expected_ve
         )
         runtime.full_clean()
         runtime.save()
+        _audit(runtime, "ALLOW", "Managed runtime ownership reserved.", action="agent_box.runtime.reserve")
         current.status = AgentBox.Status.PROVISIONING
         current.image, current.external_id, current.namespace = image, job_name, namespace
         current.save(update_fields=["status", "image", "external_id", "namespace", "updated_at", "version"])
@@ -295,10 +296,13 @@ def revoke_managed_runtime(box):
         runtime = ManagedBoxRuntime.objects.select_for_update().filter(box_id=box.pk).first()
         if runtime is None:
             return None
+        transitioned = runtime.phase != ManagedBoxRuntime.Phase.REVOKED
         runtime.phase = ManagedBoxRuntime.Phase.REVOKED
         runtime.token_hash = ""
         runtime.token_expires_at = timezone.now()
         runtime.save(update_fields=["phase", "token_hash", "token_expires_at", "updated_at", "version"])
+        if transitioned:
+            _audit(runtime, "ALLOW", "Managed runtime authority revoked.", action="agent_box.runtime.revoke")
     return runtime
 
 
