@@ -526,7 +526,7 @@ def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
     # transient startup states (ContainerCreating, a first-attempt
     # ErrImagePull) fall through and get another poll.
     fatal = (
-        _fatal_pod_wait_reason(cluster, namespace, str(task.guid), pods=startup_pods)
+        _fatal_pod_wait_reason(cluster, namespace, str(task.guid), startup_pods)
         if backend == "k8s_job"
         else None
     )
@@ -573,7 +573,7 @@ def _cleanup_terminal_task_secret(task: Any, *, spawner: Any | None = None) -> N
 _FATAL_POD_WAIT_REASONS = frozenset({"ImagePullBackOff", "InvalidImageName", "CreateContainerConfigError"})
 
 
-def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str, *, pods=None) -> str:
+def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str, pods=None) -> str:
     """Return the task pod's fatal container-waiting reason, or ``""``.
 
     Discovers the pod by its ``astrolift.dev/task-id`` label (the same lookup
