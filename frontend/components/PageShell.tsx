@@ -4,11 +4,7 @@ import { ChevronDownIcon } from "lucide-react";
 import * as React from "react";
 
 import { useAppChrome } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const STORAGE_PREFIX = "astrolift.pageshell.header.";
 
@@ -160,17 +156,13 @@ function CollapsibleHeaderShell({
   const hasFoldable = Boolean(description || actions);
 
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={handleChange}
-      className="flex flex-1 flex-col gap-6 p-6"
-    >
+    <Collapsible open={open} onOpenChange={handleChange} className="flex flex-1 flex-col gap-6 p-6">
       <header className="border-b pb-5">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {hasFoldable && (
             <CollapsibleTrigger
-              className="group/hdr text-muted-foreground hover:text-foreground -mr-1 mt-1 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition-colors"
+              className="group/hdr text-muted-foreground hover:text-foreground mt-1 -mr-1 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition-colors"
               aria-label={open ? "Collapse header" : "Expand header"}
             >
               <span className="hidden sm:inline">{open ? "Collapse" : "Details"}</span>
