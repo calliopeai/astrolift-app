@@ -1975,14 +1975,14 @@
       }
     },
     "audit": {
-      "title": "Audit-Protokoll",
-      "description": "Jede Berechtigungsentscheidung und jede statusändernde Mutation, append-only. Mandantenscoping auf der Datenbankebene.",
-      "retentionDescription": "Jede Berechtigungsentscheidung und jede statusändernde Mutation, append-only. {days} Tage gemäß Compliance-Richtlinie aufbewahrt.",
+      "title": "Auditprotokoll",
+      "description": "Alle Berechtigungsentscheidungen und zustandsändernden Vorgänge werden unveränderlich angehängt. Die Trennung nach Organisation erfolgt in der Datenbank.",
+      "retentionDescription": "Alle Berechtigungsentscheidungen und zustandsändernden Vorgänge werden unveränderlich angehängt. Aufbewahrung für {days} Tage gemäß der Compliance-Richtlinie.",
       "loadMore": "Mehr laden",
-      "emptyTitle": "Keine Audit-Ereignisse passen",
-      "emptyDescription": "Keine Audit-Ereignisse entsprechen den aktuellen Filtern. Erweitern Sie den Datumsbereich, löschen Sie den Aktionsfilter oder warten Sie auf neue Aktivität.",
+      "emptyTitle": "Keine passenden Auditereignisse",
+      "emptyDescription": "Keine Auditereignisse passen zu den Filtern. Erweitere den Zeitraum, entferne den Aktionsfilter oder warte auf neue Aktivitäten.",
       "columns": {
-        "when": "Wann",
+        "when": "Zeitpunkt",
         "actor": "Akteur",
         "action": "Aktion",
         "target": "Ziel",
@@ -2001,32 +2001,63 @@
         "button": "Exportieren",
         "formatCsv": "Als CSV exportieren",
         "formatNdjson": "Als NDJSON exportieren",
-        "toastStart": "Audit-Export wird vorbereitet…",
-        "toastReady": "Audit-Export bereit · {rows} Zeilen",
+        "toastStart": "Auditexport wird vorbereitet…",
+        "toastReady": "Auditexport bereit · {rows} Zeilen",
         "toastDownload": "Herunterladen",
-        "toastFailure": "Audit-Export fehlgeschlagen"
+        "toastFailure": "Auditexport fehlgeschlagen"
       },
       "sheet": {
         "targetSection": "Ziel",
         "beforeSection": "Vorher",
         "afterSection": "Nachher",
-        "payloadSection": "Mutationskontext",
-        "redactedNote": "Sensible Werte (Geheimnisse, Tokens, Passwörter) werden vor der Anzeige maskiert.",
+        "payloadSection": "Vorgangskontext",
+        "redactedNote": "Vertrauliche Werte (Geheimnisse, Tokens und Passwörter) werden vor der Anzeige geschwärzt.",
         "requestIdSection": "Anfrage-ID"
       },
       "pageSizeLabel": "Zeilen pro Seite",
       "retention": {
         "button": "Aufbewahrung",
-        "title": "Audit-Aufbewahrung",
-        "help": "Wie lange Audit-Ereignisse für diese Organisation aufbewahrt werden, bevor sie vom Aufbewahrungs-Sweeper gelöscht werden dürfen.",
-        "fieldLabel": "Audit-Ereignisse aufbewahren für (Tage)",
+        "title": "Auditaufbewahrung",
+        "help": "Wie lange die Auditereignisse dieser Organisation aufbewahrt werden, bevor der Bereinigungsprozess sie löschen darf.",
+        "fieldLabel": "Auditereignisse aufbewahren für (Tage)",
         "range": "Zwischen {min} und {max} Tagen (etwa 7 Jahre).",
         "cancel": "Abbrechen",
         "save": "Speichern",
         "saving": "Wird gespeichert…",
         "toastSuccess": "Aufbewahrung auf {days} Tage aktualisiert",
-        "toastFailure": "Audit-Aufbewahrung konnte nicht aktualisiert werden"
-      }
+        "toastFailure": "Auditaufbewahrung konnte nicht aktualisiert werden"
+      },
+      "searchPlaceholder": "Aktionen, Akteure, Ziele und Anfrage-IDs durchsuchen…",
+      "listFields": {
+        "actor": "Akteur",
+        "action": "Aktion",
+        "target": "Zieltyp",
+        "decision": "Entscheidung",
+        "since": "Seit"
+      },
+      "decisions": {
+        "ALLOW": "Erlaubt",
+        "DENY": "Verweigert",
+        "UNKNOWN": "Unbekannt"
+      },
+      "since": {
+        "1h": "Letzte Stunde",
+        "24h": "Letzte 24 Stunden",
+        "7d": "Letzte 7 Tage",
+        "30d": "Letzte 30 Tage",
+        "90d": "Letzte 90 Tage"
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "denied": "Verweigert"
+      },
+      "eventsCount": "{count, plural, one {# Ereignis} other {# Ereignisse}}",
+      "retainedDays": "Aufbewahrung für {days, plural, one {# Tag} other {# Tage}}",
+      "viewsLabel": "Ansichten",
+      "feedLabel": "Auditereignisse",
+      "filteredTitle": "Keine passenden Auditereignisse",
+      "filteredDescription": "Entferne einen Filter oder ändere die Suche, um weitere Ergebnisse zu sehen."
     },
     "approval": {
       "quorum": {

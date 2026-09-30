@@ -1976,57 +1976,88 @@
     },
     "audit": {
       "title": "Registro de auditoría",
-      "description": "Cada decisión de permisos y cada mutación de estado, solo anexar. Aislado por inquilino en la capa de base de datos.",
-      "retentionDescription": "Cada decisión de permisos y cada mutación de estado, solo anexar. Conservado durante {days} días según la política de cumplimiento.",
+      "description": "Todas las decisiones de permisos y operaciones que cambian el estado se registran sin modificar entradas anteriores. El aislamiento por organización se aplica en la base de datos.",
+      "retentionDescription": "Todas las decisiones de permisos y operaciones que cambian el estado se registran sin modificar entradas anteriores. Se conservan durante {days} días según la política de cumplimiento.",
       "loadMore": "Cargar más",
       "emptyTitle": "Ningún evento de auditoría coincide",
-      "emptyDescription": "Ningún evento de auditoría coincide con los filtros actuales. Amplíe el rango de fechas, borre el filtro de acción o espere nueva actividad.",
+      "emptyDescription": "Ningún evento de auditoría coincide con los filtros. Amplía el intervalo de fechas, quita el filtro de acción o espera nueva actividad.",
       "columns": {
-        "when": "Cuándo",
+        "when": "Fecha",
         "actor": "Actor",
         "action": "Acción",
-        "target": "Objetivo",
+        "target": "Destino",
         "decision": "Decisión"
       },
       "filters": {
         "actionLabel": "Acción",
-        "actionPlaceholder": "ej. team.create",
+        "actionPlaceholder": "p. ej., team.create",
         "decisionLabel": "Decisión",
         "anyDecision": "Cualquier decisión",
         "fromLabel": "Desde",
         "toLabel": "Hasta",
-        "totalCount": "{count} coincidentes"
+        "totalCount": "{count} coincidencias"
       },
       "export": {
         "button": "Exportar",
         "formatCsv": "Exportar como CSV",
         "formatNdjson": "Exportar como NDJSON",
         "toastStart": "Preparando exportación de auditoría…",
-        "toastReady": "Exportación lista · {rows} filas",
+        "toastReady": "Exportación de auditoría lista · {rows} filas",
         "toastDownload": "Descargar",
-        "toastFailure": "Falló la exportación"
+        "toastFailure": "La exportación de auditoría falló"
       },
       "sheet": {
-        "targetSection": "Objetivo",
+        "targetSection": "Destino",
         "beforeSection": "Antes",
         "afterSection": "Después",
-        "payloadSection": "Contexto de la mutación",
-        "redactedNote": "Los valores sensibles (secretos, tokens, contraseñas) se ocultan antes de mostrarlos.",
+        "payloadSection": "Contexto de la operación",
+        "redactedNote": "Los valores sensibles (secretos, tokens y contraseñas) se ocultan antes de mostrarlos.",
         "requestIdSection": "ID de solicitud"
       },
       "pageSizeLabel": "Filas por página",
       "retention": {
-        "button": "Retención",
-        "title": "Retención de auditoría",
-        "help": "Cuánto tiempo se conservan los eventos de auditoría de esta organización antes de que el barrido de retención pueda eliminarlos.",
+        "button": "Conservación",
+        "title": "Conservación de auditoría",
+        "help": "Cuánto tiempo se conservan los eventos de auditoría de esta organización antes de que el proceso de limpieza pueda eliminarlos.",
         "fieldLabel": "Conservar eventos de auditoría durante (días)",
         "range": "Entre {min} y {max} días (unos 7 años).",
         "cancel": "Cancelar",
         "save": "Guardar",
         "saving": "Guardando…",
-        "toastSuccess": "Retención actualizada a {days} días",
-        "toastFailure": "No se pudo actualizar la retención de auditoría"
-      }
+        "toastSuccess": "Conservación actualizada a {days} días",
+        "toastFailure": "No se pudo actualizar la conservación de auditoría"
+      },
+      "searchPlaceholder": "Buscar acciones, actores, destinos, ID de solicitudes…",
+      "listFields": {
+        "actor": "Actor",
+        "action": "Acción",
+        "target": "Tipo de destino",
+        "decision": "Decisión",
+        "since": "Desde"
+      },
+      "decisions": {
+        "ALLOW": "Permitida",
+        "DENY": "Denegada",
+        "UNKNOWN": "Desconocida"
+      },
+      "since": {
+        "1h": "Última hora",
+        "24h": "Últimas 24 horas",
+        "7d": "Últimos 7 días",
+        "30d": "Últimos 30 días",
+        "90d": "Últimos 90 días"
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Míos",
+        "denied": "Denegados"
+      },
+      "eventsCount": "{count, plural, one {# evento} other {# eventos}}",
+      "retainedDays": "se conservan durante {days, plural, one {# día} other {# días}}",
+      "viewsLabel": "Vistas",
+      "feedLabel": "Eventos de auditoría",
+      "filteredTitle": "Ningún evento de auditoría coincide",
+      "filteredDescription": "Quita un filtro o cambia la búsqueda para ver más resultados."
     },
     "approval": {
       "quorum": {

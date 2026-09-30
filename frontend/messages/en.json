@@ -2705,7 +2705,38 @@
         "saving": "Saving…",
         "toastSuccess": "Retention updated to {days} days",
         "toastFailure": "Couldn't update audit retention"
-      }
+      },
+      "searchPlaceholder": "Search actions, actors, targets, request ids…",
+      "listFields": {
+        "actor": "Actor",
+        "action": "Action",
+        "target": "Target kind",
+        "decision": "Decision",
+        "since": "Since"
+      },
+      "decisions": {
+        "ALLOW": "Allowed",
+        "DENY": "Denied",
+        "UNKNOWN": "Unknown"
+      },
+      "since": {
+        "1h": "Last hour",
+        "24h": "Last 24 hours",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "90d": "Last 90 days"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "denied": "Denied"
+      },
+      "eventsCount": "{count, plural, one {# event} other {# events}}",
+      "retainedDays": "retained {days, plural, one {# day} other {# days}}",
+      "viewsLabel": "Views",
+      "feedLabel": "Audit events",
+      "filteredTitle": "No audit events match",
+      "filteredDescription": "Remove a filter or change the search to see more."
     },
     "membersBulk": {
       "selectAllLabel": "Select all role bindings",

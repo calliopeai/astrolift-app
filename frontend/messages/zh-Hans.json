@@ -1976,57 +1976,88 @@
     },
     "audit": {
       "title": "审计日志",
-      "description": "每个权限决策和每个状态变更操作，仅追加。在数据库层进行租户作用域隔离。",
-      "retentionDescription": "每个权限决策和每个状态变更操作，仅追加。根据合规政策保留 {days} 天。",
+      "description": "所有权限判定和状态变更操作只追加记录，不修改已有条目。数据库层面按组织隔离。",
+      "retentionDescription": "所有权限判定和状态变更操作只追加记录，不修改已有条目。根据合规策略保留 {days} 天。",
       "loadMore": "加载更多",
       "emptyTitle": "没有匹配的审计事件",
-      "emptyDescription": "当前过滤器没有匹配的审计事件。请扩展日期范围、清除操作过滤器或等待新活动。",
+      "emptyDescription": "没有审计事件匹配当前筛选条件。请扩大日期范围、清除操作筛选条件或等待新活动。",
       "columns": {
         "when": "时间",
-        "actor": "行为者",
+        "actor": "执行者",
         "action": "操作",
         "target": "目标",
-        "decision": "决策"
+        "decision": "判定"
       },
       "filters": {
         "actionLabel": "操作",
-        "actionPlaceholder": "如 team.create",
-        "decisionLabel": "决策",
-        "anyDecision": "任何决策",
-        "fromLabel": "从",
-        "toLabel": "到",
-        "totalCount": "{count} 项匹配"
+        "actionPlaceholder": "例如 team.create",
+        "decisionLabel": "判定",
+        "anyDecision": "所有判定",
+        "fromLabel": "开始",
+        "toLabel": "结束",
+        "totalCount": "{count} 条匹配"
       },
       "export": {
         "button": "导出",
         "formatCsv": "导出为 CSV",
         "formatNdjson": "导出为 NDJSON",
-        "toastStart": "正在准备审计导出…",
-        "toastReady": "审计导出已就绪 · {rows} 行",
+        "toastStart": "正在准备审计日志导出…",
+        "toastReady": "审计日志导出已就绪 · {rows} 行",
         "toastDownload": "下载",
-        "toastFailure": "审计导出失败"
+        "toastFailure": "审计日志导出失败"
       },
       "sheet": {
         "targetSection": "目标",
-        "beforeSection": "之前",
-        "afterSection": "之后",
+        "beforeSection": "变更前",
+        "afterSection": "变更后",
         "payloadSection": "操作上下文",
-        "redactedNote": "敏感值（密钥、令牌、密码）在显示前已被遮蔽。",
+        "redactedNote": "敏感值（密钥、令牌、密码）会在显示前隐藏。",
         "requestIdSection": "请求 ID"
       },
       "pageSizeLabel": "每页行数",
       "retention": {
         "button": "保留期限",
-        "title": "审计保留期限",
-        "help": "在保留清理程序可以删除之前，本组织的审计事件保留的时长。",
-        "fieldLabel": "审计事件保留天数",
-        "range": "在 {min} 到 {max} 天之间（约 7 年）。",
+        "title": "审计日志保留期限",
+        "help": "本组织的审计事件在清理任务可以删除之前保留的时间。",
+        "fieldLabel": "保留审计事件的天数",
+        "range": "介于 {min} 和 {max} 天之间（约 7 年）。",
         "cancel": "取消",
         "save": "保存",
-        "saving": "保存中…",
+        "saving": "正在保存…",
         "toastSuccess": "保留期限已更新为 {days} 天",
-        "toastFailure": "无法更新审计保留期限"
-      }
+        "toastFailure": "无法更新审计日志保留期限"
+      },
+      "searchPlaceholder": "搜索操作、执行者、目标、请求 ID…",
+      "listFields": {
+        "actor": "执行者",
+        "action": "操作",
+        "target": "目标类型",
+        "decision": "判定",
+        "since": "起始时间"
+      },
+      "decisions": {
+        "ALLOW": "允许",
+        "DENY": "拒绝",
+        "UNKNOWN": "未知"
+      },
+      "since": {
+        "1h": "最近一小时",
+        "24h": "最近 24 小时",
+        "7d": "最近 7 天",
+        "30d": "最近 30 天",
+        "90d": "最近 90 天"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "denied": "已拒绝"
+      },
+      "eventsCount": "{count, plural, one {# 个事件} other {# 个事件}}",
+      "retainedDays": "{days, plural, one {保留 # 天} other {保留 # 天}}",
+      "viewsLabel": "视图",
+      "feedLabel": "审计事件",
+      "filteredTitle": "没有匹配的审计事件",
+      "filteredDescription": "移除筛选条件或更改搜索内容以查看其他结果。"
     },
     "approval": {
       "quorum": {

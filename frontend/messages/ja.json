@@ -1976,57 +1976,88 @@
     },
     "audit": {
       "title": "監査ログ",
-      "description": "すべての権限決定とすべての状態変更ミューテーション、追記専用。データベース層でテナントスコープ。",
-      "retentionDescription": "すべての権限決定とすべての状態変更ミューテーション、追記専用。コンプライアンス ポリシーに従って{days}日間保持。",
+      "description": "すべての権限判断と状態を変更する操作を、過去の記録を変更せずに追加します。組織ごとの分離はデータベースで適用されます。",
+      "retentionDescription": "すべての権限判断と状態を変更する操作を、過去の記録を変更せずに追加します。コンプライアンスポリシーに従い{days}日間保持します。",
       "loadMore": "さらに読み込む",
-      "emptyTitle": "一致する監査イベントはありません",
-      "emptyDescription": "現在のフィルターに一致する監査イベントはありません。日付範囲を広げるか、アクション フィルターをクリアするか、新しいアクティビティを待ってください。",
+      "emptyTitle": "一致する監査イベントがありません",
+      "emptyDescription": "現在のフィルターに一致する監査イベントはありません。期間を広げるか、操作フィルターを解除するか、新しいイベントをお待ちください。",
       "columns": {
-        "when": "いつ",
-        "actor": "アクター",
-        "action": "アクション",
-        "target": "ターゲット",
+        "when": "日時",
+        "actor": "実行者",
+        "action": "操作",
+        "target": "対象",
         "decision": "判定"
       },
       "filters": {
-        "actionLabel": "アクション",
-        "actionPlaceholder": "例: team.create",
+        "actionLabel": "操作",
+        "actionPlaceholder": "例：team.create",
         "decisionLabel": "判定",
         "anyDecision": "すべての判定",
         "fromLabel": "開始",
         "toLabel": "終了",
-        "totalCount": "{count}件一致"
+        "totalCount": "{count}件が一致"
       },
       "export": {
         "button": "エクスポート",
-        "formatCsv": "CSV としてエクスポート",
-        "formatNdjson": "NDJSON としてエクスポート",
-        "toastStart": "監査エクスポートを準備しています…",
-        "toastReady": "エクスポート準備完了 · {rows}行",
+        "formatCsv": "CSVでエクスポート",
+        "formatNdjson": "NDJSONでエクスポート",
+        "toastStart": "監査ログのエクスポートを準備中…",
+        "toastReady": "監査ログのエクスポートが完了 · {rows}行",
         "toastDownload": "ダウンロード",
-        "toastFailure": "監査エクスポートに失敗しました"
+        "toastFailure": "監査ログのエクスポートに失敗しました"
       },
       "sheet": {
-        "targetSection": "ターゲット",
+        "targetSection": "対象",
         "beforeSection": "変更前",
         "afterSection": "変更後",
-        "payloadSection": "ミューテーション コンテキスト",
-        "redactedNote": "機密情報 (シークレット、トークン、パスワード) は表示前にマスクされます。",
-        "requestIdSection": "リクエスト ID"
+        "payloadSection": "操作のコンテキスト",
+        "redactedNote": "機密値（シークレット、トークン、パスワード）は表示前に伏せられます。",
+        "requestIdSection": "リクエストID"
       },
-      "pageSizeLabel": "1ページあたりの行数",
+      "pageSizeLabel": "1ページの行数",
       "retention": {
         "button": "保持期間",
         "title": "監査ログの保持期間",
-        "help": "保持スイーパーが削除できるようになるまで、この組織の監査イベントを保持する期間です。",
-        "fieldLabel": "監査イベントの保持日数",
-        "range": "{min}〜{max}日（約7年）の範囲で指定します。",
+        "help": "この組織の監査イベントを、クリーンアップ処理で削除できるようになるまで保持する期間です。",
+        "fieldLabel": "監査イベントの保持期間（日）",
+        "range": "{min}日から{max}日まで（約7年）。",
         "cancel": "キャンセル",
         "save": "保存",
         "saving": "保存中…",
         "toastSuccess": "保持期間を{days}日に更新しました",
         "toastFailure": "監査ログの保持期間を更新できませんでした"
-      }
+      },
+      "searchPlaceholder": "操作、実行者、対象、リクエストIDを検索…",
+      "listFields": {
+        "actor": "実行者",
+        "action": "操作",
+        "target": "対象の種類",
+        "decision": "判定",
+        "since": "期間"
+      },
+      "decisions": {
+        "ALLOW": "許可",
+        "DENY": "拒否",
+        "UNKNOWN": "不明"
+      },
+      "since": {
+        "1h": "過去1時間",
+        "24h": "過去24時間",
+        "7d": "過去7日",
+        "30d": "過去30日",
+        "90d": "過去90日"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分",
+        "denied": "拒否された操作"
+      },
+      "eventsCount": "{count, plural, one {#件のイベント} other {#件のイベント}}",
+      "retainedDays": "{days, plural, one {#日間保持} other {#日間保持}}",
+      "viewsLabel": "表示",
+      "feedLabel": "監査イベント",
+      "filteredTitle": "一致する監査イベントがありません",
+      "filteredDescription": "フィルターを解除するか検索内容を変更すると、ほかの結果を表示できます。"
     },
     "approval": {
       "quorum": {

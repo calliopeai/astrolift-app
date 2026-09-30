@@ -1976,57 +1976,88 @@
     },
     "audit": {
       "title": "감사 로그",
-      "description": "모든 권한 결정 및 모든 상태 변경 뮤테이션, 추가 전용. 데이터베이스 계층에서 테넌트 범위 지정.",
-      "retentionDescription": "모든 권한 결정 및 모든 상태 변경 뮤테이션, 추가 전용. 컴플라이언스 정책에 따라 {days}일 동안 보관.",
-      "loadMore": "더 보기",
-      "emptyTitle": "일치하는 감사 이벤트 없음",
-      "emptyDescription": "현재 필터와 일치하는 감사 이벤트가 없습니다. 날짜 범위를 넓히거나, 작업 필터를 지우거나, 새 활동을 기다리세요.",
+      "description": "모든 권한 판단과 상태 변경 작업을 기존 기록을 수정하지 않고 추가합니다. 조직별 격리는 데이터베이스에서 적용됩니다.",
+      "retentionDescription": "모든 권한 판단과 상태 변경 작업을 기존 기록을 수정하지 않고 추가합니다. 규정 준수 정책에 따라 {days}일 동안 보관합니다.",
+      "loadMore": "더 불러오기",
+      "emptyTitle": "일치하는 감사 이벤트가 없습니다",
+      "emptyDescription": "현재 필터와 일치하는 감사 이벤트가 없습니다. 날짜 범위를 넓히거나 작업 필터를 해제하거나 새 활동을 기다리세요.",
       "columns": {
         "when": "시간",
-        "actor": "행위자",
+        "actor": "수행자",
         "action": "작업",
         "target": "대상",
-        "decision": "결정"
+        "decision": "판정"
       },
       "filters": {
         "actionLabel": "작업",
         "actionPlaceholder": "예: team.create",
-        "decisionLabel": "결정",
-        "anyDecision": "모든 결정",
+        "decisionLabel": "판정",
+        "anyDecision": "모든 판정",
         "fromLabel": "시작",
         "toLabel": "종료",
-        "totalCount": "{count}건 일치"
+        "totalCount": "{count}개 일치"
       },
       "export": {
         "button": "내보내기",
         "formatCsv": "CSV로 내보내기",
         "formatNdjson": "NDJSON으로 내보내기",
-        "toastStart": "감사 내보내기 준비 중…",
-        "toastReady": "내보내기 준비 완료 · {rows}행",
+        "toastStart": "감사 로그 내보내기 준비 중…",
+        "toastReady": "감사 로그 내보내기 준비 완료 · {rows}행",
         "toastDownload": "다운로드",
-        "toastFailure": "감사 내보내기 실패"
+        "toastFailure": "감사 로그 내보내기에 실패했습니다"
       },
       "sheet": {
         "targetSection": "대상",
-        "beforeSection": "이전",
-        "afterSection": "이후",
-        "payloadSection": "뮤테이션 컨텍스트",
-        "redactedNote": "민감한 값(비밀, 토큰, 비밀번호)은 표시 전에 마스킹됩니다.",
+        "beforeSection": "변경 전",
+        "afterSection": "변경 후",
+        "payloadSection": "작업 컨텍스트",
+        "redactedNote": "민감한 값(시크릿, 토큰, 비밀번호)은 표시 전에 가려집니다.",
         "requestIdSection": "요청 ID"
       },
       "pageSizeLabel": "페이지당 행 수",
       "retention": {
-        "button": "보존 기간",
-        "title": "감사 로그 보존 기간",
-        "help": "보존 스위퍼가 삭제할 수 있게 되기 전까지 이 조직의 감사 이벤트를 보관하는 기간입니다.",
-        "fieldLabel": "감사 이벤트 보존 일수",
-        "range": "{min}일에서 {max}일 사이(약 7년)로 설정합니다.",
+        "button": "보관 기간",
+        "title": "감사 로그 보관 기간",
+        "help": "이 조직의 감사 이벤트를 정리 작업이 삭제할 수 있을 때까지 보관하는 기간입니다.",
+        "fieldLabel": "감사 이벤트 보관 기간(일)",
+        "range": "{min}일에서 {max}일까지(약 7년).",
         "cancel": "취소",
         "save": "저장",
         "saving": "저장 중…",
-        "toastSuccess": "보존 기간을 {days}일로 업데이트했습니다",
-        "toastFailure": "감사 로그 보존 기간을 업데이트하지 못했습니다"
-      }
+        "toastSuccess": "보관 기간을 {days}일로 업데이트했습니다",
+        "toastFailure": "감사 로그 보관 기간을 업데이트하지 못했습니다"
+      },
+      "searchPlaceholder": "작업, 수행자, 대상, 요청 ID 검색…",
+      "listFields": {
+        "actor": "수행자",
+        "action": "작업",
+        "target": "대상 유형",
+        "decision": "판정",
+        "since": "기간"
+      },
+      "decisions": {
+        "ALLOW": "허용",
+        "DENY": "거부",
+        "UNKNOWN": "알 수 없음"
+      },
+      "since": {
+        "1h": "지난 1시간",
+        "24h": "지난 24시간",
+        "7d": "지난 7일",
+        "30d": "지난 30일",
+        "90d": "지난 90일"
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 기록",
+        "denied": "거부됨"
+      },
+      "eventsCount": "{count, plural, one {이벤트 #개} other {이벤트 #개}}",
+      "retainedDays": "{days, plural, one {#일 보관} other {#일 보관}}",
+      "viewsLabel": "보기",
+      "feedLabel": "감사 이벤트",
+      "filteredTitle": "일치하는 감사 이벤트가 없습니다",
+      "filteredDescription": "필터를 해제하거나 검색어를 변경하여 더 많은 결과를 확인하세요."
     },
     "approval": {
       "quorum": {

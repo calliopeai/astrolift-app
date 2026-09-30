@@ -156,13 +156,13 @@ export function AuditLogScreen({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
       <ShellHeader
-        crumbs={adminCrumbs("audit", "Audit")}
+        crumbs={adminCrumbs("audit", t("title"))}
         title={t("title")}
         context={
           <span className="font-mono">
-            {totalCount != null ? `${totalCount.toLocaleString("en-US")} events` : null}
+            {totalCount != null ? t("eventsCount", { count: totalCount }) : null}
             {totalCount != null && retentionDays != null ? " · " : null}
-            {retentionDays != null ? `retained ${retentionDays} days` : null}
+            {retentionDays != null ? t("retainedDays", { days: retentionDays }) : null}
           </span>
         }
         primaryAction={
@@ -179,7 +179,7 @@ export function AuditLogScreen({
           href: list.viewHref(v.key),
           active: v.key === state.view,
         }))}
-        tabsAriaLabel="Views"
+        tabsAriaLabel={t("viewsLabel")}
       />
       {view?.note && (
         <p className="text-muted-foreground -mt-2 min-w-0 text-xs [overflow-wrap:anywhere]">
@@ -189,7 +189,7 @@ export function AuditLogScreen({
       <FilterBar list={list} columns={[]} cards={false} menu={exportMenu} />
 
       <Feed<AstroliftAuditEvent>
-        label="Audit events"
+        label={t("feedLabel")}
         {...events}
         keyOf={(row) => row.id}
         groupBy={{ day: (row) => row.occurredAt }}
@@ -199,8 +199,8 @@ export function AuditLogScreen({
           list.isFiltered
             ? {
                 icon: <ScrollTextIcon className="size-5" />,
-                title: "No audit events match",
-                description: "Remove a filter or change the search to see more.",
+                title: t("filteredTitle"),
+                description: t("filteredDescription"),
               }
             : {
                 icon: <ScrollTextIcon className="size-5" />,
@@ -223,6 +223,7 @@ export function AuditLogScreen({
  */
 function AuditLine({ row, onOpen }: { row: AstroliftAuditEvent; onOpen: () => void }) {
   const fmt = useFormatters();
+  const t = useTranslations("lists.audit");
   const style = decisionStyles[row.decision] ?? decisionStyles.UNKNOWN;
   return (
     <button
@@ -259,7 +260,7 @@ function AuditLine({ row, onOpen }: { row: AstroliftAuditEvent; onOpen: () => vo
         variant="secondary"
       >
         {style.icon}
-        {row.decision}
+        {t.has(`decisions.${row.decision}`) ? t(`decisions.${row.decision}`) : row.decision}
       </Badge>
     </button>
   );
@@ -377,7 +378,7 @@ function AuditDetailsSheet({
               <SheetTitle className="font-mono text-base">{row.action}</SheetTitle>
               <SheetDescription>
                 {fmt.formatDateTime(row.occurredAt)} · {row.actorDisplay || row.actorKind} ·{" "}
-                {row.decision}
+                {t.has(`decisions.${row.decision}`) ? t(`decisions.${row.decision}`) : row.decision}
               </SheetDescription>
             </SheetHeader>
 

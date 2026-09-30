@@ -1975,14 +1975,14 @@
       }
     },
     "audit": {
-      "title": "Journal d'audit",
-      "description": "Chaque décision d'autorisation et chaque mutation d'état, append-only. Isolement par locataire au niveau de la base de données.",
-      "retentionDescription": "Chaque décision d'autorisation et chaque mutation d'état, append-only. Conservé pendant {days} jours selon la politique de conformité.",
-      "loadMore": "Charger plus",
-      "emptyTitle": "Aucun événement d'audit ne correspond",
-      "emptyDescription": "Aucun événement d'audit ne correspond aux filtres actuels. Élargissez la plage de dates, effacez le filtre d'action ou attendez une nouvelle activité.",
+      "title": "Journal d’audit",
+      "description": "Toutes les décisions d’autorisation et opérations modifiant l’état sont ajoutées sans modifier les entrées précédentes. L’isolation par organisation est appliquée dans la base de données.",
+      "retentionDescription": "Toutes les décisions d’autorisation et opérations modifiant l’état sont ajoutées sans modifier les entrées précédentes. Conservation pendant {days} jours selon la politique de conformité.",
+      "loadMore": "Charger davantage",
+      "emptyTitle": "Aucun événement d’audit correspondant",
+      "emptyDescription": "Aucun événement d’audit ne correspond aux filtres. Élargissez la période, retirez le filtre d’action ou attendez de nouvelles activités.",
       "columns": {
-        "when": "Quand",
+        "when": "Date",
         "actor": "Acteur",
         "action": "Action",
         "target": "Cible",
@@ -1990,43 +1990,74 @@
       },
       "filters": {
         "actionLabel": "Action",
-        "actionPlaceholder": "ex. team.create",
+        "actionPlaceholder": "p. ex. team.create",
         "decisionLabel": "Décision",
         "anyDecision": "Toute décision",
-        "fromLabel": "De",
-        "toLabel": "À",
-        "totalCount": "{count} correspondance(s)"
+        "fromLabel": "Du",
+        "toLabel": "Au",
+        "totalCount": "{count} correspondances"
       },
       "export": {
         "button": "Exporter",
         "formatCsv": "Exporter en CSV",
         "formatNdjson": "Exporter en NDJSON",
-        "toastStart": "Préparation de l'export…",
-        "toastReady": "Export prêt · {rows} lignes",
+        "toastStart": "Préparation de l’export d’audit…",
+        "toastReady": "Export d’audit prêt · {rows} lignes",
         "toastDownload": "Télécharger",
-        "toastFailure": "Échec de l'export"
+        "toastFailure": "Échec de l’export d’audit"
       },
       "sheet": {
         "targetSection": "Cible",
         "beforeSection": "Avant",
         "afterSection": "Après",
-        "payloadSection": "Contexte de mutation",
-        "redactedNote": "Les valeurs sensibles (secrets, tokens, mots de passe) sont masquées avant affichage.",
+        "payloadSection": "Contexte de l’opération",
+        "redactedNote": "Les valeurs sensibles (secrets, jetons et mots de passe) sont masquées avant affichage.",
         "requestIdSection": "ID de requête"
       },
       "pageSizeLabel": "Lignes par page",
       "retention": {
-        "button": "Rétention",
-        "title": "Rétention des audits",
-        "help": "Durée de conservation des événements d'audit de cette organisation avant que le nettoyage de rétention puisse les supprimer.",
-        "fieldLabel": "Conserver les événements d'audit pendant (jours)",
+        "button": "Conservation",
+        "title": "Conservation de l’audit",
+        "help": "Durée de conservation des événements d’audit de cette organisation avant que le processus de nettoyage puisse les supprimer.",
+        "fieldLabel": "Conserver les événements d’audit pendant (jours)",
         "range": "Entre {min} et {max} jours (environ 7 ans).",
         "cancel": "Annuler",
         "save": "Enregistrer",
         "saving": "Enregistrement…",
-        "toastSuccess": "Rétention mise à jour à {days} jours",
-        "toastFailure": "Impossible de mettre à jour la rétention des audits"
-      }
+        "toastSuccess": "Conservation mise à jour à {days} jours",
+        "toastFailure": "Impossible de mettre à jour la conservation de l’audit"
+      },
+      "searchPlaceholder": "Rechercher des actions, acteurs, cibles, ID de requêtes…",
+      "listFields": {
+        "actor": "Acteur",
+        "action": "Action",
+        "target": "Type de cible",
+        "decision": "Décision",
+        "since": "Depuis"
+      },
+      "decisions": {
+        "ALLOW": "Autorisée",
+        "DENY": "Refusée",
+        "UNKNOWN": "Inconnue"
+      },
+      "since": {
+        "1h": "Dernière heure",
+        "24h": "Dernières 24 heures",
+        "7d": "7 derniers jours",
+        "30d": "30 derniers jours",
+        "90d": "90 derniers jours"
+      },
+      "views": {
+        "all": "Tous",
+        "mine": "Les miens",
+        "denied": "Refusés"
+      },
+      "eventsCount": "{count, plural, one {# événement} other {# événements}}",
+      "retainedDays": "conservation pendant {days, plural, one {# jour} other {# jours}}",
+      "viewsLabel": "Vues",
+      "feedLabel": "Événements d’audit",
+      "filteredTitle": "Aucun événement d’audit correspondant",
+      "filteredDescription": "Retirez un filtre ou modifiez la recherche pour voir plus de résultats."
     },
     "approval": {
       "quorum": {
