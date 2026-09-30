@@ -1900,6 +1900,105 @@
           "token": "Tokens",
           "alert": "Warnungen"
         }
+      },
+      "latestDeploy": {
+        "title": "Letzte Bereitstellung",
+        "open": "Öffnen",
+        "rollback": "Zurücksetzen",
+        "failed": "Bereitstellung fehlgeschlagen",
+        "noReason": "Kein Grund aufgezeichnet. Öffne die Bereitstellung für das vollständige Protokoll.",
+        "noLastGood": "Keine vorherige erfolgreiche Bereitstellung zum Zurücksetzen vorhanden.",
+        "emptyTitle": "Noch nicht bereitgestellt",
+        "emptyDescription": "Übertrage Code in den Bereitstellungsbranch oder stelle die Anwendung über die CLI bereit, um hier den Status zu sehen.",
+        "emptyAction": "Bereitstellungen öffnen",
+        "when": "Zeitpunkt",
+        "elapsed": "verstrichen",
+        "took": "Dauer",
+        "commit": "Commit",
+        "trigger": "Auslöser",
+        "all": "Alle Bereitstellungen",
+        "confirmTitle": "Auf {tag} zurücksetzen?",
+        "confirmDescription": "Startet eine neue Bereitstellung mit dem vorherigen Image und ersetzt die fehlgeschlagene.",
+        "status": {
+          "running": "Läuft",
+          "failed": "Fehlgeschlagen",
+          "rolled_back": "Zurückgesetzt",
+          "superseded": "Ersetzt",
+          "deploying": "Wird bereitgestellt",
+          "pending": "Ausstehend",
+          "pending_approval": "Genehmigung ausstehend",
+          "redeploying": "Wird erneut bereitgestellt"
+        }
+      },
+      "health": {
+        "title": "Zustand",
+        "up": "Erreichbar",
+        "down": "Nicht erreichbar",
+        "downReason": "Die letzte Prüfung ist fehlgeschlagen. {pct}% Verfügbarkeit in den letzten {hours} Std.",
+        "waiting": "Die Verfügbarkeitsüberwachung ist aktiv. Das erste Ergebnis erscheint in wenigen Minuten.",
+        "window": "Verfügbarkeit · letzte {hours} Std.",
+        "checked": "geprüft",
+        "latency": "Latenz",
+        "latencyAria": "Latenz der letzten Prüfungen"
+      },
+      "links": {
+        "title": "Öffnen",
+        "count": "{count, plural, one {# Bereitstellung} other {# Bereitstellungen}}",
+        "deployments": {
+          "title": "Bereitstellungen",
+          "description": "Letzte Bereitstellungen, laufende Aktualisierungen und Verlauf der Rücksetzungen."
+        },
+        "workloads": {
+          "title": "Arbeitslasten",
+          "description": "Was diese Anwendung ausführt: Dienste, Aufträge und verwaltete Dienste."
+        },
+        "logs": {
+          "title": "Protokolle und Metriken",
+          "description": "Protokolle, Metriken, Konsole und Befehle."
+        },
+        "domains": {
+          "title": "Domains",
+          "description": "Hostnamen, Zertifikate und benutzerdefinierte Domains."
+        },
+        "access": {
+          "title": "Zugriff",
+          "description": "Mitglieder, Tokens, Sicherheitsprüfungen und die Randregel."
+        },
+        "settings": {
+          "title": "Einstellungen",
+          "description": "Projekt, Bereitstellungsstrategie, Manifest, Webhooks und Teams."
+        }
+      },
+      "managedServices": {
+        "title": "Verwaltete Dienste",
+        "manage": "Verwalten",
+        "emptyTitle": "Keine verwalteten Dienste",
+        "emptyDescription": "Hier erscheinen Datenbanken, Caches, Warteschlangen und Speicherbereiche, die mit dieser Anwendung verbunden sind.",
+        "emptyAction": "Verwalteten Dienst hinzufügen"
+      },
+      "ownership": {
+        "title": "Teams und Projekt",
+        "manage": "Verwalten",
+        "project": "Projekt",
+        "noProject": "Keinem Projekt zugeordnet",
+        "homeTeam": "Hauptteam",
+        "noTeam": "Keines",
+        "granted": "Berechtigt",
+        "noGrants": "Kein anderes Team hat Zugriff"
+      },
+      "ci": {
+        "title": "CI-Einrichtung",
+        "manage": "Verwalten",
+        "workflow": "Workflow",
+        "webhook": "Webhook",
+        "secret": "Bereitstellungsgeheimnis",
+        "installed": "installiert {when}",
+        "notInstalled": "nicht installiert",
+        "unknown": "unbekannt",
+        "tokens": "Bereitstellungstokens",
+        "emptyTitle": "Kein Quellcode-Repository",
+        "emptyDescription": "Verbinde ein Repository, damit ein Code-Push diese Anwendung erstellen und bereitstellen kann.",
+        "emptyAction": "Einstellungen öffnen"
       }
     }
   },

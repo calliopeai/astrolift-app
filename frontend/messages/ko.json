@@ -1900,6 +1900,105 @@
           "token": "토큰",
           "alert": "알림"
         }
+      },
+      "latestDeploy": {
+        "title": "최근 배포",
+        "open": "열기",
+        "rollback": "롤백",
+        "failed": "배포 실패",
+        "noReason": "기록된 원인이 없습니다. 배포를 열어 전체 로그를 확인하세요.",
+        "noLastGood": "롤백할 이전 성공 배포가 없습니다.",
+        "emptyTitle": "아직 배포되지 않았습니다",
+        "emptyDescription": "배포 브랜치에 푸시하거나 CLI에서 배포하면 여기에 상태가 표시됩니다.",
+        "emptyAction": "배포 열기",
+        "when": "시간",
+        "elapsed": "경과",
+        "took": "소요 시간",
+        "commit": "커밋",
+        "trigger": "트리거",
+        "all": "모든 배포",
+        "confirmTitle": "{tag}로 롤백하시겠습니까?",
+        "confirmDescription": "이전 이미지를 사용하여 새 배포를 시작하고 실패한 배포를 대체합니다.",
+        "status": {
+          "running": "실행 중",
+          "failed": "실패",
+          "rolled_back": "롤백됨",
+          "superseded": "대체됨",
+          "deploying": "배포 중",
+          "pending": "대기 중",
+          "pending_approval": "승인 대기 중",
+          "redeploying": "다시 배포 중"
+        }
+      },
+      "health": {
+        "title": "상태",
+        "up": "정상",
+        "down": "중단",
+        "downReason": "마지막 검사가 실패했습니다. 지난 {hours}시간 동안 가동률은 {pct}%입니다.",
+        "waiting": "가동률 모니터링이 활성화되었습니다. 첫 결과는 몇 분 안에 표시됩니다.",
+        "window": "가동률 · 지난 {hours}시간",
+        "checked": "확인됨",
+        "latency": "지연 시간",
+        "latencyAria": "최근 검사의 지연 시간"
+      },
+      "links": {
+        "title": "바로가기",
+        "count": "{count, plural, one {배포 #개} other {배포 #개}}",
+        "deployments": {
+          "title": "배포",
+          "description": "최근 배포, 진행 중인 업데이트 및 롤백 기록입니다."
+        },
+        "workloads": {
+          "title": "워크로드",
+          "description": "이 앱이 실행하는 서비스, 작업 및 관리형 서비스입니다."
+        },
+        "logs": {
+          "title": "로그 및 지표",
+          "description": "로그, 지표, 콘솔 및 명령입니다."
+        },
+        "domains": {
+          "title": "도메인",
+          "description": "호스트 이름, 인증서 및 사용자 지정 도메인입니다."
+        },
+        "access": {
+          "title": "접근 권한",
+          "description": "구성원, 토큰, 보안 검사 및 경계 규칙입니다."
+        },
+        "settings": {
+          "title": "설정",
+          "description": "프로젝트, 배포 전략, 매니페스트, 웹훅 및 팀입니다."
+        }
+      },
+      "managedServices": {
+        "title": "관리형 서비스",
+        "manage": "관리",
+        "emptyTitle": "관리형 서비스가 없습니다",
+        "emptyDescription": "이 앱에 연결된 데이터베이스, 캐시, 큐 및 버킷이 여기에 표시됩니다.",
+        "emptyAction": "관리형 서비스 추가"
+      },
+      "ownership": {
+        "title": "팀 및 프로젝트",
+        "manage": "관리",
+        "project": "프로젝트",
+        "noProject": "프로젝트에 속하지 않음",
+        "homeTeam": "주 담당 팀",
+        "noTeam": "없음",
+        "granted": "권한 부여됨",
+        "noGrants": "다른 팀에는 접근 권한이 없습니다"
+      },
+      "ci": {
+        "title": "CI 설정",
+        "manage": "관리",
+        "workflow": "워크플로",
+        "webhook": "웹훅",
+        "secret": "배포 시크릿",
+        "installed": "{when}에 설치됨",
+        "notInstalled": "설치되지 않음",
+        "unknown": "알 수 없음",
+        "tokens": "배포 토큰",
+        "emptyTitle": "소스 저장소가 없습니다",
+        "emptyDescription": "저장소를 연결하면 푸시할 때 앱을 빌드하고 배포할 수 있습니다.",
+        "emptyAction": "설정 열기"
       }
     }
   },

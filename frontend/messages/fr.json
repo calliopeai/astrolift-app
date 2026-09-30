@@ -1900,6 +1900,105 @@
           "token": "Jetons",
           "alert": "Alertes"
         }
+      },
+      "latestDeploy": {
+        "title": "Dernier déploiement",
+        "open": "Ouvrir",
+        "rollback": "Rétablir",
+        "failed": "Échec du déploiement",
+        "noReason": "Aucune raison enregistrée. Ouvrez le déploiement pour consulter le journal complet.",
+        "noLastGood": "Aucun déploiement réussi antérieur à rétablir.",
+        "emptyTitle": "Pas encore déployé",
+        "emptyDescription": "Poussez vers la branche de déploiement ou déployez depuis la CLI pour voir l’état ici.",
+        "emptyAction": "Ouvrir les déploiements",
+        "when": "Date",
+        "elapsed": "temps écoulé",
+        "took": "durée",
+        "commit": "Commit",
+        "trigger": "Déclencheur",
+        "all": "Tous les déploiements",
+        "confirmTitle": "Rétablir {tag} ?",
+        "confirmDescription": "Lance un nouveau déploiement avec l’image précédente et remplace celui qui a échoué.",
+        "status": {
+          "running": "En cours",
+          "failed": "Échec",
+          "rolled_back": "Rétabli",
+          "superseded": "Remplacé",
+          "deploying": "Déploiement en cours",
+          "pending": "En attente",
+          "pending_approval": "En attente d’approbation",
+          "redeploying": "Redéploiement en cours"
+        }
+      },
+      "health": {
+        "title": "État",
+        "up": "Disponible",
+        "down": "Indisponible",
+        "downReason": "La dernière sonde a échoué. Disponibilité de {pct}% sur les {hours} dernières heures.",
+        "waiting": "La surveillance de disponibilité est active. Le premier résultat apparaîtra dans quelques minutes.",
+        "window": "disponibilité · {hours} dernières heures",
+        "checked": "vérifié",
+        "latency": "Latence",
+        "latencyAria": "Latence récente des sondes"
+      },
+      "links": {
+        "title": "Accéder à",
+        "count": "{count, plural, one {# déploiement} other {# déploiements}}",
+        "deployments": {
+          "title": "Déploiements",
+          "description": "Déploiements récents, mises à jour en cours et historique des retours arrière."
+        },
+        "workloads": {
+          "title": "Charges de travail",
+          "description": "Ce que cette application exécute : services, tâches et services gérés."
+        },
+        "logs": {
+          "title": "Journaux et métriques",
+          "description": "Journaux, métriques, console et commandes."
+        },
+        "domains": {
+          "title": "Domaines",
+          "description": "Noms d’hôte, certificats et domaines personnalisés."
+        },
+        "access": {
+          "title": "Accès",
+          "description": "Membres, jetons, analyses de sécurité et règle périphérique."
+        },
+        "settings": {
+          "title": "Paramètres",
+          "description": "Projet, stratégie de déploiement, manifeste, webhooks et équipes."
+        }
+      },
+      "managedServices": {
+        "title": "Services gérés",
+        "manage": "Gérer",
+        "emptyTitle": "Aucun service géré",
+        "emptyDescription": "Les bases de données, caches, files et espaces de stockage liés à cette application apparaissent ici.",
+        "emptyAction": "Ajouter un service géré"
+      },
+      "ownership": {
+        "title": "Équipes et projet",
+        "manage": "Gérer",
+        "project": "Projet",
+        "noProject": "Aucun projet",
+        "homeTeam": "Équipe principale",
+        "noTeam": "Aucune",
+        "granted": "Autorisées",
+        "noGrants": "Aucune autre équipe n’a accès"
+      },
+      "ci": {
+        "title": "Configuration CI",
+        "manage": "Gérer",
+        "workflow": "Workflow",
+        "webhook": "Webhook",
+        "secret": "Secret de déploiement",
+        "installed": "installé {when}",
+        "notInstalled": "non installé",
+        "unknown": "inconnu",
+        "tokens": "Jetons de déploiement",
+        "emptyTitle": "Aucun dépôt source",
+        "emptyDescription": "Connectez un dépôt pour compiler et déployer cette application à chaque envoi de code.",
+        "emptyAction": "Ouvrir les paramètres"
       }
     }
   },

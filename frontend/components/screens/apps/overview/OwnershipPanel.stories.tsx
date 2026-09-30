@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import french from "@/messages/fr.json";
 
 import { OWNERSHIP, OWNERSHIP_LONG } from "./app-overview-panels.fixtures";
 import { OwnershipPanel } from "./OwnershipPanel";
@@ -31,5 +33,16 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <OwnershipPanel {...args} />
     </div>
+  ),
+};
+
+export const FrenchWidth768: Story = {
+  args: { projectName: "", teamName: "", accesses: [] },
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <div style={{ width: 768 }}>
+        <OwnershipPanel {...args} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

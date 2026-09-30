@@ -1900,6 +1900,105 @@
           "token": "Tokens",
           "alert": "Alertas"
         }
+      },
+      "latestDeploy": {
+        "title": "Último despliegue",
+        "open": "Abrir",
+        "rollback": "Revertir",
+        "failed": "El despliegue falló",
+        "noReason": "No se registró ningún motivo. Abre el despliegue para ver el registro completo.",
+        "noLastGood": "No hay un despliegue anterior exitoso al que volver.",
+        "emptyTitle": "Aún no se ha desplegado",
+        "emptyDescription": "Publica en la rama de despliegue o despliega desde la CLI para ver el estado aquí.",
+        "emptyAction": "Abrir despliegues",
+        "when": "Fecha",
+        "elapsed": "transcurrido",
+        "took": "duración",
+        "commit": "Commit",
+        "trigger": "Activador",
+        "all": "Todos los despliegues",
+        "confirmTitle": "¿Revertir a {tag}?",
+        "confirmDescription": "Inicia un despliegue con la imagen anterior y sustituye el que falló.",
+        "status": {
+          "running": "En ejecución",
+          "failed": "Falló",
+          "rolled_back": "Revertido",
+          "superseded": "Sustituido",
+          "deploying": "Desplegando",
+          "pending": "Pendiente",
+          "pending_approval": "Esperando aprobación",
+          "redeploying": "Volviendo a desplegar"
+        }
+      },
+      "health": {
+        "title": "Estado",
+        "up": "Disponible",
+        "down": "No disponible",
+        "downReason": "La última comprobación falló. Disponibilidad del {pct}% durante las últimas {hours} h.",
+        "waiting": "La supervisión de disponibilidad está activa. El primer resultado aparecerá en unos minutos.",
+        "window": "disponibilidad · últimas {hours} h",
+        "checked": "comprobado",
+        "latency": "Latencia",
+        "latencyAria": "Latencia reciente de las comprobaciones"
+      },
+      "links": {
+        "title": "Ir a",
+        "count": "{count, plural, one {# despliegue} other {# despliegues}}",
+        "deployments": {
+          "title": "Despliegues",
+          "description": "Despliegues recientes, actualizaciones en curso e historial de reversiones."
+        },
+        "workloads": {
+          "title": "Cargas de trabajo",
+          "description": "Lo que ejecuta esta aplicación: servicios, trabajos y servicios gestionados."
+        },
+        "logs": {
+          "title": "Registros y métricas",
+          "description": "Registros, métricas, consola y comandos."
+        },
+        "domains": {
+          "title": "Dominios",
+          "description": "Nombres de host, certificados y dominios personalizados."
+        },
+        "access": {
+          "title": "Acceso",
+          "description": "Miembros, tokens, análisis de seguridad y regla perimetral."
+        },
+        "settings": {
+          "title": "Configuración",
+          "description": "Proyecto, estrategia de despliegue, manifiesto, webhooks y equipos."
+        }
+      },
+      "managedServices": {
+        "title": "Servicios gestionados",
+        "manage": "Gestionar",
+        "emptyTitle": "No hay servicios gestionados",
+        "emptyDescription": "Aquí aparecen las bases de datos, cachés, colas y depósitos vinculados a esta aplicación.",
+        "emptyAction": "Añadir un servicio gestionado"
+      },
+      "ownership": {
+        "title": "Equipos y proyecto",
+        "manage": "Gestionar",
+        "project": "Proyecto",
+        "noProject": "No pertenece a un proyecto",
+        "homeTeam": "Equipo principal",
+        "noTeam": "Ninguno",
+        "granted": "Con acceso",
+        "noGrants": "Ningún otro equipo tiene acceso"
+      },
+      "ci": {
+        "title": "Configuración de CI",
+        "manage": "Gestionar",
+        "workflow": "Flujo de trabajo",
+        "webhook": "Webhook",
+        "secret": "Secreto de despliegue",
+        "installed": "instalado {when}",
+        "notInstalled": "no instalado",
+        "unknown": "desconocido",
+        "tokens": "Tokens de despliegue",
+        "emptyTitle": "No hay repositorio de código",
+        "emptyDescription": "Conecta un repositorio para compilar y desplegar esta aplicación al publicar cambios.",
+        "emptyAction": "Abrir configuración"
       }
     }
   },

@@ -1900,6 +1900,105 @@
           "token": "Tokens",
           "alert": "Alertas"
         }
+      },
+      "latestDeploy": {
+        "title": "Última implantação",
+        "open": "Abrir",
+        "rollback": "Reverter",
+        "failed": "Falha na implantação",
+        "noReason": "Nenhum motivo registrado. Abra a implantação para ver o log completo.",
+        "noLastGood": "Não há implantação anterior bem-sucedida para reverter.",
+        "emptyTitle": "Ainda não foi implantado",
+        "emptyDescription": "Envie código para a branch de implantação ou implante pela CLI para ver o status aqui.",
+        "emptyAction": "Abrir implantações",
+        "when": "Data",
+        "elapsed": "decorrido",
+        "took": "duração",
+        "commit": "Commit",
+        "trigger": "Gatilho",
+        "all": "Todas as implantações",
+        "confirmTitle": "Reverter para {tag}?",
+        "confirmDescription": "Inicia uma nova implantação com a imagem anterior e substitui a que falhou.",
+        "status": {
+          "running": "Em execução",
+          "failed": "Falhou",
+          "rolled_back": "Revertida",
+          "superseded": "Substituída",
+          "deploying": "Implantando",
+          "pending": "Pendente",
+          "pending_approval": "Aguardando aprovação",
+          "redeploying": "Implantando novamente"
+        }
+      },
+      "health": {
+        "title": "Integridade",
+        "up": "Disponível",
+        "down": "Indisponível",
+        "downReason": "A última verificação falhou. Disponibilidade de {pct}% nas últimas {hours} h.",
+        "waiting": "O monitoramento de disponibilidade está ativo. O primeiro resultado aparece em alguns minutos.",
+        "window": "disponibilidade · últimas {hours} h",
+        "checked": "verificado",
+        "latency": "Latência",
+        "latencyAria": "Latência das verificações recentes"
+      },
+      "links": {
+        "title": "Ir para",
+        "count": "{count, plural, one {# implantação} other {# implantações}}",
+        "deployments": {
+          "title": "Implantações",
+          "description": "Implantações recentes, atualizações em andamento e histórico de reversões."
+        },
+        "workloads": {
+          "title": "Cargas de trabalho",
+          "description": "O que este aplicativo executa: serviços, tarefas e serviços gerenciados."
+        },
+        "logs": {
+          "title": "Logs e métricas",
+          "description": "Logs, métricas, console e comandos."
+        },
+        "domains": {
+          "title": "Domínios",
+          "description": "Nomes de host, certificados e domínios personalizados."
+        },
+        "access": {
+          "title": "Acesso",
+          "description": "Membros, tokens, verificações de segurança e regra de borda."
+        },
+        "settings": {
+          "title": "Configurações",
+          "description": "Projeto, estratégia de implantação, manifesto, webhooks e equipes."
+        }
+      },
+      "managedServices": {
+        "title": "Serviços gerenciados",
+        "manage": "Gerenciar",
+        "emptyTitle": "Nenhum serviço gerenciado",
+        "emptyDescription": "Bancos de dados, caches, filas e buckets vinculados a este aplicativo aparecem aqui.",
+        "emptyAction": "Adicionar serviço gerenciado"
+      },
+      "ownership": {
+        "title": "Equipes e projeto",
+        "manage": "Gerenciar",
+        "project": "Projeto",
+        "noProject": "Não pertence a um projeto",
+        "homeTeam": "Equipe principal",
+        "noTeam": "Nenhuma",
+        "granted": "Com acesso",
+        "noGrants": "Nenhuma outra equipe tem acesso"
+      },
+      "ci": {
+        "title": "Configuração de CI",
+        "manage": "Gerenciar",
+        "workflow": "Workflow",
+        "webhook": "Webhook",
+        "secret": "Segredo de implantação",
+        "installed": "instalado {when}",
+        "notInstalled": "não instalado",
+        "unknown": "desconhecido",
+        "tokens": "Tokens de implantação",
+        "emptyTitle": "Nenhum repositório de código",
+        "emptyDescription": "Conecte um repositório para compilar e implantar este aplicativo ao enviar código.",
+        "emptyAction": "Abrir configurações"
       }
     }
   },

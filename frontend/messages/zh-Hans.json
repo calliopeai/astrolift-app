@@ -1900,6 +1900,105 @@
           "token": "令牌",
           "alert": "告警"
         }
+      },
+      "latestDeploy": {
+        "title": "最近部署",
+        "open": "打开",
+        "rollback": "回滚",
+        "failed": "部署失败",
+        "noReason": "未记录原因。打开部署以查看完整日志。",
+        "noLastGood": "没有可回滚的早期成功部署。",
+        "emptyTitle": "尚未部署",
+        "emptyDescription": "推送到部署分支或从 CLI 部署，即可在此查看状态。",
+        "emptyAction": "打开部署",
+        "when": "时间",
+        "elapsed": "已用时间",
+        "took": "耗时",
+        "commit": "提交",
+        "trigger": "触发器",
+        "all": "所有部署",
+        "confirmTitle": "回滚到 {tag}？",
+        "confirmDescription": "使用之前的镜像启动新部署，并替换失败的部署。",
+        "status": {
+          "running": "运行中",
+          "failed": "失败",
+          "rolled_back": "已回滚",
+          "superseded": "已替换",
+          "deploying": "正在部署",
+          "pending": "待处理",
+          "pending_approval": "等待审批",
+          "redeploying": "正在重新部署"
+        }
+      },
+      "health": {
+        "title": "健康状态",
+        "up": "正常",
+        "down": "不可用",
+        "downReason": "最后一次探测失败。最近 {hours} 小时的可用率为 {pct}%。",
+        "waiting": "可用率监控已启用，首个结果将在几分钟内显示。",
+        "window": "可用率 · 最近 {hours} 小时",
+        "checked": "已检查",
+        "latency": "延迟",
+        "latencyAria": "近期探测延迟"
+      },
+      "links": {
+        "title": "前往",
+        "count": "{count, plural, one {# 次部署} other {# 次部署}}",
+        "deployments": {
+          "title": "部署",
+          "description": "最近部署、进行中的更新和回滚历史。"
+        },
+        "workloads": {
+          "title": "工作负载",
+          "description": "此应用运行的服务、任务和托管服务。"
+        },
+        "logs": {
+          "title": "日志和指标",
+          "description": "日志、指标、控制台和命令。"
+        },
+        "domains": {
+          "title": "域名",
+          "description": "主机名、证书和自定义域名。"
+        },
+        "access": {
+          "title": "访问权限",
+          "description": "成员、令牌、安全扫描和边缘规则。"
+        },
+        "settings": {
+          "title": "设置",
+          "description": "项目、部署策略、清单、Webhook 和团队。"
+        }
+      },
+      "managedServices": {
+        "title": "托管服务",
+        "manage": "管理",
+        "emptyTitle": "没有托管服务",
+        "emptyDescription": "此应用绑定的数据库、缓存、队列和存储桶将显示在此处。",
+        "emptyAction": "添加托管服务"
+      },
+      "ownership": {
+        "title": "团队和项目",
+        "manage": "管理",
+        "project": "项目",
+        "noProject": "不属于任何项目",
+        "homeTeam": "主要团队",
+        "noTeam": "无",
+        "granted": "已授权",
+        "noGrants": "没有其他团队拥有访问权限"
+      },
+      "ci": {
+        "title": "CI 设置",
+        "manage": "管理",
+        "workflow": "工作流",
+        "webhook": "Webhook",
+        "secret": "部署密钥",
+        "installed": "于 {when} 安装",
+        "notInstalled": "未安装",
+        "unknown": "未知",
+        "tokens": "部署令牌",
+        "emptyTitle": "没有源代码仓库",
+        "emptyDescription": "连接仓库，使代码推送可以构建并部署此应用。",
+        "emptyAction": "打开设置"
       }
     }
   },

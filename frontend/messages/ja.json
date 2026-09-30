@@ -1900,6 +1900,105 @@
           "token": "トークン",
           "alert": "アラート"
         }
+      },
+      "latestDeploy": {
+        "title": "最新のデプロイ",
+        "open": "開く",
+        "rollback": "ロールバック",
+        "failed": "デプロイに失敗しました",
+        "noReason": "理由は記録されていません。デプロイを開くとログ全体を確認できます。",
+        "noLastGood": "ロールバックできる過去の成功したデプロイがありません。",
+        "emptyTitle": "まだデプロイされていません",
+        "emptyDescription": "デプロイ用ブランチへプッシュするかCLIからデプロイすると、ここに状態が表示されます。",
+        "emptyAction": "デプロイを開く",
+        "when": "日時",
+        "elapsed": "経過",
+        "took": "所要時間",
+        "commit": "コミット",
+        "trigger": "トリガー",
+        "all": "すべてのデプロイ",
+        "confirmTitle": "{tag}にロールバックしますか？",
+        "confirmDescription": "以前のイメージを使って新しいデプロイを開始し、失敗したデプロイを置き換えます。",
+        "status": {
+          "running": "実行中",
+          "failed": "失敗",
+          "rolled_back": "ロールバック済み",
+          "superseded": "置き換え済み",
+          "deploying": "デプロイ中",
+          "pending": "待機中",
+          "pending_approval": "承認待ち",
+          "redeploying": "再デプロイ中"
+        }
+      },
+      "health": {
+        "title": "稼働状態",
+        "up": "稼働中",
+        "down": "停止中",
+        "downReason": "最後のチェックに失敗しました。過去{hours}時間の稼働率は{pct}%です。",
+        "waiting": "稼働監視は有効です。最初の結果は数分以内に表示されます。",
+        "window": "稼働率 · 過去{hours}時間",
+        "checked": "確認済み",
+        "latency": "レイテンシ",
+        "latencyAria": "最近のチェックのレイテンシ"
+      },
+      "links": {
+        "title": "移動先",
+        "count": "{count, plural, one {#件のデプロイ} other {#件のデプロイ}}",
+        "deployments": {
+          "title": "デプロイ",
+          "description": "最近のデプロイ、進行中の更新、ロールバック履歴。"
+        },
+        "workloads": {
+          "title": "ワークロード",
+          "description": "このアプリが実行するサービス、ジョブ、マネージドサービス。"
+        },
+        "logs": {
+          "title": "ログとメトリクス",
+          "description": "ログ、メトリクス、コンソール、コマンド。"
+        },
+        "domains": {
+          "title": "ドメイン",
+          "description": "ホスト名、証明書、カスタムドメイン。"
+        },
+        "access": {
+          "title": "アクセス",
+          "description": "メンバー、トークン、セキュリティスキャン、エッジルール。"
+        },
+        "settings": {
+          "title": "設定",
+          "description": "プロジェクト、デプロイ戦略、マニフェスト、Webhook、チーム。"
+        }
+      },
+      "managedServices": {
+        "title": "マネージドサービス",
+        "manage": "管理",
+        "emptyTitle": "マネージドサービスがありません",
+        "emptyDescription": "このアプリに接続されたデータベース、キャッシュ、キュー、バケットがここに表示されます。",
+        "emptyAction": "マネージドサービスを追加"
+      },
+      "ownership": {
+        "title": "チームとプロジェクト",
+        "manage": "管理",
+        "project": "プロジェクト",
+        "noProject": "プロジェクトに所属していません",
+        "homeTeam": "主担当チーム",
+        "noTeam": "なし",
+        "granted": "アクセス許可済み",
+        "noGrants": "ほかのチームにはアクセス権がありません"
+      },
+      "ci": {
+        "title": "CI設定",
+        "manage": "管理",
+        "workflow": "ワークフロー",
+        "webhook": "Webhook",
+        "secret": "デプロイ用シークレット",
+        "installed": "{when}にインストール",
+        "notInstalled": "未インストール",
+        "unknown": "不明",
+        "tokens": "デプロイトークン",
+        "emptyTitle": "ソースリポジトリがありません",
+        "emptyDescription": "リポジトリを接続すると、プッシュ時にこのアプリをビルドしてデプロイできます。",
+        "emptyAction": "設定を開く"
       }
     }
   },
