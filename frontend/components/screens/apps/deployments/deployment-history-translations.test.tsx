@@ -124,6 +124,11 @@ describe("translated app deployment history", () => {
       });
       const values = {
         name: "checkout-api",
+        action: "ACTION",
+        status: "STATUS",
+        env: "prod",
+        tag: "sha-123",
+        app: "checkout-api",
         slug: "checkout-api",
         filtered: 2,
         total: 8,

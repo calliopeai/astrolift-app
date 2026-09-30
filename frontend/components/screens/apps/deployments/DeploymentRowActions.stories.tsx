@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -119,5 +122,34 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <Menu deployment={DEPLOY_LONG} />
     </div>
+  ),
+};
+
+export const FrenchAbortWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <div style={{ width: 768 }}>
+        <DeploymentActionDialog
+          target={{ kind: "abort", deployment: DEPLOY_DEPLOYING }}
+          appSlug="storefront"
+          onClose={() => {}}
+          actions={ACTIONS}
+        />
+      </div>
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseRedeployWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <div style={{ width: 768 }}>
+        <DeploymentActionDialog
+          target={{ kind: "redeploy", deployment: { ...DEPLOY_LONG, status: "running" } }}
+          appSlug={LONG}
+          onClose={() => {}}
+          actions={ACTIONS}
+        />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

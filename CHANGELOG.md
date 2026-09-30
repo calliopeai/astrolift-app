@@ -36,6 +36,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Deployment action menus, reasons, target warnings and outcomes use all eight
+  locales. Missing mutation responses now reject confirmations; pending requests
+  block resubmission and failures retain the entered reason for retry (#2145).
+
 - App deployment history, views, filters and comparison sheets use all eight
   locales. Compare still requires two actual deployments in chronological order;
   source links, manifest paths and values remain intact (#2145).
