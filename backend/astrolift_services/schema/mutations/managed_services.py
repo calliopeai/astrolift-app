@@ -9,6 +9,7 @@ from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_agents.models import AgentEnvironmentSpec
+from astrolift_agents.scopes import agent_env_spec_scope
 from astrolift_clusters import agent_test_jobs
 from astrolift_clusters.heartbeat_status import is_live as cluster_agent_is_live
 from astrolift_clusters.heartbeat_status import resolve as resolve_heartbeat_status
@@ -19,15 +20,15 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
 from astrolift_identity.operation_context import (
+    agent_region_operation,
+    environment_operation,
     managed_service_operation,
     named_environment,
     project_service_creation_operation,
 )
-from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp, Workload
-from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models import (
     ManagedService,
     ManagedServiceAttachment,
@@ -60,11 +61,63 @@ from astrolift_services.schema.types import (
     managed_service_attachment_to_type,
     managed_service_to_type,
 )
-from astrolift_services.scopes import managed_service_scope_by_guid
+from astrolift_services.scopes import (
+    _app_scope_via,
+    managed_service_attachment_scope,
+    managed_service_scope_by_guid,
+)
+from astrolift_services.scopes import services_app_scope_by_slug as app_scope_by_slug
+from astrolift_services.scopes import services_project_scope_by_guid as project_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+@require_permission(
+    Permission.PROJECT_UPDATE,
+    scope=_app_scope_via(
+        "astrolift_lifecycle.AppEnvironment", "app_environment_id", permissions=(Permission.PROJECT_UPDATE,)
+    ),
+    operation=environment_operation("app_environment_id"),
+)
+def _authorize_app_consumer(app_environment_id):
+    return None
+
+
+@require_permission(
+    Permission.PROJECT_UPDATE,
+    scope=agent_env_spec_scope("spec_slug", Permission.PROJECT_UPDATE),
+    operation=agent_region_operation,
+)
+def _authorize_agent_consumer(spec_slug):
+    return None
+
+
+def _creation_operation(args):
+    from core.scope_args import read_arg
+
+    normalized = {
+        "project_id": read_arg(args, "input.project_id"),
+        "cluster_id": read_arg(args, "input.cluster_id"),
+        "environment_name": str(read_arg(args, "input.environment_name") or "production").strip(),
+    }
+    return project_service_creation_operation({"input": normalized})
+
+
+def _attachment_operation(args):
+    from core.scope_args import read_guid
+
+    service = (
+        ManagedServiceAttachment.objects.filter(
+            guid=read_guid(args, "input.attachment_id"),
+            managed_service__project__organization_id=_caller_org_id(),
+        )
+        .values_list("managed_service__guid", flat=True)
+        .first()
+    )
+    return managed_service_operation("service_id")({"service_id": str(service)})
+
 
 # Columns an accepted in-place update writes. Both update mutations save with
 # this scope rather than a bare ``save()``: the row is only locked against
@@ -266,8 +319,8 @@ class ManagedServiceMutations:
     @mutation_audit(action="project.managed_service.provision")
     @require_permission(
         Permission.PROJECT_UPDATE,
-        scope=project_scope_by_guid("input.project_id"),
-        operation=project_service_creation_operation,
+        scope=project_scope_by_guid("input.project_id", permissions=(Permission.PROJECT_UPDATE,)),
+        operation=_creation_operation,
     )
     @tenant_scoped()
     def provision_project_managed_service(
@@ -404,6 +457,11 @@ class ManagedServiceMutations:
                 field="appEnvironmentIds",
             )
 
+        for spec in agent_specs:
+            _authorize_agent_consumer(spec.slug)
+        for env in app_envs:
+            _authorize_app_consumer(str(env.guid))
+
         svc = ManagedService.objects.create(
             project=project,
             tenant_cluster=cluster,
@@ -433,7 +491,9 @@ class ManagedServiceMutations:
     @mutation_audit(action="project.managed_service.attach")
     @require_permission(
         Permission.PROJECT_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id", permissions=(Permission.PROJECT_UPDATE,)
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -488,6 +548,7 @@ class ManagedServiceMutations:
                     ErrorCode.PRECONDITION.value,
                     "agent runtime cluster does not match the managed service cluster",
                 )
+            _authorize_agent_consumer(spec.slug)
             row, _created = ManagedServiceAttachment.objects.get_or_create(
                 managed_service=svc,
                 agent_environment_spec=spec,
@@ -502,6 +563,7 @@ class ManagedServiceMutations:
             ).first()
             if env is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "app environment not found")
+            _authorize_app_consumer(str(env.guid))
             row, _created = ManagedServiceAttachment.objects.get_or_create(
                 managed_service=svc,
                 app_environment=env,
@@ -510,7 +572,11 @@ class ManagedServiceMutations:
 
     @strawberry.field
     @mutation_audit(action="project.managed_service.detach")
-    @require_permission(Permission.PROJECT_UPDATE)
+    @require_permission(
+        Permission.PROJECT_UPDATE,
+        scope=managed_service_attachment_scope(permissions=(Permission.PROJECT_UPDATE,)),
+        operation=_attachment_operation,
+    )
     @tenant_scoped()
     def detach_project_managed_service(
         self,
@@ -532,6 +598,10 @@ class ManagedServiceMutations:
         row = rows.first()
         if row is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "attachment not found")
+        if row.app_environment_id:
+            _authorize_app_consumer(str(row.app_environment.guid))
+        else:
+            _authorize_agent_consumer(row.agent_environment_spec.slug)
         payload = managed_service_attachment_to_type(row)
         row.soft_delete()
         return gql_success(payload)
@@ -540,7 +610,7 @@ class ManagedServiceMutations:
     @mutation_audit(action="project.managed_service.update")
     @require_permission(
         Permission.PROJECT_UPDATE,
-        scope=managed_service_scope_by_guid("input.id"),
+        scope=managed_service_scope_by_guid("input.id", permissions=(Permission.PROJECT_UPDATE,)),
         operation=managed_service_operation("input.id"),
     )
     @tenant_scoped()
@@ -625,7 +695,9 @@ class ManagedServiceMutations:
     @mutation_audit(action="project.managed_service.reprovision")
     @require_permission(
         Permission.PROJECT_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id", permissions=(Permission.PROJECT_UPDATE,)
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -655,7 +727,7 @@ class ManagedServiceMutations:
     @requires_elevation(action_label="project.managed_service.deprovision")
     @require_permission(
         Permission.PROJECT_UPDATE,
-        scope=managed_service_scope_by_guid("input.id"),
+        scope=managed_service_scope_by_guid("input.id", permissions=(Permission.PROJECT_UPDATE,)),
         operation=managed_service_operation("input.id"),
     )
     @tenant_scoped()
@@ -680,7 +752,9 @@ class ManagedServiceMutations:
     @strawberry.field
     @mutation_audit(action="managed_service.provision")
     @require_permission(
-        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("input.app_slug", permissions=(Permission.APP_UPDATE,)),
+        operation=named_environment(),
     )
     @tenant_scoped()
     def provision_managed_service(
@@ -801,7 +875,7 @@ class ManagedServiceMutations:
     @mutation_audit(action="managed_service.update")
     @require_permission(
         Permission.APP_UPDATE,
-        scope=managed_service_scope_by_guid("input.id"),
+        scope=managed_service_scope_by_guid("input.id", permissions=(Permission.APP_UPDATE,)),
         operation=managed_service_operation("input.id"),
     )
     @tenant_scoped()
@@ -901,7 +975,7 @@ class ManagedServiceMutations:
     @mutation_audit(action="managed_service.reprovision")
     @require_permission(
         Permission.APP_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid("input.managed_service_id", permissions=(Permission.APP_UPDATE,)),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -987,7 +1061,7 @@ class ManagedServiceMutations:
     @mutation_audit(action="managed_service.deprovision")
     @require_permission(
         Permission.APP_UPDATE,
-        scope=managed_service_scope_by_guid("input.id"),
+        scope=managed_service_scope_by_guid("input.id", permissions=(Permission.APP_UPDATE,)),
         operation=managed_service_operation("input.id"),
     )
     @tenant_scoped()
@@ -1071,7 +1145,7 @@ class ManagedServiceMutations:
     @requires_elevation(action_label="managed_service.resource.adopt")
     @require_permission(
         Permission.MANAGED_SERVICE_ADOPT,
-        scope=managed_service_scope_by_guid("input.id"),
+        scope=managed_service_scope_by_guid("input.id", permissions=(Permission.MANAGED_SERVICE_ADOPT,)),
         operation=managed_service_operation("input.id"),
     )
     @tenant_scoped()
@@ -1192,7 +1266,13 @@ class ManagedServiceMutations:
     @require_permission(
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_READ,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -1338,7 +1418,7 @@ class ManagedServiceMutations:
     )
     @require_permission(
         Permission.APP_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid("input.managed_service_id", permissions=(Permission.APP_UPDATE,)),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()

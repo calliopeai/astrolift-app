@@ -39,6 +39,11 @@ from astrolift_identity.api_tokens import (
     SCOPE_MCP_WRITE,
     has_scope,
 )
+from astrolift_services.scopes import (
+    managed_service_attachment_scope,
+    managed_service_scope_by_guid,
+    services_project_scope_by_guid,
+)
 from core.permissions import (
     Permission,
     PermissionDenied,
@@ -89,6 +94,36 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_cancel_task": agent_task_scope("task_id", Permission.AGENT_DISPATCH),
     "astrolift_sync_agent_repo": agent_project_scope("project_id"),
     "astrolift_import_agent_spec": agent_project_scope("project_id"),
+    "astrolift_list_project_resource_clusters": services_project_scope_by_guid(
+        permissions=(Permission.PROJECT_READ,)
+    ),
+    "astrolift_list_project_resource_catalog": services_project_scope_by_guid(
+        permissions=(Permission.PROJECT_READ,)
+    ),
+    "astrolift_list_project_resources": services_project_scope_by_guid(
+        permissions=(Permission.PROJECT_READ,)
+    ),
+    "astrolift_provision_project_resource": services_project_scope_by_guid(
+        permissions=(Permission.PROJECT_UPDATE,)
+    ),
+    "astrolift_preview_project_resource_cost": managed_service_scope_by_guid(
+        permissions=(Permission.PROJECT_READ,)
+    ),
+    "astrolift_attach_project_resource": managed_service_scope_by_guid(
+        permissions=(Permission.PROJECT_UPDATE,)
+    ),
+    "astrolift_update_project_resource": managed_service_scope_by_guid(
+        permissions=(Permission.PROJECT_UPDATE,)
+    ),
+    "astrolift_reprovision_project_resource": managed_service_scope_by_guid(
+        permissions=(Permission.PROJECT_UPDATE,)
+    ),
+    "astrolift_deprovision_project_resource": managed_service_scope_by_guid(
+        permissions=(Permission.PROJECT_UPDATE,)
+    ),
+    "astrolift_detach_project_resource": managed_service_attachment_scope(
+        "attachment_id", permissions=(Permission.PROJECT_UPDATE,)
+    ),
 }
 
 
@@ -99,6 +134,34 @@ def _operation_for_tool(name: str, args: dict[str, Any]):
         return agent_task_operation("task_id")(args)[0]
     if name in {"astrolift_get_agent", "astrolift_run_agent"}:
         return agent_region_operation(args)[0]
+    if name == "astrolift_provision_project_resource":
+        from astrolift_services.schema.mutations.managed_services import _creation_operation
+
+        return _creation_operation({"input": args})[0]
+    if name in {
+        "astrolift_preview_project_resource_cost",
+        "astrolift_attach_project_resource",
+        "astrolift_update_project_resource",
+        "astrolift_reprovision_project_resource",
+        "astrolift_deprovision_project_resource",
+    }:
+        from astrolift_identity.operation_context import managed_service_operation
+
+        return managed_service_operation("managed_service_id")(args)[0]
+    if name == "astrolift_detach_project_resource":
+        from astrolift_identity.operation_context import managed_service_operation
+        from astrolift_services.models import ManagedServiceAttachment
+        from core.scope_args import read_guid
+
+        service = (
+            ManagedServiceAttachment.objects.filter(
+                guid=read_guid(args, "attachment_id"),
+                managed_service__project__organization_id=_org_id(),
+            )
+            .values_list("managed_service__guid", flat=True)
+            .first()
+        )
+        return managed_service_operation("managed_service_id")({"managed_service_id": str(service)})[0]
     return None
 
 
@@ -1025,11 +1088,15 @@ def _tool_call(request: HttpRequest, params: dict[str, Any]) -> dict[str, Any]:
         operation = _operation_for_tool(name, args)
         with operation_attributes(**(operation.attributes() if operation is not None else {})):
             declared = TOOL_SCOPES.get(name)
+            try:
+                permission_scope = declared(args) if callable(declared) else None
+            except PermissionDenied as exc:
+                raise McpCallError(exc.reason, code="permission_denied") from exc
             _authorize(
                 request,
                 scopes,
                 *(p for p in permissions if p is not None),
-                permission_scope=declared(args) if callable(declared) else None,
+                permission_scope=permission_scope,
                 any_scope=declared == ANY_SCOPE,
             )
             payload = handler(request, args)

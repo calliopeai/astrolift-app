@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Managed-resource gates resolve live app, project, team or organization owners
+  and preserve bearer ceilings across GraphQL and all ten project-resource MCP
+  tools (#2106). Collections filter before limits and counts; attachments check
+  destination ownership and persisted environment facts before any writes.
+  Missing or stale targets require explicit organization authority.
+
 - Pipeline creation requires `app.update` at the active organization (#2115).
   The existing creation input has no app association, so team/project/app
   grants and team-bound bearer credentials cannot authorize this organization

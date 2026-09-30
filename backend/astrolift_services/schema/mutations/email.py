@@ -58,7 +58,13 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -240,7 +246,13 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -371,7 +383,13 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -477,7 +495,13 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -608,7 +632,13 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
@@ -734,7 +764,13 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()

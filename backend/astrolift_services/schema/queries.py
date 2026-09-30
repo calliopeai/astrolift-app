@@ -28,12 +28,10 @@ from astrolift_identity.operation_context import (
     secret_proposal_operation,
 )
 from astrolift_identity.operation_visibility import require_app_collection_scope, visible_operation_rows
-from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_manifest.env_injection import envelope_keys_for
 from astrolift_registry.models import RegisteredApp
-from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models import (
     AppSecretBundleRef,
     AppSecretMetadata,
@@ -78,12 +76,15 @@ from astrolift_services.schema.types import (
     workload_identity_grant_to_type,
 )
 from astrolift_services.scopes import managed_service_scope_by_guid, secret_change_proposal_app_scope
+from astrolift_services.scopes import services_app_scope_by_slug as app_scope_by_slug
+from astrolift_services.scopes import services_project_scope_by_guid as project_scope_by_guid
 from astrolift_services.secret_literals import (
     allowed_scopes_for_env,
     literal_keys_pending_deploy,
     preview_branches_for_app,
 )
 from astrolift_services.secret_metadata_ops import scope_in_force
+from astrolift_services.visibility import credential_managed_services, visible_secret_bundles
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -512,7 +513,7 @@ def _model_endpoints_qs(org_id: int):
 
     apps = visible_apps(RegisteredApp.objects.filter(organization_id=org_id), Permission.APP_READ)
     projects = visible_projects(Project.objects.filter(organization_id=org_id), Permission.PROJECT_READ)
-    return (
+    return credential_managed_services(
         ManagedService.objects.select_related(
             "registered_app",
             "project",
@@ -645,13 +646,16 @@ def _managed_services_qs(
                 "app_environment__name",
             )
         )
-    return visible_operation_rows(qs, Permission.APP_READ)
+    return credential_managed_services(visible_operation_rows(qs, Permission.APP_READ))
 
 
 @strawberry.type
 class ServicesQuery:
     @strawberry.field
-    @require_permission(Permission.PROJECT_READ, scope=project_scope_by_guid("project_id"))
+    @require_permission(
+        Permission.PROJECT_READ,
+        scope=project_scope_by_guid("project_id", permissions=(Permission.PROJECT_READ,)),
+    )
     @tenant_scoped()
     def astrolift_project_resource_clusters(
         self,
@@ -677,7 +681,10 @@ class ServicesQuery:
         return [cluster_to_type(row) for row in rows]
 
     @strawberry.field
-    @require_permission(Permission.PROJECT_READ, scope=project_scope_by_guid("project_id"))
+    @require_permission(
+        Permission.PROJECT_READ,
+        scope=project_scope_by_guid("project_id", permissions=(Permission.PROJECT_READ,)),
+    )
     @tenant_scoped()
     def astrolift_project_managed_service_catalog(
         self,
@@ -810,7 +817,10 @@ class ServicesQuery:
         return managed_service_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.PROJECT_READ, scope=project_scope_by_guid("project_id"))
+    @require_permission(
+        Permission.PROJECT_READ,
+        scope=project_scope_by_guid("project_id", permissions=(Permission.PROJECT_READ,)),
+    )
     @tenant_scoped()
     def astrolift_project_managed_services(
         self,
@@ -843,7 +853,10 @@ class ServicesQuery:
         return [managed_service_to_type(row) for row in rows]
 
     @strawberry.field
-    @require_permission(Permission.PROJECT_READ, scope=project_scope_by_guid("project_id"))
+    @require_permission(
+        Permission.PROJECT_READ,
+        scope=project_scope_by_guid("project_id", permissions=(Permission.PROJECT_READ,)),
+    )
     @tenant_scoped()
     def astrolift_project_secret_bundles(
         self,
@@ -915,7 +928,7 @@ class ServicesQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=app_scope_by_slug("app_slug"),
+        scope=app_scope_by_slug("app_slug", permissions=(Permission.APP_READ,)),
         operation=named_environment("app_slug", "environment_name", all_if_absent=True),
     )
     @tenant_scoped()
@@ -1023,7 +1036,7 @@ class ServicesQuery:
         return out
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_secret_bundles(
         self,
@@ -1033,11 +1046,11 @@ class ServicesQuery:
         org_id = _caller_org_id()
         if org_id is None:
             return []
-        qs = (
-            SecretBundle.objects.select_related("organization", "team")
-            .filter(organization_id=org_id, deleted_at__isnull=True)
-            .order_by("-created_at")[:200]
-        )
+        qs = visible_secret_bundles(
+            SecretBundle.objects.select_related("organization", "team", "project").filter(
+                organization_id=org_id, deleted_at__isnull=True
+            )
+        ).order_by("-created_at")[:200]
         return [secret_bundle_to_type(b) for b in qs]
 
     @strawberry.field
@@ -1149,7 +1162,7 @@ class ServicesQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid("managed_service_id", permissions=(Permission.APP_READ,)),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1182,7 +1195,7 @@ class ServicesQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=app_scope_by_slug("app_slug"),
+        scope=app_scope_by_slug("app_slug", permissions=(Permission.APP_READ,)),
         operation=named_environment("app_slug", "environment_name", all_if_absent=True),
     )
     @tenant_scoped()
@@ -1228,7 +1241,7 @@ class ServicesQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid("managed_service_id", permissions=(Permission.APP_READ,)),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1338,7 +1351,7 @@ class ServicesQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid("managed_service_id", permissions=(Permission.APP_READ,)),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1410,7 +1423,13 @@ class ServicesQuery:
     @require_permission(
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "managed_service_id",
+            permissions=(
+                Permission.APP_READ,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1482,7 +1501,13 @@ class ServicesQuery:
     @require_permission(
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "managed_service_id",
+            permissions=(
+                Permission.APP_READ,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1525,7 +1550,13 @@ class ServicesQuery:
     @require_permission(
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "managed_service_id",
+            permissions=(
+                Permission.APP_READ,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1561,7 +1592,13 @@ class ServicesQuery:
     @require_permission(
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "managed_service_id",
+            permissions=(
+                Permission.APP_READ,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1607,7 +1644,13 @@ class ServicesQuery:
     @require_permission(
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "managed_service_id",
+            permissions=(
+                Permission.APP_READ,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1679,7 +1722,13 @@ class ServicesQuery:
     @require_permission(
         Permission.APP_READ,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "managed_service_id",
+            permissions=(
+                Permission.APP_READ,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
         operation=managed_service_operation("managed_service_id"),
     )
     @tenant_scoped()
@@ -1817,7 +1866,7 @@ class ServicesQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=secret_change_proposal_app_scope("id"),
+        scope=secret_change_proposal_app_scope("id", permissions=(Permission.APP_READ,)),
         operation=secret_proposal_operation("id"),
     )
     @tenant_scoped()

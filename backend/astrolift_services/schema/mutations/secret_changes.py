@@ -15,7 +15,6 @@ from astrolift_graphql import success as gql_success
 from astrolift_identity.operation_context import secret_proposal_operation, secret_write_operation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp
-from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models import (
     AppSecretBundleRef,
     SecretBundle,
@@ -44,6 +43,7 @@ from astrolift_services.schema.types import (
     secret_change_proposal_to_type,
 )
 from astrolift_services.scopes import secret_change_proposal_app_scope
+from astrolift_services.scopes import services_app_scope_by_slug as app_scope_by_slug
 from astrolift_services.secret_change_apply import apply_proposal
 from astrolift_services.secret_change_diff import build_diff
 from core.decorators import tenant_scoped
@@ -58,7 +58,9 @@ class SecretChangeMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.proposal.create")
     @require_permission(
-        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=secret_write_operation
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("input.app_slug", permissions=(Permission.APP_UPDATE,)),
+        operation=secret_write_operation,
     )
     @tenant_scoped()
     def propose_secret_change(
@@ -220,7 +222,7 @@ class SecretChangeMutations:
     )
     @require_permission(
         Permission.SECRET_APPROVE,
-        scope=secret_change_proposal_app_scope("input.proposal_id"),
+        scope=secret_change_proposal_app_scope("input.proposal_id", permissions=(Permission.SECRET_APPROVE,)),
         operation=secret_proposal_operation(),
     )
     @tenant_scoped()
@@ -320,7 +322,7 @@ class SecretChangeMutations:
     )
     @require_permission(
         Permission.SECRET_APPROVE,
-        scope=secret_change_proposal_app_scope("input.proposal_id"),
+        scope=secret_change_proposal_app_scope("input.proposal_id", permissions=(Permission.SECRET_APPROVE,)),
         operation=secret_proposal_operation(),
     )
     @tenant_scoped()
@@ -422,7 +424,7 @@ class SecretChangeMutations:
     )
     @require_permission(
         Permission.APP_UPDATE,
-        scope=secret_change_proposal_app_scope("input.proposal_id"),
+        scope=secret_change_proposal_app_scope("input.proposal_id", permissions=(Permission.APP_UPDATE,)),
         operation=secret_proposal_operation(),
     )
     @tenant_scoped()
