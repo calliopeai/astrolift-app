@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 import { expect, userEvent, within } from "storybook/test";
 
 import { LONG, WEBHOOK_DEPLOYS, WEBHOOK_DEPLOYS_PAUSED } from "./app-settings-members.fixtures";
@@ -36,4 +38,20 @@ export const ConfirmPause: Story = {
 
 export const LongStrings: Story = {
   args: { ...WEBHOOK_DEPLOYS_PAUSED, pausedByEmail: `${LONG}@example.com`, pauseReason: LONG },
+};
+
+export const FrenchWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <div style={{ width: 768 }}>
+        <WebhookDeploysPauseView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(
+      within(canvasElement).getByRole("button", { name: "Suspendre les déploiements par webhook" })
+    );
+    await expect(await within(document.body).findByRole("alertdialog")).toBeInTheDocument();
+  },
 };

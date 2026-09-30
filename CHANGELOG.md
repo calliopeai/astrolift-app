@@ -55,6 +55,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Source resync, ingress, webhook pause and one-shot job controls use all eight
+  locales, including audit attribution and operational help. Actual job and
+  environment selections and rejected-pause reasons remain intact (#2145).
+
 - Recovery, deregistration resource previews and grace-period cancellation
   warnings use all eight locales. Exact app-name/slug confirmation guards,
   resource identifiers, workflow IDs and rejected-action retry remain intact (#2145).

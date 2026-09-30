@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import es from "@/messages/es.json";
 
 import { ENVIRONMENTS, INGRESS, LONG } from "./app-settings-members.fixtures";
 import { IngressControlsView } from "./IngressControls";
@@ -23,4 +25,14 @@ export const Toggling: Story = { args: { busyIds: [ENVIRONMENTS[0].id] } };
 
 export const LongStrings: Story = {
   args: { envs: [{ ...ENVIRONMENTS[0], name: LONG }, ENVIRONMENTS[1]] },
+};
+
+export const SpanishWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="es" messages={es} timeZone="UTC">
+      <div style={{ width: 768 }}>
+        <IngressControlsView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };
