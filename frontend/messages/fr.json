@@ -449,7 +449,8 @@
         "applyingButton": "Applying…",
         "successToast": "Scale applied — {replicas} replicas requested",
         "errorToast": "Couldn't apply scale: {message}",
-        "permissionDenied": "You need app.deploy to scale this workload."
+        "permissionDenied": "You need app.deploy to scale this workload.",
+        "unknownError": "Erreur inconnue"
       },
       "manifest": {
         "title": "Manifest",
@@ -2843,6 +2844,13 @@
         "empty": "Aucune approbation enregistrée pour l'instant.",
         "unknownApprover": "inconnu"
       }
+    }
+  },
+  "projectResources": {
+    "operation": {
+      "label": "Dernière opération :",
+      "completed": "Terminée le {at}",
+      "running": "En cours"
     }
   }
 }

@@ -97,18 +97,18 @@ export function useWorkloadScaling({
       const payload = resp?.scaleAstroliftWorkload;
       if (payload?.ok) {
         const requested = payload.data?.desiredReplicas ?? pending;
-        toast.success(t("scaling.successToast").replace("{replicas}", String(requested)));
+        toast.success(t("scaling.successToast", { replicas: requested }));
         return true;
       }
       return feedback.reject(
         payload,
-        t("scaling.errorToast").replace("{message}", "unknown error")
+        t("scaling.errorToast", { message: t("scaling.unknownError") })
       );
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : t("scaling.errorToast").replace("{message}", "unknown error")
+          : t("scaling.errorToast", { message: t("scaling.unknownError") })
       );
       return false;
     }

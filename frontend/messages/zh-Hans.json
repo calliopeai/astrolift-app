@@ -449,7 +449,8 @@
         "applyingButton": "Applying…",
         "successToast": "Scale applied — {replicas} replicas requested",
         "errorToast": "Couldn't apply scale: {message}",
-        "permissionDenied": "You need app.deploy to scale this workload."
+        "permissionDenied": "You need app.deploy to scale this workload.",
+        "unknownError": "未知错误"
       },
       "manifest": {
         "title": "Manifest",
@@ -2840,6 +2841,13 @@
         "empty": "暂无审批记录。",
         "unknownApprover": "未知"
       }
+    }
+  },
+  "projectResources": {
+    "operation": {
+      "label": "最近的操作：",
+      "completed": "于 {at} 完成",
+      "running": "运行中"
     }
   }
 }
