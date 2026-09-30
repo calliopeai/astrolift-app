@@ -146,7 +146,16 @@ def test_me_modules_org_a_enabled_org_b_not(org_a, org_b, user):
 def test_me_modules_keeps_the_entity_modules_enabled(org_b, user):
     _bind(user, org_b, [Permission.APP_READ.value])
     mods = _modules(user, org_b)
-    assert list(mods) == ["apps", "agents", "workflows", "admin", CHAT, ATTACH, RUNS]
+    assert list(mods) == [
+        "apps",
+        "agents",
+        "workflows",
+        "admin",
+        CHAT,
+        ATTACH,
+        RUNS,
+        "agent_policy_enforcement",
+    ]
     for key in ("apps", "agents", "workflows", "admin"):
         assert mods[key].enabled is True, key
 

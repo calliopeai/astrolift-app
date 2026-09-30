@@ -62,12 +62,14 @@ describe("ModulesCard", () => {
       moduleEntitlement("chat_studio_integration", true),
       moduleEntitlement("agent_live_attach", false),
       moduleEntitlement("chat_studio_agent_runs", false),
+      moduleEntitlement("agent_policy_enforcement", false),
     ];
     state.permissions = ["org.update"];
     state.featureFlags = [
       { key: "modules.chat_studio_integration_allowed", enabled: true },
       { key: "modules.agent_live_attach_allowed", enabled: false },
       { key: "modules.chat_studio_agent_runs_allowed", enabled: true },
+      { key: "modules.agent_policy_enforcement_allowed", enabled: true },
     ];
     state.setModule = vi.fn().mockResolvedValue({
       data: {

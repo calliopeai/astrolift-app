@@ -19,6 +19,7 @@ from astrolift_identity.models import OrganizationModule
 
 CHAT_STUDIO_INTEGRATION = str(OrganizationModule.Key.CHAT_STUDIO_INTEGRATION)
 AGENT_LIVE_ATTACH = str(OrganizationModule.Key.AGENT_LIVE_ATTACH)
+AGENT_POLICY_ENFORCEMENT = str(OrganizationModule.Key.AGENT_POLICY_ENFORCEMENT)
 CHAT_STUDIO_AGENT_RUNS = str(OrganizationModule.Key.CHAT_STUDIO_AGENT_RUNS)
 
 # Module key -> the Constance switch the install admin turns off to force
@@ -26,6 +27,7 @@ CHAT_STUDIO_AGENT_RUNS = str(OrganizationModule.Key.CHAT_STUDIO_AGENT_RUNS)
 INSTALL_SWITCHES: dict[str, str] = {
     CHAT_STUDIO_INTEGRATION: "CHAT_STUDIO_INTEGRATION_ALLOWED",
     AGENT_LIVE_ATTACH: "AGENT_LIVE_ATTACH_ALLOWED",
+    AGENT_POLICY_ENFORCEMENT: "AGENT_POLICY_ENFORCEMENT_ALLOWED",
     CHAT_STUDIO_AGENT_RUNS: "CHAT_STUDIO_AGENT_RUNS_ALLOWED",
 }
 
