@@ -25,9 +25,12 @@ from types import SimpleNamespace
 
 import pytest
 from _sdk.cluster import PodInfo
+from django.contrib.auth import get_user_model
 
 from astrolift_agents.models import AgentBox
-from astrolift_identity.models import Organization
+from astrolift_identity import device_flow
+from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token, verify_token
+from astrolift_identity.models import Member, Organization
 from astrolift_lifecycle.schema.queries import LifecycleQuery
 from core.cluster_observability import (
     reset_pod_backend_for_tests,
@@ -35,7 +38,9 @@ from core.cluster_observability import (
 )
 from core.decorators import TenantRequired
 from core.permissions import Permission, PermissionDenied
+from core.schema.exec_ws import _check_box_attach_permission
 from core.tenancy import TenantContext, tenant_context
+from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
@@ -169,6 +174,68 @@ def test_no_grants_denies_before_any_cluster_work(
     with _as(org), pytest.raises(PermissionDenied):
         _list(info, box.slug)
     assert pod_backend.calls == []
+
+
+@pytest.mark.parametrize("client_kind,refresh", [("cli", False), ("cli", True), ("ide", False)])
+@pytest.mark.parametrize("access", ["allowed", "no_grant", "foreign_org"])
+def test_device_credentials_preserve_box_rbac_and_tenant_boundaries(
+    pod_backend, agent_cluster, info, client_kind, refresh, access
+):
+    """IDE Connect uses CLI login; generic IDE enrollment remains read-only.
+
+    Exercise real device issuance/refresh, token validation and role bindings.
+    Only the cluster transport is replaced by the recording pod backend.
+    """
+    org = _org("box-token-2188")
+    user = get_user_model().objects.create_user(username="box-token-2188")
+    Member.objects.create(
+        user=user,
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=org.pk,
+        is_active=True,
+        lifecycle=Member.Lifecycle.ACTIVE,
+    )
+    if access != "no_grant":
+        bind_role(
+            user,
+            permissions=[Permission.AGENT_BOX_ATTACH],
+            kind="ORG",
+            scope_id=org.pk,
+            slug="box-attach-2188",
+        )
+    box_org = _org("foreign-box-2188") if access == "foreign_org" else org
+    box = _box(box_org)
+    session, session_id = device_flow.create_session(client_kind=client_kind)
+    assert device_flow.approve_session(session, user=user, organization=org) is None
+    issued = device_flow.poll_complete(session_id)
+    assert issued.status == "issued"
+    assert issued.credentials is not None
+    if refresh:
+        issued = device_flow.refresh_credentials(issued.credentials.refresh_token)
+        assert issued.status == "issued"
+        assert issued.credentials is not None
+    token = verify_token(issued.credentials.access_token)
+    assert token is not None
+    bound = set_current_api_token(token)
+    try:
+        with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
+            if client_kind != "cli" or access == "no_grant":
+                with pytest.raises(PermissionDenied):
+                    _list(info, box.slug)
+                assert pod_backend.calls == []
+            elif access == "foreign_org":
+                assert _list(info, box.slug) == []
+                assert pod_backend.calls == []
+            else:
+                assert [p.name for p in _list(info, box.slug)] == ["agent-box-abc123-x9k2p"]
+
+            # The relay's permission gate uses the same token ceiling and
+            # real account grants. Its target check rejects foreign boxes.
+            assert _check_box_attach_permission.func(
+                box_slug=box.slug, tenant_org_id=org.pk, actor_user_id=user.pk, api_token=token
+            ) == (client_kind == "cli" and access == "allowed")
+    finally:
+        reset_current_api_token(bound)
 
 
 def test_denies_without_a_bound_tenant(pod_backend, agent_cluster, permission_resolver, info) -> None:

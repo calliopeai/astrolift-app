@@ -551,3 +551,35 @@ async def test_live_backend_follow_true_keeps_waiting_on_idle(
     # wait_for must time out rather than return "ENDED".
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(_drain_first(), timeout=0.4)
+
+
+def test_live_pod_projection_preserves_scheduling_diagnosis(monkeypatch):
+    from kubernetes import client as k8s_client
+
+    raw = SimpleNamespace(
+        metadata=SimpleNamespace(name="owned-pod", labels={}),
+        spec=SimpleNamespace(containers=[], init_containers=[], node_name=None),
+        status=SimpleNamespace(
+            phase="Pending",
+            conditions=[
+                SimpleNamespace(
+                    type="PodScheduled", status="False", reason="Unschedulable", message="2 Insufficient cpu"
+                )
+            ],
+        ),
+    )
+    monkeypatch.setattr("k8s_native.observability.build_api_client", lambda _: object())
+    calls = []
+
+    def list_pods(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(items=[raw])
+
+    monkeypatch.setattr(k8s_client, "CoreV1Api", lambda _: SimpleNamespace(list_namespaced_pod=list_pods))
+    pod = LivePodBackend().list_pods(auth=_auth(), namespace="owned-ns", app_slug="owned", task_id="owned-guid")[0]
+    assert pod.phase == "Pending"
+    assert not pod.ready
+    assert pod.scheduling_reason == "Unschedulable"
+    assert pod.scheduling_message == "2 Insufficient cpu"
+    assert calls[0]["namespace"] == "owned-ns"
+    assert "owned-guid" in calls[0]["label_selector"]

@@ -91,6 +91,15 @@
   Registration and transfer destinations are checked separately, and source
   manifest scans require organization authority.
 
+- Agent task and box startup diagnostics expose scoped pod scheduling reasons.
+  Pending Jobs stay provisioning until ready; timeout failures preserve the
+  last startup reason before cleanup, and recovery clears stale warnings (#2190).
+
+- CLI and IDE sign-in credentials can discover and attach to agent boxes when
+  account permissions allow it. The existing `mcp:dispatch` scope now includes
+  `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
+  enforced (#2188).
+
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep
   the existing production/development server behavior, and other startup

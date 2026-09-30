@@ -450,6 +450,8 @@ class PodInfo:
     age: datetime | None
     node: str
     container_statuses: list[ContainerStatusInfo] = field(default_factory=list)
+    scheduling_reason: str = ""
+    scheduling_message: str = ""
 
 
 # ---- Bring-into-management (#316) ---------------------------------

@@ -105,6 +105,7 @@ class AgentTask(BaseCoreModel):
     # Persist placement before external creation so recovery cannot pick a new default.
     dispatch_target = models.JSONField(default=dict, blank=True)
     # Container/job ID assigned by the Dispatch Service.
+    startup_diagnostic = models.JSONField(default=dict, blank=True)
     external_id = models.CharField(max_length=255, blank=True, default="")
     # Push-mode: Controller POSTs result here on terminal transition.
     callback_url = models.URLField(blank=True, default="")

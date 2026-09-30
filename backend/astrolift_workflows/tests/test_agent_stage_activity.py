@@ -381,6 +381,10 @@ def test_poll_fast_success_from_provisioning_steps_through_running(org, env_spec
 class _FakePod:
     def __init__(self, status: str) -> None:
         self.status = status
+        self.ready = False
+        self.phase = "Pending"
+        self.name = "owned-pod"
+        self.container_statuses = []
 
 
 def test_poll_fails_fast_on_imagepullbackoff(org, env_spec, cluster, patch_spawner, monkeypatch):
@@ -696,3 +700,78 @@ def test_cancel_signal_capture_failure_does_not_break_cancel(
     task.refresh_from_db()
     assert task.status == AgentTask.Status.CANCELLED
     assert AgentInteraction.objects.filter(agent_task=task, kind=AgentInteraction.Kind.SIGNAL).count() == 0
+
+
+def _startup_pod(*, ready=False):
+    from _sdk.cluster import PodInfo
+
+    return PodInfo(
+        name="owned-pod",
+        workload="agent",
+        status="Running" if ready else "Pending",
+        phase="Running" if ready else "Pending",
+        ready=ready,
+        restarts=0,
+        age=None,
+        node="",
+        scheduling_reason="" if ready else "Unschedulable",
+        scheduling_message="" if ready else "0/2 nodes are available: 2 Insufficient cpu.",
+    )
+
+
+def test_pending_startup_recovers_without_redispatch(org, env_spec, cluster, patch_spawner, monkeypatch):
+    fake = patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="owned-job"),
+            status_sequence=[TaskStatus(), TaskStatus(running=True)],
+        )
+    )
+    pods = [_startup_pod()]
+    monkeypatch.setattr("core.cluster_observability.list_app_pods", lambda **kw: pods)
+    task_pk = agent_stage._create_agent_task_sync(_params(org, environment_spec_slug=env_spec.slug))
+    agent_stage._spawn_agent_task_sync(task_pk)
+    agent_stage._poll_agent_task_sync(task_pk)
+    task = AgentTask.objects.get(pk=task_pk)
+    assert task.status == AgentTask.Status.PROVISIONING
+    assert task.started_at is None
+    assert task.startup_diagnostic["reason"] == "Unschedulable"
+    assert task.failure is None
+
+    def no_spawn(_task):
+        pytest.fail("a pending task with an external ID must not spawn twice")
+
+    monkeypatch.setattr(fake, "spawn", no_spawn)
+    assert agent_stage._spawn_agent_task_sync(task_pk)["external_id"] == "owned-job"
+    pods[:] = [_startup_pod(ready=True)]
+    agent_stage._poll_agent_task_sync(task_pk)
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.RUNNING
+    assert task.startup_diagnostic["phase"] == "Running"
+    assert task.startup_diagnostic["reason"] == task.startup_diagnostic["message"] == ""
+
+
+def test_timeout_preserves_scheduling_reason_before_cleanup(
+    org, env_spec, cluster, patch_spawner, monkeypatch
+):
+    fake = patch_spawner(
+        _FakeSpawner(
+            spawn_result=SpawnResult(external_id="owned-job"),
+            status_sequence=[TaskStatus()],
+        )
+    )
+    monkeypatch.setattr("core.cluster_observability.list_app_pods", lambda **kw: [_startup_pod()])
+    task_pk = agent_stage._create_agent_task_sync(
+        _params(org, environment_spec_slug=env_spec.slug, timeout_seconds=30)
+    )
+    agent_stage._spawn_agent_task_sync(task_pk)
+    AgentTask.objects.filter(pk=task_pk).update(provisioning_at=timezone.now() - timedelta(seconds=60))
+
+    def stop_after_recording(_external_id, **kwargs):
+        task = AgentTask.objects.get(pk=task_pk)
+        assert task.startup_diagnostic["reason"] == "Unschedulable"
+        assert "Insufficient cpu" in task.failure["message"]
+
+    monkeypatch.setattr(fake, "stop", stop_after_recording)
+    result = agent_stage._poll_agent_task_sync(task_pk)
+    assert result == {"status": AgentTask.Status.TIMED_OUT, "terminal": True}
+    assert "Insufficient cpu" in AgentTask.objects.get(pk=task_pk).failure["message"]

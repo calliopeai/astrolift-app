@@ -279,6 +279,7 @@ export type AstroliftAgentBox = {
   sessionName: Scalars['String']['output'];
   slug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
+  startupDiagnostic?: Maybe<AstroliftAgentStartupDiagnostic>;
   status: Scalars['String']['output'];
 };
 
@@ -576,6 +577,14 @@ export type AstroliftAgentSkill = {
   toolDefs: Array<AstroliftToolDef>;
 };
 
+export type AstroliftAgentStartupDiagnostic = {
+  message: Scalars['String']['output'];
+  observedAt: Scalars['DateTime']['output'];
+  phase: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type AstroliftAgentTask = {
   agentName: Scalars['String']['output'];
   agentSlug: Scalars['String']['output'];
@@ -594,6 +603,7 @@ export type AstroliftAgentTask = {
   result?: Maybe<Scalars['JSON']['output']>;
   snapshotUrl?: Maybe<Scalars['String']['output']>;
   startedAt?: Maybe<Scalars['DateTime']['output']>;
+  startupDiagnostic?: Maybe<AstroliftAgentStartupDiagnostic>;
   status: Scalars['String']['output'];
   triggerKind: Scalars['String']['output'];
   triggeredByMe: Scalars['Boolean']['output'];
