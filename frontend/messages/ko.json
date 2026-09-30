@@ -4755,6 +4755,36 @@
         "timeLabel": "관측 시각",
         "samples": "샘플 간격: {seconds}초. 시계열당 최대 {limit}개 샘플.",
         "freshness": "용량 데이터의 최대 경과 시간: {seconds}초."
+      },
+      "prompt": {
+        "title": "이 공유 모델 테스트",
+        "description": "클러스터 소유자 권한으로 제한된 실제 요청을 보냅니다. 모델 리소스를 사용하며 비용이 발생할 수 있습니다. 자격 증명과 서비스 주소는 서버에 유지됩니다.",
+        "prompt": "프롬프트",
+        "send": "모델 테스트 실행",
+        "refresh": "준비 상태 확인",
+        "loading": "프롬프트 준비 상태 확인 중…",
+        "waiting": "모델 응답을 기다리는 중…",
+        "readError": "프롬프트 준비 상태를 확인할 수 없습니다",
+        "failed": "모델 테스트에 실패했습니다.",
+        "changed": "배포 또는 준비 상태가 변경되었습니다. 새 요청을 보내기 전에 다시 확인하세요.",
+        "limits": "입력 최대 {chars}자, 출력 최대 {tokens}토큰, 분당 {perMinute}개 요청이며 최대 {seconds}초 대기합니다. 허용 여부는 사전 안내이며 전송 시 다시 확인됩니다.",
+        "invalid": "확인된 글자 수 한도 안에서 비어 있지 않은 프롬프트를 입력하세요.",
+        "result": "모델 응답",
+        "latency": "지연 시간: {value}ms",
+        "tokens": "총 토큰 수: {value}",
+        "rateLimited": "요청 한도에 도달했습니다. 잠시 기다린 후 다시 시도하세요.",
+        "timedOut": "요청 시간이 초과되었습니다. 자동으로 재전송되지 않습니다.",
+        "unsupportedReply": "서버가 완전한 성공 모델 응답을 반환하지 않았습니다.",
+        "states": {
+          "READY": "기록된 조정으로 제한된 테스트가 가능합니다. 실제 요청은 여전히 실패할 수 있습니다.",
+          "INACTIVE": "배포가 비활성 상태입니다",
+          "STALE_HEARTBEAT": "조정 확인이 오래되었습니다",
+          "UNKNOWN_HEARTBEAT": "확인된 조정이 없습니다",
+          "UNAVAILABLE": "준비 상태를 사용할 수 없습니다",
+          "UNCONFIGURED_MODEL": "모델 런타임이 구성되지 않았습니다",
+          "UNCONFIGURED_RELAY": "프롬프트 릴레이가 구성되지 않았습니다",
+          "UNSUPPORTED": "지원되지 않는 런타임입니다"
+        }
       }
     }
   }

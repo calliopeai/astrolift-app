@@ -14637,7 +14637,7 @@ export type TestSharedModelEndpointMutationVariables = Exact<{
 }>;
 
 
-export type TestSharedModelEndpointMutation = { testSharedModelEndpoint: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string }>, data?: { status: string, reply: string, latencyMs?: number | null, promptTokens?: number | null, completionTokens?: number | null, totalTokens?: number | null, error: string } | null } };
+export type TestSharedModelEndpointMutation = { testSharedModelEndpoint: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { status: string, reply: string, latencyMs?: number | null, promptTokens?: number | null, completionTokens?: number | null, totalTokens?: number | null, error: string } | null } };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

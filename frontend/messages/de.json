@@ -4758,6 +4758,36 @@
         "timeLabel": "Beobachtungszeit",
         "samples": "Messschritt: {seconds} s; höchstens {limit} Messwerte je Reihe.",
         "freshness": "Maximales Alter der Kapazitätsdaten: {seconds} s."
+      },
+      "prompt": {
+        "title": "Dieses gemeinsam genutzte Modell testen",
+        "description": "Sendet eine echte, begrenzte Anfrage mit Cluster-Eigentümerrechten. Sie verbraucht Modellressourcen und kann Kosten verursachen. Zugangsdaten und Dienstadressen bleiben auf dem Server.",
+        "prompt": "Eingabe",
+        "send": "Modelltest ausführen",
+        "refresh": "Bereitschaft prüfen",
+        "loading": "Bereitschaft für Eingaben wird geprüft…",
+        "waiting": "Warten auf das Modell…",
+        "readError": "Die Bereitschaft für Eingaben konnte nicht verifiziert werden",
+        "failed": "Der Modelltest ist fehlgeschlagen.",
+        "changed": "Die Bereitstellung oder Bereitschaft hat sich geändert. Prüfen Sie erneut, bevor Sie eine neue Anfrage senden.",
+        "limits": "Höchstens {chars} Eingabezeichen, {tokens} Ausgabetokens und {perMinute} Anfragen/Minute; Wartezeit bis zu {seconds} Sekunden. Die Zulassung ist vorläufig und wird beim Senden erneut geprüft.",
+        "invalid": "Geben Sie einen nicht leeren Text innerhalb der verifizierten Zeichenbegrenzung ein.",
+        "result": "Modellantwort",
+        "latency": "Latenz: {value} ms",
+        "tokens": "Tokens insgesamt: {value}",
+        "rateLimited": "Das Anfragelimit wurde erreicht. Warten Sie vor einem weiteren Versuch.",
+        "timedOut": "Die Anfrage ist abgelaufen. Sie wird nicht automatisch wiederholt.",
+        "unsupportedReply": "Der Server hat keine vollständige erfolgreiche Modellantwort geliefert.",
+        "states": {
+          "READY": "Der aufgezeichnete Abgleich erlaubt einen begrenzten Test; die tatsächliche Anfrage kann dennoch fehlschlagen.",
+          "INACTIVE": "Bereitstellung inaktiv",
+          "STALE_HEARTBEAT": "Abgleichbestätigung ist veraltet",
+          "UNKNOWN_HEARTBEAT": "Kein bestätigter Abgleich",
+          "UNAVAILABLE": "Bereitschaft nicht verfügbar",
+          "UNCONFIGURED_MODEL": "Modelllaufzeit nicht konfiguriert",
+          "UNCONFIGURED_RELAY": "Eingaberelay nicht konfiguriert",
+          "UNSUPPORTED": "Laufzeit nicht unterstützt"
+        }
       }
     }
   }

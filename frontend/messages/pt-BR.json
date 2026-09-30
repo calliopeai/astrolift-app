@@ -4755,6 +4755,36 @@
         "timeLabel": "Horário da observação",
         "samples": "Intervalo das amostras: {seconds} s; no máximo {limit} amostras por série.",
         "freshness": "Limite de idade dos dados de capacidade: {seconds} s."
+      },
+      "prompt": {
+        "title": "Testar este modelo compartilhado",
+        "description": "Envia uma solicitação real e limitada com acesso de proprietário do cluster. Consome recursos do modelo e pode gerar custos. Credenciais e endereços do serviço permanecem no servidor.",
+        "prompt": "Instrução",
+        "send": "Executar teste do modelo",
+        "refresh": "Verificar prontidão",
+        "loading": "Verificando prontidão para instruções…",
+        "waiting": "Aguardando o modelo…",
+        "readError": "Não foi possível verificar a prontidão para instruções",
+        "failed": "O teste do modelo falhou.",
+        "changed": "A implantação ou a prontidão mudou. Verifique novamente antes de enviar outra solicitação.",
+        "limits": "Máximo de {chars} caracteres de entrada, {tokens} tokens de saída e {perMinute} solicitações/minuto; espera de até {seconds} segundos. A admissão é indicativa e verificada novamente ao enviar.",
+        "invalid": "Insira uma instrução não vazia dentro do limite de caracteres verificado.",
+        "result": "Resposta do modelo",
+        "latency": "Latência: {value} ms",
+        "tokens": "Total de tokens: {value}",
+        "rateLimited": "O limite de solicitações foi atingido. Aguarde antes de tentar novamente.",
+        "timedOut": "A solicitação expirou. Ela não será repetida automaticamente.",
+        "unsupportedReply": "O servidor não retornou uma resposta completa e bem-sucedida do modelo.",
+        "states": {
+          "READY": "A reconciliação registrada permite um teste limitado; a solicitação real ainda pode falhar.",
+          "INACTIVE": "Implantação inativa",
+          "STALE_HEARTBEAT": "A confirmação de reconciliação está desatualizada",
+          "UNKNOWN_HEARTBEAT": "Nenhuma reconciliação confirmada",
+          "UNAVAILABLE": "Prontidão indisponível",
+          "UNCONFIGURED_MODEL": "O runtime do modelo não está configurado",
+          "UNCONFIGURED_RELAY": "O retransmissor de instruções não está configurado",
+          "UNSUPPORTED": "Runtime não suportado"
+        }
       }
     }
   }

@@ -4835,6 +4835,36 @@
         "timeLabel": "Observation time",
         "samples": "Sample step: {seconds} s; at most {limit} samples per series.",
         "freshness": "Capacity freshness limit: {seconds} s."
+      },
+      "prompt": {
+        "title": "Test this shared model",
+        "description": "Sends a real, bounded request using cluster-owner access. It consumes model resources and may incur costs. Credentials and endpoint addresses remain on the server.",
+        "prompt": "Prompt",
+        "send": "Run model test",
+        "refresh": "Check readiness",
+        "loading": "Checking prompt readiness…",
+        "waiting": "Waiting for the model…",
+        "readError": "Prompt readiness could not be verified",
+        "failed": "The model test failed.",
+        "changed": "The deployment or readiness changed. Check again before sending a new request.",
+        "limits": "Maximum {chars} prompt characters, {tokens} output tokens, {perMinute} requests/minute; wait up to {seconds} seconds. Admission is advisory and is checked again when sent.",
+        "invalid": "Enter a non-empty prompt within the verified character limit.",
+        "result": "Model reply",
+        "latency": "Latency: {value} ms",
+        "tokens": "Total tokens: {value}",
+        "rateLimited": "The request rate limit has been reached. Wait before trying again.",
+        "timedOut": "The request timed out. It will not be replayed automatically.",
+        "unsupportedReply": "The server did not return a complete successful model reply.",
+        "states": {
+          "READY": "Recorded reconciliation permits a bounded test; the actual request can still fail.",
+          "INACTIVE": "Deployment inactive",
+          "STALE_HEARTBEAT": "Reconciliation confirmation is stale",
+          "UNKNOWN_HEARTBEAT": "No confirmed reconciliation",
+          "UNAVAILABLE": "Readiness unavailable",
+          "UNCONFIGURED_MODEL": "Model runtime is not configured",
+          "UNCONFIGURED_RELAY": "Prompt relay is not configured",
+          "UNSUPPORTED": "Runtime unsupported"
+        }
       }
     }
   }

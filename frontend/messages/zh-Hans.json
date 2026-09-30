@@ -4755,6 +4755,36 @@
         "timeLabel": "观测时间",
         "samples": "采样间隔：{seconds} 秒；每个序列最多 {limit} 个样本。",
         "freshness": "容量数据时效上限：{seconds} 秒。"
+      },
+      "prompt": {
+        "title": "测试此共享模型",
+        "description": "使用集群所有者权限发送有界的真实请求。此操作消耗模型资源并可能产生费用。凭据和服务地址保留在服务器上。",
+        "prompt": "提示词",
+        "send": "运行模型测试",
+        "refresh": "检查就绪状态",
+        "loading": "正在检查提示词就绪状态…",
+        "waiting": "正在等待模型…",
+        "readError": "无法验证提示词就绪状态",
+        "failed": "模型测试失败。",
+        "changed": "部署或就绪状态已改变。发送新请求前请重新检查。",
+        "limits": "输入最多 {chars} 字符、输出最多 {tokens} 词元，每分钟 {perMinute} 个请求，最多等待 {seconds} 秒。准入仅供参考，发送时会重新检查。",
+        "invalid": "请输入不为空且符合已验证字符限制的提示词。",
+        "result": "模型回复",
+        "latency": "延迟：{value} 毫秒",
+        "tokens": "词元总数：{value}",
+        "rateLimited": "已达到请求频率限制。请稍后重试。",
+        "timedOut": "请求已超时，不会自动重放。",
+        "unsupportedReply": "服务器未返回完整的成功模型回复。",
+        "states": {
+          "READY": "记录的协调允许有界测试；实际请求仍可能失败。",
+          "INACTIVE": "部署未激活",
+          "STALE_HEARTBEAT": "协调确认已过时",
+          "UNKNOWN_HEARTBEAT": "没有已确认的协调",
+          "UNAVAILABLE": "就绪状态不可用",
+          "UNCONFIGURED_MODEL": "模型运行时未配置",
+          "UNCONFIGURED_RELAY": "提示词中继未配置",
+          "UNSUPPORTED": "运行时不受支持"
+        }
       }
     }
   }

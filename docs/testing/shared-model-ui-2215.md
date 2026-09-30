@@ -170,3 +170,28 @@ verified tenant node-pool mapping and never fabricates zero or global saturation
 All eight locales translate presentation while preserving IDs, raw units and
 source labels. Focused Apollo/locale/hydration tests and portable stories cover
 these states; production browser journeys remain final composed acceptance.
+
+## Actual shared owner prompt
+
+The shared detail's model test uses the existing dedicated shared-readiness query
+and `testSharedModelEndpoint` mutation. Both carry the exact deployment version,
+cluster and provider; the mutation carries only the bounded trimmed prompt and
+persisted deployment ID. Browser callers cannot provide a URL, credential or
+runtime configuration. Actual cluster-owner admission is checked by the server;
+module visibility is not substituted for it.
+
+Readiness limits must be positive and within the existing relay bounds. Unknown,
+stale, unsupported, unconfigured, denied and malformed admission refuses spend.
+The screen states that a request consumes model resources and can incur cost;
+recorded reconciliation remains advisory. An incomplete/mixed refusal envelope,
+missing/empty reply or timeout never produces success. Complete structured
+concurrency error metadata is queried and current/requested versions stay literal.
+
+Pending requests block duplicate sends. Changed org/model/version/provider scopes,
+A-to-B-to-A transitions and unmounts permanently discard late UI replies. Checking
+readiness is read-only; no failure or timeout automatically retries a prompt.
+Eight locales translate labels, limits and state descriptions while preserving
+prompt/reply content. Actual Apollo HTTP tests validate documents and request
+identities, refusals, duplicate/stale/unmounted operations and rendered translated
+callbacks. Shared deployment/subscription writes and final production browser
+journeys remain the following composed acceptance work.

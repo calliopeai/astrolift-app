@@ -17,6 +17,7 @@ import zh from "@/messages/zh-Hans.json";
 import { SharedModelDetailScreen } from "./SharedModelDetailScreen";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 import { modelObservationsProps } from "./model-observations.fixtures";
+import { sharedModelPromptProps } from "./shared-model-prompt.fixtures";
 import { SharedModelClient } from "@/app/(app)/models/shared/[id]/shared-model-client";
 const locales = { en, es, fr, de, "pt-BR": pt, ja, ko, "zh-Hans": zh };
 const scope = vi.hoisted(() => ({ id: "org", loading: false, error: null as Error | null }));
@@ -61,17 +62,19 @@ beforeEach(() => {
   scope.error = null;
   requests = [];
   transport = async (request) =>
-    request.operationName === "GetModelDeploymentMetrics"
-      ? response({ astroliftModelDeploymentMetrics: modelObservationsProps.metrics.data })
-      : request.operationName === "GetClusterModelDensity"
-        ? response({ astroliftClusterModelDensity: modelObservationsProps.density.data })
-        : response({
-            clusterModelDeployment: {
-              ...model(),
-              id: request.variables.id,
-              organizationId: request.variables.organizationId,
-            },
-          });
+    request.operationName === "GetSharedModelPromptReadiness"
+      ? response({ astroliftSharedModelPromptReadiness: sharedModelPromptProps.readiness.data })
+      : request.operationName === "GetModelDeploymentMetrics"
+        ? response({ astroliftModelDeploymentMetrics: modelObservationsProps.metrics.data })
+        : request.operationName === "GetClusterModelDensity"
+          ? response({ astroliftClusterModelDensity: modelObservationsProps.density.data })
+          : response({
+              clusterModelDeployment: {
+                ...model(),
+                id: request.variables.id,
+                organizationId: request.variables.organizationId,
+              },
+            });
 });
 describe("actual shared model detail", () => {
   it("reads the explicit tenant/deployment identity through the actual route client", async () => {
@@ -132,6 +135,7 @@ describe("actual shared model detail", () => {
           "GetClusterModelDeployment",
           "GetModelDeploymentMetrics",
           "GetClusterModelDensity",
+          "GetSharedModelPromptReadiness",
         ].includes(request.operationName)
       )
     ).toBe(true);

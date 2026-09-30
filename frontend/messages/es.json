@@ -4758,6 +4758,36 @@
         "timeLabel": "Hora de observación",
         "samples": "Paso de muestra: {seconds} s; como máximo {limit} muestras por serie.",
         "freshness": "Límite de antigüedad de capacidad: {seconds} s."
+      },
+      "prompt": {
+        "title": "Probar este modelo compartido",
+        "description": "Envía una solicitud real y limitada con acceso de propietario del clúster. Consume recursos del modelo y puede generar costes. Las credenciales y direcciones del servicio permanecen en el servidor.",
+        "prompt": "Instrucción",
+        "send": "Ejecutar prueba del modelo",
+        "refresh": "Comprobar disponibilidad",
+        "loading": "Comprobando si se pueden enviar instrucciones…",
+        "waiting": "Esperando al modelo…",
+        "readError": "No se pudo verificar la disponibilidad para instrucciones",
+        "failed": "La prueba del modelo falló.",
+        "changed": "El despliegue o su disponibilidad cambió. Comprueba de nuevo antes de enviar otra solicitud.",
+        "limits": "Máximo {chars} caracteres de entrada, {tokens} tokens de salida y {perMinute} solicitudes/minuto; espera hasta {seconds} segundos. La admisión es orientativa y se vuelve a comprobar al enviar.",
+        "invalid": "Introduce una instrucción no vacía dentro del límite de caracteres verificado.",
+        "result": "Respuesta del modelo",
+        "latency": "Latencia: {value} ms",
+        "tokens": "Tokens totales: {value}",
+        "rateLimited": "Se ha alcanzado el límite de solicitudes. Espera antes de volver a intentarlo.",
+        "timedOut": "La solicitud agotó el tiempo de espera. No se repetirá automáticamente.",
+        "unsupportedReply": "El servidor no devolvió una respuesta completa y correcta del modelo.",
+        "states": {
+          "READY": "La conciliación registrada permite una prueba limitada; la solicitud real aún puede fallar.",
+          "INACTIVE": "Despliegue inactivo",
+          "STALE_HEARTBEAT": "La confirmación de conciliación está desactualizada",
+          "UNKNOWN_HEARTBEAT": "Sin conciliación confirmada",
+          "UNAVAILABLE": "Disponibilidad desconocida",
+          "UNCONFIGURED_MODEL": "El entorno de ejecución del modelo no está configurado",
+          "UNCONFIGURED_RELAY": "El retransmisor de instrucciones no está configurado",
+          "UNSUPPORTED": "Entorno de ejecución no admitido"
+        }
       }
     }
   }

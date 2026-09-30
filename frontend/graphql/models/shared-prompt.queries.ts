@@ -31,6 +31,10 @@ export const TEST_SHARED_MODEL_ENDPOINT = gql`
         code
         field
         message
+        currentVersion
+        requestedVersion
+        requiresAttestation
+        supportedMethods
       }
       data {
         status

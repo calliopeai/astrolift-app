@@ -4758,6 +4758,36 @@
         "timeLabel": "Heure d’observation",
         "samples": "Pas des échantillons : {seconds} s ; au plus {limit} échantillons par série.",
         "freshness": "Ancienneté maximale de la capacité : {seconds} s."
+      },
+      "prompt": {
+        "title": "Tester ce modèle partagé",
+        "description": "Envoie une requête réelle et limitée avec les droits du propriétaire du cluster. Elle consomme les ressources du modèle et peut entraîner des frais. Les identifiants et adresses du service restent sur le serveur.",
+        "prompt": "Instruction",
+        "send": "Lancer le test du modèle",
+        "refresh": "Vérifier la disponibilité",
+        "loading": "Vérification de la disponibilité pour les instructions…",
+        "waiting": "En attente du modèle…",
+        "readError": "La disponibilité pour les instructions n’a pas pu être vérifiée",
+        "failed": "Le test du modèle a échoué.",
+        "changed": "Le déploiement ou sa disponibilité a changé. Vérifiez à nouveau avant d’envoyer une nouvelle requête.",
+        "limits": "Au plus {chars} caractères d’entrée, {tokens} tokens de sortie et {perMinute} requêtes/minute ; attente maximale de {seconds} secondes. L’admission est indicative et revérifiée lors de l’envoi.",
+        "invalid": "Saisissez une instruction non vide respectant la limite de caractères vérifiée.",
+        "result": "Réponse du modèle",
+        "latency": "Latence : {value} ms",
+        "tokens": "Total de tokens : {value}",
+        "rateLimited": "La limite de requêtes a été atteinte. Patientez avant de réessayer.",
+        "timedOut": "La requête a expiré. Elle ne sera pas rejouée automatiquement.",
+        "unsupportedReply": "Le serveur n’a pas renvoyé de réponse complète et réussie du modèle.",
+        "states": {
+          "READY": "La réconciliation enregistrée permet un test limité ; la requête réelle peut encore échouer.",
+          "INACTIVE": "Déploiement inactif",
+          "STALE_HEARTBEAT": "La confirmation de réconciliation est périmée",
+          "UNKNOWN_HEARTBEAT": "Aucune réconciliation confirmée",
+          "UNAVAILABLE": "Disponibilité indisponible",
+          "UNCONFIGURED_MODEL": "Le moteur du modèle n’est pas configuré",
+          "UNCONFIGURED_RELAY": "Le relais d’instructions n’est pas configuré",
+          "UNSUPPORTED": "Moteur non pris en charge"
+        }
       }
     }
   }

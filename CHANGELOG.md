@@ -9,6 +9,8 @@
 - Shared-model prompt denials return the complete public mutation error
   envelope, including nullable version details, while preserving status auditing
   and bounded real relay outcomes (#2213).
+- Add bounded real shared-model prompt tests with exact owner/version/placement
+  admission, structured refusal feedback and no automatic replay in all locales.
 
 - Add actual owner-gated shared model metrics and tenant cluster snapshots with
   observed source/time/availability, explicit truncation and full catalogue links
