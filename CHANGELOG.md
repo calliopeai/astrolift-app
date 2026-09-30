@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Webhook pause confirmation actions wrap inside the dialog for longer localized
+  labels, including the French layout found by browser CI.
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
 - Model prompt relay admission, dispatch and result transitions atomically retain
