@@ -2503,7 +2503,8 @@
         "cluster": "Cluster",
         "approvals": "Approvals",
         "status": "Status",
-        "actions": "Actions"
+        "actions": "Actions",
+        "app": "App"
       },
       "emptyTitle": "No environments yet",
       "emptyDescription": "Register an app and bind it to a cluster to create your first environment.",
@@ -2518,6 +2519,40 @@
         "fallbackTitle": "Pause environment?",
         "description": "CI pushes and source-driven triggers are rejected with a 423 until you explicitly resume. In-flight deployments continue to completion. Operator-initiated deployments from the UI are still allowed.",
         "confirm": "Pause environment"
+      },
+      "openUrl": "Open URL",
+      "openApp": "Open app",
+      "searchPlaceholder": "Search environments, apps, clusters, regions…",
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "production": "Production",
+        "previews": "Previews"
+      },
+      "operationFailed": "{action} failed",
+      "operationResult": "{action}: {status}",
+      "detail": {
+        "environmentLabel": "environment {id}",
+        "title": "Environment",
+        "notFound": "Environment not found",
+        "notFoundDescription": "No environment has this id, or you do not have permission to see it.",
+        "openEnvironments": "Open environments",
+        "settings": "Settings",
+        "deploysPaused": "Deploys paused",
+        "deploysActive": "Deploys active",
+        "open": "Open",
+        "moreActions": "More actions",
+        "environmentSettings": "Environment settings",
+        "deploymentsHere": "Deployments here",
+        "overview": "Overview",
+        "provider": "Provider",
+        "domainZone": "Domain zone",
+        "requiredApprovals": "Required approvals",
+        "deploys": "Deploys",
+        "ingress": "Ingress",
+        "created": "Created",
+        "noSettings": "No environment settings",
+        "noSettingsDescription": "This environment has no per-environment settings configured."
       }
     },
     "previews": {

@@ -12,6 +12,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Environment list views, filters, pause confirmations, outcomes and detail
+  panels use all eight locales. Ownership/kind filter values, target links and
+  actual settings remain unchanged; failed pauses require a confirmed retry (#2145).
+
 - Deploy strategy editor copy and notices are translated in all eight locales.
   Branch help retains its actual identifier, rejected saves keep edits for retry,
   and missing-message version conflicts use the localized shared fallback (#2145).

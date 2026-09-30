@@ -28,6 +28,19 @@ export const ENVIRONMENTS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+/** Localize labels without changing view ownership, URL keys or API filter values. */
+export function localizedEnvironmentsList(t: (key: string) => string): ListDefinition {
+  return {
+    ...ENVIRONMENTS_LIST,
+    searchPlaceholder: t("searchPlaceholder"),
+    fields: ENVIRONMENTS_LIST.fields.map((field) => ({
+      ...field,
+      label: t(`columns.${field.key}`),
+    })),
+    views: ENVIRONMENTS_LIST.views.map((view) => ({ ...view, label: t(`views.${view.key}`) })),
+  };
+}
+
 /** The filter input's shape on `astroliftEnvironmentsPage` (AstroliftEnvironmentsFilter). */
 export interface EnvironmentsFilter {
   kind?: string[];

@@ -8,6 +8,7 @@ import {
   SlidersHorizontalIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
 import { Identifier } from "@/components/Identifier";
@@ -31,16 +32,17 @@ import type { EnvironmentState } from "./use-environment";
 export type EnvironmentDetailProps = EnvironmentState & { id: string };
 
 function PausedBadge({ paused }: { paused: boolean }) {
+  const t = useTranslations("lists.environments");
   return paused ? (
-    <Badge variant="destructive">Paused</Badge>
+    <Badge variant="destructive">{t("paused")}</Badge>
   ) : (
-    <Badge variant="secondary">Active</Badge>
+    <Badge variant="secondary">{t("active")}</Badge>
   );
 }
 
 /** Environments ▾ › storefront › prod (spec 44 §4.4). */
-function crumbs(id: string, e: AstroliftAppEnvironment | null) {
-  if (!e) return appsDetailCrumbs("environments", { label: `environment ${id.slice(0, 8)}` });
+function crumbs(e: AstroliftAppEnvironment | null, fallback: string) {
+  if (!e) return appsDetailCrumbs("environments", { label: fallback });
   return appsDetailCrumbs(
     "environments",
     {
@@ -64,14 +66,16 @@ export function EnvironmentDetail({
   error,
   onRetry,
 }: EnvironmentDetailProps) {
+  const t = useTranslations("lists.environments.detail");
+  const fallback = t("environmentLabel", { id: id.slice(0, 8) });
   if (!e) {
-    const title = loading || error ? "Environment" : "Environment not found";
+    const title = loading || error ? t("title") : t("notFound");
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <ShellHeader crumbs={crumbs(id, null)} title={title} />
+        <ShellHeader crumbs={crumbs(null, fallback)} title={title} />
         <PanelGrid>
           <Panel
-            title="Environment"
+            title={t("title")}
             icon={<CloudIcon className="size-4" />}
             span={6}
             loading={loading}
@@ -79,15 +83,15 @@ export function EnvironmentDetail({
             onRetry={onRetry}
             empty={{
               icon: <CloudIcon className="size-5" />,
-              title: "Environment not found",
-              description: "No environment has this id, or you do not have permission to see it.",
+              title: t("notFound"),
+              description: t("notFoundDescription"),
               actionHref: "/environments",
-              actionLabel: "Open environments",
+              actionLabel: t("openEnvironments"),
             }}
           />
           {loading && (
             <Panel
-              title="Settings"
+              title={t("settings")}
               icon={<SlidersHorizontalIcon className="size-4" />}
               span={6}
               loading
@@ -101,12 +105,12 @@ export function EnvironmentDetail({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
       <ShellHeader
-        crumbs={crumbs(id, e)}
+        crumbs={crumbs(e, fallback)}
         title={<span className="font-mono">{e.name}</span>}
         status={
           <span className="inline-flex shrink-0 items-center gap-1.5 text-sm">
             <StatusDot status={e.deploysPaused ? "warn" : "ok"} />
-            {e.deploysPaused ? "Deploys paused" : "Deploys active"}
+            {e.deploysPaused ? t("deploysPaused") : t("deploysActive")}
           </span>
         }
         context={
@@ -129,7 +133,7 @@ export function EnvironmentDetail({
             <Button size="sm" variant="outline" asChild>
               <a href={e.url} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-4" />
-                Open
+                {t("open")}
               </a>
             </Button>
           ) : undefined
@@ -137,21 +141,26 @@ export function EnvironmentDetail({
         menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                aria-label={t("moreActions")}
+              >
                 <MoreHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-44">
               <DropdownMenuItem asChild>
                 <Link href={`/apps/${e.registeredAppSlug}/settings?section=environments`}>
-                  Environment settings
+                  {t("environmentSettings")}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link
                   href={`/deployments?app=${encodeURIComponent(e.registeredAppSlug)}&environment=${encodeURIComponent(e.name)}`}
                 >
-                  Deployments here
+                  {t("deploymentsHere")}
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -160,7 +169,7 @@ export function EnvironmentDetail({
       />
 
       <PanelGrid className="items-start">
-        <Panel title="Overview" icon={<InfoIcon className="size-4" />} span={6}>
+        <Panel title={t("overview")} icon={<InfoIcon className="size-4" />} span={6}>
           <DefinitionList
             items={[
               { term: "ID", description: <Identifier value={e.id} form="full" /> },
@@ -180,13 +189,13 @@ export function EnvironmentDetail({
                 ),
               },
               {
-                term: "Provider",
+                term: t("provider"),
                 description: (
                   <span className="font-mono text-xs">{e.clusterProviderPluginSlug ?? "—"}</span>
                 ),
               },
               {
-                term: "Domain zone",
+                term: t("domainZone"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {e.domainZone ?? "—"}
@@ -194,18 +203,18 @@ export function EnvironmentDetail({
                 ),
               },
               {
-                term: "Required approvals",
+                term: t("requiredApprovals"),
                 description: <span className="font-mono">{e.requiredApprovals}</span>,
               },
-              { term: "Deploys", description: <PausedBadge paused={e.deploysPaused} /> },
-              { term: "Ingress", description: <PausedBadge paused={e.ingressPaused} /> },
-              { term: "Created", description: <DetailTimestamp iso={e.createdAt} /> },
+              { term: t("deploys"), description: <PausedBadge paused={e.deploysPaused} /> },
+              { term: t("ingress"), description: <PausedBadge paused={e.ingressPaused} /> },
+              { term: t("created"), description: <DetailTimestamp iso={e.createdAt} /> },
             ]}
           />
         </Panel>
 
         <Panel
-          title="Settings"
+          title={t("settings")}
           icon={<SlidersHorizontalIcon className="size-4" />}
           span={6}
           actions={
@@ -215,8 +224,8 @@ export function EnvironmentDetail({
             e.settings.length === 0
               ? {
                   icon: <SlidersHorizontalIcon className="size-5" />,
-                  title: "No environment settings",
-                  description: "This environment has no per-environment settings configured.",
+                  title: t("noSettings"),
+                  description: t("noSettingsDescription"),
                 }
               : null
           }

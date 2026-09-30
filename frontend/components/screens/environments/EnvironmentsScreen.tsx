@@ -154,14 +154,14 @@ export function EnvironmentsScreen({
           <DropdownMenuItem asChild>
             <a href={e.url} target="_blank" rel="noreferrer">
               <ExternalLinkIcon className="size-4" />
-              Open URL
+              {t("openUrl")}
             </a>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
           <Link href={`/apps/${e.registeredAppSlug}`}>
             <CloudIcon className="size-4" />
-            Open app
+            {t("openApp")}
           </Link>
         </DropdownMenuItem>
       </>
@@ -178,7 +178,7 @@ export function EnvironmentsScreen({
 
   const body = {
     list,
-    label: "Environments",
+    label: t("title"),
     columns,
     rows,
     getRowId: (e: AstroliftAppEnvironment) => e.id,
