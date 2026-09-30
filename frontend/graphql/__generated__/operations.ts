@@ -613,6 +613,7 @@ export type AstroliftAgentTaskDispatcher = {
 
 export type AstroliftAgentTaskEvent = {
   createdAt: Scalars['DateTime']['output'];
+  data?: Maybe<Scalars['JSON']['output']>;
   kind: Scalars['String']['output'];
   messageId: Scalars['String']['output'];
   request?: Maybe<Scalars['JSON']['output']>;

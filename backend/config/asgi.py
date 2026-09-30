@@ -83,6 +83,10 @@ async def application(scope, receive, send):
             from core.schema.exec_ws import exec_ws_application
 
             return await exec_ws_application(scope, receive, send)
+        if path in {"/app/ahp", "/app/ahp/"}:
+            from astrolift_agents.agent_host_ws import agent_host_ws_application
+
+            return await agent_host_ws_application(scope, receive, send)
         if path.startswith("/app/vnc/"):
             from core.schema.vnc_ws import vnc_ws_application
 

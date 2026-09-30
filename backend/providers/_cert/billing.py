@@ -185,7 +185,8 @@ _GCP: dict[tuple[str, str], Classification] = {
         BillingClass.NO_IDLE_COST, "Billed per workflow step and external call."
     ),
     _c("cdn", "cloud_cdn"): Classification(
-        BillingClass.NO_IDLE_COST, "Billed for requests and egress; an idle configuration has no capacity floor."
+        BillingClass.NO_IDLE_COST,
+        "Billed for requests and egress; an idle configuration has no capacity floor.",
     ),
     _c("encryption_key", "cloud_kms"): Classification(
         BillingClass.SMALL_FIXED_FLOOR, "A key version carries a small monthly floor plus operation charges."
@@ -194,7 +195,8 @@ _GCP: dict[tuple[str, str], Classification] = {
         BillingClass.SMALL_FIXED_FLOOR, "The forwarding rule and endpoint carry a bounded hourly charge."
     ),
     _c("observability", "cloud_operations"): Classification(
-        BillingClass.SMALL_FIXED_FLOOR, "The workspace is near-zero idle; ingestion and retention are usage billed."
+        BillingClass.SMALL_FIXED_FLOOR,
+        "The workspace is near-zero idle; ingestion and retention are usage billed.",
     ),
 }
 
@@ -203,6 +205,11 @@ _GCP: dict[tuple[str, str], Classification] = {
 # serverless retains a billed compute floor while provisioned, just as the AWS
 # table treats Aurora Serverless v2.
 _AZURE: dict[tuple[str, str], Classification] = {
+    # The driver only admits standard SKUs, never provisioned throughput.
+    # https://learn.microsoft.com/azure/ai-services/openai/how-to/deployment-types
+    _c("model_endpoint", "azure_foundry"): Classification(
+        BillingClass.NO_IDLE_COST, "Standard Foundry deployments bill per token, with no reserved capacity."
+    ),
     **{
         _c(kind, variant): Classification(BillingClass.HOURLY_CAPACITY_FLOOR, rationale)
         for kind, variant, rationale in [
@@ -214,30 +221,60 @@ _AZURE: dict[tuple[str, str], Classification] = {
             ("mssql", "azure_sql_database", "Provisioned vCores bill from creation."),
             ("mssql", "azure_sql_hyperscale", "Provisioned compute and storage bill from creation."),
             ("redis", "azure_managed_redis", "A cache capacity bills by the hour from creation."),
-            ("document_db", "cosmos_nosql", "The certification account provisions throughput with an hourly floor."),
-            ("document_db", "cosmos_mongodb", "The certification account provisions throughput with an hourly floor."),
-            ("graph_db", "cosmos_gremlin", "The certification account provisions throughput with an hourly floor."),
+            (
+                "document_db",
+                "cosmos_nosql",
+                "The certification account provisions throughput with an hourly floor.",
+            ),
+            (
+                "document_db",
+                "cosmos_mongodb",
+                "The certification account provisions throughput with an hourly floor.",
+            ),
+            (
+                "graph_db",
+                "cosmos_gremlin",
+                "The certification account provisions throughput with an hourly floor.",
+            ),
             (
                 "wide_column",
                 "cosmos_cassandra",
                 "The certification account provisions throughput with an hourly floor.",
             ),
-            ("kv_store", "cosmos_table", "The certification account provisions throughput with an hourly floor."),
+            (
+                "kv_store",
+                "cosmos_table",
+                "The certification account provisions throughput with an hourly floor.",
+            ),
             ("filesystem", "azure_files", "Provisioned share capacity and transactions can bill while idle."),
-            ("filesystem", "azure_files_classic", "The backing storage account and share retain billable storage."),
-            ("event_bus", "event_grid_namespace", "Namespace throughput units retain an hourly capacity floor."),
+            (
+                "filesystem",
+                "azure_files_classic",
+                "The backing storage account and share retain billable storage.",
+            ),
+            (
+                "event_bus",
+                "event_grid_namespace",
+                "Namespace throughput units retain an hourly capacity floor.",
+            ),
             ("stream", "event_hubs", "Throughput or processing units bill by the hour."),
-            ("event_stream", "event_hubs_kafka", "The Event Hubs namespace bills throughput units by the hour."),
+            (
+                "event_stream",
+                "event_hubs_kafka",
+                "The Event Hubs namespace bills throughput units by the hour.",
+            ),
         ]
     },
     _c("event_bus", "event_grid"): Classification(
         BillingClass.NO_IDLE_COST, "Basic Event Grid is billed per operation."
     ),
     _c("faas", "azure_functions"): Classification(
-        BillingClass.NO_IDLE_COST, "The certification shape uses consumption billing per execution and duration."
+        BillingClass.NO_IDLE_COST,
+        "The certification shape uses consumption billing per execution and duration.",
     ),
     _c("encryption_key", "key_vault_key"): Classification(
-        BillingClass.SMALL_FIXED_FLOOR, "Key Vault operations are usage billed and the key itself has a small floor."
+        BillingClass.SMALL_FIXED_FLOOR,
+        "Key Vault operations are usage billed and the key itself has a small floor.",
     ),
     _c("private_endpoint", "private_link"): Classification(
         BillingClass.SMALL_FIXED_FLOOR, "A private endpoint has a bounded endpoint-hour charge."
