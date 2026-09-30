@@ -49,11 +49,16 @@ export function InvitationExpiryBadge({ expiresAt, className }: Props) {
 
   const target = React.useMemo(() => new Date(expiresAt).getTime(), [expiresAt]);
   const remainingMs = target - now;
-  const tooltip = fmt.formatDateTime(expiresAt);
+  const valid = Number.isFinite(target);
+  const tooltip = valid ? fmt.formatDateTime(expiresAt) : "—";
 
   const label = formatRemaining(remainingMs, t);
   const isExpired = remainingMs <= 0;
   const isUrgent = !isExpired && remainingMs < ONE_DAY;
+
+  if (!valid) {
+    return <span className={cn("text-muted-foreground text-sm", className)}>—</span>;
+  }
 
   // Pre-hydration fallback: render the absolute timestamp so the
   // server-rendered HTML is stable and only the live label drops in
@@ -94,6 +99,7 @@ export function InvitationExpiryBadge({ expiresAt, className }: Props) {
 type ExpiryTranslator = (k: string, v?: Record<string, string | number | Date>) => string;
 
 export function formatRemaining(remainingMs: number, t: ExpiryTranslator): string {
+  if (!Number.isFinite(remainingMs)) return "—";
   if (remainingMs <= 0) return t("expired");
   const days = Math.floor(remainingMs / ONE_DAY);
   const hours = Math.floor((remainingMs % ONE_DAY) / ONE_HOUR);

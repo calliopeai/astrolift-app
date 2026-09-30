@@ -14,6 +14,10 @@ type Story = StoryObj;
 
 export const Open: Story = { render: () => <CreateProjectSheet {...createProjectProps()} /> };
 
+export const RequestedTeam: Story = {
+  render: () => <CreateProjectSheet {...createProjectProps()} initialTeamSlug={TEAMS[1].slug} />,
+};
+
 /** The create mutation is in flight. */
 export const Creating: Story = {
   render: () => <CreateProjectSheet {...createProjectProps({ creating: true })} />,

@@ -74,8 +74,8 @@ def _scaffold(org, *, source_kind: str = "github", source_repo: str = "acme/api"
         manifest_path="astrolift.toml",
         k8s_namespace=f"acme-{slug}",
         subdomain=slug,
-        registry_repo_uri="123456.dkr.ecr.us-east-1.amazonaws.com/hello-app",
-        push_role_ref="arn:aws:iam::123456:role/astrolift-push-hello-app",
+        registry_repo_uri="123456789012.dkr.ecr.us-east-1.amazonaws.com/hello-app",
+        push_role_ref="arn:aws:iam::123456789012:role/astrolift-push-hello-app",
     )
 
 

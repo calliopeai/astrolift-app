@@ -3,7 +3,7 @@
 import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
 
-import { slugify } from "@/components/screens/projects/project-team-slug";
+import { slugify, isValidSlug } from "@/components/screens/projects/project-team-slug";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { CREATE_TEAM } from "@/graphql/identity/identity.mutations";
 import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
@@ -29,7 +29,8 @@ export function useCreateTeam() {
   /** Resolves true when the team was created, so the sheet can close. */
   async function createTeam(values: CreateTeamValues): Promise<boolean> {
     if (!org) return false;
-    const finalSlug = values.slug || slugify(values.name);
+    const finalSlug = values.slug.trim() || slugify(values.name);
+    if (!values.name.trim() || !isValidSlug(finalSlug)) return false;
     const { data } = await createTeamMutation({
       variables: {
         input: {

@@ -207,7 +207,23 @@ export function ClusterStatusBody({
   return (
     <PanelGrid>
       <StatusLiveStateCard slug={slug} {...liveState} />
-      {live ? (
+      {!state ? (
+        liveState.loading ? (
+          <>
+            {["Cluster saturation", "Workload health", "Live health", "Recent workflows"].map(
+              (title, index) => (
+                <Panel
+                  key={title}
+                  title={title}
+                  span={index === 0 ? 12 : 6}
+                  loading
+                  skeleton={<Skeleton className="h-24 w-full" />}
+                />
+              )
+            )}
+          </>
+        ) : null
+      ) : live ? (
         <>
           {metrics}
           {workloads}
@@ -322,7 +338,7 @@ export function StatusLiveStateCard({
   const age = formatHeartbeatAge(state?.heartbeatAgeSeconds ?? null);
   const live = isClusterLive(status);
 
-  if ((loading || error) && !state) {
+  if (!state) {
     return (
       <Panel
         icon={<ActivityIcon className="size-4" />}
@@ -330,7 +346,7 @@ export function StatusLiveStateCard({
         description="Keep-alive heartbeat from the in-cluster agent."
         loading={loading}
         skeleton={<Skeleton className="h-16 w-full" />}
-        error={error}
+        error={error ?? (loading ? null : "Cluster connection state unavailable")}
         onRetry={refetch}
       />
     );

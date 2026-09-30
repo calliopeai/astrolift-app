@@ -59,13 +59,13 @@ def cluster(org):
     # Seeded directly; the plugin row is scaffolding for this test.
     plugin = ProviderPlugin(
         name="Test Provider",
-        slug="test-provider-pr",
+        slug="aws",
         plugin_version="0.0.1",
         capabilities_manifest={},
         config_schema={},
     )
     ProviderPlugin.objects.bulk_create([plugin])
-    plugin = ProviderPlugin.objects.get(slug="test-provider-pr")
+    plugin = ProviderPlugin.objects.get(slug="aws")
     return TenantCluster.objects.create(
         organization=org,
         name="dev",
@@ -207,7 +207,7 @@ def test_sync_heals_blank_ref_before_rendering(app, monkeypatch):
 
     assert result.status == "updated"
     assert driver.calls, "sync must attempt push-role provisioning"
-    assert "role-to-assume: arn:aws:iam::111111111111:role/pr-push" in pushed["rendered"]
+    assert 'role-to-assume: "arn:aws:iam::111111111111:role/pr-push"' in pushed["rendered"]
 
 
 def test_agent_sync_does_not_provision_an_app_image_push_role(app, monkeypatch):

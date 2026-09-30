@@ -23,6 +23,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-west-2"
 `;
 
 export const SYNC_IN_SYNC: AstroliftCiWorkflowSyncStatus = {
@@ -30,8 +34,8 @@ export const SYNC_IN_SYNC: AstroliftCiWorkflowSyncStatus = {
   path: ".github/workflows/astrolift-ci.yml",
   detail: "",
   prUrl: "",
-  currentTemplateVersion: 7,
-  syncedTemplateVersion: 7,
+  currentTemplateVersion: 8,
+  syncedTemplateVersion: 8,
   checkedAt: "2026-09-28T11:40:00Z",
   syncedAt: "2026-09-27T09:00:00Z",
   repoText: RENDERED,
@@ -141,6 +145,33 @@ export const CI_SETUP_EMPTY: CiSetupSectionViewProps = {
   sourceWebhookInstalledAt: null,
   ciWorkflowSyncStatus: null,
   validate: { ...CI_DATA.validate, results: null },
+};
+
+export const CI_SETUP_EU: CiSetupSectionViewProps = {
+  ...CI_SETUP,
+  deployBranch: "release/eu",
+  registryUri: CI_SETUP.registryUri.replace("us-west-2", "eu-west-1"),
+  ciWorkflowSyncStatus: {
+    ...SYNC_IN_SYNC,
+    renderedText: RENDERED.replace("us-west-2", "eu-west-1").replace("[main]", '["release/eu"]'),
+  },
+};
+
+export const CI_SETUP_APAC: CiSetupSectionViewProps = {
+  ...CI_SETUP_EU,
+  registryUri: CI_SETUP_EU.registryUri.replace("eu-west-1", "ap-southeast-2"),
+  ciWorkflowSyncStatus: {
+    ...SYNC_IN_SYNC,
+    renderedText: CI_SETUP_EU.ciWorkflowSyncStatus!.renderedText.replace(
+      "eu-west-1",
+      "ap-southeast-2"
+    ),
+  },
+};
+
+export const CI_SETUP_UNAVAILABLE: CiSetupSectionViewProps = {
+  ...CI_SETUP,
+  ciWorkflowSyncStatus: { ...SYNC_IN_SYNC, renderedText: "" },
 };
 
 /** Platform API URL still loading, actions in flight. */

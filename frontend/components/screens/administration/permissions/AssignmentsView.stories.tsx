@@ -99,3 +99,14 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+/** The complete matching-list download is still running; no duplicate export. */
+export const ExportingCsv: Story = {
+  render: () => <Assignments {...assignmentsProps({ exportingCsv: true })} />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "More list actions" }));
+    await expect(
+      within(canvasElement.ownerDocument.body).getByRole("menuitem", { name: "Exporting CSV…" })
+    ).toHaveAttribute("aria-disabled", "true");
+  },
+};

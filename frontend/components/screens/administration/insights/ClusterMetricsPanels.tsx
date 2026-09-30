@@ -2,6 +2,7 @@
 
 import { BarChart3Icon, CloudIcon, RefreshCwIcon, WifiOffIcon } from "lucide-react";
 import Link from "next/link";
+import { useId } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -170,6 +171,7 @@ function KpiTile({
 
 // ─── Single metric area card (shared: Prometheus + system series) ─────
 function MetricAreaCard({ series }: { series: RangeSeries }) {
+  const gradientId = `sysgrad-${useId()}`;
   const tone = seriesTone(series);
   const colors = TONE_COLORS[tone];
   const chartData = series.points.map((p) => ({ ts: p.ts, value: p.value }));
@@ -189,7 +191,7 @@ function MetricAreaCard({ series }: { series: RangeSeries }) {
           <ResponsiveContainer width="100%" height={80}>
             <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <defs>
-                <linearGradient id={`sysgrad-${series.metric}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={colors.stroke} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={colors.stroke} stopOpacity={0.0} />
                 </linearGradient>
@@ -214,7 +216,7 @@ function MetricAreaCard({ series }: { series: RangeSeries }) {
                 dataKey="value"
                 stroke={colors.stroke}
                 strokeWidth={2}
-                fill={`url(#sysgrad-${series.metric})`}
+                fill={`url(#${gradientId})`}
                 dot={false}
                 isAnimationActive={false}
               />

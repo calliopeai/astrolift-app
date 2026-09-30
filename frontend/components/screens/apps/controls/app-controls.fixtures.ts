@@ -60,6 +60,10 @@ export const ENV_LONG: AstroliftAppEnvironment = {
 // ---------------------------------------------------------------- workloads
 
 export const WORKLOAD_WEB: AstroliftWorkload = {
+  viewerCan: {
+    restart: { allowed: true, code: "", reason: "" },
+    scale: { allowed: true, code: "", reason: "" },
+  },
   version: 1,
   id: "wl-web",
   name: "Web",

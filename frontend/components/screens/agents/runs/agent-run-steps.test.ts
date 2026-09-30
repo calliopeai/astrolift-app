@@ -15,6 +15,24 @@ const call = (
 ): AstroliftAgentInteraction => ({ id, kind, name, status, occurredAt: at });
 
 describe("agentRunSteps", () => {
+  it.each(["canceled", "CANCELLED"])(
+    "finishes %s runs as skipped rather than successful",
+    (status) => {
+      const steps = agentRunSteps(
+        {
+          status,
+          createdAt: "2026-09-28T12:00:00Z",
+          startedAt: "2026-09-28T12:00:01Z",
+          finishedAt: "2026-09-28T12:05:00Z",
+        },
+        [],
+        NOW
+      );
+      expect(steps[1].state).toBe("skipped");
+      expect(steps[1].durationMs).toBe(299_000);
+    }
+  );
+
   it("shows queued and the run, ticking while live", () => {
     const steps = agentRunSteps(
       {

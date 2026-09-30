@@ -150,7 +150,7 @@ You want users to sign in with their existing corporate identity instead of a se
 Pick the matching subsection. Every kind ends with the same three clicks in Astrolift: Settings · Identity providers → New provider → pick the kind → paste the credentials → Set active .
 ## Domain allowlist (auto-signup)
 By default, an SSO sign-in succeeds only if Astrolift already has an account for that user. To let new users self-onboard, mark their email domains as trusted.
-- Open Settings · Organization .
+- Open Administration · Organization .
 - Scroll to the Trusted email domains card and add corp.com (no @ ).
 - Save. Anyone who signs in via SSO with an @corp.com email is auto-joined to the organization with the default member role.
 ## Troubleshooting

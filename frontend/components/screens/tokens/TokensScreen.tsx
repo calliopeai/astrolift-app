@@ -361,7 +361,7 @@ export function TokensScreen({
               <Input
                 id="token-expires"
                 type="number"
-                min={1}
+                min={0}
                 max={365}
                 value={expiresInDays}
                 onChange={(e) => setExpiresInDays(e.target.value)}

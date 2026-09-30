@@ -170,10 +170,9 @@ export function ClusterPrerequisitesScreen() {
       <section className="flex flex-col gap-3">
         <h3 className="text-base font-medium">An ingress controller</h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Astrolift renders one ingress resource per app whose
-          <code>spec.ingressClassName</code> matches an <code>IngressClass</code> that exists in the
-          cluster. Any of the following controllers is fine — pick the one your platform team
-          already runs.
+          Astrolift renders one ingress resource per app whose <code>spec.ingressClassName</code>{" "}
+          matches an <code>IngressClass</code> that exists in the cluster. Any of the following
+          controllers is fine — pick the one your platform team already runs.
         </p>
 
         <h4 className="text-sm font-medium">
@@ -328,7 +327,7 @@ export function ClusterPrerequisitesScreen() {
             Almost always an ACME challenge problem. For <code>dns-01</code>: the issuer has no
             credentials to write the TXT record (check the <code>ClusterIssuer</code> spec, then the
             controller pod logs for credential errors). For <code>http-01</code>: the validator pod
-            cannot reach <code>http://&lt;hostname&gt;/.well-known/acme-challenge/...</code>— make
+            cannot reach <code>http://&lt;hostname&gt;/.well-known/acme-challenge/...</code> — make
             sure the ingress controller is exposed publicly. Inspect with:
             <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3 text-xs leading-relaxed">
               <code>{`kubectl describe certificate <name> -n <namespace>

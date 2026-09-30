@@ -227,6 +227,12 @@ export type AstroliftAccessEntryPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftActionPermission = {
+  allowed: Scalars['Boolean']['output'];
+  code: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type AstroliftActiveSession = {
   attestationKind: Scalars['String']['output'];
   attestationTrustLevel: Scalars['String']['output'];
@@ -2822,6 +2828,13 @@ export type AstroliftHeartbeatSessionPayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftIdentityCsvExport = {
+  content: Scalars['String']['output'];
+  contentType: Scalars['String']['output'];
+  filename: Scalars['String']['output'];
+  rowCount: Scalars['Int']['output'];
+};
+
 export type AstroliftIdentityProvider = {
   activatedAt?: Maybe<Scalars['DateTime']['output']>;
   clientId: Scalars['String']['output'];
@@ -2881,6 +2894,7 @@ export type AstroliftInvitation = {
   invitedByEmail?: Maybe<Scalars['String']['output']>;
   invitedByUserId?: Maybe<Scalars['String']['output']>;
   invitedByUsername?: Maybe<Scalars['String']['output']>;
+  lastActiveAt?: Maybe<Scalars['DateTime']['output']>;
   roleSlug?: Maybe<Scalars['String']['output']>;
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
@@ -4311,6 +4325,8 @@ export type AstroliftRoleBindingsListFilter = {
   role: InputMaybe<Array<Scalars['String']['input']>>;
   /** ORG, TEAM, PROJECT, APP. */
   scopeKind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Alias of holder, including "me" and "group:<external id>". */
+  subject: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftRoleLineage = {
@@ -5279,6 +5295,8 @@ export type AstroliftWorkload = {
   storageSize: Scalars['String']['output'];
   /** Version of this workload for restart and scale preconditions. */
   version: Scalars['Int']['output'];
+  /** Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply. */
+  viewerCan: AstroliftWorkloadViewerCan;
   volumes: Scalars['JSON']['output'];
 };
 
@@ -5379,6 +5397,11 @@ export type AstroliftWorkloadScalingStatus = {
   replicaLowerBound: Scalars['Int']['output'];
   replicaUpperBound: Scalars['Int']['output'];
   sourcedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftWorkloadViewerCan = {
+  restart: AstroliftActionPermission;
+  scale: AstroliftActionPermission;
 };
 
 /** The workloads list's declared filters. Unset fields do not filter; list values match any. */
@@ -9235,6 +9258,7 @@ export type Query = {
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
+  astroliftInvitationsCsv: AstroliftIdentityCsvExport;
   astroliftInvitationsPage: AstroliftInvitationPage;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftManagedServiceCostPreview?: Maybe<AstroliftManagedServiceCostPreview>;
@@ -9245,6 +9269,7 @@ export type Query = {
   astroliftManagedServicesPage: AstroliftManagedServicePage;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage. */
   astroliftMembers: Array<AstroliftMember>;
+  astroliftMembersCsv: AstroliftIdentityCsvExport;
   astroliftMembersPage: AstroliftMemberPage;
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
@@ -9306,6 +9331,7 @@ export type Query = {
   astroliftRole?: Maybe<AstroliftRole>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage. */
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
+  astroliftRoleBindingsCsv: AstroliftIdentityCsvExport;
   astroliftRoleBindingsPage: AstroliftRoleBindingPage;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage. */
   astroliftRoles: Array<AstroliftRole>;
@@ -10323,6 +10349,14 @@ export type QueryAstroliftInvitationsArgs = {
 };
 
 
+export type QueryAstroliftInvitationsCsvArgs = {
+  filter?: InputMaybe<AstroliftInvitationsListFilter>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftInvitationsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   filter?: InputMaybe<AstroliftInvitationsListFilter>;
@@ -10368,6 +10402,13 @@ export type QueryAstroliftManagedServicesPageArgs = {
 
 export type QueryAstroliftMembersArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMembersCsvArgs = {
+  filter?: InputMaybe<AstroliftMembersListFilter>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -10621,6 +10662,15 @@ export type QueryAstroliftRenderedManifestArgs = {
 
 export type QueryAstroliftRoleArgs = {
   id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftRoleBindingsCsvArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftRoleBindingsListFilter>;
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -13355,6 +13405,7 @@ export type ListRolesPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
   filter?: InputMaybe<AstroliftRolesListFilter>;
   sort?: InputMaybe<Scalars['String']['input']>;
   page?: InputMaybe<Scalars['Int']['input']>;
@@ -13426,6 +13477,7 @@ export type ListPoliciesPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
+  sortBy?: InputMaybe<AstroliftListSortKey>;
   filter?: InputMaybe<AstroliftPoliciesListFilter>;
   sort?: InputMaybe<Scalars['String']['input']>;
   page?: InputMaybe<Scalars['Int']['input']>;
@@ -13490,7 +13542,7 @@ export type ListInvitationsQueryVariables = Exact<{
 
 export type ListInvitationsQuery = { astroliftInvitations: Array<{ id: string, email: string, scopeKind: string, scopeId: string, roleSlug?: string | null, status: string, expiresAt: string, acceptedAt?: string | null, invitedByUsername?: string | null, invitedByUserId?: string | null, invitedByDisplayName?: string | null, invitedByEmail?: string | null, invitedByAvatarUrl?: string | null, createdAt: string }> };
 
-export type InvitationFieldsFragment = { id: string, email: string, scopeKind: string, scopeId: string, roleSlug?: string | null, status: string, expiresAt: string, acceptedAt?: string | null, invitedByUsername?: string | null, invitedByUserId?: string | null, invitedByDisplayName?: string | null, invitedByEmail?: string | null, invitedByAvatarUrl?: string | null, createdAt: string };
+export type InvitationFieldsFragment = { id: string, email: string, scopeKind: string, scopeId: string, roleSlug?: string | null, status: string, expiresAt: string, acceptedAt?: string | null, invitedByUsername?: string | null, invitedByUserId?: string | null, invitedByDisplayName?: string | null, invitedByEmail?: string | null, invitedByAvatarUrl?: string | null, createdAt: string, lastActiveAt?: string | null };
 
 export type ListInvitationsPageQueryVariables = Exact<{
   status?: InputMaybe<Scalars['String']['input']>;
@@ -13504,7 +13556,7 @@ export type ListInvitationsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListInvitationsPageQuery = { astroliftInvitationsPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, email: string, scopeKind: string, scopeId: string, roleSlug?: string | null, status: string, expiresAt: string, acceptedAt?: string | null, invitedByUsername?: string | null, invitedByUserId?: string | null, invitedByDisplayName?: string | null, invitedByEmail?: string | null, invitedByAvatarUrl?: string | null, createdAt: string }> } };
+export type ListInvitationsPageQuery = { astroliftInvitationsPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, email: string, scopeKind: string, scopeId: string, roleSlug?: string | null, status: string, expiresAt: string, acceptedAt?: string | null, invitedByUsername?: string | null, invitedByUserId?: string | null, invitedByDisplayName?: string | null, invitedByEmail?: string | null, invitedByAvatarUrl?: string | null, createdAt: string, lastActiveAt?: string | null }> } };
 
 export type SearchableUsersQueryVariables = Exact<{
   query: Scalars['String']['input'];
@@ -13534,6 +13586,36 @@ export type GetElevationStatusQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetElevationStatusQuery = { astroliftElevationStatus: { elevated: boolean, elevatedUntil?: string | null, secondsRemaining: number, method?: string | null, requiredFor: Array<string> } };
+
+export type ExportMembersCsvQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftMembersListFilter>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ExportMembersCsvQuery = { astroliftMembersCsv: { filename: string, content: string, rowCount: number, contentType: string } };
+
+export type ExportInvitationsCsvQueryVariables = Exact<{
+  status?: InputMaybe<Scalars['String']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftInvitationsListFilter>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ExportInvitationsCsvQuery = { astroliftInvitationsCsv: { filename: string, content: string, rowCount: number, contentType: string } };
+
+export type ExportRoleBindingsCsvQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+  filter?: InputMaybe<AstroliftRoleBindingsListFilter>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ExportRoleBindingsCsvQuery = { astroliftRoleBindingsCsv: { filename: string, content: string, rowCount: number, contentType: string } };
 
 export type UpdateMyUiPreferencesMutationVariables = Exact<{
   input: UpdateMyUiPreferencesInput;

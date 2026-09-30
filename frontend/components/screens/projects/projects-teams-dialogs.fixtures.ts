@@ -83,6 +83,7 @@ export function projectsProps(
     teamsLoading: false,
     noTeams: false,
     autoOpenCreate: false,
+    initialTeamSlug: null,
     deleting: false,
     deleteProject: async () => {},
     renderCreateDialog: () => null,

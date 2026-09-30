@@ -318,7 +318,7 @@ export function membersVariables(s: ListQuestion): NumberedVariables<MembersFilt
 export function invitationsVariables(s: ListQuestion): NumberedVariables<InvitationsFilter> {
   const sort = s.sort
     .map((k) => ({ ...k, key: INVITATION_SORT[k.key] ?? k.key }))
-    .filter((k) => ["email", "created", "expires", "status", "role"].includes(k.key));
+    .filter((k) => ["email", "created", "expires", "status", "role", "lastActive"].includes(k.key));
   return numberedVariables(
     { ...s, sort: sort.length ? sort : [{ key: "created", dir: "desc" }] },
     { status: one(s.filters.status), role: one(s.filters.role) }

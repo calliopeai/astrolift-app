@@ -25,6 +25,10 @@ function Screen({
 
 export const Full: Story = { render: () => <Screen /> };
 
+export const ConfiguredTemporal: Story = {
+  render: () => <Screen temporalUiUrl="https://workflows.operator.example/" />,
+};
+
 export const Loading: Story = {
   render: () => <Screen metrics={undefined} metricsLoading apps={[]} healthLoading />,
 };

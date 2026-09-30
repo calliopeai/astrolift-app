@@ -319,10 +319,10 @@ export function WorkloadDetailScreen({
                   </Badge>
                 )}
                 <Button variant="outline" size="sm" asChild>
-                  <a href={appHref(basePath, appSlug, "manifest")}>
+                  <Link href={appHref(basePath, appSlug, "manifest")}>
                     <GitBranchIcon className="size-4" />
                     Manifest preview
-                  </a>
+                  </Link>
                 </Button>
               </>
             }

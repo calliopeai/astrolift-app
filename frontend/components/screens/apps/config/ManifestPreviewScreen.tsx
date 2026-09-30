@@ -120,11 +120,11 @@ export function ManifestPreviewScreen({
             {result.errorPath && (
               <p className="text-muted-foreground text-xs">
                 offending key: <span className="font-mono">{result.errorPath}</span>
-                {result.errorLine && (
+                {result.errorLine != null && (
                   <>
                     {" "}
                     — line <span className="font-mono">{result.errorLine}</span>
-                    {result.errorColumn && (
+                    {result.errorColumn != null && (
                       <>
                         , col <span className="font-mono">{result.errorColumn}</span>
                       </>

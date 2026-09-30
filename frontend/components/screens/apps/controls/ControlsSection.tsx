@@ -319,7 +319,8 @@ export function WorkloadOpsRowView({
           {workload.slug}
         </Badge>
         <span className="text-muted-foreground text-xs">
-          {t("readyCount", { ready: initial, desired: initial })}
+          {/* Desired replicas come from the manifest; no pod readiness is observed here. */}
+          {t("readyCount", { ready: "—", desired: workload.replicas ?? "—" })}
         </span>
       </div>
       <Can permission="app.deploy">

@@ -365,11 +365,19 @@ def decide(
 
     groups = actor_groups(tenant)
     grants = tuple(_live_grants(tenant, chain))
+    shares = (
+        tuple(_share_grants(tenant, [chain[0][1]], historical=historical).get(chain[0][1], ()))
+        if chain[0][0] == "APP"
+        else ()
+    )
+    return _decide_from_grants(tenant, permission, chain, grants, shares, groups)
+
+
+def _decide_from_grants(tenant, permission, chain, grants, shares, groups) -> Decision:
+    """The scalar checker and batched advisory reads evaluate the same inputs."""
     covering = [g for g in grants if g.covers(chain)]
     matched: Grant | ShareGrant | None = next((g for g in covering if g.carries(permission.value)), None)
-    shares: tuple[ShareGrant, ...] = ()
     if chain[0][0] == "APP":
-        shares = tuple(_share_grants(tenant, [chain[0][1]], historical=historical).get(chain[0][1], ()))
         if matched is None:
             matched = next((s for s in shares if permission.value in _share_permissions(s)), None)
 

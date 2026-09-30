@@ -23,19 +23,21 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { AstroliftTeam } from "@/graphql/identity/identity.types";
 
-import { slugify } from "./project-team-slug";
+import { slugify, isValidSlug, SLUG_MAX, SLUG_INPUT_PATTERN } from "./project-team-slug";
 import type { useCreateProject } from "./use-create-project";
 
 export type CreateProjectSheetProps = ReturnType<typeof useCreateProject> & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teams: AstroliftTeam[];
+  initialTeamSlug?: string | null;
 };
 
 export function CreateProjectSheet({
   open,
   onOpenChange,
   teams,
+  initialTeamSlug,
   creating,
   createProject,
 }: CreateProjectSheetProps) {
@@ -46,11 +48,17 @@ export function CreateProjectSheet({
   const [slugTouched, setSlugTouched] = React.useState(false);
 
   React.useEffect(() => {
-    if (teams.length > 0 && !teamId) setTeamId(teams[0].id);
-  }, [teams, teamId]);
+    if (open && teams.length > 0 && !teams.some((team) => team.id === teamId)) {
+      const preferred = initialTeamSlug
+        ? teams.find((team) => team.slug === initialTeamSlug)
+        : teams[0];
+      if (preferred) setTeamId(preferred.id);
+    }
+  }, [open, teams, teamId, initialTeamSlug]);
 
   React.useEffect(() => {
     if (!open) {
+      setTeamId("");
       setName("");
       setSlug("");
       setDescription("");
@@ -60,7 +68,7 @@ export function CreateProjectSheet({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!teamId) return;
+    if (creating || !teamId || !name.trim() || !isValidSlug(slug)) return;
     if (await createProject({ teamId, name, slug, description })) onOpenChange(false);
   }
 
@@ -122,9 +130,15 @@ export function CreateProjectSheet({
                 setSlugTouched(true);
               }}
               placeholder="api"
-              pattern="[a-z0-9-]+"
+              pattern={SLUG_INPUT_PATTERN}
+              maxLength={SLUG_MAX}
+              aria-invalid={slug.length > 0 && !isValidSlug(slug)}
               required
             />
+            <p className="text-muted-foreground text-xs">
+              Start with a lowercase letter; use letters, numbers and hyphens, up to 40 characters.
+              End with a letter or number.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -142,7 +156,10 @@ export function CreateProjectSheet({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={creating || !name || !teamId}>
+            <Button
+              type="submit"
+              disabled={creating || !name.trim() || !teamId || !isValidSlug(slug)}
+            >
               {creating ? "Creating…" : "Create project"}
             </Button>
           </SheetFooter>

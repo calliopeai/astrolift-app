@@ -760,6 +760,17 @@ def _render_app_ingresses_and_tls(
         "app_environment__tenant_cluster",
     ).get(pk=deployment_id)
 
+    edge_cluster = (
+        d.app_environment.tenant_cluster
+        if d.app_environment and d.app_environment.tenant_cluster_id
+        else None
+    )
+    out: list[dict[str, Any]] = []
+    if edge_cluster is not None and edge_cluster.ingress_class == "envoy":
+        from core.app_deploy import envoy_custom_domain_routes
+
+        out.extend(envoy_custom_domain_routes(d, manifest, namespace=namespace, cluster=edge_cluster))
+
     # Find the public-facing workload + its port. If the app has no
     # deployment workload with an exposed port we can't route to it,
     # so no ingress.
@@ -768,13 +779,13 @@ def _render_app_ingresses_and_tls(
         None,
     )
     if primary_workload is None or not primary_workload.containers:
-        return []
+        return out
     primary_container = next(
         (c for c in primary_workload.containers if c.is_primary),
         primary_workload.containers[0],
     )
     if primary_container.port <= 0:
-        return []
+        return out
     backend_port = int(primary_container.port)
     backend_service = primary_workload.name
 
@@ -808,20 +819,15 @@ def _render_app_ingresses_and_tls(
     # domain itself; see custom_domain_edge_auth_state.
     from core.app_deploy import custom_domain_edge_auth_state
 
-    edge_cluster = (
-        d.app_environment.tenant_cluster
-        if d.app_environment and d.app_environment.tenant_cluster_id
-        else None
-    )
-
-    out: list[dict[str, Any]] = []
     domains = CustomDomain.objects.filter(
         registered_app=d.registered_app,
         deleted_at__isnull=True,
         is_active=True,
         validation_status=CustomDomain.ValidationStatus.VALIDATED,
     )
-    if (getattr(d.app_environment, "k8s_namespace", "") or "").strip():
+    if (edge_cluster is not None and edge_cluster.ingress_class == "envoy") or (
+        getattr(d.app_environment, "k8s_namespace", "") or ""
+    ).strip():
         # A custom domain is the app's, served from the app namespace. An
         # environment in a namespace of its own (a preview, #1922) emitting
         # it too would be a second Ingress for the same host on the cluster.

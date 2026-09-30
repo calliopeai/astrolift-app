@@ -440,6 +440,14 @@ class Command(BaseCommand):
         # "leave whatever the row has". The plugin default still applies, but
         # only when the row is being created.
         explicit_ingress_class = opts["ingress_class"] or _env("ASTROLIFT_CLUSTER_INGRESS_CLASS") or None
+        if explicit_ingress_class == "envoy" and plugin_slug != "aws":
+            from types import SimpleNamespace
+
+            from astrolift_clusters.edge_install import edge_support_refusal
+
+            raise CommandError(
+                edge_support_refusal(SimpleNamespace(provider_plugin=SimpleNamespace(slug=plugin_slug)))
+            )
         org_slug = opts["org_slug"] or _env("ASTROLIFT_CLUSTER_ORG_SLUG") or ""
         # No default: absent means "leave whatever the row has". Unlike
         # ingress_class, an unset ingress_mode must not resolve to a value

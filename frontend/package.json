@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build --quiet",
-    "test:layout": "playwright test"
+    "test:layout": "playwright test",
+    "test:routes": "playwright test --config playwright.routes.config.ts"
   },
   "dependencies": {
     "@apollo/client": "^4.1.6",

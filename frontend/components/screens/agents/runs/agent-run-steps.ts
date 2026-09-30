@@ -7,8 +7,17 @@ import type { LogLine } from "@/components/run/LogView";
 import type { StepState, TimelineStep } from "@/components/run/Timeline";
 import type { AstroliftAgentInteraction } from "@/graphql/agents/agents.types";
 
-/** Terminal AgentTask statuses: a successful task is "completed", not "succeeded". */
-export const TERMINAL_STATUSES = new Set(["completed", "failed", "timed_out", "cancelled"]);
+/** Canonical task statuses and terminal spellings accepted by the run surfaces. */
+const TERMINAL_STATUSES = new Set([
+  "completed",
+  "succeeded",
+  "failed",
+  "timed_out",
+  "cancelled",
+  "canceled",
+]);
+
+export const isTerminalAgentTask = (status: string) => TERMINAL_STATUSES.has(status.toLowerCase());
 
 /** Past this many interaction steps the Timeline keeps the newest; the map has them all. */
 export const MAX_INTERACTION_STEPS = 40;
@@ -57,7 +66,7 @@ export function agentRunSteps(
   now: number
 ): TimelineStep[] {
   const s = task.status.toLowerCase();
-  const terminal = TERMINAL_STATUSES.has(s);
+  const terminal = isTerminalAgentTask(s);
   const started = Boolean(task.startedAt);
   const failed = s === "failed" || s === "timed_out";
 
@@ -82,7 +91,7 @@ export function agentRunSteps(
           ? "running"
           : failed
             ? "failed"
-            : s === "cancelled"
+            : s === "cancelled" || s === "canceled"
               ? "skipped"
               : "ok",
       durationMs: started ? span(task.startedAt, task.finishedAt ?? (terminal ? null : now)) : null,

@@ -218,6 +218,12 @@ type AstroliftAccessEntryPage {
   pageSize: Int
 }
 
+type AstroliftActionPermission {
+  allowed: Boolean!
+  code: String!
+  reason: String!
+}
+
 type AstroliftActiveSession {
   id: String!
   expiresAt: DateTime
@@ -2940,6 +2946,13 @@ type AstroliftHeartbeatSessionPayloadMutationResult {
   data: AstroliftHeartbeatSessionPayload
 }
 
+type AstroliftIdentityCsvExport {
+  filename: String!
+  content: String!
+  rowCount: Int!
+  contentType: String!
+}
+
 type AstroliftIdentityProvider {
   id: GUID!
   organizationSlug: String!
@@ -3003,6 +3016,7 @@ type AstroliftInvitation {
   invitedByEmail: String
   invitedByAvatarUrl: String
   createdAt: DateTime!
+  lastActiveAt: DateTime
 }
 
 type AstroliftInvitationCreated {
@@ -4552,6 +4566,9 @@ input AstroliftRoleBindingsListFilter {
   Who holds the binding: a username, "group:<external id>", or "me": the viewer's own bindings and those on the IdP groups the viewer is in.
   """
   holder: [String!] = null
+
+  """Alias of holder, including "me" and "group:<external id>"."""
+  subject: [String!] = null
 }
 
 type AstroliftRoleLineage {
@@ -5614,6 +5631,11 @@ type AstroliftWorkload {
   storageClass: String!
   storageSize: String!
   registeredAppSlug: String!
+
+  """
+  Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply.
+  """
+  viewerCan: AstroliftWorkloadViewerCan!
   inClusterServiceFqdn: String!
   volumes: JSON!
   ownerUserId: String
@@ -5726,6 +5748,11 @@ type AstroliftWorkloadScalingStatus {
   replicaLowerBound: Int!
   replicaUpperBound: Int!
   sourcedAt: DateTime!
+}
+
+type AstroliftWorkloadViewerCan {
+  restart: AstroliftActionPermission!
+  scale: AstroliftActionPermission!
 }
 
 """
@@ -7693,6 +7720,9 @@ type Query {
 
   """Cursor-paginated list of members in the caller's organizations."""
   membersPage(search: String = null, limit: Int! = 50, after: String = null): OrganizationMemberTypePage!
+  astroliftMembersCsv(search: String = null, filter: AstroliftMembersListFilter = null, sort: String = null): AstroliftIdentityCsvExport!
+  astroliftInvitationsCsv(status: String = null, search: String = null, filter: AstroliftInvitationsListFilter = null, sort: String = null): AstroliftIdentityCsvExport!
+  astroliftRoleBindingsCsv(search: String = null, appSlug: String = null, roleId: GUID = null, filter: AstroliftRoleBindingsListFilter = null, sort: String = null): AstroliftIdentityCsvExport!
   me: AstroliftMe
   astroliftOrganization(slug: String!): AstroliftOrganization
   astroliftOrganizations: [AstroliftOrganization!]!

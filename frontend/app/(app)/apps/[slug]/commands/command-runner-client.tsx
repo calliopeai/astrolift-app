@@ -7,5 +7,5 @@ import { AppTabs } from "../components/app-tabs";
 
 export function CommandRunnerClient({ slug }: { slug: string }) {
   const runner = useCommandRunner(slug);
-  return <CommandRunnerScreen {...runner} tabs={<AppTabs slug={slug} active="deployments" />} />;
+  return <CommandRunnerScreen {...runner} tabs={<AppTabs slug={slug} active="commands" />} />;
 }

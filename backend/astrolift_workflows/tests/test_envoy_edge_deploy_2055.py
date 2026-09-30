@@ -272,12 +272,26 @@ def test_shared_ingress_aws_app_gets_a_rule_on_its_alb_group():
     assert ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/group.name"] == "astrolift-conflict"
 
 
-def test_no_group_rule_off_aws_or_outside_shared_ingress():
-    for cluster in (_cluster(COGNITO, plugin="gcp"), _cluster(COGNITO, mode="per_app")):
-        out = envoy_edge_routes(
-            _app(), namespace="ns", workloads={"web": (["a.z.example"], 80)}, cluster=cluster, paused=False
+def test_no_group_rule_outside_shared_ingress():
+    out = envoy_edge_routes(
+        _app(),
+        namespace="ns",
+        workloads={"web": (["a.z.example"], 80)},
+        cluster=_cluster(COGNITO, mode="per_app"),
+        paused=False,
+    )
+    assert _front(out) == []
+
+
+def test_non_eks_edge_refuses_without_a_tls_front():
+    with pytest.raises(AppDeployError, match="no supported TLS front"):
+        envoy_edge_routes(
+            _app(),
+            namespace="ns",
+            workloads={"web": (["a.z.example"], 80)},
+            cluster=_cluster(COGNITO, plugin="gcp"),
+            paused=False,
         )
-        assert _front(out) == []
 
 
 def test_prune_keeps_the_rendered_group_rule_and_drops_a_stale_one():

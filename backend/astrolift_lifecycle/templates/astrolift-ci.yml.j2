@@ -14,7 +14,7 @@ concurrency:
   # Concurrency groups are already repository-scoped by GitHub. Keep the key
   # bounded to the app slug: refs can be arbitrarily long, and this workflow
   # deploys only the configured branch (plus explicit manual dispatches).
-  group: astrolift-{{ app_slug }}
+  group: {{ concurrency_group }}
   cancel-in-progress: true
 
 jobs:
@@ -23,13 +23,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+{% if aws_auth %}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: {{ push_role_arn }}
-          aws-region: us-west-2
+          aws-region: {{ aws_region }}
           role-session-name: astrolift-${{ github.run_id }}
+{% endif %}
 {% if platform_built %}
 
       - name: Login to Amazon ECR
@@ -51,7 +53,7 @@ jobs:
       - name: Build and push image
         if: steps.image_exists.outputs.exists != 'true'
         env:
-          IMAGE: {{ ecr_uri }}:${{ github.sha }}
+          IMAGE: {{ image }}
         run: |
           docker build -t "$IMAGE" .
           docker push "$IMAGE"

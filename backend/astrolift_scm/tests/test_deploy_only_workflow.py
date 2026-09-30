@@ -113,14 +113,14 @@ def test_deploy_only_tolerates_whitespace_only_uri(host, settings):
     assert "docker push" not in body
 
 
-def test_github_deploy_only_keeps_checkout_and_oidc_drops_ecr(settings):
+def test_github_unconfigured_deploy_only_keeps_checkout_without_aws(settings):
     """GitHub deploy-only keeps checkout + OIDC creds, drops the ECR-login step."""
     settings.PLATFORM_API_URL = "https://platform.astrolift.test"
     body = render_astrolift_ci_workflow(_app(registry_repo_uri="", source_kind="github"))
 
     assert "actions/checkout@v4" in body
-    assert "Configure AWS credentials (OIDC)" in body  # harmless, kept
-    assert "aws-actions/configure-aws-credentials@v4" in body
+    assert "Configure AWS credentials (OIDC)" not in body
+    assert "aws-actions/configure-aws-credentials@v4" not in body
     assert "aws-actions/amazon-ecr-login" not in body  # only needed for the build
     assert "Build and push image" not in body
     # Deploy-only notifies with the bare commit SHA as the wildcard tag.
@@ -143,7 +143,7 @@ def test_github_build_render_still_has_every_build_step(settings):
     # die on the registry's immutable tags.
     assert "Check for existing image" in body
     assert "aws ecr describe-images" in body
-    assert "ECR_REPO: emr-bug-triage" in body
+    assert 'ECR_REPO: "emr-bug-triage"' in body
     assert "if: steps.image_exists.outputs.exists != 'true'" in body
     assert "{%" not in body  # blocks resolved
     assert "{{ ecr_repo_name }}" not in body
@@ -153,7 +153,7 @@ def test_github_managed_workflow_cancels_superseded_runs(settings):
     settings.PLATFORM_API_URL = "https://platform.astrolift.test"
     body = render_astrolift_ci_workflow(_app(registry_repo_uri=_PLATFORM_URI, source_kind="github"))
 
-    assert "group: astrolift-emr-bug-triage" in body
+    assert 'group: "astrolift-emr-bug-triage"' in body
     assert "cancel-in-progress: true" in body
 
 

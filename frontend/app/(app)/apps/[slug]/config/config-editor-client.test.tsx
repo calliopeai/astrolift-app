@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UPDATE_MANIFEST } from "@/graphql/registry/registry.mutations";
@@ -104,6 +104,31 @@ beforeEach(() => {
 });
 
 describe("ConfigEditorClient save round trip (#1920)", () => {
+  it("keeps a conflicting local draft unsaved until the explicit Save action", async () => {
+    render(<ConfigEditorClient slug="demo" />);
+    fireEvent.click(screen.getByRole("button", { name: "view.code" }));
+    const ours = `${STORED_VIEW}LOCAL = "retained"\n`;
+    fireEvent.change(screen.getByPlaceholderText("# astrolift.toml"), { target: { value: ours } });
+    act(() =>
+      server.set(appWithStaged(`${STORED_VIEW}REMOTE = "changed"\n`, "2026-09-24T00:00:05Z"))
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("keepMine");
+    expect(screen.queryByText("forceOverwrite")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "keepMine" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(server.resolveSave).toBeNull();
+    expect(screen.getByPlaceholderText("# astrolift.toml")).toHaveValue(ours);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "saveDraft" })));
+    expect(server.resolveSave).not.toBeNull();
+    await act(async () =>
+      server.resolveSave?.({
+        data: { updateManifest: { ok: false, errors: [{ message: "Retry later" }] } },
+      })
+    );
+    expect(screen.getByPlaceholderText("# astrolift.toml")).toHaveValue(ours);
+  });
+
   it("adopts the masked echo of its own save instead of raising a conflict", async () => {
     render(<ConfigEditorClient slug="demo" />);
     fireEvent.click(screen.getByRole("button", { name: "view.code" }));

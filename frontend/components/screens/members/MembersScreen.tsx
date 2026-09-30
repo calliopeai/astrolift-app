@@ -83,6 +83,7 @@ export function MembersScreen({
   error,
   onRetry,
   onExportCsv,
+  exportingCsv,
   revokingInvite,
   deletingInvite,
   resendingInvite,
@@ -133,8 +134,10 @@ export function MembersScreen({
       // Above the row link, so the tooltip opens.
       cellClassName: "relative z-10",
       cell: (row) =>
-        row.kind === "user" ? (
-          <LastActiveCell value={row.lastActiveAt} />
+        row.kind === "user" || (row.kind === "invitation" && row.invitation.lastActiveAt) ? (
+          <LastActiveCell
+            value={row.kind === "user" ? row.lastActiveAt : (row.invitation.lastActiveAt ?? null)}
+          />
         ) : (
           <span className="text-muted-foreground text-xs">—</span>
         ),
@@ -264,7 +267,7 @@ export function MembersScreen({
           error={error}
           onRetry={onRetry}
           totalCount={totalCount}
-          menu={<ExportMenu count={totalCount} onExport={onExportCsv} />}
+          menu={<ExportMenu count={totalCount} onExport={onExportCsv} exporting={exportingCsv} />}
           empty={{
             icon: <UsersIcon className="size-5" />,
             title: "No people yet",
@@ -337,7 +340,15 @@ const INVITE_CONFIRM: Record<
  * row the view and filters match, walked from the server, not only the page
  * on screen.
  */
-function ExportMenu({ count, onExport }: { count: number; onExport: () => void }) {
+function ExportMenu({
+  count,
+  onExport,
+  exporting,
+}: {
+  count: number;
+  onExport: () => void;
+  exporting: boolean;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -346,9 +357,9 @@ function ExportMenu({ count, onExport }: { count: number; onExport: () => void }
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={count === 0} onSelect={onExport}>
+        <DropdownMenuItem disabled={count === 0 || exporting} onSelect={onExport}>
           <DownloadIcon className="size-4" />
-          Export {count.toLocaleString("en-US")} as CSV
+          {exporting ? "Exporting CSV…" : `Export ${count.toLocaleString("en-US")} as CSV`}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

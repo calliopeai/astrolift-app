@@ -653,6 +653,11 @@ class ClustersMutation:
                 f"plugin {input.provider_plugin_slug!r} not registered",
                 field="providerPluginSlug",
             )
+        if input.ingress_class == "envoy":
+            from astrolift_clusters.edge_install import edge_support_refusal
+
+            if refusal := edge_support_refusal(TenantCluster(provider_plugin=plugin)):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="ingressClass")
         if input.auth_method not in {"kubeconfig", "exec_plugin", "service_account_token"}:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -861,6 +866,13 @@ class ClustersMutation:
         _require_operator_for_shared(info, cluster, Permission.CLUSTER_UPDATE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
+        if (input.ingress_class or cluster.ingress_class) == "envoy" and (
+            input.ingress_class is not None or input.oidc_auth_config not in (strawberry.UNSET, None)
+        ):
+            from astrolift_clusters.edge_install import edge_support_refusal
+
+            if refusal := edge_support_refusal(cluster):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="ingressClass")
         if input.is_active is not None:
             cluster.is_active = input.is_active
         if input.region is not None:
@@ -1189,6 +1201,11 @@ class ClustersMutation:
 
         # Reshape the flat triple list into the nested dict the
         # workflow consumes.
+        if "envoy-gateway" in input.selected_components:
+            from astrolift_clusters.edge_install import edge_support_refusal
+
+            if refusal := edge_support_refusal(cluster):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
         overrides: dict[str, dict[str, str]] = {}
         for o in input.option_overrides or []:
             overrides.setdefault(o.component_key, {})[o.option_key] = o.value

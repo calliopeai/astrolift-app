@@ -67,8 +67,9 @@ export interface CiSetupSectionViewProps extends CiSetupData {
   /** Provider-plugin slug of the app's default cluster (#854) — one of
    *  `aws` / `gcp` / `azure` / `k8s_native`. Drives the provider-correct
    *  secret names, hints, and reference workflow. Empty when no default
-   *  cluster is bound yet, in which case we fall back to the AWS shape. */
+   *  cluster is bound yet; the workflow then requires a backend preview. */
   providerPluginSlug: string;
+  deployBranch?: string | null;
   /** ISO timestamp of the last successful webhook install / refresh
    *  (#385). `null` until the operator clicks "Install webhook" for
    *  the first time. */
@@ -101,6 +102,7 @@ export function CiSetupSectionView({
   registryUri,
   pushCredentialRef,
   providerPluginSlug,
+  deployBranch,
   sourceWebhookInstalledAt,
   ciWorkflowSyncStatus,
   agentMode = false,
@@ -217,9 +219,15 @@ export function CiSetupSectionView({
     },
   ];
 
-  const workflowYaml = renderWorkflowYaml(meta);
+  const workflowYaml = renderWorkflowYaml(meta, {
+    providerSlug: providerPluginSlug,
+    renderedText: ciWorkflowSyncStatus?.renderedText,
+    deployBranch,
+  });
+  const managedWorkflow = !["gcp", "azure", "k8s_native"].includes(providerPluginSlug);
 
   async function copyYaml() {
+    if (!workflowYaml) return;
     try {
       await navigator.clipboard.writeText(workflowYaml);
       toast.success("Reference workflow YAML copied.");
@@ -238,9 +246,7 @@ export function CiSetupSectionView({
       }
       description={
         <>
-          Paste these values into your GitHub repo&rsquo;s Actions secrets, then drop in the
-          reference workflow below. The workflow keys off these exact names — rename one and the run
-          breaks.
+          Review the app&rsquo;s CI secrets and workflow before syncing it to the source repository.
         </>
       }
     >
@@ -261,18 +267,31 @@ export function CiSetupSectionView({
         <summary className="hover:bg-muted/50 flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
           <span className="flex items-center gap-2">
             <ChevronDownIcon className="size-4 transition-transform group-open:rotate-180" />
-            Reference GitHub Actions workflow
+            {managedWorkflow ? "Managed CI workflow" : "Reference GitHub Actions workflow"}
           </span>
           <span className="text-muted-foreground text-2xs">
-            paste into <span className="font-mono">.github/workflows/astrolift-ci.yml</span>
+            {managedWorkflow ? (
+              ciWorkflowSyncStatus?.path || "Review before syncing"
+            ) : (
+              <>
+                paste into <span className="font-mono">.github/workflows/astrolift-ci.yml</span>
+              </>
+            )}
           </span>
         </summary>
         <div className="border-t">
           <pre className="bg-background text-2xs overflow-x-auto p-4 font-mono leading-relaxed">
-            {workflowYaml}
+            {workflowYaml ??
+              "Workflow unavailable. Check the app's CI configuration and refresh its current workflow preview."}
           </pre>
           <div className="flex justify-end border-t p-3">
-            <Button size="sm" variant="outline" onClick={copyYaml} className="gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyYaml}
+              disabled={!workflowYaml}
+              className="gap-1.5"
+            >
               <CopyIcon className="size-3.5" />
               Copy workflow YAML
             </Button>

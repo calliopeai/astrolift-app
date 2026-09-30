@@ -23,6 +23,18 @@ logger = logging.getLogger(__name__)
 EDGE_INGRESS_CLASS = "envoy"
 
 
+def edge_support_refusal(cluster: Any) -> str:
+    """The current recipe needs an EKS ALB TLS front, not just the chart."""
+    plugin = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
+    if plugin == "aws":
+        return ""
+    return (
+        f"Envoy edge is unsupported for provider {plugin or 'unknown'!r}: "
+        "AKS, GKE and k8s_native recipes have no supported TLS front or DNS integration. "
+        "Keep the existing ingress class; installing the controller alone does not serve HTTPS."
+    )
+
+
 _LBC_KEY = "aws-load-balancer-controller"
 _EXTERNAL_DNS_KEY = "external-dns"
 
@@ -57,6 +69,10 @@ def edge_install_wanted(cluster: Any) -> bool:
     from providers.k8s_native.edge_gateway import EDGE_COMPONENT_KEY, edge_configured
 
     if (cluster.ingress_class or "") != EDGE_INGRESS_CLASS:
+        return False
+    refusal = edge_support_refusal(cluster)
+    if refusal:
+        logger.error("edge install refused for cluster %s: %s", cluster.slug, refusal)
         return False
     if not edge_configured(cluster.oidc_auth_config):
         return False
