@@ -30,27 +30,6 @@ this feature does not change an agent repository or deploy an image.
 
 ## Job admission and delivery
 
-The v.next shared-owner API adds `astroliftSharedModelPromptReadiness` and
-`testSharedModelEndpoint`. Both require organization-level `CLUSTER_UPDATE`,
-the current credential ceiling and actual cluster region policy. Every call
-captures the model GUID, cluster GUID, provider GUID and expected model version;
-changed targets refuse before rate/job cache access. This is an operator test,
-and an app subscription does not grant that permission or the operator key.
-
-Shared prompts require an active generation model with a recorded readiness
-observation, positive Deployment generation, matching applied/pod authentication
-revision and applied positive replicas. They also require a managed active
-cluster, enabled provider, live heartbeat and configured agent relay. The internal
-target and operator Secret are derived from the saved
-organization, cluster and model UUIDs, using the provider's canonical naming.
-The mutation locks model, cluster and provider through admission, rechecks the
-current policy, then releases those locks before waiting for the agent. The
-same existing prompt, output, rate, cluster-job and wait bounds apply. The read
-contains only readiness and limits; browser requests contain no URL or credential.
-These additive fields are under implementation for #2213, with route integration
-tracked by #2215; this documentation does not establish deployment or live
-tenant inference.
-
 The configured Django Redis cache commits job admission and the cluster's slot
 together. Dispatch atomically changes the current pending job to dispatched and
 renews both entries' 180-second TTL. Concurrent heartbeats dispatch at most once;
@@ -139,13 +118,20 @@ or aggregate telemetry access. No browser key, endpoint URL or raw config is
 accepted or returned.
 
 Shared readiness requires the current available cluster/provider and the
-persisted confirmed generation, auth revision, observation time and recorded
-canonical backend target. It is advisory last-confirmed state; admission is
-rechecked under locks before the existing atomic bounded relay enqueue. The
-agent uses the private operator key in the model namespace, not a subscriber's
-app binding. Pending, failed, retargeted or unobserved deployments refuse a
-prompt. The existing bounded limits, transient-cache delivery semantics and
-at-most-once dispatch conditions above also apply to shared requests.
+persisted positive integer generation, matching applied/auth revision, positive
+applied replicas, observation time, observed provider GUID and recorded canonical
+backend target. The observed provider and target must still match the current
+placement. A managed active cluster, live heartbeat and configured relay are
+required. It is advisory last-confirmed state; admission refreshes actor, bearer
+scopes, grants and region policy after locking model, cluster and provider,
+before the existing atomic bounded relay enqueue. Those locks are released
+before waiting for the result. The internal target and private operator Secret
+come from saved organization, cluster and model UUIDs. Pending, failed,
+retargeted or unobserved deployments refuse a prompt. The existing bounded
+limits, transient-cache delivery semantics and at-most-once dispatch conditions
+above also apply to shared requests. Release evidence is tracked by
+[#2212](https://github.com/calliopeai/astrolift-app/issues/2212); this document
+does not establish deployment or live tenant inference.
 
 Subscription creation/revocation can restart the entire shared model; pending
 reconciliation does not promise uninterrupted playground availability. See
