@@ -139,6 +139,10 @@ class PreconditionFailedError(Exception):
     """
 
 
+class AlreadyExistsError(Exception):
+    """Atomic create refused an occupied name; never retry as an update."""
+
+
 class NotFoundError(Exception):
     """Raised by the helper when a resource doesn't exist.
 
@@ -334,6 +338,33 @@ class KubernetesDynamicClient:
         return obj
 
     # ---- public API ----------------------------------------------
+
+    def create_manifest(
+        self,
+        *,
+        namespace: str | None,
+        manifest: dict[str, Any],
+        dry_run: bool = False,
+    ) -> str:
+        """POST exactly once: a concurrent creator must win without being adopted."""
+        self._refresh_token()
+        from kubernetes.dynamic.exceptions import ConflictError as DynConflict
+
+        api_version = manifest.get("apiVersion", "v1")
+        kind = manifest.get("kind")
+        name = (manifest.get("metadata") or {}).get("name")
+        if not kind or not name:
+            raise ValueError("Create-only manifest requires kind and metadata.name")
+        resource = self._resource_for(api_version, kind)
+        request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
+        kwargs: dict[str, Any] = {"body": manifest, "namespace": request_namespace}
+        if dry_run:
+            kwargs["dry_run"] = "All"
+        try:
+            resource.create(**kwargs)
+        except DynConflict as exc:
+            raise AlreadyExistsError(f"{kind}/{name} already exists; create-only refused adoption") from exc
+        return "created"
 
     def server_side_apply(
         self,

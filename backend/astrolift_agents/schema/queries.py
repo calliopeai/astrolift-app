@@ -60,6 +60,8 @@ from astrolift_agents.schema.types import (
     AgentSecretStatusFilterInput,
     AgentSecretStatusPageType,
     AgentSecretStatusType,
+    AgentTaskBacklogItemType,
+    AgentTaskBacklogType,
     AgentTaskEventType,
     AgentTaskInputMessageType,
     AgentTaskLogPageType,
@@ -1353,6 +1355,34 @@ class AgentsQuery:
             qs = qs.filter(occurred_at__gt=since)
         qs = qs.order_by("occurred_at")[:capped]
         return [agent_interaction_to_type(r) for r in qs]
+
+    @strawberry.field
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_task_scope("task_id"), operation=agent_task_operation("task_id")
+    )
+    @tenant_scoped()
+    def agent_task_backlog(
+        self, info: Info, org_id: strawberry.ID, task_id: strawberry.ID
+    ) -> AgentTaskBacklogType | None:
+        org_pk = _caller_org_id(info, org_id)
+        guid = _valid_guid(task_id)
+        if guid is None:
+            return None
+        task = (
+            visible_agent_tasks(org_pk, Permission.AGENT_READ)
+            .filter(guid=guid, organization_id=org_pk)
+            .first()
+        )
+        if task is None or task.backlog_snapshot is None:
+            return None
+        value = task.backlog_snapshot
+        return AgentTaskBacklogType(
+            harness=value["harness"],
+            session_id=value["session_id"],
+            revision=value["revision"],
+            updated_at=datetime.fromisoformat(value["updated_at"]),
+            items=[AgentTaskBacklogItemType(**item) for item in value["items"]],
+        )
 
     @strawberry.field
     @require_permission(

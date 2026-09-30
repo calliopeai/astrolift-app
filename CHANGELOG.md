@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- Audit managed runtime reservation and revocation, and redact provider failures
+  during managed Stop without losing retry or retained-storage recovery (#1971).
+
+- Provision explicit managed IDE boxes with a supervised server/browser, retained
+  CSI storage and projected, renewable runtime credentials (#1971). Failed starts
+  and Stop revoke ownership; private resource creation and deletion honor Kubernetes
+  ownership preconditions across all four providers. Managed Move remains unadvertised.
+
+- Add internal certification and box-scoped validation for managed IDE runtime
+  ownership (#1971). Exact live Job, Pod and persistent claim identities are
+  checked before binding a runtime incarnation. Managed provisioning and Move
+  remain unavailable until their separate lifecycle and transfer integration lands.
+
+- Merge the agent startup-diagnostic and durable-backlog migration branches so
+  a combined control-plane upgrade has one migration leaf. Both additive
+  migrations remain applicable from either previously deployed branch (#1972, #2190).
+
+- Agent task backlog snapshots survive pod termination and are readable through
+  `agentTaskBacklog(orgId, taskId)` with the same scoped authority as task events
+  (#1972). Negotiated runner callbacks persist ordered, bounded snapshots outside
+  the event feed; an explicit empty list clears prior progress without changing
+  event types or cursors.
 - Team and project create sheets generate backend-compatible slugs and preserve
   a requested visible team. Workflow configuration waits for and scopes reads
   to the active organization, create access stays unknown while loading, and
