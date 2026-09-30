@@ -3518,5 +3518,34 @@
       "reasonRequired": "理由を入力してください",
       "failed": "操作に失敗しました"
     }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "環境仕様へのアクセスを確認中…",
+      "accessDenied": "環境仕様の読み取りには agent_env_spec.read が必要です。",
+      "accessError": "環境仕様へのアクセスを確認できませんでした。ページを再読み込みして再試行してください。",
+      "title": "環境仕様のシークレット",
+      "description": "表示されている環境仕様を選択して、シークレットを管理します。変更は、この設定を使用するすべての実行とインスタンスに適用されます。エージェントの送信時には、設定を別途選択してください。",
+      "search": "環境仕様を検索",
+      "searchPlaceholder": "名前、識別子、ランタイム、リポジトリを検索…",
+      "spec": "環境仕様",
+      "loadingSpecs": "仕様を読み込み中…",
+      "chooseSpecs": "環境仕様を選択",
+      "listError": "環境仕様を読み込めませんでした。",
+      "retryChoices": "選択肢を再読み込み",
+      "loadingChoices": "選択肢を読み込み中…",
+      "count": "表示可能な仕様：{count, number} 件 · {page, number} ページ",
+      "previous": "前の仕様",
+      "next": "次の仕様",
+      "empty": "この検索に一致する環境仕様は表示できません。",
+      "clear": "選択を解除",
+      "verify": "選択を再確認",
+      "unselected": "環境仕様を選択して、値とバンドルを表示してください。",
+      "checking": "選択した仕様を確認中…",
+      "unavailable": "選択した仕様は利用できなくなりました。表示されている仕様を選択してください。",
+      "verifyError": "選択した仕様を確認できませんでした。選択を再確認してください。",
+      "listDenied": "この仕様のシークレット値とバンドルを一覧表示するには secret.list が必要です。",
+      "bundlesDenied": "この仕様に関連付けられたバンドルの読み取りには secret.read と secret.list が必要です。"
+    }
   }
 }

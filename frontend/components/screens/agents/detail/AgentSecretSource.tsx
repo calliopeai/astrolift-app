@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,14 +63,15 @@ export function AgentSecretSource({
   canListSecrets,
   children,
 }: AgentSecretSourceProps) {
+  const t = useTranslations("agentSecrets.source");
   if (access !== "ready") {
     return (
       <p role="status" className="text-muted-foreground text-sm">
         {access === "loading"
-          ? "Checking access to environment specs…"
+          ? t("accessLoading")
           : access === "denied"
-            ? "Reading environment specs requires agent_env_spec.read."
-            : "Access to environment specs could not be checked. Reload this page to try again."}
+            ? t("accessDenied")
+            : t("accessError")}
       </p>
     );
   }
@@ -81,30 +83,25 @@ export function AgentSecretSource({
     <div className="flex min-w-0 flex-col gap-5">
       <section className="flex min-w-0 flex-col gap-3 rounded-md border p-4">
         <div className="space-y-1">
-          <h2 className="text-sm font-medium">Environment spec secrets</h2>
-          <p className="text-muted-foreground text-sm">
-            Choose a visible environment spec to manage its secrets. Edits affect every run or box
-            using this recipe. Select the recipe separately when dispatching an agent.
-          </p>
+          <h2 className="text-sm font-medium">{t("title")}</h2>
+          <p className="text-muted-foreground text-sm">{t("description")}</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="secret-source-search">Search environment specs</Label>
+          <Label htmlFor="secret-source-search">{t("search")}</Label>
           <Input
             id="secret-source-search"
             value={search}
             onChange={(event) => onSearch(event.target.value)}
-            placeholder="Search names, slugs, runtimes, repos…"
+            placeholder={t("searchPlaceholder")}
           />
-          <Label htmlFor="secret-source">Environment spec</Label>
+          <Label htmlFor="secret-source">{t("spec")}</Label>
           <Select
             value={selection?.id ?? ""}
             onValueChange={onSelect}
             disabled={optionsLoading || Boolean(optionsError)}
           >
             <SelectTrigger id="secret-source" className="w-full min-w-0">
-              <SelectValue
-                placeholder={optionsLoading ? "Loading specs…" : "Choose an environment spec"}
-              />
+              <SelectValue placeholder={optionsLoading ? t("loadingSpecs") : t("chooseSpecs")} />
             </SelectTrigger>
             <SelectContent>
               {choices.map((option) => (
@@ -119,17 +116,15 @@ export function AgentSecretSource({
         </div>
         {optionsError ? (
           <div role="alert" className="space-y-2">
-            <p className="text-destructive text-sm">Environment specs could not be loaded.</p>
+            <p className="text-destructive text-sm">{t("listError")}</p>
             <Button variant="outline" size="sm" onClick={onRetryOptions}>
-              Retry choices
+              {t("retryChoices")}
             </Button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground" role="status">
-              {optionsLoading
-                ? "Loading choices…"
-                : `${totalCount} visible spec${totalCount === 1 ? "" : "s"} · Page ${page}`}
+              {optionsLoading ? t("loadingChoices") : t("count", { count: totalCount, page })}
             </span>
             <Button
               variant="outline"
@@ -137,7 +132,7 @@ export function AgentSecretSource({
               disabled={optionsLoading || page <= 1}
               onClick={() => onPage(page - 1)}
             >
-              Previous specs
+              {t("previous")}
             </Button>
             <Button
               variant="outline"
@@ -145,19 +140,19 @@ export function AgentSecretSource({
               disabled={optionsLoading || page * pageSize >= totalCount}
               onClick={() => onPage(page + 1)}
             >
-              Next specs
+              {t("next")}
             </Button>
           </div>
         )}
         {!optionsLoading && !optionsError && totalCount === 0 && (
           <p role="status" className="text-muted-foreground text-sm">
-            No visible environment specs match this search.
+            {t("empty")}
           </p>
         )}
         {selection && (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={onClear}>
-              Clear source
+              {t("clear")}
             </Button>
             <Button
               variant="outline"
@@ -165,34 +160,34 @@ export function AgentSecretSource({
               disabled={sourceState === "loading"}
               onClick={onVerify}
             >
-              Verify source again
+              {t("verify")}
             </Button>
           </div>
         )}
       </section>
       {sourceState === "unselected" && (
         <p role="status" className="text-muted-foreground text-sm">
-          Select an environment spec to view its values and bundles.
+          {t("unselected")}
         </p>
       )}
       {sourceState === "loading" && (
         <p role="status" className="text-muted-foreground text-sm">
-          Checking the selected spec…
+          {t("checking")}
         </p>
       )}
       {sourceState === "unavailable" && (
         <p role="status" className="text-muted-foreground text-sm">
-          The selected spec is no longer available. Choose a visible spec.
+          {t("unavailable")}
         </p>
       )}
       {sourceState === "error" && (
         <p role="alert" className="text-destructive text-sm">
-          The selected spec could not be verified. Try verifying the source again.
+          {t("verifyError")}
         </p>
       )}
       {sourceState === "confirmed" && !canListSecrets && (
         <p role="status" className="text-muted-foreground text-sm">
-          Listing this spec&apos;s secret values and bundles requires secret.list.
+          {t("listDenied")}
         </p>
       )}
       {sourceState === "confirmed" && canListSecrets && children}
@@ -202,9 +197,10 @@ export function AgentSecretSource({
 
 /** Known missing bundle-read permission never starts attachment queries. */
 export function AgentSecretBundleReadDenied() {
+  const t = useTranslations("agentSecrets.source");
   return (
     <p className="text-muted-foreground text-sm" role="status">
-      Reading this spec&apos;s bundle attachments requires secret.read and secret.list.
+      {t("bundlesDenied")}
     </p>
   );
 }

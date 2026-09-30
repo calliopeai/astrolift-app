@@ -3518,5 +3518,34 @@
       "reasonRequired": "请填写原因",
       "failed": "操作失败"
     }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "正在检查环境规格访问权限…",
+      "accessDenied": "读取环境规格需要 agent_env_spec.read 权限。",
+      "accessError": "无法检查环境规格访问权限。请刷新此页面后重试。",
+      "title": "环境规格密钥",
+      "description": "选择可见的环境规格来管理其密钥。修改会影响使用此配置的所有运行和实例。派发代理时，请单独选择该配置。",
+      "search": "搜索环境规格",
+      "searchPlaceholder": "搜索名称、标识符、运行时、仓库…",
+      "spec": "环境规格",
+      "loadingSpecs": "正在加载规格…",
+      "chooseSpecs": "选择环境规格",
+      "listError": "无法加载环境规格。",
+      "retryChoices": "重新加载选项",
+      "loadingChoices": "正在加载选项…",
+      "count": "可见规格：{count, number} 个 · 第 {page, number} 页",
+      "previous": "上一页规格",
+      "next": "下一页规格",
+      "empty": "没有可见的环境规格与此搜索匹配。",
+      "clear": "清除选择",
+      "verify": "重新验证选择",
+      "unselected": "请选择环境规格以查看其值和密钥包。",
+      "checking": "正在检查所选规格…",
+      "unavailable": "所选规格已不可用。请选择可见的规格。",
+      "verifyError": "无法验证所选规格。请重新验证选择。",
+      "listDenied": "列出此规格的密钥值和密钥包需要 secret.list 权限。",
+      "bundlesDenied": "读取此规格关联的密钥包需要 secret.read 和 secret.list 权限。"
+    }
   }
 }

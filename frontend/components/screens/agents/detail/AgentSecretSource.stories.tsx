@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import french from "@/messages/fr.json";
 import { AgentSecretBundleReadDenied, AgentSecretSource } from "./AgentSecretSource";
 
 const options = [
@@ -77,3 +79,11 @@ export const LongStrings: Story = {
 };
 
 export const BundleReadDenied: Story = { render: () => <AgentSecretBundleReadDenied /> };
+
+export const FrenchChoices: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <AgentSecretSource {...args} />
+    </NextIntlClientProvider>
+  ),
+};

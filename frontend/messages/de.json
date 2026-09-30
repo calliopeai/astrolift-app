@@ -3521,5 +3521,34 @@
       "reasonRequired": "Eine Begründung ist erforderlich",
       "failed": "Aktion fehlgeschlagen"
     }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "Zugriff auf Umgebungsspezifikationen wird geprüft…",
+      "accessDenied": "Zum Lesen von Umgebungsspezifikationen ist agent_env_spec.read erforderlich.",
+      "accessError": "Der Zugriff auf Umgebungsspezifikationen konnte nicht geprüft werden. Laden Sie diese Seite neu, um es erneut zu versuchen.",
+      "title": "Geheimnisse der Umgebungsspezifikation",
+      "description": "Wählen Sie eine sichtbare Umgebungsspezifikation aus, um ihre Geheimnisse zu verwalten. Änderungen betreffen alle Ausführungen oder Instanzen, die diese Konfiguration verwenden. Wählen Sie sie beim Starten eines Agenten separat aus.",
+      "search": "Umgebungsspezifikationen suchen",
+      "searchPlaceholder": "Namen, Kennungen, Laufzeitumgebungen, Repositories suchen…",
+      "spec": "Umgebungsspezifikation",
+      "loadingSpecs": "Spezifikationen werden geladen…",
+      "chooseSpecs": "Umgebungsspezifikation auswählen",
+      "listError": "Umgebungsspezifikationen konnten nicht geladen werden.",
+      "retryChoices": "Auswahl erneut laden",
+      "loadingChoices": "Auswahl wird geladen…",
+      "count": "{count, plural, one {# sichtbare Spezifikation} other {# sichtbare Spezifikationen}} · Seite {page, number}",
+      "previous": "Vorherige Spezifikationen",
+      "next": "Nächste Spezifikationen",
+      "empty": "Keine sichtbare Umgebungsspezifikation entspricht dieser Suche.",
+      "clear": "Auswahl aufheben",
+      "verify": "Auswahl erneut prüfen",
+      "unselected": "Wählen Sie eine Umgebungsspezifikation aus, um ihre Werte und Bündel anzuzeigen.",
+      "checking": "Ausgewählte Spezifikation wird geprüft…",
+      "unavailable": "Die ausgewählte Spezifikation ist nicht mehr verfügbar. Wählen Sie eine sichtbare Spezifikation aus.",
+      "verifyError": "Die ausgewählte Spezifikation konnte nicht geprüft werden. Prüfen Sie die Auswahl erneut.",
+      "listDenied": "Zum Auflisten der geheimen Werte und Bündel dieser Spezifikation ist secret.list erforderlich.",
+      "bundlesDenied": "Zum Lesen der angehängten Bündel dieser Spezifikation sind secret.read und secret.list erforderlich."
+    }
   }
 }

@@ -3633,5 +3633,34 @@
       "reasonRequired": "Reason required",
       "failed": "Action failed"
     }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "Checking access to environment specs…",
+      "accessDenied": "Reading environment specs requires agent_env_spec.read.",
+      "accessError": "Access to environment specs could not be checked. Reload this page to try again.",
+      "title": "Environment spec secrets",
+      "description": "Choose a visible environment spec to manage its secrets. Edits affect every run or box using this recipe. Select the recipe separately when dispatching an agent.",
+      "search": "Search environment specs",
+      "searchPlaceholder": "Search names, slugs, runtimes, repos…",
+      "spec": "Environment spec",
+      "loadingSpecs": "Loading specs…",
+      "chooseSpecs": "Choose an environment spec",
+      "listError": "Environment specs could not be loaded.",
+      "retryChoices": "Retry choices",
+      "loadingChoices": "Loading choices…",
+      "count": "{count, plural, one {# visible spec} other {# visible specs}} · Page {page, number}",
+      "previous": "Previous specs",
+      "next": "Next specs",
+      "empty": "No visible environment specs match this search.",
+      "clear": "Clear source",
+      "verify": "Verify source again",
+      "unselected": "Select an environment spec to view its values and bundles.",
+      "checking": "Checking the selected spec…",
+      "unavailable": "The selected spec is no longer available. Choose a visible spec.",
+      "verifyError": "The selected spec could not be verified. Try verifying the source again.",
+      "listDenied": "Listing this spec’s secret values and bundles requires secret.list.",
+      "bundlesDenied": "Reading this spec’s bundle attachments requires secret.read and secret.list."
+    }
   }
 }

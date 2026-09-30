@@ -3518,5 +3518,34 @@
       "reasonRequired": "É necessário informar um motivo",
       "failed": "A ação falhou"
     }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "Verificando o acesso às especificações de ambiente…",
+      "accessDenied": "A leitura das especificações de ambiente exige agent_env_spec.read.",
+      "accessError": "Não foi possível verificar o acesso às especificações de ambiente. Recarregue esta página para tentar novamente.",
+      "title": "Segredos da especificação de ambiente",
+      "description": "Escolha uma especificação de ambiente visível para gerenciar seus segredos. As alterações afetam todas as execuções ou instâncias que usam esta configuração. Selecione-a separadamente ao enviar um agente.",
+      "search": "Buscar especificações de ambiente",
+      "searchPlaceholder": "Buscar nomes, identificadores, ambientes de execução, repositórios…",
+      "spec": "Especificação de ambiente",
+      "loadingSpecs": "Carregando especificações…",
+      "chooseSpecs": "Escolha uma especificação de ambiente",
+      "listError": "Não foi possível carregar as especificações de ambiente.",
+      "retryChoices": "Recarregar opções",
+      "loadingChoices": "Carregando opções…",
+      "count": "{count, plural, one {# especificação visível} other {# especificações visíveis}} · Página {page, number}",
+      "previous": "Especificações anteriores",
+      "next": "Próximas especificações",
+      "empty": "Nenhuma especificação de ambiente visível corresponde a esta busca.",
+      "clear": "Limpar seleção",
+      "verify": "Verificar a seleção novamente",
+      "unselected": "Selecione uma especificação de ambiente para visualizar seus valores e pacotes.",
+      "checking": "Verificando a especificação selecionada…",
+      "unavailable": "A especificação selecionada não está mais disponível. Escolha uma especificação visível.",
+      "verifyError": "Não foi possível verificar a especificação selecionada. Verifique a seleção novamente.",
+      "listDenied": "Listar os valores secretos e pacotes desta especificação exige secret.list.",
+      "bundlesDenied": "Ler os pacotes anexados a esta especificação exige secret.read e secret.list."
+    }
   }
 }

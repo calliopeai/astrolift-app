@@ -3518,5 +3518,34 @@
       "reasonRequired": "사유를 입력해 주세요",
       "failed": "작업에 실패했습니다"
     }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "환경 사양 접근 권한 확인 중…",
+      "accessDenied": "환경 사양을 읽으려면 agent_env_spec.read 권한이 필요합니다.",
+      "accessError": "환경 사양 접근 권한을 확인할 수 없습니다. 페이지를 새로고침하여 다시 시도하세요.",
+      "title": "환경 사양 시크릿",
+      "description": "표시되는 환경 사양을 선택하여 시크릿을 관리하세요. 변경 사항은 이 설정을 사용하는 모든 실행과 인스턴스에 적용됩니다. 에이전트를 보낼 때는 설정을 별도로 선택하세요.",
+      "search": "환경 사양 검색",
+      "searchPlaceholder": "이름, 식별자, 런타임, 저장소 검색…",
+      "spec": "환경 사양",
+      "loadingSpecs": "사양 불러오는 중…",
+      "chooseSpecs": "환경 사양 선택",
+      "listError": "환경 사양을 불러올 수 없습니다.",
+      "retryChoices": "선택 항목 다시 불러오기",
+      "loadingChoices": "선택 항목 불러오는 중…",
+      "count": "표시 가능한 사양 {count, number}개 · {page, number}페이지",
+      "previous": "이전 사양",
+      "next": "다음 사양",
+      "empty": "검색과 일치하는 환경 사양이 표시되지 않습니다.",
+      "clear": "선택 해제",
+      "verify": "선택 항목 다시 확인",
+      "unselected": "환경 사양을 선택하여 값과 번들을 확인하세요.",
+      "checking": "선택한 사양 확인 중…",
+      "unavailable": "선택한 사양을 더 이상 사용할 수 없습니다. 표시되는 사양을 선택하세요.",
+      "verifyError": "선택한 사양을 확인할 수 없습니다. 선택 항목을 다시 확인하세요.",
+      "listDenied": "이 사양의 시크릿 값과 번들을 나열하려면 secret.list 권한이 필요합니다.",
+      "bundlesDenied": "이 사양에 연결된 번들을 읽으려면 secret.read 및 secret.list 권한이 필요합니다."
+    }
   }
 }

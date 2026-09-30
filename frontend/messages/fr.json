@@ -3521,5 +3521,34 @@
       "reasonRequired": "Un motif est requis",
       "failed": "L’action a échoué"
     }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "Vérification de l’accès aux spécifications d’environnement…",
+      "accessDenied": "La lecture des spécifications d’environnement nécessite agent_env_spec.read.",
+      "accessError": "L’accès aux spécifications d’environnement n’a pas pu être vérifié. Rechargez cette page pour réessayer.",
+      "title": "Secrets de la spécification d’environnement",
+      "description": "Choisissez une spécification d’environnement visible pour gérer ses secrets. Les modifications affectent toutes les exécutions ou instances utilisant cette configuration. Sélectionnez-la séparément lors de l’envoi d’un agent.",
+      "search": "Rechercher des spécifications d’environnement",
+      "searchPlaceholder": "Rechercher des noms, identifiants, environnements d’exécution, dépôts…",
+      "spec": "Spécification d’environnement",
+      "loadingSpecs": "Chargement des spécifications…",
+      "chooseSpecs": "Choisir une spécification d’environnement",
+      "listError": "Les spécifications d’environnement n’ont pas pu être chargées.",
+      "retryChoices": "Réessayer le chargement",
+      "loadingChoices": "Chargement des choix…",
+      "count": "{count, plural, one {# spécification visible} other {# spécifications visibles}} · Page {page, number}",
+      "previous": "Spécifications précédentes",
+      "next": "Spécifications suivantes",
+      "empty": "Aucune spécification d’environnement visible ne correspond à cette recherche.",
+      "clear": "Effacer la sélection",
+      "verify": "Vérifier à nouveau la sélection",
+      "unselected": "Sélectionnez une spécification d’environnement pour afficher ses valeurs et ses lots.",
+      "checking": "Vérification de la spécification sélectionnée…",
+      "unavailable": "La spécification sélectionnée n’est plus disponible. Choisissez une spécification visible.",
+      "verifyError": "La spécification sélectionnée n’a pas pu être vérifiée. Vérifiez à nouveau la sélection.",
+      "listDenied": "La liste des valeurs secrètes et des lots de cette spécification nécessite secret.list.",
+      "bundlesDenied": "La lecture des lots associés à cette spécification nécessite secret.read et secret.list."
+    }
   }
 }

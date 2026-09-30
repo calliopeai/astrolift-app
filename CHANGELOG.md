@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The explicit agent environment-spec picker translates access boundaries,
+  shared-recipe notices, search and pagination in all eight locales (#2145).
+
 - Shared numbered and cursor pagination translates controls and count sentences
   in all eight locales, retaining page/cursor callbacks and unknown totals.
 - Shared confirmation dialogs use all eight locales for default actions,
