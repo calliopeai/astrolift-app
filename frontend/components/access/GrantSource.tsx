@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 
 import { describeSource, type GrantSourceInfo, viaName } from "./access-model";
 
+import { localizedScopeLabel } from "./access-copy";
+
 export interface GrantSourceProps {
   source: GrantSourceInfo;
   className?: string;
@@ -32,7 +34,7 @@ export function GrantSource({ source, className }: GrantSourceProps) {
       title={describeSource(source, {
         direct: t("direct"),
         via: (kind, name) => t("via", { kind: t(`principal.${kind}`), name }),
-        inherited: (kind, name) => t("inherited", { kind: t(`scope.${kind}`), name }),
+        inherited: (kind, name) => t("inherited", { kind: localizedScopeLabel(kind, t), name }),
         combined: (via, inherited) => t("combined", { via, inherited }),
       })}
       data-source={
@@ -60,7 +62,7 @@ export function GrantSource({ source, className }: GrantSourceProps) {
           tone="inherited"
         >
           {t.rich("inheritedRich", {
-            kind: t(`scope.${inheritedFrom.kind}`),
+            kind: localizedScopeLabel(inheritedFrom.kind, t),
             name: inheritedFrom.name,
             identifier: (chunks) => <span className="font-mono">{chunks}</span>,
           })}

@@ -1690,3 +1690,5 @@ report_shared_zone_hostname_collisions` is a new read-only command that
 - Always inject and verify agent callback delivery so successful runs cannot
   silently lose findings or telemetry.
 - Use public application GUIDs for managed workflow resync operations.
+
+- Preserve custom or future access scope labels literally instead of requesting missing translation keys.

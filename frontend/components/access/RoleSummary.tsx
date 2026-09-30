@@ -9,7 +9,7 @@ import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { cn } from "@/lib/utils";
 
 import { type RoleRef, summarizePermissions } from "./access-model";
-import { localizedPermissionPresentation } from "./access-copy";
+import { localizedPermissionPresentation, localizedScopeLabel } from "./access-copy";
 import { PermissionMatrix } from "./PermissionMatrix";
 
 export interface RoleSummaryProps {
@@ -64,7 +64,7 @@ export function RoleSummary({
             {role.slug}
           </span>
           <Badge variant="outline" className="text-2xs font-mono uppercase">
-            {t(`scope.${role.scopeLevel}`)}
+            {localizedScopeLabel(role.scopeLevel, t)}
           </Badge>
           {role.isSystem ? (
             <Badge variant="secondary" className="text-2xs gap-1">

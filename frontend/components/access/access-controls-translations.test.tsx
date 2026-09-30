@@ -17,6 +17,7 @@ import {
   localizedBindReason,
   localizedPermissionPresentation,
   localizedResourceLabel,
+  localizedScopeLabel,
 } from "./access-copy";
 import { canBindAt, summarizePermissions, type RoleRef, type ScopeNode } from "./access-model";
 import { PermissionMatrix } from "./PermissionMatrix";
@@ -106,6 +107,25 @@ describe.each(Object.entries(catalogs))("%s access controls", (locale, messages)
     expect(
       screen.getByText(t("presentation.readOnly", { resources: t("presentation.resource.app") }))
     ).toBeInTheDocument();
+  });
+
+  it("preserves unknown API scope labels without translation errors while expanding the role", () => {
+    const onError = vi.fn();
+    const scopeLevel = "Future.<literal>{scope}" as RoleRef["scopeLevel"];
+    render(
+      <NextIntlClientProvider locale={locale} messages={messages} onError={onError}>
+        <RoleSummary role={{ ...role, scopeLevel }} catalog={slugs} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.getByText(scopeLevel)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: t("role.show") }));
+    expect(screen.getByRole("table", { name: t("matrix.label") })).toBeInTheDocument();
+    expect(localizedScopeLabel(scopeLevel, t)).toBe(scopeLevel);
+    expect(localizedScopeLabel("APP", t)).toBe(t("scope.APP"));
+    expect(localizedBindReason(t)({ ...role, scopeLevel })).toBe(
+      t("presentation.bindReason", { name: role.name, kind: scopeLevel })
+    );
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it("keeps cell, whole-resource and whole-area changes on canonical permission slugs, with localized diff states", () => {

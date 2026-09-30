@@ -1,4 +1,9 @@
-import type { PermissionPresentation, RoleRef, ScopeKind } from "./access-model";
+import {
+  SCOPE_ORDER,
+  type PermissionPresentation,
+  type RoleRef,
+  type ScopeKind,
+} from "./access-model";
 
 const RESOURCE_KEYS = [
   "app",
@@ -40,6 +45,12 @@ export type AccessTranslator = (
   key: PresentationKey,
   values?: Record<string, string | number>
 ) => string;
+const scopeKeys = new Set<string>(SCOPE_ORDER);
+
+export function localizedScopeLabel(scope: string, t: AccessTranslator): string {
+  return scopeKeys.has(scope) ? t(`scope.${scope as ScopeKind}`) : scope;
+}
+
 const resourceKeys = new Set<string>(RESOURCE_KEYS);
 const isResourceKey = (resource: string): resource is ResourceKey => resourceKeys.has(resource);
 
@@ -63,5 +74,8 @@ export function localizedPermissionPresentation(
 
 export function localizedBindReason(t: AccessTranslator) {
   return (role: Pick<RoleRef, "name" | "scopeLevel">): string =>
-    t("presentation.bindReason", { name: role.name, kind: t(`scope.${role.scopeLevel}`) });
+    t("presentation.bindReason", {
+      name: role.name,
+      kind: localizedScopeLabel(role.scopeLevel, t),
+    });
 }

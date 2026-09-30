@@ -17,6 +17,10 @@ export default meta;
 
 type Story = StoryObj<typeof RoleSummary>;
 
+export const FutureScope: Story = {
+  args: { role: { ...DEPLOYER, scopeLevel: "CUSTOM_SCOPE" as typeof DEPLOYER.scopeLevel } },
+};
+
 /** The role's own description wins. */
 export const WithDescription: Story = {};
 

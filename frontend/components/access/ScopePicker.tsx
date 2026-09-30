@@ -27,6 +27,8 @@ const ICON: Record<ScopeKind, typeof BuildingIcon> = {
   APP: AppWindowIcon,
 };
 
+import { localizedScopeLabel } from "./access-copy";
+
 export interface ScopePickerProps {
   /** Usually one node: the organization, with its teams below. */
   roots: ScopeNode[];
@@ -260,7 +262,7 @@ export function ScopePicker({
       {value && (
         <p className="text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]">
           {t.rich("scopePicker.selected", {
-            kind: t(`scope.${value.kind}`),
+            kind: localizedScopeLabel(value.kind, t),
             name: value.name,
             identifier: (chunks) => <span className="font-mono">{chunks}</span>,
           })}
@@ -345,7 +347,7 @@ export function ScopePicker({
                     </span>
                   )}
                   <span className="text-muted-foreground text-2xs ml-auto shrink-0 font-mono uppercase">
-                    {t(`scope.${node.kind}`)}
+                    {localizedScopeLabel(node.kind, t)}
                   </span>
                   {allowed !== true && <span className="sr-only">, {allowed}</span>}
                   {(failed[key] === null || failed[key]) && (
