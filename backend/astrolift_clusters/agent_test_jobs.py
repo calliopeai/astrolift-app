@@ -16,8 +16,8 @@ A test job rides that existing channel:
    "current job" slot at it. ``testModelEndpoint`` then blocks (bounded,
    see ``wait_cap_seconds``) polling ``get_job()`` for a terminal status.
 2. The agent's next heartbeat calls ``dispatch_pending()``, which hands the
-   job back in the heartbeat response body exactly once and flips it to
-   DISPATCHED.
+   job back in the heartbeat response body at most once and flips it to
+   DISPATCHED. A lost response can mean no execution; it is not re-dispatched.
 3. The agent runs the bounded chat completion in-cluster -- reading the
    model's API key straight off its Kubernetes Secret, never through the
    control plane -- and POSTs the outcome to the model-test-result view,
@@ -36,11 +36,14 @@ cache TTL.
 from __future__ import annotations
 
 import datetime as dt
+import threading
 import time
 import uuid
 from typing import Any
 
-from django.core.cache import cache
+from django.core.cache import DEFAULT_CACHE_ALIAS, cache, caches
+from django.core.cache.backends.locmem import LocMemCache
+from django.core.cache.backends.redis import RedisCache
 
 # ---- tunables -----------------------------------------------------------
 
@@ -84,6 +87,86 @@ class AgentTestRateLimited(AgentTestError):
     """Caller exceeded the per-minute test-prompt budget."""
 
 
+class AgentTestUnavailable(AgentTestError):
+    """The cache cannot safely admit or transition a relay job."""
+
+
+_LOCAL_LOCKS = tuple(threading.Lock() for _ in range(64))
+
+
+def _relay_cache():
+    try:
+        backend = caches[DEFAULT_CACHE_ALIAS]
+    except Exception as exc:
+        raise AgentTestUnavailable("model test relay cache is unavailable") from exc
+    if not isinstance(backend, (RedisCache, LocMemCache)):
+        raise AgentTestUnavailable("model test relay cache is unavailable")
+    return backend
+
+
+def _atomic_transition(cluster_guid, job_id, decide):
+    """Commit the job and matching slot together; no expiring lock lease."""
+    backend = _relay_cache()
+    current_key = _CURRENT_KEY.format(cluster_guid=cluster_guid)
+    try:
+        if isinstance(backend, LocMemCache):
+            lock = _LOCAL_LOCKS[hash(cluster_guid) % len(_LOCAL_LOCKS)]
+            if not lock.acquire(timeout=1):
+                raise AgentTestUnavailable("model test relay cache is busy")
+            try:
+                current_id = backend.get(current_key)
+                target = job_id or current_id
+                key = _JOB_KEY.format(job_id=target)
+                job = backend.get(key) if target else None
+                result, update, slot = decide(current_id, job)
+                if update is not None:
+                    backend.set(key, update, _JOB_TTL_SECONDS)
+                if slot == "claim":
+                    backend.set(current_key, target, _JOB_TTL_SECONDS)
+                elif slot == "release":
+                    backend.delete(current_key)
+                return result
+            finally:
+                lock.release()
+
+        from redis.exceptions import WatchError
+
+        storage = backend._cache
+        client = storage.get_client(write=True)
+        serializer = storage._serializer
+        slot_key = backend.make_and_validate_key(current_key)
+        for _attempt in range(8):
+            with client.pipeline() as pipeline:
+                try:
+                    pipeline.watch(slot_key)
+                    value = pipeline.get(slot_key)
+                    current_id = serializer.loads(value) if value is not None else None
+                    target = job_id or current_id
+                    key = backend.make_and_validate_key(_JOB_KEY.format(job_id=target))
+                    pipeline.watch(key)
+                    value = pipeline.get(key)
+                    job = serializer.loads(value) if value is not None else None
+                    result, update, slot = decide(current_id, job)
+                    if update is None and slot == "keep":
+                        return result
+                    pipeline.multi()
+                    if update is not None:
+                        pipeline.set(key, serializer.dumps(update), ex=_JOB_TTL_SECONDS)
+                    if slot == "claim":
+                        pipeline.set(slot_key, serializer.dumps(target), ex=_JOB_TTL_SECONDS)
+                    elif slot == "release":
+                        pipeline.delete(slot_key)
+                    pipeline.execute()
+                    return result
+                except WatchError:
+                    continue
+        raise AgentTestUnavailable("model test relay cache is busy")
+    except (AgentTestConflict, AgentTestUnavailable):
+        raise
+    except Exception as exc:
+        raise AgentTestUnavailable("model test relay cache is unavailable") from exc
+
+
 def check_rate_limit(user_id: int) -> None:
     """Raise :class:`AgentTestRateLimited` once ``user_id`` exceeds the
     per-minute budget.
@@ -95,13 +178,18 @@ def check_rate_limit(user_id: int) -> None:
     """
     minute = dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M")
     key = _RATE_KEY.format(user_id=user_id, minute=minute)
-    cache.add(key, 0, 120)
     try:
-        count = cache.incr(key)
-    except ValueError:
-        # Key expired between `add` and `incr` -- treat as a fresh bucket.
-        cache.set(key, 1, 120)
-        count = 1
+        backend = _relay_cache()
+        backend.add(key, 0, 120)
+        try:
+            count = backend.incr(key)
+        except ValueError:
+            backend.set(key, 1, 120)
+            count = 1
+    except AgentTestUnavailable:
+        raise
+    except Exception as exc:
+        raise AgentTestUnavailable("model test relay cache is unavailable") from exc
     if count > RATE_LIMIT_PER_MINUTE:
         raise AgentTestRateLimited(
             f"too many test prompts ({count}/{RATE_LIMIT_PER_MINUTE} per minute); wait and retry"
@@ -133,14 +221,7 @@ def enqueue(
     cluster's agent key (the result POST is Bearer-authenticated with
     it).
     """
-    current_key = _CURRENT_KEY.format(cluster_guid=cluster_guid)
-    if cache.get(current_key):
-        raise AgentTestConflict("a test prompt is already in flight for this cluster's agent")
     job_id = uuid.uuid4().hex
-    # `add`, not `set`: closes the race the check above leaves open between
-    # two concurrent submissions for the same cluster.
-    if not cache.add(current_key, job_id, _JOB_TTL_SECONDS):
-        raise AgentTestConflict("a test prompt is already in flight for this cluster's agent")
     job = {
         "job_id": job_id,
         "cluster_guid": cluster_guid,
@@ -163,12 +244,22 @@ def enqueue(
         "error": "",
         "created_unix": time.time(),
     }
-    cache.set(_JOB_KEY.format(job_id=job_id), job, _JOB_TTL_SECONDS)
-    return job_id
+
+    def admit(current_id, _job):
+        if current_id is not None:
+            raise AgentTestConflict("a test prompt is already in flight for this cluster's agent")
+        return job_id, job, "claim"
+
+    return _atomic_transition(cluster_guid, job_id, admit)
 
 
 def get_job(job_id: str) -> dict[str, Any] | None:
-    return cache.get(_JOB_KEY.format(job_id=job_id))
+    try:
+        return _relay_cache().get(_JOB_KEY.format(job_id=job_id))
+    except AgentTestUnavailable:
+        raise
+    except Exception as exc:
+        raise AgentTestUnavailable("model test relay cache is unavailable") from exc
 
 
 def current_job_id(cluster_guid: str) -> str | None:
@@ -180,22 +271,25 @@ def current_job_id(cluster_guid: str) -> str | None:
 
 def dispatch_pending(cluster_guid: str) -> dict[str, Any] | None:
     """Called from the heartbeat view: return (and mark DISPATCHED) this
-    cluster's pending job, if any.
+    cluster's pending job at most once, if any.
 
     Returns None when there is nothing to do, including when the job
-    already left the PENDING state -- a job is handed to the agent exactly
-    once, so a retried or duplicate heartbeat can't fire the same prompt
-    twice.
+    already left the PENDING state. A lost heartbeat response can result in
+    zero execution; a retried or duplicate heartbeat never re-dispatches it.
     """
-    job_id = cache.get(_CURRENT_KEY.format(cluster_guid=cluster_guid))
-    if not job_id:
-        return None
-    job = get_job(job_id)
-    if job is None or job["status"] != PENDING:
-        return None
-    job["status"] = DISPATCHED
-    cache.set(_JOB_KEY.format(job_id=job_id), job, _JOB_TTL_SECONDS)
-    return job
+
+    def dispatch(current_id, job):
+        if (
+            not isinstance(job, dict)
+            or current_id != job.get("job_id")
+            or job.get("cluster_guid") != cluster_guid
+            or job.get("status") != PENDING
+        ):
+            return None, None, "keep"
+        dispatched = {**job, "status": DISPATCHED}
+        return dispatched, dispatched, "claim"
+
+    return _atomic_transition(cluster_guid, None, dispatch)
 
 
 def record_result(
@@ -214,23 +308,35 @@ def record_result(
     the job is unknown/expired or does not belong to ``cluster_guid`` -- the
     callback view maps either into one 404 without distinguishing them, so
     a stolen job id from a different cluster can't be used to probe or
-    poison another cluster's result.
+    poison another cluster's result. Only the current dispatched job can
+    finish. A terminal replay acknowledges the original outcome unchanged
+    and never releases a newer job's slot.
     """
-    job = get_job(job_id)
-    if job is None or job.get("cluster_guid") != cluster_guid:
-        return False
-    job["status"] = SUCCEEDED if ok else FAILED
-    job["reply"] = reply[:MAX_REPLY_CHARS]
-    job["latency_ms"] = latency_ms
-    job["prompt_tokens"] = prompt_tokens
-    job["completion_tokens"] = completion_tokens
-    job["total_tokens"] = total_tokens
-    job["error"] = error[:MAX_ERROR_CHARS]
-    cache.set(_JOB_KEY.format(job_id=job_id), job, _JOB_TTL_SECONDS)
-    # Free the cluster's slot right away instead of waiting out the full
-    # TTL, so back-to-back tests don't trip the in-flight conflict check.
-    cache.delete(_CURRENT_KEY.format(cluster_guid=cluster_guid))
-    return True
+
+    def finish(current_id, job):
+        if (
+            not isinstance(job, dict)
+            or job.get("cluster_guid") != cluster_guid
+            or job.get("job_id") != job_id
+        ):
+            return False, None, "keep"
+        if job.get("status") in _TERMINAL:
+            return True, None, "keep"
+        if current_id != job_id or job.get("status") != DISPATCHED:
+            return False, None, "keep"
+        completed = {
+            **job,
+            "status": SUCCEEDED if ok else FAILED,
+            "reply": reply[:MAX_REPLY_CHARS],
+            "latency_ms": latency_ms,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "error": error[:MAX_ERROR_CHARS],
+        }
+        return True, completed, "release"
+
+    return _atomic_transition(cluster_guid, job_id, finish)
 
 
 def wait_cap_seconds(heartbeat_interval_seconds: int) -> float:

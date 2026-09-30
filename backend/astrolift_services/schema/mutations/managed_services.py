@@ -1497,6 +1497,8 @@ class ManagedServiceMutations:
             agent_test_jobs.check_rate_limit(actor_user_id or 0)
         except agent_test_jobs.AgentTestRateLimited as exc:
             return gql_failure(ErrorCode.RATE_LIMITED.value, str(exc))
+        except agent_test_jobs.AgentTestUnavailable:
+            return gql_failure(ErrorCode.PRECONDITION.value, "model test relay is unavailable")
 
         try:
             # No result_url passed: the agent derives its own callback
@@ -1515,10 +1517,15 @@ class ManagedServiceMutations:
             )
         except agent_test_jobs.AgentTestConflict as exc:
             return gql_failure(ErrorCode.CONFLICT.value, str(exc))
+        except agent_test_jobs.AgentTestUnavailable:
+            return gql_failure(ErrorCode.PRECONDITION.value, "model test relay is unavailable")
 
-        job = agent_test_jobs.await_result(
-            job_id, heartbeat_interval_seconds=cluster.heartbeat_interval_seconds
-        )
+        try:
+            job = agent_test_jobs.await_result(
+                job_id, heartbeat_interval_seconds=cluster.heartbeat_interval_seconds
+            )
+        except agent_test_jobs.AgentTestUnavailable:
+            return gql_failure(ErrorCode.PRECONDITION.value, "model test relay result is unavailable")
 
         svc.last_action_at = timezone.now()
         svc.last_action_kind = "test_prompt"

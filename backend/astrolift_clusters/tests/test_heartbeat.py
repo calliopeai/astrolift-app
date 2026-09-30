@@ -21,11 +21,12 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import socket
 import uuid
 from types import SimpleNamespace
 
 import pytest
-from django.test import Client
+from django.test import Client, override_settings
 from django.utils import timezone
 
 from astrolift_clusters import agent_test_jobs
@@ -666,6 +667,7 @@ def test_model_test_result_records_success(cluster):
     cluster.agent_key_hash = _hash(raw)
     cluster.save(update_fields=["agent_key_hash"])
     job_id = _enqueue_job(cluster)
+    assert agent_test_jobs.dispatch_pending(str(cluster.guid))["job_id"] == job_id
     client = Client()
     resp = client.post(
         _result_url(cluster),
@@ -697,6 +699,7 @@ def test_model_test_result_records_failure(cluster):
     cluster.agent_key_hash = _hash(raw)
     cluster.save(update_fields=["agent_key_hash"])
     job_id = _enqueue_job(cluster)
+    assert agent_test_jobs.dispatch_pending(str(cluster.guid))["job_id"] == job_id
     client = Client()
     resp = client.post(
         _result_url(cluster),
@@ -708,6 +711,50 @@ def test_model_test_result_records_failure(cluster):
     job = agent_test_jobs.get_job(job_id)
     assert job["status"] == agent_test_jobs.FAILED
     assert job["error"] == "connection refused"
+
+
+@pytest.mark.parametrize("backend", ["dummy", "unreachable-redis"])
+def test_unavailable_relay_preserves_authenticated_heartbeat_and_generic_result_error(cluster, backend):
+    raw = "relay-unavailable-test-key"
+    cluster.agent_key_hash = _hash(raw)
+    cluster.save(update_fields=["agent_key_hash"])
+    with socket.socket() as unavailable:
+        unavailable.bind(("127.0.0.1", 0))
+        configuration = {"BACKEND": "django.core.cache.backends.dummy.DummyCache"}
+        if backend == "unreachable-redis":
+            from redis.backoff import NoBackoff
+            from redis.retry import Retry
+
+            configuration = {
+                "BACKEND": "django.core.cache.backends.redis.RedisCache",
+                "LOCATION": f"redis://127.0.0.1:{unavailable.getsockname()[1]}/14",
+                "OPTIONS": {
+                    "socket_connect_timeout": 0.1,
+                    "socket_timeout": 0.1,
+                    "retry": Retry(NoBackoff(), 0),
+                },
+            }
+        with override_settings(CACHES={"default": configuration}):
+            client = Client()
+            heartbeat = client.post(
+                _heartbeat_url(cluster),
+                data=json.dumps({"agent_version": "controlled-test-version"}),
+                content_type="application/json",
+                **_bearer(raw),
+            )
+            assert heartbeat.status_code == 200 and heartbeat.json()["ok"]
+            assert "test_job" not in heartbeat.json()
+            cluster.refresh_from_db()
+            assert cluster.last_heartbeat_at is not None
+            assert cluster.last_heartbeat_payload["agent_version"] == "controlled-test-version"
+            result = client.post(
+                _result_url(cluster),
+                data=json.dumps({"job_id": "controlled-old-job", "ok": True}),
+                content_type="application/json",
+                **_bearer(raw),
+            )
+            assert result.status_code == 503
+            assert result.json() == {"error": "model test relay is unavailable"}
 
 
 def test_full_dispatch_and_result_round_trip_via_http(cluster):

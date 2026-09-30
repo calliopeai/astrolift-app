@@ -2,10 +2,14 @@
 """Prompt readiness and dispatch retain actual live owner and credential gates."""
 
 import json
+import os
+import uuid
+from contextlib import ExitStack
 from types import SimpleNamespace
 
 import pytest
-from django.test import Client
+from django.conf import settings
+from django.test import Client, override_settings
 from django.utils import timezone
 from graphql import GraphQLError
 
@@ -331,3 +335,86 @@ def test_authorized_prompt_roundtrip_uses_only_persisted_service_target(world, m
     assert outcome.ok and outcome.data.status == "succeeded"
     assert outcome.data.reply == "Controlled agent transport reply"
     assert outcome.data.total_tokens == 7
+
+
+@pytest.mark.parametrize("failure_at", ["rate", "enqueue", "poll"])
+def test_actual_owner_http_cache_unavailability_is_a_failure_envelope(world, monkeypatch, failure_at):
+    row = setup(world)
+    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    minted = mint_token()
+    ApiToken.objects.create(
+        user=world.user,
+        organization=world.org,
+        name="prompt-unavailable-http",
+        token_hash=minted.token_hash,
+        scopes=["admin"],
+    )
+    unavailable = {"default": {"BACKEND": "django.core.cache.backends.dummy.DummyCache"}}
+    location = (
+        os.environ.get("ASTROLIFT_TEST_REDIS_URL")
+        or os.environ.get("DJANGO_CACHE_URL")
+        or settings.CACHES["default"].get("LOCATION")
+    )
+    assert location, "Real Redis is required; configure DJANGO_CACHE_URL or ASTROLIFT_TEST_REDIS_URL"
+    available = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": location,
+            "KEY_PREFIX": "relay-http-boundary-" + uuid.uuid4().hex,
+            "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
+        }
+    }
+    stages = []
+    admitted = []
+    with override_settings(CACHES=available):
+        with ExitStack() as failures:
+            if failure_at == "rate":
+                failures.enter_context(override_settings(CACHES=unavailable))
+            elif failure_at == "enqueue":
+                original = agent_test_jobs.check_rate_limit
+
+                def consume_budget_then_lose_cache(user_id):
+                    original(user_id)
+                    stages.append("rate")
+                    failures.enter_context(override_settings(CACHES=unavailable))
+
+                monkeypatch.setattr(agent_test_jobs, "check_rate_limit", consume_budget_then_lose_cache)
+            else:
+                original = agent_test_jobs.enqueue
+
+                def admit_then_lose_cache(**kwargs):
+                    job_id = original(**kwargs)
+                    admitted.append(job_id)
+                    stages.append("enqueue")
+                    failures.enter_context(override_settings(CACHES=unavailable))
+                    return job_id
+
+                monkeypatch.setattr(agent_test_jobs, "enqueue", admit_then_lose_cache)
+            response = Client().post(
+                "/app/gql/config/",
+                data=json.dumps(
+                    {
+                        "query": SEND.replace("errors{code field}", "errors{code field message}"),
+                        "variables": {"id": str(row.guid)},
+                    }
+                ),
+                content_type="application/json",
+                HTTP_AUTHORIZATION="Bearer " + minted.plaintext,
+            )
+        if failure_at == "poll":
+            # Result transport uncertainty does not cancel an admitted job.
+            assert agent_test_jobs.current_job_id(str(world.cluster.guid)) == admitted[0]
+            assert agent_test_jobs.get_job(admitted[0])["status"] == agent_test_jobs.PENDING
+            assert stages == ["enqueue"]
+        elif failure_at == "enqueue":
+            assert stages == ["rate"]
+            assert agent_test_jobs.current_job_id(str(world.cluster.guid)) is None
+    assert response.status_code == 200
+    envelope = response.json()["data"]["testModelEndpoint"]
+    assert not envelope["ok"] and envelope["data"] is None
+    assert envelope["errors"][0]["code"] == "PRECONDITION"
+    assert envelope["errors"][0]["message"] == (
+        "model test relay result is unavailable"
+        if failure_at == "poll"
+        else "model test relay is unavailable"
+    )

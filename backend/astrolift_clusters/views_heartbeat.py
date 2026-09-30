@@ -169,7 +169,11 @@ def cluster_heartbeat(request: HttpRequest, cluster_guid: str) -> JsonResponse:
         "ok": True,
         "interval_seconds": cluster.heartbeat_interval_seconds,
     }
-    job = agent_test_jobs.dispatch_pending(str(cluster.guid))
+    try:
+        job = agent_test_jobs.dispatch_pending(str(cluster.guid))
+    except agent_test_jobs.AgentTestUnavailable:
+        logger.warning("cluster.model_test_dispatch_unavailable: cluster=%s", cluster.guid)
+        job = None
     if job is not None:
         response["test_job"] = {
             "job_id": job["job_id"],
@@ -200,12 +204,13 @@ def cluster_test_result(request: HttpRequest, cluster_guid: str) -> JsonResponse
         or, on failure:
         {"job_id": "...", "ok": false, "error": "..."}
 
-    Response 200: {"ok": true}
+    Response 200: {"ok": true}; terminal replay preserves the original outcome.
     Response 401: missing / invalid agent key, or key not bound to the
         cluster in the URL.
     Response 400: malformed JSON / missing job_id.
-    Response 404: job unknown, expired, or not owned by this cluster —
-        both read identically so a stolen job id can't be used to probe.
+    Response 404: job unknown, expired, not current/dispatched, or not owned
+        by this cluster; these read identically to avoid probing.
+    Response 503: the relay cache cannot safely record the result.
     """
     cluster = _cluster_for_agent_key(request, cluster_guid)
     if cluster is None:
@@ -222,17 +227,21 @@ def cluster_test_result(request: HttpRequest, cluster_guid: str) -> JsonResponse
     if not isinstance(job_id, str) or not job_id:
         return JsonResponse({"error": "job_id is required"}, status=400)
 
-    recorded = agent_test_jobs.record_result(
-        cluster_guid=str(cluster.guid),
-        job_id=job_id,
-        ok=bool(body.get("ok")),
-        reply=str(body.get("reply") or ""),
-        latency_ms=_as_int_or_none(body.get("latency_ms")),
-        prompt_tokens=_as_int_or_none(body.get("prompt_tokens")),
-        completion_tokens=_as_int_or_none(body.get("completion_tokens")),
-        total_tokens=_as_int_or_none(body.get("total_tokens")),
-        error=str(body.get("error") or ""),
-    )
+    try:
+        recorded = agent_test_jobs.record_result(
+            cluster_guid=str(cluster.guid),
+            job_id=job_id,
+            ok=bool(body.get("ok")),
+            reply=str(body.get("reply") or ""),
+            latency_ms=_as_int_or_none(body.get("latency_ms")),
+            prompt_tokens=_as_int_or_none(body.get("prompt_tokens")),
+            completion_tokens=_as_int_or_none(body.get("completion_tokens")),
+            total_tokens=_as_int_or_none(body.get("total_tokens")),
+            error=str(body.get("error") or ""),
+        )
+    except agent_test_jobs.AgentTestUnavailable:
+        logger.warning("cluster.model_test_result_unavailable: cluster=%s", cluster.guid)
+        return JsonResponse({"error": "model test relay is unavailable"}, status=503)
     if not recorded:
         return JsonResponse({"error": "job not found"}, status=404)
 

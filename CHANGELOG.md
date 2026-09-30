@@ -4,6 +4,11 @@
 
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
+- Model prompt relay admission, dispatch and result transitions atomically retain
+  the matching cluster slot. Concurrent heartbeats dispatch at most once and
+  replayed results preserve the first outcome without releasing a newer job.
+  Cache failures return generic mutation/result failures while authenticated
+  heartbeats remain healthy; admitted jobs may still finish after polling fails.
 
 - Confirmation dialogs retain handled false outcomes and entered reasons for
   retry without duplicating action diagnostics. Workload restart confirmations

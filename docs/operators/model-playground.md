@@ -28,6 +28,44 @@ fail or time out, and readiness/configuration/authorization can change before
 submission. Upgrade/roll out the agent through the ordinary operator workflow;
 this feature does not change an agent repository or deploy an image.
 
+## Job admission and delivery
+
+The configured Django Redis cache commits job admission and the cluster's slot
+together. Dispatch atomically changes the current pending job to dispatched and
+renews both entries' 180-second TTL. Concurrent heartbeats dispatch at most once;
+if the heartbeat response is lost, the model may execute zero times. There is no
+exactly-once network-delivery guarantee and no automatic re-dispatch.
+
+A result can finish only the current dispatched job. The first terminal outcome
+releases its matching slot atomically. Replayed terminal results acknowledge that
+original outcome unchanged, without refreshing its TTL or clearing a newer job's
+slot. Pending, orphaned, expired and foreign-cluster results are refused. Prompt
+jobs and their results remain transient cache data, not persisted crash history.
+
+Redis transitions use bounded WATCH/MULTI retries against the configured primary,
+watching both job and slot. Redis 6.0.9 or newer aborts a watched transaction when
+an entry expires; the local regression proof uses Redis 7. See the
+[Redis transaction contract](https://redis.io/docs/latest/interact/transactions/).
+The supported production backend is Django's core `RedisCache`; this does not
+add Redis Cluster support. `LocMemCache` provides process-local transitions for
+ordinary tests, not coordination across server processes. Other cache backends,
+including `DummyCache`, refuse relay operations.
+
+Cache connection failure or exhausted transition retries return a generic
+`PRECONDITION` mutation failure. Healthy authenticated heartbeats still persist
+their observations and return without a test job; unavailable result callbacks
+return HTTP 503. Result-polling failure does not cancel an already admitted job:
+it may still finish, so transport uncertainty is not evidence that retrying the
+prompt will have no additional effect. Existing permission and token checks run
+before cache admission, and rate limits remain independent of job transitions.
+
+Regression checks use actual PostgreSQL ownership and HTTP credentials plus
+isolated Redis key prefixes. They cover independent processes, concurrent
+admission/dispatch/results, expiry during watched transitions, immutable replay,
+and cache failure at rate checking, admission, polling and agent HTTP boundaries.
+Redis tests use `ASTROLIFT_TEST_REDIS_URL`, then `DJANGO_CACHE_URL`, then the
+configured cache location; unavailable Redis is a failure, not a skipped proof.
+
 Source verification: published `astrolift-agents` main at
 `ce47cfb152b0ca7bc362833640b0cfc2ed1ec48d`,
 `images/keepalive/keepalive.py` (blob
