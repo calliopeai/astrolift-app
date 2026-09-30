@@ -127,3 +127,27 @@ contain only the locally observed records explicitly selected by the user.
 The real prompt, local history, and starred routes are reachable from Models.
 Unrelated `/playground/topology` and `/playground/observability` showcases, and
 `/forms`, remain parked. All new playground notices have all eight UI locales.
+
+## Shared cluster-owned endpoints
+
+The additive `astroliftSharedModelPromptReadiness` query and
+`testSharedModelEndpoint` mutation bind the deployment GUID, expected cluster
+GUID, expected provider GUID and current deployment version. Their operator
+admission is exact-organization `CLUSTER_UPDATE`, with current credential and
+region-policy checks. App subscription rights do not grant operator playground
+or aggregate telemetry access. No browser key, endpoint URL or raw config is
+accepted or returned.
+
+Shared readiness requires the current available cluster/provider and the
+persisted confirmed generation, auth revision, observation time and recorded
+canonical backend target. It is advisory last-confirmed state; admission is
+rechecked under locks before the existing atomic bounded relay enqueue. The
+agent uses the private operator key in the model namespace, not a subscriber's
+app binding. Pending, failed, retargeted or unobserved deployments refuse a
+prompt. The existing bounded limits, transient-cache delivery semantics and
+at-most-once dispatch conditions above also apply to shared requests.
+
+Subscription creation/revocation can restart the entire shared model; pending
+reconciliation does not promise uninterrupted playground availability. See
+[vLLM hosting](vllm-model-hosting.md#organization-owned-shared-deployments) for
+certified CPU/GPU declarations, named bindings, monitoring and agent prerequisites.

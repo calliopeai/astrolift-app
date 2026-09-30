@@ -82,3 +82,45 @@ def validate_cluster_request(input, cluster):
     provider_config = cluster.provider_config if isinstance(cluster.provider_config, dict) else {}
     runtime = shared_runtime(provider_config.get("vllm_shared_runtimes", {}), config, "python")
     return config, runtime
+
+
+def canonical_model_handle(service):
+    """One pure recorded-target contract shared by writes and readiness projection."""
+    from _sdk.k8s_naming import cluster_model_namespace, cluster_model_resource_name
+    from k8s_native.managed._handle import pack
+
+    return pack(
+        kind="model_endpoint",
+        cluster_id=str(service.tenant_cluster.guid),
+        namespace=cluster_model_namespace(
+            organization_id=str(service.organization.guid),
+            cluster_id=str(service.tenant_cluster.guid),
+            managed_service_id=str(service.guid),
+        ),
+        name=cluster_model_resource_name(str(service.guid)),
+    )
+
+
+def with_canonical_model_handle(rows):
+    """Filter recorded targets before pagination using the SDK's UUID-only naming contract.
+
+    The three UUID namespace input always exceeds 63 characters. Its 52-character
+    prefix ends in the first UUID's trailing separator, which dns_label trims.
+    Regression tests compare this expression with the SDK producer.
+    """
+    from django.db.models import BinaryField, CharField, F, Func, Value
+    from django.db.models.functions import Cast, Concat, Substr
+
+    org = Cast(F("organization__guid"), CharField())
+    cluster = Cast(F("tenant_cluster__guid"), CharField())
+    service = Cast(F("guid"), CharField())
+    raw = Concat(Value("astrolift-model-"), org, Value("-"), cluster, Value("-"), service)
+    raw_bytes = Func(raw, Value("UTF8"), function="convert_to", output_field=BinaryField())
+    digest = Func(raw_bytes, function="sha256", output_field=BinaryField())
+    hex_digest = Func(digest, Value("hex"), function="encode", output_field=CharField())
+    namespace = Concat(Value("astrolift-model-"), org, Value("-"), Substr(hex_digest, 1, 10))
+    return rows.annotate(
+        _canonical_model_handle=Concat(
+            Value("model_endpoint/"), cluster, Value("/"), namespace, Value("/vllm-"), service
+        )
+    )

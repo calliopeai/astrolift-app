@@ -40,6 +40,7 @@ from astrolift_operations.observability_profile import (
     RETENTION_METRICS_ROLLUP,
     RETENTION_TRACES,
 )
+from astrolift_services.model_retirement import retirement_guard
 from core.appearance import AppearanceError, validate_appearance
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -246,6 +247,7 @@ class OrganizationMutations:
     @mutation_audit(action="org.delete")
     @require_permission(Permission.ORG_DELETE, scope=identity_organization_scope(Permission.ORG_DELETE))
     @tenant_scoped()
+    @retirement_guard(kind="organization", field="input.id")
     def soft_delete_organization(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:

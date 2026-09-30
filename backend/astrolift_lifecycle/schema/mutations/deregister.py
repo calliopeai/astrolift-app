@@ -19,6 +19,7 @@ from astrolift_lifecycle.scopes import deregister_workflow_scope
 from astrolift_lifecycle.visibility import live_app_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_services.model_retirement import retirement_guard
 from astrolift_workflows.client import (
     signal_workflow,
     start_workflow,
@@ -50,6 +51,7 @@ class DeregisterMutations:
         Permission.APP_DELETE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DELETE)
     )
     @tenant_scoped()
+    @retirement_guard(kind="app", field="input.app_slug")
     def deregister_astrolift_app(
         self,
         info: Info,

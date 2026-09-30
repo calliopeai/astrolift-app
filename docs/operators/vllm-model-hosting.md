@@ -57,3 +57,132 @@ This needs two things on the cluster, both fail closed with a specific message r
 2. `vllm_agent_test` set (above), so the agent's NetworkPolicy allowance actually reaches the model.
 
 The prompt and reply never touch Postgres -- they live only in the cache for the duration of the request, capped in size, and the reply is capped to a short response (128 tokens).
+
+## Organization-owned shared deployments
+
+Shared deployments use an explicit organization and available physical cluster,
+not a fabricated owning app. The GUID-derived model namespace and resource name
+remain stable across display-name changes. Existing app/project services and
+legacy `MODEL_*` bindings retain their contracts. Shared creation requires
+`CLUSTER_UPDATE` in the exact organization, an unchanged reviewed provider GUID,
+and an available enabled managed cluster. In-org catalogue reads require
+`ORG_READ`; metadata visibility does not grant deployment authority.
+
+Configure certified runtimes in the cluster's `provider_config` before creation.
+This example is a declaration template: replace both digest placeholders with
+verified image digests and certify the actual hardware/node labels first.
+Unconfigured modes are refused; neither zero requested GPUs nor an architecture
+label proves CPU compatibility.
+
+```json
+{
+  "vllm_shared_runtimes": {
+    "cpu": {
+      "version": "0.15.1",
+      "package_version": "0.15.1+cpu",
+      "image": "registry.example/operator-verified-vllm-cpu@sha256:<64-lowercase-hex-digest>",
+      "architecture": "amd64",
+      "hardware_certified": true,
+      "node_selector": {"example.com/vllm-cpu-certified": "true"}
+    },
+    "gpu": {
+      "version": "0.15.1",
+      "package_version": "0.15.1",
+      "image": "registry.example/operator-verified-vllm-gpu@sha256:<64-lowercase-hex-digest>",
+      "architecture": "amd64",
+      "hardware_certified": true,
+      "node_selector": {"example.com/vllm-gpu-certified": "true"}
+    }
+  },
+  "vllm_agent_test": {
+    "namespace": "astrolift-system",
+    "pod_labels": {"app": "astrolift-agent"}
+  },
+  "vllm_metrics": {
+    "namespace": "monitoring",
+    "labels": {"release": "kube-prometheus-stack"}
+  }
+}
+```
+
+The shared launcher requires the supported Python vLLM package at startup;
+GPU operators may declare a matching released `0.15.1+cuNNN` build. CPU images
+require their certified instruction set and runtime dependencies as well as the
+selected architecture. CPU requests include explicit KV-cache GiB and memory
+strictly larger than that cache. CPU/memory requests are positive and bounded;
+GPU mode requires a positive GPU request. Admission checks declarations, not
+live capacity, downloaded weights, model fit or successful inference.
+
+Creation currently accepts only a public, ungated Hugging Face repository at a
+verified immutable lowercase 40-hex revision. Gated/private/unknown access is
+refused. The shared runtime is generation-only, with explicit
+`--runner generate --convert none`; embedding/rerank metadata does not authorize
+those tasks. The service uses one replica. Existing legacy frontend selection
+and non-shared image behavior are unchanged.
+
+### Named subscriptions and reconciliation
+
+A new subscription requires a live same-cluster app environment with exact
+`APP_UPDATE` destination permission plus source `ORG_READ`, both subject to
+credential ceilings. The owner must enable new subscriptions. Named aliases
+match `[a-z][a-z0-9_]{0,31}`; `chat` binds `MODEL_CHAT_ENDPOINT_URL`,
+`MODEL_CHAT_API_KEY`, `MODEL_CHAT_DEPLOYMENT_NAME`, `MODEL_CHAT_REGION`,
+`MODEL_CHAT_API_STYLE` and `MODEL_CHAT_AUTH_MODE`. Multiple aliases are allowed,
+up to 64 active consumers per shared deployment. An alias cannot overwrite an
+existing subscription, explicit environment variable or existing Secret/ConfigMap
+source prefix. There is no implicit replacement or new legacy `MODEL_*` default.
+
+This initial destination contract supports existing long-running Deployment and
+StatefulSet workloads (including agent/workflow workload kinds) in the canonical
+app namespace. Empty, Job/CronJob, custom and preview namespace targets are
+explicitly refused. Per-subscription Secrets contain only that consumer's key;
+the operator key is never copied into app bindings.
+
+Accepted mutations persist pending/revoking state and enqueue revision-bound
+Temporal reconciliation; they do not claim readiness or immediate revocation.
+Credential changes restart the shared model using **Recreate**, with temporary
+unavailability for every subscriber. Independent remaining keys stay unchanged.
+The worker confirms the current model generation, authentication revision,
+provider GUID and recorded resource, then conditionally updates app pod templates
+using observed UID/resourceVersion and verifies actual current Ready pods. It
+preserves HPA-owned replica counts. A revoked key is reported revoked only after
+the model has restarted with its new snapshot and destination bindings are
+removed; updating a Secret alone does not revoke a running frontend's key.
+
+A failed reconciliation exposes a fixed bounded diagnostic and remains failed;
+retry/revoke may require operator review. Previously confirmed unrelated bindings
+can remain available while a later change fails. Ordinary app deploys materialize
+only confirmed coherent subscription references. `ready` is the last confirmed
+reconciliation observation, not a continuous health guarantee. The recorded
+observation time/generation and actual telemetry remain separate facts.
+Deletion requires every subscription's confirmed revocation. Existing cache-PVC
+retention semantics still apply; namespace/data cleanup is not implied.
+
+### Private metrics and agent prerequisites
+
+Unlike the legacy single-app `/metrics` behavior described above, shared servers
+mount the validated auth middleware and an immutable startup key snapshot.
+Subscribers can access the supported model routes but cannot scrape `/metrics`
+or operator/config/admin paths. Operator scrape credentials are private. The
+shared ServiceMonitor lives in the model namespace, so its operator Secret
+selector is local; `vllm_metrics.namespace` admits the monitoring namespace in
+NetworkPolicy. Prometheus must discover model namespaces and have permission to
+read their ServiceMonitors and referenced scrape Secrets. An installed compatible
+ServiceMonitor CRD and policy-enforcing CNI are separate operator prerequisites.
+
+The keepalive agent must be live, include the actual bounded `test_job` relay,
+and have network access matching `vllm_agent_test`. Merely seeing an agent version
+or accepted NetworkPolicy is not transport/enforcement proof. Runtime tests use
+controlled mounted-auth HTTP servers and real pod rollouts; they do not claim a
+large model was downloaded or vLLM inference was exercised.
+
+Retire consumers in order: revoke all their subscriptions, wait for each
+subscription's confirmed `revoked` state, then retire/deregister the app or its
+team/project. Pending, revoking, failed and unconfirmed revocation states block
+retirement before side effects. The worker rechecks under app/environment locks
+before entering teardown and deleting namespaces/platform records. Once teardown
+begins, new subscriptions are refused. Organization retirement additionally
+requires deprovisioning all its shared model deployments, including deployments
+without subscribers. This release adds no orphan-recovery or instant force-revoke
+API; investigate pre-existing corrupted/orphaned records with an operator before
+attempting cleanup.

@@ -31,6 +31,15 @@
   cluster, provider and version identities under owner permissions and current
   region policy. The bounded in-cluster relay derives its private target from
   persisted UUIDs, preserving actual failure and timeout outcomes (#2213).
+- Shared model deployment/update/deletion and named app-environment subscription
+  mutations now enqueue revision-bound Temporal reconciliation. Independent key
+  changes use Recreate and report pending/revoking until actual model and consumer
+  pod readiness confirms application. Current locked owners, provider identities,
+  bearer scopes, grants and region policies are rechecked before writes. Consumer
+  and ancestor retirement require confirmed revocation; organization retirement
+  also requires its shared deployments to be deprovisioned (#2213).
+
+
 - Shared model catalogue, placement review and subscription-target pages use
   current organization/provider identities and filter before paging. Runtime
   admission requires cluster management authority; readable subscriptions have
@@ -41,8 +50,8 @@
   explicit certified CPU/GPU runtimes, immutable model revisions, independent
   startup credential snapshots and operator-authenticated metrics. Readiness
   waits for the current Deployment generation and every current pod. App and
-  environment identity labels cannot be overwritten by supplied labels. Public
-  deployment/subscription operations remain pending their lifecycle integration.
+  environment identity labels cannot be overwritten by supplied labels. Existing
+  app-owned endpoint ownership and legacy bindings remain compatible.
 
 - Shared Python model serving has a startup-snapshot ASGI authorization hook:
   subscription keys reach supported inference routes, while metrics and operator
@@ -67,8 +76,7 @@
   metadata without browser credentials or inferred runtime fit (#2214).
 - Shared vLLM model storage can identify an explicit organization and cluster
   owner without an app/project placeholder. Named subscription aliases and
-  reconciliation revisions have database constraints. This foundation does
-  not yet expose deployment or subscription operations; unavailable placements
+  reconciliation revisions have database constraints. Unavailable placements
   remain inspectable while infrastructure transport requires managed, active
   clusters and enabled providers (#2213).
 - Add translated shared-cluster CPU/GPU deployment reviews with immutable model

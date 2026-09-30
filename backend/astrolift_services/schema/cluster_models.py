@@ -3,14 +3,14 @@
 from uuid import UUID
 
 import strawberry
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import CharField, Exists, F, Func, OuterRef, Q
 from strawberry.types import Info
 
 from astrolift_clusters.models import TenantCluster
 from astrolift_graphql import GUID, PageType, numbered_page
 from astrolift_identity.operation_visibility import visible_operation_rows
 from astrolift_lifecycle.models import AppEnvironment
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.scopes import live_app_owners
 from astrolift_services.cluster_models import (
     available_model_clusters,
@@ -23,6 +23,7 @@ from astrolift_services.model_admission import (
     in_current_org,
     shared_cluster_operation,
     validate_cluster_request,
+    with_canonical_model_handle,
 )
 from astrolift_services.models import ManagedService, ManagedServiceAttachment
 from astrolift_services.schema.model_types import (
@@ -101,6 +102,8 @@ def _environment_rows(permission):
         registered_app__in=owners,
         tenant_cluster__deleted_at__isnull=True,
     ).select_related("registered_app__organization", "tenant_cluster")
+    if permission == Permission.APP_UPDATE:
+        rows = rows.exclude(registered_app__provisioning_status__in=("tearing_down", "deregistered"))
     return visible_operation_rows(rows, permission, environment_path="self")
 
 
@@ -178,18 +181,32 @@ class ClusterModelsQuery:
                 )
                 rows = rows.filter(mine if filter.deployed_by_me else ~mine)
             if filter.ready is not None:
+                rows = with_canonical_model_handle(rows).annotate(
+                    _applied_type=Func(
+                        F("applied_config"), function="jsonb_typeof", output_field=CharField()
+                    ),
+                    _replicas_type=Func(
+                        F("applied_config__replicas"), function="jsonb_typeof", output_field=CharField()
+                    ),
+                )
                 ready = Q(
+                    _applied_type="object",
                     status="active",
                     applied_config__isnull=False,
                     model_ready_observed_at__isnull=False,
-                    model_ready_generation__isnull=False,
+                    model_ready_generation__gt=0,
                     model_ready_auth_revision=F("subscription_revision"),
+                    model_ready_provider_guid=F("tenant_cluster__provider_plugin__guid"),
+                    model_ready_backend_ref=F("backend_ref"),
+                    backend_ref=F("_canonical_model_handle"),
                     applied_subscription_revision=F("subscription_revision"),
                     tenant_cluster__is_active=True,
                     tenant_cluster__lifecycle="managed",
                     tenant_cluster__provider_plugin__is_enabled=True,
                 ) & ~Q(backend_ref="")
-                ready &= ~Q(applied_config__has_key="replicas") | Q(applied_config__replicas__gt=0)
+                ready &= ~Q(applied_config__has_key="replicas") | Q(
+                    _replicas_type="number", applied_config__replicas__regex=r"^[1-9][0-9]*$"
+                )
                 rows = rows.filter(ready if filter.ready else ~ready)
         return _page(
             _search(rows, search, ("name", "config__model")),
@@ -267,7 +284,13 @@ class ClusterModelsQuery:
     ) -> PageType[ModelSubscriptionTargetType]:
         check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
         service = live_cluster_model_by_guid(model_deployment_id) if in_current_org(organization_id) else None
-        rows = _environment_rows(Permission.APP_UPDATE)
+        from astrolift_services.model_subscriptions import LONG_RUNNING_KINDS
+
+        workloads = Workload.objects.filter(registered_app_id=OuterRef("registered_app_id"))
+        rows = _environment_rows(Permission.APP_UPDATE).annotate(
+            _has_workloads=Exists(workloads),
+            _unsupported_workloads=Exists(workloads.exclude(kind__in=LONG_RUNNING_KINDS)),
+        )
         if service is None:
             rows = rows.none()
         admitted = bool(
@@ -284,7 +307,13 @@ class ClusterModelsQuery:
                     TenantCluster.objects.filter(pk=service.tenant_cluster_id), current_org_id()
                 ).exists()
             )
-            admitted = admitted and cluster_model_to_type(service).runtime_supported is True
+            decision = cluster_model_to_type(service)
+            admitted = (
+                admitted
+                and decision.runtime_supported is True
+                and decision.ready is True
+                and service.status == "active"
+            )
 
         def project(env):
             from _sdk.k8s_naming import app_namespace
@@ -295,7 +324,13 @@ class ClusterModelsQuery:
                 organization_slug=env.registered_app.organization.slug, app_slug=env.registered_app.slug
             )
             supported_namespace = namespace_for_environment(env) == canonical_namespace
-            eligible = admitted and service.tenant_cluster_id == env.tenant_cluster_id and supported_namespace
+            supported_workloads = env._has_workloads and not env._unsupported_workloads
+            eligible = (
+                admitted
+                and service.tenant_cluster_id == env.tenant_cluster_id
+                and supported_namespace
+                and supported_workloads
+            )
             return ModelSubscriptionTargetType(
                 environment_id=GUID(str(env.guid)),
                 environment_version=env.version,
@@ -310,7 +345,11 @@ class ClusterModelsQuery:
                 else (
                     "Custom or preview namespaces are not supported for shared model subscriptions."
                     if not supported_namespace
-                    else "Environment and model placement or subscription admission is unavailable."
+                    else (
+                        "Shared model subscriptions require existing long-running Deployment or StatefulSet workloads."
+                        if not supported_workloads
+                        else "Environment and model placement or subscription admission is unavailable."
+                    )
                 ),
             )
 
@@ -366,6 +405,6 @@ class ClusterModelsQuery:
             page=page,
             page_size=page_size,
             projection=lambda row: model_subscription_to_type(
-                row, can_revoke=row._can_revoke and row.desired_enabled
+                row, can_revoke=row._can_revoke and row.subscription_status != "revoked"
             ),
         )

@@ -66,6 +66,8 @@ def cluster_model_to_type(service):
 
     from k8s_native.managed.shared_model_runtime import shared_runtime
 
+    from astrolift_services.model_admission import canonical_model_handle
+
     config = service.config if isinstance(service.config, dict) else {}
     cluster = service.tenant_cluster
     provider = cluster.provider_plugin
@@ -90,10 +92,14 @@ def cluster_model_to_type(service):
         and service.status == ManagedService.Status.ACTIVE
         and service.applied_config is not None
         and service.model_ready_observed_at is not None
-        and service.model_ready_generation is not None
+        and type(service.model_ready_generation) is int
+        and service.model_ready_generation > 0
+        and service.model_ready_provider_guid == provider.guid
         and service.model_ready_auth_revision == service.subscription_revision
         and service.applied_subscription_revision == service.subscription_revision
         and bool(service.backend_ref)
+        and service.model_ready_backend_ref == service.backend_ref
+        and service.backend_ref == canonical_model_handle(service)
         and isinstance(service.applied_config, dict)
         and type(service.applied_config.get("replicas", 1)) is int
         and service.applied_config.get("replicas", 1) > 0

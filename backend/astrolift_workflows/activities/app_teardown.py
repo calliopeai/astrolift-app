@@ -28,9 +28,12 @@ import logging
 
 from temporalio import activity
 
+from astrolift_services.model_retirement import retirement_activity
+
 log = logging.getLogger("astrolift_workflows.activities.app_teardown")
 
 
+@retirement_activity
 def _mark_state_sync(registered_app_id: int, status: str) -> None:
     from astrolift_registry.models import RegisteredApp
 
@@ -40,6 +43,7 @@ def _mark_state_sync(registered_app_id: int, status: str) -> None:
     )
 
 
+@retirement_activity
 def _mark_tearing_down_sync(registered_app_id: int) -> bool:
     """Flip the app to TEARING_DOWN. Returns True when the app was ALREADY
     in a teardown state (tearing_down, or the terminal deregistered) before
@@ -120,6 +124,7 @@ async def list_app_managed_service_ids(
     return ids
 
 
+@retirement_activity
 def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
     """Delete the k8s namespace per (app, env) for every environment
     the app is bound to. Cascades all Deployments / Services /
@@ -323,6 +328,7 @@ async def revoke_app_deploy_tokens(registered_app_id: int) -> int:
     return n
 
 
+@retirement_activity
 def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
     """Final soft-delete pass. Soft-deletes the app's per-app business
     rows so none outlive the RegisteredApp. The audit / event / cost /

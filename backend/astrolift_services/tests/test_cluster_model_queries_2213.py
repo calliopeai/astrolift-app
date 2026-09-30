@@ -145,7 +145,9 @@ def test_active_without_an_observed_rollout_never_claims_ready(world):
     grant(world, Permission.ORG_READ)
     world.model.status = "active"
     world.model.applied_config = {"replicas": 1}
-    world.model.backend_ref = "recorded"
+    from astrolift_services.model_admission import canonical_model_handle
+
+    world.model.backend_ref = canonical_model_handle(world.model)
     world.model.save()
     query = ClusterModelsQuery()
     with subject(world):
@@ -168,6 +170,8 @@ def test_active_without_an_observed_rollout_never_claims_ready(world):
     world.model.model_ready_observed_at = timezone.now()
     world.model.model_ready_auth_revision = 0
     world.model.model_ready_generation = 4
+    world.model.model_ready_provider_guid = world.cluster.provider_plugin.guid
+    world.model.model_ready_backend_ref = world.model.backend_ref
     world.model.save()
     with subject(world):
         row = query.cluster_model_deployment(
@@ -239,3 +243,74 @@ def test_deployment_projection_has_no_per_row_queries(world):
     assert page.total_count == 21
     assert len(small) == len(large)
     assert len(large) <= 15
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "zero_generation",
+        "changed_handle",
+        "string_replicas",
+        "bool_replicas",
+        "fractional_replicas",
+        "zero_replicas",
+        "non_object_config",
+    ],
+)
+def test_ready_filter_matches_confirmed_projection_before_pagination(world, change):
+    from astrolift_services.model_admission import canonical_model_handle, with_canonical_model_handle
+
+    grant(world, Permission.ORG_READ)
+    model = world.model
+    model.status = "active"
+    model.applied_config = {"replicas": 1}
+    model.backend_ref = canonical_model_handle(model)
+    model.model_ready_backend_ref = model.backend_ref
+    model.model_ready_observed_at = timezone.now()
+    model.model_ready_auth_revision = model.subscription_revision
+    model.model_ready_provider_guid = world.cluster.provider_plugin.guid
+    model.model_ready_generation = 3
+    model.save()
+    assert with_canonical_model_handle(ManagedService.objects.filter(pk=model.pk)).values_list(
+        "_canonical_model_handle", flat=True
+    ).get() == canonical_model_handle(model)
+    with subject(world):
+        query = ClusterModelsQuery()
+        ready = query.cluster_model_deployments_page(
+            make_info(world.user),
+            organization_id=GUID(str(world.org.guid)),
+            page_size=1,
+            filter=ClusterModelsFilterInput(ready=True),
+        )
+        assert ready.total_count == 1 and ready.items[0].ready is True
+    if change == "zero_generation":
+        model.model_ready_generation = 0
+    elif change == "changed_handle":
+        model.backend_ref = model.model_ready_backend_ref = "model_endpoint/foreign/namespace/foreign"
+    elif change == "non_object_config":
+        model.applied_config = []
+    else:
+        model.applied_config = {
+            "replicas": {
+                "string_replicas": "1",
+                "bool_replicas": True,
+                "fractional_replicas": 1.5,
+                "zero_replicas": 0,
+            }[change]
+        }
+    model.save()
+    with subject(world):
+        ready = query.cluster_model_deployments_page(
+            make_info(world.user),
+            organization_id=GUID(str(world.org.guid)),
+            page_size=1,
+            filter=ClusterModelsFilterInput(ready=True),
+        )
+        unready = query.cluster_model_deployments_page(
+            make_info(world.user),
+            organization_id=GUID(str(world.org.guid)),
+            page_size=1,
+            filter=ClusterModelsFilterInput(ready=False),
+        )
+    assert ready.total_count == 0 and ready.items == []
+    assert unready.total_count == 1 and unready.items[0].ready is False
