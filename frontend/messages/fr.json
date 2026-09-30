@@ -1582,7 +1582,30 @@
         "thresholdOption": "≥ {count} de gravité élevée"
       },
       "loadError": "Impossible de charger la sécurité de l’application",
-      "eventsError": "Impossible de charger les événements de sécurité"
+      "eventsError": "Impossible de charger les événements de sécurité",
+      "access": {
+        "title": "Accès",
+        "managedByManifest": "défini dans astrolift.toml",
+        "restrictedDescription": "Seuls les groupes et utilisateurs ci-dessous peuvent entrer. Les autres utilisateurs connectés voient une page d’accès refusé.",
+        "openDescription": "Tout utilisateur pouvant se connecter à l’authentification centrale de ce cluster peut entrer.",
+        "notEnforced": "La règle est appliquée à la périphérie Envoy. Aucun cluster de cette application ne l’utilise encore ; seule la connexion est donc requise.",
+        "noRule": "Aucune règle d’accès.",
+        "groups": "Groupes",
+        "users": "Utilisateurs",
+        "usersEmail": "Utilisateurs (adresse e-mail)",
+        "remove": "Retirer {value}",
+        "add": "Ajouter",
+        "invalidEmail": "Saisissez une adresse e-mail.",
+        "preview": "Accès possible : {allowed, number} sur {total, plural, one {# utilisateur} other {# utilisateurs}}.",
+        "losingAccess": "{count, number} perdraient l’accès : {users}",
+        "saving": "Enregistrement…",
+        "save": "Enregistrer l’accès",
+        "saved": "Règle d’accès enregistrée.",
+        "removed": "Règle d’accès supprimée.",
+        "saveFailed": "Échec de l’enregistrement.",
+        "membersDescription": "Qui peut voir et modifier cette application : les rôles attribués ici et les équipes avec lesquelles elle est partagée.",
+        "edgeDescription": "Qui peut accéder à l’URL de l’application. La périphérie décide qui peut entrer ; les rôles décident qui peut la modifier."
+      }
     },
     "members": {
       "title": "App members",

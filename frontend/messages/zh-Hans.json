@@ -1582,7 +1582,30 @@
         "thresholdOption": "≥ {count} 个高危结果"
       },
       "loadError": "无法加载应用安全信息",
-      "eventsError": "无法加载安全事件"
+      "eventsError": "无法加载安全事件",
+      "access": {
+        "title": "访问",
+        "managedByManifest": "在 astrolift.toml 中配置",
+        "restrictedDescription": "只有以下群组和用户可以进入。其他用户登录后会看到无访问权限的页面。",
+        "openDescription": "能通过此集群中央认证登录的所有用户均可进入。",
+        "notEnforced": "规则在 Envoy 边缘执行。此应用的集群尚未使用该边缘，因此目前只要求登录。",
+        "noRule": "无访问规则。",
+        "groups": "群组",
+        "users": "用户",
+        "usersEmail": "用户（电子邮件）",
+        "remove": "移除 {value}",
+        "add": "添加",
+        "invalidEmail": "请输入电子邮件地址。",
+        "preview": "{total, plural, one {# 位用户} other {# 位用户}}中有 {allowed, number} 位可以进入。",
+        "losingAccess": "{count, number} 位用户将失去访问权限：{users}",
+        "saving": "正在保存…",
+        "save": "保存访问设置",
+        "saved": "访问规则已保存。",
+        "removed": "访问规则已移除。",
+        "saveFailed": "保存失败。",
+        "membersDescription": "谁可以查看和修改此应用：在此分配的角色及共享应用的团队。",
+        "edgeDescription": "谁可以访问应用 URL。边缘决定谁能进入，角色决定谁能修改应用。"
+      }
     },
     "members": {
       "title": "App members",

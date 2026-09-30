@@ -25,6 +25,10 @@
   language in all eight supported locales, including rich environment-variable
   hints. Failed confirmations remain open for retry (#2145; remaining domains
   are still being translated).
+- Edge-access rule descriptions, editor controls, validation and save feedback
+  use all eight locales. Preview counts use locale number/plural formatting;
+  group names, email identities and access policy stay unchanged (#2145).
+
 - App supply-chain security copy, vulnerability badges and numeric threshold
   labels now use all eight locales. Security-event timestamps follow the locale,
   and findings labels refresh when the language changes (#2145).

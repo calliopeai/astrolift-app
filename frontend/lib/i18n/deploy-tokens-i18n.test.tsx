@@ -5,6 +5,11 @@ import { fireEvent, render, screen, within, waitFor } from "@testing-library/rea
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { AccessCardView, AccessEditorView } from "@/components/screens/apps/security/AccessCard";
+import {
+  ACCESS_RESTRICTED,
+  EDITOR_CHANGED,
+} from "@/components/screens/apps/security/app-security-previews.fixtures";
 import { AppSecurityScreen } from "@/components/screens/apps/security/AppSecurityScreen";
 import {
   SECURITY,
@@ -61,21 +66,23 @@ function leaves(node: Record<string, unknown>, prefix = ""): Record<string, stri
   );
 }
 function argumentsOf(ast: MessageFormatElement[]): unknown[] {
-  return ast.flatMap<unknown>((node) => {
-    if (node.type === 0 || node.type === 7) return [];
-    if (node.type === 6 || node.type === 5)
-      return [
-        [
-          node.type,
-          node.value,
-          Object.fromEntries(
-            Object.entries(node.options).map(([key, option]) => [key, argumentsOf(option.value)])
-          ),
-        ],
-      ];
-    if (node.type === 8) return [[node.type, node.value, argumentsOf(node.children)]];
-    return [[node.type, node.value]];
-  });
+  return ast
+    .flatMap<unknown>((node) => {
+      if (node.type === 0 || node.type === 7) return [];
+      if (node.type === 6 || node.type === 5)
+        return [
+          [
+            node.type,
+            node.value,
+            Object.fromEntries(
+              Object.entries(node.options).map(([key, option]) => [key, argumentsOf(option.value)])
+            ),
+          ],
+        ];
+      if (node.type === 8) return [[node.type, node.value, argumentsOf(node.children)]];
+      return [[node.type, node.value]];
+    })
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 }
 
 // Same spelling is meaningful for these cognates and the technical IP label.
@@ -246,4 +253,68 @@ describe("translated supply-chain controls", () => {
     ).toBeInTheDocument();
     view.unmount();
   });
+});
+
+describe("translated edge-access editor", () => {
+  it.each(locales)(
+    "%s preserves identities and formats preview counts and validation",
+    (locale) => {
+      const messages = catalogs[locale];
+      const t = createTranslator({ locale, messages, namespace: "apps.security.access" });
+      const setUsers = vi.fn();
+      const setGroups = vi.fn();
+      const preview = {
+        ...EDITOR_CHANGED.preview!,
+        allowed: 1,
+        total: 1234,
+        losing: ["unchanged@example.com"],
+      };
+      const view = render(
+        <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
+          <AccessCardView
+            {...ACCESS_RESTRICTED}
+            editor={
+              <AccessEditorView
+                {...EDITOR_CHANGED}
+                preview={preview}
+                setUsers={setUsers}
+                setGroups={setGroups}
+              />
+            }
+          />
+        </NextIntlClientProvider>
+      );
+      expect(
+        screen.getByText(t("preview", { allowed: 1, total: 1234 }).replace(/\s+/g, " "))
+      ).toBeVisible();
+      expect(
+        screen.getByText(t("losingAccess", { count: 1, users: "unchanged@example.com" }))
+      ).toBeVisible();
+      const email = screen.getByLabelText(t("usersEmail"));
+      fireEvent.change(email, { target: { value: "invalid-address" } });
+      fireEvent.keyDown(email, { key: "Enter" });
+      expect(screen.getByText(t("invalidEmail"))).toBeVisible();
+      expect(setUsers).not.toHaveBeenCalled();
+      const group = EDITOR_CHANGED.groups[0];
+      fireEvent.click(screen.getByRole("button", { name: t("remove", { value: group }) }));
+      expect(setGroups).toHaveBeenCalledWith(
+        EDITOR_CHANGED.groups.filter((value) => value !== group)
+      );
+      view.unmount();
+    }
+  );
+});
+
+it("does not invent edge-access preview counts when the API omits them", () => {
+  const view = render(
+    <NextIntlClientProvider locale="en" messages={catalogs.en} timeZone="UTC">
+      <AccessEditorView
+        {...EDITOR_CHANGED}
+        preview={{ ...EDITOR_CHANGED.preview!, allowed: undefined, total: undefined }}
+      />
+    </NextIntlClientProvider>
+  );
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.queryByText(/undefined|NaN/)).not.toBeInTheDocument();
+  view.unmount();
 });

@@ -1582,7 +1582,30 @@
         "thresholdOption": "≥ {count} mit hohem Schweregrad"
       },
       "loadError": "App-Sicherheit konnte nicht geladen werden",
-      "eventsError": "Sicherheitsereignisse konnten nicht geladen werden"
+      "eventsError": "Sicherheitsereignisse konnten nicht geladen werden",
+      "access": {
+        "title": "Zugang",
+        "managedByManifest": "in astrolift.toml festgelegt",
+        "restrictedDescription": "Nur die unten aufgeführten Gruppen und Nutzer dürfen eintreten. Alle anderen sehen nach der Anmeldung eine Seite mit verweigertem Zugang.",
+        "openDescription": "Jeder Nutzer, der sich über die zentrale Authentifizierung dieses Clusters anmelden kann, darf eintreten.",
+        "notEnforced": "Die Regel wird am Envoy-Edge durchgesetzt. Noch keiner der App-Cluster nutzt ihn, daher ist nur die Anmeldung erforderlich.",
+        "noRule": "Keine Zugangsregel.",
+        "groups": "Gruppen",
+        "users": "Nutzer",
+        "usersEmail": "Nutzer (E-Mail)",
+        "remove": "{value} entfernen",
+        "add": "Hinzufügen",
+        "invalidEmail": "Geben Sie eine E-Mail-Adresse ein.",
+        "preview": "Möglicher Zugang: {allowed, number} von {total, plural, one {# Nutzer} other {# Nutzern}}.",
+        "losingAccess": "{count, number} würden den Zugang verlieren: {users}",
+        "saving": "Wird gespeichert…",
+        "save": "Zugang speichern",
+        "saved": "Zugangsregel gespeichert.",
+        "removed": "Zugangsregel entfernt.",
+        "saveFailed": "Speichern fehlgeschlagen.",
+        "membersDescription": "Wer diese App sehen und ändern darf: die hier zugewiesenen Rollen und die Teams, mit denen sie geteilt wird.",
+        "edgeDescription": "Wer die URL der App erreichen darf. Der Edge entscheidet über den Zugang; Rollen entscheiden, wer die App ändern darf."
+      }
     },
     "members": {
       "title": "App members",

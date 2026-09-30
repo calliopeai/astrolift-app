@@ -1582,7 +1582,30 @@
         "thresholdOption": "高重大度 ≥ {count}"
       },
       "loadError": "アプリのセキュリティを読み込めませんでした",
-      "eventsError": "セキュリティイベントを読み込めませんでした"
+      "eventsError": "セキュリティイベントを読み込めませんでした",
+      "access": {
+        "title": "アクセス",
+        "managedByManifest": "astrolift.toml で設定",
+        "restrictedDescription": "以下のグループとユーザーのみアクセスできます。それ以外のユーザーにはログイン後にアクセス拒否ページが表示されます。",
+        "openDescription": "このクラスターの中央認証でログインできるユーザーは誰でもアクセスできます。",
+        "notEnforced": "ルールは Envoy エッジで適用されます。このアプリのクラスターはまだ利用していないため、現在はログインのみが必要です。",
+        "noRule": "アクセスルールはありません。",
+        "groups": "グループ",
+        "users": "ユーザー",
+        "usersEmail": "ユーザー（メールアドレス）",
+        "remove": "{value} を削除",
+        "add": "追加",
+        "invalidEmail": "メールアドレスを入力してください。",
+        "preview": "{total, plural, one {#人} other {#人}}中{allowed, number}人がアクセスできます。",
+        "losingAccess": "{count, number}人がアクセスできなくなります：{users}",
+        "saving": "保存中…",
+        "save": "アクセス設定を保存",
+        "saved": "アクセスルールを保存しました。",
+        "removed": "アクセスルールを削除しました。",
+        "saveFailed": "保存に失敗しました。",
+        "membersDescription": "このアプリを表示・変更できるユーザー：ここでのロールと共有先のチーム。",
+        "edgeDescription": "アプリの URL にアクセスできるユーザー。エッジがアクセス可否を決め、ロールが変更権限を決めます。"
+      }
     },
     "members": {
       "title": "App members",

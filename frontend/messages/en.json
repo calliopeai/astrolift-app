@@ -1333,7 +1333,30 @@
         "thresholdOption": "≥ {count} high"
       },
       "loadError": "Could not load app security",
-      "eventsError": "Could not load security events"
+      "eventsError": "Could not load security events",
+      "access": {
+        "title": "Access",
+        "managedByManifest": "set in astrolift.toml",
+        "restrictedDescription": "Only the groups and users below can enter. Everyone else who signs in is shown a no-access page.",
+        "openDescription": "Every user who can sign in to this cluster’s central auth can enter.",
+        "notEnforced": "Enforced on the Envoy edge; none of this app’s clusters is on it yet, so it is gated by login only.",
+        "noRule": "No access rule.",
+        "groups": "Groups",
+        "users": "Users",
+        "usersEmail": "Users (email)",
+        "remove": "Remove {value}",
+        "add": "Add",
+        "invalidEmail": "Enter an email address.",
+        "preview": "{allowed, number} of {total, plural, one {# user} other {# users}} could enter.",
+        "losingAccess": "{count, number} would lose access: {users}",
+        "saving": "Saving…",
+        "save": "Save access",
+        "saved": "Access rule saved.",
+        "removed": "Access rule removed.",
+        "saveFailed": "Save failed.",
+        "membersDescription": "Who may see and change this app: their roles here, and teams it is shared with.",
+        "edgeDescription": "Who may reach the app’s URL. The edge decides who gets through to the app; roles decide who may change it."
+      }
     },
     "members": {
       "title": "App members",

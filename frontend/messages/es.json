@@ -1582,7 +1582,30 @@
         "thresholdOption": "≥ {count} de gravedad alta"
       },
       "loadError": "No se pudo cargar la seguridad de la app",
-      "eventsError": "No se pudieron cargar los eventos de seguridad"
+      "eventsError": "No se pudieron cargar los eventos de seguridad",
+      "access": {
+        "title": "Acceso",
+        "managedByManifest": "configurado en astrolift.toml",
+        "restrictedDescription": "Solo pueden entrar los grupos y usuarios indicados abajo. Los demás usuarios que inicien sesión verán una página de acceso denegado.",
+        "openDescription": "Puede entrar cualquier usuario que pueda iniciar sesión en la autenticación central de este clúster.",
+        "notEnforced": "La regla se aplica en el borde Envoy. Ningún clúster de esta app lo usa aún, por lo que solo se exige iniciar sesión.",
+        "noRule": "Sin regla de acceso.",
+        "groups": "Grupos",
+        "users": "Usuarios",
+        "usersEmail": "Usuarios (correo electrónico)",
+        "remove": "Eliminar {value}",
+        "add": "Añadir",
+        "invalidEmail": "Introduce una dirección de correo electrónico.",
+        "preview": "Acceso posible: {allowed, number} de {total, plural, one {# usuario} other {# usuarios}}.",
+        "losingAccess": "{count, number} perderían el acceso: {users}",
+        "saving": "Guardando…",
+        "save": "Guardar acceso",
+        "saved": "Se guardó la regla de acceso.",
+        "removed": "Se eliminó la regla de acceso.",
+        "saveFailed": "No se pudo guardar.",
+        "membersDescription": "Quién puede ver y modificar esta app: sus roles aquí y los equipos con los que se comparte.",
+        "edgeDescription": "Quién puede acceder a la URL de la app. El borde decide quién puede entrar; los roles deciden quién puede modificarla."
+      }
     },
     "members": {
       "title": "App members",

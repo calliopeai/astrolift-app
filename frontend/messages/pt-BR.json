@@ -1582,7 +1582,30 @@
         "thresholdOption": "≥ {count} de alta gravidade"
       },
       "loadError": "Não foi possível carregar a segurança do app",
-      "eventsError": "Não foi possível carregar os eventos de segurança"
+      "eventsError": "Não foi possível carregar os eventos de segurança",
+      "access": {
+        "title": "Acesso",
+        "managedByManifest": "definido em astrolift.toml",
+        "restrictedDescription": "Apenas os grupos e usuários abaixo podem entrar. Os demais usuários que fizerem login verão uma página de acesso negado.",
+        "openDescription": "Qualquer usuário que possa fazer login na autenticação central deste cluster pode entrar.",
+        "notEnforced": "A regra é aplicada na borda Envoy. Nenhum cluster deste app a utiliza ainda, portanto apenas o login é exigido.",
+        "noRule": "Nenhuma regra de acesso.",
+        "groups": "Grupos",
+        "users": "Usuários",
+        "usersEmail": "Usuários (e-mail)",
+        "remove": "Remover {value}",
+        "add": "Adicionar",
+        "invalidEmail": "Insira um endereço de e-mail.",
+        "preview": "Acesso possível: {allowed, number} de {total, plural, one {# usuário} other {# usuários}}.",
+        "losingAccess": "{count, number} perderiam o acesso: {users}",
+        "saving": "Salvando…",
+        "save": "Salvar acesso",
+        "saved": "Regra de acesso salva.",
+        "removed": "Regra de acesso removida.",
+        "saveFailed": "Falha ao salvar.",
+        "membersDescription": "Quem pode ver e alterar este app: os papéis atribuídos aqui e as equipes com as quais ele é compartilhado.",
+        "edgeDescription": "Quem pode acessar a URL do app. A borda decide quem pode entrar; os papéis decidem quem pode alterá-lo."
+      }
     },
     "members": {
       "title": "App members",
