@@ -4794,6 +4794,29 @@
           "UNCONFIGURED_RELAY": "El retransmisor de instrucciones no está configurado",
           "UNSUPPORTED": "Entorno de ejecución no admitido"
         }
+      },
+      "management": {
+        "title": "Gestión del despliegue",
+        "description": "Cambie los recursos o solicite la eliminación de este despliegue compartido.",
+        "immutable": "El modelo, la revisión inmutable, el modo de cómputo y la ubicación permanecen iguales.",
+        "checking": "Verificando acceso de gestión…",
+        "readOnly": "Estas acciones requieren acceso de gestión del clúster.",
+        "blocked": "Actualice los datos y espere a que termine la operación actual.",
+        "restartImpact": "Las actualizaciones de recursos reinician el modelo compartido. Todos los consumidores pueden perder el acceso temporalmente.",
+        "reviewUpdate": "Revisar actualización de recursos",
+        "confirmUpdate": "Solicitar actualización de recursos",
+        "updateTitle": "¿Actualizar {name}?",
+        "reviewDelete": "Revisar retirada",
+        "confirmDelete": "Solicitar retirada",
+        "deleteTitle": "¿Retirar {name}?",
+        "deleteRetained": "Revoque todas las suscripciones y confirme su conciliación antes de retirar el modelo. Los datos persistidos se conservan; esta acción no solicita borrarlos.",
+        "acceptedUpdate": "Actualización de recursos aceptada. El reinicio y la disponibilidad aún no están confirmados.",
+        "acceptedDelete": "Retirada aceptada. La eliminación aún no está confirmada.",
+        "changed": "El despliegue, el borrador o el acceso cambió. Cancele, actualice y revise de nuevo.",
+        "failed": "No se pudo verificar la operación. Actualice antes de reintentar.",
+        "subscriptionPolicy": "Deshabilitar nuevas suscripciones no revoca el acceso existente.",
+        "completedUpdate": "La revisión de recursos solicitada se ha conciliado. Esto no es una comprobación de salud en vivo.",
+        "operationFailed": "La operación aceptada falló. Revise el motivo actual del despliegue antes de otra acción."
       }
     }
   }

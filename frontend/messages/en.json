@@ -4871,6 +4871,29 @@
           "UNCONFIGURED_RELAY": "Prompt relay is not configured",
           "UNSUPPORTED": "Runtime unsupported"
         }
+      },
+      "management": {
+        "title": "Deployment management",
+        "description": "Change resources or request removal of this shared deployment.",
+        "immutable": "Model, immutable revision, compute mode and placement remain unchanged.",
+        "checking": "Checking management access…",
+        "readOnly": "Cluster management access is required for these actions.",
+        "blocked": "Refresh current facts and wait for the existing operation to finish.",
+        "restartImpact": "Resource updates restart the shared model. All consumers may temporarily lose access.",
+        "reviewUpdate": "Review resource update",
+        "confirmUpdate": "Request resource update",
+        "updateTitle": "Update {name}?",
+        "reviewDelete": "Review deprovisioning",
+        "confirmDelete": "Request deprovisioning",
+        "deleteTitle": "Deprovision {name}?",
+        "deleteRetained": "Revoke every subscription and confirm reconciliation before removal. Persisted data is retained; this action does not request data deletion.",
+        "acceptedUpdate": "Resource update accepted. Restart and readiness are not yet confirmed.",
+        "acceptedDelete": "Deprovisioning accepted. Removal is not yet confirmed.",
+        "changed": "The deployment, draft or access changed. Cancel, refresh and review again.",
+        "failed": "The operation could not be verified. Refresh before retrying.",
+        "subscriptionPolicy": "Disabling new subscriptions does not revoke existing access.",
+        "completedUpdate": "The requested resource revision has been reconciled. This is not a live health check.",
+        "operationFailed": "The accepted operation failed. Review the current deployment reason before another action."
       }
     }
   }

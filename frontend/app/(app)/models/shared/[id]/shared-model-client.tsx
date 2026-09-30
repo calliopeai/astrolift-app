@@ -4,6 +4,7 @@ import { useSharedModelDetail } from "@/components/screens/models/use-shared-mod
 import { ModelObservationsClient } from "@/components/screens/models/ModelObservationsClient";
 import { SharedModelPromptClient } from "@/components/screens/models/SharedModelPromptClient";
 import { ModelSubscriptionsClient } from "@/components/screens/models/ModelSubscriptionsClient";
+import { SharedModelManagementClient } from "@/components/screens/models/SharedModelManagementClient";
 export function SharedModelClient({ id }: { id: string }) {
   const props = useSharedModelDetail(id);
   return (
@@ -20,6 +21,15 @@ export function SharedModelClient({ id }: { id: string }) {
       }
       observations={props.model ? <ModelObservationsClient model={props.model} /> : null}
       prompt={props.model ? <SharedModelPromptClient model={props.model} /> : null}
+      management={
+        props.model ? (
+          <SharedModelManagementClient
+            model={props.model}
+            blocked={props.stale || !!props.error}
+            onRefresh={props.onRetry}
+          />
+        ) : null
+      }
     />
   );
 }

@@ -21,6 +21,7 @@ export type SharedModelDetailScreenProps = {
   subscriptions: ReactNode;
   observations: ReactNode;
   prompt: ReactNode;
+  management?: ReactNode;
 };
 export function SharedModelDetailScreen({
   model,
@@ -31,6 +32,7 @@ export function SharedModelDetailScreen({
   subscriptions,
   observations,
   prompt,
+  management,
 }: SharedModelDetailScreenProps) {
   const t = useTranslations("models.shared.detail"),
     common = useTranslations("models.shared.deployments"),
@@ -196,6 +198,7 @@ export function SharedModelDetailScreen({
             {subscriptions}
             {observations}
             {prompt}
+            {management}
             <details className="rounded-lg border p-4">
               <summary className="cursor-pointer font-medium">{t("technical")}</summary>
               <div className="mt-4 space-y-4">

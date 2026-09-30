@@ -4794,6 +4794,29 @@
           "UNCONFIGURED_RELAY": "Le relais d’instructions n’est pas configuré",
           "UNSUPPORTED": "Moteur non pris en charge"
         }
+      },
+      "management": {
+        "title": "Gestion du déploiement",
+        "description": "Modifiez les ressources ou demandez le retrait de ce déploiement partagé.",
+        "immutable": "Le modèle, la révision immuable, le mode de calcul et le placement restent inchangés.",
+        "checking": "Vérification des droits de gestion…",
+        "readOnly": "Ces actions nécessitent les droits de gestion du cluster.",
+        "blocked": "Actualisez les informations et attendez la fin de l’opération en cours.",
+        "restartImpact": "Les modifications de ressources redémarrent le modèle partagé. Tous les consommateurs peuvent perdre temporairement l’accès.",
+        "reviewUpdate": "Vérifier la modification des ressources",
+        "confirmUpdate": "Demander la modification des ressources",
+        "updateTitle": "Modifier {name} ?",
+        "reviewDelete": "Vérifier le retrait",
+        "confirmDelete": "Demander le retrait",
+        "deleteTitle": "Retirer {name} ?",
+        "deleteRetained": "Révoquez tous les abonnements et confirmez leur rapprochement avant le retrait. Les données persistantes sont conservées ; cette action ne demande pas leur suppression.",
+        "acceptedUpdate": "Modification des ressources acceptée. Le redémarrage et la disponibilité ne sont pas encore confirmés.",
+        "acceptedDelete": "Retrait accepté. La suppression n’est pas encore confirmée.",
+        "changed": "Le déploiement, le brouillon ou les droits ont changé. Annulez, actualisez et vérifiez à nouveau.",
+        "failed": "L’opération n’a pas pu être vérifiée. Actualisez avant de réessayer.",
+        "subscriptionPolicy": "Désactiver les nouveaux abonnements ne révoque pas les accès existants.",
+        "completedUpdate": "La révision des ressources demandée a été rapprochée. Il ne s’agit pas d’un contrôle de santé en temps réel.",
+        "operationFailed": "L’opération acceptée a échoué. Consultez le motif actuel du déploiement avant une autre action."
       }
     }
   }

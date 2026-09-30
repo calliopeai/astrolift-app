@@ -4794,6 +4794,29 @@
           "UNCONFIGURED_RELAY": "Eingaberelay nicht konfiguriert",
           "UNSUPPORTED": "Laufzeit nicht unterstützt"
         }
+      },
+      "management": {
+        "title": "Bereitstellung verwalten",
+        "description": "Ressourcen ändern oder die Entfernung dieser gemeinsamen Bereitstellung anfordern.",
+        "immutable": "Modell, unveränderliche Revision, Rechenmodus und Platzierung bleiben unverändert.",
+        "checking": "Verwaltungsrechte werden geprüft…",
+        "readOnly": "Diese Aktionen erfordern Cluster-Verwaltungsrechte.",
+        "blocked": "Aktuelle Daten laden und warten, bis der laufende Vorgang abgeschlossen ist.",
+        "restartImpact": "Ressourcenänderungen starten das gemeinsame Modell neu. Alle Verbraucher können vorübergehend den Zugriff verlieren.",
+        "reviewUpdate": "Ressourcenänderung prüfen",
+        "confirmUpdate": "Ressourcenänderung anfordern",
+        "updateTitle": "{name} aktualisieren?",
+        "reviewDelete": "Entfernung prüfen",
+        "confirmDelete": "Entfernung anfordern",
+        "deleteTitle": "{name} entfernen?",
+        "deleteRetained": "Vor der Entfernung alle Abonnements widerrufen und den Abgleich bestätigen. Gespeicherte Daten bleiben erhalten; diese Aktion fordert keine Datenlöschung an.",
+        "acceptedUpdate": "Ressourcenänderung angenommen. Neustart und Bereitschaft sind noch nicht bestätigt.",
+        "acceptedDelete": "Entfernung angenommen. Der Abschluss ist noch nicht bestätigt.",
+        "changed": "Bereitstellung, Entwurf oder Zugriff haben sich geändert. Abbrechen, aktualisieren und erneut prüfen.",
+        "failed": "Der Vorgang konnte nicht überprüft werden. Vor einem erneuten Versuch aktualisieren.",
+        "subscriptionPolicy": "Neue Abonnements zu deaktivieren widerruft keine bestehenden Zugriffe.",
+        "completedUpdate": "Die angeforderte Ressourcenrevision wurde abgeglichen. Dies ist keine Live-Zustandsprüfung.",
+        "operationFailed": "Der angenommene Vorgang ist fehlgeschlagen. Vor einer weiteren Aktion den aktuellen Bereitstellungsgrund prüfen."
       }
     }
   }

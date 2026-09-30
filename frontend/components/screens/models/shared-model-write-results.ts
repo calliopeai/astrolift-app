@@ -2,6 +2,11 @@ import type {
   ProvisionClusterModelMutation,
   SubscribeClusterModelMutation,
   RevokeModelSubscriptionMutation,
+  UpdateClusterModelMutation,
+  DeprovisionClusterModelMutation,
+  ClusterModelFieldsFragment,
+  UpdateClusterModelInput,
+  DeprovisionClusterModelInput,
 } from "@/graphql/__generated__/operations";
 import type {
   SubscriptionRequest,
@@ -10,6 +15,7 @@ import type {
 } from "./ModelSubscriptionsPanel";
 import type { SharedModelRequest } from "./shared-model-form";
 import type { SharedModelDeploymentScreenProps } from "./SharedModelDeploymentScreen";
+import type { ManagementResult } from "./SharedModelManagementPanel";
 type ErrorEnvelope = { ok: boolean; errors: { code: string; message: string }[] };
 export function modelWriteFailure(
   envelope: ErrorEnvelope | null | undefined,
@@ -124,4 +130,47 @@ export function subscriptionModelResult(
     subscriptionId: subscription.id,
     desiredRevision: subscription.desiredRevision,
   };
+}
+export function managementModelResult(
+  envelope:
+    | UpdateClusterModelMutation["updateClusterModel"]
+    | DeprovisionClusterModelMutation["deprovisionClusterModel"]
+    | null
+    | undefined,
+  model: ClusterModelFieldsFragment,
+  input: UpdateClusterModelInput | DeprovisionClusterModelInput,
+  fallback: string
+): ManagementResult {
+  const failure = modelWriteFailure(envelope, fallback),
+    data = envelope?.data,
+    update = "cpuRequest" in input;
+  if (failure) return { accepted: false, message: failure };
+  if (
+    !data ||
+    data.id !== model.id ||
+    data.organizationId !== model.organizationId ||
+    data.clusterId !== model.clusterId ||
+    data.providerId !== model.providerId ||
+    data.modelRepo !== model.modelRepo ||
+    data.revisionSha !== model.revisionSha ||
+    data.computeMode !== model.computeMode ||
+    !Number.isSafeInteger(data.version) ||
+    data.version <= input.ifMatchVersion ||
+    data.status !== (update ? "updating" : "deprovisioning") ||
+    !data.operationId ||
+    data.operationCompletedAt ||
+    data.ready === true ||
+    data.desiredSubscriptionRevision <= model.desiredSubscriptionRevision
+  )
+    return { accepted: false, message: fallback };
+  if (
+    update &&
+    (data.desiredResources.cpuRequest !== input.cpuRequest ||
+      data.desiredResources.memoryRequest !== input.memoryRequest ||
+      data.desiredResources.gpuCount !== input.gpuCount ||
+      (data.desiredResources.cpuKvCacheGiB ?? null) !== (input.cpuKvCacheGiB ?? null) ||
+      data.subscriptionsEnabled !== input.allowSubscriptions)
+  )
+    return { accepted: false, message: fallback };
+  return { accepted: true, operationId: data.operationId };
 }

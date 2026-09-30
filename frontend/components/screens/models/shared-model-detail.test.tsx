@@ -62,19 +62,58 @@ beforeEach(() => {
   scope.error = null;
   requests = [];
   transport = async (request) =>
-    request.operationName === "GetSharedModelPromptReadiness"
-      ? response({ astroliftSharedModelPromptReadiness: sharedModelPromptProps.readiness.data })
-      : request.operationName === "GetModelDeploymentMetrics"
-        ? response({ astroliftModelDeploymentMetrics: modelObservationsProps.metrics.data })
-        : request.operationName === "GetClusterModelDensity"
-          ? response({ astroliftClusterModelDensity: modelObservationsProps.density.data })
-          : response({
-              clusterModelDeployment: {
-                ...model(),
-                id: request.variables.id,
-                organizationId: request.variables.organizationId,
+    request.operationName === "Me"
+      ? response({
+          me: {
+            id: "viewer",
+            profile: { id: "profile", username: "reader" },
+            modules: [
+              {
+                key: "models",
+                enabled: true,
+                canView: true,
+                canCreate: false,
+                canManage: false,
+                canRun: false,
               },
-            });
+            ],
+          },
+        })
+      : request.operationName === "ListModelSubscriptionTargets"
+        ? response({
+            clusterModelSubscriptionTargetsPage: {
+              items: [],
+              totalCount: 0,
+              nextCursor: null,
+              page: request.variables.page,
+              pageSize: request.variables.pageSize,
+            },
+          })
+        : request.operationName === "ListClusterModelSubscriptions"
+          ? response({
+              clusterModelSubscriptionsPage: {
+                items: [],
+                totalCount: 0,
+                nextCursor: null,
+                page: request.variables.page,
+                pageSize: request.variables.pageSize,
+              },
+            })
+          : request.operationName === "GetSharedModelPromptReadiness"
+            ? response({
+                astroliftSharedModelPromptReadiness: sharedModelPromptProps.readiness.data,
+              })
+            : request.operationName === "GetModelDeploymentMetrics"
+              ? response({ astroliftModelDeploymentMetrics: modelObservationsProps.metrics.data })
+              : request.operationName === "GetClusterModelDensity"
+                ? response({ astroliftClusterModelDensity: modelObservationsProps.density.data })
+                : response({
+                    clusterModelDeployment: {
+                      ...model(),
+                      id: request.variables.id,
+                      organizationId: request.variables.organizationId,
+                    },
+                  });
 });
 describe("actual shared model detail", () => {
   it("reads the explicit tenant/deployment identity through the actual route client", async () => {
@@ -136,6 +175,9 @@ describe("actual shared model detail", () => {
           "GetModelDeploymentMetrics",
           "GetClusterModelDensity",
           "GetSharedModelPromptReadiness",
+          "Me",
+          "ListModelSubscriptionTargets",
+          "ListClusterModelSubscriptions",
         ].includes(request.operationName)
       )
     ).toBe(true);

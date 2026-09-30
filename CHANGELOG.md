@@ -13,6 +13,10 @@
 - Shared model prompt writes refresh current bearer scopes, grants, actor status
   and placement policy after locking, returning public permission refusals before
   queue admission when authority changes (#2213).
+- Add guarded shared-model resource updates and retained-data deprovisioning with
+  fresh management capability reads, complete request admission, exact placement
+  versions and honest pending/observed operation feedback in all eight locales.
+
 - Connect shared model subscription and independent revocation reviews to actual
   versioned writes, server-paged app environments and observed desired/applied
   revisions. Failed refreshes preserve accepted pending requests without replay.

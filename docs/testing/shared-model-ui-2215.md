@@ -259,3 +259,40 @@ all-eight-locale revocation copy. Twelve portable subscription/client stories
 render; TSC, focused ESLint and formatter checks pass. The backend PostgreSQL
 ownership/reconciliation proof and composed production browser journeys remain
 separate acceptance evidence.
+
+## Actual update and deprovision management
+
+Shared detail now mounts resource management and retained-data removal reviews.
+A freshly read no-cache Models management capability is an advisory control gate,
+not Models visibility or destination authority. A failed capability read has a
+read-only retry. The server still rechecks exact current owner, placement, region,
+credential and version for each mutation.
+
+RHF/Zod resource drafts retain the existing immutable model/SHA/compute/placement.
+Updates request actual runtime admission for the complete edited resource draft,
+then send only the existing update input with exact model version and expected
+cluster/provider. Reviews explain restart impact and distinguish disabling new
+subscriptions from revoking existing access.
+
+Deprovisioning stays available to an authorized idle failed model with unknown or
+unconfigured runtime, without falsely requiring successful runtime admission for
+cleanup. It always sends `deleteData:false`; the review states that persisted data
+is retained and every subscription must first be revoked and reconciled. Actual
+backend precondition refusals remain visible in the open confirmation. Busy
+models, readers and failed/missing capability responses cannot issue writes.
+
+Both no-cache mutation responses are correlated to exact persisted identities,
+versions and pending operation state; updates also verify the requested resources.
+Mixed/missing/foreign or premature-complete responses never acknowledge success.
+Permanent version/draft A-to-B-to-A scopes discard late replies without replay.
+Accepted operations survive independent refresh failure. A further update becomes
+available only after the exact accepted operation is read as completed; completed
+resource reconciliation is explicitly not a live health check.
+
+28 management HTTP/locale interactions, 18 detail read/SSR checks and seven portable
+management stories pass (53 checks). TSC, focused ESLint, formatter and whitespace
+checks pass. Existing detail fixtures now include valid read-only Me and empty
+subscription-page responses, and their exact no-write query allowlist includes
+those new reads. Production browser management journeys, backend/store proof and
+final composed release gates remain root integration evidence, not a claim that
+controlled UI fixtures performed cloud reconciliation.

@@ -4791,6 +4791,29 @@
           "UNCONFIGURED_RELAY": "O retransmissor de instruções não está configurado",
           "UNSUPPORTED": "Runtime não suportado"
         }
+      },
+      "management": {
+        "title": "Gerenciamento da implantação",
+        "description": "Altere os recursos ou solicite a remoção desta implantação compartilhada.",
+        "immutable": "O modelo, a revisão imutável, o modo de computação e o posicionamento permanecem iguais.",
+        "checking": "Verificando acesso de gerenciamento…",
+        "readOnly": "Estas ações exigem acesso de gerenciamento do cluster.",
+        "blocked": "Atualize os dados e aguarde a conclusão da operação atual.",
+        "restartImpact": "Atualizações de recursos reiniciam o modelo compartilhado. Todos os consumidores podem perder o acesso temporariamente.",
+        "reviewUpdate": "Revisar atualização de recursos",
+        "confirmUpdate": "Solicitar atualização de recursos",
+        "updateTitle": "Atualizar {name}?",
+        "reviewDelete": "Revisar desprovisionamento",
+        "confirmDelete": "Solicitar desprovisionamento",
+        "deleteTitle": "Desprovisionar {name}?",
+        "deleteRetained": "Revogue todas as assinaturas e confirme a reconciliação antes da remoção. Os dados persistidos são mantidos; esta ação não solicita sua exclusão.",
+        "acceptedUpdate": "Atualização de recursos aceita. O reinício e a prontidão ainda não foram confirmados.",
+        "acceptedDelete": "Desprovisionamento aceito. A remoção ainda não foi confirmada.",
+        "changed": "A implantação, o rascunho ou o acesso mudou. Cancele, atualize e revise novamente.",
+        "failed": "Não foi possível verificar a operação. Atualize antes de tentar novamente.",
+        "subscriptionPolicy": "Desativar novas assinaturas não revoga os acessos existentes.",
+        "completedUpdate": "A revisão de recursos solicitada foi reconciliada. Isto não é uma verificação de saúde em tempo real.",
+        "operationFailed": "A operação aceita falhou. Revise o motivo atual da implantação antes de outra ação."
       }
     }
   }

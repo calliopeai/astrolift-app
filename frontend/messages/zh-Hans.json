@@ -4791,6 +4791,29 @@
           "UNCONFIGURED_RELAY": "提示词中继未配置",
           "UNSUPPORTED": "运行时不受支持"
         }
+      },
+      "management": {
+        "title": "部署管理",
+        "description": "更改此共享部署的资源或请求移除。",
+        "immutable": "模型、不可变修订版本、计算模式和部署位置保持不变。",
+        "checking": "正在检查管理权限…",
+        "readOnly": "这些操作需要集群管理权限。",
+        "blocked": "请刷新当前信息并等待现有操作完成。",
+        "restartImpact": "资源更新会重启共享模型。所有使用者可能暂时无法访问。",
+        "reviewUpdate": "审核资源更新",
+        "confirmUpdate": "请求资源更新",
+        "updateTitle": "更新 {name}？",
+        "reviewDelete": "审核取消部署",
+        "confirmDelete": "请求取消部署",
+        "deleteTitle": "取消部署 {name}？",
+        "deleteRetained": "移除前请撤销所有订阅并确认协调已完成。持久化数据会保留；此操作不请求删除数据。",
+        "acceptedUpdate": "资源更新请求已接受。重启和就绪状态尚未确认。",
+        "acceptedDelete": "取消部署请求已接受。移除尚未确认。",
+        "changed": "部署、输入草稿或访问权限已更改。请取消、刷新并重新审核。",
+        "failed": "无法验证操作。重试前请刷新。",
+        "subscriptionPolicy": "禁用新订阅不会撤销现有访问权限。",
+        "completedUpdate": "请求的资源修订版本已协调完成。这不是实时健康检查。",
+        "operationFailed": "已接受的操作失败。执行其他操作前请检查当前部署原因。"
       }
     }
   }
