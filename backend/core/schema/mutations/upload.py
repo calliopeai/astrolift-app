@@ -8,12 +8,14 @@ and ProfileImageFieldUploadMutation.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from typing import List, Optional
 from uuid import UUID, uuid4
 
 import strawberry
 from django.contrib.contenttypes.models import ContentType
+from django.db import IntegrityError
+from django.utils import timezone
 from graphql import GraphQLError
 from strawberry.types import Info
 
@@ -36,6 +38,53 @@ except ImportError:
     HAS_DOMAIN_APP = False
 
 logger = logging.getLogger(__name__)
+
+
+def _upload_organization(info):
+    """Uploads use legacy organizations; token organization PKs are independent."""
+    from astrolift_identity.api_tokens import SCOPE_ADMIN, get_current_api_token, has_scope
+    from core.permissions import is_platform_operator
+    from organization.models import OrganizationMember
+
+    user = info.context.user
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
+        raise GraphQLError("Not authorized to modify uploads.")
+    profile = getattr(user, "profile", None)
+    organization = profile.organization() if profile is not None else None
+    if organization is None or organization.deleted_at is not None or (
+        not is_platform_operator(user)
+        and not OrganizationMember.objects.filter(
+            organization=organization, member=user, is_active=True, deleted_at__isnull=True
+        ).exists()
+    ):
+        raise GraphQLError("Not authorized to modify uploads.")
+    token = get_current_api_token()
+    if token is not None and (
+        token.organization.guid != organization.guid or not has_scope(token, SCOPE_ADMIN)
+    ):
+        raise GraphQLError("Not authorized to modify uploads.")
+    return organization
+
+
+def _resolve_confirmable_upload(info, upload_id, public_url) -> Upload:
+    from core.permissions import require_platform_operator
+
+    organization = _upload_organization(info)
+    if not upload_id and not public_url:
+        raise GraphQLError("Requires either an upload id or a public URL to complete the update/confirmation.")
+
+    uploads = Upload.objects.filter(organization=organization, deleted_at__isnull=True)
+    if upload_id:
+        pk = GlobalIDUtils.get_pk_flexible(upload_id, expected_type="UploadType")
+        uploads = uploads.filter(pk=pk) if pk is not None else uploads.none()
+    if public_url:
+        uploads = uploads.filter(public_url=public_url)
+    upload = uploads.first()
+    if upload is None:
+        raise GraphQLError("Upload not found.")
+    if upload.created_by_id != info.context.user.pk:
+        require_platform_operator(info.context.user)
+    return upload
 
 
 def _resolve_upload(info: Info, global_id: strawberry.ID) -> Upload:
@@ -167,14 +216,12 @@ def create_upload(
     name: Optional[str] = None,
     description: Optional[str] = None,
 ) -> Upload:
-    """Create or update an Upload record and generate pre-signed URLs.
-
-    This mirrors PreSignedUrlImageUploadMutation.create_upload exactly.
-    """
+    """Create an upload or retry the caller's live row in the active organization."""
+    organization = _upload_organization(info)
     _exists_global_id_guard(info, global_id)
-    from organization.models import Organization
-
-    organization: Organization = info.context.user.profile.organization()
+    own_uploads = Upload.objects.filter(
+        organization=organization, created_by=info.context.user, deleted_at__isnull=True
+    )
     upload_location: Upload.Location = location and Upload.Location(location) or Upload.Location.STATIC
     uuid = uuid or (upload and upload.id) or uuid4()
     path = Upload.generate_path(
@@ -189,27 +236,29 @@ def create_upload(
         public_url = public_url.split("?")[0]
     if upload is None:
         pre_signed_url = Upload.generate_pre_signed_url_for_put(path, content_type=mimetype)
-        upload, _created = Upload.objects.update_or_create(
-            id=uuid,
-            defaults=dict(
-                pre_signed_url=pre_signed_url,
-                public_url=public_url,
-                content_type=mimetype,
-                target_global_id=global_id,
-                created_by=info.context.user,
-                # #537: persist the resolved tenant so
-                # UploadQuerySet.with_view_permission can filter rows
-                # back to the owning organization. Previously NULL,
-                # which kept the queryset from being able to scope.
-                organization=organization,
-                metadata=metadata,
-                location=upload_location.value,
-                path=path,
-                name=name,
-                description=description,
-            ),
-        )
+        try:
+            upload, _created = own_uploads.update_or_create(
+                id=uuid,
+                defaults=dict(
+                    pre_signed_url=pre_signed_url,
+                    public_url=public_url,
+                    content_type=mimetype,
+                    target_global_id=global_id,
+                    created_by=info.context.user,
+                    organization=organization,
+                    metadata=metadata,
+                    location=upload_location.value,
+                    path=path,
+                    name=name,
+                    description=description,
+                ),
+            )
+        except IntegrityError as exc:
+            raise GraphQLError("Not authorized to reuse the requested upload id.") from exc
     else:
+        upload = own_uploads.filter(pk=upload.pk).first()
+        if upload is None:
+            raise GraphQLError("Upload not found.")
         upload.metadata = metadata
         upload.save()
     return upload
@@ -346,29 +395,17 @@ class UploadMutations:
         upload_id: Optional[strawberry.ID] = None,
         expiration_date: Optional[date] = None,
     ) -> ConfirmUploadResult:
-        if not upload_id and not public_url:
-            raise GraphQLError(
-                "Requires either an upload id or a public URL to complete the update/confirmation."
-            )
-        if upload_id:
-            # `from core.schema import UploadType` raised ImportError here:
-            # the package root exports no type names. The real type is
-            # already imported at module scope as `StrawberryUploadType`,
-            # and it has no `get_object` -- a Graphene-era classmethod the
-            # Strawberry migration dropped. See #1567 for the same fix.
-            upload = _resolve_upload(info, upload_id)
-        else:
-            upload = Upload.objects.filter(public_url=public_url).get()
+        upload = _resolve_confirmable_upload(info, upload_id, public_url)
 
         upload.updated_by = info.context.user
-        upload.updated_at = datetime.now()
+        upload.updated_at = timezone.now()
         upload.metadata = metadata or upload.metadata
 
         if expiration_date is not None:
             upload.employee_document_upload.update(expiration_date=expiration_date)
         if delete:
             upload.deleted_by = info.context.user
-            upload.deleted_at = datetime.now()
+            upload.deleted_at = timezone.now()
             logger.info(f"Marking upload with id {upload.id} as deleted")
 
         upload.save()

@@ -36,6 +36,12 @@ describe("definitionSubject", () => {
     const other = RUNS.map((r) => ({ ...r, definitionGuid: "someone-else" }));
     expect(definitionSubject(DEFINITION, other).lastRun).toBeNull();
   });
+
+  it("settles an expired definition with an unknown result", () => {
+    const subject = definitionSubject(DEFINITION, [{ ...RUNS[0]!, status: "expired" }]);
+    expect(subject.lastRun?.live).toBe(false);
+    expect(workflowStatus(subject)).toEqual({ dot: "muted", label: "Last run history expired" });
+  });
 });
 
 describe("workflowStatus", () => {
@@ -52,6 +58,7 @@ describe("workflowStatus", () => {
       workflowStatus({ ...base, lastRun: { ...base.lastRun!, state, live: false } }).label;
     expect(ended("cancelled")).toBe("Last run cancelled");
     expect(ended("completed")).toBe("Last run succeeded");
+    expect(ended("expired")).toBe("Last run history expired");
   });
 });
 

@@ -138,6 +138,10 @@ class _Secrets:
 
 @pytest.fixture
 def one_cluster(org, app, env, cluster, monkeypatch):
+    import boto3
+    from aws.registry_ecr import ECRConfig, ECRDriver
+    from botocore.stub import Stubber
+
     aws, _ = ProviderPlugin.objects.get_or_create(
         slug="aws",
         defaults={"name": "AWS", "plugin_version": "0.0.1", "capabilities_manifest": {}, "config_schema": {}},
@@ -174,15 +178,21 @@ def one_cluster(org, app, env, cluster, monkeypatch):
 
     fake = _Cluster()
     iam = _Iam()
+    ecr_client = boto3.client(
+        "ecr", region_name="us-east-1", aws_access_key_id="testing", aws_secret_access_key="testing"
+    )
+    registry = ECRDriver(config=ECRConfig(region="us-east-1", account_id="111122223333"), client=ecr_client)
     ctx = SimpleNamespace(slug="shared-cluster")
     for target in ("core.app_deploy", "core.cluster_management"):
         monkeypatch.setattr(f"{target}._driver_for_cluster", lambda _cluster: fake)
         monkeypatch.setattr(f"{target}._context_for_cluster", lambda _cluster: ctx)
     monkeypatch.setattr(
         "core.app_deploy.driver_for_capability",
-        lambda _cluster, capability: iam if capability == "identity" else _Secrets(),
+        lambda _cluster, capability: {"identity": iam, "registry": registry}.get(capability, _Secrets()),
     )
-    return SimpleNamespace(app=app, prod=env, cluster=fake, iam=iam, database=database)
+    # These fixture images are external to ECR; no registry request is valid.
+    with Stubber(ecr_client):
+        yield SimpleNamespace(app=app, prod=env, cluster=fake, iam=iam, database=database)
 
 
 def _open_pull_request(app, database, number=7):

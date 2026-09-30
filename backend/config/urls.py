@@ -39,7 +39,7 @@ from core.utils.logger_helper import gql_logger
 from core.views_well_known import apple_app_site_association, assetlinks_json
 
 from .schema import schema, schema_auth
-from .views import app_root_view, metrics_view, root_view, test_open_telemetry
+from .views import app_root_view, metrics_view, root_view
 
 strawberry_view = CoreStrawberryView.as_view(schema=schema)
 strawberry_auth_view = CoreStrawberryView.as_view(schema=schema_auth)
@@ -53,10 +53,6 @@ def support_tickets_view(request):
     return support_tickets(request)
 
 
-def trigger_error(request):
-    return 1 / 0
-
-
 admin.autodiscover()
 admin.site.login_form = AuthAdminForm
 admin.site.login_template = "admin/auth1_login.html"
@@ -68,7 +64,6 @@ urls = [
     path("", app_root_view),
     path("admin/", admin.site.urls),
     path("nested_admin/", include("nested_admin.urls")),
-    path("sentry-debug/", trigger_error),
     path("export/", views.download_file),
     # GraphQL endpoints (Strawberry) — rate limited
     path(
@@ -122,7 +117,6 @@ urls = [
     # /app/ so auth1's @login_required redirects unauth'd browsers
     # into the IdP just like every other operator surface.
     *identity_app_urls,
-    path("test/open_telemetry/", test_open_telemetry, name="test-open-telemetry"),
 ]
 
 base = settings.BASE_URL

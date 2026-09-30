@@ -325,10 +325,12 @@ export type AstroliftAgentEnvironmentSpec = {
   migProfile: Scalars['String']['output'];
   modelGateway: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['GUID']['output']>;
   runAsNonRoot: Scalars['Boolean']['output'];
   runtime: Scalars['String']['output'];
   secretRefs: Scalars['JSON']['output'];
   slug: Scalars['String']['output'];
+  teamId?: Maybe<Scalars['GUID']['output']>;
   toolPreset: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   vncEnabled: Scalars['Boolean']['output'];
@@ -5647,10 +5649,12 @@ export type CreateAgentEnvironmentSpecInput = {
   migProfile: Scalars['String']['input'];
   modelGateway: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
+  projectId: InputMaybe<Scalars['GUID']['input']>;
   runAsNonRoot: Scalars['Boolean']['input'];
   runtime: Scalars['String']['input'];
   secretRefs: InputMaybe<Scalars['JSON']['input']>;
   slug: Scalars['String']['input'];
+  teamId: InputMaybe<Scalars['GUID']['input']>;
   toolPreset: Scalars['String']['input'];
   vncEnabled: Scalars['Boolean']['input'];
 };

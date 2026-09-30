@@ -302,7 +302,7 @@ def test_capture_failure_does_not_break_callback(org, dispatcher, brief, raw_key
 
 
 @pytest.mark.django_db(transaction=True)
-def test_meter_records_interaction_via_run_bridge(org):
+def test_meter_records_interaction_via_run_bridge(org, dispatcher, raw_key):
     """The metering endpoint keys off AgentRun.guid; the interaction is
     bridged onto the AgentTask the run dispatched."""
     workload = _agent_workload(org, slug="meter-wl")
@@ -321,6 +321,7 @@ def test_meter_records_interaction_via_run_bridge(org):
         METER.format(run.guid),
         data=json.dumps({"cpu_seconds": 1.5, "source": "wall_time_estimate"}),
         content_type="application/json",
+        **_auth(raw_key),
     )
     assert resp.status_code == 201, resp.content
 
@@ -425,7 +426,7 @@ def test_resolver_returns_none_for_no_run_and_no_match(org):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_meter_records_interaction_via_fk_link(org):
+def test_meter_records_interaction_via_fk_link(org, dispatcher, raw_key):
     """The run-keyed bridge resolves the task through the explicit FK too — no
     pod-name fuzzy match required once the FK is set."""
     workload = _agent_workload(org, slug="fk-meter-wl")
@@ -436,6 +437,7 @@ def test_meter_records_interaction_via_fk_link(org):
         METER.format(run.guid),
         data=json.dumps({"cpu_seconds": 2.0, "source": "wall_time_estimate"}),
         content_type="application/json",
+        **_auth(raw_key),
     )
     assert resp.status_code == 201, resp.content
 

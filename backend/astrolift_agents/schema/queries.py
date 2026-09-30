@@ -1,8 +1,11 @@
 """Read-only queries for the Agent Dispatch Layer.
 
-Skills, ToolDefs, Briefs, and AgentTasks are org-scoped; the
-``dispatchers`` resolver is platform-level (the routing fabric spans
-tenants) and is the platform operator's alone (#1978).
+Skills, ToolDefs, Briefs and org skill repos are the org's catalog and
+check at the explicit org scope. AgentTasks, boxes and environment specs
+are owned by a project, a team or an agent's app and narrow to the rows the
+caller's grants reach (#1866). The ``dispatchers`` resolver is
+platform-level (the routing fabric spans tenants) and is the platform
+operator's alone (#1978).
 
 Every resolver carries ``@require_permission`` + ``@tenant_scoped`` per
 the tenancy guardrail. ``@tenant_scoped`` only asserts a tenant context
@@ -90,10 +93,17 @@ from astrolift_agents.schema.types import (
     skill_to_type,
     tool_def_to_type,
 )
-from astrolift_agents.scopes import agent_task_scope, agent_workload_app_scope
+from astrolift_agents.scopes import (
+    agent_box_scope,
+    agent_org_scope,
+    agent_task_scope,
+    agent_workload_app_scope,
+)
+from astrolift_agents.visibility import agent_boxes as visible_agent_boxes
 from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
 from astrolift_agents.visibility import agent_workloads as visible_agent_workloads
 from astrolift_agents.visibility import dispatchable_agent_workloads
+from astrolift_agents.visibility import environment_specs as visible_environment_specs
 from astrolift_graphql import (
     DEFAULT_PAGE_SIZE,
     GUID,
@@ -781,7 +791,7 @@ def _slice_page(rows: list, page: int | None, page_size: int | None) -> tuple[li
 @strawberry.type
 class AgentsQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def skills(self, info: Info, org_id: strawberry.ID, is_global: bool = False) -> list[SkillType]:
         """Org skills plus all global skills.
@@ -805,7 +815,7 @@ class AgentsQuery:
         return [skill_to_type(s) for s in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def skill(self, info: Info, id: strawberry.ID) -> SkillType | None:
         """One skill by GUID, scoped to the caller's org or the global
@@ -823,7 +833,7 @@ class AgentsQuery:
         return skill_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def tool_defs(self, info: Info, skill_id: strawberry.ID) -> list[ToolDefType]:
         """ToolDefs attached to ``skill_id``. The parent skill must be
@@ -847,7 +857,7 @@ class AgentsQuery:
         return [tool_def_to_type(t) for t in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def org_tool_defs(self, info: Info, org_id: strawberry.ID) -> list[ToolDefType]:
         """All ToolDefs across every skill visible to ``org_id`` (own +
@@ -865,7 +875,7 @@ class AgentsQuery:
         return [tool_def_to_type(t) for t in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def skills_page(
         self,
@@ -920,7 +930,7 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def org_tool_defs_page(
         self,
@@ -977,7 +987,7 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def tool_def(self, info: Info, id: strawberry.ID) -> ToolDefType | None:
         """One tool by GUID, on a skill of the caller's org or the global
@@ -1001,7 +1011,7 @@ class AgentsQuery:
         return tool_def_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()
     def brief(self, info: Info, id: strawberry.ID) -> BriefType | None:
         """One Brief by GUID, scoped to the caller's org."""
@@ -1011,7 +1021,7 @@ class AgentsQuery:
         return brief_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.SCM_READ)
+    @require_permission(Permission.SCM_READ, scope=agent_org_scope)
     @tenant_scoped()
     def org_skill_repos(self, info: Info, org_id: strawberry.ID) -> list[OrgSkillRepoType]:
         """The org's registered skill repos (spec 39d), ordered by alias.
@@ -1497,23 +1507,23 @@ class AgentsQuery:
         return lines
 
     @strawberry.field
-    @require_permission(Permission.AGENT_ENV_SPEC_READ)
+    @require_permission(Permission.AGENT_ENV_SPEC_READ, any_scope=True)
     @tenant_scoped()
     def agent_environment_specs(self, info: Info, org_id: strawberry.ID) -> list[AgentEnvironmentSpecType]:
-        """The org's AgentEnvironmentSpecs, ordered by slug.
+        """The environment specs the caller may read, ordered by slug.
 
         Org-scoped: ``org_id`` must match the caller's active tenant
         (superusers excepted) — the spec carries secret *references* the
         dispatcher resolves at launch, so it must never leak across orgs.
+        Within the org the rows narrow to the org-shared specs and the ones
+        owned by a project or team the caller's grants cover (#1866).
         """
         org_pk = _caller_org_id(info, org_id)
-        qs = AgentEnvironmentSpec.objects.filter(organization_id=org_pk, deleted_at__isnull=True).order_by(
-            "slug"
-        )[:200]
+        qs = visible_environment_specs(org_pk, Permission.AGENT_ENV_SPEC_READ).order_by("slug")[:200]
         return [agent_env_spec_to_type(s) for s in qs]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_boxes(
         self, info: Info, org_id: strawberry.ID, include_ended: bool = False
@@ -1526,21 +1536,23 @@ class AgentsQuery:
         something that no longer exists. ``include_ended`` brings the
         reaped/stopped/failed rows back for the "why did my box go away"
         case.
+
+        Rows narrow to the boxes the caller's grants reach: a box belongs to
+        its recorded project or team, else its agent's app, else the org
+        (#1866).
         """
         org_pk = _caller_org_id(info, org_id)
-        qs = AgentBox.objects.filter(organization_id=org_pk, deleted_at__isnull=True)
+        qs = visible_agent_boxes(org_pk, Permission.AGENT_READ)
         if not include_ended:
             qs = qs.filter(status__in=sorted(AgentBox.LIVE_STATUSES))
-        qs = qs.select_related("organization", "agent_definition", "environment_spec").order_by(
-            "-created_at"
-        )[:200]
+        qs = qs.order_by("-created_at")[:200]
         return [agent_box_to_type(b) for b in qs]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, scope=agent_box_scope("slug"))
     @tenant_scoped()
     def agent_box(self, info: Info, slug: str) -> AgentBoxType | None:
-        """One box by slug, scoped to the caller's org.
+        """One box by slug, checked at the box's own scope (#1866).
 
         The slug is what a client stores between sessions, so this is the
         lookup an IDE polls while a box provisions. Another org's box
@@ -1550,39 +1562,46 @@ class AgentsQuery:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
         row = (
-            AgentBox.objects.filter(slug=slug, organization_id=org_pk, deleted_at__isnull=True)
-            .select_related("organization", "agent_definition", "environment_spec")
+            visible_agent_boxes(org_pk, Permission.AGENT_READ)
+            .filter(slug=slug, organization_id=org_pk)
             .first()
         )
         return agent_box_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.AGENT_ENV_SPEC_READ)
+    @require_permission(Permission.AGENT_ENV_SPEC_READ, any_scope=True)
     @tenant_scoped()
     def agent_environment_spec(self, info: Info, slug: str) -> AgentEnvironmentSpecType | None:
-        """One AgentEnvironmentSpec by slug, scoped to the caller's org.
+        """One AgentEnvironmentSpec by slug, among the specs the caller may
+        read (#1866).
 
-        A spec in another org resolves to null (not an error) so the
-        surface doesn't leak existence across tenants.
+        An org-shared spec is readable wherever the caller reads specs, so
+        this gates like the list and narrows to the same rows. A spec in
+        another org, or one owned by a scope the caller's grants miss,
+        resolves to null (not an error) so the surface leaks no existence.
         """
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        row = AgentEnvironmentSpec.objects.filter(
-            slug=slug, organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        row = (
+            visible_environment_specs(org_pk, Permission.AGENT_ENV_SPEC_READ)
+            .filter(slug=slug, organization_id=org_pk)
+            .first()
+        )
         return agent_env_spec_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.SECRET_LIST)
+    @require_permission(Permission.SECRET_LIST, any_scope=True)
     @tenant_scoped()
     def agent_environment_spec_secret_status(self, info: Info, slug: str) -> list[AgentSecretStatusType]:
         """Per-ref presence status for a spec's ``secret_refs`` — metadata
         only (env var, uri, exists), never values.
 
-        Scoped to the caller's org. A ref whose store read fails reports
-        ``exists=false`` with a short ``error`` string rather than failing
-        the whole query (mirrors the bundle-key swallow-and-report). A spec
-        in another org (or absent) resolves to ``[]``.
+        Narrowed to the specs the caller reaches at ``secret.list``, as the
+        spec list is at ``agent_env_spec.read`` (#1866). A ref whose store
+        read fails reports ``exists=false`` with a short ``error`` string
+        rather than failing the whole query (mirrors the bundle-key
+        swallow-and-report). A spec the caller cannot reach, in another org
+        or absent, resolves to ``[]``.
         """
         from astrolift_agents.services.agent_cluster import (
             NoAgentClusterError,
@@ -1597,8 +1616,8 @@ class AgentsQuery:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
         spec = (
-            AgentEnvironmentSpec.objects.select_related("organization")
-            .filter(slug=slug, organization_id=org_pk, deleted_at__isnull=True)
+            visible_environment_specs(org_pk, Permission.SECRET_LIST)
+            .filter(slug=slug, organization_id=org_pk)
             .first()
         )
         if spec is None:
@@ -1615,7 +1634,7 @@ class AgentsQuery:
         return [agent_secret_status_to_type(r) for r in rows]
 
     @strawberry.field
-    @require_permission(Permission.SECRET_LIST)
+    @require_permission(Permission.SECRET_LIST, any_scope=True)
     @tenant_scoped()
     def agent_environment_spec_secret_status_page(
         self,
@@ -1638,9 +1657,10 @@ class AgentsQuery:
         and sorting; a spec carries a handful of refs.
 
         ``error`` says why the whole read could not answer: the spec is not
-        in the caller's org (no rows), or the org has no agent cluster or
-        secret store (rows report ``exists: false``). A spec in another org
-        reads exactly like one that does not exist.
+        one the caller reaches at ``secret.list`` (no rows, #1866), or the
+        org has no agent cluster or secret store (rows report ``exists:
+        false``). A spec in another org or another team reads exactly like
+        one that does not exist.
         """
         from astrolift_agents.services.agent_cluster import (
             NoAgentClusterError,
@@ -1656,8 +1676,8 @@ class AgentsQuery:
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
         spec = (
-            AgentEnvironmentSpec.objects.select_related("organization")
-            .filter(slug=slug, organization_id=org_pk, deleted_at__isnull=True)
+            visible_environment_specs(org_pk, Permission.SECRET_LIST)
+            .filter(slug=slug, organization_id=org_pk)
             .first()
         )
         if spec is None:
@@ -1704,10 +1724,14 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.SECRET_LIST)
+    @require_permission(Permission.SECRET_LIST, scope=agent_org_scope)
     @tenant_scoped()
     def agent_secret_bundles(self, info: Info, env_spec_slug: str) -> list[AgentSecretBundleType]:
-        """Reusable bundles visible to this agent's organization."""
+        """Reusable bundles visible to this agent's organization.
+
+        Org-level: the bundles are the org's shared secret packets, and
+        wiring one to a spec is an org-level act (#1866).
+        """
         from astrolift_agents.services.agent_cluster import resolve_agent_cluster
         from astrolift_agents.services.project_membership import agent_spec_belongs_to_project
         from astrolift_dispatch.agent_secrets import (
@@ -1718,9 +1742,11 @@ class AgentsQuery:
 
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
-        spec = AgentEnvironmentSpec.objects.filter(
-            slug=env_spec_slug, organization_id=org_pk, deleted_at__isnull=True
-        ).first()
+        spec = (
+            visible_environment_specs(org_pk, Permission.SECRET_LIST)
+            .filter(slug=env_spec_slug, organization_id=org_pk)
+            .first()
+        )
         if spec is None:
             return []
         backend = None
@@ -1746,20 +1772,29 @@ class AgentsQuery:
         return [agent_secret_bundle_to_type(bundle, capabilities) for bundle in visible]
 
     @strawberry.field
-    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST)
+    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST, scope=agent_org_scope)
     @tenant_scoped()
     def agent_environment_spec_secret_bundle_attachments(
         self, info: Info, slug: str
     ) -> list[AgentSecretBundleAttachmentType]:
-        """Ordered reusable-secret bundles attached to one agent spec."""
+        """Ordered reusable-secret bundles attached to one agent spec.
+
+        Org-level, like the bundle picker: attachments are the org's secret
+        wiring (#1866).
+        """
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None
+        spec = (
+            visible_environment_specs(org_pk, Permission.SECRET_LIST)
+            .filter(slug=slug, organization_id=org_pk)
+            .first()
+        )
+        if spec is None:
+            return []
         refs = (
             AgentSecretBundleRef.objects.select_related("environment_spec", "secret_bundle")
             .filter(
-                environment_spec__slug=slug,
-                environment_spec__organization_id=org_pk,
-                environment_spec__deleted_at__isnull=True,
+                environment_spec=spec,
                 secret_bundle__deleted_at__isnull=True,
                 deleted_at__isnull=True,
             )
@@ -2049,7 +2084,7 @@ class AgentsQuery:
         return page.map(agent_trigger_to_type)
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ)
+    @require_permission(Permission.AGENT_READ, scope=agent_org_scope)
     @tenant_scoped()
     def scan_agent_manifests(
         self,
@@ -2067,12 +2102,13 @@ class AgentsQuery:
         each agent manifest as a preview row WITHOUT persisting anything.
         The operator then confirms registration via ``registerAgentRepo``.
 
-        Read-only and org-scoped exactly like :meth:`agent_workloads`:
-        ``org_id`` must match the caller's active tenant (superusers
-        excepted, via ``_caller_org_id``), and the repo is fetched through
-        the org's own source connection — a caller can neither scan with
-        another tenant's credentials nor see another tenant's registered
-        agents (``already_registered`` is computed against this org's apps).
+        Read-only and org-level: the scan uses the org's own source
+        connection and reports ``already_registered`` across every app in
+        the org, so it checks at the explicit org scope rather than a
+        selected team (#1866). ``org_id`` must match the caller's active
+        tenant (superusers excepted, via ``_caller_org_id``) — a caller can
+        neither scan with another tenant's credentials nor see another
+        tenant's registered agents.
         """
         from astrolift_registry.services.manifest_sync import discover_agent_manifests
 

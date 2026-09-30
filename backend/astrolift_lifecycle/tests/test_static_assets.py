@@ -288,11 +288,15 @@ def test_sync_one_workload_stub_when_services_not_active(app, env, cluster):
 # ---- platform-build failure propagation ----------------------------------
 
 
-def test_platform_build_raises_on_failed_build(monkeypatch, app, cluster):
+def test_platform_build_raises_on_failed_build(monkeypatch, app, env, cluster):
     """A failed in-cluster build Job must raise (terminal _ROLLOUT_RETRY
     signal) -- not return success -- or a broken deploy reports green."""
     import importlib
     import types
+
+    import boto3
+    from aws.registry_ecr import ECRConfig, ECRDriver
+    from botocore.stub import Stubber
 
     import core.app_deploy as app_deploy
     import core.cluster_management as cluster_management
@@ -301,6 +305,16 @@ def test_platform_build_raises_on_failed_build(monkeypatch, app, cluster):
     # ``astrolift_workflows.activities.build_image`` resolves to the activity
     # function (re-exported by the package __init__), so reach the module.
     build_image = importlib.import_module("astrolift_workflows.activities.build_image")
+
+    cluster.provider_plugin.slug = "aws"
+    cluster.provider_plugin.save(update_fields=["slug"])
+    cluster.provider_config = {"region": "us-west-2", "account_id": "123456789012"}
+    cluster.save(update_fields=["provider_config", "updated_at", "version"])
+    deployment = _deployment(app, env)
+    ecr_client = boto3.client(
+        "ecr", region_name="us-west-2", aws_access_key_id="testing", aws_secret_access_key="testing"
+    )
+    registry = ECRDriver(config=ECRConfig(region="us-west-2", account_id="123456789012"), client=ecr_client)
 
     class _FakeIdentity:
         def create_identity_role(self, name, perms):
@@ -318,7 +332,11 @@ def test_platform_build_raises_on_failed_build(monkeypatch, app, cluster):
 
     monkeypatch.setattr(build_image, "_ensure_cluster_oidc_issuer", lambda c: None)
     monkeypatch.setattr(build_image, "_resolve_source_url", lambda a, s: "git+https://example.com/r#main")
-    monkeypatch.setattr(app_deploy, "driver_for_capability", lambda c, cap: _FakeIdentity())
+    monkeypatch.setattr(
+        app_deploy,
+        "driver_for_capability",
+        lambda c, cap: {"registry": registry, "identity": _FakeIdentity()}[cap],
+    )
     monkeypatch.setattr(
         cluster_management, "_context_for_cluster", lambda c: types.SimpleNamespace(slug=c.slug)
     )
@@ -328,16 +346,19 @@ def test_platform_build_raises_on_failed_build(monkeypatch, app, cluster):
     w = WorkloadManifest(
         name="site", kind="static_site", static_build_command="npm run build", static_output_dir="dist"
     )
-    with pytest.raises(RuntimeError, match="static asset build failed"):
+    # The real retention driver accepts the public builder image without any
+    # ECR calls. An empty SDK stub rejects accidental remote calls while leaving
+    # the deployment retention gate in place before the failed build result.
+    with Stubber(ecr_client), pytest.raises(RuntimeError, match="static asset build failed.*boom"):
         static_site._platform_build_workload(
-            deployment=types.SimpleNamespace(pk=1),
+            deployment=deployment,
             app=app,
             cluster=cluster,
             workload=w,
             bucket="acme-site-assets",
             distribution_id="E1",
             region="us-west-2",
-            account_id="1",
+            account_id="123456789012",
             commit_sha="abc",
         )
 

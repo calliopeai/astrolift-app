@@ -214,6 +214,37 @@ def pin_ws_identity(context) -> None:
         set_current_api_token(token)
 
 
+def ws_identity(fn):
+    """Pin the WS identity (:func:`pin_ws_identity`) before a subscription's
+    gates run.
+
+    A subscription's ``@require_permission`` and ``@tenant_scoped`` read the
+    tenant and token contextvars, which the handshake only stashed on the
+    context. Apply this outermost, directly under ``@strawberry.subscription``,
+    so the pin happens first.
+    """
+    import functools
+    import inspect
+
+    signature = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        bound = signature.bind(*args, **kwargs)
+        pin_ws_identity(bound.arguments["info"].context)
+        # Close the inner generator when the subscriber goes away; ``async
+        # for`` alone leaves it suspended.
+        inner = fn(*args, **kwargs)
+        try:
+            async for item in inner:
+                yield item
+        finally:
+            await inner.aclose()
+
+    wrapper.__signature__ = signature  # type: ignore[attr-defined]
+    return wrapper
+
+
 @sync_to_async
 def _resolve_tenant_for_user(user, session_data: dict) -> Any:
     """Mirror what TenantContextMiddleware does, but synchronously

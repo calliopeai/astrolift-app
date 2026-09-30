@@ -490,6 +490,8 @@ ASTROLIFT_SUPPORT_ENABLED = env_bool("FEATURE_SUPPORT", False)
 CLIENT_COVE_SUPPORT_URL = os.environ.get("CLIENT_COVE_SUPPORT_URL", "").rstrip("/")
 CLIENT_COVE_SUPPORT_API_KEY = os.environ.get("CLIENT_COVE_SUPPORT_API_KEY", "")
 
+AGENT_RUNTIME_CLASS = env_str("AGENT_RUNTIME_CLASS", "")
+
 CONSTANCE_CONFIG = {
     "VLLM_FRONTEND_DEFAULT": (
         "rust",
@@ -798,7 +800,12 @@ CONSTANCE_CONFIG = {
 
 CONSTANCE_CONFIG_FIELDSETS = {
     "Agent pods": {
-        "fields": ("AGENT_POD_UID", "AGENT_POD_GID", "AGENT_NETWORK_FENCE", "AGENT_EGRESS_ALLOW_CIDRS"),
+        "fields": (
+            "AGENT_POD_UID",
+            "AGENT_POD_GID",
+            "AGENT_NETWORK_FENCE",
+            "AGENT_EGRESS_ALLOW_CIDRS",
+        ),
         "collapse": False,
     },
     "System": {

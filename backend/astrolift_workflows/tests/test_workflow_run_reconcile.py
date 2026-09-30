@@ -91,15 +91,20 @@ def test_closed_observation_repairs_only_exact_instance(status):
 
 
 @pytest.mark.django_db
-def test_rechecks_identity_after_external_read():
+@pytest.mark.parametrize("history_expired", [False, True])
+def test_rechecks_identity_after_external_read(history_expired):
     run = make_run()
     before = identity(run)
     run.run_id = "replacement-incarnation"
     run.save(update_fields=["run_id"])
-    assert reconcile._apply_observation(before, "cancelled", timezone.now()) is None
+    assert (
+        reconcile._apply_observation(before, "cancelled", timezone.now(), history_expired=history_expired)
+        is None
+    )
     run.refresh_from_db()
     assert run.status == "running"
     assert run.ended_at is None
+    assert run.temporal_history_expired_at is None
 
 
 @pytest.mark.django_db
@@ -221,17 +226,71 @@ async def test_tick_uses_old_execution_when_workflow_id_is_reused(temporal_env, 
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_missing_execution_does_not_fabricate_completion(temporal_env, monkeypatch):
+async def test_missing_execution_expires_once_without_fabricating_success(temporal_env, monkeypatch, caplog):
     async def client():
         return temporal_env.client
 
     monkeypatch.setattr("astrolift_workflows.client._get_client_async", client)
     monkeypatch.setattr("astrolift_workflows.client._temporal_enabled", lambda: True)
     run = await sync_to_async(make_run)()
+    own = await sync_to_async(instance)(run)
     result = await reconcile.reconcile_workflow_runs()
-    assert result.errors == 1
+    assert result.errors == 0
+    assert result.repaired == 1
     await sync_to_async(run.refresh_from_db)()
-    assert (run.status, run.ended_at) == ("running", None)
+    await sync_to_async(own.refresh_from_db)()
+    assert run.status == "expired"
+    assert run.ended_at == run.temporal_history_expired_at
+    assert run.ended_at is not None
+    assert (own.current_state, own.completed_at) == ("expired", run.ended_at)
+    assert (await reconcile.reconcile_workflow_runs()).evaluated == 0
+    assert sum("Temporal history expired" in record.message for record in caplog.records) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["running", "completed", "failed", "cancelled", "terminated", "timed_out"])
+def test_expiry_preserves_known_outcome_and_closes_open_stages(status):
+    closed_at = timezone.now() if status != "running" else None
+    run = make_run(status=status, ended_at=closed_at, result={"keep": True}, failure={"original": "keep"})
+    own = instance(run, current_state=status, completed_at=closed_at)
+    definition = WorkflowDefinition.objects.create(name="Expired", slug="expired-stages")
+    stage = WorkflowStage.objects.create(
+        definition=definition, slug="expired-gate", order=0, kind="human_gate"
+    )
+    opened = WorkflowStageExecution.objects.create(
+        workflow_run=run, stage=stage, status="running", slug="expired-open"
+    )
+    completed = WorkflowStageExecution.objects.create(
+        workflow_run=run, stage=stage, status="completed", output={"keep": True}, slug="expired-complete"
+    )
+    detected_at = timezone.now()
+    assert reconcile._apply_observation(identity(run), "expired", detected_at, history_expired=True)
+    for row in (run, own, opened, completed):
+        row.refresh_from_db()
+    assert run.temporal_history_expired_at == detected_at
+    assert run.status == ("expired" if status == "running" else status)
+    assert run.ended_at == (closed_at or detected_at)
+    assert run.result == {"keep": True}
+    assert run.failure == {"original": "keep"}
+    assert (own.current_state, own.completed_at) == (run.status, run.ended_at)
+    assert opened.status == ("failed" if status == "failed" else "cancelled")
+    assert completed.status == "completed"
+    assert completed.output == {"keep": True}
+    assert reconcile._next_batch() == []
+    assert not reconcile._apply_observation(identity(run), "expired", detected_at, history_expired=True)
+
+
+@pytest.mark.django_db
+def test_expiry_cannot_override_concurrent_finalization():
+    run = make_run()
+    before = identity(run)
+    run.status = "completed"
+    run.ended_at = timezone.now()
+    run.save(update_fields=["status", "ended_at", "updated_at", "version"])
+    assert reconcile._apply_observation(before, "expired", timezone.now(), history_expired=True) is None
+    run.refresh_from_db()
+    assert run.status == "completed"
+    assert run.temporal_history_expired_at is None
 
 
 @pytest.mark.django_db(transaction=True)
@@ -299,7 +358,9 @@ async def test_disabled_runtime_leaves_database_untouched(monkeypatch):
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.parametrize("boundary", ["mismatched_identity", "missing_close_time", "rpc_failure"])
+@pytest.mark.parametrize(
+    "boundary", ["mismatched_identity", "missing_close_time", "rpc_failure", "rpc_unavailable"]
+)
 async def test_untrusted_or_unavailable_observation_preserves_record(monkeypatch, boundary):
     from types import SimpleNamespace
 
@@ -314,6 +375,10 @@ async def test_untrusted_or_unavailable_observation_preserves_record(monkeypatch
             assert rpc_timeout == timedelta(seconds=3)
             if boundary == "rpc_failure":
                 raise TimeoutError("Temporal unavailable")
+            if boundary == "rpc_unavailable":
+                from temporalio.service import RPCError, RPCStatusCode
+
+                raise RPCError("Temporal unavailable", RPCStatusCode.UNAVAILABLE, b"")
             return SimpleNamespace(
                 id=run.workflow_id,
                 run_id="wrong" if boundary == "mismatched_identity" else run.run_id,

@@ -11,6 +11,7 @@ from django.conf import settings
 from astrolift_agents.services import agent_host_terminal as terminals
 from astrolift_agents.services.agent_host import AgentHost, HostError
 from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token
+from core.permissions import Permission, route_auth
 from core.schema.ws_auth import (
     _bearer_from_scope,
     _header_from_scope,
@@ -69,7 +70,20 @@ def _terminal_run(host, token, fn, *args):
         reset_current_api_token(marker)
 
 
+@route_auth(
+    credential="session cookie or alft_ API bearer with fresh per-message identity and scope checks",
+    permissions=(
+        Permission.AGENT_READ,
+        Permission.AGENT_TASK_SEND_INPUT,
+        Permission.AGENT_DISPATCH,
+        Permission.AGENT_BOX_ATTACH,
+    ),
+    scope="task at its workload app, project, team or org; terminal at its box plus actor-private lease",
+)
 async def agent_host_ws_application(scope, receive, send):
+    if scope.get("path") not in {"/app/ahp", "/app/ahp/"}:
+        await send({"type": "websocket.close", "code": 4404})
+        return
     first = await receive()
     if first["type"] != "websocket.connect":
         return

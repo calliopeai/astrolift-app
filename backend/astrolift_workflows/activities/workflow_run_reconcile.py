@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 
 from temporalio import activity
+from temporalio.service import RPCError, RPCStatusCode
 
 log = logging.getLogger(__name__)
 _BATCH_SIZE = 40
@@ -33,6 +34,7 @@ class RunIdentity:
     workflow_id: str
     run_id: str
     version: int
+    temporal_history_expired_at: datetime | None = None
 
 
 @dataclasses.dataclass
@@ -61,11 +63,12 @@ def _next_batch() -> list[RunIdentity]:
         )
     )
     candidates = candidates.alias(unfinished_tasks=Exists(unfinished_tasks(OuterRef("pk"))))
+    candidates = candidates.filter(Q(temporal_history_expired_at__isnull=True) | Q(unfinished_tasks=True))
     attention = (
         Q(status="running") | Q(ended_at__isnull=True) | Q(open_stages=True) | Q(unfinished_tasks=True)
     )
     state = cache.get(_CURSOR_KEY) or {}
-    fields = ("pk", "organization_id", "workflow_id", "run_id", "version")
+    fields = ("pk", "organization_id", "workflow_id", "run_id", "version", "temporal_history_expired_at")
     rows = []
     # Reserve capacity for active runs, while auditing older terminal mirrors
     # that fan-out workers may have closed incorrectly. Freeze each cycle's
@@ -87,10 +90,12 @@ def _next_batch() -> list[RunIdentity]:
     return [RunIdentity(*row) for row in rows]
 
 
-def _apply_observation(identity: RunIdentity, status: str, closed_at: datetime | None) -> bool | None:
+def _apply_observation(
+    identity: RunIdentity, status: str, closed_at: datetime | None, *, history_expired: bool = False
+) -> bool | None:
     from astrolift_agents.services.workflow_task_cleanup import cleanup_workflow_tasks
 
-    changed = _apply_run_records(identity, status, closed_at)
+    changed = _apply_run_records(identity, status, closed_at, history_expired=history_expired)
     if changed is not None and status != "running":
         cleaned = cleanup_workflow_tasks(
             identity.pk,
@@ -106,7 +111,9 @@ def _apply_observation(identity: RunIdentity, status: str, closed_at: datetime |
     return changed
 
 
-def _apply_run_records(identity: RunIdentity, status: str, closed_at: datetime | None) -> bool | None:
+def _apply_run_records(
+    identity: RunIdentity, status: str, closed_at: datetime | None, *, history_expired: bool = False
+) -> bool | None:
     from django.db import connection, transaction
     from django.db.models import F
     from django.utils import timezone
@@ -132,8 +139,15 @@ def _apply_run_records(identity: RunIdentity, status: str, closed_at: datetime |
         # Retry on a later sweep instead of undoing that newer observation.
         if run.version != identity.version:
             return None
+        expired_changed = history_expired and run.temporal_history_expired_at is None
+        if history_expired:
+            run.temporal_history_expired_at = run.temporal_history_expired_at or closed_at
+            # Missing history cannot prove success or override a known final outcome.
+            status = run.status if run.status != "running" else "expired"
+            closed_at = run.ended_at or run.temporal_history_expired_at
         changed = (
-            run.status != status
+            expired_changed
+            or run.status != status
             or run.ended_at != closed_at
             or (closed_at is not None and run.current_stage_execution_id is not None)
         )
@@ -142,8 +156,17 @@ def _apply_run_records(identity: RunIdentity, status: str, closed_at: datetime |
             run.ended_at = closed_at
             if closed_at is not None:
                 run.current_stage_execution = None
-            run.save(update_fields=["status", "ended_at", "current_stage_execution", "updated_at", "version"])
-        if status in {"cancelled", "failed", "terminated", "timed_out"}:
+            run.save(
+                update_fields=[
+                    "status",
+                    "ended_at",
+                    "current_stage_execution",
+                    "temporal_history_expired_at",
+                    "updated_at",
+                    "version",
+                ]
+            )
+        if history_expired or status in {"cancelled", "failed", "terminated", "timed_out"}:
             updated = WorkflowStageExecution.objects.filter(
                 workflow_run=run, status__in=["pending", "running"], deleted_at__isnull=True
             ).update(
@@ -168,7 +191,11 @@ async def reconcile_workflow_runs() -> WorkflowRunReconcileSummary:
     if not rows:
         return summary
     # Connection failure fails the activity visibly; no mirror is changed.
-    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+    client = (
+        await asyncio.wait_for(_get_client_async(), timeout=5)
+        if any(row.temporal_history_expired_at is None for row in rows)
+        else None
+    )
     semaphore = asyncio.Semaphore(_CONCURRENCY)
 
     async def reconcile(identity: RunIdentity) -> None:
@@ -178,8 +205,36 @@ async def reconcile_workflow_runs() -> WorkflowRunReconcileSummary:
                 summary.skipped += 1
                 return
             try:
+                if identity.temporal_history_expired_at is not None:
+                    changed = await sync_to_async(_apply_observation, thread_sensitive=False)(
+                        identity, "expired", identity.temporal_history_expired_at, history_expired=True
+                    )
+                    if changed is None:
+                        summary.skipped += 1
+                    elif changed:
+                        summary.repaired += 1
+                    else:
+                        summary.unchanged += 1
+                    return
                 handle = client.get_workflow_handle(identity.workflow_id, run_id=identity.run_id)
-                desc = await asyncio.wait_for(handle.describe(rpc_timeout=_RPC_TIMEOUT), timeout=4)
+                try:
+                    desc = await asyncio.wait_for(handle.describe(rpc_timeout=_RPC_TIMEOUT), timeout=4)
+                except RPCError as exc:
+                    if exc.status != RPCStatusCode.NOT_FOUND:
+                        raise
+                    from django.utils import timezone
+
+                    changed = await sync_to_async(_apply_observation, thread_sensitive=False)(
+                        identity, "expired", timezone.now(), history_expired=True
+                    )
+                    if changed is None:
+                        summary.skipped += 1
+                    elif changed:
+                        summary.repaired += 1
+                        log.info("Temporal history expired for workflow mirror %s", identity.pk)
+                    else:
+                        summary.unchanged += 1
+                    return
                 if (desc.id, desc.run_id, desc.workflow_type) != (
                     identity.workflow_id,
                     identity.run_id,

@@ -397,11 +397,10 @@ def app_root_view(request):
     return HttpResponse(html)
 
 
-def test_open_telemetry(request):
-    return HttpResponse("test open telemetry")
-
-
 def metrics_view(request):
+    from core.permissions import require_platform_operator
+
+    require_platform_operator(getattr(request, "user", None))
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
     return HttpResponse(generate_latest(), content_type=CONTENT_TYPE_LATEST)
 

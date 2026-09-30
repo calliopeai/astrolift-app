@@ -291,6 +291,11 @@ class AgentEnvironmentSpecType:
     config_repo: str
     config_branch: str
     config_manifest_path: str
+    # The owner (#1866): a project (with its team), or a team alone. Both
+    # null means the spec is org-shared: every spec reader in the org sees it
+    # and every team's agents may run with it.
+    team_id: GUID | None
+    project_id: GUID | None
     created_at: dt.datetime
     updated_at: dt.datetime
 
@@ -1312,6 +1317,8 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         config_repo=s.config_repo or "",
         config_branch=s.config_branch or "main",
         config_manifest_path=s.config_manifest_path or "",
+        team_id=GUID(str(s.team.guid)) if s.team_id is not None else None,
+        project_id=GUID(str(s.project.guid)) if s.project_id is not None else None,
         created_at=s.created_at,
         updated_at=s.updated_at,
     )

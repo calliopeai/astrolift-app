@@ -8,8 +8,8 @@ export function RunStateBadge({ state }: { state: string }) {
       ? "destructive"
       : s.includes("complete") || s.includes("succe") || s.includes("done")
         ? "secondary"
-        : s.includes("cancel")
+        : s.includes("cancel") || s === "expired"
           ? "outline"
           : "default";
-  return <Badge variant={variant}>{state}</Badge>;
+  return <Badge variant={variant}>{s === "expired" ? "History expired" : state}</Badge>;
 }

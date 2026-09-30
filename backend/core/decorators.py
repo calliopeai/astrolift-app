@@ -38,21 +38,49 @@ def tenant_scoped(
     body. Resolvers MUST add their own explicit ``organization_id=``
     constraint (and fail closed) — the presence of ``@tenant_scoped`` is
     not isolation. That false assumption is the #1183 leak class.
+
+    An async-generator resolver (a subscription) is checked when it is
+    first iterated, once its WebSocket identity is pinned, and a missing
+    tenant ends the stream without an event rather than raising, the way
+    ``@require_permission`` refuses one.
     """
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         import inspect
 
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
+        def missing() -> str:
             tenant = get_current_tenant()
             if tenant is None or tenant.organization_id is None:
-                raise TenantRequired(f"{fn.__qualname__} requires a resolved tenant context")
+                return f"{fn.__qualname__} requires a resolved tenant context"
             if require_team and tenant.team_id is None:
-                raise TenantRequired(f"{fn.__qualname__} requires a team in the tenant context")
+                return f"{fn.__qualname__} requires a team in the tenant context"
             if require_project and tenant.project_id is None:
-                raise TenantRequired(f"{fn.__qualname__} requires a project in the tenant context")
-            return fn(*args, **kwargs)
+                return f"{fn.__qualname__} requires a project in the tenant context"
+            return ""
+
+        if inspect.isasyncgenfunction(fn):
+
+            @functools.wraps(fn)
+            async def wrapper(*args, **kwargs):
+                if missing():
+                    return
+                # Close the inner generator when the subscriber goes away;
+                # ``async for`` alone leaves it suspended.
+                inner = fn(*args, **kwargs)
+                try:
+                    async for item in inner:
+                        yield item
+                finally:
+                    await inner.aclose()
+
+        else:
+
+            @functools.wraps(fn)
+            def wrapper(*args, **kwargs):
+                reason = missing()
+                if reason:
+                    raise TenantRequired(reason)
+                return fn(*args, **kwargs)
 
         wrapper.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
         return wrapper

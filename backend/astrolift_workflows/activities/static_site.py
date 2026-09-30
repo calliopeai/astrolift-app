@@ -616,8 +616,13 @@ def _platform_build_workload(
         _ensure_cluster_oidc_issuer,
         _resolve_source_url,
     )
+    from astrolift_workflows.activities.image_retention import retain_deployment_image_refs
     from core.app_deploy import driver_for_capability, static_build_role_name
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
+    from providers.k8s_native.build_static import STATIC_BUILDER_IMAGE, StaticAssetBuildDriver
+
+    protected = retain_deployment_image_refs(deployment, [STATIC_BUILDER_IMAGE])
+    builder_image = protected.get(STATIC_BUILDER_IMAGE, STATIC_BUILDER_IMAGE)
 
     account_id = _resolve_account_id(cluster, account_id)
     if not account_id:
@@ -647,8 +652,6 @@ def _platform_build_workload(
     ctx = _context_for_cluster(cluster)
     source_uri = _resolve_source_url(app, commit_sha)
 
-    from providers.k8s_native.build_static import StaticAssetBuildDriver
-
     driver = StaticAssetBuildDriver(
         cluster_driver=cluster_driver,
         cluster_slug=ctx.slug,
@@ -656,6 +659,7 @@ def _platform_build_workload(
         service_account_role_arn=role_arn,
         namespace=_BUILD_NAMESPACE,
         build_id=f"{deployment.pk}-{workload.name}-{commit_sha or 'head'}",
+        image=builder_image,
     )
     result = driver.build(
         source_uri=source_uri,

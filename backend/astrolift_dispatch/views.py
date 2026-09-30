@@ -10,6 +10,12 @@ Endpoints:
     POST /api/dispatch/v1/tasks/<id>/status/            — update task status
     POST /api/dispatch/v1/tasks/<id>/logs/              — stream log lines (#51)
     POST /api/dispatch/v1/tasks/<id>/meter/             — report metering data (#56)
+
+Every endpoint but registration authenticates the dispatcher key (or, for a
+task's own callbacks, the task-scoped callback key) through the decorators
+below, which also declare the route's auth for the surface guardrail
+(#1866). The key is bound to one organization; nothing here reads or writes
+another organization's rows.
 """
 
 from __future__ import annotations
@@ -40,6 +46,7 @@ from astrolift_agents.services.agent_task_events import (
     validate_task_events,
 )
 from astrolift_agents.services.agent_task_requests import TaskInputRequestError, callback_input_response
+from core.permissions import RouteAuth
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +92,16 @@ def _get_dispatcher_from_request(request: HttpRequest) -> DispatcherInstance | N
     ).first()
 
 
+_DISPATCHER_AUTH = RouteAuth(
+    credential="dispatcher API key (Bearer, hashed at rest, active or pending dispatcher)",
+    scope="the dispatcher's own organization; task rows it names must be the dispatcher's or its org's",
+)
+_CALLBACK_AUTH = RouteAuth(
+    credential="dispatcher API key, or the alft_cb_ callback key minted for the task in the path",
+    scope="the one task named in the path (a callback key is bound to exactly that task)",
+)
+
+
 def _require_dispatcher(view_func):
     """Decorator: authenticate the request as a Dispatch Service call."""
 
@@ -96,6 +113,7 @@ def _require_dispatcher(view_func):
         request.dispatcher = dispatcher
         return view_func(request, *args, **kwargs)
 
+    wrapper.__astrolift_route_auth__ = _DISPATCHER_AUTH
     return wrapper
 
 
@@ -130,6 +148,7 @@ def _require_agent_callback_auth(view_func):
         request.agent_callback_token_hash = _hash_key(raw_key)
         return view_func(request, task_id, *args, **kwargs)
 
+    wrapper.__astrolift_route_auth__ = _CALLBACK_AUTH
     return wrapper
 
 
@@ -878,15 +897,21 @@ def _record_run_interaction(
 
 
 @require_http_methods(["POST"])
+@_require_dispatcher
 def ingest_task_logs(request: HttpRequest, task_id: str) -> JsonResponse:
     """Receive log lines from the Dispatch Service.
+
+    Authenticated by the dispatcher key and confined to the dispatcher's
+    organization (#1866): the route used to take any caller's lines into
+    any run.
 
     Request body (JSON):
         {"lines": ["line 1", "line 2", ...]}
 
     Response 200:
         {"stored": <int>}   — total lines now in the buffer.
-    Response 404: unknown task_id.
+    Response 401: no valid dispatcher key.
+    Response 404: unknown task_id, or a run in another organization.
     Response 400: malformed body.
     """
     try:
@@ -899,7 +924,7 @@ def ingest_task_logs(request: HttpRequest, task_id: str) -> JsonResponse:
         return JsonResponse({"error": "'lines' must be a list"}, status=400)
 
     try:
-        stored = store_agent_log_lines(task_id, lines)
+        stored = store_agent_log_lines(task_id, lines, organization_id=request.dispatcher.organization_id)
     except AgentRun.DoesNotExist:
         return JsonResponse({"error": "task not found"}, status=404)
     except Exception as exc:
@@ -916,8 +941,12 @@ def ingest_task_logs(request: HttpRequest, task_id: str) -> JsonResponse:
 
 
 @require_http_methods(["POST"])
+@_require_dispatcher
 def ingest_task_meter(request: HttpRequest, task_id: str) -> JsonResponse:
     """Receive terminal metering data from the Dispatch Service.
+
+    Authenticated by the dispatcher key and confined to the dispatcher's
+    organization (#1866).
 
     Request body (JSON):
         {
@@ -930,7 +959,8 @@ def ingest_task_meter(request: HttpRequest, task_id: str) -> JsonResponse:
         }
 
     Response 201: metering record created.
-    Response 404: unknown task_id.
+    Response 401: no valid dispatcher key.
+    Response 404: unknown task_id, or a run in another organization.
     Response 409: record already exists for this task.
     """
     try:
@@ -939,7 +969,10 @@ def ingest_task_meter(request: HttpRequest, task_id: str) -> JsonResponse:
         return JsonResponse({"error": "invalid JSON"}, status=400)
 
     try:
-        run = AgentRun.all_objects.get(guid=task_id)
+        run = AgentRun.all_objects.get(
+            guid=task_id,
+            workload__registered_app__organization_id=request.dispatcher.organization_id,
+        )
     except AgentRun.DoesNotExist:
         return JsonResponse({"error": "task not found"}, status=404)
 

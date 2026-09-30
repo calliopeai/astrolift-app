@@ -24,6 +24,7 @@ class WorkflowRun(BaseCoreModel):
         CANCELLED = "cancelled"
         TERMINATED = "terminated"
         TIMED_OUT = "timed_out"
+        EXPIRED = "expired", "History expired"
 
     workflow_kind = models.CharField(max_length=128, db_index=True)
     workflow_id = models.CharField(max_length=255)
@@ -31,6 +32,7 @@ class WorkflowRun(BaseCoreModel):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.RUNNING)
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
+    temporal_history_expired_at = models.DateTimeField(null=True, blank=True)
 
     organization = models.ForeignKey(
         "astrolift_identity.Organization",

@@ -115,9 +115,21 @@ from starving active runs.
 Every lookup pins both Temporal workflow ID and execution run ID. The response
 must match both IDs and the definition workflow type. The database write also
 rechecks organization, identity, and version under a row lock. A missing run ID,
-unavailable/expired Temporal history, or concurrent database change leaves the
+unavailable Temporal service, or concurrent database change leaves the
 record unchanged for a later sweep. `CONTINUED_AS_NEW` is not inferred to mean
 completion. Terminal observations require Temporal's actual close timestamp.
+
+`NOT_FOUND` for the exact execution marks its Temporal history expired and logs
+once at INFO. A running mirror settles as `expired` (History expired), an
+unknown outcome, rather than success or failure; its end timestamp is the time
+expiry was observed, not an inferred execution close time. Already terminal
+mirrors keep their recorded status, end timestamp, result and failure. The nullable
+`WorkflowRun.temporal_history_expired_at` marker (migration
+`astrolift_operations.0027`) excludes these mirrors from subsequent Temporal
+lookups and audit sweeps. Open stages settle, and owned-task cleanup continues
+locally on later ticks until complete without querying the missing execution.
+Apply the additive migration before rolling workers; the previous release can
+run against the expanded schema.
 
 An authoritative observation repairs an incorrectly terminal configured record
 as well as an unfinished one. Abnormal closure settles pending/running stage

@@ -21,6 +21,7 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from core.permissions import route_auth
 from core.utils.browser_guard import require_ui_header_for_session
 
 try:
@@ -42,6 +43,10 @@ _SYSTEM_PROMPT = (
 @csrf_exempt
 @require_ui_header_for_session
 @require_http_methods(["POST"])
+@route_auth(
+    credential="authenticated session (with the UI header) or API bearer",
+    scope="none: it reads and writes no tenant data, only forwards the description to the model",
+)
 def skill_ai_assist(request: HttpRequest) -> JsonResponse:
     """Return an AI-generated system prompt suggestion for a new skill.
 

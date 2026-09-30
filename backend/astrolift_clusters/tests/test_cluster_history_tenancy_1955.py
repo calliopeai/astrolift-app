@@ -8,7 +8,7 @@ Two cluster surfaces read rows that the cluster alone cannot attribute:
   cluster came back, and a short slug matched unrelated rows.
 * ``AstroliftTenantCluster.bootstrapRuns`` / ``lastBootstrapRun`` read
   ``ClusterBootstrapRun``, which had no organization column either. Any org
-  with ``cluster.manage`` can record a run on a shared cluster, and every
+  was able to record a run on a shared cluster, and every
   org read it back: username, host info, error text.
 
 A shared cluster (organization NULL) resolves for every org, which is what
@@ -358,6 +358,10 @@ def _runs(org, cluster):
 def test_other_orgs_bootstrap_run_on_a_shared_cluster_stays_out(
     org_a, org_b, user_b, shared, captured_events
 ):
+    # Shared-cluster writes require the platform operator (#2108);
+    # the resulting history still belongs to the invocation's org.
+    user_b.is_superuser = True
+    user_b.save(update_fields=["is_superuser"])
     with _ctx(org_b, user_b):
         result = ClustersMutation().record_cluster_bootstrap_run(_info(user_b), _bootstrap_input(shared.slug))
     assert result.ok is True, result.errors
