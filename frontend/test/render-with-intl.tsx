@@ -11,7 +11,7 @@ export function renderWithIntl(ui: ReactNode, options?: RenderOptions) {
   return render(ui, {
     ...options,
     wrapper: ({ children }) => (
-      <NextIntlClientProvider locale="en" messages={messages}>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
         <CallerWrapper>{children}</CallerWrapper>
       </NextIntlClientProvider>
     ),

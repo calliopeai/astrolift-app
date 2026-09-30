@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 import { UPDATE_MANIFEST } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
@@ -52,12 +54,9 @@ vi.mock("@apollo/client/react", async () => {
   };
 });
 
-vi.mock("next-intl", () => ({
+vi.mock("next-intl", async (original) => ({
+  ...(await original<typeof import("next-intl")>()),
   useTranslations: () => (key: string) => key,
-}));
-
-vi.mock("@/lib/i18n/formatters", () => ({
-  useFormatters: () => ({ formatRelativeTime: () => "just now" }),
 }));
 
 vi.mock("sonner", () => ({

@@ -53,10 +53,14 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => "/apps",
 }));
-vi.mock("next-intl", async (original) => ({
-  ...(await original<typeof import("next-intl")>()),
-  useTranslations: () => (key: string) => key,
-}));
+vi.mock("next-intl", async (original) => {
+  const actual = await original<typeof import("next-intl")>();
+  return {
+    ...actual,
+    useTranslations: (namespace?: string) =>
+      namespace?.startsWith("shared.") ? actual.useTranslations(namespace) : (key: string) => key,
+  };
+});
 vi.mock("@/lib/permissions/use-my-permissions", () => ({
   useMyPermissions: () => ({ can: () => true, loading: false }),
 }));
@@ -83,7 +87,7 @@ let queryFails: boolean;
 let client: ApolloClient;
 function wrapper({ children }: PropsWithChildren) {
   return (
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
       <ApolloProvider client={client}>{children}</ApolloProvider>
     </NextIntlClientProvider>
   );
