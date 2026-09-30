@@ -7,9 +7,7 @@ test("pending environment clear disables its row while other overrides remain av
     "/iframe.html?id=screens-apps-settings-environmentsettings--clearing&viewMode=story"
   );
   await expect(page.getByRole("button", { name: "Clear replicas override" })).toBeDisabled();
-  await expect(
-    page.getByRole("button", { name: "Clear memory_limit override" })
-  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Clear memory_limit override" })).toBeEnabled();
 });
 
 test("pending bundle attachment and key deletion leave the other bundle actionable", async ({
