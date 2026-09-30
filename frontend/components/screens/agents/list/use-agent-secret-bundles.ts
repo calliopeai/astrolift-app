@@ -25,6 +25,8 @@ import type {
   AstroliftAgentSecretBundleAttachment,
 } from "@/graphql/agents/agents.types";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { usePendingActions } from "@/hooks/use-pending-actions";
 
 type MutationError = { message: string };
@@ -125,7 +127,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         | undefined;
       if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
       toast.success(t("created"));
-      await refresh();
+      await refetchAfterMutation({ refetch: refresh }, t("refreshFailed"));
       return true;
     } catch (error) {
       toast.error(failure("createFailed", error instanceof Error ? error.message : String(error)));
@@ -156,7 +158,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         | undefined;
       if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
       toast.success(t("updated"));
-      await refresh();
+      await refetchAfterMutation({ refetch: refresh }, t("refreshFailed"));
       return true;
     } catch (error) {
       toast.error(failure("updateFailed", error instanceof Error ? error.message : String(error)));
@@ -178,7 +180,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         | undefined;
       if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
       toast.success(t("bundleDeleted"));
-      await refresh();
+      await refetchAfterMutation({ refetch: refresh }, t("refreshFailed"));
     } catch (error) {
       toast.error(
         failure("deleteBundleFailed", error instanceof Error ? error.message : String(error))
@@ -210,7 +212,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         | undefined;
       if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
       toast.success(t(attachment ? "attachmentUpdated" : "attached"));
-      await refresh();
+      await refetchAfterMutation({ refetch: refresh }, t("refreshFailed"));
       return true;
     } catch (error) {
       toast.error(failure("attachFailed", error instanceof Error ? error.message : String(error)));
@@ -232,7 +234,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         | undefined;
       if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
       toast.success(t("detached"));
-      await refresh();
+      await refetchAfterMutation({ refetch: refresh }, t("refreshFailed"));
     } catch (error) {
       toast.error(failure("detachFailed", error instanceof Error ? error.message : String(error)));
     } finally {
@@ -265,7 +267,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         | undefined;
       if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
       toast.success(t("keySaved", { key }));
-      await refresh();
+      await refetchAfterMutation({ refetch: refresh }, t("refreshFailed"));
       return true;
     } catch (error) {
       toast.error(failure("saveKeyFailed", error instanceof Error ? error.message : String(error)));
@@ -287,7 +289,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         | undefined;
       if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
       toast.success(t("keyDeleted", { key }));
-      await refresh();
+      await refetchAfterMutation({ refetch: refresh }, t("refreshFailed"));
     } catch (error) {
       toast.error(
         failure("deleteKeyFailed", error instanceof Error ? error.message : String(error))

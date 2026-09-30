@@ -8,6 +8,10 @@
 - Shared settings navigation, danger-zone notices, default save/cancel actions
   and read-only permission sentences use all eight locales. Actual permission
   IDs, caller labels, server diagnostics and draft/retry behavior are preserved
+- Successful agent secret value/reference and bundle/key writes remain
+  committed when their list refresh fails. All eight locales explain that the
+  view needs refreshing and the write should not be repeated (#2145).
+
 - Agent secret value and bundle editors translate presentation and feedback in
   all eight locales, identify the explicitly selected environment recipe and
   retain provider identifiers and server diagnostics. Failed status/catalog

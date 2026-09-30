@@ -4190,7 +4190,8 @@
       "detachFailed": "解除附加失败",
       "saveKeyFailed": "保存键失败",
       "deleteKeyFailed": "删除键失败",
-      "readFailed": "读取失败"
+      "readFailed": "读取失败",
+      "refreshFailed": "更改已保存，但无法刷新视图。请刷新以查看最新数据；不要重复写入。"
     }
   }
 }

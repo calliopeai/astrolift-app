@@ -4193,7 +4193,8 @@
       "detachFailed": "No se pudo desvincular",
       "saveKeyFailed": "No se pudo guardar la clave",
       "deleteKeyFailed": "No se pudo eliminar la clave",
-      "readFailed": "No se pudo leer"
+      "readFailed": "No se pudo leer",
+      "refreshFailed": "El cambio se guardó, pero no se pudo actualizar la vista. Actualícela para ver los datos actuales; no repita la escritura."
     }
   }
 }

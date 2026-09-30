@@ -4193,7 +4193,8 @@
       "detachFailed": "Échec de la dissociation",
       "saveKeyFailed": "Échec de l’enregistrement de la clé",
       "deleteKeyFailed": "Échec de la suppression de la clé",
-      "readFailed": "Échec de la lecture"
+      "readFailed": "Échec de la lecture",
+      "refreshFailed": "La modification a été enregistrée, mais la vue n’a pas pu être actualisée. Actualisez-la pour voir les données actuelles ; ne répétez pas l’écriture."
     }
   }
 }

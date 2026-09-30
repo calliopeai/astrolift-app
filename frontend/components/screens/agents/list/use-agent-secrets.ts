@@ -20,6 +20,8 @@ import {
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { usePendingActions } from "@/hooks/use-pending-actions";
 
 interface SecretStatusResp {
@@ -130,7 +132,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
         return false;
       }
       toast.success(t("valueSaved", { name: envVar }));
-      await refetch();
+      await refetchAfterMutation({ refetch }, t("refreshFailed"));
       return true;
     } catch (err) {
       toast.error(
@@ -161,7 +163,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
         return;
       }
       toast.success(t("valueDeleted", { name: target.envVar }));
-      await refetch();
+      await refetchAfterMutation({ refetch }, t("refreshFailed"));
     } catch (err) {
       toast.error(
         failure(
@@ -193,7 +195,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
         return false;
       }
       toast.success(t("bindingSaved", { name: envVar }));
-      await refetch();
+      await refetchAfterMutation({ refetch }, t("refreshFailed"));
       return true;
     } catch (err) {
       toast.error(failure("saveRefFailed", err instanceof Error ? err.message : String(err)));
@@ -213,7 +215,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
         throw new Error(firstError(payload?.errors ?? [], t("unknownError")));
       }
       toast.success(t("bindingRemoved", { name: row.envVar }));
-      await refetch();
+      await refetchAfterMutation({ refetch }, t("refreshFailed"));
     } catch (err) {
       toast.error(failure("removeRefFailed", err instanceof Error ? err.message : String(err)));
     } finally {

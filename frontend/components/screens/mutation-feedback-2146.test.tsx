@@ -455,7 +455,10 @@ describe("real Apollo refetch rejection", () => {
       ).toEqual({});
     });
     expect(state.success).toHaveBeenCalledWith("Skill saved");
-    expect(state.warning).toHaveBeenCalled();
+    // Apollo's onQueryUpdated passes a cache diff as its second argument.
+    expect(state.warning).toHaveBeenCalledWith(
+      "Could not refresh the view. Refresh to see current data."
+    );
     expect(requests.filter((r) => r.operation === "GetSkill")).toHaveLength(2);
     expect(requests.filter((r) => r.operation === "UpdateSkill")).toHaveLength(1);
   });

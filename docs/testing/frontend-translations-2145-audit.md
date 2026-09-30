@@ -88,7 +88,7 @@ Japanese stories exercise the shared frame.
 ## Agent secret values and attached bundles
 
 The value list, legacy value dialog, bundle consumers and their feedback use
-119 translated keys under `agentSecrets.values`, `agentSecrets.bundles` and
+120 translated keys under `agentSecrets.values`, `agentSecrets.bundles` and
 `agentSecrets.feedback` in every locale. The existing `agentSecrets.source`
 picker and access-boundary messages are preserved. Copy identifies the
 explicitly selected environment recipe rather than implying that a secret
@@ -109,5 +109,17 @@ All-eight-locale React/Apollo regressions verify ICU argument/tag parity,
 actual selected-recipe mutation inputs, failed-write drafts, exact destructive
 targets, untranslated provider diagnostics, and read/loading/empty distinctions.
 Portable German/French/Japanese stories cover ready, long, loading and failed
-states. Committed-write versus failed-refresh feedback is tracked separately
-from this localization slice.
+states.
+
+The bounded feedback follow-up reuses `refetchAfterMutation` with an optional
+localized warning; existing callers retain the original default. All eleven
+value/reference and bundle/key write paths preserve a committed result if
+refresh fails, release pending admission and warn to refresh rather than repeat
+the write. Boolean save callbacks return true after a successful write, so
+editors can clear committed drafts. Twenty real Apollo regressions exercise
+every path and all eight locales, suppress concurrent duplicate submissions,
+and prove a read retry never resubmits the mutation. A rendered French editor
+clears its committed plaintext draft after a read retry recovers the view.
+Apollo's callback cache-diff argument retains the existing generic warning;
+it is never interpreted as translated copy. Actual write refusals
+retain the original provider diagnostic and unsuccessful callback result.

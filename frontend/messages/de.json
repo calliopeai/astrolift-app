@@ -4193,7 +4193,8 @@
       "detachFailed": "Abhängen fehlgeschlagen",
       "saveKeyFailed": "Speichern des Schlüssels fehlgeschlagen",
       "deleteKeyFailed": "Löschen des Schlüssels fehlgeschlagen",
-      "readFailed": "Lesen fehlgeschlagen"
+      "readFailed": "Lesen fehlgeschlagen",
+      "refreshFailed": "Die Änderung wurde gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um die aktuellen Daten zu sehen; wiederholen Sie den Schreibvorgang nicht."
     }
   }
 }

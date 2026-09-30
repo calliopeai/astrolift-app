@@ -4270,7 +4270,8 @@
       "detachFailed": "Detach failed",
       "saveKeyFailed": "Save key failed",
       "deleteKeyFailed": "Delete key failed",
-      "readFailed": "Read failed"
+      "readFailed": "Read failed",
+      "refreshFailed": "The change was saved, but the view could not refresh. Refresh to see current data; do not repeat the write."
     }
   }
 }

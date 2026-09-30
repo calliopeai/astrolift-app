@@ -4190,7 +4190,8 @@
       "detachFailed": "Falha ao desanexar",
       "saveKeyFailed": "Falha ao salvar chave",
       "deleteKeyFailed": "Falha ao excluir chave",
-      "readFailed": "Falha ao ler"
+      "readFailed": "Falha ao ler",
+      "refreshFailed": "A alteração foi salva, mas não foi possível atualizar a visualização. Atualize-a para ver os dados atuais; não repita a gravação."
     }
   }
 }
