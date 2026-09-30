@@ -375,6 +375,7 @@ def start_agent_box(box) -> None:
 
     secret_env_names = sorted((secret_manifest or {}).get("stringData") or {})
     from astrolift_dispatch.model_gateway import ModelGatewayError
+    from astrolift_dispatch.pod_hardening import AgentRuntimeClassError, preflight_agent_runtime
 
     try:
         job = render_agent_box_job(
@@ -388,7 +389,8 @@ def start_agent_box(box) -> None:
             payload_env=payload_env,
             model_gateway=gateway,
         )
-    except ModelGatewayError as exc:
+        preflight_agent_runtime(cluster, job["spec"]["template"]["spec"])
+    except (ModelGatewayError, AgentRuntimeClassError) as exc:
         _fail(box, str(exc))
         raise AgentBoxError(str(exc)) from exc
 
