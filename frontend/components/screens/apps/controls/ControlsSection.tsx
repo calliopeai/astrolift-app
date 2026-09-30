@@ -284,7 +284,9 @@ export function WorkloadOpsRowView({
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
 
   async function handleRestart() {
-    if (await onRestart()) setRestartConfirmOpen(false);
+    const restarted = await onRestart();
+    if (restarted) setRestartConfirmOpen(false);
+    return restarted;
   }
 
   async function handleApply() {

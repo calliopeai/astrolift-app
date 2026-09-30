@@ -49,9 +49,10 @@ interface ConfirmDialogProps {
   confirmDisabled?: boolean;
   /** Awaited when the user confirms. While the returned Promise is
    *  pending, both buttons are disabled and the confirm label switches
-   *  to a "working" state. On resolve, the dialog closes. On reject, the
-   *  dialog stays open and a sonner toast surfaces the error message so
-   *  the operator can correct and retry. */
+   *  to a "working" state. Resolving exactly false retains the prompt and
+   *  reason without a second diagnostic; the caller handles that failure.
+   *  Other resolved values (including void) close the dialog. On reject,
+   *  the dialog stays open and a sonner toast surfaces the error message. */
   onConfirm: (reason: string) => Promise<unknown> | unknown;
   /** Ask for a required reason (reject a deploy, abort a rollout). The
    *  trimmed reason is passed to `onConfirm`; an empty one is refused
@@ -134,8 +135,8 @@ export function ConfirmDialog({
     setError(null);
     setPending(true);
     try {
-      await onConfirm(trimmed);
-      close();
+      const result = await onConfirm(trimmed);
+      if (result !== false) close();
     } catch (err) {
       const message =
         err instanceof Error && err.message

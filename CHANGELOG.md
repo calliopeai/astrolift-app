@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Confirmation dialogs retain handled false outcomes and entered reasons for
+  retry without duplicating action diagnostics. Workload restart confirmations
+  propagate the actual outcome; existing void-success callbacks still close.
+
 - The browser workload-controls regression checks the actual three-replica web
   and zero-replica worker fixtures independently, keeping unobserved readiness
   unknown rather than inventing healthy pod counts (#2145).

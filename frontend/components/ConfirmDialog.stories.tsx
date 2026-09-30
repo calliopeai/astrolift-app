@@ -1,3 +1,4 @@
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 import { NextIntlClientProvider } from "next-intl";
@@ -63,5 +64,25 @@ export const FrenchDefaults: StoryObj = {
     <NextIntlClientProvider locale="fr" messages={french}>
       <Demo title="Confirmer l’action ?" reason={{ label: "Motif" }} />
     </NextIntlClientProvider>
+  ),
+};
+
+/** A handled mutation failure retains its prompt and reason for retry. */
+export const HandledFailure: StoryObj = {
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement.ownerDocument.body);
+    await userEvent.type(page.getByRole("textbox", { name: "Reason" }), "retry reason");
+    await userEvent.click(page.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(page.getByRole("button", { name: "Confirm" })).toBeEnabled());
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveValue("retry reason");
+  },
+  render: () => (
+    <Demo
+      title="Retry this action?"
+      description="A failed action keeps the confirmation open."
+      reason={{ label: "Reason" }}
+      onConfirm={() => false}
+    />
   ),
 };
