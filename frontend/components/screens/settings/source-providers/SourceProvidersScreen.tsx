@@ -26,6 +26,14 @@ import { SettingsPage } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Section } from "@/components/ui/section";
 import type {
@@ -143,6 +151,7 @@ export function SourceHostsView({
   renderConnectSource,
   renderAddClientId,
 }: SourceHostsViewProps) {
+  const hostsRegion = React.useRef<HTMLElement | null>(null);
   const [openConnect, setOpenConnect] = React.useState(false);
   const [openConnectGithub, setOpenConnectGithub] = React.useState(false);
   const [openConnectGitlab, setOpenConnectGitlab] = React.useState(false);
@@ -314,6 +323,9 @@ export function SourceHostsView({
 
   return (
     <Section
+      ref={hostsRegion}
+      tabIndex={-1}
+      aria-label="Source connections"
       headingLevel="h3"
       title={
         <span className="flex items-center gap-2">
@@ -490,7 +502,11 @@ export function SourceHostsView({
         refreshConnections();
       })}
       {revealedSecret && (
-        <WebhookSecretReveal reveal={revealedSecret} onClose={() => setRevealedSecret(null)} />
+        <WebhookSecretReveal
+          reveal={revealedSecret}
+          onClose={() => setRevealedSecret(null)}
+          returnFocusRef={hostsRegion}
+        />
       )}
 
       <ConfirmDialog
@@ -678,10 +694,13 @@ export function DeployKeysView({
 export function WebhookSecretReveal({
   reveal,
   onClose,
+  returnFocusRef,
 }: {
   reveal: AstroliftWebhookSecretReveal;
   onClose: () => void;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }) {
+  const previousFocus = React.useRef<HTMLElement | null>(null);
   const fullUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}${reveal.webhookUrlPath}`
@@ -695,14 +714,34 @@ export function WebhookSecretReveal({
     }
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-      <div className="bg-background w-full max-w-xl rounded-lg border p-6 shadow-lg">
-        <h2 className="text-lg font-semibold">Webhook secret generated</h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Paste these into the SCM host&apos;s webhook config{" "}
-          <span className="font-medium">now</span> — the plaintext secret is shown exactly once,
-          then encrypted at rest.
-        </p>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        aria-modal="true"
+        onOpenAutoFocus={() => {
+          previousFocus.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const target =
+            returnFocusRef?.current ??
+            (previousFocus.current?.isConnected ? previousFocus.current : null);
+          target?.focus();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Webhook secret generated</DialogTitle>
+          <DialogDescription>
+            Paste these into the SCM host&apos;s webhook config{" "}
+            <span className="font-medium">now</span> — the plaintext secret is shown exactly once,
+            then encrypted at rest.
+          </DialogDescription>
+        </DialogHeader>
         <div className="mt-4 space-y-3">
           <div>
             <span className="text-muted-foreground block text-xs tracking-wide uppercase">
@@ -713,7 +752,7 @@ export function WebhookSecretReveal({
                 {fullUrl}
               </code>
               <Button size="sm" variant="outline" onClick={() => copy(fullUrl, "URL")}>
-                copy
+                Copy URL
               </Button>
             </div>
           </div>
@@ -730,7 +769,7 @@ export function WebhookSecretReveal({
                 variant="outline"
                 onClick={() => copy(reveal.plaintextSecret, "Secret")}
               >
-                copy
+                Copy secret
               </Button>
             </div>
           </div>
@@ -741,11 +780,11 @@ export function WebhookSecretReveal({
             tick <code>Push events</code>.
           </p>
         </div>
-        <div className="mt-6 flex justify-end">
+        <DialogFooter>
           <Button onClick={onClose}>Done</Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

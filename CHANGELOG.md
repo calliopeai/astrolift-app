@@ -135,6 +135,12 @@
   account permissions allow it. The existing `mcp:dispatch` scope now includes
   `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
   enforced (#2188).
+- App cards provide separate app, pin and failed-deployment keyboard actions
+  without nested links or buttons (#2144). Email bounce and complaint details
+  expose their disclosure state and named details region. The one-time webhook
+  secret reveal uses the shared modal with a title, description, focus trap,
+  Escape dismissal and focus return after rotation.
+
 - Frontend forms retain edits across query refreshes and failed retries (#2147).
   Successful tool and skill saves keep their accepted values until fresh data
   arrives, without clearing edits made while the save was pending. Reopened
