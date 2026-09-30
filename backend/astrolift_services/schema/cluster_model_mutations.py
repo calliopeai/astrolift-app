@@ -343,6 +343,7 @@ class ClusterModelMutations:
                         "PRECONDITION",
                         "The immutable public model revision is unavailable or requires access not supported by this flow.",
                     )
+                _recheck_authority(info, Permission.CLUSTER_UPDATE, cluster)
                 tenant = get_current_tenant()
                 service = ManagedService.objects.create(
                     organization_id=current_org_id(),

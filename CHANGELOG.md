@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared model creation refreshes current authority after the bounded Hugging
+  Face revision read, refusing revoked credentials or grants before persisting
+  or queueing a deployment (#2213).
+
 - Shared model prompt writes refresh current bearer scopes, grants, actor status
   and placement policy after locking, returning public permission refusals before
   queue admission when authority changes (#2213).

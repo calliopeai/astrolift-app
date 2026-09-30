@@ -315,6 +315,51 @@ def test_provision_checks_actual_owner_provider_and_runtime_before_hf(world, que
     )
 
 
+@pytest.mark.parametrize("change", ["narrowed-token", "revoked-token", "retired-grant", "inactive-actor"])
+def test_creation_refreshes_authority_after_hub_observation(world, queue, monkeypatch, change):
+    from types import SimpleNamespace
+
+    from astrolift_clusters.models import ProviderPlugin
+    from astrolift_identity.api_tokens import get_current_api_token
+    from astrolift_identity.models import ApiToken, Member
+    from astrolift_services.hf_catalogue import CatalogueState, ModelGating
+    from astrolift_services.models import ManagedService
+    from core.permissions import Permission
+
+    binding = grant(world, Permission.CLUSTER_UPDATE)
+    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    actual = ProviderPlugin.objects.filter(slug="k8s_native").first()
+    if actual is None:
+        world.cluster.provider_plugin.slug = "k8s_native"
+        world.cluster.provider_plugin.save()
+    else:
+        world.cluster.provider_plugin = actual
+    world.cluster.save()
+
+    def observed(repo, revision):
+        if change == "narrowed-token":
+            ApiToken.objects.filter(pk=get_current_api_token().pk).update(scopes=["read:clusters"])
+        elif change == "revoked-token":
+            ApiToken.objects.filter(pk=get_current_api_token().pk).update(is_revoked=True)
+        elif change == "retired-grant":
+            binding.soft_delete()
+        else:
+            type(world.user).objects.filter(pk=world.user.pk).update(is_active=False)
+        return SimpleNamespace(
+            state=CatalogueState.AVAILABLE,
+            model=SimpleNamespace(repo_id=repo, revision_sha=revision, gated=ModelGating.NONE),
+        )
+
+    monkeypatch.setattr("astrolift_services.hf_catalogue.model_detail", observed)
+    count = ManagedService.objects.count()
+    with subject(world, scopes=["admin"]):
+        result = ClusterModelMutations().provision_cluster_model(
+            make_info(world.user), input=request(world, name="revoked-during-catalogue")
+        )
+    assert not result.ok and result.errors[0].code == "PERMISSION_DENIED"
+    assert ManagedService.objects.count() == count and queue == []
+
+
 @pytest.mark.django_db(transaction=True)
 def test_simultaneous_subscribers_are_serialized_by_actual_postgres_row_lock(world, queue):
     from concurrent.futures import ThreadPoolExecutor
