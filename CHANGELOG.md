@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared Python model serving has a startup-snapshot ASGI authorization hook:
+  subscription keys reach supported inference routes, while metrics and operator
+  endpoints require the private operator credential. Secret updates require a
+  new matching runtime revision before revocation can be reported (#2213).
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
 - Add bounded server-side public Hugging Face model search and revision reads,

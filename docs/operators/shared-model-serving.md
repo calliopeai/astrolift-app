@@ -72,6 +72,26 @@ network allowance, removes its key from the running frontend through the rollout
 and only then reports revoked. A failed or incomplete reconciliation stays
 visible. Other subscriptions retain their credentials and access.
 
+The runtime hook is `astrolift_shared_model_auth.SharedModelAuth`, mounted from
+the dependency-free provider module using the supported Python vLLM middleware
+hook. It reads `/var/run/astrolift/model-auth/keys.json` once at startup. The
+snapshot has version 1, the expected revision, one private operator key and at
+most 64 distinct subscription keys. `ASTROLIFT_MODEL_AUTH_REVISION` must match;
+missing, malformed, duplicate or replaced snapshots refuse startup.
+
+Supported inference paths accept a current subscription key or operator key.
+Other paths, including `/metrics`, `/load` and runtime configuration routes,
+require the operator key. Only exact unauthenticated GET/HEAD `/health` probes
+are public. Administrative `/v1` paths do not inherit inference access, and
+WebSocket traffic has no supported subscription contract. The ServiceMonitor
+must authenticate with the operator Secret. Kubernetes NetworkPolicy cannot
+enforce these HTTP path boundaries on its own.
+
+ASGI transport checks prove this hook's routing and startup-snapshot behavior,
+including removal of one key while preserving another. They do not establish
+that the provider has mounted it, completed a rollout, or served model inference;
+those remain separate implementation and release gates.
+
 ## Density and operational statistics
 
 Every displayed metric needs a scope, unit, source, observation time and window.
