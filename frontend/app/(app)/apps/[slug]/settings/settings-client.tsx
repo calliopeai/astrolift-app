@@ -84,6 +84,7 @@ export function AppSettingsTabClient({ slug }: { slug: string }) {
                   registryUri={a.ecrRepoUri}
                   pushCredentialRef={a.ecrPushRoleArn}
                   providerPluginSlug={a.providerPluginSlug}
+                  deployBranch={a.deployBranch}
                   sourceWebhookInstalledAt={a.sourceWebhookInstalledAt ?? null}
                   ciWorkflowSyncStatus={a.ciWorkflowSyncStatus ?? null}
                   agentMode={false}
@@ -182,6 +183,7 @@ export function SettingsClient({
                   registryUri={a.ecrRepoUri}
                   pushCredentialRef={a.ecrPushRoleArn}
                   providerPluginSlug={a.providerPluginSlug}
+                  deployBranch={a.deployBranch}
                   sourceWebhookInstalledAt={a.sourceWebhookInstalledAt ?? null}
                   ciWorkflowSyncStatus={a.ciWorkflowSyncStatus ?? null}
                   agentMode={isAgent}

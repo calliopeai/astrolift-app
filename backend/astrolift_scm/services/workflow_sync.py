@@ -340,6 +340,36 @@ def github_workflow_path_for(app: RegisteredApp) -> str:
     return WORKFLOW_PATH
 
 
+_PRIVATE_ECR_URI = re.compile(
+    r"^[0-9]{12}\.dkr\.ecr\.([a-z]{2}(?:-[a-z]+)+-[0-9]+)\.amazonaws\.com(?:\.cn)?/"
+    r"[a-z0-9]+(?:[._/-][a-z0-9]+)*$"
+)
+_AWS_REGION = re.compile(r"^[a-z]{2}(?:-[a-z]+)+-[0-9]+$")
+
+
+def _github_aws_region(app: RegisteredApp, ecr_uri: str) -> str:
+    cluster = app.default_tenant_cluster if getattr(app, "default_tenant_cluster_id", None) else None
+    if cluster is not None:
+        if (
+            cluster.deleted_at is not None
+            or not cluster.is_active
+            or cluster.organization_id not in {None, app.organization_id}
+            or cluster.provider_plugin.slug != "aws"
+        ):
+            raise ValueError("Managed AWS CI requires a live AWS default cluster belonging to the app or shared.")
+    if ecr_uri:
+        match = _PRIVATE_ECR_URI.fullmatch(ecr_uri)
+        if match is None:
+            raise ValueError("Managed AWS CI requires a private ECR repository URI with an explicit region.")
+        # ECR authentication targets the registry's region, even when a
+        # coherently owned cluster pulls its images across regions.
+        return match.group(1)
+    region = (cluster.region or "").strip() if cluster is not None else ""
+    if region and not _AWS_REGION.fullmatch(region):
+        raise ValueError("The app's AWS default cluster has an invalid region.")
+    return region
+
+
 def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     """Render the workflow YAML for ``app`` against the file template.
 
@@ -369,17 +399,18 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     ``registry_repo_uri`` is empty/blank — the workflow is rendered
     WITHOUT the ECR-login + build-and-push steps (the image is built by
     a separate pipeline; there is nothing for this workflow to build).
-    Checkout, the OIDC credentials step and the Astrolift notify step are
-    kept: CI's only job is to tell the platform a new SHA exists.
+    Checkout and the Astrolift notify step are kept. OIDC credentials are
+    included only with a known AWS region; deploy-only needs no AWS access.
     """
     if _is_agent_app(app):
         return render_astrolift_agent_ci_workflow(app)
     template = _load_template()
     api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
-    ecr_uri = app.registry_repo_uri or ""
+    ecr_uri = (app.registry_repo_uri or "").strip()
     # A non-empty registry_repo_uri is the signal that the platform builds
     # and pushes this app's image; empty ⇒ deploy-only (built elsewhere).
     platform_built = bool(ecr_uri.strip())
+    aws_region = _github_aws_region(app, ecr_uri)
     values = {
         "app_slug": app.slug,
         "deploy_branch": (app.deploy_branch or "main").strip() or "main",
@@ -387,7 +418,13 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
         "ecr_repo_name": ecr_uri.split("/", 1)[1] if platform_built and "/" in ecr_uri else "",
         "push_role_arn": app.push_role_ref or "",
         "api_url": api_url,
+        "aws_region": aws_region,
+        "concurrency_group": f"astrolift-{app.slug}",
+        "image": f"{ecr_uri}:${{{{ github.sha }}}}",
     }
+    if any("${{" in values[key] for key in values if key != "image"):
+        raise ValueError("Managed CI configuration cannot contain GitHub Actions expressions.")
+    values = {key: json.dumps(value) for key, value in values.items()}
 
     def _replace(match: re.Match[str]) -> str:
         name = match.group(1)
@@ -398,7 +435,7 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
             return match.group(0)
         return values[name]
 
-    template = _apply_blocks(template, {"platform_built": platform_built})
+    template = _apply_blocks(template, {"platform_built": platform_built, "aws_auth": bool(aws_region)})
     rendered = _VAR_RE.sub(_replace, template)
     return stamp_workflow(rendered, version=TEMPLATE_VERSION, digest=content_hash(rendered))
 
@@ -1274,6 +1311,10 @@ def sync_workflow_file_to_repo(
         # Heal it here — every push path funnels through this function
         # (#1219) — and refuse to push when provisioning genuinely failed.
         if not is_agent:
+            try:
+                render_astrolift_ci_workflow(app)
+            except ValueError as exc:
+                raise WorkflowSyncError("CI_CONFIGURATION_INVALID", str(exc)) from exc
             role_err = ensure_ci_push_role(app)
             if role_err:
                 raise WorkflowSyncError(

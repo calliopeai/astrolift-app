@@ -71,7 +71,7 @@ def _scaffold(org):
         manifest_path="astrolift.toml",
         k8s_namespace="acme-hello-app",
         subdomain="hello-app",
-        registry_repo_uri="123456.dkr.ecr.us-east-1.amazonaws.com/hello-app",
+        registry_repo_uri="123456789012.dkr.ecr.us-east-1.amazonaws.com/hello-app",
     )
 
 

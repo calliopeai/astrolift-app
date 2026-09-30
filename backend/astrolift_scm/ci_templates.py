@@ -79,7 +79,9 @@ import re
 # own CI -- the workflow contradicted the reason it was written -- and the
 # only way through was to split the agent into agents/<slug>/astrolift.toml.
 # It now requires at least one agent workload and says what it found.
-TEMPLATE_VERSION = 7
+# v8 (#2148): GitHub AWS authentication uses the actual ECR/default-cluster
+# region, omits unconfigured deploy-only AWS auth, and quotes YAML inputs.
+TEMPLATE_VERSION = 8
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never
