@@ -566,8 +566,6 @@ GAPS: dict[str, tuple[str, ...]] = {
         "Mutation.importWorkflowFlow",
         "Mutation.importWorkflowManifest",
     ),
-    # TODO(#2115): pipelines routes without a scoped gate; the issue says what each checks today.
-    "#2115": ("Mutation.createPipeline",),
 }
 
 

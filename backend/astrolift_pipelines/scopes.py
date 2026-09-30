@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.permissions import PermissionScope, ScopeKind
+from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind
 from core.scope_args import read_guid
 from core.tenancy import get_current_tenant
 
@@ -18,6 +18,20 @@ from core.tenancy import get_current_tenant
 def _org_id() -> int | None:
     tenant = get_current_tenant()
     return tenant.organization_id if tenant else None
+
+
+def pipeline_creation_scope(_args) -> PermissionScope:
+    """Creation has no app association in its input and creates an org object."""
+    from astrolift_identity.api_tokens import get_current_api_token
+
+    org_id = _org_id()
+    scope = PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
+    token = get_current_api_token()
+    if token is not None and (token.organization_id != org_id or token.team_id is not None):
+        raise PermissionDenied(
+            Permission.APP_UPDATE, scope, "bearer token does not cover organization pipelines"
+        )
+    return scope
 
 
 def pipeline_app_scope(field: str = "id"):

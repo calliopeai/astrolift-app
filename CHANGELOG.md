@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pipeline creation requires `app.update` at the active organization (#2115).
+  The existing creation input has no app association, so team/project/app
+  grants and team-bound bearer credentials cannot authorize this organization
+  object through selected headers. Organization grants retain the existing
+  validation and response contract.
 - Scoped operation checks resolve owner factories under trusted facts and isolate
   permission-scope caches per target (#2164). Log subscriptions admit the verified
   environment and cluster, release operation context before yielding events, and
