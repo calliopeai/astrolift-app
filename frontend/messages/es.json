@@ -4012,6 +4012,100 @@
         "none": "Nadie coincide con «{query}».",
         "type": "Escribe para buscar.",
         "pick": "Seleccionar {name}"
+      },
+      "role": {
+        "builtIn": "integrado",
+        "custom": "personalizado",
+        "count": "{count, plural, one {# permiso} other {# permisos}}",
+        "show": "Mostrar permisos",
+        "hide": "Ocultar permisos"
+      },
+      "matrix": {
+        "filter": "Filtrar permisos",
+        "placeholder": "Filtrar permisos, p. ej. deploy",
+        "count": "{held, number} de {total, number}",
+        "vs": "frente a {name}",
+        "noMatch": "Ningún permiso coincide con «{query}».",
+        "notLoaded": "El catálogo de permisos no se ha cargado.",
+        "none": "No hay permisos.",
+        "label": "Permisos",
+        "resource": "Recurso",
+        "also": "También",
+        "all": "Todos los permisos de {name}",
+        "notApplicable": "no aplicable",
+        "state": {
+          "on": "concedido",
+          "off": "no concedido",
+          "added": "añadido",
+          "removed": "eliminado"
+        },
+        "stateTitle": "{slug} ({state})",
+        "stateLabel": "{slug}: {state}"
+      },
+      "permissionPicker": {
+        "label": "Puede realizar",
+        "placeholder": "Filtrar permisos (app.deploy)",
+        "empty": "El catálogo está vacío."
+      },
+      "scopePicker": {
+        "label": "Ámbito",
+        "placeholder": "Buscar equipos, proyectos, aplicaciones…",
+        "search": "Buscar en {label}",
+        "selected": "Selección: {kind} <identifier>{name}</identifier>",
+        "noMatch": "Nada de lo cargado coincide con «{query}».",
+        "empty": "No hay ámbitos para seleccionar.",
+        "failed": "No se pudieron cargar los ámbitos: {message}",
+        "loadFailed": "No se pudo cargar",
+        "retry": "Reintentar",
+        "loading": "Cargando",
+        "expand": "Expandir {name}",
+        "collapse": "Contraer {name}"
+      },
+      "presentation": {
+        "none": "Sin permisos",
+        "everything": "Todo el catálogo",
+        "readOnly": "Solo lectura: {resources}",
+        "resourceVerbs": "{resource}: {verbs}",
+        "bindReason": "{name} es un rol de {kind}: elige ese ámbito o uno dentro de él.",
+        "area": {
+          "agents": "Agentes",
+          "apps": "Aplicaciones",
+          "workflows": "Flujos de trabajo",
+          "admin": "Administración",
+          "other": "Otros"
+        },
+        "column": {
+          "read": "Leer",
+          "create": "Crear",
+          "update": "Actualizar",
+          "delete": "Eliminar"
+        },
+        "resource": {
+          "app": "aplicaciones",
+          "agent": "agentes",
+          "agent_task": "ejecutuciones de agentes",
+          "agent_box": "entornos de ejecución de agentes",
+          "agent_env_spec": "entornos de agentes",
+          "skill": "habilidades",
+          "secret": "secretos",
+          "managed_service": "servicios gestionados",
+          "deploy_token": "tokens de despliegue",
+          "form": "formularios",
+          "workflow": "flujos de trabajo",
+          "pipeline": "canalizaciones",
+          "org": "la organización",
+          "team": "equipos",
+          "project": "proyectos",
+          "api_token": "tokens de API",
+          "webhook": "webhooks",
+          "cluster": "clústeres",
+          "provider_plugin": "proveedores",
+          "scm": "control de versiones",
+          "audit_log": "el registro de auditoría",
+          "billing": "facturación",
+          "zentinelle": "Zentinelle",
+          "admin": "administración"
+        }
       }
     },
     "settings": {

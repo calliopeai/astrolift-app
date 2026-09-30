@@ -179,11 +179,13 @@ export interface RoleRef {
  */
 export function canBindAt(
   role: Pick<RoleRef, "name" | "scopeLevel">,
-  kind: ScopeKind
+  kind: ScopeKind,
+  describe?: (role: Pick<RoleRef, "name" | "scopeLevel">) => string
 ): true | string {
   return SCOPE_ORDER.indexOf(kind) >= SCOPE_ORDER.indexOf(role.scopeLevel)
     ? true
-    : `${role.name} is a ${SCOPE_NOUN[role.scopeLevel]} role: pick a ${SCOPE_NOUN[role.scopeLevel]} or something inside one.`;
+    : (describe?.(role) ??
+        `${role.name} is a ${SCOPE_NOUN[role.scopeLevel]} role: pick a ${SCOPE_NOUN[role.scopeLevel]} or something inside one.`);
 }
 
 export interface PermissionArea {
@@ -329,6 +331,15 @@ export function resourceLabel(resource: string): string {
   return RESOURCE_LABEL[resource] ?? `${resource.replace(/_/g, " ")}s`;
 }
 
+export interface PermissionPresentation {
+  none: string;
+  everything: string;
+  resource: (resource: string) => string;
+  list: (items: string[]) => string;
+  readOnly: (resources: string) => string;
+  resourceVerbs: (resource: string, verbs: string) => string;
+}
+
 function verbLabel(verb: string): string {
   return verb.replace(/_/g, " ");
 }
@@ -340,11 +351,13 @@ function verbLabel(verb: string): string {
  */
 export function summarizePermissions(
   permissions: readonly string[],
-  catalog: readonly string[] = ASTROLIFT_PERMISSIONS
+  catalog: readonly string[] = ASTROLIFT_PERMISSIONS,
+  presentation?: PermissionPresentation
 ): string {
-  if (permissions.length === 0) return "No permissions";
+  if (permissions.length === 0) return presentation?.none ?? "No permissions";
   const held = new Set(permissions);
-  if (catalog.length > 0 && catalog.every((p) => held.has(p))) return "Everything in the catalog";
+  if (catalog.length > 0 && catalog.every((p) => held.has(p)))
+    return presentation?.everything ?? "Everything in the catalog";
 
   const byResource = new Map<string, string[]>();
   for (const slug of permissions) {
@@ -352,6 +365,19 @@ export function summarizePermissions(
     byResource.set(resource, [...(byResource.get(resource) ?? []), verb]);
   }
   const resources = [...byResource.keys()];
+  if (presentation) {
+    if ([...byResource.values()].every((verbs) => verbs.every((v) => v === "read"))) {
+      return presentation.readOnly(presentation.list(resources.map(presentation.resource)));
+    }
+    return presentation.list(
+      resources.map((resource) =>
+        presentation.resourceVerbs(
+          presentation.resource(resource),
+          presentation.list(byResource.get(resource) ?? [])
+        )
+      )
+    );
+  }
   if ([...byResource.values()].every((verbs) => verbs.every((v) => v === "read"))) {
     return `Read only: ${resources.map(resourceLabel).join(", ")}`;
   }

@@ -4009,6 +4009,100 @@
         "none": "\"{query}\"와(과) 일치하는 사용자가 없습니다.",
         "type": "검색어를 입력하세요.",
         "pick": "{name} 선택"
+      },
+      "role": {
+        "builtIn": "기본 제공",
+        "custom": "사용자 정의",
+        "count": "{count, plural, other {권한 #개}}",
+        "show": "권한 표시",
+        "hide": "권한 숨기기"
+      },
+      "matrix": {
+        "filter": "권한 필터링",
+        "placeholder": "권한 필터링(예: deploy)",
+        "count": "{total, number}개 중 {held, number}개",
+        "vs": "비교 대상: {name}",
+        "noMatch": "“{query}”와 일치하는 권한이 없습니다.",
+        "notLoaded": "권한 카탈로그가 로드되지 않았습니다.",
+        "none": "권한이 없습니다.",
+        "label": "권한",
+        "resource": "리소스",
+        "also": "기타",
+        "all": "{name}의 모든 권한",
+        "notApplicable": "해당 없음",
+        "state": {
+          "on": "부여됨",
+          "off": "부여되지 않음",
+          "added": "추가됨",
+          "removed": "제거됨"
+        },
+        "stateTitle": "{slug} ({state})",
+        "stateLabel": "{slug}: {state}"
+      },
+      "permissionPicker": {
+        "label": "허용할 작업",
+        "placeholder": "권한 필터링(app.deploy)",
+        "empty": "카탈로그가 비어 있습니다."
+      },
+      "scopePicker": {
+        "label": "범위",
+        "placeholder": "팀, 프로젝트, 앱 검색…",
+        "search": "{label} 검색",
+        "selected": "선택됨: {kind} <identifier>{name}</identifier>",
+        "noMatch": "로드된 항목 중 “{query}”와 일치하는 항목이 없습니다.",
+        "empty": "선택할 범위가 없습니다.",
+        "failed": "범위를 로드할 수 없습니다: {message}",
+        "loadFailed": "로드할 수 없습니다",
+        "retry": "다시 시도",
+        "loading": "로드 중",
+        "expand": "{name} 펼치기",
+        "collapse": "{name} 접기"
+      },
+      "presentation": {
+        "none": "권한 없음",
+        "everything": "카탈로그의 모든 권한",
+        "readOnly": "읽기 전용: {resources}",
+        "resourceVerbs": "{resource}: {verbs}",
+        "bindReason": "{name}은(는) {kind} 수준의 역할입니다. 해당 범위 또는 그 아래 범위를 선택하세요.",
+        "area": {
+          "agents": "에이전트",
+          "apps": "앱",
+          "workflows": "워크플로",
+          "admin": "관리",
+          "other": "기타"
+        },
+        "column": {
+          "read": "읽기",
+          "create": "생성",
+          "update": "수정",
+          "delete": "삭제"
+        },
+        "resource": {
+          "app": "앱",
+          "agent": "에이전트",
+          "agent_task": "에이전트 실행",
+          "agent_box": "에이전트 박스",
+          "agent_env_spec": "에이전트 환경",
+          "skill": "스킬",
+          "secret": "시크릿",
+          "managed_service": "관리형 서비스",
+          "deploy_token": "배포 토큰",
+          "form": "양식",
+          "workflow": "워크플로",
+          "pipeline": "파이프라인",
+          "org": "조직",
+          "team": "팀",
+          "project": "프로젝트",
+          "api_token": "API 토큰",
+          "webhook": "웹훅",
+          "cluster": "클러스터",
+          "provider_plugin": "공급자",
+          "scm": "소스 제어",
+          "audit_log": "감사 로그",
+          "billing": "결제",
+          "zentinelle": "Zentinelle",
+          "admin": "관리"
+        }
       }
     },
     "settings": {

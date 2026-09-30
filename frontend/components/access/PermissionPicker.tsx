@@ -2,12 +2,14 @@
 
 import { CheckIcon, SearchIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Input } from "@/components/ui/input";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { cn } from "@/lib/utils";
 
-import { buildMatrix, resourceLabel } from "./access-model";
+import { localizedResourceLabel } from "./access-copy";
+import { buildMatrix } from "./access-model";
 
 export interface PermissionPickerProps {
   value: string | null;
@@ -28,9 +30,10 @@ export function PermissionPicker({
   value,
   onChange,
   catalog = ASTROLIFT_PERMISSIONS,
-  label = "Can do",
+  label,
   className,
 }: PermissionPickerProps) {
+  const t = useTranslations("shared.access");
   const id = React.useId();
   const [filter, setFilter] = React.useState("");
   const areas = React.useMemo(() => buildMatrix(catalog), [catalog]);
@@ -48,7 +51,7 @@ export function PermissionPicker({
   return (
     <div role="group" aria-labelledby={id} className={cn("flex min-w-0 flex-col gap-2", className)}>
       <span id={id} className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        {label}
+        {label ?? t("permissionPicker.label")}
       </span>
       <div className="relative min-w-0">
         <SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
@@ -56,30 +59,30 @@ export function PermissionPicker({
           type="search"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter permissions (app.deploy)"
-          aria-label="Filter permissions"
+          placeholder={t("permissionPicker.placeholder")}
+          aria-label={t("matrix.filter")}
           className="pl-8 font-mono"
         />
       </div>
       <div className="max-h-64 min-w-0 overflow-auto rounded-md border">
         {shown.length === 0 ? (
           <p className="text-muted-foreground p-3 text-sm [overflow-wrap:anywhere]">
-            {needle ? `No permission matches "${filter.trim()}".` : "The catalog is empty."}
+            {needle ? t("matrix.noMatch", { query: filter.trim() }) : t("permissionPicker.empty")}
           </p>
         ) : (
           shown.map((area) => (
             <section
               key={area.key}
-              aria-label={area.label}
+              aria-label={t(`presentation.area.${area.key}`)}
               className="min-w-0 border-b last:border-b-0"
             >
               <h3 className="bg-muted/40 text-muted-foreground sticky top-0 px-3 py-1 text-xs font-medium">
-                {area.label}
+                {t(`presentation.area.${area.key}`)}
               </h3>
               {area.rows.map((row) => (
                 <div key={row.resource} className="min-w-0 px-3 py-1.5">
                   <p className="text-muted-foreground mb-1 text-xs">
-                    {resourceLabel(row.resource)}
+                    {localizedResourceLabel(row.resource, t)}
                   </p>
                   <ul className="flex min-w-0 flex-wrap gap-1">
                     {row.all.map((slug) => {

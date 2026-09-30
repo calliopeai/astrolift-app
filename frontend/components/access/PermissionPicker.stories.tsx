@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 import * as React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -52,4 +54,15 @@ export const Width768: Story = {
       <Picker initial="agent.dispatch" />
     </div>
   ),
+};
+
+export const Japanese: Story = {
+  render: () => <Picker initial="app.deploy" />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

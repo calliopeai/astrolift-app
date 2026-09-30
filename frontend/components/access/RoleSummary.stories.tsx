@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 
 import { DEPLOYER, LONG_ROLE, RELEASE_CAPTAIN, ROLES, TEAM_DEV, VIEWER } from "./fixtures";
 import { RoleSummary } from "./RoleSummary";
@@ -57,4 +59,15 @@ export const Width768: Story = {
     ),
   ],
   args: { role: RELEASE_CAPTAIN, base: TEAM_DEV, defaultOpen: true },
+};
+
+export const Japanese: Story = {
+  args: { role: VIEWER, defaultOpen: true },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

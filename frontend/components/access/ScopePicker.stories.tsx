@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 import * as React from "react";
 
 import { canBindAt, type ScopeNode, type ScopeRef } from "./access-model";
@@ -87,4 +89,15 @@ export const Width768: Story = {
       <Picker initial={CHECKOUT} selectable={(n) => canBindAt(TEAM_DEV, n.kind)} />
     </div>
   ),
+};
+
+export const Japanese: Story = {
+  render: () => <Picker initial={CHECKOUT} />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

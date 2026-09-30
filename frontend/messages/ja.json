@@ -4009,6 +4009,100 @@
         "none": "「{query}」に一致するユーザーはいません。",
         "type": "入力して検索してください。",
         "pick": "{name} を選択"
+      },
+      "role": {
+        "builtIn": "組み込み",
+        "custom": "カスタム",
+        "count": "{count, plural, other {# 件の権限}}",
+        "show": "権限を表示",
+        "hide": "権限を非表示"
+      },
+      "matrix": {
+        "filter": "権限を絞り込む",
+        "placeholder": "権限を絞り込む（例：deploy）",
+        "count": "{total, number} 件中 {held, number} 件",
+        "vs": "比較対象：{name}",
+        "noMatch": "「{query}」に一致する権限はありません。",
+        "notLoaded": "権限カタログが読み込まれていません。",
+        "none": "権限はありません。",
+        "label": "権限",
+        "resource": "リソース",
+        "also": "その他",
+        "all": "{name} のすべての権限",
+        "notApplicable": "該当なし",
+        "state": {
+          "on": "付与済み",
+          "off": "未付与",
+          "added": "追加",
+          "removed": "削除"
+        },
+        "stateTitle": "{slug}（{state}）",
+        "stateLabel": "{slug}：{state}"
+      },
+      "permissionPicker": {
+        "label": "許可する操作",
+        "placeholder": "権限を絞り込む（app.deploy）",
+        "empty": "カタログは空です。"
+      },
+      "scopePicker": {
+        "label": "スコープ",
+        "placeholder": "チーム、プロジェクト、アプリを検索…",
+        "search": "{label} を検索",
+        "selected": "選択中：{kind} <identifier>{name}</identifier>",
+        "noMatch": "読み込み済みの項目に「{query}」と一致するものはありません。",
+        "empty": "選択できるスコープはありません。",
+        "failed": "スコープを読み込めませんでした：{message}",
+        "loadFailed": "読み込みに失敗しました",
+        "retry": "再試行",
+        "loading": "読み込み中",
+        "expand": "{name} を展開",
+        "collapse": "{name} を折りたたむ"
+      },
+      "presentation": {
+        "none": "権限なし",
+        "everything": "カタログ内のすべての権限",
+        "readOnly": "読み取り専用：{resources}",
+        "resourceVerbs": "{resource}：{verbs}",
+        "bindReason": "{name} は {kind} レベルのロールです。そのスコープか配下のスコープを選択してください。",
+        "area": {
+          "agents": "エージェント",
+          "apps": "アプリ",
+          "workflows": "ワークフロー",
+          "admin": "管理",
+          "other": "その他"
+        },
+        "column": {
+          "read": "読み取り",
+          "create": "作成",
+          "update": "更新",
+          "delete": "削除"
+        },
+        "resource": {
+          "app": "アプリ",
+          "agent": "エージェント",
+          "agent_task": "エージェント実行",
+          "agent_box": "エージェントボックス",
+          "agent_env_spec": "エージェント環境",
+          "skill": "スキル",
+          "secret": "シークレット",
+          "managed_service": "マネージドサービス",
+          "deploy_token": "デプロイトークン",
+          "form": "フォーム",
+          "workflow": "ワークフロー",
+          "pipeline": "パイプライン",
+          "org": "組織",
+          "team": "チーム",
+          "project": "プロジェクト",
+          "api_token": "API トークン",
+          "webhook": "Webhook",
+          "cluster": "クラスター",
+          "provider_plugin": "プロバイダー",
+          "scm": "ソース管理",
+          "audit_log": "監査ログ",
+          "billing": "請求",
+          "zentinelle": "Zentinelle",
+          "admin": "管理"
+        }
       }
     },
     "settings": {

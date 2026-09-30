@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 import * as React from "react";
 
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
@@ -91,4 +93,15 @@ export const Width768: Story = {
     ),
   ],
   render: () => <Editable start={RELEASE_CAPTAIN.permissions} base={TEAM_DEV.permissions} />,
+};
+
+export const Japanese: Story = {
+  args: { permissions: TEAM_DEV.permissions, base: VIEWER.permissions, baseLabel: "Original role" },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared role summaries and permission/scope pickers translate presentation
+  defaults in all eight locales, retaining literal role metadata, permission
+  slugs, target IDs, server diagnostics and disabled selection checks (#2145).
+
 - Translate shared principal search, empty/error states and selection controls in all eight locales, preserving provider diagnostics and selected identities (#2145).
 
 - Translate grant-source phrases, principal removal labels and Home’s app ownership note in all eight locales while preserving identifiers, edit links and callbacks (#2145).

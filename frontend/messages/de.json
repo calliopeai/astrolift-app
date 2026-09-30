@@ -4012,6 +4012,100 @@
         "none": "Keine Person stimmt mit „{query}“ überein.",
         "type": "Zum Suchen Text eingeben.",
         "pick": "{name} auswählen"
+      },
+      "role": {
+        "builtIn": "integriert",
+        "custom": "benutzerdefiniert",
+        "count": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+        "show": "Berechtigungen anzeigen",
+        "hide": "Berechtigungen ausblenden"
+      },
+      "matrix": {
+        "filter": "Berechtigungen filtern",
+        "placeholder": "Berechtigungen filtern, z. B. deploy",
+        "count": "{held, number} von {total, number}",
+        "vs": "im Vergleich zu {name}",
+        "noMatch": "Keine Berechtigung entspricht „{query}“.",
+        "notLoaded": "Der Berechtigungskatalog wurde noch nicht geladen.",
+        "none": "Keine Berechtigungen.",
+        "label": "Berechtigungen",
+        "resource": "Ressource",
+        "also": "Weitere",
+        "all": "Alle Berechtigungen für {name}",
+        "notApplicable": "nicht zutreffend",
+        "state": {
+          "on": "gewährt",
+          "off": "nicht gewährt",
+          "added": "hinzugefügt",
+          "removed": "entfernt"
+        },
+        "stateTitle": "{slug} ({state})",
+        "stateLabel": "{slug}: {state}"
+      },
+      "permissionPicker": {
+        "label": "Kann ausführen",
+        "placeholder": "Berechtigungen filtern (app.deploy)",
+        "empty": "Der Katalog ist leer."
+      },
+      "scopePicker": {
+        "label": "Geltungsbereich",
+        "placeholder": "Teams, Projekte, Apps suchen…",
+        "search": "{label} durchsuchen",
+        "selected": "Ausgewählt: {kind} <identifier>{name}</identifier>",
+        "noMatch": "Kein geladenes Element entspricht „{query}“.",
+        "empty": "Keine Geltungsbereiche zur Auswahl.",
+        "failed": "Geltungsbereiche konnten nicht geladen werden: {message}",
+        "loadFailed": "Laden fehlgeschlagen",
+        "retry": "Erneut versuchen",
+        "loading": "Wird geladen",
+        "expand": "{name} aufklappen",
+        "collapse": "{name} zuklappen"
+      },
+      "presentation": {
+        "none": "Keine Berechtigungen",
+        "everything": "Der gesamte Katalog",
+        "readOnly": "Nur lesen: {resources}",
+        "resourceVerbs": "{resource}: {verbs}",
+        "bindReason": "{name} ist eine Rolle auf Ebene {kind}: Wähle diesen Geltungsbereich oder einen darunter.",
+        "area": {
+          "agents": "Agenten",
+          "apps": "Apps",
+          "workflows": "Workflows",
+          "admin": "Verwaltung",
+          "other": "Sonstige"
+        },
+        "column": {
+          "read": "Lesen",
+          "create": "Erstellen",
+          "update": "Aktualisieren",
+          "delete": "Löschen"
+        },
+        "resource": {
+          "app": "Apps",
+          "agent": "Agenten",
+          "agent_task": "Agentenläufe",
+          "agent_box": "Agentenboxen",
+          "agent_env_spec": "Agentenumgebungen",
+          "skill": "Fähigkeiten",
+          "secret": "Secrets",
+          "managed_service": "verwaltete Dienste",
+          "deploy_token": "Bereitstellungstoken",
+          "form": "Formulare",
+          "workflow": "Workflows",
+          "pipeline": "Pipelines",
+          "org": "die Organisation",
+          "team": "Teams",
+          "project": "Projekte",
+          "api_token": "API-Token",
+          "webhook": "Webhooks",
+          "cluster": "Cluster",
+          "provider_plugin": "Anbieter",
+          "scm": "Versionsverwaltung",
+          "audit_log": "das Auditprotokoll",
+          "billing": "Abrechnung",
+          "zentinelle": "Zentinelle",
+          "admin": "Verwaltung"
+        }
       }
     },
     "settings": {

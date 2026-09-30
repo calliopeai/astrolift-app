@@ -2,12 +2,14 @@
 
 import { ChevronRightIcon, LockIcon } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { cn } from "@/lib/utils";
 
-import { type RoleRef, SCOPE_NOUN, summarizePermissions } from "./access-model";
+import { type RoleRef, summarizePermissions } from "./access-model";
+import { localizedPermissionPresentation } from "./access-copy";
 import { PermissionMatrix } from "./PermissionMatrix";
 
 export interface RoleSummaryProps {
@@ -36,9 +38,17 @@ export function RoleSummary({
   catalog = ASTROLIFT_PERMISSIONS,
   className,
 }: RoleSummaryProps) {
+  const t = useTranslations("shared.access");
+  const format = useFormatter();
   const [open, setOpen] = React.useState(defaultOpen);
   const matrixId = React.useId();
-  const summary = role.description?.trim() || summarizePermissions(role.permissions, catalog);
+  const summary =
+    role.description?.trim() ||
+    summarizePermissions(
+      role.permissions,
+      catalog,
+      localizedPermissionPresentation(t, (items) => format.list(items, { type: "conjunction" }))
+    );
 
   return (
     <div className={cn("flex min-w-0 flex-col gap-2", className)}>
@@ -54,20 +64,20 @@ export function RoleSummary({
             {role.slug}
           </span>
           <Badge variant="outline" className="text-2xs font-mono uppercase">
-            {SCOPE_NOUN[role.scopeLevel]}
+            {t(`scope.${role.scopeLevel}`)}
           </Badge>
           {role.isSystem ? (
             <Badge variant="secondary" className="text-2xs gap-1">
               <LockIcon aria-hidden className="size-3" />
-              built-in
+              {t("role.builtIn")}
             </Badge>
           ) : (
             <Badge variant="secondary" className="text-2xs">
-              custom
+              {t("role.custom")}
             </Badge>
           )}
           <span className="text-muted-foreground font-mono text-xs tabular-nums">
-            {role.permissions.length} permission{role.permissions.length === 1 ? "" : "s"}
+            {t("role.count", { count: role.permissions.length })}
           </span>
         </div>
         <p className="text-muted-foreground min-w-0 text-sm [overflow-wrap:anywhere]">{summary}</p>
@@ -87,7 +97,7 @@ export function RoleSummary({
               open && "rotate-90"
             )}
           />
-          {open ? "Hide permissions" : "Show permissions"}
+          {t(open ? "role.hide" : "role.show")}
         </button>
       )}
       {expandable && open && (

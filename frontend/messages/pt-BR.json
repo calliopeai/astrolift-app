@@ -4009,6 +4009,100 @@
         "none": "Nenhuma pessoa corresponde a \"{query}\".",
         "type": "Digite para buscar.",
         "pick": "Selecionar {name}"
+      },
+      "role": {
+        "builtIn": "integrado",
+        "custom": "personalizado",
+        "count": "{count, plural, one {# permissão} other {# permissões}}",
+        "show": "Mostrar permissões",
+        "hide": "Ocultar permissões"
+      },
+      "matrix": {
+        "filter": "Filtrar permissões",
+        "placeholder": "Filtrar permissões, por exemplo, deploy",
+        "count": "{held, number} de {total, number}",
+        "vs": "em comparação com {name}",
+        "noMatch": "Nenhuma permissão corresponde a “{query}”.",
+        "notLoaded": "O catálogo de permissões não foi carregado.",
+        "none": "Nenhuma permissão.",
+        "label": "Permissões",
+        "resource": "Recurso",
+        "also": "Também",
+        "all": "Todas as permissões de {name}",
+        "notApplicable": "não se aplica",
+        "state": {
+          "on": "concedida",
+          "off": "não concedida",
+          "added": "adicionada",
+          "removed": "removida"
+        },
+        "stateTitle": "{slug} ({state})",
+        "stateLabel": "{slug}: {state}"
+      },
+      "permissionPicker": {
+        "label": "Pode fazer",
+        "placeholder": "Filtrar permissões (app.deploy)",
+        "empty": "O catálogo está vazio."
+      },
+      "scopePicker": {
+        "label": "Escopo",
+        "placeholder": "Buscar equipes, projetos, aplicativos…",
+        "search": "Buscar em {label}",
+        "selected": "Selecionado: {kind} <identifier>{name}</identifier>",
+        "noMatch": "Nenhum item carregado corresponde a “{query}”.",
+        "empty": "Nenhum escopo para selecionar.",
+        "failed": "Não foi possível carregar os escopos: {message}",
+        "loadFailed": "Não foi possível carregar",
+        "retry": "Tentar novamente",
+        "loading": "Carregando",
+        "expand": "Expandir {name}",
+        "collapse": "Recolher {name}"
+      },
+      "presentation": {
+        "none": "Nenhuma permissão",
+        "everything": "Todo o catálogo",
+        "readOnly": "Somente leitura: {resources}",
+        "resourceVerbs": "{resource}: {verbs}",
+        "bindReason": "{name} é uma função de {kind}: escolha esse escopo ou um escopo dentro dele.",
+        "area": {
+          "agents": "Agentes",
+          "apps": "Aplicativos",
+          "workflows": "Fluxos de trabalho",
+          "admin": "Administração",
+          "other": "Outros"
+        },
+        "column": {
+          "read": "Ler",
+          "create": "Criar",
+          "update": "Atualizar",
+          "delete": "Excluir"
+        },
+        "resource": {
+          "app": "aplicativos",
+          "agent": "agentes",
+          "agent_task": "execuções de agentes",
+          "agent_box": "ambientes de execução de agentes",
+          "agent_env_spec": "ambientes de agentes",
+          "skill": "habilidades",
+          "secret": "segredos",
+          "managed_service": "serviços gerenciados",
+          "deploy_token": "tokens de implantação",
+          "form": "formulários",
+          "workflow": "fluxos de trabalho",
+          "pipeline": "pipelines",
+          "org": "a organização",
+          "team": "equipes",
+          "project": "projetos",
+          "api_token": "tokens de API",
+          "webhook": "webhooks",
+          "cluster": "clusters",
+          "provider_plugin": "provedores",
+          "scm": "controle de versão",
+          "audit_log": "o registro de auditoria",
+          "billing": "faturamento",
+          "zentinelle": "Zentinelle",
+          "admin": "administração"
+        }
       }
     },
     "settings": {

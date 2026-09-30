@@ -4089,6 +4089,100 @@
         "none": "No one matches \"{query}\".",
         "type": "Type to search.",
         "pick": "Pick {name}"
+      },
+      "role": {
+        "builtIn": "built-in",
+        "custom": "custom",
+        "count": "{count, plural, one {# permission} other {# permissions}}",
+        "show": "Show permissions",
+        "hide": "Hide permissions"
+      },
+      "matrix": {
+        "filter": "Filter permissions",
+        "placeholder": "Filter permissions, e.g. deploy",
+        "count": "{held, number} of {total, number}",
+        "vs": "vs {name}",
+        "noMatch": "No permission matches \"{query}\".",
+        "notLoaded": "The permission catalog has not loaded.",
+        "none": "No permissions.",
+        "label": "Permissions",
+        "resource": "Resource",
+        "also": "Also",
+        "all": "All {name} permissions",
+        "notApplicable": "not applicable",
+        "state": {
+          "on": "granted",
+          "off": "not granted",
+          "added": "added",
+          "removed": "removed"
+        },
+        "stateTitle": "{slug} ({state})",
+        "stateLabel": "{slug}: {state}"
+      },
+      "permissionPicker": {
+        "label": "Can do",
+        "placeholder": "Filter permissions (app.deploy)",
+        "empty": "The catalog is empty."
+      },
+      "scopePicker": {
+        "label": "Scope",
+        "placeholder": "Search teams, projects, apps…",
+        "search": "Search {label}",
+        "selected": "Selected: {kind} <identifier>{name}</identifier>",
+        "noMatch": "Nothing loaded matches \"{query}\".",
+        "empty": "No scopes to choose from.",
+        "failed": "Could not load scopes: {message}",
+        "loadFailed": "Could not load",
+        "retry": "Retry",
+        "loading": "Loading",
+        "expand": "Expand {name}",
+        "collapse": "Collapse {name}"
+      },
+      "presentation": {
+        "none": "No permissions",
+        "everything": "Everything in the catalog",
+        "readOnly": "Read only: {resources}",
+        "resourceVerbs": "{resource}: {verbs}",
+        "bindReason": "{name} is a {kind} role: pick a {kind} or something inside one.",
+        "area": {
+          "agents": "Agents",
+          "apps": "Apps",
+          "workflows": "Workflows",
+          "admin": "Admin",
+          "other": "Other"
+        },
+        "column": {
+          "read": "Read",
+          "create": "Create",
+          "update": "Update",
+          "delete": "Delete"
+        },
+        "resource": {
+          "app": "apps",
+          "agent": "agents",
+          "agent_task": "agent runs",
+          "agent_box": "agent boxes",
+          "agent_env_spec": "agent environments",
+          "skill": "skills",
+          "secret": "secrets",
+          "managed_service": "managed services",
+          "deploy_token": "deploy tokens",
+          "form": "forms",
+          "workflow": "workflows",
+          "pipeline": "pipelines",
+          "org": "the organization",
+          "team": "teams",
+          "project": "projects",
+          "api_token": "API tokens",
+          "webhook": "webhooks",
+          "cluster": "clusters",
+          "provider_plugin": "providers",
+          "scm": "source control",
+          "audit_log": "the audit log",
+          "billing": "billing",
+          "zentinelle": "Zentinelle",
+          "admin": "administration"
+        }
       }
     },
     "settings": {

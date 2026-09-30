@@ -4009,6 +4009,100 @@
         "none": "没有与“{query}”匹配的用户。",
         "type": "输入搜索内容。",
         "pick": "选择{name}"
+      },
+      "role": {
+        "builtIn": "内置",
+        "custom": "自定义",
+        "count": "{count, plural, other {# 项权限}}",
+        "show": "显示权限",
+        "hide": "隐藏权限"
+      },
+      "matrix": {
+        "filter": "筛选权限",
+        "placeholder": "筛选权限，例如 deploy",
+        "count": "{held, number} / {total, number}",
+        "vs": "对比 {name}",
+        "noMatch": "没有与“{query}”匹配的权限。",
+        "notLoaded": "权限目录尚未加载。",
+        "none": "没有权限。",
+        "label": "权限",
+        "resource": "资源",
+        "also": "其他",
+        "all": "{name} 的所有权限",
+        "notApplicable": "不适用",
+        "state": {
+          "on": "已授予",
+          "off": "未授予",
+          "added": "已添加",
+          "removed": "已移除"
+        },
+        "stateTitle": "{slug}（{state}）",
+        "stateLabel": "{slug}：{state}"
+      },
+      "permissionPicker": {
+        "label": "可执行操作",
+        "placeholder": "筛选权限（app.deploy）",
+        "empty": "目录为空。"
+      },
+      "scopePicker": {
+        "label": "作用域",
+        "placeholder": "搜索团队、项目、应用…",
+        "search": "搜索{label}",
+        "selected": "已选择：{kind} <identifier>{name}</identifier>",
+        "noMatch": "已加载的内容中没有与“{query}”匹配的项。",
+        "empty": "没有可选择的作用域。",
+        "failed": "无法加载作用域：{message}",
+        "loadFailed": "无法加载",
+        "retry": "重试",
+        "loading": "正在加载",
+        "expand": "展开 {name}",
+        "collapse": "折叠 {name}"
+      },
+      "presentation": {
+        "none": "无权限",
+        "everything": "目录中的所有权限",
+        "readOnly": "只读：{resources}",
+        "resourceVerbs": "{resource}：{verbs}",
+        "bindReason": "{name} 是 {kind} 级别的角色：请选择该作用域或其下的作用域。",
+        "area": {
+          "agents": "智能体",
+          "apps": "应用",
+          "workflows": "工作流",
+          "admin": "管理",
+          "other": "其他"
+        },
+        "column": {
+          "read": "读取",
+          "create": "创建",
+          "update": "更新",
+          "delete": "删除"
+        },
+        "resource": {
+          "app": "应用",
+          "agent": "智能体",
+          "agent_task": "智能体运行",
+          "agent_box": "智能体容器",
+          "agent_env_spec": "智能体环境",
+          "skill": "技能",
+          "secret": "密钥",
+          "managed_service": "托管服务",
+          "deploy_token": "部署令牌",
+          "form": "表单",
+          "workflow": "工作流",
+          "pipeline": "流水线",
+          "org": "组织",
+          "team": "团队",
+          "project": "项目",
+          "api_token": "API 令牌",
+          "webhook": "Webhook",
+          "cluster": "集群",
+          "provider_plugin": "提供商",
+          "scm": "源码管理",
+          "audit_log": "审计日志",
+          "billing": "账单",
+          "zentinelle": "Zentinelle",
+          "admin": "管理"
+        }
       }
     },
     "settings": {

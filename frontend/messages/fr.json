@@ -4012,6 +4012,100 @@
         "none": "Aucun résultat pour « {query} ».",
         "type": "Saisissez votre recherche.",
         "pick": "Sélectionner {name}"
+      },
+      "role": {
+        "builtIn": "intégré",
+        "custom": "personnalisé",
+        "count": "{count, plural, one {# autorisation} other {# autorisations}}",
+        "show": "Afficher les autorisations",
+        "hide": "Masquer les autorisations"
+      },
+      "matrix": {
+        "filter": "Filtrer les autorisations",
+        "placeholder": "Filtrer les autorisations, par ex. deploy",
+        "count": "{held, number} sur {total, number}",
+        "vs": "par rapport à {name}",
+        "noMatch": "Aucune autorisation ne correspond à « {query} ».",
+        "notLoaded": "Le catalogue des autorisations n’a pas été chargé.",
+        "none": "Aucune autorisation.",
+        "label": "Autorisations",
+        "resource": "Ressource",
+        "also": "Également",
+        "all": "Toutes les autorisations de {name}",
+        "notApplicable": "sans objet",
+        "state": {
+          "on": "accordée",
+          "off": "non accordée",
+          "added": "ajoutée",
+          "removed": "supprimée"
+        },
+        "stateTitle": "{slug} ({state})",
+        "stateLabel": "{slug} : {state}"
+      },
+      "permissionPicker": {
+        "label": "Peut effectuer",
+        "placeholder": "Filtrer les autorisations (app.deploy)",
+        "empty": "Le catalogue est vide."
+      },
+      "scopePicker": {
+        "label": "Périmètre",
+        "placeholder": "Rechercher des équipes, projets, applications…",
+        "search": "Rechercher dans {label}",
+        "selected": "Sélection : {kind} <identifier>{name}</identifier>",
+        "noMatch": "Aucun élément chargé ne correspond à « {query} ».",
+        "empty": "Aucun périmètre à sélectionner.",
+        "failed": "Impossible de charger les périmètres : {message}",
+        "loadFailed": "Chargement impossible",
+        "retry": "Réessayer",
+        "loading": "Chargement",
+        "expand": "Développer {name}",
+        "collapse": "Réduire {name}"
+      },
+      "presentation": {
+        "none": "Aucune autorisation",
+        "everything": "Tout le catalogue",
+        "readOnly": "Lecture seule : {resources}",
+        "resourceVerbs": "{resource} : {verbs}",
+        "bindReason": "{name} est un rôle de niveau {kind} : choisissez ce périmètre ou un périmètre inférieur.",
+        "area": {
+          "agents": "Agents",
+          "apps": "Applications",
+          "workflows": "Flux de travail",
+          "admin": "Administration",
+          "other": "Autres"
+        },
+        "column": {
+          "read": "Lire",
+          "create": "Créer",
+          "update": "Modifier",
+          "delete": "Supprimer"
+        },
+        "resource": {
+          "app": "applications",
+          "agent": "agents",
+          "agent_task": "exécutions d’agents",
+          "agent_box": "boîtes d’agents",
+          "agent_env_spec": "environnements d’agents",
+          "skill": "compétences",
+          "secret": "secrets",
+          "managed_service": "services gérés",
+          "deploy_token": "jetons de déploiement",
+          "form": "formulaires",
+          "workflow": "flux de travail",
+          "pipeline": "pipelines",
+          "org": "l’organisation",
+          "team": "équipes",
+          "project": "projets",
+          "api_token": "jetons d’API",
+          "webhook": "webhooks",
+          "cluster": "clusters",
+          "provider_plugin": "fournisseurs",
+          "scm": "gestion de versions",
+          "audit_log": "le journal d’audit",
+          "billing": "facturation",
+          "zentinelle": "Zentinelle",
+          "admin": "administration"
+        }
       }
     },
     "settings": {
