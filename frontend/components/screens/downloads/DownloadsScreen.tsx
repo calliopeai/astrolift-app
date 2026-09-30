@@ -279,33 +279,14 @@ function CopyableCommand({ label, command }: { label: string; command: string })
   );
 }
 
-function PackageRow({
-  name,
-  command,
-  note,
-  badge,
-  disabled,
-}: {
-  name: string;
-  command: string;
-  note?: string;
-  badge?: string;
-  disabled?: boolean;
-}) {
+function PackageRow({ name, command, note }: { name: string; command: string; note?: string }) {
   return (
     <div className="border-border rounded-md border p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">{name}</span>
-        {badge && (
-          <Badge variant="outline" className="text-2xs uppercase">
-            {badge}
-          </Badge>
-        )}
       </div>
       <div className="bg-muted flex items-start gap-2 rounded-md p-2">
-        <pre
-          className={`flex-1 overflow-x-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap ${disabled ? "opacity-60" : ""}`}
-        >
+        <pre className="flex-1 overflow-x-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
           {command}
         </pre>
         <CopyButton value={command} label={`Copy ${name} install`} />

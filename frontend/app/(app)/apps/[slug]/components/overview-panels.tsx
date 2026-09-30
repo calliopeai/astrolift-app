@@ -9,7 +9,7 @@ import { OwnershipPanel as OwnershipPanelView } from "@/components/screens/apps/
 import { useManagedServicesSummary } from "@/components/screens/apps/overview/use-managed-services-summary";
 import { useOwnership } from "@/components/screens/apps/overview/use-ownership";
 
-import { appPath, useAppChrome } from "./app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 /**
  * Containers for the Overview panels that have a query of their own. Each

@@ -9,7 +9,7 @@ import { WorkloadsListScreen } from "@/components/screens/apps/workloads/Workloa
 
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-import { appPath, useAppChrome } from "../components/app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 /**
  * The app's Workloads tab, and its scheduled jobs as the cronjob kind. The

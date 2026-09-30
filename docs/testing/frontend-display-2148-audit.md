@@ -64,15 +64,15 @@ The following seven-item slice starts from `66b902d1`: **64 React/Apollo checks 
 | 40. Agent secrets dialog leaks reveal timers on close | Fixed | Closing, changing the environment spec or unmounting cancels timers and invalidates late reveal responses; a cleared older timer cannot hide a later reveal. Real Apollo/timer regressions cover each boundary. |
 | 41. Agent secrets page assumes env spec slug equals agent slug | Remaining | Current SecretsContent still passes agent slug directly as envSpecSlug and documents that assumption; an actual association read is needed. |
 | 42. Register tool form has two duplicate close buttons | Pre-existing | AddToolForm dialog was replaced by AddToolScreen/use-add-tool page flow; duplicate dialog cancellation path is absent. |
-| 43. PageShell imports from app/, breaking the components rule | Remaining | PageShell still imports useAppChrome from an app route directory. |
+| 43. PageShell imports from app/, breaking the components rule | Fixed | Shared app chrome context now lives in lib/app-chrome-context.tsx; PageShell and every route/story consumer import the same shared module. Existing navigation/hydration and new framed/agent-shell tests preserve behavior. |
 | 44. Profile identity copy points to the old organization settings path | Pre-existing | Earlier profile organization-link correction is included in the audited base. |
 | 45. AppearanceClient export actually renders language and timezone | Pre-existing | ProfilePreferences now contains language/timezone only; appearance has its own settings page. |
-| 46. 'Cannot delete the active provider' toast is unreachable | Remaining | Active IdP deletion is disabled in the view; unreachable defensive hook toast remains cleanup work. |
+| 46. 'Cannot delete the active provider' toast is unreachable | Fixed | Removed the unreachable active-provider toast callback from the hook, view and fixture. Active-provider Delete remains disabled, with local request admission still refusing active rows. |
 | 47. Identity provider client ID always gets an ellipsis | Pre-existing | Earlier IdP client-id truncation correction is included in the audited base. |
 | 48. 'Active since' falls back to updatedAt for legacy providers | Pre-existing | Earlier IdP observed activation-date correction is included in the audited base. |
 | 49. Agents Active and History tables show raw ISO timestamps | Pre-existing | Current AgentRunScreen Time formats startedAt/finishedAt with formatRelativeAge; old Active/History components are gone. |
 | 50. useAgentBoxes hides includeEnded behind a type cast | Pre-existing | useAgentBoxes uses AgentBoxesVars directly with orgId/includeEnded; hidden variable cast is gone. |
-| 51. 'No other sessions' toast can never fire | Remaining | No-other-session toast remains a defensive hook path behind a disabled sign-out-all view. |
+| 51. 'No other sessions' toast can never fire | Fixed | Removed the unreachable no-other-sessions toast callback. The actual count and pending state still guard the disabled sign-out action and confirmation admission. |
 | 52. Identity providers doc link label does not match its target | Pre-existing | Earlier identity-provider organization-label documentation correction is included in the audited base. |
 | 53. Introduction, Get Started and Changelog describe an unrelated boilerplate | Remaining | Introduction/GetStarted/Changelog still require product-fact review; this branch does not claim their static content is accurate. |
 | 54. Changelog shows unknown entry types as destructive | Remaining | ChangelogScreen.typeVariant still gives unrecognized types destructive styling. |
@@ -83,13 +83,13 @@ The following seven-item slice starts from `66b902d1`: **64 React/Apollo checks 
 | 59. Mute hours above 168 are not rejected in the submit handler | Pre-existing | display-logic.test.tsx verifies integer 1..168-hour boundaries and pending refusal. |
 | 60. Dashboard loading skeleton no longer matches the layout | Pre-existing | DashboardLoading was replaced by components/home/HomeScreen HomeSkeleton over current panel spans. |
 | 61. Dashboard counts recent failures twice | Pre-existing | Old DashboardScreen failure tiles are gone; current HomeScreen/HomeScreen.test.tsx use permission-scoped home panels. |
-| 62. ApprovalScreen computes unused approve and reject CTA flags | Remaining | ApprovalScreen still computes unused showApproveCta/showRejectCta. |
-| 63. Approval history tones use hard-coded rgb() values | Remaining | ApprovalHistory still returns inline rgb colors for tone borders/icons. |
+| 62. ApprovalScreen computes unused approve and reject CTA flags | Fixed | Removed unused showApproveCta/showRejectCta locals; the rendered approval controls retain their existing permission and self-trigger checks. |
+| 63. Approval history tones use hard-coded rgb() values | Fixed | Approval history borders and icons use success/danger/muted semantic Tailwind tokens instead of raw inline RGB styles. The icon registry uses stable module-level component references. |
 | 64. Approvals select-all is wrong when stale ids remain selected | Pre-existing | display-logic.test.tsx verifies visible approval selection after polling, including stale ids. |
 | 65. Form submissions sparkline mixes local and UTC dates | Parked | Forms route flag remains false. Do not enable or claim runtime fulfillment of sparkline time display. |
 | 66. Form detail says 'No published form found' for any missing form | Pre-existing | Earlier missing-form copy fix is included; Forms remains parked independently of this copy correction. |
 | 67. Managed domains table flashes the skeleton on poll | Pre-existing | ManagedDomainsScreen now delegates loading/rows to shared ListPage/DataTable rather than replacing its whole table on poll. |
-| 68. Downloads PackageRow has unused badge and disabled props | Remaining | DownloadsScreen PackageRow still declares unused badge/disabled props. |
+| 68. Downloads PackageRow has unused badge and disabled props | Fixed | Removed PackageRow badge/disabled props and their unused rendering branches; both real install-channel callers retain their command/copy behavior. |
 | 69. Redeploy input shape differs between detail and list screens | Pre-existing | use-deployment-detail.onRedeploy now sends input {id: deployment.id}, matching other actual callers. |
 | 70. Metrics footer links Temporal UI to localhost | Fixed | Metrics receives existing NEXT_PUBLIC_TEMPORAL_UI_URL from its route container; hides link when unconfigured; focused React check. |
 | 71. Ops cluster status comment contradicts the code | Pre-existing | use-ops now reads scoped queries; obsolete disabled-cluster aggregation comment is absent there. |

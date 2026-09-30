@@ -3,7 +3,7 @@
 import { ShellScreen } from "@/components/screens/apps/tools/ShellScreen";
 import { useAppShell } from "@/components/screens/apps/tools/use-app-shell";
 
-import { appPath, useAppChrome } from "../components/app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 import { usePodTarget } from "../components/use-pod-target";
 

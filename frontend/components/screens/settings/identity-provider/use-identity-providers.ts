@@ -65,10 +65,6 @@ export function useIdentityProviders() {
     }
   }
 
-  function onDeleteActiveBlocked() {
-    toast.error("Cannot delete the active provider — set a different one first.");
-  }
-
   return {
     list,
     providers: data?.astroliftIdentityProviders ?? [],
@@ -79,6 +75,5 @@ export function useIdentityProviders() {
     deleting,
     onSetActive,
     onDelete,
-    onDeleteActiveBlocked,
   };
 }

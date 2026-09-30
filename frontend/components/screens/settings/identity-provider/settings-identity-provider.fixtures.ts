@@ -82,7 +82,6 @@ export const SCREEN: Omit<IdentityProvidersScreenProps, "renderCreateSheet"> = {
   deleting: false,
   onSetActive: noop,
   onDelete: noop,
-  onDeleteActiveBlocked: () => {},
 };
 
 const LONG =

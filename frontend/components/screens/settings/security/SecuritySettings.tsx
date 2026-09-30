@@ -60,7 +60,6 @@ export function SecuritySettingsView({
   errorMessage,
   signingOut,
   revoking,
-  onRequestSignOutAll,
   onSignOutAll,
   onRevoke,
 }: SecuritySettingsViewProps & { list: ListStateController }) {
@@ -112,7 +111,7 @@ export function SecuritySettingsView({
   }
 
   function requestSignOutAll() {
-    if (onRequestSignOutAll()) setConfirmSignOut(true);
+    if (!signingOut && otherCount > 0) setConfirmSignOut(true);
   }
 
   async function handleRevokeOne() {

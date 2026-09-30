@@ -47,15 +47,6 @@ export function useSecuritySettings() {
   const sessions = data?.astroliftActiveSessions ?? [];
   const otherCount = sessions.filter((s) => !s.isCurrent).length;
 
-  /** False (after a toast) when there is no other session to sign out. */
-  function onRequestSignOutAll(): boolean {
-    if (otherCount === 0) {
-      toast.info(t("toasts.noOthers"));
-      return false;
-    }
-    return true;
-  }
-
   /** Throws on failure so ConfirmDialog stays open and shows the error. */
   async function onSignOutAll(): Promise<void> {
     const { data: resp } = await logoutAll({
@@ -97,7 +88,6 @@ export function useSecuritySettings() {
     errorMessage: error ? error.message : null,
     signingOut,
     revoking,
-    onRequestSignOutAll,
     onSignOutAll,
     onRevoke,
   };

@@ -18,6 +18,10 @@
   Reference saves use trimmed variable identities; closing or changing a secret
   dialog cancels reveal timers and ignores late reveal responses (#2148).
 
+- Shared page chrome uses a common context outside app routes. Remove unreachable
+  active-provider/session toast callbacks and unused approval/download props;
+  approval history uses semantic theme tokens (#2148).
+
 - Team and project create sheets generate backend-compatible slugs and preserve
   a requested visible team. Workflow configuration waits for and scopes reads
   to the active organization, create access stays unknown while loading, and

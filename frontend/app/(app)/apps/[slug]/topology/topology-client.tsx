@@ -3,7 +3,7 @@
 import { TopologyScreen } from "@/components/screens/apps/tools/TopologyScreen";
 import { useAppTopology } from "@/components/screens/apps/tools/use-app-topology";
 
-import { appPath, useAppChrome } from "../components/app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 /** The overview's topology panel (#705; the Topology tab folded into Overview). */
 export function TopologyClient({ slug }: { slug: string }) {

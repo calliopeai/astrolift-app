@@ -6,7 +6,7 @@ import { SecretsScreen } from "@/components/screens/apps/secrets/SecretsScreen";
 import { useAppSecrets } from "@/components/screens/apps/secrets/use-app-secrets";
 import { useSecretHistory } from "@/components/screens/apps/secrets/use-secret-history";
 
-import { appPath, useAppChrome } from "../components/app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 import { PushAndRotateButton } from "../components/ci-setup-section";
 

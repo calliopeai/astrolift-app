@@ -1,8 +1,10 @@
-import { act, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import Link from "next/link";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+
+import { AppChromeProvider } from "@/lib/app-chrome-context";
 
 import { PageShell } from "./PageShell";
 
@@ -52,4 +54,36 @@ describe("PageShell server-rendered descriptions", () => {
       }
     }
   );
+});
+
+it("preserves the app frame toolbar without duplicating its title", () => {
+  render(
+    <AppChromeProvider framed>
+      <PageShell
+        title="Child heading"
+        description="Environment settings"
+        actions={<button>Save</button>}
+      >
+        <p>Settings body</p>
+      </PageShell>
+    </AppChromeProvider>
+  );
+  expect(screen.queryByRole("heading", { name: "Child heading" })).not.toBeInTheDocument();
+  expect(screen.getByText("Environment settings")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
+  expect(screen.getByText("Settings body")).toBeVisible();
+});
+
+it("lets the agent shell own its chrome while retaining the child page body", () => {
+  render(
+    <AppChromeProvider basePath="/agents" agentShell>
+      <PageShell title="Child heading" description="Child toolbar" actions={<button>Save</button>}>
+        <p>Agent platform body</p>
+      </PageShell>
+    </AppChromeProvider>
+  );
+  expect(screen.queryByRole("heading", { name: "Child heading" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Child toolbar")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  expect(screen.getByText("Agent platform body")).toBeVisible();
 });

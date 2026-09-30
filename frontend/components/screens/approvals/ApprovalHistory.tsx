@@ -19,6 +19,14 @@ import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useApprovalHistory } from "./use-approval";
 
+const DECISION_ICONS: Record<string, typeof ClockIcon> = {
+  "deployment.approve": CheckCircle2Icon,
+  "deployment.approve_by_token": CheckCircle2Icon,
+  "deployment.reject": XCircleIcon,
+  "deployment.reject_by_token": XCircleIcon,
+  "deployment.abort": XCircleIcon,
+};
+
 export type ApprovalHistoryPanelProps = ReturnType<typeof useApprovalHistory>;
 
 /** Collapsible side panel listing every approve / reject / abort on a deployment. */
@@ -68,11 +76,11 @@ function HistoryEntry({ entry }: { entry: AstroliftDeploymentApprovalHistoryEntr
   const t = useTranslations("lists.approval");
   const fmt = useFormatters();
   const tone = decisionTone(entry.action, entry.decision);
-  const Icon = decisionIcon(entry.action);
+  const Icon = DECISION_ICONS[entry.action] ?? ClockIcon;
   return (
-    <li className="flex gap-3 border-l-2 pl-3" style={{ borderColor: tone.border }}>
+    <li className={`flex gap-3 border-l-2 pl-3 ${tone.border}`}>
       <div className="mt-0.5">
-        <Icon className="size-4" style={{ color: tone.icon }} />
+        <Icon className={`size-4 ${tone.icon}`} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-2 text-xs">
@@ -106,38 +114,24 @@ function actionKey(action: string): string {
   }
 }
 
-interface ToneCss {
+interface ToneClasses {
   border: string;
   icon: string;
 }
 
-function decisionTone(action: string, decision: string): ToneCss {
+function decisionTone(action: string, decision: string): ToneClasses {
   if (action === "deployment.approve" || action === "deployment.approve_by_token") {
-    return { border: "rgb(34 197 94 / 0.5)", icon: "rgb(34 197 94)" };
+    return { border: "border-success-border", icon: "text-success-fg" };
   }
   if (
     action === "deployment.reject" ||
     action === "deployment.reject_by_token" ||
     action === "deployment.abort"
   ) {
-    return { border: "rgb(239 68 68 / 0.5)", icon: "rgb(239 68 68)" };
+    return { border: "border-danger-border", icon: "text-danger-fg" };
   }
   if (decision === "DENY") {
-    return { border: "rgb(239 68 68 / 0.5)", icon: "rgb(239 68 68)" };
+    return { border: "border-danger-border", icon: "text-danger-fg" };
   }
-  return { border: "rgb(148 163 184 / 0.5)", icon: "rgb(100 116 139)" };
-}
-
-function decisionIcon(action: string) {
-  if (action === "deployment.approve" || action === "deployment.approve_by_token") {
-    return CheckCircle2Icon;
-  }
-  if (
-    action === "deployment.reject" ||
-    action === "deployment.reject_by_token" ||
-    action === "deployment.abort"
-  ) {
-    return XCircleIcon;
-  }
-  return ClockIcon;
+  return { border: "border-border", icon: "text-muted-foreground" };
 }

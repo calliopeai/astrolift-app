@@ -58,7 +58,6 @@ export function IdentityProvidersScreen({
   deleting,
   onSetActive,
   onDelete,
-  onDeleteActiveBlocked,
   renderCreateSheet,
 }: IdentityProvidersScreenProps & { list: ListStateController }) {
   const [open, setOpen] = React.useState(false);
@@ -75,10 +74,7 @@ export function IdentityProvidersScreen({
   }
 
   function requestDelete(idp: AstroliftIdentityProvider) {
-    if (idp.isActive) {
-      onDeleteActiveBlocked();
-      return;
-    }
+    if (idp.isActive) return;
     setDeleteTarget(idp);
   }
 

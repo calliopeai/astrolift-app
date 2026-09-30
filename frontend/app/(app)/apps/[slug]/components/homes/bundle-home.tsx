@@ -3,7 +3,7 @@
 import { BundleHomeScreen } from "@/components/screens/apps/homes/BundleHome";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
-import { appPath, useAppChrome } from "../app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 interface BundleHomeProps {
   slug: string;

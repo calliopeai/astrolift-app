@@ -33,7 +33,7 @@ import { EnvironmentsClient } from "@/app/(app)/environments/environments-client
 import { WebhooksClient } from "@/app/(app)/webhooks/webhooks-client";
 
 import { ConfigEditorClient } from "../config/config-editor-client";
-import { useAppChrome } from "../components/app-chrome-context";
+import { useAppChrome } from "@/lib/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 import { AssignProjectCard } from "../components/assign-project-card";
 import { CiSetupSection } from "../components/ci-setup-section";
