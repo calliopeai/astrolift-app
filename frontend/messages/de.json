@@ -1827,6 +1827,13 @@
         "failed": "Upload failed: {error}",
         "noUrl": "no pre-signed URL returned"
       }
+    },
+    "workloadActions": {
+      "primary": "Primäre Umgebung",
+      "advisory": "Berechtigungen werden beim Lesen geprüft. Aktionen prüfen sie vor der Ausführung erneut.",
+      "unavailable": "Aktuelle Workload-Berechtigungen oder Version sind nicht verfügbar. Lade die Seite neu.",
+      "selectedEnvironmentUnsupported": "Diese Aktion betrifft die primäre Umgebung. Eine ausgewählte Umgebung kann nicht adressiert werden.",
+      "permissionDenied": "Berechtigung verweigert"
     }
   },
   "settingsIndex": {

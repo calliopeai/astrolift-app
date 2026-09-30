@@ -1827,6 +1827,13 @@
         "failed": "Upload failed: {error}",
         "noUrl": "no pre-signed URL returned"
       }
+    },
+    "workloadActions": {
+      "primary": "主环境",
+      "advisory": "权限在读取时检查，操作应用前会再次检查。",
+      "unavailable": "无法获取工作负载的当前权限或版本。请刷新页面。",
+      "selectedEnvironmentUnsupported": "此操作针对主环境，不能针对所选环境。",
+      "permissionDenied": "权限被拒绝"
     }
   },
   "settingsIndex": {

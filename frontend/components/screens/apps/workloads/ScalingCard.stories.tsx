@@ -28,7 +28,9 @@ export const ScaledToZero: Story = {
 };
 
 /** Without app.deploy the slider and Apply are disabled. */
-export const NoPermission: Story = { args: { canDeploy: false } };
+export const NoPermission: Story = {
+  args: { canDeploy: false, permissionReason: "Production policy requires reauthentication" },
+};
 
 export const Applying: Story = { args: { scaling: true } };
 

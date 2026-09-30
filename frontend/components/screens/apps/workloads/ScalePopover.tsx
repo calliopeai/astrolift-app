@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2Icon, ScalingIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -22,9 +23,11 @@ export function ScalePopoverView({
   workloadName,
   currentDesired,
   loading,
+  permission,
   apply: applyValue,
   defaultOpen = false,
 }: ScalePopoverViewProps) {
+  const t = useTranslations("apps.workloadActions");
   const [open, setOpen] = React.useState(defaultOpen);
   const [value, setValue] = React.useState(String(currentDesired));
   function onOpenChange(next: boolean) {
@@ -39,11 +42,22 @@ export function ScalePopoverView({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-6" title={`Scale ${workloadName}`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          title={permission.allowed ? `Scale ${workloadName} · ${t("primary")}` : permission.reason}
+          disabled={!permission.allowed || loading}
+        >
           <ScalingIcon className="size-3" />
           <span className="sr-only">Scale</span>
         </Button>
       </PopoverTrigger>
+      {!permission.allowed && (
+        <span role="status" className="text-muted-foreground max-w-48 text-xs">
+          {permission.reason}
+        </span>
+      )}
       <PopoverContent className="w-56 p-3" align="start">
         <p className="mb-2 text-xs font-medium">Scale {workloadName}</p>
         <div className="flex items-center gap-2">
@@ -58,15 +72,21 @@ export function ScalePopoverView({
               if (e.key === "Enter") void apply();
               if (e.key === "Escape") setOpen(false);
             }}
+            disabled={!permission.allowed || loading}
             autoFocus
           />
-          <Button size="sm" onClick={() => void apply()} disabled={loading}>
+          <Button size="sm" onClick={() => void apply()} disabled={loading || !permission.allowed}>
             {loading ? <Loader2Icon className="size-3 animate-spin" /> : "Apply"}
           </Button>
         </div>
         <p className="text-muted-foreground text-2xs mt-2">
-          Current: {currentDesired}. Takes effect immediately.
+          Current: {currentDesired}. {t("primary")}. {t("advisory")}
         </p>
+        {!permission.allowed && (
+          <p role="status" className="text-muted-foreground mt-2 text-xs">
+            {permission.reason}
+          </p>
+        )}
       </PopoverContent>
     </Popover>
   );

@@ -42,6 +42,12 @@
   for observed connectivity before reporting an absent agent, and metrics charts
   use distinct SVG gradients when multiple clusters render together (#2148).
 
+- Web workload restart and scale controls use object `viewerCan` decisions,
+  retain denial reasons and refresh authority after structured failures. Settings
+  name the actual primary-environment target once; workload version preconditions
+  protect stale actions (#1867). Other objects, navigation and CLI acceptance
+  remain pending.
+
 - Workloads expose advisory `viewerCan.restart` and `viewerCan.scale` decisions
   using actual owner, bearer, grant/share and primary-environment policy checks,
   batched across a page (#1867). Mutations still recheck; web/CLI consumption

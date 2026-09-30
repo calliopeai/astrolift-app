@@ -1827,6 +1827,13 @@
         "failed": "Upload failed: {error}",
         "noUrl": "no pre-signed URL returned"
       }
+    },
+    "workloadActions": {
+      "primary": "Entorno principal",
+      "advisory": "Los permisos se comprueban al leer. Las acciones vuelven a comprobarlos antes de aplicarse.",
+      "unavailable": "Los permisos o la versión actuales de la carga no están disponibles. Actualiza la página.",
+      "selectedEnvironmentUnsupported": "Esta acción afecta al entorno principal. No puede dirigirse a un entorno seleccionado.",
+      "permissionDenied": "Permiso denegado"
     }
   },
   "settingsIndex": {

@@ -43,25 +43,23 @@ import type {
 
 export type ControlsSectionViewProps = Pick<
   ReturnType<typeof useControlsSection>,
-  "envs" | "loading"
+  "envs" | "loading" | "workloads" | "workloadsLoading"
 > & {
   /** One EnvironmentControlsView per env; the route wires its hook. */
   renderEnvironment: (env: AstroliftAppEnvironment) => React.ReactNode;
+  renderWorkload: (workload: AstroliftWorkload) => React.ReactNode;
 };
 
-/**
- * Live operational controls (#402). One row per environment; each row
- * carries the env-level toggles (pause/resume, deploy now, rebuild &
- * deploy) AND the inline workload-ops list (rolling restart + replica
- * scale) for that env. The standalone workload-ops panel that used to
- * sit below the env grid is gone — operators triaging the prod row
- * no longer have to scroll past dev/stg to reach its workloads.
- */
+/** Environment controls stay separate from the implicit primary workload target. */
 export function ControlsSectionView({
   envs,
   loading,
   renderEnvironment,
+  workloads,
+  workloadsLoading,
+  renderWorkload,
 }: ControlsSectionViewProps) {
+  const actions = useTranslations("apps.workloadActions");
   const t = useTranslations("apps.settings.controls");
 
   // Rendered inside the page-level "Controls" Section — h3 keeps the
@@ -82,16 +80,20 @@ export function ControlsSectionView({
           ))}
         </div>
       )}
+      <Card className="mt-4 px-4">
+        <h4 className="text-sm font-semibold">{actions("primary")}</h4>
+        <p className="text-muted-foreground text-xs">{actions("advisory")}</p>
+        <PrimaryWorkloads
+          workloads={workloads}
+          loading={workloadsLoading}
+          renderWorkload={renderWorkload}
+        />
+      </Card>
     </Section>
   );
 }
 
-export type EnvironmentControlsViewProps = ReturnType<typeof useEnvironmentControls> & {
-  workloads: AstroliftWorkload[];
-  workloadsLoading: boolean;
-  /** One WorkloadOpsRowView per workload; the route wires its hook. */
-  renderWorkload: (workload: AstroliftWorkload) => React.ReactNode;
-};
+export type EnvironmentControlsViewProps = ReturnType<typeof useEnvironmentControls>;
 
 export function EnvironmentControlsView({
   env,
@@ -103,9 +105,6 @@ export function EnvironmentControlsView({
   onTogglePause,
   onDeploy,
   onRebuildAndDeploy,
-  workloads,
-  workloadsLoading,
-  renderWorkload,
 }: EnvironmentControlsViewProps) {
   const t = useTranslations("apps.settings.controls");
   const [imageTag, setImageTag] = useState("");
@@ -202,31 +201,15 @@ export function EnvironmentControlsView({
           {t("approvalsRequired", { count: env.requiredApprovals })}
         </p>
       )}
-
-      <EnvWorkloads
-        envName={env.name}
-        workloads={workloads}
-        loading={workloadsLoading}
-        renderWorkload={renderWorkload}
-      />
     </Card>
   );
 }
 
-/**
- * Per-env workload-ops list (#402). Renders the rolling-restart +
- * replica scale rows nested inside an environment row. Workload list
- * is shared across env rows today (see useControlsSection); the
- * env-scoped confirmation copy still gives the operator unambiguous
- * intent at the action moment.
- */
-function EnvWorkloads({
-  envName,
+function PrimaryWorkloads({
   workloads,
   loading,
   renderWorkload,
 }: {
-  envName: string;
   workloads: AstroliftWorkload[];
   loading: boolean;
   renderWorkload: (workload: AstroliftWorkload) => React.ReactNode;
@@ -244,7 +227,7 @@ function EnvWorkloads({
       ) : (
         <div className="grid gap-2">
           {workloads.map((w) => (
-            <React.Fragment key={`${envName}-${w.id}`}>{renderWorkload(w)}</React.Fragment>
+            <React.Fragment key={w.id}>{renderWorkload(w)}</React.Fragment>
           ))}
         </div>
       )}
@@ -260,7 +243,7 @@ const HARD_UPPER = 20;
 const HARD_LOWER = 0;
 
 /**
- * One row in the per-env workload-ops list: a rolling-restart button
+ * One row in the primary-environment workload-ops list: a rolling-restart button
  * and an adjustable replica counter (− / N / + / Apply) per workload.
  * The counter is locally controlled so the operator can stage a value
  * before applying it; Apply is what actually fires the scale mutation.
@@ -283,6 +266,8 @@ export function WorkloadOpsRowView({
   scaling,
   onRestart,
   onApply,
+  restartPermission,
+  scalePermission,
 }: WorkloadOpsRowViewProps) {
   const t = useTranslations("apps.settings.controls");
 
@@ -299,8 +284,7 @@ export function WorkloadOpsRowView({
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
 
   async function handleRestart() {
-    await onRestart();
-    setRestartConfirmOpen(false);
+    if (await onRestart()) setRestartConfirmOpen(false);
   }
 
   async function handleApply() {
@@ -313,17 +297,36 @@ export function WorkloadOpsRowView({
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <span className="truncate text-sm font-medium">{workload.name}</span>
-        <Badge variant="outline" className="text-muted-foreground text-2xs font-mono">
+        <Badge
+          variant="outline"
+          className="text-muted-foreground text-2xs max-w-full truncate font-mono"
+        >
           {workload.slug}
         </Badge>
         <span className="text-muted-foreground text-xs">
           {/* Desired replicas come from the manifest; no pod readiness is observed here. */}
           {t("readyCount", { ready: "—", desired: workload.replicas ?? "—" })}
         </span>
+        {!restartPermission.allowed && (
+          <span
+            role="status"
+            className="text-muted-foreground basis-full text-xs [overflow-wrap:anywhere]"
+          >
+            {t("rollingRestart")}: {restartPermission.reason}
+          </span>
+        )}
+        {!scalePermission.allowed && (
+          <span
+            role="status"
+            className="text-muted-foreground basis-full text-xs [overflow-wrap:anywhere]"
+          >
+            {t("apply")}: {scalePermission.reason}
+          </span>
+        )}
       </div>
-      <Can permission="app.deploy">
+      <>
         {/* Desktop: inline counter + Apply + Rolling restart. */}
         <div className="hidden items-center gap-2 sm:flex">
           <div className="flex items-center rounded-md border">
@@ -332,7 +335,7 @@ export function WorkloadOpsRowView({
               variant="ghost"
               className="size-7 rounded-none p-0"
               onClick={() => setPending((v) => Math.max(HARD_LOWER, v - 1))}
-              disabled={scaling || pending <= HARD_LOWER}
+              disabled={!scalePermission.allowed || scaling || pending <= HARD_LOWER}
               aria-label={t("ariaDecrease")}
             >
               <MinusIcon className="size-3.5" />
@@ -345,7 +348,7 @@ export function WorkloadOpsRowView({
               variant="ghost"
               className="size-7 rounded-none p-0"
               onClick={() => setPending((v) => Math.min(HARD_UPPER, v + 1))}
-              disabled={scaling || pending >= HARD_UPPER}
+              disabled={!scalePermission.allowed || scaling || pending >= HARD_UPPER}
               aria-label={t("ariaIncrease")}
             >
               <PlusIcon className="size-3.5" />
@@ -355,7 +358,7 @@ export function WorkloadOpsRowView({
             size="sm"
             variant="outline"
             onClick={handleApply}
-            disabled={scaling || !dirty}
+            disabled={!scalePermission.allowed || scaling || !dirty}
             className="gap-1.5"
           >
             {scaling ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
@@ -367,7 +370,7 @@ export function WorkloadOpsRowView({
                 size="sm"
                 variant="outline"
                 onClick={() => setRestartConfirmOpen(true)}
-                disabled={restarting}
+                disabled={!restartPermission.allowed || restarting}
                 className="gap-1.5"
               >
                 {restarting ? (
@@ -385,14 +388,14 @@ export function WorkloadOpsRowView({
           open={restartConfirmOpen}
           onOpenChange={setRestartConfirmOpen}
           title={t("confirmRestart", { workload: workload.name, env: envName })}
-          description=""
+          description={restartPermission.allowed ? "" : restartPermission.reason}
           confirmLabel={t("rollingRestart")}
           onConfirm={handleRestart}
         />
 
         {/* Mobile: kebab dropdown carrying the same actions. Pattern
             mirrors clusters-client.tsx renderRowMenu from #412 — keeps
-            env rows compact when stacked single-column. */}
+            workload rows compact when stacked single-column. */}
         <div className="flex items-center justify-end gap-2 sm:hidden">
           <span className="border-input rounded-md border px-2 py-1 font-mono text-xs tabular-nums">
             {pending}
@@ -423,7 +426,7 @@ export function WorkloadOpsRowView({
                   e.preventDefault();
                   setPending((v) => Math.max(HARD_LOWER, v - 1));
                 }}
-                disabled={scaling || pending <= HARD_LOWER}
+                disabled={!scalePermission.allowed || scaling || pending <= HARD_LOWER}
               >
                 <MinusIcon className="size-4" />
                 {t("decreaseReplica")}
@@ -433,12 +436,15 @@ export function WorkloadOpsRowView({
                   e.preventDefault();
                   setPending((v) => Math.min(HARD_UPPER, v + 1));
                 }}
-                disabled={scaling || pending >= HARD_UPPER}
+                disabled={!scalePermission.allowed || scaling || pending >= HARD_UPPER}
               >
                 <PlusIcon className="size-4" />
                 {t("increaseReplica")}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void handleApply()} disabled={scaling || !dirty}>
+              <DropdownMenuItem
+                onSelect={() => void handleApply()}
+                disabled={!scalePermission.allowed || scaling || !dirty}
+              >
                 {scaling ? (
                   <Loader2Icon className="size-4 animate-spin" />
                 ) : (
@@ -447,7 +453,10 @@ export function WorkloadOpsRowView({
                 {t("applyScale", { count: pending })}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setRestartConfirmOpen(true)} disabled={restarting}>
+              <DropdownMenuItem
+                onSelect={() => setRestartConfirmOpen(true)}
+                disabled={!restartPermission.allowed || restarting}
+              >
                 {restarting ? (
                   <Loader2Icon className="size-4 animate-spin" />
                 ) : (
@@ -458,7 +467,7 @@ export function WorkloadOpsRowView({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </Can>
+      </>
     </div>
   );
 }

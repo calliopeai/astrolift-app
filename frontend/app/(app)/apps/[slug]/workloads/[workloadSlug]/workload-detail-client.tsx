@@ -39,7 +39,8 @@ export function WorkloadDetailClient({
             appSlug={appSlug}
             workloadSlug={workloadSlug}
             environmentName={null}
-            canDeploy={detail.canDeploy}
+            permission={w.viewerCan?.scale}
+            version={w.version}
           />
         ) : null
       }

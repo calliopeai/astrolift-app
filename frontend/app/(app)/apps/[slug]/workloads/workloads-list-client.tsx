@@ -7,6 +7,8 @@ import { useWorkloadsList } from "@/components/screens/apps/workloads/use-worklo
 import { WorkloadRowActions } from "@/components/screens/apps/workloads/WorkloadRowActions";
 import { WorkloadsListScreen } from "@/components/screens/apps/workloads/WorkloadsListScreen";
 
+import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
+
 import { appPath, useAppChrome } from "../components/app-chrome-context";
 
 /**
@@ -25,7 +27,7 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
       slug={slug}
       basePath={chrome.basePath}
       renderScale={(w, currentDesired) => (
-        <ScalePopover workloadId={w.id} workloadName={w.name} currentDesired={currentDesired} />
+        <ScalePopover workload={w} currentDesired={currentDesired} />
       )}
       renderRowActions={(w) => (
         <WorkloadRowActions
@@ -39,13 +41,11 @@ export function WorkloadsListClient({ slug }: { slug: string }) {
 }
 
 function ScalePopover({
-  workloadId,
-  workloadName,
+  workload,
   currentDesired,
 }: {
-  workloadId: string;
-  workloadName: string;
+  workload: AstroliftWorkload;
   currentDesired: number;
 }) {
-  return <ScalePopoverView {...useScaleWorkload(workloadId, workloadName, currentDesired)} />;
+  return <ScalePopoverView {...useScaleWorkload(workload, currentDesired)} />;
 }

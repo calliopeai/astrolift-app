@@ -175,6 +175,7 @@ export const LIST_LONG: WorkloadsListFixture = {
 
 export const SCALE: ScalePopoverViewProps = {
   workloadName: "API",
+  permission: { allowed: true, code: "", reason: "" },
   currentDesired: 3,
   loading: false,
   apply: resolved,
@@ -322,7 +323,6 @@ const VOLUMES = [
 export const DETAIL: WorkloadDetailScreenProps = {
   workload: workload({ volumes: volumes(VOLUMES) }),
   workloadLoading: false,
-  canDeploy: true,
   containers: CONTAINERS,
   containersLoading: false,
   pods: PODS,
@@ -493,6 +493,7 @@ export const SCALING: ScalingCardViewProps = {
   loading: false,
   scaling: false,
   canDeploy: true,
+  permissionReason: "",
   onApply: resolved,
 };
 

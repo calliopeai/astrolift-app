@@ -22,6 +22,7 @@ import { useSkillBuilder } from "./agents/skills/use-skill-builder";
 import { GET_SKILL } from "@/graphql/agents/agents.queries";
 import { AgentConfigFormPane } from "./apps/config/AgentConfigFormPane";
 import { PANE_PROPS } from "./apps/config/app-config-agent.fixtures";
+import { WORKLOAD_WEB } from "./apps/controls/app-controls.fixtures";
 import { useEnvironmentControls, useWorkloadOps } from "./apps/controls/use-controls-section";
 import { useDeployToken } from "./apps/controls/use-deploy-token";
 import { ENVS } from "./apps/managed-services/app-managed-services.fixtures";
@@ -230,8 +231,8 @@ describe("plain action failures (#2146)", () => {
     expect(state.success).not.toHaveBeenCalled();
   });
   it("reports restart rejection and returns false from scale so its counter can revert", async () => {
-    const workload = { id: "w-1", name: "api" } as Parameters<typeof useWorkloadOps>[1];
-    const { result } = renderHook(() => useWorkloadOps("prod", workload, "api"), { wrapper });
+    const workload = { ...WORKLOAD_WEB, id: "w-1", name: "api" };
+    const { result } = renderHook(() => useWorkloadOps(workload), { wrapper });
     await act(async () => {
       await result.current.onRestart();
       expect(await result.current.onApply(3)).toBe(false);

@@ -14347,9 +14347,9 @@ export type ListWorkloadsQueryVariables = Exact<{
 }>;
 
 
-export type ListWorkloadsQuery = { astroliftWorkloads: Array<{ id: string, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string }> };
+export type ListWorkloadsQuery = { astroliftWorkloads: Array<{ id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } }> };
 
-export type WorkloadFieldsFragment = { id: string, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string };
+export type WorkloadFieldsFragment = { id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } };
 
 export type ListWorkloadsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -14364,7 +14364,7 @@ export type ListWorkloadsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListWorkloadsPageQuery = { astroliftWorkloadsPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string }> } };
+export type ListWorkloadsPageQuery = { astroliftWorkloadsPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } }> } };
 
 export type GetRenderedManifestQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -14381,7 +14381,7 @@ export type GetWorkloadQueryVariables = Exact<{
 }>;
 
 
-export type GetWorkloadQuery = { astroliftWorkload?: { id: string, name: string, slug: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, inClusterServiceFqdn: string } | null };
+export type GetWorkloadQuery = { astroliftWorkload?: { id: string, version: number, name: string, slug: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, inClusterServiceFqdn: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } } | null };
 
 export type ListContainersQueryVariables = Exact<{
   workloadSlug?: InputMaybe<Scalars['String']['input']>;

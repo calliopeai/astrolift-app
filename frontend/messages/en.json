@@ -2056,6 +2056,13 @@
         "failed": "Upload failed: {error}",
         "noUrl": "no pre-signed URL returned"
       }
+    },
+    "workloadActions": {
+      "primary": "Primary environment",
+      "advisory": "Permissions are checked at read time. Actions recheck before applying.",
+      "unavailable": "Current workload permissions or version are unavailable. Refresh the page.",
+      "selectedEnvironmentUnsupported": "This action targets the primary environment. It cannot target a selected environment.",
+      "permissionDenied": "Permission denied"
     }
   },
   "lists": {

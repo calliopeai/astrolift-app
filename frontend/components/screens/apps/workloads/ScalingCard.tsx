@@ -42,8 +42,10 @@ export function ScalingCardView({
   loading,
   scaling,
   canDeploy,
+  permissionReason,
   onApply,
 }: ScalingCardViewProps) {
+  const actions = useTranslations("apps.workloadActions");
   const t = useTranslations("apps.workloadDetail");
   const labels: ScalingCardLabels = {
     title: t("scaling.title"),
@@ -65,7 +67,7 @@ export function ScalingCardView({
     scalingDown: t("scaling.scalingDown"),
     applyButton: t("scaling.applyButton"),
     applyingButton: t("scaling.applyingButton"),
-    permissionDenied: t("scaling.permissionDenied"),
+    permissionDenied: permissionReason || t("scaling.permissionDenied"),
   };
 
   // Pending replicas — what the slider currently shows. We track the
@@ -135,6 +137,9 @@ export function ScalingCardView({
       }
     >
       <div className="min-w-0 space-y-5">
+        <p className="text-muted-foreground text-xs">
+          {actions("primary")}. {actions("advisory")}
+        </p>
         <ManualScaleSection
           status={status}
           pending={pending}
