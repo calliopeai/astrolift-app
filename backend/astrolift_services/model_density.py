@@ -212,7 +212,7 @@ def cluster_density(cluster, rows, start, end, *, transport_available):
                 applied=resource_requests(
                     service.applied_config,
                     source="last_provider_applied_config",
-                    observed_at=service.operation_completed_at,
+                    observed_at=service.model_ready_observed_at,
                 )
                 if isinstance(service.applied_config, dict)
                 else None,

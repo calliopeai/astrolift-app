@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve shared model applied-resource observation time across failed newer
+  revisions; historical configuration without recorded provenance remains
+  undated (#2214).
+
 - Shared model creation refreshes current authority after the bounded Hugging
   Face revision read, refusing revoked credentials or grants before persisting
   or queueing a deployment (#2213).

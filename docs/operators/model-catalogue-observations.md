@@ -88,8 +88,11 @@ truncated measurement. Desired/applied requests are not observed usage totals.
 
 Desired requests come from persisted config; their timestamp is the row's
 recorded modification time, not infrastructure observation. Applied requests
-come only from provider-confirmed applied_config and operation completion time,
-both nullable. Supported quantities and explicitly present replica/device
+come only from provider-confirmed applied_config and the readiness observation
+recorded alongside that configuration, both nullable. A later operation failure
+does not refresh the applied snapshot's observation time. Historical applied
+configuration without recorded observation provenance has a null timestamp.
+Supported quantities and explicitly present replica/device
 counts may be multiplied; absent or unsupported values stay null. Inactive
 configured rows are not running instances. Desired/applied replica counts do
 not establish observed Deployment generation or successful reconciliation.

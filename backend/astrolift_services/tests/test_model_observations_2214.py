@@ -507,6 +507,43 @@ def test_density_separates_desired_applied_observed_and_exact_tenant_inventory(w
     assert all("never-visible" not in query for query, _, _ in world.calls)
 
 
+@pytest.mark.parametrize("recorded_observation", [False, True])
+def test_density_failed_newer_revision_preserves_applied_observation_provenance(world, recorded_observation):
+    from astrolift_workflows.activities.shared_model_reconcile import _failed_sync
+
+    grant(world)
+    observed_at = world.end - timedelta(hours=2) if recorded_observation else None
+    world.model.model_ready_observed_at = observed_at
+    world.model.operation_completed_at = world.end - timedelta(hours=1)
+    world.model.subscription_revision = 2
+    world.model.applied_subscription_revision = 1
+    world.model.save()
+    prior_applied = dict(world.model.applied_config)
+
+    _failed_sync(world.model.pk, 2)
+    world.model.refresh_from_db()
+    assert world.model.status == "failed"
+    assert world.model.applied_config == prior_applied
+    assert world.model.operation_completed_at > world.end
+    with caller(world):
+        applied = density(world).items[0].applied
+    assert applied.observed_at == observed_at
+    assert applied.total_cpu_cores == 0.25 and applied.replicas == 1
+
+
+def test_density_pending_newer_revision_uses_recorded_rollout_observation(world):
+    grant(world)
+    observed_at = world.end - timedelta(minutes=1)
+    world.model.status = "updating"
+    world.model.operation_completed_at = world.end - timedelta(hours=1)
+    world.model.model_ready_observed_at = observed_at
+    world.model.save()
+    with caller(world):
+        applied = density(world).items[0].applied
+    assert applied.observed_at == observed_at
+    assert applied.observed_at != world.model.operation_completed_at
+
+
 def test_inventory_limit_never_masquerades_as_full_fleet_count(world):
     grant(world)
     ManagedService.objects.bulk_create(
