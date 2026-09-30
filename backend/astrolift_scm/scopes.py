@@ -45,6 +45,7 @@ def _team_apps(qs, team_id: int, permission: Permission):
     return qs.filter(
         Q(team_id=team_id, team__organization_id=org_id, team__deleted_at__isnull=True)
         | Q(
+            team_id__isnull=True,
             project__team_id=team_id,
             project__organization_id=org_id,
             project__deleted_at__isnull=True,
@@ -63,11 +64,14 @@ def _team_apps(qs, team_id: int, permission: Permission):
 
 def _apps():
     from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.scopes import live_app_owners
 
-    return RegisteredApp.objects.filter(
-        organization_id=_organization_scope().id,
-        organization__deleted_at__isnull=True,
-        deleted_at__isnull=True,
+    return live_app_owners(
+        RegisteredApp.objects.filter(
+            organization_id=_organization_scope().id,
+            organization__deleted_at__isnull=True,
+            deleted_at__isnull=True,
+        )
     )
 
 

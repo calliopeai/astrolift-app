@@ -24,6 +24,8 @@
 - SCM connection and OAuth/GitHub App routes require their explicit
   organization permission; per-app SSH keys and CI actions authorize their
   owning app (#2109). SSH collections filter rows before pagination and counts.
+  SCM uses the registry's live, coherent app ancestry, so a stale project or
+  mismatched project team cannot widen a bearer credential's app ownership.
   Team-bound bearers cannot borrow an org owner's or operator's wider scope.
   Named repo/file reads preserve personal credential ownership, and installation
   callbacks refuse stale state from another organization before exchange/write.

@@ -40,6 +40,14 @@ the target to lie under the token's live team ownership or an applicable live
 team share; an organization role cannot widen that ceiling. Session selections
 remain navigation context, not an additional grant.
 
+SCM uses the registry's live app-owner checks: every populated project and
+team must be live, belong to the organization, and agree on the app's home
+team. A team bearer follows that canonical home, using the project's team
+only when the app has no direct team. A share cannot make an app with invalid
+ancestry eligible. SSH collections exclude those app keys before counts and
+pagination; a direct stale-key operation retains the explicit organization
+fallback and requires an organization credential and grant.
+
 No database migration or GraphQL field change is required. Existing per-app
 roles can manage their app's keys and CI workflow. Organizations that previously
 let viewers or team-only roles connect SCM hosts must assign `scm.connect` at
