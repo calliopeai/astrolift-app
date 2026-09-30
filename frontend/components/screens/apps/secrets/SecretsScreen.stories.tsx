@@ -1,3 +1,6 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import ja from "@/messages/ja.json";
+import es from "@/messages/es.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { userEvent, within } from "storybook/test";
 
@@ -28,6 +31,7 @@ type Story = StoryObj;
 
 /** The screen with in-memory list state, its rows answered as the hook would. */
 function Screen(props: typeof SECRETS_SCREEN) {
+  const t = useTranslations("apps.secrets");
   const keysList = useLocalListState(APP_SECRETS_LIST);
   const bundlesList = useLocalListState(APP_SECRET_BUNDLES_LIST);
   const keys = selectSecrets(props.secrets, keysList.filters, keysList.state);
@@ -59,7 +63,7 @@ function Screen(props: typeof SECRETS_SCREEN) {
           pushing={false}
           onPushAndRotate={async () => {}}
           variant="outline"
-          label="Push to GitHub"
+          label={t("pushToRepo")}
         />
       }
       renderHistory={(secretKey) => <SecretHistoryPanelView {...HISTORY} secretKey={secretKey} />}
@@ -169,5 +173,20 @@ export const W768: Story = {
     <div style={{ width: 768 }}>
       <Screen {...SECRETS_LONG} />
     </div>
+  ),
+};
+
+export const Spanish: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={es} timeZone="UTC">
+      <Screen {...SECRETS_SCREEN} />
+    </NextIntlClientProvider>
+  ),
+};
+export const Japanese: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <Screen {...SECRETS_SCREEN} />
+    </NextIntlClientProvider>
   ),
 };

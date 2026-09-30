@@ -1426,100 +1426,174 @@
       }
     },
     "secrets": {
-      "title": "Secrets",
-      "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest; push to repo to land.",
-      "bulkImport": "Bulk import",
-      "newSecret": "New secret",
-      "environment": "Environment",
-      "allEnvironments": "All environments",
-      "keysCount": "{count, plural, one {# key} other {# keys}}",
-      "emptyTitle": "No secrets yet",
-      "emptyDescription": "Add literals via 'New secret', or attach a Secret Bundle. Managed services contribute their connection envelope automatically.",
+      "title": "Geheimnisse",
+      "description": "App-weite [env]-Werte, angehängte Pakete und Verbindungsdaten verwalteter Dienste für {slug}. Setzen oder Löschen ändert den vorgemerkten Manifestentwurf; übertragen Sie ihn ins Repository, um die Änderung festzuhalten.",
+      "bulkImport": "Massenimport",
+      "newSecret": "Neues Geheimnis",
+      "environment": "Umgebung",
+      "allEnvironments": "Alle Umgebungen",
+      "keysCount": "{count, plural, one {# Schlüssel} other {# Schlüssel}}",
+      "emptyTitle": "Noch keine Geheimnisse",
+      "emptyDescription": "Fügen Sie Werte über Neues Geheimnis hinzu oder hängen Sie ein Geheimnispaket an. Verwaltete Dienste liefern ihre Verbindungsdaten automatisch.",
       "columns": {
-        "key": "Key",
-        "source": "Source",
-        "env": "Env",
-        "lastEdited": "Last edited",
-        "value": "Value"
+        "key": "Schlüssel",
+        "source": "Quelle",
+        "env": "Umgebung",
+        "lastEdited": "Zuletzt bearbeitet",
+        "value": "Wert",
+        "actions": "Aktionen"
       },
       "delete": {
-        "title": "Delete {key}?",
-        "fallbackTitle": "Delete secret?",
-        "description": "Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed.",
-        "confirm": "Delete secret"
+        "title": "{key} löschen?",
+        "fallbackTitle": "Geheimnis löschen?",
+        "description": "Merkt die Änderung im Manifest der Plattform vor. Übertragen Sie den Entwurf auf der Konfigurationsseite ins Repository, um sie festzuhalten. Bis dahin lässt sie sich rückgängig machen.",
+        "confirm": "Geheimnis löschen"
       },
       "setSheet": {
-        "title": "New secret",
-        "description": "Sets one literal in the app's [env] table. Plaintext is never returned by the API; only this submit ships the value to the backend.",
-        "keyLabel": "Key",
-        "valueLabel": "Value",
-        "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
-        "submit": "Save secret",
-        "submitting": "Saving…"
+        "title": "Neues Geheimnis",
+        "description": "Setzt einen Wert in der [env]-Tabelle der App. Die API gibt keinen Klartext zurück; nur dieses Absenden übermittelt den Wert an das Backend.",
+        "keyLabel": "Schlüssel",
+        "valueLabel": "Wert",
+        "valueHint": "Wird in manifest_raw_staged gespeichert. Übertragen Sie den Entwurf auf der Konfigurationsseite ins Repository, um die Änderung festzuhalten.",
+        "submit": "Geheimnis speichern",
+        "submitting": "Wird gespeichert…",
+        "scope": "Geltungsbereich",
+        "allScope": "Alle Umgebungen (Standard)",
+        "productionScope": "Nur Produktion",
+        "previewScope": "Alle Vorschauen",
+        "branchScope": "Bestimmter Vorschau-Branch…",
+        "branchLabel": "Vorschau-Branch",
+        "allHint": "Für alle Deployments dieser App sichtbar.",
+        "productionHint": "Nur Produktions-Deployments können diesen Wert lesen.",
+        "previewHint": "Nur Vorschau-Deployments können diesen Wert lesen.",
+        "branchHint": "Nur der angegebene Vorschau-Branch kann diesen Wert lesen."
       },
       "bulkSheet": {
-        "title": "Bulk import from .env",
-        "description": "Paste a .env file. Each KEY=value line gets staged into the app's [env] table. Existing keys are overwritten.",
-        "willSet": "Will set {count, plural, one {# key} other {# keys}}:",
-        "submit": "Import",
-        "submitting": "Importing…"
+        "title": "Massenimport aus .env",
+        "description": "Fügen Sie eine .env-Datei ein. Jede Zeile KEY=value wird in der [env]-Tabelle der App vorgemerkt. Vorhandene Schlüssel werden überschrieben.",
+        "willSet": "Es werden {count, plural, one {# Schlüssel} other {# Schlüssel}} gesetzt:",
+        "submit": "Importieren",
+        "submitting": "Wird importiert…"
       },
       "reveal": {
-        "show": "Reveal value",
-        "hide": "Hide value",
-        "revealing": "Revealing…",
-        "failed": "Reveal failed",
-        "toastRevealed": "Revealed by you — audit logged",
-        "literalOnly": "Only literal-source secrets can be revealed from the UI. Bundle and managed-service values live in the platform secrets backend.",
-        "permissionDenied": "You don't have permission to read secret values."
+        "show": "Wert anzeigen",
+        "hide": "Wert verbergen",
+        "revealing": "Wird angezeigt…",
+        "failed": "Anzeige fehlgeschlagen",
+        "toastRevealed": "Von Ihnen angezeigt; im Audit protokolliert",
+        "literalOnly": "Nur direkt gesetzte Geheimnisse lassen sich in der Oberfläche anzeigen. Werte aus Paketen und verwalteten Diensten liegen im Geheimnis-Backend der Plattform.",
+        "permissionDenied": "Sie haben keine Berechtigung, Geheimniswerte zu lesen.",
+        "masked": "Wert verborgen"
       },
       "edit": {
-        "save": "Save",
-        "cancel": "Cancel",
-        "saving": "Saving…",
-        "hint": "Enter to save · Esc to cancel",
-        "toastSaved": "Updated {key}"
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "saving": "Wird gespeichert…",
+        "hint": "Enter zum Speichern · Esc zum Abbrechen",
+        "toastSaved": "{key} aktualisiert"
       },
-      "lastEditedBy": "Last edited by {name}",
-      "lastEditedByUnknown": "Last editor unknown",
+      "lastEditedBy": "Zuletzt bearbeitet von {name}",
+      "lastEditedByUnknown": "Letzter Bearbeiter unbekannt",
       "attached": {
-        "title": "Attached bundles",
-        "description": "Bundles currently merged into this app's runtime env. App-local literals win on key collision regardless of merge order — use this list to debug precedence.",
-        "empty": "No bundles attached yet. Attach one to share keys across apps without copying them into the manifest.",
-        "loading": "Loading attachments…",
-        "detach": "Detach",
-        "detaching": "Detaching…",
-        "detachConfirmTitle": "Detach {name}?",
-        "detachConfirmDescription": "Removes the bundle attachment from {env}. The bundle and its values stay in the secrets backend — only this app's reference is removed. Workloads pick up the change on the next deploy.",
-        "detachConfirm": "Detach bundle",
-        "toastDetached": "Detached {name}",
+        "title": "Angehängte Pakete",
+        "description": "Pakete, die mit der Laufzeitumgebung dieser App zusammengeführt werden. App-lokale Werte gewinnen bei gleichen Schlüsseln unabhängig von der Reihenfolge. Nutzen Sie diese Liste, um die Priorität zu prüfen.",
+        "empty": "Noch keine Pakete angehängt. Hängen Sie eines an, um Schlüssel zwischen Apps zu teilen, ohne sie ins Manifest zu kopieren.",
+        "loading": "Verknüpfungen werden geladen…",
+        "detach": "Trennen",
+        "detaching": "Wird getrennt…",
+        "detachConfirmTitle": "{name} trennen?",
+        "detachConfirmDescription": "Entfernt die Paketverknüpfung aus {env}. Paket und Werte bleiben im Geheimnis-Backend; nur die Referenz dieser App wird entfernt. Workloads übernehmen die Änderung beim nächsten Deployment.",
+        "detachConfirm": "Paket trennen",
+        "toastDetached": "{name} getrennt",
         "columns": {
-          "bundle": "Bundle",
+          "bundle": "Paket",
           "team": "Team",
-          "env": "Env",
-          "prefix": "Prefix",
-          "keys": "Keys",
-          "order": "Order",
-          "attached": "Attached"
+          "env": "Umgebung",
+          "prefix": "Präfix",
+          "keys": "Schlüssel",
+          "order": "Reihenfolge",
+          "attached": "Angehängt"
         },
         "noTeam": "—",
         "noPrefix": "—",
         "keyCountUnknown": "?",
-        "orderHint": "lowest-first; app literals override",
+        "orderHint": "niedrigste zuerst; App-Werte haben Vorrang",
         "perEnvBadge": "{env}"
       },
       "pendingProposals": {
-        "title": "{count, plural, one {# ausstehender Geheimnisänderungsantrag} other {# ausstehende Geheimnisänderungsanträge}}",
-        "appWide": "app-weit",
+        "title": "{count, plural, one {# ausstehender Änderungsvorschlag für ein Geheimnis} other {# ausstehende Änderungsvorschläge für Geheimnisse}}",
+        "appWide": "App-weit",
         "votes": "{received}/{required} Genehmigungen",
-        "seeAll": "Alle {count} Anträge anzeigen →"
+        "seeAll": "Alle {count} Vorschläge ansehen →"
       },
-      "pendingApprovalBadge": "won't deploy as shown",
-      "pendingApprovalTooltip": "This value has no matching approval and will revert to the last-approved value on the next deploy.",
+      "pendingApprovalBadge": "wird so nicht deployt",
+      "pendingApprovalTooltip": "Dieser Wert hat keine passende Genehmigung und wird beim nächsten Deployment auf den zuletzt genehmigten Wert zurückgesetzt.",
       "revertWarning": {
-        "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
-        "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
-        "seeAll": "+{count} more"
+        "title": "{count, plural, one {# Schlüssel wird beim nächsten Deployment zurückgesetzt} other {# Schlüssel werden beim nächsten Deployment zurückgesetzt}}",
+        "description": "Diese Werte sind vorgemerkt, haben aber keine passende Genehmigung. Ohne diese setzt das nächste Deployment sie auf die zuletzt genehmigten Werte zurück.",
+        "seeAll": "+{count} weitere"
+      },
+      "history": {
+        "title": "Audit-Verlauf",
+        "action": "Verlauf",
+        "actionHint": "Audit-Verlauf für diesen Schlüssel",
+        "loadError": "Verlauf konnte nicht geladen werden",
+        "empty": "Noch keine Audit-Einträge",
+        "system": "System",
+        "actions": {
+          "set": "Setzen",
+          "rotate": "Rotieren",
+          "delete": "Löschen",
+          "metadata": "Metadaten aktualisieren",
+          "import": "Massenimport"
+        }
+      },
+      "source": {
+        "literal": "Direkter Wert",
+        "bundle": "Paket",
+        "managed": "Verwalteter Dienst"
+      },
+      "setVia": {
+        "web": "Web",
+        "cli": "CLI",
+        "envPaste": "Aus .env eingefügt",
+        "bundle": "Paketsynchronisierung",
+        "managed": "Verwalteter Dienst",
+        "description": "Gesetzt über {source}"
+      },
+      "scope": {
+        "title": "Geltungsbereich",
+        "all": "Alle Deployments",
+        "production": "Produktion",
+        "preview": "Vorschauen",
+        "previewBranch": "Vorschau: {branch}"
+      },
+      "expiry": {
+        "expired": "Vor {days, plural, one {# Tag} other {# Tagen}} abgelaufen",
+        "rotateSoon": "Rotieren: läuft in {days, plural, one {# Tag} other {# Tagen}} ab",
+        "expires": "Läuft in {days, plural, one {# Tag} other {# Tagen}} ab"
+      },
+      "rotate": "Rotieren",
+      "rotateHint": "Rotieren (im Audit von Bearbeiten unterschieden)",
+      "list": {
+        "searchKeys": "Schlüssel suchen…",
+        "searchBundles": "Pakete, Teams und Präfixe suchen…",
+        "all": "Alle",
+        "localNote": "Filterung, Sortierung und Seiteneinteilung erfolgen im Browser: Das Backend liefert alle Zeilen auf einmal."
+      },
+      "pushToRepo": "Ins Repository übertragen",
+      "toasts": {
+        "bundleDeleteBlocked": "Trennen Sie das Paket, um diesen Schlüssel zu entfernen.",
+        "managedDeleteBlocked": "Verbindungsdaten verwalteter Dienste lassen sich nicht direkt bearbeiten.",
+        "deleted": "{key} gelöscht",
+        "deleteFailed": "Löschen fehlgeschlagen",
+        "rotateFailed": "Rotation fehlgeschlagen",
+        "saveFailed": "Speichern fehlgeschlagen",
+        "detachFailed": "Trennen fehlgeschlagen",
+        "set": "{key} gesetzt",
+        "setScoped": "{key} gesetzt ({scope})",
+        "imported": "{count, plural, one {# Schlüssel importiert} other {# Schlüssel importiert}}",
+        "importFailed": "Import fehlgeschlagen"
       }
     },
     "security": {

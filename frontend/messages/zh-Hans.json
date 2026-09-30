@@ -1426,100 +1426,174 @@
       }
     },
     "secrets": {
-      "title": "Secrets",
-      "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest; push to repo to land.",
-      "bulkImport": "Bulk import",
-      "newSecret": "New secret",
-      "environment": "Environment",
-      "allEnvironments": "All environments",
-      "keysCount": "{count, plural, one {# key} other {# keys}}",
-      "emptyTitle": "No secrets yet",
-      "emptyDescription": "Add literals via 'New secret', or attach a Secret Bundle. Managed services contribute their connection envelope automatically.",
+      "title": "密钥",
+      "description": "{slug} 的应用级 [env] 字面值、附加密钥包及托管服务连接信息。设置或删除会更新暂存的清单；推送到仓库后才会提交更改。",
+      "bulkImport": "批量导入",
+      "newSecret": "新建密钥",
+      "environment": "环境",
+      "allEnvironments": "所有环境",
+      "keysCount": "{count, plural, one {# 个键} other {# 个键}}",
+      "emptyTitle": "暂无密钥",
+      "emptyDescription": "通过“新建密钥”添加字面值，或附加密钥包。托管服务会自动提供连接信息。",
       "columns": {
-        "key": "Key",
-        "source": "Source",
-        "env": "Env",
-        "lastEdited": "Last edited",
-        "value": "Value"
+        "key": "键",
+        "source": "来源",
+        "env": "环境",
+        "lastEdited": "上次编辑",
+        "value": "值",
+        "actions": "操作"
       },
       "delete": {
-        "title": "Delete {key}?",
-        "fallbackTitle": "Delete secret?",
-        "description": "Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed.",
-        "confirm": "Delete secret"
+        "title": "删除 {key}？",
+        "fallbackTitle": "删除密钥？",
+        "description": "在平台清单中暂存更改。从配置页面推送到仓库后确认更改；推送前仍可恢复。",
+        "confirm": "删除密钥"
       },
       "setSheet": {
-        "title": "New secret",
-        "description": "Sets one literal in the app's [env] table. Plaintext is never returned by the API; only this submit ships the value to the backend.",
-        "keyLabel": "Key",
-        "valueLabel": "Value",
-        "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
-        "submit": "Save secret",
-        "submitting": "Saving…"
+        "title": "新建密钥",
+        "description": "在应用的 [env] 表中设置字面值。API 不会返回明文；仅此提交会将值发送到后端。",
+        "keyLabel": "键",
+        "valueLabel": "值",
+        "valueHint": "存储在 manifest_raw_staged 中。在配置页面使用推送到仓库以提交更改。",
+        "submit": "保存密钥",
+        "submitting": "正在保存…",
+        "scope": "适用范围",
+        "allScope": "所有环境（默认）",
+        "productionScope": "仅生产",
+        "previewScope": "所有预览",
+        "branchScope": "指定预览分支…",
+        "branchLabel": "预览分支",
+        "allHint": "此应用的所有部署均可使用。",
+        "productionHint": "仅生产部署可以读取此值。",
+        "previewHint": "仅预览部署可以读取此值。",
+        "branchHint": "仅指定预览分支可以读取此值。"
       },
       "bulkSheet": {
-        "title": "Bulk import from .env",
-        "description": "Paste a .env file. Each KEY=value line gets staged into the app's [env] table. Existing keys are overwritten.",
-        "willSet": "Will set {count, plural, one {# key} other {# keys}}:",
-        "submit": "Import",
-        "submitting": "Importing…"
+        "title": "从 .env 批量导入",
+        "description": "粘贴 .env 文件。每行 KEY=value 将暂存到应用的 [env] 表中，已有键将被覆盖。",
+        "willSet": "将设置 {count, plural, one {# 个键} other {# 个键}}：",
+        "submit": "导入",
+        "submitting": "正在导入…"
       },
       "reveal": {
-        "show": "Reveal value",
-        "hide": "Hide value",
-        "revealing": "Revealing…",
-        "failed": "Reveal failed",
-        "toastRevealed": "Revealed by you — audit logged",
-        "literalOnly": "Only literal-source secrets can be revealed from the UI. Bundle and managed-service values live in the platform secrets backend.",
-        "permissionDenied": "You don't have permission to read secret values."
+        "show": "显示值",
+        "hide": "隐藏值",
+        "revealing": "正在显示…",
+        "failed": "显示失败",
+        "toastRevealed": "您已显示此值，操作已记入审计日志",
+        "literalOnly": "界面中只能显示直接设置的密钥。密钥包和托管服务的值存储在平台密钥后端中。",
+        "permissionDenied": "您无权读取密钥值。",
+        "masked": "值已隐藏"
       },
       "edit": {
-        "save": "Save",
-        "cancel": "Cancel",
-        "saving": "Saving…",
-        "hint": "Enter to save · Esc to cancel",
-        "toastSaved": "Updated {key}"
+        "save": "保存",
+        "cancel": "取消",
+        "saving": "正在保存…",
+        "hint": "Enter 保存 · Esc 取消",
+        "toastSaved": "已更新 {key}"
       },
-      "lastEditedBy": "Last edited by {name}",
-      "lastEditedByUnknown": "Last editor unknown",
+      "lastEditedBy": "上次编辑者：{name}",
+      "lastEditedByUnknown": "上次编辑者未知",
       "attached": {
-        "title": "Attached bundles",
-        "description": "Bundles currently merged into this app's runtime env. App-local literals win on key collision regardless of merge order — use this list to debug precedence.",
-        "empty": "No bundles attached yet. Attach one to share keys across apps without copying them into the manifest.",
-        "loading": "Loading attachments…",
-        "detach": "Detach",
-        "detaching": "Detaching…",
-        "detachConfirmTitle": "Detach {name}?",
-        "detachConfirmDescription": "Removes the bundle attachment from {env}. The bundle and its values stay in the secrets backend — only this app's reference is removed. Workloads pick up the change on the next deploy.",
-        "detachConfirm": "Detach bundle",
-        "toastDetached": "Detached {name}",
+        "title": "附加密钥包",
+        "description": "合并到此应用运行环境中的密钥包。键冲突时，无论合并顺序如何，应用本地字面值均优先。可用此列表排查优先级。",
+        "empty": "尚未附加密钥包。附加后可在应用间共享键，无需将其复制到清单中。",
+        "loading": "正在加载关联…",
+        "detach": "解除附加",
+        "detaching": "正在解除附加…",
+        "detachConfirmTitle": "解除 {name} 的附加？",
+        "detachConfirmDescription": "移除 {env} 中的密钥包关联。密钥包及其值仍保留在密钥后端，仅移除此应用的引用。工作负载将在下次部署时应用更改。",
+        "detachConfirm": "解除密钥包附加",
+        "toastDetached": "已解除 {name} 的附加",
         "columns": {
-          "bundle": "Bundle",
-          "team": "Team",
-          "env": "Env",
-          "prefix": "Prefix",
-          "keys": "Keys",
-          "order": "Order",
-          "attached": "Attached"
+          "bundle": "密钥包",
+          "team": "团队",
+          "env": "环境",
+          "prefix": "前缀",
+          "keys": "键",
+          "order": "顺序",
+          "attached": "附加时间"
         },
         "noTeam": "—",
         "noPrefix": "—",
         "keyCountUnknown": "?",
-        "orderHint": "lowest-first; app literals override",
+        "orderHint": "从低到高；应用字面值优先",
         "perEnvBadge": "{env}"
       },
       "pendingProposals": {
-        "title": "{count, plural, one {# 个待处理的密钥变更提案} other {# 个待处理的密钥变更提案}}",
-        "appWide": "应用全局",
-        "votes": "{received}/{required} 个审批",
+        "title": "{count, plural, one {# 个待处理密钥更改提案} other {# 个待处理密钥更改提案}}",
+        "appWide": "应用范围",
+        "votes": "{received}/{required} 项批准",
         "seeAll": "查看全部 {count} 个提案 →"
       },
-      "pendingApprovalBadge": "won't deploy as shown",
-      "pendingApprovalTooltip": "This value has no matching approval and will revert to the last-approved value on the next deploy.",
+      "pendingApprovalBadge": "不会按显示值部署",
+      "pendingApprovalTooltip": "此值没有匹配的批准，下次部署时将恢复为上次批准的值。",
       "revertWarning": {
-        "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
-        "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
-        "seeAll": "+{count} more"
+        "title": "{count, plural, one {# 个键将在下次部署时恢复} other {# 个键将在下次部署时恢复}}",
+        "description": "这些字面值已暂存，但没有匹配的批准。没有批准时，下次部署会将其恢复为上次批准的值。",
+        "seeAll": "另有 {count} 个"
+      },
+      "history": {
+        "title": "审计历史",
+        "action": "历史",
+        "actionHint": "此键的审计历史",
+        "loadError": "无法加载历史",
+        "empty": "暂无审计记录",
+        "system": "系统",
+        "actions": {
+          "set": "设置",
+          "rotate": "轮换",
+          "delete": "删除",
+          "metadata": "更新元数据",
+          "import": "批量导入"
+        }
+      },
+      "source": {
+        "literal": "字面值",
+        "bundle": "密钥包",
+        "managed": "托管服务"
+      },
+      "setVia": {
+        "web": "网页",
+        "cli": "CLI",
+        "envPaste": "粘贴 .env",
+        "bundle": "密钥包同步",
+        "managed": "托管服务",
+        "description": "设置方式：{source}"
+      },
+      "scope": {
+        "title": "适用范围",
+        "all": "所有部署",
+        "production": "生产",
+        "preview": "预览",
+        "previewBranch": "预览：{branch}"
+      },
+      "expiry": {
+        "expired": "已于 {days, plural, one {# 天前} other {# 天前}}过期",
+        "rotateSoon": "请轮换：将在 {days, plural, one {# 天后} other {# 天后}}过期",
+        "expires": "将在 {days, plural, one {# 天后} other {# 天后}}过期"
+      },
+      "rotate": "轮换",
+      "rotateHint": "轮换（在审计日志中区别于编辑）",
+      "list": {
+        "searchKeys": "搜索键…",
+        "searchBundles": "搜索密钥包、团队、前缀…",
+        "all": "全部",
+        "localNote": "在浏览器中筛选、排序和分页：后端一次返回所有行。"
+      },
+      "pushToRepo": "推送到仓库",
+      "toasts": {
+        "bundleDeleteBlocked": "请解除密钥包附加以移除此键。",
+        "managedDeleteBlocked": "托管服务连接信息中的键无法直接编辑。",
+        "deleted": "已删除 {key}",
+        "deleteFailed": "删除失败",
+        "rotateFailed": "轮换失败",
+        "saveFailed": "保存失败",
+        "detachFailed": "解除附加失败",
+        "set": "已设置 {key}",
+        "setScoped": "已设置 {key}（{scope}）",
+        "imported": "已导入 {count, plural, one {# 个键} other {# 个键}}",
+        "importFailed": "导入失败"
       }
     },
     "security": {

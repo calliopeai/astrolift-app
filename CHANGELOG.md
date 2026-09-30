@@ -49,6 +49,10 @@
   language in all eight supported locales, including rich environment-variable
   hints. Failed confirmations remain open for retry (#2145; remaining domains
   are still being translated).
+- App secret controls, scopes, history and mutation feedback use all eight
+  locales. Dates and expiry counts follow the locale; secret values, scope
+  identifiers and server-provided errors stay unchanged (#2145).
+
 - Edge-access rule descriptions, editor controls, validation and save feedback
   use all eight locales. Preview counts use locale number/plural formatting;
   group names, email identities and access policy stay unchanged (#2145).

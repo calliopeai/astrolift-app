@@ -1426,100 +1426,174 @@
       }
     },
     "secrets": {
-      "title": "Secrets",
-      "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest; push to repo to land.",
-      "bulkImport": "Bulk import",
-      "newSecret": "New secret",
-      "environment": "Environment",
-      "allEnvironments": "All environments",
-      "keysCount": "{count, plural, one {# key} other {# keys}}",
-      "emptyTitle": "No secrets yet",
-      "emptyDescription": "Add literals via 'New secret', or attach a Secret Bundle. Managed services contribute their connection envelope automatically.",
+      "title": "シークレット",
+      "description": "{slug} のアプリ共通 [env] 値、接続済みバンドル、マネージドサービスの接続情報です。設定・削除はステージ済みマニフェストに保存され、リポジトリへのプッシュで確定します。",
+      "bulkImport": "一括インポート",
+      "newSecret": "新しいシークレット",
+      "environment": "環境",
+      "allEnvironments": "すべての環境",
+      "keysCount": "{count, plural, one {#件のキー} other {#件のキー}}",
+      "emptyTitle": "シークレットはまだありません",
+      "emptyDescription": "「新しいシークレット」で値を追加するか、シークレットバンドルを接続します。マネージドサービスの接続情報は自動的に追加されます。",
       "columns": {
-        "key": "Key",
-        "source": "Source",
-        "env": "Env",
-        "lastEdited": "Last edited",
-        "value": "Value"
+        "key": "キー",
+        "source": "取得元",
+        "env": "環境",
+        "lastEdited": "最終編集日時",
+        "value": "値",
+        "actions": "操作"
       },
       "delete": {
-        "title": "Delete {key}?",
-        "fallbackTitle": "Delete secret?",
-        "description": "Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed.",
-        "confirm": "Delete secret"
+        "title": "{key} を削除しますか？",
+        "fallbackTitle": "シークレットを削除しますか？",
+        "description": "プラットフォーム側のマニフェストに変更をステージします。設定ページからリポジトリへプッシュすると確定します。プッシュ前なら復元できます。",
+        "confirm": "シークレットを削除"
       },
       "setSheet": {
-        "title": "New secret",
-        "description": "Sets one literal in the app's [env] table. Plaintext is never returned by the API; only this submit ships the value to the backend.",
-        "keyLabel": "Key",
-        "valueLabel": "Value",
-        "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
-        "submit": "Save secret",
-        "submitting": "Saving…"
+        "title": "新しいシークレット",
+        "description": "アプリの [env] テーブルに値を設定します。API は平文を返さず、この送信時のみ値がバックエンドに渡されます。",
+        "keyLabel": "キー",
+        "valueLabel": "値",
+        "valueHint": "manifest_raw_staged に保存されます。設定ページからリポジトリへプッシュして変更を確定します。",
+        "submit": "シークレットを保存",
+        "submitting": "保存中…",
+        "scope": "適用範囲",
+        "allScope": "すべての環境（既定）",
+        "productionScope": "本番のみ",
+        "previewScope": "すべてのプレビュー",
+        "branchScope": "特定のプレビューブランチ…",
+        "branchLabel": "プレビューブランチ",
+        "allHint": "このアプリのすべてのデプロイで利用できます。",
+        "productionHint": "本番デプロイのみこの値を読み取れます。",
+        "previewHint": "プレビューデプロイのみこの値を読み取れます。",
+        "branchHint": "指定したプレビューブランチのみこの値を読み取れます。"
       },
       "bulkSheet": {
-        "title": "Bulk import from .env",
-        "description": "Paste a .env file. Each KEY=value line gets staged into the app's [env] table. Existing keys are overwritten.",
-        "willSet": "Will set {count, plural, one {# key} other {# keys}}:",
-        "submit": "Import",
-        "submitting": "Importing…"
+        "title": ".env から一括インポート",
+        "description": ".env ファイルを貼り付けます。各 KEY=value 行がアプリの [env] テーブルにステージされ、既存のキーは上書きされます。",
+        "willSet": "{count, plural, one {#件のキー} other {#件のキー}}を設定します：",
+        "submit": "インポート",
+        "submitting": "インポート中…"
       },
       "reveal": {
-        "show": "Reveal value",
-        "hide": "Hide value",
-        "revealing": "Revealing…",
-        "failed": "Reveal failed",
-        "toastRevealed": "Revealed by you — audit logged",
-        "literalOnly": "Only literal-source secrets can be revealed from the UI. Bundle and managed-service values live in the platform secrets backend.",
-        "permissionDenied": "You don't have permission to read secret values."
+        "show": "値を表示",
+        "hide": "値を非表示",
+        "revealing": "表示中…",
+        "failed": "表示に失敗しました",
+        "toastRevealed": "値を表示しました。監査ログに記録されました",
+        "literalOnly": "画面で表示できるのは直接設定したシークレットのみです。バンドルとマネージドサービスの値はプラットフォームのシークレットバックエンドにあります。",
+        "permissionDenied": "シークレットの値を読み取る権限がありません。",
+        "masked": "値は非表示です"
       },
       "edit": {
-        "save": "Save",
-        "cancel": "Cancel",
-        "saving": "Saving…",
-        "hint": "Enter to save · Esc to cancel",
-        "toastSaved": "Updated {key}"
+        "save": "保存",
+        "cancel": "キャンセル",
+        "saving": "保存中…",
+        "hint": "Enter で保存 · Esc でキャンセル",
+        "toastSaved": "{key} を更新しました"
       },
-      "lastEditedBy": "Last edited by {name}",
-      "lastEditedByUnknown": "Last editor unknown",
+      "lastEditedBy": "最終編集者：{name}",
+      "lastEditedByUnknown": "最終編集者は不明です",
       "attached": {
-        "title": "Attached bundles",
-        "description": "Bundles currently merged into this app's runtime env. App-local literals win on key collision regardless of merge order — use this list to debug precedence.",
-        "empty": "No bundles attached yet. Attach one to share keys across apps without copying them into the manifest.",
-        "loading": "Loading attachments…",
-        "detach": "Detach",
-        "detaching": "Detaching…",
-        "detachConfirmTitle": "Detach {name}?",
-        "detachConfirmDescription": "Removes the bundle attachment from {env}. The bundle and its values stay in the secrets backend — only this app's reference is removed. Workloads pick up the change on the next deploy.",
-        "detachConfirm": "Detach bundle",
-        "toastDetached": "Detached {name}",
+        "title": "接続済みバンドル",
+        "description": "アプリの実行環境に統合されるバンドルです。同じキーがある場合、統合順序にかかわらずアプリ固有の値が優先されます。この一覧で優先順位を確認できます。",
+        "empty": "バンドルはまだ接続されていません。接続すると、マニフェストにコピーせずにアプリ間でキーを共有できます。",
+        "loading": "接続を読み込み中…",
+        "detach": "接続解除",
+        "detaching": "接続解除中…",
+        "detachConfirmTitle": "{name} の接続を解除しますか？",
+        "detachConfirmDescription": "{env} のバンドル接続を削除します。バンドルと値はシークレットバックエンドに残り、このアプリの参照のみ削除されます。次のデプロイでワークロードに反映されます。",
+        "detachConfirm": "バンドルの接続を解除",
+        "toastDetached": "{name} の接続を解除しました",
         "columns": {
-          "bundle": "Bundle",
-          "team": "Team",
-          "env": "Env",
-          "prefix": "Prefix",
-          "keys": "Keys",
-          "order": "Order",
-          "attached": "Attached"
+          "bundle": "バンドル",
+          "team": "チーム",
+          "env": "環境",
+          "prefix": "プレフィックス",
+          "keys": "キー",
+          "order": "順序",
+          "attached": "接続日時"
         },
         "noTeam": "—",
         "noPrefix": "—",
         "keyCountUnknown": "?",
-        "orderHint": "lowest-first; app literals override",
+        "orderHint": "小さい順。アプリ固有の値が優先",
         "perEnvBadge": "{env}"
       },
       "pendingProposals": {
-        "title": "{count, plural, one {# 件の保留中のシークレット変更提案} other {# 件の保留中のシークレット変更提案}}",
+        "title": "{count, plural, one {#件のシークレット変更提案が承認待ち} other {#件のシークレット変更提案が承認待ち}}",
         "appWide": "アプリ全体",
-        "votes": "{received}/{required} 件の承認",
-        "seeAll": "すべての {count} 件の提案を表示 →"
+        "votes": "承認 {received}/{required}",
+        "seeAll": "{count}件の提案をすべて表示 →"
       },
-      "pendingApprovalBadge": "won't deploy as shown",
-      "pendingApprovalTooltip": "This value has no matching approval and will revert to the last-approved value on the next deploy.",
+      "pendingApprovalBadge": "表示どおりにはデプロイされません",
+      "pendingApprovalTooltip": "この値に対応する承認がないため、次のデプロイで最後に承認された値に戻ります。",
       "revertWarning": {
-        "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
-        "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
-        "seeAll": "+{count} more"
+        "title": "{count, plural, one {#件のキーが次のデプロイで元に戻ります} other {#件のキーが次のデプロイで元に戻ります}}",
+        "description": "これらの値はステージ済みですが、対応する承認がありません。承認がない場合、次のデプロイで最後に承認された値に戻ります。",
+        "seeAll": "ほか{count}件"
+      },
+      "history": {
+        "title": "監査履歴",
+        "action": "履歴",
+        "actionHint": "このキーの監査履歴",
+        "loadError": "履歴を読み込めませんでした",
+        "empty": "監査記録はまだありません",
+        "system": "システム",
+        "actions": {
+          "set": "設定",
+          "rotate": "ローテーション",
+          "delete": "削除",
+          "metadata": "メタデータを更新",
+          "import": "一括インポート"
+        }
+      },
+      "source": {
+        "literal": "直接設定",
+        "bundle": "バンドル",
+        "managed": "マネージドサービス"
+      },
+      "setVia": {
+        "web": "ウェブ",
+        "cli": "CLI",
+        "envPaste": ".env の貼り付け",
+        "bundle": "バンドル同期",
+        "managed": "マネージドサービス",
+        "description": "設定方法：{source}"
+      },
+      "scope": {
+        "title": "適用範囲",
+        "all": "すべてのデプロイ",
+        "production": "本番",
+        "preview": "プレビュー",
+        "previewBranch": "プレビュー：{branch}"
+      },
+      "expiry": {
+        "expired": "{days, plural, one {#日前} other {#日前}}に期限切れ",
+        "rotateSoon": "ローテーションが必要：{days, plural, one {#日後} other {#日後}}に期限切れ",
+        "expires": "{days, plural, one {#日後} other {#日後}}に期限切れ"
+      },
+      "rotate": "ローテーション",
+      "rotateHint": "ローテーション（監査ログでは編集と区別されます）",
+      "list": {
+        "searchKeys": "キーを検索…",
+        "searchBundles": "バンドル、チーム、プレフィックスを検索…",
+        "all": "すべて",
+        "localNote": "ブラウザーで絞り込み、並べ替え、ページ分割を行います。バックエンドはすべての行を一度に返します。"
+      },
+      "pushToRepo": "リポジトリにプッシュ",
+      "toasts": {
+        "bundleDeleteBlocked": "このキーを削除するにはバンドルの接続を解除してください。",
+        "managedDeleteBlocked": "マネージドサービスの接続情報のキーは直接編集できません。",
+        "deleted": "{key} を削除しました",
+        "deleteFailed": "削除に失敗しました",
+        "rotateFailed": "ローテーションに失敗しました",
+        "saveFailed": "保存に失敗しました",
+        "detachFailed": "接続解除に失敗しました",
+        "set": "{key} を設定しました",
+        "setScoped": "{key} を設定しました（{scope}）",
+        "imported": "{count, plural, one {#件のキー} other {#件のキー}}をインポートしました",
+        "importFailed": "インポートに失敗しました"
       }
     },
     "security": {

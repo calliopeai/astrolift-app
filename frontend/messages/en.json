@@ -1186,7 +1186,19 @@
         "actions": "Actions"
       },
       "history": {
-        "title": "Audit history"
+        "title": "Audit history",
+        "action": "History",
+        "actionHint": "Audit history for this key",
+        "loadError": "Could not load history",
+        "empty": "No audit entries yet",
+        "system": "System",
+        "actions": {
+          "set": "Set",
+          "rotate": "Rotate",
+          "delete": "Delete",
+          "metadata": "Update metadata",
+          "import": "Bulk import"
+        }
       },
       "delete": {
         "title": "Delete {key}?",
@@ -1201,7 +1213,17 @@
         "valueLabel": "Value",
         "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
         "submit": "Save secret",
-        "submitting": "Saving…"
+        "submitting": "Saving…",
+        "scope": "Scope",
+        "allScope": "All environments (default)",
+        "productionScope": "Production only",
+        "previewScope": "All previews",
+        "branchScope": "Specific preview branch…",
+        "branchLabel": "Preview branch",
+        "allHint": "Visible to every deploy of this app.",
+        "productionHint": "Only production deploys can read this value.",
+        "previewHint": "Only preview deploys can read this value.",
+        "branchHint": "Only the named preview branch can read this value."
       },
       "bulkSheet": {
         "title": "Bulk import from .env",
@@ -1267,6 +1289,53 @@
         "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
         "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
         "seeAll": "+{count} more"
+      },
+      "source": {
+        "literal": "Literal",
+        "bundle": "Bundle",
+        "managed": "Managed service"
+      },
+      "setVia": {
+        "web": "Web",
+        "cli": "CLI",
+        "envPaste": ".env paste",
+        "bundle": "Bundle sync",
+        "managed": "Managed service",
+        "description": "Set via {source}"
+      },
+      "scope": {
+        "title": "Scope",
+        "all": "All deploys",
+        "production": "Production",
+        "preview": "Previews",
+        "previewBranch": "Preview: {branch}"
+      },
+      "expiry": {
+        "expired": "Expired {days, plural, one {# day ago} other {# days ago}}",
+        "rotateSoon": "Rotate — expires in {days, plural, one {# day} other {# days}}",
+        "expires": "Expires in {days, plural, one {# day} other {# days}}"
+      },
+      "rotate": "Rotate",
+      "rotateHint": "Rotate (distinct from edit in the audit log)",
+      "list": {
+        "searchKeys": "Search keys…",
+        "searchBundles": "Search bundles, teams, prefixes…",
+        "all": "All",
+        "localNote": "Filtered, sorted and paged in the browser: this list’s backend field returns every row at once."
+      },
+      "pushToRepo": "Push to repo",
+      "toasts": {
+        "bundleDeleteBlocked": "Detach the bundle to remove this key.",
+        "managedDeleteBlocked": "Managed-service envelope keys aren’t editable directly.",
+        "deleted": "Deleted {key}",
+        "deleteFailed": "Delete failed",
+        "rotateFailed": "Rotate failed",
+        "saveFailed": "Save failed",
+        "detachFailed": "Detach failed",
+        "set": "Set {key}",
+        "setScoped": "Set {key} ({scope})",
+        "imported": "Imported {count, plural, one {# key} other {# keys}}",
+        "importFailed": "Import failed"
       }
     },
     "security": {

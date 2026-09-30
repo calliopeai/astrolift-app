@@ -19,6 +19,8 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { useFormatters } from "@/lib/i18n/formatters";
+
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
@@ -51,7 +53,7 @@ import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.
 
 import { SECRETS_SECTIONS, type SecretsSection } from "./secrets-list";
 import type { AppSecret, AppSecretBundleAttachment } from "./secrets.types";
-import { ALL_ENVS, scopeBadgeLabel, type useAppSecrets } from "./use-app-secrets";
+import { ALL_ENVS, useSecretScopeLabel, type useAppSecrets } from "./use-app-secrets";
 
 export type SecretsScreenProps = ReturnType<typeof useAppSecrets> & {
   /** The app tab bar. */
@@ -64,12 +66,6 @@ export type SecretsScreenProps = ReturnType<typeof useAppSecrets> & {
   sectionHref: (section: SecretsSection) => string;
 };
 
-const SOURCE_LABEL: Record<string, string> = {
-  literal: "literal",
-  bundle: "bundle",
-  managed_service: "managed",
-};
-
 const SOURCE_TONE: Record<string, "secondary" | "outline" | "default"> = {
   literal: "secondary",
   bundle: "outline",
@@ -78,14 +74,6 @@ const SOURCE_TONE: Record<string, "secondary" | "outline" | "default"> = {
 
 // #678 — provenance of the most recent set/rotate write. Keep these in
 // sync with `AppSecretType.set_via` valid values in the backend.
-const SET_VIA_LABEL: Record<string, string> = {
-  web: "web",
-  cli: "CLI",
-  env_paste: ".env paste",
-  bundle: "bundle sync",
-  managed_service: "managed service",
-};
-
 // #679 — per-environment scope sentinel for the "preview:<branch>"
 // option in the scope <Select>. The literal value is replaced with
 // "preview:" + branch input when the form is submitted; the sentinel
@@ -96,6 +84,7 @@ const SCOPE_PREVIEW_BRANCH = "preview:<branch>";
  *  the default "all" scope so the table stays quiet for the common
  *  case; renders for production / preview / preview:branch. */
 function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
+  const scopeLabel = useSecretScopeLabel();
   if (!scope || scope === "all") return null;
   const isProd = scope === "production";
   return (
@@ -107,7 +96,7 @@ function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
           : "border-info-border bg-info/10 text-2xs text-info-fg ml-2"
       }
     >
-      {scopeBadgeLabel(scope)}
+      {scopeLabel(scope)}
     </Badge>
   );
 }
@@ -115,21 +104,23 @@ function SecretScopeBadge({ scope }: { scope: string | null | undefined }) {
 /** #677 — small inline expiry chip for the secret key cell. Hidden when
  *  no rotation deadline is set; warning < 14d; destructive < 7d / past. */
 function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined }) {
+  const t = useTranslations("apps.secrets.expiry");
   const [now] = React.useState(() => Date.now());
   if (!expiresAt) return null;
   const ms = new Date(expiresAt).getTime() - now;
   const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (!Number.isFinite(days)) return null;
   if (days < 0) {
     return (
       <Badge variant="destructive" className="text-2xs ml-2">
-        Expired {Math.abs(days)}d ago
+        {t("expired", { days: Math.abs(days) })}
       </Badge>
     );
   }
   if (days <= 7) {
     return (
       <Badge variant="destructive" className="text-2xs ml-2">
-        Rotate — expires in {days}d
+        {t("rotateSoon", { days })}
       </Badge>
     );
   }
@@ -139,13 +130,13 @@ function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined
         variant="outline"
         className="border-warning-border bg-warning/10 text-2xs text-warning-fg ml-2"
       >
-        Expires in {days}d
+        {t("expires", { days })}
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="text-muted-foreground text-2xs ml-2">
-      Expires in {days}d
+      {t("expires", { days })}
     </Badge>
   );
 }
@@ -261,6 +252,7 @@ export function SecretsScreen({
   sectionHref,
 }: SecretsScreenProps) {
   const t = useTranslations("apps.secrets");
+  const fmt = useFormatters();
   const [setOpen, setSetOpen] = React.useState(false);
   const [bulkOpen, setBulkOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AppSecret | null>(null);
@@ -270,6 +262,7 @@ export function SecretsScreen({
 
   const columns = secretColumns({
     t,
+    formatDateTime: fmt.formatDateTime,
     revealedValues,
     editingId,
     rotatingId,
@@ -361,7 +354,7 @@ export function SecretsScreen({
             <TooltipProvider delayDuration={200}>
               <ListPage<AppSecret>
                 embedded
-                list={keysList}
+                list={localizeSecretList(keysList, t)}
                 label={t("title")}
                 columns={columns}
                 rows={keyRows}
@@ -469,8 +462,49 @@ export function SecretsScreen({
 
 type SecretsT = ReturnType<typeof useTranslations<"apps.secrets">>;
 
+function localizeSecretList(
+  list: ListStateController,
+  t: SecretsT,
+  bundles = false
+): ListStateController {
+  const options: Record<string, string> = {
+    literal: t("source.literal"),
+    bundle: t("source.bundle"),
+    managed_service: t("source.managed"),
+    all: t("scope.all"),
+    production: t("scope.production"),
+    preview: t("scope.preview"),
+  };
+  return {
+    ...list,
+    definition: {
+      ...list.definition,
+      searchPlaceholder: t(bundles ? "list.searchBundles" : "list.searchKeys"),
+      fields: list.definition.fields.map((field) => ({
+        ...field,
+        label:
+          field.key === "source"
+            ? t("columns.source")
+            : field.key === "scope"
+              ? t("scope.title")
+              : field.label,
+        options: field.options?.map((option) => ({
+          ...option,
+          label: options[option.value] ?? option.label,
+        })),
+      })),
+      views: list.definition.views.map((view) => ({
+        ...view,
+        label: view.key === "all" ? t("list.all") : view.label,
+        note: t("list.localNote"),
+      })),
+    },
+  };
+}
+
 interface SecretColumnsArgs {
   t: SecretsT;
+  formatDateTime: (date: string) => string;
   revealedValues: Record<string, string>;
   editingId: string | null;
   rotatingId: string | null;
@@ -489,6 +523,7 @@ interface SecretColumnsArgs {
 /** The secrets table's columns; each cell reads the row plus the screen's edit state. */
 function secretColumns({
   t,
+  formatDateTime,
   revealedValues,
   editingId,
   rotatingId,
@@ -503,6 +538,18 @@ function secretColumns({
   onRequestDelete,
   onOpenHistory,
 }: SecretColumnsArgs): Column<AppSecret>[] {
+  const sourceLabels: Record<string, string> = {
+    literal: t("source.literal"),
+    bundle: t("source.bundle"),
+    managed_service: t("source.managed"),
+  };
+  const setViaLabels: Record<string, string> = {
+    web: t("setVia.web"),
+    cli: t("setVia.cli"),
+    env_paste: t("setVia.envPaste"),
+    bundle: t("setVia.bundle"),
+    managed_service: t("setVia.managed"),
+  };
   const revealedOf = (s: AppSecret) => (s.id in revealedValues ? revealedValues[s.id] : null);
   return [
     {
@@ -555,7 +602,7 @@ function secretColumns({
       cell: (s) => (
         <span className="flex min-w-0 flex-wrap items-center gap-2">
           <Badge variant={SOURCE_TONE[s.source] ?? "outline"}>
-            {SOURCE_LABEL[s.source] ?? s.source}
+            {sourceLabels[s.source] ?? s.source}
           </Badge>
           {s.bundleSlug && (
             <span className="text-muted-foreground text-2xs min-w-0 font-mono [overflow-wrap:anywhere]">
@@ -585,17 +632,17 @@ function secretColumns({
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (s) => {
         const editorName = s.lastEditedBy?.displayName || s.lastEditedBy?.username;
-        const setViaLabel = SET_VIA_LABEL[s.setVia ?? "web"] ?? s.setVia ?? "web";
+        const setViaLabel = setViaLabels[s.setVia ?? "web"] ?? s.setVia ?? "web";
         // "edited by X · set via Y"; the "by X" half drops when the writer
         // is unknown (backfilled rows).
         const tip = editorName
-          ? `${t("lastEditedBy", { name: editorName })} · set via ${setViaLabel}`
-          : `${t("lastEditedByUnknown")} · set via ${setViaLabel}`;
+          ? `${t("lastEditedBy", { name: editorName })} · ${t("setVia.description", { source: setViaLabel })}`
+          : `${t("lastEditedByUnknown")} · ${t("setVia.description", { source: setViaLabel })}`;
         return (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="cursor-help">
-                {s.lastEditedAt ? new Date(s.lastEditedAt).toLocaleString() : "—"}
+                {s.lastEditedAt ? formatDateTime(s.lastEditedAt) : "—"}
               </span>
             </TooltipTrigger>
             <TooltipContent>{tip}</TooltipContent>
@@ -638,8 +685,8 @@ function secretColumns({
             {canEdit && (
               <Can permission="app.deploy">
                 <IconAction
-                  label="Rotate"
-                  tooltip="Rotate (distinct from edit in the audit log)"
+                  label={t("rotate")}
+                  tooltip={t("rotateHint")}
                   onClick={() => onStartRotate(s)}
                   disabled={busy || editing}
                   pressed={rotatingId === s.id}
@@ -651,8 +698,8 @@ function secretColumns({
             {/* #714: the key's audit timeline, in a side sheet; its query runs only while open. */}
             <Can permission="secret.read">
               <IconAction
-                label="History"
-                tooltip="Audit history for this key"
+                label={t("history.action")}
+                tooltip={t("history.actionHint")}
                 onClick={() => onOpenHistory(s)}
                 pressed={historyId === s.id}
               >
@@ -846,6 +893,8 @@ function AttachedBundlesList({
   busy: boolean;
 }) {
   const t = useTranslations("apps.secrets.attached");
+  const all = useTranslations("apps.secrets");
+  const fmt = useFormatters();
   const columns: Column<AppSecretBundleAttachment>[] = [
     {
       id: "bundle",
@@ -914,7 +963,7 @@ function AttachedBundlesList({
       header: t("columns.attached"),
       sortKey: "attached",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (a) => (a.attachedAt ? new Date(a.attachedAt).toLocaleString() : "—"),
+      cell: (a) => (a.attachedAt ? fmt.formatDateTime(a.attachedAt) : "—"),
     },
     {
       id: "actions",
@@ -936,7 +985,7 @@ function AttachedBundlesList({
       <TooltipProvider delayDuration={200}>
         <ListPage<AppSecretBundleAttachment>
           embedded
-          list={list}
+          list={localizeSecretList(list, all, true)}
           label={t("title")}
           columns={columns}
           rows={rows}
@@ -1030,21 +1079,22 @@ function SetSecretSheet({
               behavior; production / preview / preview:<branch> let
               operators carve preview branches off from prod values. */}
           <div className="space-y-2">
-            <Label htmlFor="secret-scope">Scope</Label>
+            <Label htmlFor="secret-scope">{t("scope")}</Label>
             <Select value={scope} onValueChange={setScope}>
               <SelectTrigger id="secret-scope">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All environments (default)</SelectItem>
-                <SelectItem value="production">Production only</SelectItem>
-                <SelectItem value="preview">All previews</SelectItem>
-                <SelectItem value={SCOPE_PREVIEW_BRANCH}>Specific preview branch…</SelectItem>
+                <SelectItem value="all">{t("allScope")}</SelectItem>
+                <SelectItem value="production">{t("productionScope")}</SelectItem>
+                <SelectItem value="preview">{t("previewScope")}</SelectItem>
+                <SelectItem value={SCOPE_PREVIEW_BRANCH}>{t("branchScope")}</SelectItem>
               </SelectContent>
             </Select>
             {needsBranchInput && (
               <Input
                 id="secret-scope-branch"
+                aria-label={t("branchLabel")}
                 value={previewBranch}
                 onChange={(e) => setPreviewBranch(e.target.value)}
                 placeholder="feature/login-redesign"
@@ -1055,12 +1105,12 @@ function SetSecretSheet({
             )}
             <p className="text-muted-foreground text-xs">
               {scope === "all"
-                ? "Visible to every deploy of this app."
+                ? t("allHint")
                 : scope === "production"
-                  ? "Only production deploys can read this value."
+                  ? t("productionHint")
                   : scope === "preview"
-                    ? "Only preview deploys can read this value."
-                    : "Only the named preview branch can read this value."}
+                    ? t("previewHint")
+                    : t("branchHint")}
             </p>
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { SecretHistoryPanelView } from "@/components/screens/apps/secrets/SecretHistoryPanel";
 import type { SecretsSection } from "@/components/screens/apps/secrets/secrets-list";
 import { SecretsScreen } from "@/components/screens/apps/secrets/SecretsScreen";
@@ -16,12 +17,15 @@ import { PushAndRotateButton } from "../components/ci-setup-section";
  */
 export function SecretsClient({ slug, section }: { slug: string; section: SecretsSection }) {
   const chrome = useAppChrome();
+  const t = useTranslations("apps.secrets");
   const base = appPath(chrome, slug, "secrets");
   return (
     <SecretsScreen
       {...useAppSecrets(slug, section)}
       tabs={<AppTabs slug={slug} active="secrets" />}
-      pushToGitHub={<PushAndRotateButton appSlug={slug} variant="outline" label="Push to GitHub" />}
+      pushToGitHub={
+        <PushAndRotateButton appSlug={slug} variant="outline" label={t("pushToRepo")} />
+      }
       renderHistory={(secretKey) => <SecretHistory appSlug={slug} secretKey={secretKey} />}
       sectionHref={(s) => (s === "bundles" ? `${base}?section=bundles` : base)}
     />

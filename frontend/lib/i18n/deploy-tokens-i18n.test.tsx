@@ -318,3 +318,50 @@ it("does not invent edge-access preview counts when the API omits them", () => {
   expect(screen.queryByText(/undefined|NaN/)).not.toBeInTheDocument();
   view.unmount();
 });
+
+describe("app secret translations", () => {
+  const same = new Set([
+    "attached.noTeam",
+    "attached.noPrefix",
+    "attached.keyCountUnknown",
+    "attached.perEnvBadge",
+    "setVia.cli",
+    "es:source.literal",
+    "fr:title",
+    "fr:columns.source",
+    "fr:columns.actions",
+    "fr:scope.production",
+    "de:attached.columns.team",
+    "de:history.system",
+    ...["es", "fr", "de", "pt-BR"].map((locale) => `${locale}:setVia.web`),
+  ]);
+  it.each(locales)(
+    "%s covers the full secrets namespace, including plural and technical parameters",
+    (locale) => {
+      const source = leaves(catalogs.en.apps.secrets);
+      const translated = leaves(catalogs[locale].apps.secrets);
+      expect(Object.keys(translated).sort()).toEqual(Object.keys(source).sort());
+      for (const [key, text] of Object.entries(source)) {
+        expect(argumentsOf(parse(translated[key])), `${locale}:${key}`).toEqual(
+          argumentsOf(parse(text))
+        );
+        if (locale !== "en" && !same.has(key) && !same.has(`${locale}:${key}`))
+          expect(translated[key], `${locale}:${key}`).not.toBe(text);
+        for (const technical of [
+          "[env]",
+          "manifest_raw_staged",
+          ".env",
+          "KEY=value",
+          "CLI",
+          "Enter",
+          "Esc",
+        ]) {
+          // Keyboard labels are localized where the locale uses a translated key name.
+          if (technical === "Enter" || technical === "Esc") continue;
+          if (text.includes(technical))
+            expect(translated[key], `${locale}:${key}`).toContain(technical);
+        }
+      }
+    }
+  );
+});

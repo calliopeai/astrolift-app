@@ -1427,99 +1427,173 @@
     },
     "secrets": {
       "title": "Secrets",
-      "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest; push to repo to land.",
-      "bulkImport": "Bulk import",
-      "newSecret": "New secret",
-      "environment": "Environment",
-      "allEnvironments": "All environments",
-      "keysCount": "{count, plural, one {# key} other {# keys}}",
-      "emptyTitle": "No secrets yet",
-      "emptyDescription": "Add literals via 'New secret', or attach a Secret Bundle. Managed services contribute their connection envelope automatically.",
+      "description": "Valeurs littérales de [env], ensembles joints et données de connexion des services gérés pour {slug}. Enregistrer ou supprimer modifie le manifeste préparé ; envoyez-le au dépôt pour enregistrer le changement.",
+      "bulkImport": "Importer en masse",
+      "newSecret": "Nouveau secret",
+      "environment": "Environnement",
+      "allEnvironments": "Tous les environnements",
+      "keysCount": "{count, plural, one {# clé} other {# clés}}",
+      "emptyTitle": "Aucun secret",
+      "emptyDescription": "Ajoutez des valeurs avec Nouveau secret ou joignez un ensemble de secrets. Les services gérés fournissent automatiquement leurs données de connexion.",
       "columns": {
-        "key": "Key",
+        "key": "Clé",
         "source": "Source",
-        "env": "Env",
-        "lastEdited": "Last edited",
-        "value": "Value"
+        "env": "Environnement",
+        "lastEdited": "Dernière modification",
+        "value": "Valeur",
+        "actions": "Actions"
       },
       "delete": {
-        "title": "Delete {key}?",
-        "fallbackTitle": "Delete secret?",
-        "description": "Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed.",
-        "confirm": "Delete secret"
+        "title": "Supprimer {key} ?",
+        "fallbackTitle": "Supprimer le secret ?",
+        "description": "Prépare le changement dans le manifeste de la plateforme. Envoyez-le au dépôt depuis Configuration pour le confirmer. Il reste récupérable avant l’envoi.",
+        "confirm": "Supprimer le secret"
       },
       "setSheet": {
-        "title": "New secret",
-        "description": "Sets one literal in the app's [env] table. Plaintext is never returned by the API; only this submit ships the value to the backend.",
-        "keyLabel": "Key",
-        "valueLabel": "Value",
-        "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
-        "submit": "Save secret",
-        "submitting": "Saving…"
+        "title": "Nouveau secret",
+        "description": "Définit une valeur littérale dans la table [env] de l’application. L’API ne renvoie pas le texte en clair ; seul cet envoi transmet la valeur au backend.",
+        "keyLabel": "Clé",
+        "valueLabel": "Valeur",
+        "valueHint": "Stocké dans manifest_raw_staged. Utilisez Envoyer au dépôt sur la page Configuration pour confirmer le changement.",
+        "submit": "Enregistrer le secret",
+        "submitting": "Enregistrement…",
+        "scope": "Portée",
+        "allScope": "Tous les environnements (par défaut)",
+        "productionScope": "Production uniquement",
+        "previewScope": "Tous les aperçus",
+        "branchScope": "Branche d’aperçu spécifique…",
+        "branchLabel": "Branche d’aperçu",
+        "allHint": "Visible dans tous les déploiements de cette application.",
+        "productionHint": "Seuls les déploiements de production peuvent lire cette valeur.",
+        "previewHint": "Seuls les déploiements d’aperçu peuvent lire cette valeur.",
+        "branchHint": "Seule la branche d’aperçu indiquée peut lire cette valeur."
       },
       "bulkSheet": {
-        "title": "Bulk import from .env",
-        "description": "Paste a .env file. Each KEY=value line gets staged into the app's [env] table. Existing keys are overwritten.",
-        "willSet": "Will set {count, plural, one {# key} other {# keys}}:",
-        "submit": "Import",
-        "submitting": "Importing…"
+        "title": "Importer en masse depuis .env",
+        "description": "Collez un fichier .env. Chaque ligne KEY=value est préparée dans la table [env] de l’application. Les clés existantes sont écrasées.",
+        "willSet": "Définira {count, plural, one {# clé} other {# clés}} :",
+        "submit": "Importer",
+        "submitting": "Importation…"
       },
       "reveal": {
-        "show": "Reveal value",
-        "hide": "Hide value",
-        "revealing": "Revealing…",
-        "failed": "Reveal failed",
-        "toastRevealed": "Revealed by you — audit logged",
-        "literalOnly": "Only literal-source secrets can be revealed from the UI. Bundle and managed-service values live in the platform secrets backend.",
-        "permissionDenied": "You don't have permission to read secret values."
+        "show": "Afficher la valeur",
+        "hide": "Masquer la valeur",
+        "revealing": "Affichage…",
+        "failed": "Échec de l’affichage",
+        "toastRevealed": "Vous avez affiché la valeur ; action consignée dans l’audit",
+        "literalOnly": "Seuls les secrets littéraux peuvent être affichés dans l’interface. Les valeurs des ensembles et des services gérés se trouvent dans le backend de secrets de la plateforme.",
+        "permissionDenied": "Vous n’avez pas l’autorisation de lire les valeurs des secrets.",
+        "masked": "Valeur masquée"
       },
       "edit": {
-        "save": "Save",
-        "cancel": "Cancel",
-        "saving": "Saving…",
-        "hint": "Enter to save · Esc to cancel",
-        "toastSaved": "Updated {key}"
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "saving": "Enregistrement…",
+        "hint": "Entrée pour enregistrer · Échap pour annuler",
+        "toastSaved": "{key} mis à jour"
       },
-      "lastEditedBy": "Last edited by {name}",
-      "lastEditedByUnknown": "Last editor unknown",
+      "lastEditedBy": "Dernière modification par {name}",
+      "lastEditedByUnknown": "Dernier auteur inconnu",
       "attached": {
-        "title": "Attached bundles",
-        "description": "Bundles currently merged into this app's runtime env. App-local literals win on key collision regardless of merge order — use this list to debug precedence.",
-        "empty": "No bundles attached yet. Attach one to share keys across apps without copying them into the manifest.",
-        "loading": "Loading attachments…",
-        "detach": "Detach",
-        "detaching": "Detaching…",
-        "detachConfirmTitle": "Detach {name}?",
-        "detachConfirmDescription": "Removes the bundle attachment from {env}. The bundle and its values stay in the secrets backend — only this app's reference is removed. Workloads pick up the change on the next deploy.",
-        "detachConfirm": "Detach bundle",
-        "toastDetached": "Detached {name}",
+        "title": "Ensembles joints",
+        "description": "Ensembles fusionnés avec les variables d’exécution de cette application. Les valeurs locales l’emportent en cas de clé identique, quel que soit l’ordre de fusion. Cette liste aide à vérifier la priorité.",
+        "empty": "Aucun ensemble joint. Joignez-en un pour partager des clés entre applications sans les copier dans le manifeste.",
+        "loading": "Chargement des associations…",
+        "detach": "Détacher",
+        "detaching": "Détachement…",
+        "detachConfirmTitle": "Détacher {name} ?",
+        "detachConfirmDescription": "Supprime l’association de l’ensemble dans {env}. L’ensemble et ses valeurs restent dans le backend de secrets ; seule la référence de cette application est retirée. Les charges de travail prennent en compte le changement au prochain déploiement.",
+        "detachConfirm": "Détacher l’ensemble",
+        "toastDetached": "{name} détaché",
         "columns": {
-          "bundle": "Bundle",
-          "team": "Team",
-          "env": "Env",
-          "prefix": "Prefix",
-          "keys": "Keys",
-          "order": "Order",
-          "attached": "Attached"
+          "bundle": "Ensemble",
+          "team": "Équipe",
+          "env": "Environnement",
+          "prefix": "Préfixe",
+          "keys": "Clés",
+          "order": "Ordre",
+          "attached": "Joint"
         },
         "noTeam": "—",
         "noPrefix": "—",
         "keyCountUnknown": "?",
-        "orderHint": "lowest-first; app literals override",
+        "orderHint": "les plus faibles d’abord ; les valeurs locales l’emportent",
         "perEnvBadge": "{env}"
       },
       "pendingProposals": {
-        "title": "{count, plural, one {# proposition de changement de secret en attente} other {# propositions de changement de secret en attente}}",
-        "appWide": "toute l'app",
+        "title": "{count, plural, one {# proposition de changement de secret en attente} other {# propositions de changement de secrets en attente}}",
+        "appWide": "toute l’application",
         "votes": "{received}/{required} approbations",
-        "seeAll": "Voir toutes les {count} propositions →"
+        "seeAll": "Voir les {count} propositions →"
       },
-      "pendingApprovalBadge": "won't deploy as shown",
-      "pendingApprovalTooltip": "This value has no matching approval and will revert to the last-approved value on the next deploy.",
+      "pendingApprovalBadge": "ne sera pas déployé tel quel",
+      "pendingApprovalTooltip": "Cette valeur n’a pas d’approbation correspondante et reviendra à la dernière valeur approuvée au prochain déploiement.",
       "revertWarning": {
-        "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
-        "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
-        "seeAll": "+{count} more"
+        "title": "{count, plural, one {# clé sera rétablie au prochain déploiement} other {# clés seront rétablies au prochain déploiement}}",
+        "description": "Ces valeurs littérales sont préparées, mais sans approbation correspondante. Sans celle-ci, le prochain déploiement rétablit leurs dernières valeurs approuvées.",
+        "seeAll": "+{count} autres"
+      },
+      "history": {
+        "title": "Historique d’audit",
+        "action": "Historique",
+        "actionHint": "Historique d’audit de cette clé",
+        "loadError": "Impossible de charger l’historique",
+        "empty": "Aucune entrée d’audit",
+        "system": "Système",
+        "actions": {
+          "set": "Définir",
+          "rotate": "Renouveler",
+          "delete": "Supprimer",
+          "metadata": "Mettre à jour les métadonnées",
+          "import": "Importer en masse"
+        }
+      },
+      "source": {
+        "literal": "Valeur littérale",
+        "bundle": "Ensemble",
+        "managed": "Service géré"
+      },
+      "setVia": {
+        "web": "Web",
+        "cli": "CLI",
+        "envPaste": "Collage de .env",
+        "bundle": "Synchronisation d’ensemble",
+        "managed": "Service géré",
+        "description": "Défini via {source}"
+      },
+      "scope": {
+        "title": "Portée",
+        "all": "Tous les déploiements",
+        "production": "Production",
+        "preview": "Aperçus",
+        "previewBranch": "Aperçu : {branch}"
+      },
+      "expiry": {
+        "expired": "Expiré {days, plural, one {depuis # jour} other {depuis # jours}}",
+        "rotateSoon": "Renouveler : expire dans {days, plural, one {# jour} other {# jours}}",
+        "expires": "Expire dans {days, plural, one {# jour} other {# jours}}"
+      },
+      "rotate": "Renouveler",
+      "rotateHint": "Renouveler (distinct d’une modification dans l’audit)",
+      "list": {
+        "searchKeys": "Rechercher des clés…",
+        "searchBundles": "Rechercher des ensembles, équipes et préfixes…",
+        "all": "Tous",
+        "localNote": "Filtrage, tri et pagination dans le navigateur : le backend renvoie toutes les lignes à la fois."
+      },
+      "pushToRepo": "Envoyer au dépôt",
+      "toasts": {
+        "bundleDeleteBlocked": "Détachez l’ensemble pour retirer cette clé.",
+        "managedDeleteBlocked": "Les clés de connexion des services gérés ne peuvent pas être modifiées directement.",
+        "deleted": "{key} supprimé",
+        "deleteFailed": "Échec de la suppression",
+        "rotateFailed": "Échec du renouvellement",
+        "saveFailed": "Échec de l’enregistrement",
+        "detachFailed": "Échec du détachement",
+        "set": "{key} défini",
+        "setScoped": "{key} défini ({scope})",
+        "imported": "{count, plural, one {# clé importée} other {# clés importées}}",
+        "importFailed": "Échec de l’importation"
       }
     },
     "security": {
