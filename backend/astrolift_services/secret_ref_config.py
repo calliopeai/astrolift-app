@@ -217,12 +217,14 @@ def gcp_secret_refs(config: Any) -> list[GcpSecretRef]:
 
 
 def service_owner(service) -> Any:
-    """The app that owns ``service``, or the project for a project service."""
+    """App/project owner, or the explicitly org-owned shared model itself."""
+    if getattr(service, "organization_id", None):
+        return service
     return service.registered_app if service.registered_app_id else service.project
 
 
 def service_organization(service) -> Any:
-    """The organization that owns ``service``, through its app or project."""
+    """The explicit shared-model tenant or the legacy app/project tenant."""
     return service_owner(service).organization
 
 

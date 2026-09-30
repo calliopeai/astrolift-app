@@ -10,6 +10,25 @@ from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
+class ModelConsumer:
+    subscription_id: str
+    namespace: str
+    app_slug: str
+    environment_name: str
+    credential_ref: str
+    workload_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ClusterModelPlacement:
+    organization_id: str
+    cluster_id: str
+    managed_service_id: str
+    revision: int = 0
+    consumers: tuple[ModelConsumer, ...] = ()
+
+
+@dataclass(frozen=True)
 class ProvisionSpec:
     """Normalized request to provision a managed service.
 
@@ -58,6 +77,8 @@ class ProvisionSpec:
     recorded_handle_exclusive: bool = False
     """Whether ``recorded_handle`` is this service's and no other live one's.
     See ``UpdateSpec.recorded_handle_exclusive``."""
+    cluster_model: ClusterModelPlacement | None = None
+    """Verified third-owner placement and desired subscriber credential snapshot."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +120,7 @@ class UpdateSpec:
     after checking every live service the same GCP driver resolves to in the same
     project. ``False`` means "not established", never "contested", so a caller that
     leaves it unset gets a refusal rather than a pass."""
+    cluster_model: ClusterModelPlacement | None = None
 
 
 @dataclass(frozen=True)

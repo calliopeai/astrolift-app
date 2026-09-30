@@ -102,6 +102,7 @@ class ManagedService(BaseCoreModel):
     )
     environment_name = models.CharField(max_length=128, blank=True, default="")
     subscription_revision = models.PositiveBigIntegerField(default=0)
+    applied_subscription_revision = models.PositiveBigIntegerField(default=0)
     kind = models.CharField(max_length=32, choices=Kind.choices)
     name = models.CharField(max_length=128, blank=True, default="")
     variant = models.CharField(max_length=64, blank=True, default="")

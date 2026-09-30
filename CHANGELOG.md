@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The v.next shared vLLM driver foundation renders GUID-owned namespaces,
+  explicit certified CPU/GPU runtimes, immutable model revisions, independent
+  startup credential snapshots and operator-authenticated metrics. Readiness
+  waits for the current Deployment generation and every current pod. App and
+  environment identity labels cannot be overwritten by supplied labels. Public
+  deployment/subscription operations remain pending their lifecycle integration.
+
 - Shared Python model serving has a startup-snapshot ASGI authorization hook:
   subscription keys reach supported inference routes, while metrics and operator
   endpoints require the private operator credential. Secret updates require a

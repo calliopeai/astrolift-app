@@ -142,8 +142,13 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
     app = svc.registered_app
     project = svc.project
     owner = app or project
-    org = app.organization if app is not None else project.organization
-    environment_id = str(getattr(env, "guid", "") or getattr(cluster, "guid", "") or "")
+    from astrolift_services.secret_ref_config import service_organization
+
+    org = service_organization(svc)
+    shared_model = bool(getattr(svc, "organization_id", None))
+    environment_id = (
+        "" if shared_model else str(getattr(env, "guid", "") or getattr(cluster, "guid", "") or "")
+    )
     environment_name = env.name if env is not None else svc.effective_environment_name
     svc_config = dict(svc.config or {})
     desired_extensions = svc_config.pop("desired_extensions", [])
@@ -155,7 +160,7 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
         organization_id=str(getattr(org, "guid", "") or ""),
         organization_slug=getattr(org, "slug", "") or "",
         app_id=str(getattr(owner, "guid", "") or ""),
-        app_slug=owner.slug,
+        app_slug=getattr(owner, "slug", "") or "",
         environment_id=environment_id,
         environment_name=environment_name,
         tenant_cluster_id=str(getattr(cluster, "guid", "") or ""),
@@ -172,6 +177,73 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
         # way into the org, so it is portable by the time it lands here.
         tags=dict(getattr(org, "default_resource_tags", None) or {}),
         recorded_handle=str(svc.backend_ref or ""),
+        cluster_model=_cluster_model_placement(svc, cluster=cluster) if shared_model else None,
+    )
+
+
+def _cluster_model_placement(svc: Any, *, cluster: Any) -> Any:
+    from _sdk.k8s_naming import app_namespace
+    from _sdk.managed_service import ClusterModelPlacement, ModelConsumer
+
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.scopes import live_app_owners
+    from astrolift_services.cluster_models import available_model_clusters, live_cluster_models
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment
+    from core.tenancy import TenantContext, tenant_context
+
+    if not live_cluster_models(ManagedService.objects.filter(pk=svc.pk), svc.organization_id).exists():
+        raise ValueError("Shared model owner is no longer live and coherent.")
+    if not available_model_clusters(
+        TenantCluster.objects.filter(pk=cluster.pk), svc.organization_id
+    ).exists():
+        raise ValueError("Shared model cluster is unavailable for lifecycle operations.")
+    desired = ManagedServiceAttachment.objects.filter(
+        managed_service=svc,
+        model_subscription=True,
+        desired_enabled=True,
+    ).select_related("app_environment__registered_app__organization")
+    with tenant_context(TenantContext(organization_id=svc.organization_id)):
+        app_ids = set(
+            live_app_owners(
+                RegisteredApp.objects.filter(
+                    organization_id=svc.organization_id,
+                    organization__deleted_at__isnull=True,
+                    pk__in=desired.values("app_environment__registered_app_id"),
+                )
+            ).values_list("pk", flat=True)
+        )
+    consumers = []
+    for row in desired.order_by("guid"):
+        env = row.app_environment
+        app = env.registered_app if env else None
+        if (
+            env is None
+            or env.deleted_at is not None
+            or env.tenant_cluster_id != cluster.pk
+            or app is None
+            or app.pk not in app_ids
+        ):
+            raise ValueError("Shared model subscription destination is no longer live and coherent.")
+        expected = f"services/{svc.organization.guid}/{svc.guid}/subscriptions/{row.guid}#api_key"
+        if row.credential_ref != expected:
+            raise ValueError("Shared model subscription credential identity is invalid.")
+        consumers.append(
+            ModelConsumer(
+                subscription_id=str(row.guid),
+                namespace=app_namespace(organization_slug=svc.organization.slug, app_slug=app.slug),
+                app_slug=app.slug,
+                environment_name=env.name,
+                credential_ref=row.credential_ref,
+                workload_names=tuple(row.workload_names or ()),
+            )
+        )
+    return ClusterModelPlacement(
+        str(svc.organization.guid),
+        str(cluster.guid),
+        str(svc.guid),
+        svc.subscription_revision,
+        tuple(consumers),
     )
 
 
@@ -873,6 +945,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
             config=desired,
             managed_service_id=_service_identity(svc),
             recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+            cluster_model=_cluster_model_placement(svc, cluster=cluster) if svc.organization_id else None,
         ),
     )
     return {
@@ -1006,6 +1079,8 @@ def _connection_secret_path(svc: Any) -> str:
 
     app = svc.registered_app
     owner = app or svc.project
+    if getattr(svc, "organization_id", None):
+        return f"services/{svc.organization.guid}/{svc.guid}/connection"
     org = app.organization if app is not None else svc.project.organization
     return secret_storage_path(
         env_slug=svc.effective_environment_name,

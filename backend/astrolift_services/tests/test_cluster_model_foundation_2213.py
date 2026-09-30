@@ -292,3 +292,58 @@ def test_service_owned_namespace_has_stable_tenant_cluster_identity(world):
         assert cluster_model_namespace(**(values | {field: str(uuid4())})) != namespace
     with pytest.raises(ValueError):
         cluster_model_namespace(**(values | {"organization_id": ""}))
+
+
+def test_lifecycle_spec_and_secret_namespace_keep_the_actual_third_owner(world):
+    from astrolift_services.secret_ref_config import (
+        owner_secret_namespace,
+        service_organization,
+        service_owner,
+    )
+    from astrolift_workflows.activities.managed_service_lifecycle import (
+        _connection_secret_path,
+        build_provision_spec,
+    )
+
+    spec = build_provision_spec(world.model, cluster=world.cluster)
+    assert spec.organization_id == str(world.org.guid)
+    assert spec.cluster_model.organization_id == str(world.org.guid)
+    assert spec.cluster_model.managed_service_id == str(world.model.guid)
+    assert spec.app_id == spec.app_slug == spec.environment_id == spec.environment_name == ""
+    assert service_owner(world.model).pk == world.model.pk
+    assert service_organization(world.model).pk == world.org.pk
+    namespace = f"services/{world.org.guid}/{world.model.guid}/"
+    assert owner_secret_namespace(service_owner(world.model)) == namespace
+    assert _connection_secret_path(world.model) == namespace + "connection"
+
+
+def test_worker_consumer_snapshot_is_batched_without_request_tenant_and_refuses_sibling_env(world):
+    from astrolift_workflows.activities.managed_service_lifecycle import build_provision_spec
+
+    row = subscription(world)
+    row.credential_ref = f"services/{world.org.guid}/{world.model.guid}/subscriptions/{row.guid}#api_key"
+    row.save()
+    spec = build_provision_spec(world.model, cluster=world.cluster)
+    assert spec.cluster_model.consumers[0].environment_name == "production"
+    assert spec.cluster_model.consumers[0].app_slug == world.medops_app.slug
+    other_cluster = make_cluster(world, "models2213-other")
+    world.env.tenant_cluster = other_cluster
+    world.env.save()
+    with pytest.raises(ValueError, match="destination"):
+        build_provision_spec(world.model, cluster=world.cluster)
+
+
+def test_cluster_model_typed_secret_reference_cannot_name_app_or_sibling_credentials(world):
+    from astrolift_services.secret_ref_config import assert_config_secret_refs_scoped, service_owner
+
+    own = f"services/{world.org.guid}/{world.model.guid}/huggingface#token"
+    assert_config_secret_refs_scoped(
+        {"hf_token_secret_ref": own}, owner=service_owner(world.model), cluster=world.cluster
+    )
+    for owner_id in (world.medops_app.guid, uuid4()):
+        with pytest.raises(ValueError):
+            assert_config_secret_refs_scoped(
+                {"hf_token_secret_ref": f"services/{world.org.guid}/{owner_id}/huggingface#token"},
+                owner=service_owner(world.model),
+                cluster=world.cluster,
+            )
