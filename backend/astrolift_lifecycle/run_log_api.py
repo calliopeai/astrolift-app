@@ -5,11 +5,35 @@ import json
 from django.core import signing
 from django.db.models import Max
 
+from astrolift_identity.historical_scopes import HistoricalAppScope
+from astrolift_identity.operation_context import UNKNOWN, deployment_approval_count, environment_context
 from astrolift_lifecycle.models import Deployment, DeploymentLog
 from astrolift_lifecycle.visibility import historical_deployment_rows
+from astrolift_registry.scopes import _credential_scope, registry_org_scope
+from core.permissions import Permission, ScopeKind
+from core.scope_args import read_guid
 from core.tenancy import get_current_tenant
 
 _SALT = "deployment-run-log-2176"
+
+
+def historical_log_scope(args):
+    key = read_guid(args, "deployment_id")
+    deployment = deployment_for_log(str(key)) if key else None
+    scope = (
+        HistoricalAppScope(kind=ScopeKind.APP, id=deployment.registered_app_id)
+        if deployment
+        else registry_org_scope()
+    )
+    return _credential_scope(scope, Permission.APP_READ_LOGS)
+
+
+def historical_log_operation(args):
+    key = read_guid(args, "deployment_id")
+    deployment = deployment_for_log(str(key)) if key else None
+    if deployment is None:
+        return UNKNOWN
+    return (environment_context(deployment.app_environment, approvals=deployment_approval_count(deployment)),)
 
 
 def deployment_for_log(deployment_id: str):
@@ -19,6 +43,7 @@ def deployment_for_log(deployment_id: str):
     return (
         historical_deployment_rows(Deployment.objects.all())
         .filter(guid=deployment_id, registered_app__organization_id=tenant.organization_id)
+        .select_related("registered_app", "app_environment__tenant_cluster")
         .first()
     )
 

@@ -243,7 +243,7 @@ class ShareGrant:
 
 
 def _shares_on_apps(
-    organization_id: int | None, app_ids: Iterable[int]
+    organization_id: int | None, app_ids: Iterable[int], *, historical: bool = False
 ) -> dict[int, list[tuple[str, int, str]]]:
     """``app_id -> [(share guid, team id, level)]`` for live shares whose
     app and team both belong to the org."""
@@ -256,17 +256,21 @@ def _shares_on_apps(
     rows = AppTeamAccess.objects.filter(
         registered_app_id__in=ids,
         registered_app__organization_id=organization_id,
-        registered_app__deleted_at__isnull=True,
         team__organization_id=organization_id,
         team__deleted_at__isnull=True,
-    ).values_list("guid", "registered_app_id", "team_id", "access_level")
+    )
+    if not historical:
+        rows = rows.filter(registered_app__deleted_at__isnull=True)
+    rows = rows.values_list("guid", "registered_app_id", "team_id", "access_level")
     out: dict[int, list[tuple[str, int, str]]] = {}
     for guid, app_id, team_id, level in rows:
         out.setdefault(app_id, []).append((str(guid), team_id, level))
     return out
 
 
-def _share_grants(tenant: TenantContext, app_ids: Iterable[int]) -> dict[int, list[ShareGrant]]:
+def _share_grants(
+    tenant: TenantContext, app_ids: Iterable[int], *, historical: bool = False
+) -> dict[int, list[ShareGrant]]:
     """Every actor grant that reaches each app through a team share.
 
     Only an inheriting grant held at the sharing team counts: the share
@@ -274,7 +278,7 @@ def _share_grants(tenant: TenantContext, app_ids: Iterable[int]) -> dict[int, li
     confined to its own scope does not reach.
     """
 
-    shares = _shares_on_apps(tenant.organization_id, app_ids)
+    shares = _shares_on_apps(tenant.organization_id, app_ids, historical=historical)
     if not shares:
         return {}
     team_ids = {team_id for rows in shares.values() for _g, team_id, _l in rows}
@@ -337,6 +341,11 @@ def decide(
     permission: Permission,
     scope: PermissionScope | None,
 ) -> Decision:
+    from astrolift_identity.historical_scopes import HistoricalAppScope
+
+    historical = isinstance(scope, HistoricalAppScope)
+    if historical and permission != Permission.APP_READ_LOGS:
+        return Decision(False, "history scope only permits persisted log reads")
     if tenant.actor_user_id is None:
         return Decision(False, "no actor")
 
@@ -360,7 +369,7 @@ def decide(
     matched: Grant | ShareGrant | None = next((g for g in covering if g.carries(permission.value)), None)
     shares: tuple[ShareGrant, ...] = ()
     if chain[0][0] == "APP":
-        shares = tuple(_share_grants(tenant, [chain[0][1]]).get(chain[0][1], ()))
+        shares = tuple(_share_grants(tenant, [chain[0][1]], historical=historical).get(chain[0][1], ()))
         if matched is None:
             matched = next((s for s in shares if permission.value in _share_permissions(s)), None)
 
@@ -789,7 +798,11 @@ def _scope_ancestry(tenant: TenantContext, scope: PermissionScope) -> list[tuple
         return []
 
     if scope.kind == ScopeKind.APP:
-        return _app_scope_chains(tenant, [scope.id]).get(scope.id, [])
+        from astrolift_identity.historical_scopes import HistoricalAppScope
+
+        return _app_scope_chains(tenant, [scope.id], historical=isinstance(scope, HistoricalAppScope)).get(
+            scope.id, []
+        )
     if scope.kind == ScopeKind.ORG:
         if scope.id != org_id or not Organization.objects.filter(pk=org_id).exists():
             return []
@@ -817,7 +830,9 @@ def _scope_ancestry(tenant: TenantContext, scope: PermissionScope) -> list[tuple
     return out
 
 
-def _app_scope_chains(tenant: TenantContext, app_ids: Iterable[int]) -> dict[int, list[tuple[str, int]]]:
+def _app_scope_chains(
+    tenant: TenantContext, app_ids: Iterable[int], *, historical: bool = False
+) -> dict[int, list[tuple[str, int]]]:
     """Read current ownership in one query for both single and bulk checks.
 
     Joined parents need explicit validity checks: a foreign or deleted
@@ -828,9 +843,12 @@ def _app_scope_chains(tenant: TenantContext, app_ids: Iterable[int]) -> dict[int
     org_id = tenant.organization_id
     if org_id is None:
         return {}
-    rows = RegisteredApp.objects.filter(
-        pk__in=app_ids, organization_id=org_id, organization__deleted_at__isnull=True
-    ).values(
+    rows = RegisteredApp.objects.all()
+    if historical:
+        from astrolift_identity.historical_scopes import historical_app_owners
+
+        rows = historical_app_owners(RegisteredApp.all_objects.all(), org_id)
+    rows = rows.filter(pk__in=app_ids, organization_id=org_id, organization__deleted_at__isnull=True).values(
         "pk",
         "project_id",
         "project__organization_id",
@@ -846,7 +864,7 @@ def _app_scope_chains(tenant: TenantContext, app_ids: Iterable[int]) -> dict[int
             if (
                 row[f"{parent}_id"] is not None
                 and row[f"{parent}__organization_id"] == org_id
-                and row[f"{parent}__deleted_at"] is None
+                and (historical or row[f"{parent}__deleted_at"] is None)
             ):
                 chain.append((parent.upper(), row[f"{parent}_id"]))
         chain.append(("ORG", org_id))

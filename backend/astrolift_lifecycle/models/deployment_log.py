@@ -24,8 +24,8 @@ class DeploymentLog(AppendOnlyMixin, models.Model):
         on_delete=models.CASCADE,
     )
     status = models.CharField(max_length=32, blank=True, default="")
-    phase = models.CharField(max_length=16, blank=True, default="")
-    event = models.CharField(max_length=32, blank=True, default="")
+    phase = models.CharField(max_length=16, blank=True, default="", db_default="")
+    event = models.CharField(max_length=32, blank=True, default="", db_default="")
     message = models.TextField(blank=True, default="")
     detail = models.JSONField(null=True, blank=True)
     by_user = models.ForeignKey(

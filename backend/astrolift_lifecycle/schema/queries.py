@@ -35,6 +35,7 @@ from astrolift_lifecycle.models import (
     ScheduledJobRun,
     TaskRun,
 )
+from astrolift_lifecycle.run_log_api import historical_log_operation, historical_log_scope
 from astrolift_lifecycle.schema.list_contract import (
     COMMAND_RUNS_FILTERS,
     DEPLOYMENTS_DEFAULT_SORT,
@@ -1307,8 +1308,8 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ_LOGS,
-        scope=deployment_app_scope("deployment_id", permission=Permission.APP_READ_LOGS),
-        operation=deployment_operation("deployment_id"),
+        scope=historical_log_scope,
+        operation=historical_log_operation,
     )
     @tenant_scoped()
     def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
@@ -1333,8 +1334,8 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ_LOGS,
-        scope=deployment_app_scope("deployment_id", permission=Permission.APP_READ_LOGS),
-        operation=deployment_operation("deployment_id"),
+        scope=historical_log_scope,
+        operation=historical_log_operation,
     )
     @tenant_scoped()
     def astrolift_deployment_run_log_page(
@@ -1362,8 +1363,8 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ_LOGS,
-        scope=deployment_app_scope("deployment_id", permission=Permission.APP_READ_LOGS),
-        operation=deployment_operation("deployment_id"),
+        scope=historical_log_scope,
+        operation=historical_log_operation,
     )
     @tenant_scoped()
     def astrolift_deployment_run_log_download(

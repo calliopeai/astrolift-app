@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Persisted deployment logs retain actual owner deny policies and current bearer
+  ceilings after app/environment teardown or cluster retirement. Failed history
+  diagnostics preserve the original provider failure; completion writes still
+  fail the activity when durable storage is unavailable. Durable database defaults
+  keep old log writers compatible during migration-first rollout (#2176).
+
 - Add explicit, reviewed agent secret-owner maintenance tools (#2102): private
   metadata-only plans, full-payload copies before atomic ref changes, operator and
   paused-writer checks, and resumable application without source deletion. Runtime

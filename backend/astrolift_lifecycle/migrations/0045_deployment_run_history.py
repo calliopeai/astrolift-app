@@ -22,12 +22,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="deploymentlog",
             name="event",
-            field=models.CharField(blank=True, default="", max_length=32),
+            field=models.CharField(blank=True, db_default="", default="", max_length=32),
         ),
         migrations.AddField(
             model_name="deploymentlog",
             name="phase",
-            field=models.CharField(blank=True, default="", max_length=16),
+            field=models.CharField(blank=True, db_default="", default="", max_length=16),
         ),
         AddIndexConcurrently(
             model_name="deploymentlog",

@@ -263,13 +263,13 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
         inp.image_tag,
     )
 
-    from astrolift_lifecycle.run_history import record
+    from astrolift_lifecycle.run_history import record, record_failure
 
     record(deployment.pk, "build", "started")
     try:
         result = prepared.driver.build(spec, prepared.repo_uri, inp.image_tag)
     except Exception as exc:
-        record(deployment.pk, "build", "failed", "Build driver failed.")
+        record_failure(deployment.pk, "build", "Build driver failed.")
         log.error("build_image failed deployment=%s: %s", inp.deployment_id, exc)
         raise RuntimeError(f"BuildDriver.build failed: {exc}") from exc
 
@@ -280,7 +280,7 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
         # (#1686). ``aborted_reason`` keeps one line, so the full text is
         # persisted on the deploy row rather than truncated away there.
         _record_build_failure(deployment, "\n".join(parts))
-        record(deployment.pk, "build", "failed", "\n".join(parts))
+        record_failure(deployment.pk, "build", "\n".join(parts))
         raise RuntimeError(f"image build failed: {parts[0]}")
 
     record(deployment.pk, "build", "completed", "Build/push job reported successful completion.")

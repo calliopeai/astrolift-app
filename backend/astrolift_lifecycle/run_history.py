@@ -1,5 +1,6 @@
 """Durable observations of real deployment work, independent of pod lifetime."""
 
+import logging
 from contextlib import contextmanager
 
 
@@ -16,6 +17,14 @@ def record(deployment_id: int, phase: str, event: str, message: str = "", detail
     )
 
 
+def record_failure(deployment_id: int, name: str, message: str):
+    """A diagnostic write must not replace an already-established failure."""
+    try:
+        record(deployment_id, name, "failed", message)
+    except Exception:
+        logging.getLogger(__name__).warning("Could not journal failed deployment activity")
+
+
 @contextmanager
 def phase(deployment_id: int, name: str):
     record(deployment_id, name, "started")
@@ -23,7 +32,7 @@ def phase(deployment_id: int, name: str):
         yield
     except Exception:
         # Keep the original exception in the workflow's existing failure path.
-        record(deployment_id, name, "failed", "Activity failed; see deployment failure reason.")
+        record_failure(deployment_id, name, "Activity failed; see deployment failure reason.")
         raise
     else:
         record(deployment_id, name, "completed")

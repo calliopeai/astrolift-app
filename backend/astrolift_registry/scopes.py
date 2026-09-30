@@ -36,11 +36,19 @@ def _credential_scope(scope: PermissionScope, permission: Permission | None) -> 
     if scope.kind == ScopeKind.APP:
         from django.db.models import Q
 
-        owned = (
-            live_app_owners(RegisteredApp.objects.filter(pk=scope.id, organization_id=org_id))
-            .filter(Q(team_id=token.team_id) | Q(team_id__isnull=True, project__team_id=token.team_id))
-            .exists()
-        )
+        from astrolift_identity.historical_scopes import HistoricalAppScope, historical_app_owners
+
+        owners = live_app_owners(RegisteredApp.objects.filter(pk=scope.id, organization_id=org_id))
+        if isinstance(scope, HistoricalAppScope):
+            owners = historical_app_owners(RegisteredApp.all_objects.filter(pk=scope.id), org_id)
+        owned = owners.filter(
+            Q(team_id=token.team_id, team__deleted_at__isnull=True)
+            | Q(
+                team_id__isnull=True,
+                project__team_id=token.team_id,
+                project__team__deleted_at__isnull=True,
+            )
+        ).exists()
         shared = AppTeamAccess.objects.filter(
             registered_app_id=scope.id,
             registered_app__organization_id=org_id,

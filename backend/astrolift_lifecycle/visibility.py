@@ -41,14 +41,9 @@ def visible_apps(qs, permission):
 def historical_deployment_rows(qs):
     """Organization-confined snapshots remain readable after app/environment teardown."""
     org_id = _org_id()
-    apps = RegisteredApp.all_objects.filter(
-        organization_id=org_id, organization__deleted_at__isnull=True
-    ).filter(
-        Q(team_id__isnull=True) | Q(team__organization_id=org_id),
-        Q(project_id__isnull=True)
-        | Q(project__organization_id=org_id, project__team__organization_id=org_id),
-        Q(team_id__isnull=True) | Q(project_id__isnull=True) | Q(team_id=F("project__team_id")),
-    )
+    from astrolift_identity.historical_scopes import historical_app_owners
+
+    apps = historical_app_owners(RegisteredApp.all_objects.all(), org_id)
     return qs.filter(deleted_at__isnull=True, registered_app__in=apps).filter(
         Q(workload_id__isnull=True) | Q(workload__registered_app_id=F("registered_app_id")),
         Q(app_environment_id__isnull=True)
