@@ -4446,5 +4446,54 @@
       "readFailed": "읽기 실패",
       "refreshFailed": "변경 사항은 저장되었지만 화면을 새로 고치지 못했습니다. 최신 데이터를 보려면 화면을 새로 고치세요. 쓰기 작업을 반복하지 마세요."
     }
+  },
+  "models": {
+    "shared": {
+      "subscriptions": {
+        "title": "앱 구독",
+        "description": "앱 환경을 전용 자격 증명 참조로 이 공유 배포에 연결합니다. 자격 증명 값은 표시되지 않습니다.",
+        "restartImpact": "구독을 추가하거나 철회하면 공유 모델이 다시 시작됩니다. 모든 사용 앱이 일시적으로 접근하지 못할 수 있습니다. 요청한 세대가 준비된 후에만 접근 변경이 적용됩니다.",
+        "unsupportedRuntime": "이 런타임은 구독별 독립 자격 증명을 조정할 수 없습니다.",
+        "unknownRuntime": "이 런타임의 구독 자격 증명 지원은 확인되지 않았습니다.",
+        "retry": "다시 시도",
+        "verifyingTargets": "앱 환경 확인 중…",
+        "noEligibleTargets": "이 구독에 사용할 수 있는 검증된 앱 환경이 없습니다.",
+        "target": "앱 환경",
+        "chooseTarget": "앱 환경 선택",
+        "alias": "구독 별칭",
+        "aliasHelp": "소문자로 시작하고 소문자, 숫자 또는 밑줄을 사용하여 32자 이내로 입력하세요. 새 구독에는 이름이 지정된 별칭이 필요합니다. 기존 MODEL_* 바인딩은 유지됩니다.",
+        "invalidAlias": "32자 이하의 소문자 별칭을 입력하세요.",
+        "notVerified": "확인되지 않음",
+        "reviewSubscribe": "구독 검토",
+        "accepted": "요청이 수락되었습니다. 재시작과 준비 완료를 기다리는 중이며, 요청한 접근 변경은 아직 확인되지 않았습니다.",
+        "changed": "배포, 대상 또는 권한이 변경되었습니다. 검토를 취소하고 새로 고침한 후 현재 대상을 다시 검토하세요.",
+        "requestFailed": "요청을 확인할 수 없습니다. 완료 여부가 확인되지 않았으므로 다시 시도하기 전에 새로 고침하세요.",
+        "empty": "구독 없음",
+        "emptyDescription": "사용 가능한 앱 환경을 이 공유 배포에 연결하세요.",
+        "destination": "대상",
+        "state": "상태",
+        "actions": "작업",
+        "legacyAlias": "기존 기본값",
+        "versions": "요청 버전 {desired}; 적용 버전 {applied}",
+        "notObserved": "관측되지 않음",
+        "reviewRevoke": "철회 검토",
+        "subscribeTitle": "{name}을(를) 구독하시겠습니까?",
+        "revokeTitle": "{name}에 대한 접근을 철회하시겠습니까?",
+        "subscribeDestination": "별칭 {alias}을(를) 사용하여 {app} / {environment}을(를) 연결합니다.",
+        "revokeDestination": "{app} / {environment}의 별칭 {alias}에 대한 독립 자격 증명을 철회합니다.",
+        "confirmSubscribe": "구독 요청",
+        "confirmRevoke": "철회 요청",
+        "status": {
+          "pending": "재시작 및 준비 완료 대기 중",
+          "active": "활성",
+          "revoking": "철회 처리 중: 재시작 및 준비 완료 대기",
+          "revoked": "철회됨",
+          "failed": "실패"
+        },
+        "searchTargets": "앱 환경 검색",
+        "eligible": "사용 가능",
+        "selectedTarget": "선택됨: {target}"
+      }
+    }
   }
 }

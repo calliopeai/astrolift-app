@@ -4526,5 +4526,54 @@
       "readFailed": "Read failed",
       "refreshFailed": "The change was saved, but the view could not refresh. Refresh to see current data; do not repeat the write."
     }
+  },
+  "models": {
+    "shared": {
+      "subscriptions": {
+        "title": "App subscriptions",
+        "description": "Connect an app environment to this shared deployment with its own credential reference. Credential values are never displayed.",
+        "restartImpact": "Adding or revoking a subscription restarts the shared model. All consumers may temporarily lose access. Access changes take effect only after the requested generation is ready.",
+        "unsupportedRuntime": "This runtime cannot reconcile independent subscription credentials.",
+        "unknownRuntime": "Subscription credential support has not been verified for this runtime.",
+        "retry": "Retry",
+        "verifyingTargets": "Verifying app environments…",
+        "noEligibleTargets": "No verified app environment is available for this subscription.",
+        "target": "App environment",
+        "chooseTarget": "Choose an app environment",
+        "alias": "Subscription alias",
+        "aliasHelp": "Start with a lowercase letter, followed by lowercase letters, digits or underscores, up to 32 characters. Each new subscription requires a named alias; existing legacy MODEL_* bindings are preserved.",
+        "invalidAlias": "Use a named lowercase alias of at most 32 characters.",
+        "notVerified": "Not verified",
+        "reviewSubscribe": "Review subscription",
+        "accepted": "Request accepted. Waiting for restart and readiness; the requested access change is not yet confirmed.",
+        "changed": "The deployment, target or permission changed. Cancel this review, refresh, and review the current target again.",
+        "requestFailed": "The request could not be verified. No completion is confirmed; refresh before retrying.",
+        "empty": "No subscriptions",
+        "emptyDescription": "Connect an eligible app environment to this shared deployment.",
+        "destination": "Destination",
+        "state": "State",
+        "actions": "Actions",
+        "legacyAlias": "Legacy default",
+        "versions": "Desired version {desired}; applied version {applied}",
+        "notObserved": "not observed",
+        "reviewRevoke": "Review revocation",
+        "subscribeTitle": "Subscribe to {name}?",
+        "revokeTitle": "Revoke access to {name}?",
+        "subscribeDestination": "Connect {app} / {environment} using alias {alias}.",
+        "revokeDestination": "Revoke the independent credential for {app} / {environment}, alias {alias}.",
+        "confirmSubscribe": "Request subscription",
+        "confirmRevoke": "Request revocation",
+        "status": {
+          "pending": "Pending restart and readiness",
+          "active": "Active",
+          "revoking": "Revocation pending restart and readiness",
+          "revoked": "Revoked",
+          "failed": "Failed"
+        },
+        "searchTargets": "Search app environments",
+        "eligible": "Eligible",
+        "selectedTarget": "Selected: {target}"
+      }
+    }
   }
 }

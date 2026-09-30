@@ -4449,5 +4449,54 @@
       "readFailed": "Lesen fehlgeschlagen",
       "refreshFailed": "Die Änderung wurde gespeichert, aber die Ansicht konnte nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um die aktuellen Daten zu sehen; wiederholen Sie den Schreibvorgang nicht."
     }
+  },
+  "models": {
+    "shared": {
+      "subscriptions": {
+        "title": "App-Abonnements",
+        "description": "Verbinden Sie eine App-Umgebung über eine eigene Zugangsdatenreferenz mit diesem gemeinsamen Deployment. Zugangsdaten werden nie angezeigt.",
+        "restartImpact": "Das Hinzufügen oder Widerrufen eines Abonnements startet das gemeinsame Modell neu. Alle Nutzer können vorübergehend den Zugriff verlieren. Zugriffsänderungen gelten erst, wenn die angeforderte Generation bereit ist.",
+        "unsupportedRuntime": "Diese Laufzeit kann unabhängige Zugangsdaten pro Abonnement nicht abgleichen.",
+        "unknownRuntime": "Die Unterstützung für Abonnement-Zugangsdaten wurde für diese Laufzeit noch nicht geprüft.",
+        "retry": "Erneut versuchen",
+        "verifyingTargets": "App-Umgebungen werden geprüft…",
+        "noEligibleTargets": "Für dieses Abonnement ist keine geprüfte App-Umgebung verfügbar.",
+        "target": "App-Umgebung",
+        "chooseTarget": "App-Umgebung auswählen",
+        "alias": "Abonnement-Alias",
+        "aliasHelp": "Beginnen Sie mit einem Kleinbuchstaben, gefolgt von Kleinbuchstaben, Ziffern oder Unterstrichen, maximal 32 Zeichen. Jedes neue Abonnement benötigt einen benannten Alias; bisherige MODEL_*-Bindungen bleiben erhalten.",
+        "invalidAlias": "Verwenden Sie einen benannten Alias in Kleinbuchstaben mit höchstens 32 Zeichen.",
+        "notVerified": "Nicht geprüft",
+        "reviewSubscribe": "Abonnement prüfen",
+        "accepted": "Anfrage angenommen. Neustart und Bereitschaft stehen noch aus; die angeforderte Zugriffsänderung ist noch nicht bestätigt.",
+        "changed": "Deployment, Ziel oder Berechtigung haben sich geändert. Brechen Sie die Prüfung ab, aktualisieren Sie und prüfen Sie das aktuelle Ziel erneut.",
+        "requestFailed": "Die Anfrage konnte nicht überprüft werden. Ein Abschluss ist nicht bestätigt; aktualisieren Sie vor einem neuen Versuch.",
+        "empty": "Keine Abonnements",
+        "emptyDescription": "Verbinden Sie eine geeignete App-Umgebung mit diesem gemeinsamen Deployment.",
+        "destination": "Ziel",
+        "state": "Zustand",
+        "actions": "Aktionen",
+        "legacyAlias": "Bisheriger Standard",
+        "versions": "Gewünschte Version {desired}; angewendete Version {applied}",
+        "notObserved": "nicht beobachtet",
+        "reviewRevoke": "Widerruf prüfen",
+        "subscribeTitle": "{name} abonnieren?",
+        "revokeTitle": "Zugriff auf {name} widerrufen?",
+        "subscribeDestination": "{app} / {environment} mit dem Alias {alias} verbinden.",
+        "revokeDestination": "Die unabhängigen Zugangsdaten für {app} / {environment}, Alias {alias}, widerrufen.",
+        "confirmSubscribe": "Abonnement anfordern",
+        "confirmRevoke": "Widerruf anfordern",
+        "status": {
+          "pending": "Neustart und Bereitschaft ausstehend",
+          "active": "Aktiv",
+          "revoking": "Widerruf wartet auf Neustart und Bereitschaft",
+          "revoked": "Widerrufen",
+          "failed": "Fehlgeschlagen"
+        },
+        "searchTargets": "App-Umgebungen suchen",
+        "eligible": "Geeignet",
+        "selectedTarget": "Ausgewählt: {target}"
+      }
+    }
   }
 }

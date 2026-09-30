@@ -17,6 +17,10 @@
   not yet expose deployment or subscription operations; unavailable placements
   remain inspectable while infrastructure transport requires managed, active
   clusters and enabled providers (#2213).
+- Add Storybook subscription reviews for shared model deployments in all eight
+  locales, with named aliases, immutable target/version checks, restart-impact
+  warnings and distinct accepted versus applied states. Production adapter and
+  route integration follows the shared model API contract (#2215).
 
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.

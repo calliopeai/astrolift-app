@@ -4449,5 +4449,54 @@
       "readFailed": "Échec de la lecture",
       "refreshFailed": "La modification a été enregistrée, mais la vue n’a pas pu être actualisée. Actualisez-la pour voir les données actuelles ; ne répétez pas l’écriture."
     }
+  },
+  "models": {
+    "shared": {
+      "subscriptions": {
+        "title": "Abonnements des applications",
+        "description": "Connectez un environnement à ce déploiement partagé avec sa propre référence d’identifiant. Les valeurs des identifiants ne sont jamais affichées.",
+        "restartImpact": "L’ajout ou la révocation d’un abonnement redémarre le modèle partagé. Tous les consommateurs peuvent perdre temporairement l’accès. Les changements prennent effet lorsque la génération demandée est prête.",
+        "unsupportedRuntime": "Ce moteur ne peut pas appliquer des identifiants indépendants par abonnement.",
+        "unknownRuntime": "La prise en charge des identifiants d’abonnement n’a pas été vérifiée pour ce moteur.",
+        "retry": "Réessayer",
+        "verifyingTargets": "Vérification des environnements…",
+        "noEligibleTargets": "Aucun environnement vérifié n’est disponible pour cet abonnement.",
+        "target": "Environnement de l’application",
+        "chooseTarget": "Choisir un environnement",
+        "alias": "Alias de l’abonnement",
+        "aliasHelp": "Commencez par une lettre minuscule, suivie de minuscules, chiffres ou traits de soulignement, sur 32 caractères maximum. Chaque nouvel abonnement exige un alias ; les liaisons historiques MODEL_* sont conservées.",
+        "invalidAlias": "Utilisez un alias en minuscules de 32 caractères maximum.",
+        "notVerified": "Non vérifié",
+        "reviewSubscribe": "Vérifier l’abonnement",
+        "accepted": "Demande acceptée. En attente du redémarrage et de la disponibilité ; le changement d’accès n’est pas encore confirmé.",
+        "changed": "Le déploiement, la cible ou les droits ont changé. Annulez cette vérification, actualisez, puis vérifiez à nouveau la cible actuelle.",
+        "requestFailed": "La demande n’a pas pu être vérifiée. Aucune réalisation n’est confirmée ; actualisez avant de réessayer.",
+        "empty": "Aucun abonnement",
+        "emptyDescription": "Connectez un environnement admissible à ce déploiement partagé.",
+        "destination": "Destination",
+        "state": "État",
+        "actions": "Actions",
+        "legacyAlias": "Valeur historique par défaut",
+        "versions": "Version souhaitée {desired} ; version appliquée {applied}",
+        "notObserved": "non observée",
+        "reviewRevoke": "Vérifier la révocation",
+        "subscribeTitle": "S’abonner à {name} ?",
+        "revokeTitle": "Révoquer l’accès à {name} ?",
+        "subscribeDestination": "Connecter {app} / {environment} avec l’alias {alias}.",
+        "revokeDestination": "Révoquer l’identifiant indépendant de {app} / {environment}, alias {alias}.",
+        "confirmSubscribe": "Demander l’abonnement",
+        "confirmRevoke": "Demander la révocation",
+        "status": {
+          "pending": "En attente du redémarrage et de la disponibilité",
+          "active": "Actif",
+          "revoking": "Révocation en attente du redémarrage et de la disponibilité",
+          "revoked": "Révoqué",
+          "failed": "Échec"
+        },
+        "searchTargets": "Rechercher des environnements",
+        "eligible": "Admissible",
+        "selectedTarget": "Sélection : {target}"
+      }
+    }
   }
 }

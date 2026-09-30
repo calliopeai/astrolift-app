@@ -4446,5 +4446,54 @@
       "readFailed": "读取失败",
       "refreshFailed": "更改已保存，但无法刷新视图。请刷新以查看最新数据；不要重复写入。"
     }
+  },
+  "models": {
+    "shared": {
+      "subscriptions": {
+        "title": "应用订阅",
+        "description": "使用独立的凭据引用将应用环境连接到此共享部署。凭据值不会显示。",
+        "restartImpact": "添加或撤销订阅会重启共享模型。所有使用方可能暂时无法访问。只有请求的代次就绪后，访问变更才会生效。",
+        "unsupportedRuntime": "此运行时不支持协调各订阅的独立凭据。",
+        "unknownRuntime": "尚未验证此运行时是否支持订阅凭据。",
+        "retry": "重试",
+        "verifyingTargets": "正在验证应用环境…",
+        "noEligibleTargets": "此订阅没有可用的已验证应用环境。",
+        "target": "应用环境",
+        "chooseTarget": "选择应用环境",
+        "alias": "订阅别名",
+        "aliasHelp": "以小写字母开头，后接小写字母、数字或下划线，最多 32 个字符。每个新订阅都必须指定别名；现有旧版 MODEL_* 绑定保持不变。",
+        "invalidAlias": "输入最多 32 个字符的小写命名别名。",
+        "notVerified": "未验证",
+        "reviewSubscribe": "查看订阅",
+        "accepted": "请求已接受。正在等待重启和就绪；请求的访问变更尚未确认。",
+        "changed": "部署、目标或权限已变更。请取消此次确认，刷新后重新确认当前目标。",
+        "requestFailed": "无法验证请求，尚未确认完成。请刷新后再重试。",
+        "empty": "没有订阅",
+        "emptyDescription": "将符合条件的应用环境连接到此共享部署。",
+        "destination": "目标",
+        "state": "状态",
+        "actions": "操作",
+        "legacyAlias": "旧版默认值",
+        "versions": "期望版本 {desired}；已应用版本 {applied}",
+        "notObserved": "未观测",
+        "reviewRevoke": "查看撤销",
+        "subscribeTitle": "订阅 {name}？",
+        "revokeTitle": "撤销对 {name} 的访问？",
+        "subscribeDestination": "使用别名 {alias} 连接 {app} / {environment}。",
+        "revokeDestination": "撤销 {app} / {environment}（别名 {alias}）的独立凭据。",
+        "confirmSubscribe": "请求订阅",
+        "confirmRevoke": "请求撤销",
+        "status": {
+          "pending": "等待重启和就绪",
+          "active": "已生效",
+          "revoking": "正在撤销：等待重启和就绪",
+          "revoked": "已撤销",
+          "failed": "失败"
+        },
+        "searchTargets": "搜索应用环境",
+        "eligible": "符合条件",
+        "selectedTarget": "已选择：{target}"
+      }
+    }
   }
 }

@@ -4449,5 +4449,54 @@
       "readFailed": "No se pudo leer",
       "refreshFailed": "El cambio se guardó, pero no se pudo actualizar la vista. Actualícela para ver los datos actuales; no repita la escritura."
     }
+  },
+  "models": {
+    "shared": {
+      "subscriptions": {
+        "title": "Suscripciones de aplicaciones",
+        "description": "Conecta un entorno de aplicación a este despliegue compartido con su propia referencia de credencial. Los valores de las credenciales nunca se muestran.",
+        "restartImpact": "Añadir o revocar una suscripción reinicia el modelo compartido. Todos los consumidores pueden perder el acceso temporalmente. Los cambios de acceso solo se aplican cuando la generación solicitada está lista.",
+        "unsupportedRuntime": "Este entorno de ejecución no puede conciliar credenciales independientes de suscripción.",
+        "unknownRuntime": "No se ha verificado la compatibilidad de este entorno de ejecución con las credenciales de suscripción.",
+        "retry": "Reintentar",
+        "verifyingTargets": "Verificando entornos de aplicaciones…",
+        "noEligibleTargets": "No hay ningún entorno de aplicación verificado disponible para esta suscripción.",
+        "target": "Entorno de aplicación",
+        "chooseTarget": "Elige un entorno de aplicación",
+        "alias": "Alias de suscripción",
+        "aliasHelp": "Empieza con una letra minúscula, seguida de letras minúsculas, números o guiones bajos, hasta 32 caracteres. Cada nueva suscripción requiere un alias; se conservan los enlaces heredados MODEL_*.",
+        "invalidAlias": "Usa un alias en minúsculas de hasta 32 caracteres.",
+        "notVerified": "Sin verificar",
+        "reviewSubscribe": "Revisar suscripción",
+        "accepted": "Solicitud aceptada. Esperando el reinicio y la disponibilidad; el cambio de acceso solicitado aún no está confirmado.",
+        "changed": "El despliegue, el destino o los permisos han cambiado. Cancela esta revisión, actualiza y vuelve a revisar el destino actual.",
+        "requestFailed": "No se pudo verificar la solicitud. No se ha confirmado su finalización; actualiza antes de reintentar.",
+        "empty": "Sin suscripciones",
+        "emptyDescription": "Conecta un entorno de aplicación apto a este despliegue compartido.",
+        "destination": "Destino",
+        "state": "Estado",
+        "actions": "Acciones",
+        "legacyAlias": "Predeterminado heredado",
+        "versions": "Versión deseada {desired}; versión aplicada {applied}",
+        "notObserved": "no observada",
+        "reviewRevoke": "Revisar revocación",
+        "subscribeTitle": "¿Suscribirse a {name}?",
+        "revokeTitle": "¿Revocar el acceso a {name}?",
+        "subscribeDestination": "Conectar {app} / {environment} con el alias {alias}.",
+        "revokeDestination": "Revocar la credencial independiente de {app} / {environment}, alias {alias}.",
+        "confirmSubscribe": "Solicitar suscripción",
+        "confirmRevoke": "Solicitar revocación",
+        "status": {
+          "pending": "Pendiente de reinicio y disponibilidad",
+          "active": "Activa",
+          "revoking": "Revocación pendiente de reinicio y disponibilidad",
+          "revoked": "Revocada",
+          "failed": "Fallida"
+        },
+        "searchTargets": "Buscar entornos de aplicaciones",
+        "eligible": "Apto",
+        "selectedTarget": "Seleccionado: {target}"
+      }
+    }
   }
 }

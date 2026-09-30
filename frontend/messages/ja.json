@@ -4446,5 +4446,54 @@
       "readFailed": "読み取りに失敗しました",
       "refreshFailed": "変更は保存されましたが、表示を更新できませんでした。最新のデータを確認するには表示を更新してください。書き込みを繰り返さないでください。"
     }
+  },
+  "models": {
+    "shared": {
+      "subscriptions": {
+        "title": "アプリのサブスクリプション",
+        "description": "アプリ環境を、専用の認証情報参照でこの共有デプロイに接続します。認証情報の値は表示されません。",
+        "restartImpact": "サブスクリプションを追加または取り消すと、共有モデルが再起動します。すべての利用アプリで一時的にアクセスできなくなる可能性があります。アクセス変更は、要求した世代の準備完了後に適用されます。",
+        "unsupportedRuntime": "このランタイムは、サブスクリプションごとの独立した認証情報の更新に対応していません。",
+        "unknownRuntime": "このランタイムでのサブスクリプション認証情報のサポートは未確認です。",
+        "retry": "再試行",
+        "verifyingTargets": "アプリ環境を確認中…",
+        "noEligibleTargets": "このサブスクリプションで利用できる確認済みアプリ環境はありません。",
+        "target": "アプリ環境",
+        "chooseTarget": "アプリ環境を選択",
+        "alias": "サブスクリプションのエイリアス",
+        "aliasHelp": "先頭は小文字の英字、その後は小文字の英字、数字、アンダースコアで、32文字以内にしてください。新しいサブスクリプションには名前付きエイリアスが必要です。既存の MODEL_* バインディングは維持されます。",
+        "invalidAlias": "32文字以内の小文字の名前付きエイリアスを入力してください。",
+        "notVerified": "未確認",
+        "reviewSubscribe": "サブスクリプションを確認",
+        "accepted": "要求を受け付けました。再起動と準備完了を待っています。要求したアクセス変更はまだ確認されていません。",
+        "changed": "デプロイ、対象、または権限が変更されました。この確認をキャンセルして更新し、現在の対象をもう一度確認してください。",
+        "requestFailed": "要求を確認できませんでした。完了は確認されていません。再試行する前に更新してください。",
+        "empty": "サブスクリプションなし",
+        "emptyDescription": "対象となるアプリ環境をこの共有デプロイに接続してください。",
+        "destination": "接続先",
+        "state": "状態",
+        "actions": "操作",
+        "legacyAlias": "従来のデフォルト",
+        "versions": "要求バージョン {desired}、適用バージョン {applied}",
+        "notObserved": "未観測",
+        "reviewRevoke": "取り消しを確認",
+        "subscribeTitle": "{name} を利用しますか？",
+        "revokeTitle": "{name} へのアクセスを取り消しますか？",
+        "subscribeDestination": "エイリアス {alias} で {app} / {environment} を接続します。",
+        "revokeDestination": "{app} / {environment} のエイリアス {alias} に対応する独立した認証情報を取り消します。",
+        "confirmSubscribe": "サブスクリプションを要求",
+        "confirmRevoke": "取り消しを要求",
+        "status": {
+          "pending": "再起動と準備完了待ち",
+          "active": "有効",
+          "revoking": "取り消し処理中：再起動と準備完了待ち",
+          "revoked": "取り消し済み",
+          "failed": "失敗"
+        },
+        "searchTargets": "アプリ環境を検索",
+        "eligible": "利用可能",
+        "selectedTarget": "選択中：{target}"
+      }
+    }
   }
 }
