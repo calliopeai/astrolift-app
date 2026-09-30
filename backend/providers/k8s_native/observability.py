@@ -496,6 +496,14 @@ class LivePodBackend:
             # vacuously-true ``all([]) == True``.
             ready = bool(main_statuses) and all(c.ready for c in main_statuses)
             restarts = sum(c.restart_count for c in main_statuses)
+            unscheduled = next(
+                (
+                    c
+                    for c in (getattr(status, "conditions", None) or [])
+                    if getattr(c, "type", "") == "PodScheduled" and str(getattr(c, "status", "")) == "False"
+                ),
+                None,
+            )
             out.append(
                 PodInfo(
                     name=(getattr(metadata, "name", "") or "") if metadata else "",
@@ -507,6 +515,8 @@ class LivePodBackend:
                     age=(getattr(metadata, "creation_timestamp", None) if metadata else None),
                     node=((getattr(spec, "node_name", "") or "") if spec else ""),
                     container_statuses=statuses,
+                    scheduling_reason=getattr(unscheduled, "reason", "") or "",
+                    scheduling_message=getattr(unscheduled, "message", "") or "",
                 )
             )
         return out

@@ -267,6 +267,7 @@ type AstroliftAgentBox {
   podName: String!
   ownerEmail: String!
   lastError: String!
+  startupDiagnostic: AstroliftAgentStartupDiagnostic
   createdAt: DateTime!
   startedAt: DateTime
   endedAt: DateTime
@@ -578,6 +579,14 @@ type AstroliftAgentSkill {
   toolDefs: [AstroliftToolDef!]!
 }
 
+type AstroliftAgentStartupDiagnostic {
+  phase: String!
+  reason: String!
+  message: String!
+  podName: String!
+  observedAt: DateTime!
+}
+
 type AstroliftAgentTask {
   id: GUID!
   agentSlug: String!
@@ -588,6 +597,7 @@ type AstroliftAgentTask {
   result: JSON
   failureMessage: String
   eventSequence: Int!
+  startupDiagnostic: AstroliftAgentStartupDiagnostic
   createdAt: DateTime!
   updatedAt: DateTime!
   queuedAt: DateTime

@@ -173,6 +173,28 @@ class AgentTaskInputReplyType:
     created_at: dt.datetime
 
 
+@strawberry.type(name="AstroliftAgentStartupDiagnostic")
+class AgentStartupDiagnosticType:
+    phase: str
+    reason: str
+    message: str
+    pod_name: str
+    observed_at: dt.datetime
+
+
+def startup_diagnostic_to_type(row) -> AgentStartupDiagnosticType | None:
+    snapshot = row.startup_diagnostic or {}
+    if not snapshot:
+        return None
+    return AgentStartupDiagnosticType(
+        phase=snapshot["phase"],
+        reason=snapshot["reason"],
+        message=snapshot["message"],
+        pod_name=snapshot["podName"],
+        observed_at=dt.datetime.fromisoformat(snapshot["observedAt"]),
+    )
+
+
 @strawberry.type(name="AstroliftAgentTask")
 class AgentTaskType:
     id: GUID
@@ -191,6 +213,7 @@ class AgentTaskType:
     # is the only signal.
     failure_message: str | None
     event_sequence: int
+    startup_diagnostic: AgentStartupDiagnosticType | None
     created_at: dt.datetime
     # Lifecycle cursor for the fleet map (#1091): ``transition_to`` bumps
     # ``updated_at`` on every state change, so it is the incremental cursor
@@ -361,6 +384,7 @@ class AgentBoxType:
     # complete, or whose gateway key cannot be renewed past Zentinelle's key
     # lifetime (#1851); it is the sentence an operator needs, not a stack trace.
     last_error: str
+    startup_diagnostic: AgentStartupDiagnosticType | None
     created_at: dt.datetime
     started_at: dt.datetime | None
     ended_at: dt.datetime | None
@@ -387,6 +411,7 @@ def agent_box_to_type(box) -> AgentBoxType:
         pod_name=box.pod_name or "",
         owner_email=(getattr(box.owner, "email", "") or "" if box.owner_id is not None else ""),
         last_error=box.last_error or "",
+        startup_diagnostic=startup_diagnostic_to_type(box),
         created_at=box.created_at,
         started_at=box.started_at,
         ended_at=box.ended_at,
@@ -698,6 +723,7 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
         result=t.result,
         failure_message=_agent_task_failure_message(t.failure),
         event_sequence=t.event_sequence,
+        startup_diagnostic=startup_diagnostic_to_type(t),
         created_at=t.created_at,
         updated_at=t.updated_at,
         queued_at=t.queued_at,

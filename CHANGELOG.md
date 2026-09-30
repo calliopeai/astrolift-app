@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Merge the agent startup-diagnostic and durable-backlog migration branches so
+  a combined control-plane upgrade has one migration leaf. Both additive
+  migrations remain applicable from either previously deployed branch (#1972, #2190).
+
 - Agent task backlog snapshots survive pod termination and are readable through
   `agentTaskBacklog(orgId, taskId)` with the same scoped authority as task events
   (#1972). Negotiated runner callbacks persist ordered, bounded snapshots outside
@@ -89,6 +93,14 @@
   retain their owner/share ceiling despite an organization-wide user role.
   Registration and transfer destinations are checked separately, and source
   manifest scans require organization authority.
+- Agent task and box startup diagnostics expose scoped pod scheduling reasons.
+  Pending Jobs stay provisioning until ready; timeout failures preserve the
+  last startup reason before cleanup, and recovery clears stale warnings (#2190).
+
+- CLI and IDE sign-in credentials can discover and attach to agent boxes when
+  account permissions allow it. The existing `mcp:dispatch` scope now includes
+  `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
+  enforced (#2188).
 
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep
