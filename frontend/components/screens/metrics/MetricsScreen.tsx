@@ -32,7 +32,9 @@ import { cn } from "@/lib/utils";
 import { METRICS_APPS_SELECT } from "./metrics-apps-list";
 import type { useMetrics } from "./use-metrics";
 
-export type MetricsScreenProps = Omit<ReturnType<typeof useMetrics>, "list">;
+export type MetricsScreenProps = Omit<ReturnType<typeof useMetrics>, "list"> & {
+  temporalUiUrl?: string;
+};
 
 const STATUS_DOT: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
   pending_approval: "warn",
@@ -176,6 +178,7 @@ function SuccessRateCard({
  * run over the summary in hand: the field returns every app at once).
  */
 export function MetricsScreen({
+  temporalUiUrl,
   windowDays,
   metrics,
   metricsLoading,
@@ -397,15 +400,17 @@ export function MetricsScreen({
           <ExternalLinkIcon className="size-3" />
           Raw Prometheus exposition
         </a>
-        <a
-          className="inline-flex items-center gap-1 hover:underline"
-          href="http://localhost:8233"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <ExternalLinkIcon className="size-3" />
-          Temporal UI (workflows)
-        </a>
+        {temporalUiUrl?.trim() && (
+          <a
+            className="inline-flex items-center gap-1 hover:underline"
+            href={temporalUiUrl.trim()}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLinkIcon className="size-3" />
+            Temporal UI (workflows)
+          </a>
+        )}
         <span className="text-muted-foreground/70">
           Grafana embeds land in v2 — wire a prometheus + grafana docker profile and these cards
           become live charts.

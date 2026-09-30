@@ -47,7 +47,7 @@ function manifestError(preview: WorkflowManifestPreview): string {
 export function useWorkflowBuilder() {
   const router = useRouter();
   const { org } = useActiveOrg();
-  const { canCreate } = useWorkflowsEntitlement();
+  const { canCreate, loading: entitlementLoading } = useWorkflowsEntitlement();
   const [importManifest] = useManifestImport();
   const [previewManifest, { loading: previewing }] = useManifestPreview();
   const [creating, setCreating] = useState(false);
@@ -109,5 +109,5 @@ export function useWorkflowBuilder() {
     return preview.ok ? { preview } : { preview: null, error: manifestError(preview) };
   }
 
-  return { canCreate, creating, previewing, onCreate, onImport, onPreview };
+  return { canCreate, entitlementLoading, creating, previewing, onCreate, onImport, onPreview };
 }

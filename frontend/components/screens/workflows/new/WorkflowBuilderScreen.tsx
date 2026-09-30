@@ -146,6 +146,7 @@ function ReviewRow({ term, children }: { term: string; children: React.ReactNode
  */
 export function WorkflowBuilderScreen({
   canCreate,
+  entitlementLoading,
   creating,
   previewing,
   onCreate,
@@ -175,6 +176,7 @@ export function WorkflowBuilderScreen({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (step === 3 && (creating || entitlementLoading || !canCreate)) return;
     if (step === 1) {
       const found = validateSource(source, { name, slug, toml });
       setErrors(found);
@@ -410,10 +412,10 @@ export function WorkflowBuilderScreen({
           ) : (
             <Button
               type="submit"
-              disabled={creating || !canCreate}
-              title={canCreate ? undefined : "You don't have create access"}
+              disabled={creating || entitlementLoading || !canCreate}
+              title={entitlementLoading || canCreate ? undefined : "You don't have create access"}
             >
-              {creating && <Loader2Icon className="size-4 animate-spin" />}
+              {(creating || entitlementLoading) && <Loader2Icon className="size-4 animate-spin" />}
               Create workflow
             </Button>
           )}

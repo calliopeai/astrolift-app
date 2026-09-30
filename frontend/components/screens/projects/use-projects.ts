@@ -45,10 +45,7 @@ export function useProjects() {
   // table.
   const teams = useQuery<TeamsResp>(LIST_TEAMS);
 
-  // #717 — When the NavTree's "Add project" affordance navigates here
-  // with ?new=1, auto-open the dialog. The optional ?team=<slug> is
-  // honored by the dialog itself if it's wired to read the URL; we
-  // only open the modal here to keep this hook small.
+  // NavTree creates a project under the requested visible team.
   const searchParams = useSearchParams();
   const autoOpenCreate = searchParams.get("new") === "1";
 
@@ -89,6 +86,7 @@ export function useProjects() {
     teamsLoading: teams.loading,
     noTeams: teams.data?.astroliftTeams.length === 0,
     autoOpenCreate,
+    initialTeamSlug: searchParams.get("team"),
     deleting,
     deleteProject,
   };

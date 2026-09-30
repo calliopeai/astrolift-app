@@ -2,7 +2,12 @@
 
 import * as React from "react";
 
-import { slugify } from "@/components/screens/projects/project-team-slug";
+import {
+  slugify,
+  isValidSlug,
+  SLUG_MAX,
+  SLUG_INPUT_PATTERN,
+} from "@/components/screens/projects/project-team-slug";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +51,7 @@ export function CreateTeamSheet({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (creating || !hasOrg || !name.trim() || !isValidSlug(slug)) return;
     if (await createTeam({ name, slug, description })) onOpenChange(false);
   }
 
@@ -85,11 +91,14 @@ export function CreateTeamSheet({
                 setSlugTouched(true);
               }}
               placeholder="backend"
-              pattern="[a-z0-9-]+"
+              pattern={SLUG_INPUT_PATTERN}
+              maxLength={SLUG_MAX}
+              aria-invalid={slug.length > 0 && !isValidSlug(slug)}
               required
             />
             <p className="text-muted-foreground text-xs">
-              Lowercase letters, numbers, hyphens. Used in URLs.
+              Start with a lowercase letter; use letters, numbers and hyphens, up to 40 characters.
+              End with a letter or number.
             </p>
           </div>
 
@@ -108,7 +117,10 @@ export function CreateTeamSheet({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={creating || !name || !hasOrg}>
+            <Button
+              type="submit"
+              disabled={creating || !name.trim() || !hasOrg || !isValidSlug(slug)}
+            >
               {creating ? "Creating…" : "Create team"}
             </Button>
           </SheetFooter>

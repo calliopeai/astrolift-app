@@ -16,6 +16,12 @@ type Story = StoryObj;
 /** Step 1, from a pattern: the screen loads no data, so this is also its empty state. */
 export const Full: Story = { render: () => <WorkflowBuilderScreen {...BUILDER} /> };
 
+export const CheckingAccess: Story = {
+  render: () => (
+    <WorkflowBuilderScreen {...BUILDER} initialStep={3} entitlementLoading canCreate={false} />
+  ),
+};
+
 /** Opened with `?pattern=fan_out`. */
 export const PatternFromQuery: Story = {
   render: () => <WorkflowBuilderScreen {...BUILDER} initialPattern="fan_out" />,

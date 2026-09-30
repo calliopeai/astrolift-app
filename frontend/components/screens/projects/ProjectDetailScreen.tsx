@@ -339,7 +339,9 @@ export function ProjectDetailScreen({
                 ? "border-warning-border bg-warning/5"
                 : undefined
             }
-            href="#workflows"
+            href={
+              hasWorkflows ? "#workflows" : `/agents?project=${encodeURIComponent(project.slug)}`
+            }
           />
           <StatTile
             icon={BoxIcon}

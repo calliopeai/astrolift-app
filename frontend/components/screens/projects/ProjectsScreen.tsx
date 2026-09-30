@@ -21,6 +21,7 @@ export interface CreateProjectDialogSlotProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teams: AstroliftTeam[];
+  initialTeamSlug?: string | null;
 }
 
 /** The edit sheet, rendered by the caller so its queries stay out of this view. */
@@ -52,6 +53,7 @@ export function ProjectsScreen({
   teamsLoading,
   noTeams,
   autoOpenCreate,
+  initialTeamSlug,
   deleting,
   deleteProject,
   renderCreateDialog,
@@ -171,7 +173,7 @@ export function ProjectsScreen({
         }}
       />
 
-      {renderCreateDialog({ open, onOpenChange: handleCreateOpenChange, teams })}
+      {renderCreateDialog({ open, onOpenChange: handleCreateOpenChange, teams, initialTeamSlug })}
 
       {renderEditDialog({
         open: editTarget !== null,

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Team and project create sheets generate backend-compatible slugs and preserve
+  a requested visible team. Workflow configuration waits for and scopes reads
+  to the active organization, create access stays unknown while loading, and
+  agent-only attention links target actual agent pages. Metrics links Temporal
+  only when `NEXT_PUBLIC_TEMPORAL_UI_URL` is configured (#2148).
+
 - Operational forms stay blocked during secret rotation and require a command
   container. Terminal agent-run aliases stop polling, uppercase running tasks
   accept overseer input, help copy timers are cleaned up, and webhook writes

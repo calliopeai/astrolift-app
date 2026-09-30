@@ -100,8 +100,12 @@ export function useConfigureWorkflow(definitionSlug: string) {
   const orgScoped = org?.id ?? null;
   const agentWorkloads = useAgentWorkloadOptions(orgScoped);
   const { canCreate, loading: entitlementLoading } = useWorkflowsEntitlement();
-  const { definition, loading: definitionLoading, error } = useWorkflowDefinition(definitionSlug);
-  const { stages, loading: stagesLoading } = useWorkflowStages(definitionSlug);
+  const {
+    definition,
+    loading: definitionLoading,
+    error,
+  } = useWorkflowDefinition(orgScoped ? definitionSlug : null, orgScoped);
+  const { stages, loading: stagesLoading } = useWorkflowStages(orgScoped ? definitionSlug : null);
   const [createWorkflow, { loading: submitting }] = useCreateConfiguredWorkflow();
 
   const loading = definitionLoading || stagesLoading;
