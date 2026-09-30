@@ -354,6 +354,19 @@ export function ClustersList(props: ClustersListProps) {
             </DropdownMenuItem>
           </Can>
         )}
+        {c.lifecycle === "managed" && (
+          <Can permission="cluster.manage">
+            <DropdownMenuItem
+              disabled={busy}
+              onSelect={() => {
+                void props.onRefresh(c, true);
+              }}
+            >
+              <RefreshCcwIcon className="size-4" />
+              Refresh setup with full preflight
+            </DropdownMenuItem>
+          </Can>
+        )}
         <Can permission="cluster.unregister">
           <DropdownMenuItem
             variant="destructive"

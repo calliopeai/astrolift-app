@@ -65,7 +65,7 @@ function Screen(props: Partial<ClusterStatusBodyProps> & { cluster?: typeof CLUS
 /** Connected cluster, every card populated. */
 export const Full: Story = { render: () => <Screen /> };
 
-/** Heartbeat still loading: offline stand-ins until the live state lands. */
+/** Heartbeat still loading: observed connectivity is not known yet. */
 export const Loading: Story = {
   render: () => (
     <Screen
