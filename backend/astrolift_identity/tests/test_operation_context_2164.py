@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from django.utils import timezone
 
 from astrolift_identity.abac import RequestAttributes, current_attributes, request_attributes
 from astrolift_identity.models import Member, Policy
@@ -154,6 +155,31 @@ def policy(w, *, action="app.deploy", resource=None, conditions=None, effect="DE
     )
 
 
+def approve_deployment_as(w, deployment, voter):
+    from astrolift_lifecycle.schema.mutations import DeploymentByIdInput
+
+    Member.objects.get_or_create(
+        user=voter,
+        scope_kind="ORG",
+        scope_id=w.world.org.pk,
+        defaults={"lifecycle": "active", "is_active": True},
+    )
+    bind_role(
+        voter,
+        permissions=[Permission.APP_APPROVE_DEPLOY],
+        kind="ORG",
+        scope_id=w.world.org.pk,
+        slug=f"voter-{uuid4().hex}",
+    )
+    with as_tenant(w.world, voter):
+        result = LifecycleMutation().approve_deployment(
+            make_info(voter), DeploymentByIdInput(id=str(deployment.guid))
+        )
+    assert result.ok, result.errors
+    deployment.refresh_from_db()
+    return result
+
+
 @pytest.mark.parametrize("resource", [{"env": ["production"]}, {"region": ["us-east-1"]}])
 def test_environment_and_region_deny_only_the_matching_target(operation_world, resource):
     w = operation_world
@@ -197,7 +223,8 @@ def test_deployment_gate_reads_recorded_approvals(operation_world):
     deployment = Deployment.objects.create(
         registered_app=w.world.medops_app,
         app_environment=w.production,
-        status="pending",
+        status="pending_approval",
+        approvals_required=3,
         approvals_received=0,
     )
     policy(
@@ -209,9 +236,19 @@ def test_deployment_gate_reads_recorded_approvals(operation_world):
         )
         assert not refused.ok
         deployment.refresh_from_db()
-        assert deployment.status == "pending"
-        deployment.approvals_received = 2
-        deployment.save(update_fields=["approvals_received", "updated_at", "version"])
+        assert deployment.status == "pending_approval"
+    approve_deployment_as(w, deployment, w.user)
+    approve_deployment_as(w, deployment, w.user)
+    assert deployment.approvals_received == 1
+    with as_tenant(w.world, w.user):
+        assert (
+            not LifecycleMutation()
+            .abort_deployment(w.info, AbortDeploymentInput(id=str(deployment.guid), reason="stop"))
+            .ok
+        )
+    approve_deployment_as(w, deployment, make_user(f"second-voter-{uuid4().hex}"))
+    assert deployment.approvals_received == 2
+    with as_tenant(w.world, w.user):
         allowed = LifecycleMutation().abort_deployment(
             w.info, AbortDeploymentInput(id=str(deployment.guid), reason="stop")
         )
@@ -251,6 +288,39 @@ def test_app_wide_secret_write_checks_production_as_well_as_staging(operation_wo
         assert not refused.ok
     app.refresh_from_db()
     assert app.manifest_raw_staged == before
+
+
+def test_literal_secret_proposal_checks_all_environments_despite_its_display_target(operation_world):
+    from astrolift_identity.operation_context import secret_proposal_operation
+    from astrolift_services.models import SecretChangeApproval, SecretChangeProposal
+    from astrolift_services.scopes import secret_change_proposal_app_scope
+    from core.permissions import require_permission
+
+    w = operation_world
+    proposal = SecretChangeProposal.objects.create(
+        registered_app=w.world.medops_app,
+        app_environment=w.staging,
+        proposer=w.user,
+        op="set",
+        expires_at=timezone.now(),
+    )
+    SecretChangeApproval.objects.create(proposal=proposal, approver=None, decision="approved")
+    policy(w, action="app.update", resource={"env": ["production"]})
+
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=secret_change_proposal_app_scope("id"),
+        operation=secret_proposal_operation("id"),
+    )
+    def apply(id):
+        pytest.fail("a staging display target must not authorize an app-wide production change")
+
+    with as_tenant(w.world, w.user):
+        contexts = secret_proposal_operation("id")({"id": str(proposal.guid)})
+        assert {context.environment for context in contexts} == {"production", "staging"}
+        assert all(context.approvals == 0 for context in contexts)
+        with pytest.raises(PermissionDenied):
+            apply(str(proposal.guid))
 
 
 def test_workflow_gate_counts_distinct_persisted_approved_voters(operation_world):
@@ -402,3 +472,274 @@ def test_visibility_backed_scope_uses_the_operation_region_before_resolving(oper
         with pytest.raises(PermissionDenied):
             act(workload.slug, "us-east-1")
     assert seen == [ScopeKind.APP]
+
+
+def test_unavailable_agent_cluster_region_remains_unknown_and_denied(operation_world, monkeypatch):
+    from astrolift_identity.operation_context import agent_region_operation
+    from core.permissions import require_permission
+
+    w = operation_world
+    monkeypatch.setattr(
+        "astrolift_agents.services.agent_cluster.resolve_agent_cluster", lambda _organization: object()
+    )
+    policy(w, action="agent.dispatch", resource={"region": ["us-east-1"]})
+
+    @require_permission(Permission.AGENT_DISPATCH, operation=agent_region_operation)
+    def dispatch():
+        pytest.fail("unavailable cluster metadata must not bypass the region policy")
+
+    with as_tenant(w.world, w.user):
+        assert agent_region_operation({})[0].region is None
+        with pytest.raises(PermissionDenied):
+            dispatch()
+
+
+def test_stage_execution_graphql_reader_cannot_borrow_the_latest_runs_approvals(operation_world):
+    import strawberry
+
+    from workflows.schema.queries import Query as LegacyQuery
+
+    w = operation_world
+    bind_role(
+        w.user,
+        permissions=[Permission.WORKFLOW_READ],
+        kind="ORG",
+        scope_id=w.world.org.pk,
+        slug=f"stage-reader-{uuid4().hex}",
+    )
+    definition = WorkflowDefinition.objects.create(
+        organization=w.world.org, slug=f"read-{uuid4().hex}", name="Read"
+    )
+    stage = WorkflowStage.objects.create(definition=definition, kind="human_gate", order=0, slug="gate")
+    runs = [
+        WorkflowRun.objects.create(
+            organization=w.world.org,
+            registered_app=w.world.medops_app,
+            app_environment=w.production,
+            workflow_definition=definition,
+            workflow_kind="WorkflowDefinitionRunWorkflow",
+            workflow_id="reused-workflow-id",
+            run_id=run_id,
+        )
+        for run_id in ("older-unapproved", "latest-approved")
+    ]
+    executions = [
+        WorkflowStageExecution.objects.create(
+            workflow_run=run,
+            stage=stage,
+            status="completed",
+            slug=run.run_id,
+            output={
+                "human_gate": {
+                    "decision": "approved" if index else "rejected",
+                    "decided_by_user_id": w.user.pk,
+                }
+            },
+        )
+        for index, run in enumerate(runs)
+    ]
+    policy(w, action="workflow.read", conditions=[{"kind": "approval_required"}])
+    schema = strawberry.Schema(query=LegacyQuery)
+    query = """query($run: String!) {
+      workflowStageExecutions(workflowId: "reused-workflow-id", runId: $run) { guid status }
+    }"""
+    with as_tenant(w.world, w.user):
+        denied = schema.execute_sync(
+            query, variable_values={"run": runs[0].run_id}, context_value=w.info.context
+        )
+        allowed = schema.execute_sync(
+            query, variable_values={"run": runs[1].run_id}, context_value=w.info.context
+        )
+    assert denied.errors and isinstance(denied.errors[0].original_error, PermissionDenied)
+    assert denied.data is None
+    assert not allowed.errors
+    assert allowed.data["workflowStageExecutions"] == [
+        {"guid": str(executions[1].guid), "status": "completed"}
+    ]
+
+
+@pytest.mark.parametrize("action", ["approve", "reject"])
+@pytest.mark.parametrize("deny_scope", ["APP", "PROJECT", "environment", "region"])
+def test_bulk_approval_checks_each_app_scope_and_operation_before_its_side_effects(
+    operation_world, action, deny_scope
+):
+    from astrolift_lifecycle.schema.mutations import (
+        BulkApproveDeploymentsInput,
+        BulkRejectDeploymentsInput,
+        DeploymentByIdInput,
+    )
+
+    w = operation_world
+    bind_role(
+        w.user,
+        permissions=[Permission.APP_APPROVE_DEPLOY],
+        kind="ORG",
+        scope_id=w.world.org.pk,
+        slug=f"bulk-approver-{uuid4().hex}",
+    )
+    permitted_env = AppEnvironment.objects.create(
+        registered_app=w.world.platform_app, name="staging", tenant_cluster=w.staging.tenant_cluster
+    )
+    deployments = [
+        Deployment.objects.create(
+            registered_app=env.registered_app,
+            app_environment=env,
+            status="pending_approval",
+            approvals_required=2,
+        )
+        for env in (w.production, permitted_env)
+    ]
+    denied = policy(w, action="app.approve_deploy")
+    if deny_scope in ("APP", "PROJECT"):
+        denied.scope_level = deny_scope
+        denied.scope_id = w.world.medops_app.pk if deny_scope == "APP" else w.world.medops_project.pk
+    else:
+        denied.resource_pattern = (
+            {"env": ["production"]} if deny_scope == "environment" else {"region": ["us-east-1"]}
+        )
+    denied.save()
+    with as_tenant(w.world, w.user):
+        single = LifecycleMutation().approve_deployment(
+            w.info, DeploymentByIdInput(id=str(deployments[0].guid))
+        )
+        assert not single.ok and single.errors[0].code == "PERMISSION_DENIED"
+        ids = [str(deployment.guid) for deployment in deployments]
+        if action == "approve":
+            result = LifecycleMutation().bulk_approve_deployments(
+                w.info, BulkApproveDeploymentsInput(deployment_ids=ids)
+            )
+        else:
+            result = LifecycleMutation().bulk_reject_deployments(
+                w.info, BulkRejectDeploymentsInput(deployment_ids=ids, reason="refused")
+            )
+    assert result.ok
+    assert (result.data.failed_count, result.data.succeeded_count) == (1, 1)
+    assert not result.data.results[0].ok
+    assert result.data.results[0].errors[0].code == "PERMISSION_DENIED"
+    assert result.data.results[1].ok
+    for deployment in deployments:
+        deployment.refresh_from_db()
+    assert deployments[0].approvals_received == 0
+    assert deployments[0].status == "pending_approval"
+    assert not deployments[0].aborted_reason
+    assert deployments[1].approvals_received == (1 if action == "approve" else 0)
+    assert deployments[1].status == ("pending_approval" if action == "approve" else "failed")
+
+
+def test_legacy_deployment_counter_and_anonymous_credential_do_not_supply_human_votes(operation_world):
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    from astrolift_identity.operation_context import deployment_approval_count
+    from astrolift_lifecycle.models import DeploymentApproval
+
+    w = operation_world
+    deployment = Deployment.objects.create(
+        registered_app=w.world.medops_app,
+        app_environment=w.production,
+        status="pending_approval",
+        approvals_required=3,
+        approvals_received=2,
+    )
+    DeploymentApproval.objects.create(deployment=deployment, credential_hash="a" * 64)
+    assert deployment_approval_count(deployment) == 0
+    policy(w, conditions=[{"kind": "approval_required", "min_approvers": 2}])
+    with as_tenant(w.world, w.user):
+        assert (
+            not LifecycleMutation()
+            .abort_deployment(
+                w.info, AbortDeploymentInput(id=str(deployment.guid), reason="no identity proof")
+            )
+            .ok
+        )
+    previous = (
+        MigrationExecutor(connection)
+        .loader.project_state([("astrolift_lifecycle", "0043_previewenvironment_opened_by_failure_reason")])
+        .apps.get_model("astrolift_lifecycle", "Deployment")
+    )
+    assert previous.objects.get(pk=deployment.pk).status == "pending_approval"
+    assert previous.objects.get(pk=deployment.pk).approvals_received == 2
+    approve_deployment_as(w, deployment, w.user)
+    assert deployment.approvals_received == 1  # multi-person quorum requires identified humans
+    assert deployment_approval_count(deployment) == 1
+
+
+def test_multi_person_quorum_starts_only_after_two_authenticated_voters(operation_world, monkeypatch):
+    from astrolift_identity.operation_context import deployment_approval_count
+    from astrolift_lifecycle.approval import mint_magic_link
+    from astrolift_lifecycle.schema.mutations import ApproveByTokenInput
+
+    w = operation_world
+    issued = mint_magic_link(now=timezone.now())
+    deployment = Deployment.objects.create(
+        registered_app=w.world.medops_app,
+        app_environment=w.production,
+        status="pending_approval",
+        approvals_required=2,
+        approval_token_hash=issued.token_hash,
+        approval_token_expires_at=issued.expires_at,
+    )
+    queued = []
+    monkeypatch.setattr(
+        "astrolift_lifecycle.schema.mutations.helpers._start_deploy_workflow_on_commit",
+        lambda **kwargs: queued.append(kwargs),
+    )
+    token_vote = LifecycleMutation().approve_deployment_by_token(
+        w.info, ApproveByTokenInput(token=issued.plaintext_token)
+    )
+    assert token_vote.ok, token_vote.errors
+    approve_deployment_as(w, deployment, w.user)
+    approve_deployment_as(w, deployment, w.user)
+    assert deployment.approvals_received == 1
+    assert deployment.status == "pending_approval"
+    assert not queued
+    approve_deployment_as(w, deployment, make_user(f"quorum-voter-{uuid4().hex}"))
+    assert deployment.approvals_received == 2
+    assert deployment_approval_count(deployment) == 2
+    assert deployment.status == "pending"
+    assert len(queued) == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_approval_requests_from_one_user_record_one_vote(operation_world):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    from django.db import close_old_connections
+
+    from astrolift_lifecycle.schema.mutations import DeploymentByIdInput
+
+    w = operation_world
+    deployment = Deployment.objects.create(
+        registered_app=w.world.medops_app,
+        app_environment=w.production,
+        status="pending_approval",
+        approvals_required=3,
+    )
+    bind_role(
+        w.user,
+        permissions=[Permission.APP_APPROVE_DEPLOY],
+        kind="ORG",
+        scope_id=w.world.org.pk,
+        slug=f"concurrent-voter-{uuid4().hex}",
+    )
+    barrier = Barrier(2)
+
+    def vote():
+        close_old_connections()
+        try:
+            barrier.wait(timeout=10)
+            with as_tenant(w.world, w.user):
+                return LifecycleMutation().approve_deployment(
+                    w.info, DeploymentByIdInput(id=str(deployment.guid))
+                )
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _index: vote(), range(2)))
+    assert all(result.ok for result in results)
+    deployment.refresh_from_db()
+    assert deployment.approvals_received == 1
+    assert deployment.approval_votes.count() == 1
+    assert deployment.status == "pending_approval"

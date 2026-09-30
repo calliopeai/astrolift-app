@@ -11,7 +11,6 @@ from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.operation_context import (
-    bulk_deployment_operation,
     deployment_operation,
     named_environment,
 )
@@ -431,7 +430,7 @@ class DeploymentMutations:
     # same as if the operator had clicked through one at a time.
 
     @strawberry.field
-    @require_permission(Permission.APP_APPROVE_DEPLOY, operation=bulk_deployment_operation)
+    @require_permission(Permission.APP_APPROVE_DEPLOY, any_scope=True)
     @tenant_scoped()
     def bulk_approve_deployments(
         self, info: Info, input: BulkApproveDeploymentsInput
@@ -478,7 +477,7 @@ class DeploymentMutations:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_APPROVE_DEPLOY, operation=bulk_deployment_operation)
+    @require_permission(Permission.APP_APPROVE_DEPLOY, any_scope=True)
     @tenant_scoped()
     def bulk_reject_deployments(
         self, info: Info, input: BulkRejectDeploymentsInput

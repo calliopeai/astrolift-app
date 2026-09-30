@@ -102,6 +102,15 @@
 - Scoped policies now reduce collection rows and capabilities, including a grant
   whose only app is denied; an allowed parent cannot restore a denied child (#2164).
   Policy writes reject malformed conditions and selector shapes before saving.
+- Operation collections apply each row's environment, frozen dispatch region and
+  recorded approvals before pagination, totals, deployment comparisons and health
+  metrics (#2164). Secret and service lists filter their actual environments;
+  app-wide secret proposals check all affected environments. An approved run
+  cannot lend its votes to another run's read.
+- Deployment approvals now record distinct voter identities under a row lock
+  (#2164). Repeated requests are idempotent, and a legacy counter or anonymous
+  bearer link cannot supply human identities to an ABAC approval requirement.
+  Bulk approvals and rejections apply each deployment's actual app-scope policy.
 - SCIM Groups now supports org-confined provisioning, reads, atomic membership
   PATCH, replacement and deletion with the existing SCIM credential (#2164).
   Removal immediately drops group-derived roles without changing direct grants;

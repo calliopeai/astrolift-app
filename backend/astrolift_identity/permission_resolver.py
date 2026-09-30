@@ -547,6 +547,28 @@ def _policy_scope_permissions(tenant: TenantContext, slugs: set[str]) -> dict[st
             environments.setdefault(env.registered_app_id, []).append(environment_context(env))
         for ident, chain in _app_scope_chains(tenant, app_ids).items():
             points.append((("APP", ident), chain, tuple(environments.get(ident) or (OperationContext(),))))
+        operation_kinds = {kind.kind for kind in abac.CONDITION_KINDS if kind.needs == "operation"}
+        if any(
+            any(key in (policy.resource_pattern or {}) for key in ("env", "region"))
+            or isinstance(policy.conditions, list)
+            and any(
+                isinstance(condition, dict) and condition.get("kind") in operation_kinds
+                for condition in policy.conditions
+            )
+            for policy in abac.org_policies(tenant.organization_id, attrs)
+        ):
+            from astrolift_identity.operation_visibility import agent_scope_contexts
+
+            points = agent_scope_contexts(tenant, points)
+        if any(
+            isinstance(policy.conditions, list)
+            and any(
+                isinstance(condition, dict) and condition.get("kind") == "approval_required"
+                for condition in policy.conditions
+            )
+            for policy in abac.org_policies(tenant.organization_id, attrs)
+        ):
+            points = _recorded_approval_contexts(tenant, points)
         attrs.cache[key] = (points, app_ids)
     points, app_ids = attrs.cache[key]
     grants = _org_confined_bindings(tenant)
@@ -578,6 +600,94 @@ def _policy_scope_permissions(tenant: TenantContext, slugs: set[str]) -> dict[st
         if kept:
             allowed[kind][ident] = kept
     return allowed
+
+
+def _recorded_approval_contexts(tenant, points):
+    """Browse capabilities at actual approved operations without lending votes.
+
+    Exact actions override these candidates with their own facts, and
+    collection filters check each execution's count before returning it.
+    """
+    from django.db.models import Count, Q
+
+    from astrolift_identity.operation_context import agent_region_operation
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_services.models import SecretChangeApproval
+    from workflows.models import WorkflowStageExecution
+
+    index = {point: i for i, (point, _chain, _contexts) in enumerate(points)}
+
+    def add(point, count, *, environment=None, default=None):
+        position = index.get(point)
+        if position is None or count < 1:
+            return
+        key, chain, contexts = points[position]
+        candidates = [
+            context for context in contexts if environment is None or context.environment == environment
+        ]
+        if default is not None:
+            candidates = [default]
+        points[position] = (
+            key,
+            chain,
+            tuple(
+                dict.fromkeys(
+                    (*contexts, *(dataclasses.replace(context, approvals=count) for context in candidates))
+                )
+            ),
+        )
+
+    for row in (
+        Deployment.objects.filter(registered_app__organization_id=tenant.organization_id)
+        .annotate(
+            count=Count(
+                "approval_votes__voter_user_id",
+                filter=Q(approval_votes__deleted_at__isnull=True),
+                distinct=True,
+            )
+        )
+        .values("registered_app_id", "app_environment__name", "count")
+    ):
+        add(("APP", row["registered_app_id"]), row["count"], environment=row["app_environment__name"])
+    for row in (
+        SecretChangeApproval.objects.filter(
+            proposal__registered_app__organization_id=tenant.organization_id,
+            proposal__deleted_at__isnull=True,
+            decision="approved",
+        )
+        .values("proposal_id", "proposal__registered_app_id", "proposal__app_environment__name")
+        .annotate(count=Count("approver_id", distinct=True))
+    ):
+        add(
+            ("APP", row["proposal__registered_app_id"]),
+            row["count"],
+            environment=row["proposal__app_environment__name"],
+        )
+    votes = {}
+    for run_id, app_id, env_name, project_id, user_id in WorkflowStageExecution.objects.filter(
+        workflow_run__organization_id=tenant.organization_id,
+        workflow_run__deleted_at__isnull=True,
+        status="completed",
+        stage__kind="human_gate",
+        output__human_gate__decision="approved",
+    ).values_list(
+        "workflow_run_id",
+        "workflow_run__registered_app_id",
+        "workflow_run__app_environment__name",
+        "workflow_run__workflow_definition__project_id",
+        "output__human_gate__decided_by_user_id",
+    ):
+        if isinstance(user_id, int) and not isinstance(user_id, bool) and user_id > 0:
+            votes.setdefault((run_id, app_id, env_name, project_id), set()).add(user_id)
+    agent = agent_region_operation({})[0] if votes else None
+    for (_run_id, app_id, env_name, project_id), voters in votes.items():
+        point = (
+            ("APP", app_id)
+            if app_id
+            else (("PROJECT", project_id) if project_id else ("ORG", tenant.organization_id))
+        )
+        add(point, len(voters), environment=env_name, default=agent if env_name is None else None)
+    return points
 
 
 @_memoized

@@ -93,7 +93,7 @@ def row_operation(
         if row is None:
             return UNKNOWN
         environment = row if environment_path == "self" else getattr(row, environment_path)
-        approvals = getattr(row, "approvals_received", 0)
+        approvals = deployment_approval_count(row) if model_label == "astrolift_lifecycle.Deployment" else 0
         return (environment_context(environment, approvals=approvals),)
 
     return load
@@ -105,6 +105,16 @@ def environment_operation(field: str = "input.id") -> OperationLoader:
 
 def deployment_operation(field: str = "input.id") -> OperationLoader:
     return row_operation("astrolift_lifecycle.Deployment", field)
+
+
+def deployment_approval_count(deployment) -> int:
+    """Only distinct durable human identities establish min_approvers."""
+    return (
+        deployment.approval_votes.filter(voter_user_id__isnull=False)
+        .values("voter_user_id")
+        .distinct()
+        .count()
+    )
 
 
 def workload_operation(field: str = "input.workload_id") -> OperationLoader:
@@ -153,15 +163,12 @@ def agent_region_operation(args: dict[str, Any]) -> tuple[OperationContext, ...]
         cluster = resolve_agent_cluster(organization)
     except NoAgentClusterError:
         return UNKNOWN
-    return (OperationContext(region=cluster.region or None, approvals=0),)
+    return (OperationContext(region=getattr(cluster, "region", None) or None, approvals=0),)
 
 
 def agent_task_operation(field: str = "id") -> OperationLoader:
     def load(args):
-        from django.db.models import Q
-
         from astrolift_agents.models import AgentTask
-        from astrolift_clusters.models import TenantCluster
 
         org_id, guid = _org_id(), read_guid(args, field)
         if org_id is None or guid is None:
@@ -173,27 +180,46 @@ def agent_task_operation(field: str = "id") -> OperationLoader:
         )
         if task is None:
             return UNKNOWN
+        return (agent_task_contexts([task], org_id)[task.pk],)
+
+    return load
+
+
+def agent_task_contexts(tasks, org_id):
+    """Batch the same frozen dispatch facts for object gates and collections."""
+    from django.db.models import Q
+
+    from astrolift_clusters.models import TenantCluster
+
+    targets = {}
+    for task in tasks:
+        target = task.dispatch_target if isinstance(task.dispatch_target, dict) else {}
+        if target.get("cluster_guid"):
+            targets[task.pk] = read_guid({"guid": target["cluster_guid"]}, "guid")
+    clusters = {
+        str(cluster.guid): cluster
+        for cluster in TenantCluster.objects.filter(
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
+            guid__in={guid for guid in targets.values() if guid is not None},
+        )
+    }
+    contexts = {}
+    default = None
+    for task in tasks:
         context = (
             environment_context(task.agent_run.app_environment)
             if task.agent_run_id and task.agent_run.app_environment_id
             else OperationContext(approvals=0)
         )
-        target = task.dispatch_target or {}
-        if target.get("cluster_guid"):
-            guid = read_guid({"guid": target["cluster_guid"]}, "guid")
-            cluster = (
-                TenantCluster.objects.filter(
-                    Q(organization_id=org_id) | Q(organization_id__isnull=True), guid=guid
-                ).first()
-                if guid
-                else None
-            )
-            return (dataclasses.replace(context, region=cluster.region or None),) if cluster else UNKNOWN
-        if context.environment is not None:
-            return (context,)
-        return agent_region_operation(args)
-
-    return load
+        if task.pk in targets:
+            cluster = clusters.get(str(targets[task.pk]))
+            context = dataclasses.replace(context, region=cluster.region or None) if cluster else UNKNOWN[0]
+        elif context.environment is None:
+            if default is None:
+                default = agent_region_operation({})[0]
+            context = default
+        contexts[task.pk] = context
+    return contexts
 
 
 def migration_operation(args: dict[str, Any]) -> tuple[OperationContext, ...]:
@@ -291,13 +317,15 @@ def secret_proposal_operation(field: str = "input.proposal_id") -> OperationLoad
             return UNKNOWN
         count = (
             proposal.approvals.filter(
-                decision=SecretChangeApproval.Decision.APPROVED, deleted_at__isnull=True
+                decision=SecretChangeApproval.Decision.APPROVED,
+                deleted_at__isnull=True,
+                approver_id__isnull=False,
             )
             .values("approver_id")
             .distinct()
             .count()
         )
-        if proposal.app_environment_id:
+        if proposal.app_environment_id and proposal.op in ("attach_bundle", "detach_bundle"):
             return (environment_context(proposal.app_environment, approvals=count),)
         contexts = named_environment("app_slug", "environment", all_if_absent=True)(
             {"app_slug": proposal.registered_app.slug}

@@ -265,7 +265,10 @@ def visible_runs(qs, org_id: int | None, permission: Permission):
     app's project and team cover it only while they are live, as in the
     resolver's ``_app_scope_chains``.
     """
+    from astrolift_identity.operation_visibility import visible_workflow_operation_rows
     from astrolift_registry.models import RegisteredApp
+
+    qs = visible_workflow_operation_rows(qs, permission)
 
     projects = covered_project_ids(org_id, permission)
     if projects is None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import strawberry
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.db.models.functions import Lower
 from strawberry.types import Info
 
@@ -27,6 +27,7 @@ from astrolift_identity.operation_context import (
     named_environment,
     secret_proposal_operation,
 )
+from astrolift_identity.operation_visibility import require_app_collection_scope, visible_operation_rows
 from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import read_app_env
@@ -644,7 +645,7 @@ def _managed_services_qs(
                 "app_environment__name",
             )
         )
-    return qs
+    return visible_operation_rows(qs, Permission.APP_READ)
 
 
 @strawberry.type
@@ -865,11 +866,8 @@ class ServicesQuery:
         return [secret_bundle_to_type(row) for row in rows]
 
     @strawberry.field
-    @require_permission(
-        Permission.APP_READ,
-        scope=app_scope_by_slug("app_slug"),
-        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
-    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_app_secrets(
         self,
@@ -889,17 +887,29 @@ class ServicesQuery:
         )
         if app is None:
             return []
+        environments = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True)
         if environment_name:
-            env_names = [environment_name]
-        else:
-            env_names = list(
-                AppEnvironment.objects.filter(
-                    registered_app=app,
-                    deleted_at__isnull=True,
-                ).values_list("name", flat=True),
+            environments = environments.filter(name=environment_name)
+        env_names = list(
+            visible_operation_rows(environments, Permission.APP_READ, environment_path="self").values_list(
+                "name", flat=True
             )
-            if not env_names:
-                env_names = ["preview"]
+        )
+        if not env_names and not environment_name and not environments.exists():
+            from astrolift_identity import abac
+            from core.permissions import PermissionDenied, PermissionScope, ScopeKind, check_permission
+
+            # The legacy no-environment metadata view has no operation
+            # facts. Preserve it only when that unknown target is allowed.
+            with abac.operation_attributes(environment=None, region=None, approvals=0):
+                try:
+                    check_permission(Permission.APP_READ, scope=PermissionScope(ScopeKind.APP, app.pk))
+                except PermissionDenied:
+                    pass
+                else:
+                    env_names = ["preview"]
+        if not env_names:
+            return []
         return _list_app_secrets(app=app, env_names=env_names)
 
     @strawberry.field
@@ -1031,11 +1041,8 @@ class ServicesQuery:
         return [secret_bundle_to_type(b) for b in qs]
 
     @strawberry.field
-    @require_permission(
-        Permission.APP_READ,
-        scope=app_scope_by_slug("app_slug"),
-        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
-    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_app_secret_bundle_attachments(
         self,
@@ -1068,6 +1075,7 @@ class ServicesQuery:
         )
         if environment_name:
             qs = qs.filter(app_environment__name=environment_name)
+        qs = visible_operation_rows(qs, Permission.APP_READ)
         out: list[AppSecretBundleAttachmentType] = []
         env_seq: dict[str, int] = {}
         for ref in qs:
@@ -1089,11 +1097,8 @@ class ServicesQuery:
             "Postgres returns. Use astroliftManagedServicesPage."
         )
     )
-    @require_permission(
-        Permission.APP_READ,
-        scope=app_scope_by_slug("app_slug"),
-        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
-    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_managed_services(
         self,
@@ -1107,11 +1112,8 @@ class ServicesQuery:
         return [managed_service_to_type(s) for s in qs]
 
     @strawberry.field
-    @require_permission(
-        Permission.APP_READ,
-        scope=app_scope_by_slug("app_slug"),
-        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
-    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_managed_services_page(
         self,
@@ -1762,11 +1764,8 @@ class ServicesQuery:
     # ---- Secret-change proposals (#488) ------------------------------
 
     @strawberry.field
-    @require_permission(
-        Permission.APP_READ,
-        scope=app_scope_by_slug("app_slug"),
-        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
-    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_secret_change_proposals(
         self,
@@ -1799,6 +1798,19 @@ class ServicesQuery:
             valid = {s.value for s in SecretChangeProposal.Status}
             if status in valid:
                 qs = qs.filter(status=status)
+        qs = qs.annotate(
+            _policy_approvals=Count(
+                "approvals__approver_id",
+                filter=Q(approvals__decision="approved", approvals__deleted_at__isnull=True),
+                distinct=True,
+            )
+        )
+        qs = visible_operation_rows(
+            qs,
+            Permission.APP_READ,
+            approvals_field="_policy_approvals",
+            app_wide_operations_field="op",
+        )
         # Hard cap so a runaway tenant can't page-of-everything us.
         return [secret_change_proposal_to_type(p, info=info) for p in qs[:200]]
 

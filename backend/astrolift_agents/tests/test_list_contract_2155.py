@@ -668,9 +668,9 @@ def test_create_skill_records_its_creator(permission_resolver, fleet):
 
 
 @pytest.fixture
-def probed(monkeypatch):
+def probed(monkeypatch, fleet):
     """Probe results without a secret store; the cluster resolves or not."""
-    state = SimpleNamespace(cluster=object())
+    state = SimpleNamespace(cluster=fleet.cluster)
 
     def _resolve(org):
         from astrolift_agents.services.agent_cluster import NoAgentClusterError

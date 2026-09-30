@@ -108,7 +108,7 @@ class Query:
     @require_permission(
         Permission.WORKFLOW_READ,
         scope=workflow_run_scope_by_id("workflow_id", run_field="run_id"),
-        operation=workflow_id_operation("workflow_id"),
+        operation=workflow_id_operation("workflow_id", run_field="run_id"),
     )
     @tenant_scoped()
     def workflow_stage_executions(
