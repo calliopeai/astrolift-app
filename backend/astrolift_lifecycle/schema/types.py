@@ -1549,6 +1549,13 @@ def app_domain_to_type(d, cluster=None) -> AppDomainType:
     )
 
 
+@strawberry.type(name="AstroliftDeployTokenRotationMetadata")
+class DeployTokenRotationMetadataType:
+    """Validated current rotation window; contains no credential or raw config."""
+
+    rotation_grace_seconds: int
+
+
 @strawberry.type(name="AstroliftDeployToken")
 class DeployTokenType:
     """Bearer credential bound to one app, scoped narrowly. The

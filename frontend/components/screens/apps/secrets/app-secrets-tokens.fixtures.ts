@@ -351,6 +351,7 @@ export const TOKEN_REVEAL: DeployTokenSecretReveal = {
 
 /** The screen's props less its tab bar and its list state (the stories keep that in memory). */
 export const TOKENS_SCREEN: Omit<DeployTokensScreenProps, "tabs" | "list"> = {
+  rotationScopeKey: "org:storefront",
   slug: "storefront",
   rows: TOKENS,
   loading: false,
@@ -364,6 +365,7 @@ export const TOKENS_SCREEN: Omit<DeployTokensScreenProps, "tabs" | "list"> = {
   onDismissReveal: noop,
   onCreate: yes,
   onRotate: asyncNoop,
+  onLoadRotationGrace: async () => 10800,
   onRevoke: asyncNoop,
 };
 

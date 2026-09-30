@@ -748,10 +748,14 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "Plazo de gracia configurado: {window}. El token anterior sigue siendo válido durante este plazo tras la rotación.",
+        "newLine": "La confirmación emite un nuevo token.",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "Leyendo el plazo de rotación configurado…",
+        "unavailable": "No se pudo leer el plazo de rotación. La rotación está bloqueada hasta que esté disponible.",
+        "retry": "Reintentar",
+        "snapshotHint": "Esta es la configuración actual. La rotación vuelve a comprobar el acceso y lee el plazo al emitir el nuevo token."
       },
       "revokeDialog": {
         "title": "Revoke {name}?",

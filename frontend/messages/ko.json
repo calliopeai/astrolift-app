@@ -748,10 +748,14 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "설정된 유예 기간: {window}. 교체 후에도 이 기간 동안 이전 토큰이 유효합니다.",
+        "newLine": "확인하면 새 토큰이 발급됩니다.",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "설정된 교체 유예 기간을 읽는 중…",
+        "unavailable": "교체 유예 기간을 읽을 수 없습니다. 확인될 때까지 교체가 차단됩니다.",
+        "retry": "다시 시도",
+        "snapshotHint": "현재 설정입니다. 새 토큰을 발급할 때 접근 권한과 유예 기간을 다시 확인합니다."
       },
       "revokeDialog": {
         "title": "Revoke {name}?",

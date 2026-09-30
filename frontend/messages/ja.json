@@ -748,10 +748,14 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "設定された猶予期間：{window}。ローテーション後も、この期間中は以前のトークンが有効です。",
+        "newLine": "確認すると、新しいトークンが発行されます。",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "設定されたローテーション期間を読み込み中…",
+        "unavailable": "ローテーション期間を読み取れませんでした。取得できるまでローテーションは実行できません。",
+        "retry": "再試行",
+        "snapshotHint": "現在の設定です。新しいトークンの発行時に、アクセス権と期間を再確認します。"
       },
       "revokeDialog": {
         "title": "Revoke {name}?",

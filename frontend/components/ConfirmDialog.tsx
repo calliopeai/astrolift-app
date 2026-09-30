@@ -44,6 +44,8 @@ interface ConfirmDialogProps {
   /** If true, the confirm button uses the destructive variant — the
    *  standard treatment for delete / revoke / soft-delete affordances. */
   destructive?: boolean;
+  /** Block confirmation until required supporting data is available. */
+  confirmDisabled?: boolean;
   /** Awaited when the user confirms. While the returned Promise is
    *  pending, both buttons are disabled and the confirm label switches
    *  to a "working" state. On resolve, the dialog closes. On reject, the
@@ -94,6 +96,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   destructive = false,
+  confirmDisabled = false,
   onConfirm,
   reason,
 }: ConfirmDialogProps) {
@@ -120,7 +123,7 @@ export function ConfirmDialog({
     // hold the dialog open while the mutation is in flight and re-open
     // if it throws.
     e.preventDefault();
-    if (pending) return;
+    if (pending || confirmDisabled) return;
     const trimmed = draft.trim();
     if (reason && !trimmed) {
       setError(reason.requiredError ?? "Reason required");
@@ -189,7 +192,7 @@ export function ConfirmDialog({
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             onClick={handleConfirm}
           >
             {pending ? "Working…" : confirmLabel}

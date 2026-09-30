@@ -5,6 +5,10 @@
 - Deregistration loads its authorized resource preview before displaying the
   count badge, refreshes on confirmation and treats unavailable/refused reads
   as unknown. Confirmation waits for a usable preview (#2148).
+- Deploy-token rotation confirmation reads the actual validated configuration
+  through an app-update scoped metadata query. Loading, refused and missing
+  metadata block confirmation; each opening rereads, ignores stale replies and
+  shows the exact duration and read-time snapshot semantics (#2148).
 
 - Policy condition JSON passes through the existing validating parser without an
   object-only type or double assertion; Storybook fixtures use actual arrays (#2148).

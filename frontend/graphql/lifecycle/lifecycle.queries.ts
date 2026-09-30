@@ -1219,3 +1219,12 @@ export const GET_APP_DEPLOYMENT_ACTIVITY = gql`
     }
   }
 `;
+
+/** APP_UPDATE-scoped, validated rotation window; never contains a secret. */
+export const GET_APP_DEPLOY_TOKEN_ROTATION_METADATA = gql`
+  query GetAppDeployTokenRotationMetadata($appSlug: String!) {
+    astroliftAppDeployTokenRotationMetadata(appSlug: $appSlug) {
+      rotationGraceSeconds
+    }
+  }
+`;

@@ -14,6 +14,16 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 
 The following seven-item slice starts from `66b902d1`: **64 React/Apollo checks across four files** (16 new operational/route checks plus existing query-state/frame regressions), **53 affected portable stories**, **13 Chromium behavior/layout checks**, Storybook production build, TypeScript and ESLint with zero warnings/errors in affected files. It uses existing queries/mutations only. Pipeline metadata refusal remains separate from the authorization of secret/run reads. Item 79 was already implemented and is corrected to Pre-existing, with an actual Apollo route regression. Other owners' later fixes are not changed by this slice.
 
+The separate item-21 rotation metadata slice adds a nullable read-only query with
+`app.update` on the coherent live owner and existing credential/policy ceilings.
+Verification: **169 real PostgreSQL/HTTP and owner/guardrail checks** (31 new),
+**49 React/Apollo checks** (10 new), **15 affected portable stories**, eight
+message-catalog checks, atomic SDL/codegen/contracts, TypeScript, Ruff and format
+checks. ESLint has zero errors and one pre-existing create-sheet reset warning.
+Six Chromium checks cover rotation loading/refusal/configured confirmation and the
+existing token/dialog layout states. The duration is a fresh read-time snapshot;
+the mutation retains authorization/elevation and uses its then-current value.
+
 - Focused cluster/config/operational/navigation React and real Apollo tests; terminal polling and actual concurrent mutations use the real Apollo client over a controlled transport.
 - Chromium behavior checks cover actual menu admission, separate SVG paint servers, draft choice/readiness, pending rows, command target and uppercase-running input.
 - Typecheck, ESLint and affected Storybook builds/layout checks; the parent runs the final combined route/build checks.
@@ -44,7 +54,7 @@ Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 a
 | 18. Code view 'services' pill never finds the managed services section | Pre-existing | Earlier managed_services section-link codec correction and story are included in the audited base. |
 | 19. Conflict modal 'Force overwrite' does not save anything | Fixed | ConfigEditorClient regression keeps draft without a mutation; explicit Save submits later, including failed-save draft retention. |
 | 20. Path route form cannot be submitted when no workloads exist | Pre-existing | Old path-route/workload form is absent; AddDomainSheet submits a hostname without an empty workload Select. |
-| 21. Deploy token rotate confirm ignores the configured grace period | Remaining | DeployTokensScreen rotate confirmation still uses ROTATION_GRACE_DEFAULT_SECONDS; no pre-rotation configured grace read is wired. |
+| 21. Deploy token rotate confirm ignores the configured grace period | Fixed | App-update scoped metadata reuses the rotation helper; every confirmation opens with an uncached read and blocks while loading/refused/missing. Real PostgreSQL/HTTP roles, bearer ceilings, live ancestry, policy denies and mutation/clamp parity plus Apollo target/org/app race and retry regressions; exact duration and snapshot semantics are explicit. |
 | 22. Secret expiry badge says 'Expired 1d ago' for keys expiring today | Pre-existing | Earlier future-under-a-day SecretExpiryBadge correction is included in the audited base. |
 | 23. Secret sheets are not blocked while a rotate is in flight | Fixed | Real Apollo rotation request now contributes to useAppSecrets.busy for both shared sheets. |
 | 24. Email detail sheet comment says five panels, it renders twelve | Pre-existing | EmailDetailSheet header documents five health panels and separately scoped embedded lists. |

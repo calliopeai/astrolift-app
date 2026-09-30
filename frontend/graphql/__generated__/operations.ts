@@ -2132,6 +2132,10 @@ export type AstroliftDeployTokenPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftDeployTokenRotationMetadata = {
+  rotationGraceSeconds: Scalars['Int']['output'];
+};
+
 export type AstroliftDeployment = {
   abortedReason: Scalars['String']['output'];
   approvalsReceived: Scalars['Int']['output'];
@@ -9164,6 +9168,7 @@ export type Query = {
   astroliftAppAccessPreview?: Maybe<AstroliftAppAccessPreview>;
   astroliftAppCertificates: AstroliftAppCertificatesResult;
   astroliftAppCountForCluster: Scalars['Int']['output'];
+  astroliftAppDeployTokenRotationMetadata?: Maybe<AstroliftDeployTokenRotationMetadata>;
   /** @deprecated Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage. */
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
   astroliftAppDeployTokensPage: AstroliftDeployTokenPage;
@@ -9792,6 +9797,11 @@ export type QueryAstroliftAppCertificatesArgs = {
 
 export type QueryAstroliftAppCountForClusterArgs = {
   clusterId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftAppDeployTokenRotationMetadataArgs = {
+  appSlug: Scalars['String']['input'];
 };
 
 
@@ -13961,6 +13971,13 @@ export type GetAppDeploymentActivityQueryVariables = Exact<{
 
 
 export type GetAppDeploymentActivityQuery = { astroliftDeploymentsPage: { nextCursor?: string | null, items: Array<{ id: string, status: string, createdAt: string, startedAt?: string | null }> } };
+
+export type GetAppDeployTokenRotationMetadataQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+}>;
+
+
+export type GetAppDeployTokenRotationMetadataQuery = { astroliftAppDeployTokenRotationMetadata?: { rotationGraceSeconds: number } | null };
 
 export type DeploymentLifecycleStreamSubscriptionVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;

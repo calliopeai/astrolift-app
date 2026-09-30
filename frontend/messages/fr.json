@@ -748,10 +748,14 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "Délai de grâce configuré : {window}. Le jeton précédent reste valide pendant ce délai après la rotation.",
+        "newLine": "La confirmation émet un nouveau jeton.",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "Lecture du délai de rotation configuré…",
+        "unavailable": "Le délai de rotation n’a pas pu être lu. La rotation est bloquée jusqu’à ce qu’il soit disponible.",
+        "retry": "Réessayer",
+        "snapshotHint": "Il s’agit de la configuration actuelle. La rotation vérifie à nouveau l’accès et relit le délai lors de l’émission du nouveau jeton."
       },
       "revokeDialog": {
         "title": "Revoke {name}?",

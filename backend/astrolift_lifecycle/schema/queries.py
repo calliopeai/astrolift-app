@@ -23,6 +23,7 @@ from astrolift_graphql import (
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_identity.operation_context import deployment_operation, named_environment, row_operation
 from astrolift_identity.operation_visibility import require_app_collection_scope
+from astrolift_lifecycle.deploy_tokens import rotation_grace_seconds_from_constance
 from astrolift_lifecycle.models import (
     AgentRun,
     AppEnvironment,
@@ -76,6 +77,7 @@ from astrolift_lifecycle.schema.types import (
     DeploymentRunLogDownloadType,
     DeploymentRunLogPageType,
     DeploymentType,
+    DeployTokenRotationMetadataType,
     DeployTokenType,
     DeregisterPreviewType,
     ForceRedeployPreviewType,
@@ -2070,6 +2072,30 @@ class LifecycleQuery:
             cursor_scope=scope,
         )
         return page.map(deploy_token_to_type)
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("app_slug", permission=Permission.APP_UPDATE)
+    )
+    @tenant_scoped()
+    def astrolift_app_deploy_token_rotation_metadata(
+        self, info: Info, app_slug: str
+    ) -> DeployTokenRotationMetadataType | None:
+        """Read the current rotation window for an app the caller can update.
+
+        This is a configuration snapshot, using the same validation as rotation.
+        Rotation rechecks authorization/elevation and reads the current value
+        again when issuing the new secret. Invalid app ancestry never reads config.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if (
+            not live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=app_slug, organization_id=org_id)
+            .exists()
+        ):
+            return None
+        return DeployTokenRotationMetadataType(rotation_grace_seconds=rotation_grace_seconds_from_constance())
 
     # ---- #377 / #1111 observability cards (DNS / TLS / Workload identity) ----
     #

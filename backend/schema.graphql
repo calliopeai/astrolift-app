@@ -2214,6 +2214,10 @@ type AstroliftDeployTokenPage {
   pageSize: Int
 }
 
+type AstroliftDeployTokenRotationMetadata {
+  rotationGraceSeconds: Int!
+}
+
 type AstroliftDeployment {
   id: GUID!
 
@@ -7851,6 +7855,7 @@ type Query {
   astroliftWorkloadPodStatusBreakdown(appSlug: String!, workloadSlug: String!, environmentName: String = null): [AstroliftWorkloadPodStatusBucket!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]! @deprecated(reason: "Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage.")
   astroliftAppDeployTokensPage(appSlug: String!, search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftDeployTokenPage!
+  astroliftAppDeployTokenRotationMetadata(appSlug: String!): AstroliftDeployTokenRotationMetadata
   astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): AstroliftAppDnsRecordsResult!
   astroliftAppCertificates(appSlug: String!, environmentName: String = null): AstroliftAppCertificatesResult!
   astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBindingResult!

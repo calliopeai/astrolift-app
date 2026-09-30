@@ -748,10 +748,14 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "Konfiguriertes Kulanzfenster: {window}. Das vorherige Token bleibt nach der Rotation für diesen Zeitraum gültig.",
+        "newLine": "Die Bestätigung gibt ein neues Token aus.",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "Das konfigurierte Rotationsfenster wird gelesen…",
+        "unavailable": "Das Rotationsfenster konnte nicht gelesen werden. Die Rotation ist blockiert, bis es verfügbar ist.",
+        "retry": "Erneut versuchen",
+        "snapshotHint": "Dies ist die aktuelle Konfiguration. Die Rotation prüft den Zugriff und liest das Zeitfenster bei der Ausgabe des neuen Tokens erneut."
       },
       "revokeDialog": {
         "title": "Revoke {name}?",

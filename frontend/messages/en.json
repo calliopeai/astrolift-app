@@ -1979,10 +1979,14 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "Configured grace window: {window}. The previous token remains valid for this window after rotation.",
+        "newLine": "Confirmation issues a new token.",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "Reading the configured rotation window…",
+        "unavailable": "The rotation window could not be read. Rotation is blocked until it is available.",
+        "retry": "Retry",
+        "snapshotHint": "This is the current configuration. Rotation rechecks access and reads the window again when issuing the new token."
       },
       "revokeDialog": {
         "title": "Revoke {name}?",

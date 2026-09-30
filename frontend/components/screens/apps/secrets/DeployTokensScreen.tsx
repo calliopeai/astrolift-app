@@ -36,11 +36,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { CreateDeployTokenInput, DeployToken, DeployTokenSecretReveal } from "./secrets.types";
 import type { useDeployTokens } from "./use-deploy-tokens";
 
-/** Default rotation grace surfaced when the backend hasn't replied yet — must
- *  match the backend Constance default so the *first* dialog open lines up
- *  with the post-rotate reveal. */
-const ROTATION_GRACE_DEFAULT_SECONDS = 86400;
-
 export type DeployTokensScreenProps = ReturnType<typeof useDeployTokens> & {
   /** The app tab bar. */
   tabs: React.ReactNode;
@@ -67,12 +62,18 @@ export function DeployTokensScreen({
   onDismissReveal,
   onCreate,
   onRotate,
+  onLoadRotationGrace,
+  rotationScopeKey,
   onRevoke,
   tabs,
 }: DeployTokensScreenProps) {
   const tr = useTranslations("apps.tokens");
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [rotateTarget, setRotateTarget] = React.useState<DeployToken | null>(null);
+  const [rotation, setRotation] = React.useState<{ token: DeployToken; scope: string } | null>(
+    null
+  );
+  if (rotation && rotation.scope !== rotationScopeKey) setRotation(null);
+  const rotateTarget = rotation?.scope === rotationScopeKey ? rotation.token : null;
   const [revokeTarget, setRevokeTarget] = React.useState<DeployToken | null>(null);
 
   const columns: Column<DeployToken>[] = [
@@ -137,11 +138,11 @@ export function DeployTokensScreen({
       width: "w-48",
       cell: (token) =>
         token.isRevoked ? null : (
-          <Can permission="app.deploy">
+          <Can permission="app.update">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setRotateTarget(token)}
+              onClick={() => setRotation({ token, scope: rotationScopeKey })}
               disabled={busy}
             >
               <RefreshCwIcon className="size-3.5" />
@@ -170,7 +171,7 @@ export function DeployTokensScreen({
         </span>
       }
       actions={
-        <Can permission="app.deploy">
+        <Can permission="app.update">
           <Button onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-4" />
             {tr("createToken")}
@@ -214,32 +215,15 @@ export function DeployTokensScreen({
 
       <RevealDialog reveal={reveal} onOpenChange={onDismissReveal} />
 
-      <ConfirmDialog
-        open={rotateTarget !== null}
-        onOpenChange={(next) => {
-          if (!next) setRotateTarget(null);
-        }}
-        title={
-          rotateTarget
-            ? tr("rotateDialog.title", { name: rotateTarget.name })
-            : tr("rotateDialog.fallbackTitle")
-        }
-        description={
-          <div className="space-y-1">
-            <p>
-              {tr("rotateDialog.graceLine", {
-                window: humanizeGrace(ROTATION_GRACE_DEFAULT_SECONDS),
-              })}
-            </p>
-            <p>{tr("rotateDialog.newLine")}</p>
-            <p className="text-muted-foreground text-xs">{tr("rotateDialog.immediateHint")}</p>
-          </div>
-        }
-        confirmLabel={tr("rotateDialog.confirm")}
-        onConfirm={async () => {
-          if (rotateTarget) await onRotate(rotateTarget);
-        }}
-      />
+      {rotateTarget && (
+        <RotationDialog
+          key={`${rotationScopeKey}:${rotateTarget.id}`}
+          token={rotateTarget}
+          onClose={() => setRotation(null)}
+          onLoad={onLoadRotationGrace}
+          onRotate={onRotate}
+        />
+      )}
 
       <ConfirmDialog
         open={revokeTarget !== null}
@@ -259,6 +243,94 @@ export function DeployTokensScreen({
         }}
       />
     </PageShell>
+  );
+}
+
+/** Each mount/retry reads fresh metadata; replies after close/scope change are ignored. */
+function RotationDialog({
+  token,
+  onClose,
+  onLoad,
+  onRotate,
+}: {
+  token: DeployToken;
+  onClose: () => void;
+  onLoad: () => Promise<number | null>;
+  onRotate: (token: DeployToken) => Promise<void>;
+}) {
+  const tr = useTranslations("apps.tokens.rotateDialog");
+  const [attempt, retry] = React.useReducer((n: number) => n + 1, 0);
+  const [result, setResult] = React.useState<{
+    loader: typeof onLoad;
+    attempt: number;
+    seconds: number | null;
+  } | null>(null);
+  // A changed loader or retry invalidates the previous result synchronously,
+  // before effects start a new request or a handler can admit confirmation.
+  const metadata = result?.loader === onLoad && result.attempt === attempt ? result : null;
+  const ready = metadata?.seconds != null;
+  React.useEffect(() => {
+    let current = true;
+    const complete = (seconds: number | null) => {
+      if (current)
+        setResult({
+          loader: onLoad,
+          attempt,
+          seconds: seconds !== null && Number.isInteger(seconds) && seconds > 0 ? seconds : null,
+        });
+    };
+    onLoad().then(complete, () => complete(null));
+    return () => {
+      current = false;
+    };
+  }, [attempt, onLoad]);
+
+  return (
+    <ConfirmDialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={tr("title", { name: token.name })}
+      description={
+        <span className="block space-y-1">
+          {metadata?.seconds != null ? (
+            <>
+              <span className="block">
+                {tr("graceLine", { window: humanizeGrace(metadata.seconds) })}
+              </span>
+              <span className="text-muted-foreground block text-xs">{tr("snapshotHint")}</span>
+            </>
+          ) : metadata === null ? (
+            <span className="block" role="status">
+              {tr("loading")}
+            </span>
+          ) : (
+            <>
+              <span className="block" role="alert">
+                {tr("unavailable")}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  retry();
+                }}
+              >
+                {tr("retry")}
+              </Button>
+            </>
+          )}
+          <span className="block">{tr("newLine")}</span>
+          <span className="text-muted-foreground block text-xs">{tr("immediateHint")}</span>
+        </span>
+      }
+      confirmLabel={tr("confirm")}
+      confirmDisabled={!ready}
+      onConfirm={async () => {
+        if (metadata?.seconds != null) await onRotate(token);
+      }}
+    />
   );
 }
 
@@ -304,19 +376,20 @@ function LastUsedCell({ token }: { token: DeployToken }) {
   );
 }
 
-// Humanize a grace window in seconds → operator-readable text. We
-// only render the largest single unit so the dialog copy stays
-// terse ("~24h" beats "24 hours, 0 minutes"). Edge cases:
-//   < 60s   → "<1m"      (Constance floor is 60s; this is safety net)
-//   < 1h    → "Nm"
-//   < 1d    → "Nh"
-//   >= 1d   → "Nd" (floor)
+// Preserve the configured duration exactly, including non-whole hours/minutes.
 function humanizeGrace(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
-  if (seconds < 60) return "<1m";
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remaining = seconds % 60;
+  return [
+    days && `${days}d`,
+    hours && `${hours}h`,
+    minutes && `${minutes}m`,
+    remaining && `${remaining}s`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function CreateTokenSheet({

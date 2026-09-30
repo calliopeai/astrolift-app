@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { userEvent, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 import { AppTabsView } from "@/components/screens/apps/detail/AppTabs";
@@ -75,4 +75,43 @@ export const W768: Story = {
       <Screen {...TOKENS_LONG} />
     </div>
   ),
+};
+
+/** No confirmation is possible before the app-scoped configuration read completes. */
+export const RotationMetadataLoading: Story = {
+  render: () => <Screen {...TOKENS_SCREEN} onLoadRotationGrace={() => new Promise(() => {})} />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getAllByRole("button", { name: "Rotate" })[0]);
+    const dialog = within(document.body).getByRole("alertdialog");
+    await expect(within(dialog).getByRole("status")).toHaveTextContent("Reading the configured");
+    await expect(within(dialog).getByRole("button", { name: "Rotate token" })).toBeDisabled();
+  },
+};
+
+export const RotationMetadataUnavailable: Story = {
+  render: () => (
+    <Screen
+      {...TOKENS_SCREEN}
+      onLoadRotationGrace={async () => {
+        throw new Error("Permission denied");
+      }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getAllByRole("button", { name: "Rotate" })[0]);
+    const dialog = within(document.body).getByRole("alertdialog");
+    await expect(await within(dialog).findByRole("alert")).toHaveTextContent("could not be read");
+    await expect(within(dialog).getByRole("button", { name: "Rotate token" })).toBeDisabled();
+  },
+};
+
+/** Non-default, non-whole-minute windows retain their exact duration. */
+export const RotationConfiguredWindow: Story = {
+  render: () => <Screen {...TOKENS_SCREEN} onLoadRotationGrace={async () => 90} />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getAllByRole("button", { name: "Rotate" })[0]);
+    const dialog = within(document.body).getByRole("alertdialog");
+    await expect(await within(dialog).findByText(/Configured grace window: 1m 30s/)).toBeVisible();
+    await expect(within(dialog).getByRole("button", { name: "Rotate token" })).toBeEnabled();
+  },
 };

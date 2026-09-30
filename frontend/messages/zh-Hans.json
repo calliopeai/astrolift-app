@@ -748,10 +748,14 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "配置的宽限期：{window}。轮换后，旧令牌在此期间内仍然有效。",
+        "newLine": "确认后将发放新令牌。",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "正在读取配置的轮换宽限期…",
+        "unavailable": "无法读取轮换宽限期。在获取该信息之前，无法进行轮换。",
+        "retry": "重试",
+        "snapshotHint": "这是当前配置。发放新令牌时，轮换操作会重新检查访问权限并再次读取宽限期。"
       },
       "revokeDialog": {
         "title": "Revoke {name}?",
