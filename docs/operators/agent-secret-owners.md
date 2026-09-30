@@ -87,6 +87,7 @@ An authenticated read returned 28 visible environment specs, below the legacy
 plan: hidden/deleted rows, binding overrides, other organizations and source
 repository manifests need the maintenance tool's full review. No migration ran.
 
-Provider failure messages, command output and audit rows do not echo payloads.
-Consult provider audit logs for store errors. Keep the private review file outside
-source control.
+Migration command output/errors and `agents.secret.owner_migrate` audit records
+do not echo payloads. Existing provider telemetry may retain raw store exceptions
+in logs and provider audit records; handle access to those records accordingly.
+Keep the private review file outside source control.

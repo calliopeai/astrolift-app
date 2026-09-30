@@ -1,6 +1,7 @@
 """Reviewed, resumable migration of legacy typed agent refs and store payloads.
 
-No values enter plans, audit events or errors. Sources are never deleted.
+No values enter plans, migration audit events or outward command errors.
+Existing provider telemetry may retain raw store exceptions. Sources are never deleted.
 The portable store has no compare-and-swap; all secret writers must be paused
 for apply, including out-of-band writers. A plan is not an authorization grant.
 """
