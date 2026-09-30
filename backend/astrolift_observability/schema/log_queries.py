@@ -182,7 +182,9 @@ def _ns_to_iso(ts: str) -> str:
 @strawberry.type
 class LogHistoryQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ_LOGS)
+    )
     @tenant_scoped()
     def astrolift_app_logs(
         self,

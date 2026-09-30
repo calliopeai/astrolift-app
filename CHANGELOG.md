@@ -23,6 +23,13 @@
   authorized requests keep the existing response and notification behavior.
   See [billing access scopes](docs/operators/billing-access-scopes.md).
 
+- Observability gates resolve live app/service ownership with explicit organization
+  fallback and permission-specific bearer team/share ceilings (#2111). Selected
+  team headers cannot authorize missing, stale or sibling targets. Historical
+  logs keep their separate permission. Internal metric catalogs no longer become
+  accidental GraphQL root fields; existing data-query contracts are unchanged.
+  See [observability access scopes](docs/operators/observability-access-scopes.md).
+
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep
   the existing production/development server behavior, and other startup

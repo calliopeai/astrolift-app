@@ -547,25 +547,6 @@ GAPS: dict[str, tuple[str, ...]] = {
         "/app/export/",
         "/api/support/v1/tickets/",
     ),
-    # TODO(#2111): observability routes without a scoped gate; the issue says what each checks today.
-    "#2111": (
-        "Query.PostgresMetrics",
-        "Query.ObjectStoreMetrics",
-        "Query.ModelEndpointMetrics",
-        "Query.astroliftAppGoldenSignals",
-        "Query.astroliftAppStatusCodeBreakdown",
-        "Query.astroliftWorkloadResourceUsage",
-        "Query.astroliftAppUrlHealth",
-        "Query.astroliftAppUrlProbeHistory",
-        "Query.astroliftAppManagedServiceMetrics",
-        "Query.astroliftPodResourceUsage",
-        "Query.astroliftAppMetricNames",
-        "Query.astroliftExecutePromql",
-        "Query.astroliftAppTraces",
-        "Query.astroliftTraceSpans",
-        "Query.astroliftAppEndpointMetrics",
-        "Query.astroliftAppLogs",
-    ),
     # TODO(#2112): forms routes without a scoped gate; the issue says what each checks today.
     "#2112": (
         "Query.formDefinitions",

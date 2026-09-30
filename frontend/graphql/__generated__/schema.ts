@@ -8951,9 +8951,6 @@ export type PushManifestToRepoInput = {
 };
 
 export type Query = {
-  ModelEndpointMetrics: Array<Array<Scalars['String']['output']>>;
-  ObjectStoreMetrics: Array<Array<Scalars['String']['output']>>;
-  PostgresMetrics: Array<Array<Scalars['String']['output']>>;
   agent?: Maybe<AstroliftAgentDetail>;
   agentBox?: Maybe<AstroliftAgentBox>;
   agentBoxPods: Array<AstroliftAppPod>;
