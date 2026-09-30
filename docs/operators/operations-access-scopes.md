@@ -38,3 +38,9 @@ environment context before writing a reference. Alert changes use their
 persisted environment or managed-service facts, and each check restores its
 operation context before the next target. Provider reads refuse foreign or
 deleted cluster targets, including for organization operators.
+
+Workload alert targets use the first live app environment by ID, matching the
+primary environment that workload restart and scale actually operate on.
+Environment alert targets check their own persisted environment; app alert
+targets check every affected app environment. An environment-dependent read
+policy narrows alert collections even when the actor has an organization role.

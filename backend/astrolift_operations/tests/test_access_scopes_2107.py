@@ -761,3 +761,74 @@ def test_http_bulk_denial_uses_the_existing_bulk_result_contract(world, settings
     assert result["okCount"] == 0 and result["failedCount"] == 2
     assert all(not item["ok"] and item["errors"] for item in result["perApp"])
     assert world.calls == []
+
+
+@pytest.mark.parametrize("kind", ["TEAM", "ORG"])
+@pytest.mark.parametrize("primary_name", ["staging", "production"])
+@pytest.mark.parametrize("identifier", ["guid", "slug"])
+def test_workload_alert_lists_match_primary_operation_and_deny_production_environments(
+    world, kind, primary_name, identifier
+):
+    from astrolift_identity.operation_context import workload_operation
+    from astrolift_operations.scopes import alert_operation
+    from core.permissions import granted_scopes
+
+    grant(world, kind)
+    primary = world.environments[0]
+    primary.name = primary_name
+    primary.save(update_fields=["name", "updated_at", "version"])
+    secondary = AppEnvironment.objects.create(
+        registered_app=world.medops_app,
+        name="production" if primary_name == "staging" else "staging",
+        tenant_cluster=world.cluster,
+    )
+    stage, production = (primary, secondary) if primary_name == "staging" else (secondary, primary)
+    workload = world.workloads[0]
+    workload.slug = "unique-owned-workload"
+    workload.save(update_fields=["slug", "updated_at", "version"])
+    stage_rule = AlertRule.objects.create(
+        organization=world.org, name="staging environment", target="env", target_id=str(stage.guid)
+    )
+    production_rule = AlertRule.objects.create(
+        organization=world.org, name="production environment", target="env", target_id=str(production.guid)
+    )
+    workload_rule = AlertRule.objects.create(
+        organization=world.org,
+        name="primary workload",
+        target="workload",
+        target_id=str(workload.guid) if identifier == "guid" else workload.slug,
+    )
+    Policy.objects.create(
+        organization=world.org,
+        name="production alert reads denied",
+        slug="deny-production-alerts",
+        scope_level="ORG",
+        scope_id=world.org.pk,
+        effect="DENY",
+        action_pattern=Permission.APP_READ.value,
+        resource_pattern={"env": ["production"]},
+        actor_pattern={},
+        conditions=[],
+    )
+    expected = {str(stage_rule.guid)}
+    if primary_name == "staging":
+        expected.add(str(workload_rule.guid))
+    with selected_sibling(world):
+        from core.tenancy import get_current_tenant
+
+        assert not granted_scopes(get_current_tenant(), Permission.APP_READ).org
+        gate_facts = workload_operation("workload_id")({"workload_id": workload.guid})
+        rule_facts = alert_operation("rule_id")({"rule_id": workload_rule.guid})
+        assert gate_facts == rule_facts
+        assert [fact.environment for fact in gate_facts] == [primary_name]
+        cursor, seen = None, set()
+        for _ in range(3):
+            page = OperationsQuery().astrolift_alert_rules_page(make_info(world.user), limit=1, after=cursor)
+            assert page.total_count == len(expected)
+            seen.update(str(row.id) for row in page.items)
+            cursor = page.next_cursor
+            if cursor is None:
+                break
+        assert cursor is None and seen == expected
+    assert str(production_rule.guid) not in seen
+    assert str(world.rules[0].guid) not in seen
