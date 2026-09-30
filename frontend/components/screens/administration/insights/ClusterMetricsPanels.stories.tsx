@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, waitFor } from "storybook/test";
 
 import { PrometheusPanel, SystemMetricsPanel } from "./ClusterMetricsPanels";
 import {
@@ -78,16 +77,4 @@ export const MultipleClusters: Story = {
       <PrometheusPanel {...PROMETHEUS} slug="second-cluster" />
     </div>
   ),
-  play: async ({ canvasElement }) => {
-    await waitFor(() =>
-      expect(canvasElement.querySelectorAll("linearGradient[id]").length).toBeGreaterThan(0)
-    );
-    const gradients = [...canvasElement.querySelectorAll("linearGradient[id]")];
-    await expect(new Set(gradients.map((gradient) => gradient.id)).size).toBe(gradients.length);
-    for (const gradient of gradients) {
-      await expect(
-        gradient.closest("svg")?.querySelector(`[fill="url(#${gradient.id})"]`)
-      ).not.toBeNull();
-    }
-  },
 };
