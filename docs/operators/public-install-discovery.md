@@ -4,7 +4,8 @@ Before authentication, clients POST their `astroliftServerInfo` query to
 `/app/gql/config/public/`. The prefix follows the installation's `BASE_URL`.
 This endpoint serves a separate schema containing only the curated install
 handshake. It has no tenant queries, mutation root or subscriptions, and uses
-the existing per-IP GraphQL authentication rate limit.
+the existing per-IP GraphQL authentication rate, with a separate quota group
+so discovery requests cannot exhaust the login endpoint's quota.
 
 The main `/app/gql/config/` transport still requires authentication. Its legacy
 transport wrapper refuses anonymous requests before resolver authorization,

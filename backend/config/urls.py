@@ -80,7 +80,12 @@ urls = [
     path(
         "gql/config/public/",
         csrf_exempt(
-            ratelimit(key="ip", rate=settings.RATELIMIT_GRAPHQL_AUTH_RATE, block=True)(strawberry_public_view)
+            ratelimit(
+                group="public_install_discovery",
+                key="ip",
+                rate=settings.RATELIMIT_GRAPHQL_AUTH_RATE,
+                block=True,
+            )(strawberry_public_view)
         ),
     ),
     path(

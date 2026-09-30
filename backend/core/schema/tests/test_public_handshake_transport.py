@@ -87,3 +87,11 @@ def test_discovery_remains_rate_limited_per_ip(client, settings):
     responses = [_post(client, "{ __typename }", REMOTE_ADDR="192.0.2.240") for _ in range(31)]
     assert all(response.status_code == 200 for response in responses[:30])
     assert responses[-1].status_code == 429
+    auth_response = client.post(
+        f"/{settings.BASE_URL}gql/config/auth/",
+        data=json.dumps({"query": "{ __typename }"}),
+        content_type="application/json",
+        REMOTE_ADDR="192.0.2.240",
+    )
+    assert auth_response.status_code == 200
+    assert not auth_response.json().get("errors")
