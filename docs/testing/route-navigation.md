@@ -36,3 +36,11 @@ CI runs this separate route config after the production build. Routes write
 artifacts to `test-results/routes`, and the Storybook layout suite writes to
 `test-results/layout`, so one suite's cleanup cannot delete the other's traces.
 The suites retain separate config files and catalog/application servers.
+
+The complete owner graph has a fifteen-minute aggregate budget, with individual
+navigation still capped at twenty seconds. Its trace retains calls, network
+activity and source locations; a failed page also gets a screenshot and error
+context. Recording DOM snapshots at every disclosure in the whole graph produced
+nearly fourteen thousand snapshots and a 353 MiB trace in CI, so this long walk
+uses the rendered graph and failure context instead. Assertions, visited routes,
+roles, aliases and mutation/contract checks are unchanged.
