@@ -1,5 +1,6 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import type { ReactNode } from "react";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ModelsClient } from "./models-client";

@@ -39,3 +39,34 @@ The older `WorkflowTimeline` showcase remains a separate parked playground
 surface and is not the active workflow run list. New real playground copy also
 uses all locales. Catalogue completion and the remaining source-copy work are
 required before this issue closes.
+
+## Shared list and table chrome
+
+`ListPage`, `FilterBar`, `ViewToggle`, `NewRowsPill`, `ListSummary`, the DataTable
+controls and shared empty/help and panel-error fallbacks use `shared.list` and
+`shared.table`. The 57 message keys have actual translations in all eight
+locales. DataTable cursor controls reuse `shared.pagination` without changing
+that namespace. Rich messages permit translated word order; ICU plural rules
+and counts follow the selected locale. Non-English caller labels keep their
+capitalization. English retains its existing lowercase noun convention.
+
+Field, column, view and option labels, view notes, explicit empty-state copy,
+search/help overrides, row identity and server messages remain caller data.
+Screens must supply their own translated definitions. The shared sort summary
+names the actual selected column and direction rather than assuming a default
+descending sort is chronological. Sort IDs/directions, filter IDs/values, search
+payloads, selected row IDs, paging and navigation destinations are unchanged.
+
+Regression coverage uses real next-intl providers in all eight locales, verifies
+ICU argument/tag parity, and exercises shared filter, free-value, sort, column,
+view, selection and pagination behavior. It distinguishes filtered versus
+view-empty results and checks untouched server errors in table/card renderers,
+locale counts, unknown summary totals and capped live-row notices. German and
+Japanese portable stories cover ready, loading, error and empty states at
+768px and with long identifiers. This closes the shared chrome slice; the
+screen-specific items in the issue remain independently tracked.
+
+Existing behavior tests use `test/render-with-intl.tsx` to retain the real app
+locale context around their Apollo/permissions wrappers. Legacy screen-specific
+translation mocks delegate shared namespaces to next-intl, preserving their
+existing screen assertions while exercising actual shared ICU messages.

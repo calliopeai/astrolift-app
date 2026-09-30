@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+
 /**
  * ListPage — the list archetype (spec 44 §5.1). Every list page is this.
  *
@@ -189,9 +191,11 @@ export function ListPage<TRow>({
   notice,
   rowClassName,
 }: ListPageProps<TRow>) {
+  const t = useTranslations("shared.list");
   const { definition: def, state } = list;
   const selection = useRowSelection();
-  const noun = label.toLowerCase();
+  const locale = useLocale();
+  const noun = locale.startsWith("en") ? label.toLocaleLowerCase(locale) : label;
   const view = def.views.find((v) => v.key === state.view);
   const mode = renderCard ? list.mode : "list";
 
@@ -213,7 +217,7 @@ export function ListPage<TRow>({
         ...visible,
         {
           id: "__actions",
-          header: <span className="sr-only">Actions</span>,
+          header: <span className="sr-only">{t("actions")}</span>,
           width: "w-10",
           align: "right",
           // Above the row's stretched link, so the menu opens instead of the row.
@@ -232,8 +236,8 @@ export function ListPage<TRow>({
 
   const emptyView: EmptyStateSpec = {
     icon: empty.icon,
-    title: `No ${noun} in ${view?.label ?? "this view"}`,
-    description: `Nothing here matches the ${view?.label ?? "current"} view right now.`,
+    title: t("emptyView", { label: noun, view: view?.label ?? t("thisView") }),
+    description: t("emptyViewDescription", { view: view?.label ?? t("thisView") }),
   };
 
   // DataTable's controller, adapted from the list state. The table draws
@@ -268,9 +272,10 @@ export function ListPage<TRow>({
   const sortedBy = columns.find((c) => c.sortKey === primary?.key);
   const order = !primary
     ? undefined
-    : primary.dir === "desc" && primary.key === def.defaultSort[0]?.key
-      ? "newest first"
-      : `by ${sortedBy ? columnLabel(sortedBy) : primary.key} ${primary.dir === "asc" ? "↑" : "↓"}`;
+    : t("sortedBy", {
+        field: sortedBy ? columnLabel(sortedBy) : primary.key,
+        direction: primary.dir === "asc" ? "↑" : "↓",
+      });
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -283,7 +288,7 @@ export function ListPage<TRow>({
             href: list.viewHref(v.key),
             active: v.key === state.view,
           }))}
-          tabsAriaLabel="Views"
+          tabsAriaLabel={t("views")}
         />
       )}
 
@@ -311,8 +316,8 @@ export function ListPage<TRow>({
           getRowId={getRowId}
           empty={phase === "emptyView" ? emptyView : empty}
           emptyFiltered={{
-            title: `No ${noun} match`,
-            description: "Remove a filter or change the search to see more.",
+            title: t("emptyFiltered", { label: noun }),
+            description: t("emptyFilteredDescription"),
           }}
           selection={bulkActions ? selection : undefined}
           bulkActions={bulkActions}
@@ -379,13 +384,14 @@ function ViewNote({ note, className }: { note: string; className?: string }) {
 
 /** An embedded list's views: one compact menu, each view a link to `?view=`. */
 function ViewPicker({ list }: { list: ListStateController }) {
+  const t = useTranslations("shared.list");
   const { definition: def, state } = list;
   const active = def.views.find((v) => v.key === state.view) ?? def.views[0];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="max-w-full min-w-0" aria-label="View">
-          <span className="text-muted-foreground shrink-0">View:</span>
+        <Button variant="outline" size="sm" className="max-w-full min-w-0" aria-label={t("view")}>
+          <span className="text-muted-foreground shrink-0">{t("viewPrefix")}</span>
           <span className="min-w-0 truncate">{active?.label}</span>
           <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />
         </Button>
@@ -412,10 +418,16 @@ function ViewPicker({ list }: { list: ListStateController }) {
 }
 
 function RowMenu({ label, children }: { label: string; children: React.ReactNode }) {
+  const t = useTranslations("shared.list");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-7" aria-label={`${label}: row actions`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          aria-label={t("rowActions", { label })}
+        >
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -454,11 +466,15 @@ function CardGrid<TRow>({
   count: number;
   stale: boolean;
 }) {
+  const t = useTranslations("shared.list");
   const grid = "grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3";
   switch (phase) {
     case "loading":
       return (
         <div className={grid} aria-busy>
+          <p className="sr-only" role="status">
+            {t("loading")}
+          </p>
           {Array.from({ length: count }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-md" />
           ))}
@@ -469,14 +485,14 @@ function CardGrid<TRow>({
         <div className="flex flex-col items-center gap-3 rounded-md border py-10 text-center">
           <AlertTriangleIcon className="text-danger size-5" />
           <div className="min-w-0 px-6">
-            <p className="font-medium">Could not load {noun}</p>
+            <p className="font-medium">{t("loadFailed", { label: noun })}</p>
             <p className="text-muted-foreground mt-1 max-w-md text-sm [overflow-wrap:anywhere]">
-              {error?.message ?? "The request failed."}
+              {error?.message ?? t("requestFailed")}
             </p>
           </div>
           {onRetry && (
             <Button size="sm" variant="outline" onClick={onRetry}>
-              Retry
+              {t("retry")}
             </Button>
           )}
         </div>
@@ -485,9 +501,9 @@ function CardGrid<TRow>({
       return (
         <div className="flex flex-col items-center gap-3 rounded-md border py-10 text-center">
           <SearchXIcon className="text-muted-foreground size-5" />
-          <p className="font-medium">No {noun} match</p>
+          <p className="font-medium">{t("emptyFiltered", { label: noun })}</p>
           <Button size="sm" variant="outline" onClick={onClear}>
-            Clear filters
+            {t("clearFilters")}
           </Button>
         </div>
       );

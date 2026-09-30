@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+
 /**
  * Panel: the one panel on detail tabs and dashboards (spec 44 §5.2, §6, §7).
  * A quiet bordered surface with a heading row, sitting on the 12-column
@@ -197,18 +199,21 @@ function PanelError({
   message: string;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("shared.table");
+  const locale = useLocale();
+  const label = locale.startsWith("en") ? title.toLocaleLowerCase(locale) : title;
   return (
     <div role="alert" className="flex flex-col items-center gap-3 py-6 text-center">
       <AlertTriangleIcon className="text-danger size-5" aria-hidden />
       <div className="max-w-full min-w-0">
-        <p className="font-medium [overflow-wrap:anywhere]">Could not load {title.toLowerCase()}</p>
+        <p className="font-medium [overflow-wrap:anywhere]">{t("loadFailed", { label })}</p>
         <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
           {message}
         </p>
       </div>
       {onRetry && (
         <Button size="sm" variant="outline" onClick={onRetry}>
-          Retry
+          {t("retry")}
         </Button>
       )}
     </div>

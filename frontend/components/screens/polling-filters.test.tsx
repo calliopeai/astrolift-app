@@ -1,6 +1,7 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import { ApolloClient, ApolloLink, InMemoryCache, type Operation } from "@apollo/client";
 import { ApolloProvider, useQuery } from "@apollo/client/react";
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Observable } from "rxjs";
 import { afterEach, expect, it, vi } from "vitest";
@@ -57,10 +58,17 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/graphql/identity/identity.hooks", () => ({
   useActiveOrg: () => ({ org: { id: "org", slug: "org" }, loading: false }),
 }));
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string, params?: Record<string, unknown>) =>
-    params?.remaining ? `Muted ${params.remaining}` : key,
-}));
+vi.mock("next-intl", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next-intl")>();
+  return {
+    ...actual,
+    useTranslations: (namespace?: string) =>
+      namespace?.startsWith("shared.")
+        ? actual.useTranslations(namespace)
+        : (key: string, params?: Record<string, unknown>) =>
+            params?.remaining ? `Muted ${params.remaining}` : key,
+  };
+});
 vi.mock("@/lib/i18n/formatters", () => ({
   useFormatters: () => ({
     formatDate: String,

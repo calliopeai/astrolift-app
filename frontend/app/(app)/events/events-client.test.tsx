@@ -1,6 +1,7 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EventsClient } from "./events-client";
@@ -88,10 +89,17 @@ const MESSAGES: Record<string, string> = {
   emptyDescription: "No events match the current filter.",
 };
 
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
-    key === "aggregateBadge" ? `×${vars?.count} similar` : (MESSAGES[key] ?? key),
-}));
+vi.mock("next-intl", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next-intl")>();
+  return {
+    ...actual,
+    useTranslations: (namespace?: string) =>
+      namespace?.startsWith("shared.")
+        ? actual.useTranslations(namespace)
+        : (key: string, vars?: Record<string, unknown>) =>
+            key === "aggregateBadge" ? `×${vars?.count} similar` : (MESSAGES[key] ?? key),
+  };
+});
 
 vi.mock("@/lib/i18n/formatters", () => ({
   useFormatters: () => ({

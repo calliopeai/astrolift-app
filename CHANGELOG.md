@@ -4,6 +4,10 @@
 
 - The explicit agent environment-spec picker translates access boundaries,
   shared-recipe notices, search and pagination in all eight locales (#2145).
+- Shared list and table controls, empty/error/loading states, selection and live
+  row notices use all eight locales. Counts honor the selected locale; caller
+  labels, server diagnostics and actual paging/filter/sort values are preserved
+  (#2145).
 
 - Shared numbered and cursor pagination translates controls and count sentences
   in all eight locales, retaining page/cursor callbacks and unknown totals.

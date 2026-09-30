@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { LayoutGridIcon, LayoutListIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -18,17 +20,18 @@ interface ViewToggleProps {
  * alongside sort/filter controls.
  */
 export function ViewToggle({ mode, onChange, className }: ViewToggleProps) {
+  const t = useTranslations("shared.list");
   return (
     <div className={cn("flex items-center rounded-md border", className)}>
       <Button
         type="button"
         size="icon"
         variant="ghost"
-        aria-label="Card view"
+        aria-label={t("cardView")}
         aria-pressed={mode === "card"}
         onClick={() => onChange("card")}
         className={cn(
-          "size-8 rounded-r-none rounded-l-[calc(theme(borderRadius.md)-1px)]",
+          "size-8 rounded-l-[calc(theme(borderRadius.md)-1px)] rounded-r-none",
           mode === "card" && "bg-muted text-foreground"
         )}
       >
@@ -38,7 +41,7 @@ export function ViewToggle({ mode, onChange, className }: ViewToggleProps) {
         type="button"
         size="icon"
         variant="ghost"
-        aria-label="List view"
+        aria-label={t("listView")}
         aria-pressed={mode === "list"}
         onClick={() => onChange("list")}
         className={cn(

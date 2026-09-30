@@ -1,6 +1,7 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import { ApolloClient, ApolloLink, InMemoryCache, type Operation } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Observable, type Subscriber } from "rxjs";
 import { afterEach, expect, it, vi } from "vitest";

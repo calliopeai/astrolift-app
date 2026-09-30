@@ -1,6 +1,7 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import type { ReactNode } from "react";
 
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
