@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Provision explicit managed IDE boxes with a supervised server/browser, retained
+  CSI storage and projected, renewable runtime credentials (#1971). Failed starts
+  and Stop revoke ownership; private resource creation and deletion honor Kubernetes
+  ownership preconditions across all four providers. Managed Move remains unadvertised.
+
 - Add internal certification and box-scoped validation for managed IDE runtime
   ownership (#1971). Exact live Job, Pod and persistent claim identities are
   checked before binding a runtime incarnation. Managed provisioning and Move

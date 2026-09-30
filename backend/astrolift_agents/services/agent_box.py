@@ -293,6 +293,16 @@ def start_agent_box(box) -> None:
     namespace = box_namespace(box)
 
     spec = box.environment_spec
+    from astrolift_agents.services.managed_box_lifecycle import (
+        ManagedBoxOwnershipConflict,
+        is_managed_ide_box,
+        managed_start_guard,
+    )
+
+    managed_ide = is_managed_ide_box(box)
+    managed_runtime = None
+    managed_manifests = []
+    managed_start_version, managed_start_status = box.version, box.status
     if spec is not None and spec.run_as_non_root and spec.allow_install:
         from astrolift_dispatch.pod_hardening import NON_ROOT_INSTALL_CONFLICT
 
@@ -378,7 +388,36 @@ def start_agent_box(box) -> None:
     from astrolift_dispatch.pod_hardening import AgentRuntimeClassError, preflight_agent_runtime
 
     try:
-        job = render_agent_box_job(
+        render = render_agent_box_job
+        render_extra = {"payload_env": payload_env}
+        if managed_ide:
+            from django.conf import settings
+
+            from astrolift_agents.services.managed_box_lifecycle import (
+                authority_secret_name,
+                prepare_managed_box,
+                stamp_runtime_owner,
+            )
+            from astrolift_agents.services.managed_box_manifest import render_managed_box_job
+            from astrolift_dispatch.agent_secrets import agent_container_env
+
+            managed_runtime, managed_manifests = prepare_managed_box(
+                box=box,
+                cluster=cluster,
+                image=image,
+                namespace=namespace,
+                job_name=job_name,
+                expected_version=managed_start_version,
+                expected_status=managed_start_status,
+            )
+            render = render_managed_box_job
+            render_extra = {
+                "browser_image": settings.MANAGED_IDE_BROWSER_IMAGE,
+                "claim_name": managed_runtime.claim_name,
+                "authority_secret_name": authority_secret_name(job_name),
+                "spec_env": agent_container_env(spec, box_secret_name(job_name)),
+            }
+        job = render(
             box=box,
             image=image,
             namespace=namespace,
@@ -386,95 +425,139 @@ def start_agent_box(box) -> None:
             secret_env_names=secret_env_names,
             model_service_account=model_wiring.service_account if model_wiring else "",
             model_env=model_wiring.env if model_wiring else None,
-            payload_env=payload_env,
             model_gateway=gateway,
+            **render_extra,
         )
+        if managed_runtime is not None:
+            stamp_runtime_owner(job, managed_runtime)
         preflight_agent_runtime(cluster, job["spec"]["template"]["spec"])
-    except (ModelGatewayError, AgentRuntimeClassError) as exc:
+    except ManagedBoxOwnershipConflict as exc:
+        raise AgentBoxError(str(exc)) from exc
+    except (ModelGatewayError, AgentRuntimeClassError, ValueError) as exc:
         _fail(box, str(exc))
         raise AgentBoxError(str(exc)) from exc
+    except Exception:
+        if not managed_ide:
+            raise
+        _fail(box, "Managed IDE preflight could not verify the runtime or storage.")
+        raise AgentBoxError(box.last_error) from None
 
-    gateway_key = None
-    if gateway is not None:
-        gateway_key = _mint_box_gateway_key(box, gateway)
-        from astrolift_dispatch.model_gateway import with_gateway_key
+    with managed_start_guard(managed_runtime, box):
+        gateway_key = None
+        if gateway is not None:
+            gateway_key = _mint_box_gateway_key(box, gateway)
+            from astrolift_dispatch.model_gateway import with_gateway_key
 
-        secret_manifest = with_gateway_key(
-            secret_manifest,
-            gateway_key,
-            secret_name=box_secret_name(job_name),
-            namespace=namespace,
-            owner_guid=str(box.guid),
-        )
-
-    from astrolift_dispatch.model_gateway import redact
-
-    try:
-        driver = _driver_for_cluster(cluster)
-        ctx = _context_for_cluster(cluster)
-        ensure_ns = getattr(driver, "ensure_namespace", None)
-        if callable(ensure_ns):
-            ensure_ns(
-                ctx.slug,
-                namespace,
-                {"astrolift.io/managed-by": "platform", "astrolift.io/component": "agents"},
-                {},
+            secret_manifest = with_gateway_key(
+                secret_manifest,
+                gateway_key,
+                secret_name=box_secret_name(job_name),
+                namespace=namespace,
+                owner_guid=str(box.guid),
             )
-        from astrolift_dispatch.agent_network_fence import agent_fence_manifests
 
-        manifests = (
-            ([model_wiring.service_account_manifest] if model_wiring else [])
-            + ([secret_manifest] if secret_manifest else [])
-            + agent_fence_manifests(cluster, namespace)
-            + [job]
+        from astrolift_dispatch.model_gateway import redact
+
+        if managed_runtime is not None and secret_manifest is not None:
+            stamp_runtime_owner(secret_manifest, managed_runtime)
+
+        try:
+            driver = _driver_for_cluster(cluster)
+            ctx = _context_for_cluster(cluster)
+            ensure_ns = getattr(driver, "ensure_namespace", None)
+            if callable(ensure_ns):
+                ensure_ns(
+                    ctx.slug,
+                    namespace,
+                    {"astrolift.io/managed-by": "platform", "astrolift.io/component": "agents"},
+                    {},
+                )
+            from astrolift_dispatch.agent_network_fence import agent_fence_manifests
+
+            shared = (
+                [model_wiring.service_account_manifest] if model_wiring else []
+            ) + agent_fence_manifests(cluster, namespace)
+            private = managed_manifests + ([secret_manifest] if secret_manifest else []) + [job]
+            if managed_runtime is None:
+                result = driver.apply_manifests(ctx.slug, namespace, shared + private)
+            else:
+                if shared:
+                    result = driver.apply_manifests(ctx.slug, namespace, shared)
+                    if not getattr(result, "ok", False):
+                        raise AgentBoxError("Managed runtime network or model routing could not be applied.")
+                for manifest in private:
+                    result = driver.apply_manifests(ctx.slug, namespace, [manifest], create_only=True)
+                    if not getattr(result, "ok", False):
+                        break
+        except Exception as exc:  # noqa: BLE001 — one failure mode for the caller
+            _revoke_box_gateway_key(box)
+            message = (
+                "Managed runtime resource creation failed."
+                if managed_runtime is not None
+                else redact(f"applying the box manifests failed: {exc}", gateway_key)
+            )
+            _fail(box, message)
+            # Chained, the original exception's message could carry the key.
+            cause = exc if gateway_key is None and managed_runtime is None else None
+            raise AgentBoxError(message) from cause
+
+        if not getattr(result, "ok", False):
+            detail = (
+                "Managed runtime resource creation failed."
+                if managed_runtime is not None
+                else redact(
+                    str(result.summary() if hasattr(result, "summary") else "apply failed"), gateway_key
+                )
+            )
+            # A partial apply can leave the plaintext-bearing Secret behind.
+            if managed_runtime is not None:
+                _revoke_box_gateway_key(box)
+                _fail(box, detail)
+                raise AgentBoxError(detail)
+            else:
+                _delete_box_objects(cluster, namespace, job_name)
+            _revoke_box_gateway_key(box)
+            _fail(box, detail)
+            raise AgentBoxError(detail)
+
+        if managed_runtime is not None:
+            from astrolift_agents.services.managed_box_lifecycle import record_managed_resource_ids
+
+            try:
+                record_managed_resource_ids(managed_runtime.pk)
+            except Exception:
+                log.warning("agent_box: managed resource identity observation pending for %s", box.slug)
+
+        box.startup_diagnostic = {}
+        box.status = AgentBox.Status.PROVISIONING
+        box.image = image[:512]
+        box.external_id = job_name
+        box.namespace = namespace
+        # Cleared, not left: a settled box restarts under its existing slug, and
+        # the pod from its previous incarnation is gone. Carrying that name would
+        # hand a client a dead pod to dial until the next sweep re-stamps it.
+        box.pod_name = ""
+        box.started_at = timezone.now()
+        box.ended_at = None
+        # A key Zentinelle already capped at its lifetime is never renewed, so the
+        # box says so from the start.
+        box.last_error = _key_lifetime_note(box)
+        box.save(
+            update_fields=[
+                "status",
+                "image",
+                "startup_diagnostic",
+                "external_id",
+                "namespace",
+                "pod_name",
+                "started_at",
+                "ended_at",
+                "last_error",
+                "updated_at",
+                "version",
+            ]
         )
-        result = driver.apply_manifests(ctx.slug, namespace, manifests)
-    except Exception as exc:  # noqa: BLE001 — one failure mode for the caller
-        _revoke_box_gateway_key(box)
-        message = redact(f"applying the box manifests failed: {exc}", gateway_key)
-        _fail(box, message)
-        # Chained, the original exception's message could carry the key.
-        cause = exc if gateway_key is None else None
-        raise AgentBoxError(message) from cause
-
-    if not getattr(result, "ok", False):
-        detail = redact(str(result.summary() if hasattr(result, "summary") else "apply failed"), gateway_key)
-        # A partial apply can leave the plaintext-bearing Secret behind.
-        _delete_box_objects(cluster, namespace, job_name)
-        _revoke_box_gateway_key(box)
-        _fail(box, detail)
-        raise AgentBoxError(detail)
-
-    box.startup_diagnostic = {}
-    box.status = AgentBox.Status.PROVISIONING
-    box.image = image[:512]
-    box.external_id = job_name
-    box.namespace = namespace
-    # Cleared, not left: a settled box restarts under its existing slug, and
-    # the pod from its previous incarnation is gone. Carrying that name would
-    # hand a client a dead pod to dial until the next sweep re-stamps it.
-    box.pod_name = ""
-    box.started_at = timezone.now()
-    box.ended_at = None
-    # A key Zentinelle already capped at its lifetime is never renewed, so the
-    # box says so from the start.
-    box.last_error = _key_lifetime_note(box)
-    box.save(
-        update_fields=[
-            "status",
-            "image",
-            "startup_diagnostic",
-            "external_id",
-            "namespace",
-            "pod_name",
-            "started_at",
-            "ended_at",
-            "last_error",
-            "updated_at",
-            "version",
-        ]
-    )
-    log.info("agent_box: started %s as Job %s in %s", box.slug, job_name, namespace)
+        log.info("agent_box: started %s as Job %s in %s", box.slug, job_name, namespace)
 
 
 def _mint_box_gateway_key(box, gateway):
@@ -665,10 +748,21 @@ def stop_agent_box(
 
     target = status or AgentBox.Status.STOPPED
     error = ""
-    if box.external_id:
+    from astrolift_agents.services.managed_box_lifecycle import (
+        cancel_managed_box_start,
+        delete_managed_runtime_objects,
+        revoke_managed_runtime,
+    )
+
+    cancel_managed_box_start(box)
+    managed_runtime = revoke_managed_runtime(box)
+    if box.external_id or managed_runtime is not None:
         try:
-            cluster = resolve_agent_cluster(box.organization)
-            _delete_box_objects(cluster, box.namespace or box_namespace(box), box.external_id)
+            if managed_runtime is not None:
+                delete_managed_runtime_objects(managed_runtime)
+            else:
+                cluster = resolve_agent_cluster(box.organization)
+                _delete_box_objects(cluster, box.namespace or box_namespace(box), box.external_id)
         except Exception as exc:  # noqa: BLE001
             error = f"cluster teardown did not complete: {exc}"
             log.warning("agent_box: %s for box %s", error, box.slug)
@@ -713,6 +807,21 @@ def _delete_box_objects(cluster, namespace: str, job_name: str) -> None:
 
 def _fail(box, message: str) -> None:
     from astrolift_agents.models import AgentBox
+    from astrolift_agents.services.managed_box_lifecycle import is_managed_ide_box, revoke_managed_runtime
+
+    runtime = revoke_managed_runtime(box)
+    if runtime is not None or is_managed_ide_box(box):
+        from django.db.models import F
+
+        AgentBox.objects.filter(pk=box.pk, status__in=AgentBox.LIVE_STATUSES).update(
+            status=AgentBox.Status.FAILED,
+            last_error=message[:LAST_ERROR_MAX_CHARS],
+            ended_at=timezone.now(),
+            updated_at=timezone.now(),
+            version=F("version") + 1,
+        )
+        box.refresh_from_db()
+        return
 
     box.status = AgentBox.Status.FAILED
     box.ended_at = timezone.now()
@@ -737,7 +846,12 @@ def observe_box(box) -> str | None:
 
     if not box.external_id:
         return None
-    cluster = resolve_agent_cluster(box.organization)
+    from astrolift_agents.models import ManagedBoxRuntime
+
+    managed_runtime = ManagedBoxRuntime.objects.filter(box_id=box.pk).first()
+    cluster = (
+        managed_runtime.cluster if managed_runtime is not None else resolve_agent_cluster(box.organization)
+    )
     namespace = box.namespace or box_namespace(box)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
@@ -763,6 +877,12 @@ def observe_box(box) -> str | None:
     # exists, so counting it would call a box RUNNING — and therefore
     # attachable — before its pod had started (#133).
     if getattr(status, "ready_replicas", 0) > 0:
+        if managed_runtime is not None:
+            from astrolift_agents.services.managed_box_lifecycle import reconcile_managed_runtime
+
+            if not reconcile_managed_runtime(managed_runtime.pk):
+                return None
+            return AgentBox.Status.RUNNING.value
         _record_pod_name(box, cluster=cluster, namespace=namespace)
         return AgentBox.Status.RUNNING.value
     observe_startup(box, cluster=cluster, namespace=namespace)
@@ -1269,6 +1389,14 @@ def _get_or_create_box(
     # through ``box_slug_for``, so re-pointing it would let one person's press
     # take over another person's box (#1470).
     if not box.is_live:
+        from astrolift_agents.models import ManagedBoxRuntime
+
+        if ManagedBoxRuntime.all_objects.filter(box_id=box.pk).exists():
+            raise AgentBoxEnsureError(
+                "conflict",
+                "Managed box recovery state must be explicitly recovered before replacement.",
+                "environmentSpecSlug",
+            )
         box.environment_spec = spec
         box.agent_definition = agent
         box.team_id = team_id

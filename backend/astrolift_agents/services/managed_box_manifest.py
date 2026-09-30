@@ -188,6 +188,7 @@ def render_managed_box_job(
     }
     pod = {
         "restartPolicy": "Never",
+        "nodeSelector": {"kubernetes.io/arch": "amd64"},
         "terminationGracePeriodSeconds": 15,
         "containers": [runtime, workbench],
         "initContainers": [init],

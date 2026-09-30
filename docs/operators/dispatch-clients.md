@@ -54,13 +54,68 @@ The first validation binds a process nonce atomically. A different nonce, replac
 resource, stopped/deleted box, unavailable provider or expired/revoked credential
 is refused. Validation allows and ownership refusals are audited without tokens.
 
-This is a foundation API. No public issuer, managed box provisioning, Secret
-delivery, credential renewal, pod restart recertification or Move capability is
-wired by this change. Existing terminal boxes remain unchanged. A replacement
-runtime cannot take over an existing transfer claim using this endpoint.
-Apply additive migration `astrolift_agents.0042_managed_box_runtime` before using
-the API. For code rollback retain the table, revoke issued credentials and disable
-managed consumers; do not drop ownership records containing recovery evidence.
+### Provisioning a managed IDE box
+
+An environment spec with `runtime: "calliope-managed-ide"` and an explicit immutable
+`image_tag` selects the managed runtime in the existing box ensure path. The image
+must contain the supervised entry point at
+`/opt/calliope/scripts/managed-runtime/server.sh` and compatible Calliope extensions.
+The paired browser image must contain `/opt/calliope-managed-runtime/browser.cjs`.
+Use `idleTimeoutSeconds: 0` explicitly: this mode persists until operator Stop;
+it does not silently substitute an idle policy for active or paused conversations.
+Boot-time package installation and payload workspace setup are refused; transferred
+workspace content is installed by the receiving conversation protocol.
+
+Configure these control-plane settings before selecting that runtime:
+
+| Setting | Required value |
+|---|---|
+| `MANAGED_IDE_BROWSER_IMAGE` | Immutable `repository@sha256:...` companion image |
+| `MANAGED_IDE_STORAGE_CLASS` | Existing CSI StorageClass with `Retain` reclaim policy |
+| `MANAGED_IDE_CSI_DRIVER` | Its installed CSI provisioner name |
+| `MANAGED_IDE_STORAGE_CAPACITY` | Positive Mi/Gi/Ti capacity, default `20Gi` |
+| `PLATFORM_API_URL` | Canonical HTTPS control-plane URL |
+
+Provisioning checks the live StorageClass, CSI inventory and configured RuntimeClass
+before applying resources. The first supported image target is AMD64, enforced by
+the pod selector. Runtime UID/GID and volume group are 1000. The primary requests
+1 CPU/1536 MiB and the browser 500m/768 MiB; these are startup allocations, not a
+native-load benchmark. Both containers must pass the actual extension readiness
+checks. No server port, Service or Ingress is published.
+
+One dedicated `ReadWriteOncePod` claim holds separate `state` and `workspace`
+subpaths, including the persistent browser profile. It has no Job owner reference.
+Stop, failed creation and box destruction never delete it. Retained state is recovery
+evidence; an existing managed box cannot be automatically repointed or restarted
+under another runtime. Explicit recovery and restart recertification are separate work.
+
+The authority record is reserved before creation. Private PVC, Job and Secret objects
+are created with Kubernetes POST, stopping on an existing name; none is force-adopted.
+Resource UIDs are recorded and rechecked before certification. The primary alone mounts
+`/run/astrolift-authority/authority.json`, initially `{ "version": 1, "status": "pending" }`.
+After readiness, the control plane publishes `{ version, apiUrl, boxId, ownerEpoch,
+podUid, token }` there. The receiver rereads projected credentials and verifies its
+Downward API pod/container identity and process-fixed nonce on each authority request.
+
+The reaper renews a certified credential with less than 15 minutes remaining,
+preserving its owner epoch and bound process. Secret updates carry observed UID and
+resource-version preconditions. Delivery failure rolls back the new credential;
+the next sweep retries. Stop serializes cancellation before reservation/apply,
+revokes credentials before teardown, and deletes only observed owned Job/Secret UIDs.
+The frozen cluster is used even if the organization's default cluster changes.
+Partial failures remain visible with retained storage and a retryable Stop path.
+
+Apply `astrolift_agents.0043_managed_runtime_provisioning` before the backend.
+For code rollback retain ownership tables, revoke issued credentials and disable
+managed consumers; do not drop records containing recovery evidence. Existing
+terminal-box recipes retain their established runtime and workspace behavior.
+
+Managed Move capability is still unadvertised. The authenticated transfer receiver,
+source integration and live cluster acceptance must land before enabling it.
+Actual cluster acceptance must also verify image compatibility, directory ownership
+receipts and admission-webhook behavior, including model credentials injected by
+workload-identity webhooks. The renderer itself passes approved model configuration
+only to the primary container and never copies it into the browser companion.
 
 ## Discover and run work
 

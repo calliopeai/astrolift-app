@@ -21,10 +21,7 @@ def runtime_token_hash(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def certify_managed_runtime(
-    *, box_id, cluster, workspace_path, job_uid, claim_name, claim_uid, pod_name, pod_uid, container_name
-):
-    """Internal provisioner boundary; never accept these fields from a receiver."""
+def configured_runtime_api_url():
     api_url = getattr(settings, "PLATFORM_API_URL", "").rstrip("/")
     parsed = urlsplit(api_url)
     if (
@@ -36,6 +33,24 @@ def certify_managed_runtime(
         or parsed.fragment
     ):
         raise RuntimeAuthorityError("A canonical HTTPS platform URL is required.")
+    return api_url
+
+
+def certify_managed_runtime(
+    *,
+    box_id,
+    cluster,
+    workspace_path,
+    job_uid,
+    claim_name,
+    claim_uid,
+    pod_name,
+    pod_uid,
+    container_name,
+    runtime_id=None,
+):
+    """Internal provisioner boundary; never accept these fields from a receiver."""
+    api_url = configured_runtime_api_url()
     if (
         not isinstance(workspace_path, str)
         or not re.fullmatch(r"/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*", workspace_path)
@@ -44,6 +59,11 @@ def certify_managed_runtime(
     ):
         raise RuntimeAuthorityError("A separate absolute workspace path is required.")
     with transaction.atomic():
+        pending = (
+            ManagedBoxRuntime.objects.select_for_update().get(pk=runtime_id)
+            if runtime_id is not None
+            else None
+        )
         box = AgentBox.objects.select_for_update().get(pk=box_id)
         if (
             box.status not in (AgentBox.Status.PROVISIONING, AgentBox.Status.RUNNING)
@@ -51,10 +71,26 @@ def certify_managed_runtime(
             or not re.fullmatch(r"[^\s]+@sha256:[a-f0-9]{64}", box.image)
         ):
             raise RuntimeAuthorityError("A live box with an immutable image is required.")
-        if ManagedBoxRuntime.all_objects.filter(box=box).exists():
+        if pending is not None:
+            if (
+                pending.phase != ManagedBoxRuntime.Phase.PENDING
+                or pending.box_id != box.pk
+                or pending.cluster_id != cluster.pk
+                or pending.api_url != api_url
+                or pending.workspace_path != workspace_path
+                or pending.namespace != box.namespace
+                or pending.job_name != box.external_id
+                or pending.image != box.image
+                or pending.claim_name != claim_name
+                or pending.container_name != container_name
+                or pending.job_uid != job_uid
+                or pending.claim_uid != claim_uid
+            ):
+                raise RuntimeAuthorityError("The reserved runtime resources changed.")
+        elif ManagedBoxRuntime.all_objects.filter(box=box).exists():
             raise RuntimeAuthorityError("The box already has a runtime owner epoch.")
         token = "alft_box_" + secrets.token_urlsafe(32)
-        runtime = ManagedBoxRuntime(
+        runtime = pending or ManagedBoxRuntime(
             box=box,
             cluster=cluster,
             api_url=api_url,
@@ -71,7 +107,12 @@ def certify_managed_runtime(
             token_hash=runtime_token_hash(token),
             token_expires_at=timezone.now() + timedelta(hours=1),
         )
+        runtime.pod_name = pod_name
+        runtime.pod_uid = pod_uid
+        runtime.token_hash = runtime_token_hash(token)
+        runtime.token_expires_at = timezone.now() + timedelta(hours=1)
         runtime.observed_image_id = _validate_live_resources(runtime)
+        runtime.phase = ManagedBoxRuntime.Phase.CERTIFIED
         runtime.full_clean()
         runtime.save()
         _audit(runtime, "ALLOW", "Provisioner certified exact live runtime resources.")
@@ -86,6 +127,7 @@ def authenticated_runtime(box_id, token):
     except (ValueError, TypeError):
         return None
     return ManagedBoxRuntime.objects.filter(
+        phase=ManagedBoxRuntime.Phase.CERTIFIED,
         box__guid=box_id,
         box__deleted_at__isnull=True,
         box__organization__deleted_at__isnull=True,
@@ -176,7 +218,9 @@ def _validate_live_resources(runtime):
         raise RuntimeAuthorityError("The managed runtime running image identity is unavailable.")
     image_id = image_id.removeprefix("docker-pullable://")
     if not re.fullmatch(r"(?:[^\s]+@)?sha256:[a-f0-9]{64}", image_id) or (
-        runtime.pk is not None and runtime.observed_image_id != image_id
+        runtime.pk is not None
+        and runtime.phase != ManagedBoxRuntime.Phase.PENDING
+        and runtime.observed_image_id != image_id
     ):
         raise RuntimeAuthorityError("The managed runtime running image identity changed.")
     claims = {
@@ -224,6 +268,7 @@ def validate_runtime_authority(runtime_id, token, request):
         try:
             if (
                 box is None
+                or runtime.phase != ManagedBoxRuntime.Phase.CERTIFIED
                 or box.organization.deleted_at is not None
                 or box.status not in (AgentBox.Status.PROVISIONING, AgentBox.Status.RUNNING)
                 or runtime.token_expires_at <= timezone.now()
