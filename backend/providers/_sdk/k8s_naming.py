@@ -56,6 +56,20 @@ def app_namespace(*, organization_slug: str, app_slug: str) -> str:
     return dns_label(organization_slug, app_slug)
 
 
+def cluster_model_namespace(*, organization_id: str, cluster_id: str, managed_service_id: str) -> str:
+    """One shared model's namespace, independent of app/project display names."""
+    if not all((organization_id, cluster_id, managed_service_id)):
+        raise ValueError("cluster model placement requires organization, cluster and managed service identities")
+    return dns_label("astrolift-model", organization_id, cluster_id, managed_service_id)
+
+
+def cluster_model_resource_name(managed_service_id: str) -> str:
+    """Stable model resource identity; display name changes cannot retarget it."""
+    if not managed_service_id:
+        raise ValueError("cluster model resource requires a managed service identity")
+    return dns_label("vllm", managed_service_id)
+
+
 AGENT_NAMESPACE_PREFIX = "astrolift-agents"
 
 

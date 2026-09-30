@@ -7,6 +7,12 @@
 - Add bounded server-side public Hugging Face model search and revision reads,
   filter-bound paging, immutable SHA proof and explicit unavailable/unknown
   metadata without browser credentials or inferred runtime fit (#2214).
+- Shared vLLM model storage can identify an explicit organization and cluster
+  owner without an app/project placeholder. Named subscription aliases and
+  reconciliation revisions have database constraints. This foundation does
+  not yet expose deployment or subscription operations; unavailable placements
+  remain inspectable while infrastructure transport requires managed, active
+  clusters and enabled providers (#2213).
 
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
