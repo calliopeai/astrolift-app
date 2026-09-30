@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared-model prompt denials return the complete public mutation error
+  envelope, including nullable version details, while preserving status auditing
+  and bounded real relay outcomes (#2213).
+
 - Add the actual organization-bound shared-model detail read, separating desired
   and last-applied resources from recorded readiness and operation facts. Failed
   refreshes retain marked prior data; translated UTC timestamps hydrate without

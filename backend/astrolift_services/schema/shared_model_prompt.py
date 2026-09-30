@@ -21,10 +21,11 @@ from astrolift_services.model_prompt import (
     shared_prompt_readiness,
 )
 from astrolift_services.models import ManagedService
+from astrolift_services.schema.model_mutation_audit import model_mutation_audit
 from astrolift_services.schema.model_reads import _catalogue_audience
 from astrolift_services.schema.types import ModelEndpointTestType, ModelPromptReadinessType
 from core.decorators import tenant_scoped
-from core.mutations import ErrorCode, mutation_audit
+from core.mutations import ErrorCode
 from core.permissions import Permission, PermissionDenied, check_permission, require_permission
 from core.scope_args import read_guid
 from core.tenancy import get_current_tenant
@@ -131,7 +132,7 @@ class SharedModelPromptQuery:
 @strawberry.type
 class SharedModelPromptMutations:
     @strawberry.field
-    @mutation_audit(
+    @model_mutation_audit(
         action="cluster_model.test_prompt",
         extras=lambda result: {"status": result.data.status} if result.ok and result.data else None,
     )

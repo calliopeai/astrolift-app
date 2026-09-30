@@ -235,7 +235,7 @@ def test_actual_http_bearer_admission_and_revocation(world, monkeypatch, ceiling
     mutation = """mutation($id:GUID!,$cluster:GUID!,$provider:GUID!,$version:Int!){
         testSharedModelEndpoint(input:{managedServiceId:$id,expectedClusterId:$cluster,
         expectedProviderId:$provider,expectedVersion:$version,prompt:"Explicit local refusal regression"}){
-        ok data{status} errors{code}}}
+        ok data{status} errors{code message field currentVersion}}}
     """
     no_relay(monkeypatch)
     client = Client()
@@ -267,6 +267,9 @@ def test_actual_http_bearer_admission_and_revocation(world, monkeypatch, ceiling
     refused_write = call(mutation)
     assert refused_write.status_code in {200, 401, 403}
     if refused_write.status_code == 200:
+        assert (
+            "errors" not in refused_write.json()
+        ), "Handled refusal must satisfy the complete public envelope."
         envelope = refused_write.json()["data"]["testSharedModelEndpoint"]
         assert not envelope["ok"] and envelope["errors"][0]["code"] == "PERMISSION_DENIED"
 
