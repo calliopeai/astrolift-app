@@ -30,6 +30,25 @@ this feature does not change an agent repository or deploy an image.
 
 ## Job admission and delivery
 
+The v.next shared-owner API adds `astroliftSharedModelPromptReadiness` and
+`testSharedModelEndpoint`. Both require organization-level `CLUSTER_UPDATE`,
+the current credential ceiling and actual cluster region policy. Every call
+captures the model GUID, cluster GUID, provider GUID and expected model version;
+changed targets refuse before rate/job cache access. This is an operator test,
+and an app subscription does not grant that permission or the operator key.
+
+Shared prompts require an active generation model with a confirmed subscription
+revision, managed active cluster, enabled provider, live heartbeat and configured
+agent relay. The internal target and operator Secret are derived from the saved
+organization, cluster and model UUIDs, using the provider's canonical naming.
+The mutation locks model, cluster and provider through admission, rechecks the
+current policy, then releases those locks before waiting for the agent. The
+same existing prompt, output, rate, cluster-job and wait bounds apply. The read
+contains only readiness and limits; browser requests contain no URL or credential.
+These additive fields are under implementation for #2213, with route integration
+tracked by #2215; this documentation does not establish deployment or live
+tenant inference.
+
 The configured Django Redis cache commits job admission and the cluster's slot
 together. Dispatch atomically changes the current pending job to dispatched and
 renews both entries' 180-second TTL. Concurrent heartbeats dispatch at most once;

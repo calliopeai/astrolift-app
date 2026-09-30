@@ -42,6 +42,12 @@ requests to zero on a GPU image does not establish CPU support. GPU placement
 uses explicit resource requests and actual cluster eligibility. Requested memory
 or parameter-based size estimates do not establish hardware fit.
 
+The initial pinned shared runtime admits generation models only. Other Hugging
+Face tasks remain searchable, but their metadata does not establish a supported
+deployment or chat-completion contract. The declared package version must match
+the CPU `0.15.1+cpu` build or an explicitly supported CUDA release build; unknown,
+development and future versions refuse at runtime startup.
+
 ## Subscription access and reconciliation
 
 The shared model has a service-owned namespace derived from persisted tenant,

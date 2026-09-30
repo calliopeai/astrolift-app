@@ -6984,6 +6984,7 @@ export type Mutation = {
   terminateWorkflowInstance: MutationResult;
   testModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testNotificationChannel: AstroliftNotificationMutationResult;
+  testSharedModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testWebhookSubscription: AstroliftWebhookTestResultMutationResult;
   transferApp: AstroliftRegisteredAppMutationResult;
   /** Transition a workflow instance to a new state. */
@@ -8661,6 +8662,11 @@ export type MutationTestNotificationChannelArgs = {
 };
 
 
+export type MutationTestSharedModelEndpointArgs = {
+  input: TestSharedModelEndpointInput;
+};
+
+
 export type MutationTestWebhookSubscriptionArgs = {
   input: TestWebhookInput;
 };
@@ -9521,6 +9527,7 @@ export type Query = {
   astroliftSecretChangeProposals: Array<AstroliftSecretChangeProposal>;
   /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
   astroliftServerInfo: AstroliftServerInfo;
+  astroliftSharedModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage. */
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceConnectionsPage: AstroliftSourceConnectionPage;
@@ -10971,6 +10978,14 @@ export type QueryAstroliftSecretChangeProposalsArgs = {
 };
 
 
+export type QueryAstroliftSharedModelPromptReadinessArgs = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftSourceConnectionsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -12081,6 +12096,14 @@ export type TestModelEndpointInput = {
 export type TestNotificationInput = {
   id: Scalars['GUID']['input'];
   message: InputMaybe<Scalars['String']['input']>;
+};
+
+export type TestSharedModelEndpointInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+  prompt: Scalars['String']['input'];
 };
 
 export type TestWebhookInput = {

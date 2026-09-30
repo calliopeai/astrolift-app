@@ -6984,6 +6984,7 @@ export type Mutation = {
   terminateWorkflowInstance: MutationResult;
   testModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testNotificationChannel: AstroliftNotificationMutationResult;
+  testSharedModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testWebhookSubscription: AstroliftWebhookTestResultMutationResult;
   transferApp: AstroliftRegisteredAppMutationResult;
   /** Transition a workflow instance to a new state. */
@@ -8661,6 +8662,11 @@ export type MutationTestNotificationChannelArgs = {
 };
 
 
+export type MutationTestSharedModelEndpointArgs = {
+  input: TestSharedModelEndpointInput;
+};
+
+
 export type MutationTestWebhookSubscriptionArgs = {
   input: TestWebhookInput;
 };
@@ -9521,6 +9527,7 @@ export type Query = {
   astroliftSecretChangeProposals: Array<AstroliftSecretChangeProposal>;
   /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
   astroliftServerInfo: AstroliftServerInfo;
+  astroliftSharedModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage. */
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceConnectionsPage: AstroliftSourceConnectionPage;
@@ -10971,6 +10978,14 @@ export type QueryAstroliftSecretChangeProposalsArgs = {
 };
 
 
+export type QueryAstroliftSharedModelPromptReadinessArgs = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftSourceConnectionsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -12081,6 +12096,14 @@ export type TestModelEndpointInput = {
 export type TestNotificationInput = {
   id: Scalars['GUID']['input'];
   message: InputMaybe<Scalars['String']['input']>;
+};
+
+export type TestSharedModelEndpointInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+  prompt: Scalars['String']['input'];
 };
 
 export type TestWebhookInput = {
@@ -14322,6 +14345,23 @@ export type GetClusterModelDensityQueryVariables = Exact<{
 
 
 export type GetClusterModelDensityQuery = { astroliftClusterModelDensity?: { clusterId: string, start: string, end: string, retrievedAt: string, modelCount: number, returnedCount: number, scope: string, source: string, inventoryLimit: number, truncated: boolean, capacity: { state: ModelObservationState, source: string, observedAt?: string | null, cpuCores?: number | null, memoryBytes?: number | null, vramBytes?: number | null, freshnessSeconds: number, gpuDevices: Array<{ resource: string, devices: number }> }, items: Array<{ serviceId: string, name: string, status: string, desired: { source: string, observedAt?: string | null, replicas?: number | null, cpuCoresPerReplica?: number | null, memoryBytesPerReplica?: number | null, gpuDevicesPerReplica?: number | null, gpuResource?: string | null, totalCpuCores?: number | null, totalMemoryBytes?: number | null, totalGpuDevices?: number | null }, applied?: { source: string, observedAt?: string | null, replicas?: number | null, cpuCoresPerReplica?: number | null, memoryBytesPerReplica?: number | null, gpuDevicesPerReplica?: number | null, gpuResource?: string | null, totalCpuCores?: number | null, totalMemoryBytes?: number | null, totalGpuDevices?: number | null } | null, observations: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> }> } | null };
+
+export type GetSharedModelPromptReadinessQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+}>;
+
+
+export type GetSharedModelPromptReadinessQuery = { astroliftSharedModelPromptReadiness?: { state: AstroliftModelPromptReadinessState, eligible: boolean, maxPromptChars: number, maxOutputTokens: number, promptsPerMinute: number, maxWaitSeconds: number } | null };
+
+export type TestSharedModelEndpointMutationVariables = Exact<{
+  input: TestSharedModelEndpointInput;
+}>;
+
+
+export type TestSharedModelEndpointMutation = { testSharedModelEndpoint: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string }>, data?: { status: string, reply: string, latencyMs?: number | null, promptTokens?: number | null, completionTokens?: number | null, totalTokens?: number | null, error: string } | null } };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

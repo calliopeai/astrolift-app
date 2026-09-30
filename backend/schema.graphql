@@ -7388,6 +7388,7 @@ type Mutation {
   approveSecretChange(input: ApproveSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   withdrawSecretChange(input: WithdrawSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  testSharedModelEndpoint(input: TestSharedModelEndpointInput!): AstroliftModelEndpointTestMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
@@ -8098,6 +8099,7 @@ type Query {
   astroliftClusterModelDensity(clusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ClusterModelDensity
   astroliftHuggingFaceModels(search: String! = "", author: String! = "", pipelineTag: String! = "", library: String! = "", license: String! = "", gated: Boolean = null, sortBy: String! = "downloads", first: Int! = 20, after: String = null): HuggingFaceModelsPage!
   astroliftHuggingFaceModel(repoId: String!, revision: String = null): HuggingFaceModelResult!
+  astroliftSharedModelPromptReadiness(id: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, expectedVersion: Int!): AstroliftModelPromptReadiness
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
@@ -8840,6 +8842,14 @@ input TestModelEndpointInput {
 input TestNotificationInput {
   id: GUID!
   message: String = null
+}
+
+input TestSharedModelEndpointInput {
+  managedServiceId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  expectedVersion: Int!
+  prompt: String!
 }
 
 input TestWebhookInput {
