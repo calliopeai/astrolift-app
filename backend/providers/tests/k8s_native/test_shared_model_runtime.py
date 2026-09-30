@@ -129,6 +129,8 @@ def test_shared_deployment_has_explicit_runtime_revision_and_independent_keys(mo
     env = {row["name"]: row.get("value") for row in container["env"]}
     assert container["image"] == IMAGE and container["command"] == ["python3", "/opt/astrolift/shared-model/launch.py"]
     assert "--api-key" not in container["args"]
+    assert container["args"][container["args"].index("--runner") + 1] == "generate"
+    assert container["args"][container["args"].index("--convert") + 1] == "none"
     assert container["args"][container["args"].index("--revision") + 1] == "b" * 40
     assert env["ASTROLIFT_MODEL_AUTH_REVISION"] == "1" and "VLLM_API_KEY" not in env
     assert pod["nodeSelector"] == {"astrolift.dev/vllm-compatible": mode, "kubernetes.io/arch": "amd64"}
@@ -385,3 +387,12 @@ def test_launcher_mode_bound_actual_distribution_version_admission(monkeypatch, 
     exec(LAUNCHER, namespace)
     with pytest.raises(RuntimeError, match="snapshot reached" if admitted else "Unsupported"):
         namespace["main"]()
+
+
+def test_replaced_model_owner_cannot_claim_ready():
+    driver, cluster, _secrets, spec = setup()
+    result = driver.provision(spec)
+    deployment = object_of(cluster, "apps/v1/Deployment")
+    deployment["metadata"]["labels"]["astrolift.io/managed-service-id"] = str(uuid4())
+    state = driver.status(ServiceHandle(result.handle, managed_service_id=spec.managed_service_id))
+    assert state.state == "error" and "another managed service" in state.message

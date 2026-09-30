@@ -301,7 +301,9 @@ class VLLMDriver(ManagedServiceDriver):
         if deployment is None:
             return ServiceStatus(handle.handle, "deprovisioned", "vLLM Deployment not found")
         try:
-            self._owner_id(deployment)
+            owner_id = self._owner_id(deployment)
+            if handle.managed_service_id and owner_id != handle.managed_service_id:
+                raise ValueError("vLLM Deployment belongs to another managed service.")
         except ValueError as exc:
             return ServiceStatus(handle.handle, "error", str(exc))
         annotations = (deployment.get("metadata") or {}).get("annotations") or {}
@@ -805,6 +807,8 @@ class VLLMDriver(ManagedServiceDriver):
             "--dtype",
             str(cfg["dtype"]),
         ]
+        if runtime is not None:
+            args += ["--runner", "generate", "--convert", "none"]
         if cfg.get("model_revision"):
             args += ["--revision", str(cfg["model_revision"])]
         if runtime is not None and runtime.mode == "cpu":
