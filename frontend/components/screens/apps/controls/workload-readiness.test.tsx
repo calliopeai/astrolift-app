@@ -17,7 +17,7 @@ it("does not report manifest replicas as observed ready pods", () => {
     <NextIntlClientProvider locale="en" messages={messages}>
       <PermissionsProvider value={{ granted: new Set(), loading: false }}>
         <TooltipProvider>
-          <WorkloadOpsRowView {...workloadOps("production", { ...WORKLOAD_WEB, replicas: 3 })} />
+          <WorkloadOpsRowView {...workloadOps({ ...WORKLOAD_WEB, replicas: 3 })} />
         </TooltipProvider>
       </PermissionsProvider>
     </NextIntlClientProvider>
