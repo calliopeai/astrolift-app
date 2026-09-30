@@ -36,6 +36,7 @@ const SUGGESTED_OVERRIDE_KEYS: { key: string; hint: string }[] = [
 export function EnvironmentSettingsView({
   envs,
   adding,
+  clearing,
   onAdd,
   onClear,
 }: EnvironmentSettingsViewProps) {
@@ -105,8 +106,14 @@ export function EnvironmentSettingsView({
                   className="text-destructive hover:text-destructive h-6 px-2 text-xs"
                   onClick={() => effectiveEnv && void onClear(effectiveEnv.id, s.key)}
                   title="Clear override"
+                  aria-label={`Clear ${s.key} override`}
+                  disabled={clearing.has(JSON.stringify([effectiveEnv?.id, s.key]))}
                 >
-                  <Trash2Icon className="size-3" />
+                  {clearing.has(JSON.stringify([effectiveEnv?.id, s.key])) ? (
+                    <Loader2Icon className="size-3 animate-spin" />
+                  ) : (
+                    <Trash2Icon className="size-3" />
+                  )}
                 </Button>
               </Can>
             </div>

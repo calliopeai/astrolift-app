@@ -5,6 +5,11 @@
 - Policy condition JSON passes through the existing validating parser without an
   object-only type or double assertion; Storybook fixtures use actual arrays (#2148).
 
+- Environment override clears, secret bundle attachments/deletions and secret
+  reference saves prevent pending repeats and show the affected action as busy.
+  Reference saves use trimmed variable identities; closing or changing a secret
+  dialog cancels reveal timers and ignores late reveal responses (#2148).
+
 - Team and project create sheets generate backend-compatible slugs and preserve
   a requested visible team. Workflow configuration waits for and scopes reads
   to the active organization, create access stays unknown while loading, and

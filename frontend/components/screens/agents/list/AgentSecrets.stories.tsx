@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { expect, userEvent, within } from "storybook/test";
 
 import {
   BUNDLES,
@@ -71,4 +72,16 @@ export const LongStrings: Story = {
       reveals={{ [LONG_SECRET_ROW.envVar]: `${"x".repeat(240)}` }}
     />
   ),
+};
+
+/** The pending tag and the actual mutation share a trimmed environment variable. */
+export const SavingReference: Story = {
+  render: () => <AgentSecretsView {...SECRETS} embedded pending={new Set(["ref:API_KEY"])} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByPlaceholderText("ENV_VAR"), " API_KEY ");
+    await userEvent.type(canvas.getByPlaceholderText(/Provider URI/), "agents/org-1/api-key");
+    await expect(canvas.getByRole("button", { name: "Add / update ref" })).toBeDisabled();
+    await expect(canvas.getByPlaceholderText("ENV_VAR")).toHaveValue(" API_KEY ");
+  },
 };

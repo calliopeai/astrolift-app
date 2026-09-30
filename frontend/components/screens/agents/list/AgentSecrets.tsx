@@ -61,6 +61,7 @@ export function AgentSecretsView({
   refNamespace,
   reveals,
   busyVar,
+  pending,
   clearReveals,
   onSave,
   onDeleteValue,
@@ -110,9 +111,11 @@ export function AgentSecretsView({
   }
 
   async function handleUpsertRef() {
-    if (await onUpsertRef(refEnvVar, refUri)) {
-      setRefEnvVar("");
-      setRefUri("");
+    const submittedEnvVar = refEnvVar;
+    const submittedUri = refUri;
+    if (await onUpsertRef(submittedEnvVar, submittedUri)) {
+      setRefEnvVar((current) => (current === submittedEnvVar ? "" : current));
+      setRefUri((current) => (current === submittedUri ? "" : current));
     }
   }
 
@@ -144,8 +147,21 @@ export function AgentSecretsView({
           value={refUri}
           onChange={(event) => setRefUri(event.target.value)}
         />
-        <Button onClick={handleUpsertRef} disabled={!refEnvVar.trim() || !refUri.trim()}>
-          <LinkIcon className="size-4" /> Add / update ref
+        <Button
+          onClick={handleUpsertRef}
+          disabled={
+            !refEnvVar.trim() ||
+            !refUri.trim() ||
+            pending.has(`ref:${refEnvVar.trim()}`) ||
+            busyVar === `ref:${refEnvVar.trim()}`
+          }
+        >
+          {pending.has(`ref:${refEnvVar.trim()}`) || busyVar === `ref:${refEnvVar.trim()}` ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <LinkIcon className="size-4" />
+          )}{" "}
+          Add / update ref
         </Button>
       </div>
 
@@ -194,9 +210,13 @@ export function AgentSecretsView({
                   type="button"
                   size="sm"
                   onClick={() => handleSave(r.envVar)}
-                  disabled={busyVar === r.envVar || !(drafts[r.envVar] ?? "")}
+                  disabled={
+                    pending.has(r.envVar) || busyVar === r.envVar || !(drafts[r.envVar] ?? "")
+                  }
                 >
-                  {busyVar === r.envVar && <Loader2Icon className="size-4 animate-spin" />}
+                  {(pending.has(r.envVar) || busyVar === r.envVar) && (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  )}
                   {r.exists ? "Rotate" : "Set"}
                 </Button>
                 <Button
@@ -205,7 +225,12 @@ export function AgentSecretsView({
                   variant="ghost"
                   aria-label={`${reveals[r.envVar] ? "Hide" : "Reveal"} ${r.envVar}`}
                   onClick={() => onReveal(r)}
-                  disabled={!r.exists || !r.canReveal || busyVar === `reveal:${r.envVar}`}
+                  disabled={
+                    !r.exists ||
+                    !r.canReveal ||
+                    pending.has(`reveal:${r.envVar}`) ||
+                    busyVar === `reveal:${r.envVar}`
+                  }
                 >
                   {reveals[r.envVar] ? (
                     <EyeOffIcon className="size-4" />
@@ -220,7 +245,7 @@ export function AgentSecretsView({
                   variant="ghost"
                   aria-label={`Delete ${r.envVar}`}
                   onClick={() => setDeleteTarget(r)}
-                  disabled={busyVar === r.envVar || !r.exists}
+                  disabled={pending.has(r.envVar) || busyVar === r.envVar || !r.exists}
                 >
                   <Trash2Icon className="size-4" />
                 </Button>
@@ -230,7 +255,7 @@ export function AgentSecretsView({
                   variant="ghost"
                   aria-label={`Remove binding ${r.envVar}`}
                   onClick={() => setRemoveRefTarget(r)}
-                  disabled={busyVar === `remove:${r.envVar}`}
+                  disabled={pending.has(`remove:${r.envVar}`) || busyVar === `remove:${r.envVar}`}
                 >
                   <UnlinkIcon className="size-4" />
                 </Button>

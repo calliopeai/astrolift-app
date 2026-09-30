@@ -18,6 +18,8 @@ import {
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
+import { usePendingActions } from "@/hooks/use-pending-actions";
+
 interface SecretStatusResp {
   agentEnvironmentSpecSecretStatus: AstroliftAgentSecretStatus[];
 }
@@ -64,8 +66,15 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
   const refNamespace = `agents/${org?.id ?? "<organization id>"}`;
 
   const [reveals, setReveals] = React.useState<Record<string, string>>({});
+  const [revealScope, setRevealScope] = React.useState({ envSpecSlug, open });
+  if (revealScope.envSpecSlug !== envSpecSlug || revealScope.open !== open) {
+    setRevealScope({ envSpecSlug, open });
+    setReveals({});
+  }
   const revealTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const [busyVar, setBusyVar] = React.useState<string>("");
+  const { pending, begin, finish } = usePendingActions();
+  const busyVar = pending.values().next().value ?? "";
+  const revealGeneration = React.useRef(0);
 
   const [setSecret] = useMutation<SecretMutationResp>(SET_AGENT_SECRET_VALUE);
   const [deleteSecret] = useMutation<SecretMutationResp>(DELETE_AGENT_SECRET_VALUE);
@@ -73,22 +82,29 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
   const [removeRef] = useMutation<SecretMutationResp>(REMOVE_AGENT_SECRET_REF);
   const [revealSecret] = useMutation<SecretRevealResp>(REVEAL_AGENT_SECRET_VALUE);
 
-  React.useEffect(
-    () => () => Object.values(revealTimers.current).forEach((timer) => clearTimeout(timer)),
-    []
-  );
-
-  /** Drop every revealed value (the dialog is closing). */
-  function clearReveals() {
+  /** Drop values, cancel timers and invalidate reveals that are still in flight. */
+  const clearReveals = React.useCallback(() => {
+    revealGeneration.current += 1;
+    Object.values(revealTimers.current).forEach(clearTimeout);
+    revealTimers.current = {};
     setReveals({});
-  }
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      revealGeneration.current += 1;
+      Object.values(revealTimers.current).forEach(clearTimeout);
+      revealTimers.current = {};
+    };
+  }, [envSpecSlug, open]);
 
   async function onSave(envVar: string, value: string): Promise<boolean> {
     if (!value) {
       toast.error("Enter a value first");
       return false;
     }
-    setBusyVar(envVar);
+    const action = envVar;
+    if (!begin(action)) return false;
     try {
       const res = await setSecret({
         variables: { slug: envSpecSlug, envVar, value },
@@ -105,12 +121,13 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       toast.error(`Set ${envVar} failed: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     } finally {
-      setBusyVar("");
+      finish(action);
     }
   }
 
   async function onDeleteValue(target: AstroliftAgentSecretStatus) {
-    setBusyVar(target.envVar);
+    const action = target.envVar;
+    if (!begin(action)) return;
     try {
       const res = await deleteSecret({
         variables: { slug: envSpecSlug, envVar: target.envVar },
@@ -127,38 +144,41 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
         `Delete ${target.envVar} failed: ${err instanceof Error ? err.message : String(err)}`
       );
     } finally {
-      setBusyVar("");
+      finish(action);
     }
   }
 
-  async function onUpsertRef(envVar: string, uri: string): Promise<boolean> {
-    if (!envVar.trim() || !uri.trim()) {
+  async function onUpsertRef(rawEnvVar: string, uri: string): Promise<boolean> {
+    const envVar = rawEnvVar.trim();
+    if (!envVar || !uri.trim()) {
       toast.error("Environment variable and provider URI are required");
       return false;
     }
-    setBusyVar(`ref:${envVar}`);
+    const action = `ref:${envVar}`;
+    if (!begin(action)) return false;
     try {
       const res = await upsertRef({
-        variables: { slug: envSpecSlug, envVar: envVar.trim(), uri: uri.trim() },
+        variables: { slug: envSpecSlug, envVar, uri: uri.trim() },
       });
       const payload = res.data?.upsertAgentSecretRef;
       if (!payload?.ok) {
         toast.error(`Save ref failed: ${firstError(payload?.errors ?? [])}`);
         return false;
       }
-      toast.success(`Saved binding ${envVar.trim()}`);
+      toast.success(`Saved binding ${envVar}`);
       await refetch();
       return true;
     } catch (err) {
       toast.error(`Save ref failed: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     } finally {
-      setBusyVar("");
+      finish(action);
     }
   }
 
   async function onRemoveRef(row: AstroliftAgentSecretStatus) {
-    setBusyVar(`remove:${row.envVar}`);
+    const action = `remove:${row.envVar}`;
+    if (!begin(action)) return;
     try {
       const res = await removeRef({ variables: { slug: envSpecSlug, envVar: row.envVar } });
       const payload = res.data?.removeAgentSecretRef;
@@ -170,13 +190,14 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
     } catch (err) {
       toast.error(`Remove ref failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setBusyVar("");
+      finish(action);
     }
   }
 
   async function onReveal(row: AstroliftAgentSecretStatus) {
     if (reveals[row.envVar]) {
       clearTimeout(revealTimers.current[row.envVar]);
+      delete revealTimers.current[row.envVar];
       setReveals((current) => {
         const next = { ...current };
         delete next[row.envVar];
@@ -184,16 +205,21 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       });
       return;
     }
-    setBusyVar(`reveal:${row.envVar}`);
+    const action = `reveal:${row.envVar}`;
+    if (!begin(action)) return;
+    const generation = revealGeneration.current;
     try {
       const res = await revealSecret({ variables: { slug: envSpecSlug, envVar: row.envVar } });
+      if (generation !== revealGeneration.current) return;
       const payload = res.data?.revealAgentSecretValue;
       if (!payload?.ok || !payload.data) {
         toast.error(`Reveal failed: ${firstError(payload?.errors ?? [])}`);
         return;
       }
       setReveals((current) => ({ ...current, [row.envVar]: payload.data!.value }));
+      clearTimeout(revealTimers.current[row.envVar]);
       revealTimers.current[row.envVar] = setTimeout(() => {
+        delete revealTimers.current[row.envVar];
         setReveals((current) => {
           const next = { ...current };
           delete next[row.envVar];
@@ -201,9 +227,10 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
         });
       }, 30_000);
     } catch (err) {
+      if (generation !== revealGeneration.current) return;
       toast.error(`Reveal failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setBusyVar("");
+      finish(action);
     }
   }
 
@@ -213,6 +240,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
     refNamespace,
     reveals,
     busyVar,
+    pending,
     clearReveals,
     onSave,
     onDeleteValue,

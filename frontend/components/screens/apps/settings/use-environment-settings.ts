@@ -15,6 +15,8 @@ import type {
   AstroliftEnvironmentSetting,
 } from "@/graphql/lifecycle/lifecycle.types";
 
+import { usePendingActions } from "@/hooks/use-pending-actions";
+
 interface EnvsResp {
   astroliftEnvironments: AstroliftAppEnvironment[];
 }
@@ -37,6 +39,7 @@ export function useEnvironmentSettings(appSlug: string) {
     fetchPolicy: "cache-and-network",
   });
   const envs = data?.astroliftEnvironments ?? [];
+  const { pending: clearing, begin, finish } = usePendingActions();
   const [adding, setAdding] = React.useState(false);
 
   const refetch = [{ query: LIST_ENVIRONMENTS, variables: { appSlug } }];
@@ -77,6 +80,8 @@ export function useEnvironmentSettings(appSlug: string) {
   }
 
   async function onClear(environmentId: string, key: string) {
+    const action = JSON.stringify([environmentId, key]);
+    if (!begin(action)) return;
     try {
       const { data: resp } = await clearSetting({
         variables: { input: { environmentId, key } },
@@ -89,8 +94,10 @@ export function useEnvironmentSettings(appSlug: string) {
       toast.success(`Cleared ${key}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to clear.");
+    } finally {
+      finish(action);
     }
   }
 
-  return { envs, adding, onAdd, onClear };
+  return { envs, adding, clearing, onAdd, onClear };
 }

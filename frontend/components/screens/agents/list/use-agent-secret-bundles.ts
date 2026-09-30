@@ -23,6 +23,8 @@ import type {
   AstroliftAgentSecretBundleAttachment,
 } from "@/graphql/agents/agents.types";
 
+import { usePendingActions } from "@/hooks/use-pending-actions";
+
 type MutationError = { message: string };
 type MutationEnvelope<T> = { ok: boolean; errors: MutationError[]; data: T | null };
 
@@ -85,7 +87,8 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
 
   const [reveals, setReveals] = React.useState<Record<string, string>>({});
   const revealTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const [busy, setBusy] = React.useState("");
+  const { pending, begin, finish } = usePendingActions();
+  const busy = pending.values().next().value ?? "";
 
   React.useEffect(
     () => () => Object.values(revealTimers.current).forEach((timer) => clearTimeout(timer)),
@@ -101,7 +104,8 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       toast.error("Bundle name and slug are required");
       return false;
     }
-    setBusy("create");
+    const action = "create";
+    if (!begin(action)) return false;
     try {
       const response = await createBundle({
         variables: {
@@ -124,7 +128,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       );
       return false;
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
@@ -133,7 +137,8 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
     name: string,
     backendRef: string
   ): Promise<boolean> {
-    setBusy(`update:${bundle.id}`);
+    const action = `update:${bundle.id}`;
+    if (!begin(action)) return false;
     try {
       const response = await updateBundle({
         variables: {
@@ -154,12 +159,13 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       toast.error(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
   async function onDeleteBundle(bundle: AstroliftAgentSecretBundle) {
-    setBusy(`delete:${bundle.id}`);
+    const action = `delete:${bundle.id}`;
+    if (!begin(action)) return;
     try {
       const response = await deleteBundle({
         variables: { slug: envSpecSlug, bundleId: bundle.id },
@@ -175,7 +181,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         `Delete bundle failed: ${error instanceof Error ? error.message : String(error)}`
       );
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
@@ -185,7 +191,8 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
     position: number,
     attachment?: AstroliftAgentSecretBundleAttachment
   ): Promise<boolean> {
-    setBusy(`attach:${bundle.id}`);
+    const action = `attach:${bundle.id}`;
+    if (!begin(action)) return false;
     try {
       const response = await attachBundle({
         variables: {
@@ -206,12 +213,13 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       toast.error(`Attach failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
   async function onDetach(ref: AstroliftAgentSecretBundleAttachment) {
-    setBusy(`detach:${ref.id}`);
+    const action = `detach:${ref.id}`;
+    if (!begin(action)) return;
     try {
       const response = await detachBundle({
         variables: { slug: envSpecSlug, attachmentId: ref.id },
@@ -225,7 +233,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
     } catch (error) {
       toast.error(`Detach failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
@@ -238,7 +246,8 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       toast.error("Key and value are required");
       return false;
     }
-    setBusy(`key:${bundle.id}`);
+    const action = `key:${bundle.id}`;
+    if (!begin(action)) return false;
     try {
       const response = await setBundleKey({
         variables: {
@@ -259,12 +268,13 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       toast.error(`Save key failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
   async function onDeleteKey(bundle: AstroliftAgentSecretBundle, key: string) {
-    setBusy(`key-delete:${bundle.id}:${key}`);
+    const action = `key-delete:${bundle.id}:${key}`;
+    if (!begin(action)) return;
     try {
       const response = await deleteBundleKey({
         variables: { slug: envSpecSlug, bundleId: bundle.id, key },
@@ -278,7 +288,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
     } catch (error) {
       toast.error(`Delete key failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
@@ -293,7 +303,8 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       });
       return;
     }
-    setBusy(`key-reveal:${revealId}`);
+    const action = `key-reveal:${revealId}`;
+    if (!begin(action)) return;
     try {
       const response = await revealBundleKey({
         variables: { slug: envSpecSlug, bundleId: bundle.id, key },
@@ -313,7 +324,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
     } catch (error) {
       toast.error(`Reveal failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
-      setBusy("");
+      finish(action);
     }
   }
 
@@ -324,6 +335,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
     defaultAttachments,
     loading,
     busy,
+    pending,
     reveals,
     onCreate,
     onUpdate,

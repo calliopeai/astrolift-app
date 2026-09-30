@@ -47,7 +47,7 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 | 25. Email sheet allowlist reason misdescribes its tables | Pre-existing | Email tables migrated to embedded ListPage; raw table allowlist is empty and bootstrap references its exact-match gate. |
 | 26. Workload detail links use plain anchors and reload the page | Pre-existing | Earlier WorkloadLink navigation correction is included in the audited base. |
 | 27. Danger zone deregister badge never shows before first open | Remaining | DangerZone still loads deregistration preview only after opening; pre-open magnitude is unavailable. |
-| 28. Clearing an environment override has no busy state | Remaining | EnvironmentSettings clear override button still lacks pending admission/disabled state. |
+| 28. Clearing an environment override has no busy state | Fixed | Environment/key-scoped pending admission survives the awaited refetch; the clear button disables and spins only its row. pending-operations.test.tsx covers duplicates, denial and refresh completion. |
 | 29. Command runner Run does nothing when no container is selected | Fixed | Operational React and Chromium checks require a nonempty containerName before Run. |
 | 30. Run command page highlights the Deployments tab | Fixed | Command runner fallback uses commands; canonical AppCommandsRedirect already resolves Logs & metrics Commands. |
 | 31. Observability duplicates pod selection and ignores ?container= | Remaining | use-app-observability.ts still has KNOWN_SIDECARS/pickDefaultContainer and does not consume container deep-link state. |
@@ -57,9 +57,9 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 | 35. Run content comment disagrees with StatusCell badge variants | Pre-existing | AgentRunScreen now uses StatusDot/runDot; the obsolete outline/secondary status-badge comment is absent. |
 | 36. Agent overview matches running status case-sensitively | Fixed | AgentOverview matches RUNNING case insensitively; focused React/Chromium overseer input checks. |
 | 37. Overview run mode tile shows 'Service · Service' | Pre-existing | AgentOverview uses AgentFrame.runModeLabel, which merges repeated family/mode values. |
-| 38. Secret bundle Attach and key Delete can fire twice | Remaining | Attach button and key-delete opener still omit the hook busy value; ConfirmDialog guards its own pending confirmation only. |
-| 39. Add / update ref button stays clickable during save | Remaining | AgentSecrets Add/update ref button still ignores busyVar; hook tracks untrimmed envVar while mutation trims it. |
-| 40. Agent secrets dialog leaks reveal timers on close | Remaining | use-agent-secrets.clearReveals clears values but does not cancel/reset revealTimers until unmount. |
+| 38. Secret bundle Attach and key Delete can fire twice | Fixed | Bundle actions keep independent pending keys; Attach and key-delete controls disable their operation. Real Apollo regressions prove duplicate calls reach the transport once and failures release admission. |
+| 39. Add / update ref button stays clickable during save | Fixed | Reference mutation variables and pending keys use the trimmed environment variable. The view disables that ref save and keeps drafts changed during an earlier request. |
+| 40. Agent secrets dialog leaks reveal timers on close | Fixed | Closing, changing the environment spec or unmounting cancels timers and invalidates late reveal responses; a cleared older timer cannot hide a later reveal. Real Apollo/timer regressions cover each boundary. |
 | 41. Agent secrets page assumes env spec slug equals agent slug | Remaining | Current SecretsContent still passes agent slug directly as envSpecSlug and documents that assumption; an actual association read is needed. |
 | 42. Register tool form has two duplicate close buttons | Pre-existing | AddToolForm dialog was replaced by AddToolScreen/use-add-tool page flow; duplicate dialog cancellation path is absent. |
 | 43. PageShell imports from app/, breaking the components rule | Remaining | PageShell still imports useAppChrome from an app route directory. |

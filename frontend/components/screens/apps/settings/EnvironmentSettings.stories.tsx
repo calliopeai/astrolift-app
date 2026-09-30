@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import { ENV_SETTINGS, ENVIRONMENTS, LONG } from "./app-settings-members.fixtures";
 import { EnvironmentSettingsView } from "./EnvironmentSettings";
@@ -32,5 +33,21 @@ export const LongStrings: Story = {
         settings: [{ id: "s-9", key: LONG, value: LONG }],
       } as (typeof ENVIRONMENTS)[number],
     ],
+  },
+};
+
+/** Clearing one override leaves the other rows available. */
+export const Clearing: Story = {
+  args: {
+    clearing: new Set([JSON.stringify([ENVIRONMENTS[0].id, ENVIRONMENTS[0].settings[0].key])]),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("button", { name: `Clear ${ENVIRONMENTS[0].settings[0].key} override` })
+    ).toBeDisabled();
+    await expect(
+      canvas.getByRole("button", { name: `Clear ${ENVIRONMENTS[0].settings[1].key} override` })
+    ).toBeEnabled();
   },
 };

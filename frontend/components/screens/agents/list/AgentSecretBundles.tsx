@@ -46,6 +46,7 @@ export function AgentSecretBundlesView({
   defaultAttachments,
   loading,
   busy,
+  pending,
   reveals,
   onCreate,
   onUpdate,
@@ -133,8 +134,8 @@ export function AgentSecretBundlesView({
             value={createBackendRef}
             onChange={(e) => setCreateBackendRef(e.target.value)}
           />
-          <Button onClick={handleCreate} disabled={busy === "create"}>
-            {busy === "create" ? (
+          <Button onClick={handleCreate} disabled={pending.has("create") || busy === "create"}>
+            {pending.has("create") || busy === "create" ? (
               <Loader2Icon className="size-4 animate-spin" />
             ) : (
               <PlusIcon className="size-4" />
@@ -190,7 +191,9 @@ export function AgentSecretBundlesView({
                         <Button
                           size="sm"
                           onClick={() => handleUpdate(bundle)}
-                          disabled={busy === `update:${bundle.id}`}
+                          disabled={
+                            pending.has(`update:${bundle.id}`) || busy === `update:${bundle.id}`
+                          }
                         >
                           <SaveIcon className="size-4" /> Save
                         </Button>
@@ -238,7 +241,9 @@ export function AgentSecretBundlesView({
                             size="sm"
                             variant="outline"
                             onClick={() => handleAttach(bundle, attachment)}
-                            disabled={busy === `attach:${bundle.id}`}
+                            disabled={
+                              pending.has(`attach:${bundle.id}`) || busy === `attach:${bundle.id}`
+                            }
                           >
                             <SaveIcon className="size-4" /> Save attachment
                           </Button>
@@ -265,8 +270,21 @@ export function AgentSecretBundlesView({
                               }))
                             }
                           />
-                          <Button size="sm" variant="outline" onClick={() => handleAttach(bundle)}>
-                            <LinkIcon className="size-4" /> Attach
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAttach(bundle)}
+                            disabled={
+                              pending.has(`attach:${bundle.id}`) || busy === `attach:${bundle.id}`
+                            }
+                          >
+                            {pending.has(`attach:${bundle.id}`) ||
+                            busy === `attach:${bundle.id}` ? (
+                              <Loader2Icon className="size-4 animate-spin" />
+                            ) : (
+                              <LinkIcon className="size-4" />
+                            )}{" "}
+                            Attach
                           </Button>
                         </>
                       )}
@@ -298,7 +316,11 @@ export function AgentSecretBundlesView({
                           <Button
                             size="icon-sm"
                             variant="ghost"
-                            disabled={!bundle.canReveal || busy === `key-reveal:${revealId}`}
+                            disabled={
+                              !bundle.canReveal ||
+                              pending.has(`key-reveal:${revealId}`) ||
+                              busy === `key-reveal:${revealId}`
+                            }
                             onClick={() => onRevealKey(bundle, key)}
                             aria-label={`${reveals[revealId] ? "Hide" : "Reveal"} ${key}`}
                           >
@@ -313,6 +335,10 @@ export function AgentSecretBundlesView({
                             variant="ghost"
                             onClick={() => setConfirmationTarget({ kind: "key", bundle, key })}
                             aria-label={`Delete ${key}`}
+                            disabled={
+                              pending.has(`key-delete:${bundle.id}:${key}`) ||
+                              busy === `key-delete:${bundle.id}:${key}`
+                            }
                           >
                             <Trash2Icon className="size-4" />
                           </Button>

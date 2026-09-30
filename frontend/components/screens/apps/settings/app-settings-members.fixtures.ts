@@ -215,6 +215,7 @@ export const RETENTION: RetentionPolicyViewProps = {
 // ─── environment overrides ────────────────────────────────────────────────────
 
 export const ENV_SETTINGS: EnvironmentSettingsViewProps = {
+  clearing: new Set(),
   envs: ENVIRONMENTS,
   adding: false,
   onAdd: yes,

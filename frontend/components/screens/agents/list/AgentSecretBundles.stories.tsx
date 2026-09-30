@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import { ATTACHMENT, BUNDLES, BUNDLES_LIST, LONG_BUNDLE } from "./agents-dispatch-secrets.fixtures";
 import { AgentSecretBundlesView } from "./AgentSecretBundles";
@@ -55,4 +56,21 @@ export const LongStrings: Story = {
       ]}
     />
   ),
+};
+
+export const PendingWrites: Story = {
+  render: () => (
+    <AgentSecretBundlesView
+      {...BUNDLES}
+      defaultAttachments={[]}
+      pending={new Set(["attach:bundle-1", "key-delete:bundle-1:GITHUB_APP_ID"])}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const attach = canvas.getAllByRole("button", { name: "Attach" });
+    await expect(attach[0]).toBeDisabled();
+    await expect(attach[1]).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "Delete GITHUB_APP_ID" })).toBeDisabled();
+  },
 };
