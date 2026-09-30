@@ -165,6 +165,18 @@ export const DETAIL_RUNS: PipelineDetailRun[] = RUN_ROWS.map(
 );
 
 export const DETAIL: Omit<PipelineDetailScreenProps, "secrets"> = {
+  pipeline: {
+    id: "pipeline-guid",
+    name: "Build and release",
+    repoUrl: "https://github.com/demo/app",
+    defaultBranch: "main",
+    tomlPath: "pipeline.toml",
+    createdAt: "2026-09-28T07:40:00Z",
+    updatedAt: "2026-09-28T07:40:00Z",
+  },
+  pipelineLoading: false,
+  pipelineError: null,
+  onRetryPipeline: noop,
   runsError: null,
   onRetryRuns: () => {},
   tab: "runs",

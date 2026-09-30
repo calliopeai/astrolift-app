@@ -8,9 +8,11 @@ This is an audit of current source and focused regressions, not a claim that eve
 
 ## Checks
 
-Final focused verification: **44 React/Apollo checks across 10 files**, **31 Chromium behavior/layout checks**, Storybook production build, TypeScript and ESLint (zero errors; existing effect warnings). No backend/schema changes and no production writes. The parent runs the combined release checks after integration.
+First bounded group verification: **44 React/Apollo checks across 10 files**, **31 Chromium behavior/layout checks**, Storybook production build, TypeScript and ESLint (zero errors; existing effect warnings). No backend/schema changes and no production writes. The parent runs the combined release checks after integration.
 
 Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
+
+The following seven-item slice starts from `66b902d1`: **64 React/Apollo checks across four files** (16 new operational/route checks plus existing query-state/frame regressions), **53 affected portable stories**, **13 Chromium behavior/layout checks**, Storybook production build, TypeScript and ESLint with zero warnings/errors in affected files. It uses existing queries/mutations only. Pipeline metadata refusal remains separate from the authorization of secret/run reads. Item 79 was already implemented and is corrected to Pre-existing, with an actual Apollo route regression. Other owners' later fixes are not changed by this slice.
 
 - Focused cluster/config/operational/navigation React and real Apollo tests; terminal polling and actual concurrent mutations use the real Apollo client over a controlled transport.
 - Chromium behavior checks cover actual menu admission, separate SVG paint servers, draft choice/readiness, pending rows, command target and uppercase-running input.
@@ -53,7 +55,7 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 | 31. Observability duplicates pod selection and ignores ?container= | Remaining | use-app-observability.ts still has KNOWN_SIDECARS/pickDefaultContainer and does not consume container deep-link state. |
 | 32. Agent list item Pick omits fields the schema now provides | Remaining | Agent list facade omits run-spec baseline fields; AgentControl retains save-to-set fallback notices. Verify current reads before altering DTO. |
 | 33. Run status spellings drift between terminal set and tones | Fixed | Terminal aliases are shared and case normalized; actual Apollo polling stops both task/log reads, canceled timeline is skipped. |
-| 34. Agent and apps repo pickers link to different provider routes | Remaining | AgentRepoPickerStep points at settings/source-providers, app RepoPickerStep at providers#source; shared canonical picker route remains to reconcile. |
+| 34. Agent and apps repo pickers link to different provider routes | Fixed | Agent and app repository pickers now link directly to /providers#source. The affected story and Chromium check assert the canonical destination. |
 | 35. Run content comment disagrees with StatusCell badge variants | Pre-existing | AgentRunScreen now uses StatusDot/runDot; the obsolete outline/secondary status-badge comment is absent. |
 | 36. Agent overview matches running status case-sensitively | Fixed | AgentOverview matches RUNNING case insensitively; focused React/Chromium overseer input checks. |
 | 37. Overview run mode tile shows 'Service · Service' | Pre-existing | AgentOverview uses AgentFrame.runModeLabel, which merges repeated family/mode values. |
@@ -99,7 +101,7 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 | 77. Invitation expiry badge shows NaN for unparseable dates | Pre-existing | display-logic.test.tsx verifies invalid/nonfinite invitation expiry remains unavailable. |
 | 78. 'New Pipeline' links to a route that does not exist | Pre-existing | pipelines/new has actual page/new-pipeline-client routes; it no longer falls through to a detail id of new. |
 | 79. Pipeline secrets route opens on the Runs tab | Pre-existing | usePipelineDetail selects secrets when the actual pathname ends with /secrets; this branch already honors the route independently of a tab query. |
-| 80. Pipeline detail title is always 'Pipeline' | Remaining | PipelineDetailClient still reads usePipelineDetail runs; no pipeline-name lookup is wired on this audited branch. |
+| 80. Pipeline detail title is always 'Pipeline' | Fixed | The existing GET_PIPELINE definition read supplies the visible pipeline name on both detail and secrets routes. Loading, refused and missing metadata states stay distinct; run/secret reads retain their separate gates. pipeline-route.test.tsx and Chromium verify the actual title and secrets tab. |
 | 81. Webhook row actions disable the button on every row | Fixed | Real concurrent Apollo request regression verifies synchronous same-row exclusion and independent release on transport/success; row menu uses pendingRows. |
 | 82. Create sheets default slugs the backend rejects | Fixed | Shared default slug generation obeys core/naming.py letter-start/40-char/end-alnum rules; create sheets/hooks refuse invalid submissions. |
 | 83. Create project ignores ?team= | Fixed | useProjects passes team query through dialog props; requested visible team is selected after load/reopen, unavailable request does not silently select another. |

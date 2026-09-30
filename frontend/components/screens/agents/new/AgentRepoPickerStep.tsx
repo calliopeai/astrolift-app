@@ -121,7 +121,7 @@ export function AgentRepoPickerStepView({
             )}
           </div>
           <Link
-            href="/settings/source-providers"
+            href="/providers#source"
             className="text-primary text-xs underline-offset-4 hover:underline"
           >
             Missing a host? Connect another source →
@@ -256,8 +256,8 @@ export function AgentRepoPickerStepView({
           ) : (
             <p className="text-muted-foreground text-xs">
               No repos visible to this connection. Adjust visibility scopes on{" "}
-              <Link href="/settings/source-providers" className="underline">
-                /settings/source-providers
+              <Link href="/providers#source" className="underline">
+                /providers#source
               </Link>
               .
             </p>

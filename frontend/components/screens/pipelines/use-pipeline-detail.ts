@@ -4,6 +4,9 @@ import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { GET_PIPELINE } from "@/graphql/pipelines/pipelines.queries";
+import type { AstroliftPipeline } from "@/graphql/pipelines/pipelines.types";
+
 import type { PipelineDagStage } from "@/components/viz";
 
 const GET_PIPELINE_RUNS = gql`
@@ -88,6 +91,12 @@ export function usePipelineDetail(pipelineId: string) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const definition = useQuery<{ astroliftPipeline: AstroliftPipeline | null }>(GET_PIPELINE, {
+    variables: { id: pipelineId },
+    skip: !pipelineId,
+    fetchPolicy: "cache-and-network",
+  });
+
   const rawTab = searchParams.get("tab") as PipelineDetailTab | null;
   const tab: PipelineDetailTab =
     rawTab && PIPELINE_DETAIL_TABS.includes(rawTab)
@@ -120,6 +129,12 @@ export function usePipelineDetail(pipelineId: string) {
   const runs = runsData?.astroliftPipelineRuns ?? [];
 
   return {
+    pipeline: definition.data?.astroliftPipeline ?? null,
+    pipelineLoading: definition.loading && !definition.data,
+    pipelineError: definition.error ?? null,
+    onRetryPipeline: () => {
+      void definition.refetch().catch(() => {});
+    },
     tab,
     onTabChange,
     runs,

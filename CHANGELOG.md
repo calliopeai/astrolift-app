@@ -5,6 +5,10 @@
 - Policy condition JSON passes through the existing validating parser without an
   object-only type or double assertion; Storybook fixtures use actual arrays (#2148).
 
+- Pipeline detail and secrets pages show the existing definition's actual name
+  with explicit loading/error/unavailable states. Agent repository pickers link
+  directly to the canonical Source providers section (#2148).
+
 - Environment override clears, secret bundle attachments/deletions and secret
   reference saves prevent pending repeats and show the affected action as busy.
   Reference saves use trimmed variable identities; closing or changing a secret
