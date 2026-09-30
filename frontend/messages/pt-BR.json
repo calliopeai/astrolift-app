@@ -2849,5 +2849,34 @@
       "completed": "Concluída em {at}",
       "running": "Em andamento"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "Recursos",
+      "description": "Ative ou desative os recursos em tempo de execução desta instalação e confira os recursos que exigem uma nova implantação para mudar.",
+      "loadError": "Não foi possível carregar os recursos",
+      "retry": "Tentar novamente",
+      "on": "Ativado",
+      "off": "Desativado",
+      "runtimeTitle": "Recursos em tempo de execução",
+      "runtimeDescription": "As alterações entram em vigor imediatamente em toda a instalação. Gerenciados pelo Constance; somente administradores da plataforma podem alterá-los.",
+      "runtimeEmpty": "Esta instalação não publica recursos em tempo de execução.",
+      "toggle": "Alternar {key}",
+      "installTitle": "Recursos de instalação",
+      "installDescription": "Esses recursos controlam o carregamento de aplicativos na inicialização e não podem ser alterados em tempo de execução. Altere a variável de ambiente e implante novamente. São exibidos para consulta.",
+      "installEmpty": "Esta instalação não informa recursos de instalação.",
+      "requiresRedeployLabel": "{key} (exige nova implantação)",
+      "requiresRedeploy": "Exige nova implantação: configure <code>{env}</code> e reinicie.",
+      "disableTitle": "Desativar {key}?",
+      "enableTitle": "Ativar {key}?",
+      "changeTitle": "Alterar recurso?",
+      "disableDescription": "A alteração entra em vigor imediatamente para todos os usuários desta instalação. Desativar o recurso pode ocultar telas inteiras e remover itens da barra lateral. Você pode ativá-lo novamente aqui.",
+      "enableDescription": "A alteração entra em vigor imediatamente para todos os usuários desta instalação. Ativar o recurso pode mostrar novas telas e adicionar itens à barra lateral. Você pode desativá-lo novamente aqui.",
+      "disable": "Desativar recurso",
+      "enable": "Ativar recurso",
+      "updateError": "Não foi possível atualizar o recurso.",
+      "enabled": "{key} ativado",
+      "disabled": "{key} desativado"
+    }
   }
 }

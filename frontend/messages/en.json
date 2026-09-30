@@ -3139,5 +3139,34 @@
       "completed": "Completed {at}",
       "running": "Running"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "Features",
+      "description": "Toggle runtime feature flags for this install, and review the install-time features that require a redeploy to change.",
+      "loadError": "Could not load features",
+      "retry": "Retry",
+      "on": "On",
+      "off": "Off",
+      "runtimeTitle": "Runtime flags",
+      "runtimeDescription": "Flip these live — the change takes effect immediately across the install. Backed by Constance; platform-admin only.",
+      "runtimeEmpty": "No runtime feature flags are published on this install.",
+      "toggle": "Toggle {key}",
+      "installTitle": "Install-time features",
+      "installDescription": "These gate app loading at boot and cannot be flipped at runtime — change the environment variable and redeploy. Shown for visibility.",
+      "installEmpty": "No install-time features are reported by this install.",
+      "requiresRedeployLabel": "{key} (requires redeploy)",
+      "requiresRedeploy": "Requires a redeploy — set <code>{env}</code> and restart.",
+      "disableTitle": "Disable {key}?",
+      "enableTitle": "Enable {key}?",
+      "changeTitle": "Change feature flag?",
+      "disableDescription": "This takes effect immediately for everyone on this install. Turning the flag off can hide whole surfaces and remove entries from the sidebar. You can turn it back on here.",
+      "enableDescription": "This takes effect immediately for everyone on this install. Turning the flag on can expose new surfaces and add entries to the sidebar. You can turn it back off here.",
+      "disable": "Disable flag",
+      "enable": "Enable flag",
+      "updateError": "Could not update the feature flag.",
+      "enabled": "{key} enabled",
+      "disabled": "{key} disabled"
+    }
   }
 }

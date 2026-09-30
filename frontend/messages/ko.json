@@ -2849,5 +2849,34 @@
       "completed": "{at}에 완료",
       "running": "실행 중"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "기능",
+      "description": "이 설치의 런타임 기능을 켜거나 끄고, 변경하려면 다시 배포해야 하는 설치 시 기능을 확인합니다.",
+      "loadError": "기능을 불러오지 못했습니다",
+      "retry": "다시 시도",
+      "on": "켜짐",
+      "off": "꺼짐",
+      "runtimeTitle": "런타임 기능",
+      "runtimeDescription": "변경 사항은 설치 전체에 즉시 적용됩니다. Constance에서 관리하며 플랫폼 관리자만 변경할 수 있습니다.",
+      "runtimeEmpty": "이 설치에 공개된 런타임 기능이 없습니다.",
+      "toggle": "{key} 전환",
+      "installTitle": "설치 시 기능",
+      "installDescription": "부팅 시 앱 로딩을 제어하며 실행 중에는 변경할 수 없습니다. 환경 변수를 수정하고 다시 배포하세요. 확인용으로 표시됩니다.",
+      "installEmpty": "이 설치에서 보고된 설치 시 기능이 없습니다.",
+      "requiresRedeployLabel": "{key} (다시 배포 필요)",
+      "requiresRedeploy": "다시 배포해야 합니다. <code>{env}</code>을 설정하고 다시 시작하세요.",
+      "disableTitle": "{key} 기능을 끄시겠습니까?",
+      "enableTitle": "{key} 기능을 켜시겠습니까?",
+      "changeTitle": "기능을 변경하시겠습니까?",
+      "disableDescription": "이 설치의 모든 사용자에게 즉시 적용됩니다. 기능을 끄면 화면이 숨겨지고 사이드바 항목이 사라질 수 있습니다. 여기서 다시 켤 수 있습니다.",
+      "enableDescription": "이 설치의 모든 사용자에게 즉시 적용됩니다. 기능을 켜면 새 화면과 사이드바 항목이 표시될 수 있습니다. 여기서 다시 끌 수 있습니다.",
+      "disable": "기능 끄기",
+      "enable": "기능 켜기",
+      "updateError": "기능을 업데이트하지 못했습니다.",
+      "enabled": "{key} 기능을 켰습니다",
+      "disabled": "{key} 기능을 껐습니다"
+    }
   }
 }

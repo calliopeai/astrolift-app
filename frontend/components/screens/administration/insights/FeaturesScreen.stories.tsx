@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import spanish from "@/messages/es.json";
 
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
 
@@ -82,3 +84,20 @@ function Sectioned({ initial }: { initial: string | null }) {
 export const RuntimeSection: Story = { render: () => <Sectioned initial={null} /> };
 
 export const InstallTimeSection: Story = { render: () => <Sectioned initial="install-time" /> };
+
+/** Expanded translated controls at the console minimum width. */
+export const SpanishWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }}>
+        <FeaturesScreen {...FEATURES} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("switch", { name: "Cambiar admin.cost_enabled" }));
+    const dialog = await within(document.body).findByRole("alertdialog");
+    await expect(within(dialog).getByRole("button", { name: "Activar función" })).toBeVisible();
+  },
+};

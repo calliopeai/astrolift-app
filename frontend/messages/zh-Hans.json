@@ -2849,5 +2849,34 @@
       "completed": "于 {at} 完成",
       "running": "运行中"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "功能",
+      "description": "切换此安装实例的运行时功能，并查看需要重新部署才能更改的安装时功能。",
+      "loadError": "无法加载功能",
+      "retry": "重试",
+      "on": "已启用",
+      "off": "已禁用",
+      "runtimeTitle": "运行时功能",
+      "runtimeDescription": "更改会立即在整个安装实例生效。由 Constance 管理，仅平台管理员可修改。",
+      "runtimeEmpty": "此安装实例没有发布运行时功能。",
+      "toggle": "切换 {key}",
+      "installTitle": "安装时功能",
+      "installDescription": "这些功能控制启动时的应用加载，无法在运行时切换。请修改环境变量并重新部署。此处仅供查看。",
+      "installEmpty": "此安装实例未报告安装时功能。",
+      "requiresRedeployLabel": "{key}（需要重新部署）",
+      "requiresRedeploy": "需要重新部署：设置 <code>{env}</code> 后重启。",
+      "disableTitle": "禁用 {key}？",
+      "enableTitle": "启用 {key}？",
+      "changeTitle": "更改功能？",
+      "disableDescription": "更改会立即对本安装实例的所有用户生效。禁用功能可能隐藏整个页面并移除侧边栏条目。你可以在此重新启用。",
+      "enableDescription": "更改会立即对本安装实例的所有用户生效。启用功能可能显示新页面并添加侧边栏条目。你可以在此重新禁用。",
+      "disable": "禁用功能",
+      "enable": "启用功能",
+      "updateError": "无法更新功能。",
+      "enabled": "已启用 {key}",
+      "disabled": "已禁用 {key}"
+    }
   }
 }

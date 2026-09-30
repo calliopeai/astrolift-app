@@ -2852,5 +2852,34 @@
       "completed": "Completada el {at}",
       "running": "En curso"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "Funciones",
+      "description": "Activa o desactiva las funciones de esta instalación y revisa las que requieren un nuevo despliegue para cambiar.",
+      "loadError": "No se pudieron cargar las funciones",
+      "retry": "Reintentar",
+      "on": "Activada",
+      "off": "Desactivada",
+      "runtimeTitle": "Funciones en tiempo de ejecución",
+      "runtimeDescription": "Los cambios se aplican de inmediato a toda la instalación. Gestionadas por Constance; solo para administradores de la plataforma.",
+      "runtimeEmpty": "Esta instalación no publica funciones modificables en tiempo de ejecución.",
+      "toggle": "Cambiar {key}",
+      "installTitle": "Funciones de instalación",
+      "installDescription": "Estas funciones controlan la carga de aplicaciones al arrancar y no se pueden cambiar en tiempo de ejecución. Modifica la variable de entorno y vuelve a desplegar. Se muestran como referencia.",
+      "installEmpty": "Esta instalación no informa de funciones de instalación.",
+      "requiresRedeployLabel": "{key} (requiere volver a desplegar)",
+      "requiresRedeploy": "Requiere volver a desplegar: configura <code>{env}</code> y reinicia.",
+      "disableTitle": "¿Desactivar {key}?",
+      "enableTitle": "¿Activar {key}?",
+      "changeTitle": "¿Cambiar la función?",
+      "disableDescription": "El cambio se aplica de inmediato a todos los usuarios de esta instalación. Desactivar la función puede ocultar pantallas y quitar entradas de la barra lateral. Puedes volver a activarla aquí.",
+      "enableDescription": "El cambio se aplica de inmediato a todos los usuarios de esta instalación. Activar la función puede mostrar pantallas nuevas y añadir entradas a la barra lateral. Puedes volver a desactivarla aquí.",
+      "disable": "Desactivar función",
+      "enable": "Activar función",
+      "updateError": "No se pudo actualizar la función.",
+      "enabled": "{key} activada",
+      "disabled": "{key} desactivada"
+    }
   }
 }

@@ -2849,5 +2849,34 @@
       "completed": "{at} に完了",
       "running": "実行中"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "機能",
+      "description": "このインストールの実行時機能を切り替え、変更に再デプロイが必要な機能を確認します。",
+      "loadError": "機能を読み込めませんでした",
+      "retry": "再試行",
+      "on": "有効",
+      "off": "無効",
+      "runtimeTitle": "実行時機能",
+      "runtimeDescription": "変更はインストール全体に即座に反映されます。Constanceで管理され、プラットフォーム管理者のみ変更できます。",
+      "runtimeEmpty": "このインストールには公開された実行時機能がありません。",
+      "toggle": "{key}を切り替える",
+      "installTitle": "インストール時の機能",
+      "installDescription": "起動時のアプリ読み込みを制御する機能です。実行中には変更できません。環境変数を変更して再デプロイしてください。ここでは情報として表示しています。",
+      "installEmpty": "このインストールからインストール時の機能は報告されていません。",
+      "requiresRedeployLabel": "{key}（再デプロイが必要）",
+      "requiresRedeploy": "再デプロイが必要です。<code>{env}</code>を設定して再起動してください。",
+      "disableTitle": "{key}を無効にしますか？",
+      "enableTitle": "{key}を有効にしますか？",
+      "changeTitle": "機能を変更しますか？",
+      "disableDescription": "変更はこのインストールのすべてのユーザーに即座に反映されます。無効にすると画面が非表示になり、サイドバーの項目が削除される場合があります。ここで再び有効にできます。",
+      "enableDescription": "変更はこのインストールのすべてのユーザーに即座に反映されます。有効にすると新しい画面やサイドバーの項目が表示される場合があります。ここで再び無効にできます。",
+      "disable": "機能を無効にする",
+      "enable": "機能を有効にする",
+      "updateError": "機能を更新できませんでした。",
+      "enabled": "{key}を有効にしました",
+      "disabled": "{key}を無効にしました"
+    }
   }
 }

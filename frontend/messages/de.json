@@ -2852,5 +2852,34 @@
       "completed": "Abgeschlossen am {at}",
       "running": "Wird ausgeführt"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "Funktionen",
+      "description": "Aktiviere oder deaktiviere Laufzeitfunktionen dieser Installation und prüfe Funktionen, deren Änderung eine erneute Bereitstellung erfordert.",
+      "loadError": "Funktionen konnten nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "on": "Aktiviert",
+      "off": "Deaktiviert",
+      "runtimeTitle": "Laufzeitfunktionen",
+      "runtimeDescription": "Änderungen gelten sofort für die gesamte Installation. Durch Constance verwaltet; nur für Plattformadministratoren.",
+      "runtimeEmpty": "Diese Installation veröffentlicht keine Laufzeitfunktionen.",
+      "toggle": "{key} umschalten",
+      "installTitle": "Installationsfunktionen",
+      "installDescription": "Diese Funktionen steuern das Laden von Anwendungen beim Start und lassen sich nicht zur Laufzeit ändern. Ändere die Umgebungsvariable und stelle die Installation erneut bereit. Die Anzeige dient zur Information.",
+      "installEmpty": "Diese Installation meldet keine Installationsfunktionen.",
+      "requiresRedeployLabel": "{key} (erneute Bereitstellung erforderlich)",
+      "requiresRedeploy": "Erneute Bereitstellung erforderlich: Setze <code>{env}</code> und starte neu.",
+      "disableTitle": "{key} deaktivieren?",
+      "enableTitle": "{key} aktivieren?",
+      "changeTitle": "Funktion ändern?",
+      "disableDescription": "Die Änderung gilt sofort für alle Nutzer dieser Installation. Das Deaktivieren kann ganze Ansichten ausblenden und Einträge aus der Seitenleiste entfernen. Du kannst die Funktion hier wieder aktivieren.",
+      "enableDescription": "Die Änderung gilt sofort für alle Nutzer dieser Installation. Das Aktivieren kann neue Ansichten und Einträge in der Seitenleiste sichtbar machen. Du kannst die Funktion hier wieder deaktivieren.",
+      "disable": "Funktion deaktivieren",
+      "enable": "Funktion aktivieren",
+      "updateError": "Die Funktion konnte nicht aktualisiert werden.",
+      "enabled": "{key} aktiviert",
+      "disabled": "{key} deaktiviert"
+    }
   }
 }

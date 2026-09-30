@@ -2852,5 +2852,34 @@
       "completed": "Terminée le {at}",
       "running": "En cours"
     }
+  },
+  "administration": {
+    "features": {
+      "title": "Fonctionnalités",
+      "description": "Activez ou désactivez les fonctionnalités de cette installation et consultez celles dont la modification nécessite un redéploiement.",
+      "loadError": "Impossible de charger les fonctionnalités",
+      "retry": "Réessayer",
+      "on": "Activée",
+      "off": "Désactivée",
+      "runtimeTitle": "Fonctionnalités à chaud",
+      "runtimeDescription": "Les changements prennent effet immédiatement dans toute cette installation. Gérées par Constance ; réservées aux administrateurs de la plateforme.",
+      "runtimeEmpty": "Cette installation ne publie aucune fonctionnalité modifiable à chaud.",
+      "toggle": "Basculer {key}",
+      "installTitle": "Fonctionnalités à l’installation",
+      "installDescription": "Ces fonctionnalités contrôlent le chargement des applications au démarrage et ne peuvent pas être modifiées à chaud. Modifiez la variable d’environnement puis redéployez. Elles sont affichées à titre informatif.",
+      "installEmpty": "Cette installation ne signale aucune fonctionnalité définie à l’installation.",
+      "requiresRedeployLabel": "{key} (redéploiement requis)",
+      "requiresRedeploy": "Redéploiement requis : définissez <code>{env}</code> puis redémarrez.",
+      "disableTitle": "Désactiver {key} ?",
+      "enableTitle": "Activer {key} ?",
+      "changeTitle": "Modifier la fonctionnalité ?",
+      "disableDescription": "Le changement prend effet immédiatement pour tous les utilisateurs de cette installation. Désactiver la fonctionnalité peut masquer des écrans et retirer des entrées de la barre latérale. Vous pouvez la réactiver ici.",
+      "enableDescription": "Le changement prend effet immédiatement pour tous les utilisateurs de cette installation. Activer la fonctionnalité peut afficher de nouveaux écrans et ajouter des entrées à la barre latérale. Vous pouvez la désactiver ici.",
+      "disable": "Désactiver la fonctionnalité",
+      "enable": "Activer la fonctionnalité",
+      "updateError": "Impossible de mettre à jour la fonctionnalité.",
+      "enabled": "{key} activée",
+      "disabled": "{key} désactivée"
+    }
   }
 }

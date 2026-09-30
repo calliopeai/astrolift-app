@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, FlagIcon, Loader2Icon, LockIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
@@ -81,6 +82,7 @@ function FeatureRow({
   meta?: React.ReactNode;
   control: React.ReactNode;
 }) {
+  const t = useTranslations("administration.features");
   return (
     <div className="border-border/60 flex min-w-0 items-center gap-4 border-b py-3 last:border-b-0">
       <div className="min-w-0 flex-1">
@@ -100,7 +102,7 @@ function FeatureRow({
         )}
       </div>
       <Badge variant={enabled ? "secondary" : "outline"} className="shrink-0">
-        {enabled ? "On" : "Off"}
+        {enabled ? t("on") : t("off")}
       </Badge>
       <div className="shrink-0">{control}</div>
     </div>
@@ -136,22 +138,19 @@ export function FeaturesScreen({
 }: FeaturesScreenProps) {
   // A runtime flag is install-wide and takes effect for everyone the moment
   // it flips, so the switch stages the change here and the dialog commits it.
+  const t = useTranslations("administration.features");
   const [confirmFlag, setConfirmFlag] = React.useState<RuntimeFlag | null>(null);
 
   return (
-    <AdministrationShell
-      fnKey="features"
-      title="Features"
-      description="Toggle runtime feature flags for this install, and review the install-time features that require a redeploy to change."
-    >
+    <AdministrationShell fnKey="features" title={t("title")} description={t("description")}>
       {error && runtimeFlags.length === 0 && buildTimeFeatures.length === 0 ? (
         <EmptyState
           icon={<AlertTriangleIcon className="text-danger size-5" />}
-          title="Could not load features"
+          title={t("loadError")}
           description={error.message}
           secondary={
             <Button size="sm" variant="outline" onClick={onRetry}>
-              Retry
+              {t("retry")}
             </Button>
           }
         />
@@ -162,15 +161,15 @@ export function FeaturesScreen({
             sections={[
               {
                 id: "runtime",
-                title: "Runtime flags",
+                title: t("runtimeTitle"),
                 content: (
                   <Section
                     title={
                       <span className="flex items-center gap-2">
-                        <FlagIcon className="size-4" /> Runtime flags
+                        <FlagIcon className="size-4" /> {t("runtimeTitle")}
                       </span>
                     }
-                    description="Flip these live — the change takes effect immediately across the install. Backed by Constance; platform-admin only."
+                    description={t("runtimeDescription")}
                   >
                     <Card>
                       <CardContent className="flex min-w-0 flex-col">
@@ -178,7 +177,7 @@ export function FeaturesScreen({
                           <RowSkeletons />
                         ) : runtimeFlags.length === 0 ? (
                           <p className="text-muted-foreground py-6 text-center text-sm">
-                            No runtime feature flags are published on this install.
+                            {t("runtimeEmpty")}
                           </p>
                         ) : (
                           runtimeFlags.map((flag) => (
@@ -193,7 +192,7 @@ export function FeaturesScreen({
                                   pending={pendingKey === flag.key}
                                   disabled={pendingKey !== null && pendingKey !== flag.key}
                                   onToggle={() => setConfirmFlag(flag)}
-                                  label={`Toggle ${flag.key}`}
+                                  label={t("toggle", { key: flag.key })}
                                 />
                               }
                             />
@@ -206,15 +205,15 @@ export function FeaturesScreen({
               },
               {
                 id: "install-time",
-                title: "Install-time features",
+                title: t("installTitle"),
                 content: (
                   <Section
                     title={
                       <span className="flex items-center gap-2">
-                        <LockIcon className="size-4" /> Install-time features
+                        <LockIcon className="size-4" /> {t("installTitle")}
                       </span>
                     }
-                    description="These gate app loading at boot and cannot be flipped at runtime — change the environment variable and redeploy. Shown for visibility."
+                    description={t("installDescription")}
                   >
                     <Card>
                       <CardContent className="flex min-w-0 flex-col">
@@ -222,7 +221,7 @@ export function FeaturesScreen({
                           <RowSkeletons />
                         ) : buildTimeFeatures.length === 0 ? (
                           <p className="text-muted-foreground py-6 text-center text-sm">
-                            No install-time features are reported by this install.
+                            {t("installEmpty")}
                           </p>
                         ) : (
                           buildTimeFeatures.map((feat) => (
@@ -248,13 +247,15 @@ export function FeaturesScreen({
                                       <FlagSwitch
                                         checked={feat.enabled}
                                         disabled
-                                        label={`${feat.key} (requires redeploy)`}
+                                        label={t("requiresRedeployLabel", { key: feat.key })}
                                       />
                                     </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    Requires a redeploy — set{" "}
-                                    <span className="font-mono">{feat.envVar}</span> and restart.
+                                    {t.rich("requiresRedeploy", {
+                                      env: feat.envVar,
+                                      code: (chunks) => <span className="font-mono">{chunks}</span>,
+                                    })}
                                   </TooltipContent>
                                 </Tooltip>
                               }
@@ -278,15 +279,13 @@ export function FeaturesScreen({
         }}
         title={
           confirmFlag
-            ? `${confirmFlag.enabled ? "Disable" : "Enable"} ${humanizeKey(confirmFlag.key)}?`
-            : "Change feature flag?"
+            ? t(confirmFlag.enabled ? "disableTitle" : "enableTitle", {
+                key: humanizeKey(confirmFlag.key),
+              })
+            : t("changeTitle")
         }
-        description={
-          confirmFlag?.enabled
-            ? "This takes effect immediately for everyone on this install. Turning the flag off can hide whole surfaces and remove entries from the sidebar. You can turn it back on here."
-            : "This takes effect immediately for everyone on this install. Turning the flag on can expose new surfaces and add entries to the sidebar. You can turn it back off here."
-        }
-        confirmLabel={confirmFlag?.enabled ? "Disable flag" : "Enable flag"}
+        description={confirmFlag?.enabled ? t("disableDescription") : t("enableDescription")}
+        confirmLabel={t(confirmFlag?.enabled ? "disable" : "enable")}
         destructive={confirmFlag?.enabled === true}
         onConfirm={async () => {
           if (confirmFlag) await toggleFlag(confirmFlag);
