@@ -1177,7 +1177,8 @@
             "deployTokens": "Deploy tokens",
             "identity": "Workload identity roles",
             "network": "Network / integrations"
-          }
+          },
+          "unavailable": "リソースのプレビューを利用できません。"
         }
       },
       "runJob": {

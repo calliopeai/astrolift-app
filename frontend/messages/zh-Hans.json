@@ -1177,7 +1177,8 @@
             "deployTokens": "Deploy tokens",
             "identity": "Workload identity roles",
             "network": "Network / integrations"
-          }
+          },
+          "unavailable": "资源预览不可用。"
         }
       },
       "runJob": {

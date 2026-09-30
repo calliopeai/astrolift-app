@@ -1177,7 +1177,8 @@
             "deployTokens": "Deploy tokens",
             "identity": "Workload identity roles",
             "network": "Network / integrations"
-          }
+          },
+          "unavailable": "L’aperçu des ressources est indisponible."
         }
       },
       "runJob": {

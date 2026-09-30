@@ -32,6 +32,11 @@ export const Loading: Story = {
   play: async ({ canvasElement }) => openDialog(canvasElement),
 };
 
+export const Unavailable: Story = {
+  args: { previewError: new Error("The current credential cannot preview this app.") },
+  play: async ({ canvasElement }) => openDialog(canvasElement),
+};
+
 export const Empty: Story = {
   args: {
     preview: {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Deregistration loads its authorized resource preview before displaying the
+  count badge, refreshes on confirmation and treats unavailable/refused reads
+  as unknown. Confirmation waits for a usable preview (#2148).
+
 - Policy condition JSON passes through the existing validating parser without an
   object-only type or double assertion; Storybook fixtures use actual arrays (#2148).
 

@@ -1177,7 +1177,8 @@
             "deployTokens": "Deploy tokens",
             "identity": "Workload identity roles",
             "network": "Network / integrations"
-          }
+          },
+          "unavailable": "리소스 미리보기를 사용할 수 없습니다."
         }
       },
       "runJob": {

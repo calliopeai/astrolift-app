@@ -1708,7 +1708,8 @@
             "deployTokens": "Deploy tokens",
             "identity": "Workload identity roles",
             "network": "Network / integrations"
-          }
+          },
+          "unavailable": "Resource preview unavailable."
         }
       },
       "runJob": {

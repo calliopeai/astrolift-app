@@ -323,6 +323,7 @@ export const DANGER_ZONE: DangerZoneViewProps = {
   loading: false,
   preview: null,
   previewLoading: false,
+  previewError: undefined,
   stillLive: [],
   loadPreview: () => {},
   onDeregister: yes,
