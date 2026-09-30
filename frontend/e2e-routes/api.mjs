@@ -21,10 +21,200 @@ const permissions = [
   ).matchAll(/^  "([^"]+)",/gm),
 ].map(([_, slug]) => slug);
 const id = "11111111-1111-4111-8111-111111111111";
+const sharedModelId = "22222222-2222-4222-8222-222222222222";
+const sharedClusterId = "33333333-3333-4333-8333-333333333333";
+const sharedProviderId = "44444444-4444-4444-8444-444444444444";
+const observedAt = "2026-09-30T15:30:00Z";
 const object = (extra = {}) => ({ ...extra });
 const observations = { errors: [], mutations: 0, promptInvocations: [] };
+const sharedResources = {
+  cpuRequest: "2",
+  memoryRequest: "8Gi",
+  gpuCount: 0,
+  replicas: 1,
+  cpuKvCacheGiB: 2,
+};
+const sharedModel = {
+  id: sharedModelId,
+  version: 5,
+  name: "Controlled shared CPU model",
+  organizationId: id,
+  clusterId: sharedClusterId,
+  providerId: sharedProviderId,
+  clusterSlug: "shared-fixture",
+  clusterName: "Controlled shared cluster",
+  modelRepo: "Qwen/Qwen3-0.6B",
+  revisionSha: "a".repeat(40),
+  computeMode: "cpu",
+  subscriptionsEnabled: true,
+  runtimeSupported: true,
+  runtimeReason: null,
+  status: "active",
+  reason: null,
+  ready: true,
+  readinessObservedAt: observedAt,
+  readinessGeneration: 3,
+  desiredSubscriptionRevision: 2,
+  appliedSubscriptionRevision: 2,
+  operationId: "controlled-shared-reconcile",
+  operationStartedAt: observedAt,
+  operationCompletedAt: observedAt,
+  desiredResources: sharedResources,
+  appliedResources: sharedResources,
+};
+const hubModel = {
+  repoId: sharedModel.modelRepo,
+  revisionSha: sharedModel.revisionSha,
+  author: "Qwen",
+  pipelineTag: "text-generation",
+  library: "transformers",
+  license: "apache-2.0",
+  gated: "NONE",
+  architectures: ["Qwen3ForCausalLM"],
+  downloads: 0,
+  likes: 0,
+  compatibility: "UNKNOWN",
+};
+const measurement = (key, unit, amount, state = "AVAILABLE") => ({
+  key,
+  unit,
+  value: amount,
+  state,
+  source: state === "UNSUPPORTED" ? "unsupported_device_pod_mapping" : "controlled_prometheus",
+  observedAt: state === "AVAILABLE" ? observedAt : null,
+  aggregationWindowSeconds: 0,
+  samples: [],
+});
 function value(type, field, args, role) {
   if (isNonNullType(type)) return value(type.ofType, field, args, role);
+  if (field === "clusterModelDeploymentsPage")
+    return object({
+      items: [sharedModel],
+      totalCount: 1,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelDeployment") return args.id === sharedModelId ? sharedModel : null;
+  if (field === "clusterModelSubscriptionsPage" || field === "clusterModelSubscriptionTargetsPage")
+    return object({
+      items: [],
+      totalCount: 0,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelPlacementClustersPage")
+    return object({
+      items: [
+        object({
+          id: sharedClusterId,
+          providerId: sharedProviderId,
+          name: sharedModel.clusterName,
+          slug: sharedModel.clusterSlug,
+          region: "us-west-2",
+        }),
+      ],
+      totalCount: 1,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelRuntimeAdmission")
+    return object({
+      eligible: role === "owner",
+      reason: null,
+      runtimeVersion: "0.15.1+cpu",
+      architecture: "amd64",
+      hardwareAdmission: "unknown",
+    });
+  if (field === "astroliftHuggingFaceModels")
+    return object({
+      state: "AVAILABLE",
+      source: "controlled_hub_transport",
+      observedAt,
+      nextCursor: null,
+      retryAfterSeconds: null,
+      items: [hubModel],
+    });
+  if (field === "astroliftHuggingFaceModel")
+    return object({
+      state: "AVAILABLE",
+      source: "controlled_hub_transport",
+      observedAt,
+      retryAfterSeconds: null,
+      model: args.repoId === hubModel.repoId ? hubModel : null,
+    });
+  if (field === "astroliftSharedModelPromptReadiness")
+    return object({
+      state: role === "owner" ? "READY" : "UNAVAILABLE",
+      eligible: role === "owner",
+      maxPromptChars: 4000,
+      maxOutputTokens: 128,
+      promptsPerMinute: 6,
+      maxWaitSeconds: 40,
+    });
+  if (field === "astroliftModelDeploymentMetrics")
+    return object({
+      serviceId: args.serviceId,
+      clusterId: args.expectedClusterId,
+      start: args.start,
+      end: args.end,
+      retrievedAt: observedAt,
+      stepSeconds: 30,
+      scope: "deployment_aggregate_not_app_attributed",
+      sampleLimit: 120,
+      metrics: [
+        measurement("requests_waiting", "count", 0),
+        measurement("vram_usage", "bytes", null, "UNSUPPORTED"),
+      ],
+    });
+  if (field === "astroliftClusterModelDensity") {
+    const resourceTotals = {
+      source: "persisted_model_configuration",
+      observedAt,
+      replicas: 1,
+      cpuCoresPerReplica: 2,
+      memoryBytesPerReplica: 8589934592,
+      gpuDevicesPerReplica: 0,
+      gpuResource: null,
+      totalCpuCores: 2,
+      totalMemoryBytes: 8589934592,
+      totalGpuDevices: 0,
+    };
+    return object({
+      clusterId: args.clusterId,
+      start: args.start,
+      end: args.end,
+      retrievedAt: observedAt,
+      modelCount: 1,
+      returnedCount: 1,
+      inventoryLimit: 20,
+      truncated: false,
+      scope: "organization_cluster_owned_models",
+      source: "persisted_model_inventory",
+      capacity: object({
+        state: "UNSUPPORTED",
+        source: "unsupported_tenant_node_pool_mapping",
+        observedAt: null,
+        gpuDevices: [],
+        cpuCores: null,
+        memoryBytes: null,
+        vramBytes: null,
+        freshnessSeconds: 1800,
+      }),
+      items: [
+        object({
+          serviceId: sharedModelId,
+          name: sharedModel.name,
+          status: "active",
+          desired: resourceTotals,
+          applied: resourceTotals,
+          observations: [measurement("ready_replicas", "count", 1)],
+        }),
+      ],
+    });
+  }
   if (field === "astroliftModelEndpointsPage")
     return object({
       items: [
@@ -88,7 +278,7 @@ function value(type, field, args, role) {
         "admin.quotas_enabled",
       ].map((key) => object({ key, enabled: true }));
     if (field === "modules")
-      return ["apps", "agents", "workflows", "admin"].map((key) => object({ key }));
+      return ["apps", "agents", "workflows", "admin", "models"].map((key) => object({ key }));
     if (field === "astroliftMyPermissions")
       return role === "owner"
         ? permissions
@@ -182,6 +372,30 @@ createServer(async (req, res) => {
       rootValue: {},
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
+          if (
+            info.fieldName === "testSharedModelEndpoint" &&
+            role === "owner" &&
+            args.input.managedServiceId === sharedModelId &&
+            args.input.expectedClusterId === sharedClusterId &&
+            args.input.expectedProviderId === sharedProviderId &&
+            args.input.expectedVersion === 5 &&
+            args.input.prompt === "Answer shared 2 plus 2 for the local browser regression."
+          ) {
+            observations.promptInvocations.push({ ...args.input });
+            return object({
+              ok: true,
+              errors: [],
+              data: object({
+                status: "succeeded",
+                reply: "4",
+                latencyMs: 120,
+                promptTokens: 9,
+                completionTokens: 1,
+                totalTokens: 10,
+                error: "",
+              }),
+            });
+          }
           if (
             info.fieldName === "testModelEndpoint" &&
             role === "owner" &&
