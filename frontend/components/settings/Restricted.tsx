@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { useDisplayPrefs, type RestrictedSettings } from "@/lib/display-prefs";
 
@@ -19,19 +20,14 @@ export interface RestrictedProps {
   children: React.ReactNode;
 }
 
-export function Restricted({
-  allowed,
-  permission,
-  verb = "Changing these",
-  mode,
-  children,
-}: RestrictedProps) {
+export function Restricted({ allowed, permission, verb, mode, children }: RestrictedProps) {
+  const t = useTranslations("shared.restricted");
   const effective = useRestrictedMode(mode);
   if (allowed) return <>{children}</>;
   if (effective === "hide") return null;
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <PermissionNote permission={permission} verb={verb} />
+      <PermissionNote permission={permission} verb={verb ?? t("changing")} />
       <fieldset disabled className="min-w-0">
         {children}
       </fieldset>
@@ -46,11 +42,16 @@ export function useRestrictedMode(mode?: RestrictedSettings): RestrictedSettings
 }
 
 export function PermissionNote({ permission, verb }: { permission: string; verb: string }) {
+  const t = useTranslations("shared.restricted");
   return (
     <p className="bg-muted text-muted-foreground rounded-md border px-3 py-2 text-sm">
-      {verb} needs the{" "}
-      <code className="text-foreground font-mono [overflow-wrap:anywhere]">{permission}</code>{" "}
-      permission.
+      {t.rich("needsPermission", {
+        verb,
+        permission,
+        code: (chunks) => (
+          <code className="text-foreground font-mono [overflow-wrap:anywhere]">{chunks}</code>
+        ),
+      })}
     </p>
   );
 }

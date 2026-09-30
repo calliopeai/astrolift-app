@@ -3936,6 +3936,20 @@
         "type": "入力して検索してください。",
         "pick": "{name} を選択"
       }
+    },
+    "settings": {
+      "sections": "設定セクション一覧",
+      "section": "設定セクション",
+      "dangerZone": "危険な操作",
+      "dangerDescription": "これらの操作は元に戻せません。実行前にそれぞれ確認を求めます。",
+      "readOnly": "これらの設定は閲覧できます。変更するには <code>{permission}</code> 権限が必要です。",
+      "save": "保存",
+      "saving": "保存中…",
+      "cancel": "キャンセル"
+    },
+    "restricted": {
+      "changing": "これらの設定の変更",
+      "needsPermission": "「{verb}」には <code>{permission}</code> 権限が必要です。"
     }
   },
   "agentSecrets": {

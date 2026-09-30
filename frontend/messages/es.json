@@ -3939,6 +3939,20 @@
         "type": "Escribe para buscar.",
         "pick": "Seleccionar {name}"
       }
+    },
+    "settings": {
+      "sections": "Secciones de ajustes",
+      "section": "Sección de ajustes",
+      "dangerZone": "Zona de peligro",
+      "dangerDescription": "Estas acciones no se pueden deshacer. Cada una pide confirmación antes de ejecutarse.",
+      "readOnly": "Puedes ver estos ajustes. Para cambiarlos necesitas el permiso <code>{permission}</code>.",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "cancel": "Cancelar"
+    },
+    "restricted": {
+      "changing": "Cambiar estos ajustes",
+      "needsPermission": "Para esta acción ({verb}) necesitas el permiso <code>{permission}</code>."
     }
   },
   "agentSecrets": {

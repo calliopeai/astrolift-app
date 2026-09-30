@@ -5,6 +5,10 @@
 - Translate shared principal search, empty/error states and selection controls in all eight locales, preserving provider diagnostics and selected identities (#2145).
 
 - Translate grant-source phrases, principal removal labels and Home’s app ownership note in all eight locales while preserving identifiers, edit links and callbacks (#2145).
+- Shared settings navigation, danger-zone notices, default save/cancel actions
+  and read-only permission sentences use all eight locales. Actual permission
+  IDs, caller labels, server diagnostics and draft/retry behavior are preserved
+  (#2145).
 
 - The explicit agent environment-spec picker translates access boundaries,
   shared-recipe notices, search and pagination in all eight locales (#2145).

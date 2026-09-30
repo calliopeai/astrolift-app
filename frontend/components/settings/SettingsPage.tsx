@@ -35,6 +35,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -90,6 +91,7 @@ export function SettingsPage({
   single,
   className,
 }: SettingsPageProps) {
+  const t = useTranslations("shared.settings");
   // A person who hides what they can't change sees only the notice on a
   // page that is read-only as a whole.
   const hideAll = useRestrictedMode(restrictedMode) === "hide" && Boolean(readOnly);
@@ -97,7 +99,7 @@ export function SettingsPage({
   const dangerZone = hideAll ? undefined : danger;
   const nav = [
     ...sections.map((s) => ({ id: s.id, title: s.title })),
-    ...(dangerZone ? [{ id: DANGER_ID, title: "Danger zone" }] : []),
+    ...(dangerZone ? [{ id: DANGER_ID, title: t("dangerZone") }] : []),
   ];
   const [scrolledTo, setScrolledTo] = React.useState(nav[0]?.id);
   const active = single ? (nav.find((n) => n.id === single.active) ?? nav[0])?.id : scrolledTo;
@@ -115,13 +117,10 @@ export function SettingsPage({
   return (
     <ReadOnlyContext.Provider value={readOnly}>
       <div className={cn("flex min-w-0 flex-col gap-6 md:flex-row md:items-start", className)}>
-        <nav
-          aria-label="Settings sections"
-          className="min-w-0 md:sticky md:top-6 md:w-48 md:shrink-0"
-        >
+        <nav aria-label={t("sections")} className="min-w-0 md:sticky md:top-6 md:w-48 md:shrink-0">
           <div className="md:hidden">
             <Select value={active} onValueChange={go}>
-              <SelectTrigger aria-label="Settings section" className="w-full">
+              <SelectTrigger aria-label={t("section")} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -179,8 +178,8 @@ export function SettingsPage({
           {dangerZone && shown(DANGER_ID) && (
             <div id={DANGER_ID} className="min-w-0 scroll-mt-6">
               <Section
-                title="Danger zone"
-                description="These cannot be undone. Each one asks before it runs."
+                title={t("dangerZone")}
+                description={t("dangerDescription")}
                 className="border-danger-border rounded-md border p-4"
               >
                 <fieldset disabled={Boolean(readOnly)} className="flex min-w-0 flex-col divide-y">
@@ -206,11 +205,15 @@ function navItemClass(isActive: boolean, id: string) {
 }
 
 function ReadOnlyNotice({ permission }: { permission: string }) {
+  const t = useTranslations("shared.settings");
   return (
     <p className="bg-muted text-muted-foreground rounded-md border px-3 py-2 text-sm">
-      You can view these settings. Changing them needs the{" "}
-      <code className="text-foreground font-mono [overflow-wrap:anywhere]">{permission}</code>{" "}
-      permission.
+      {t.rich("readOnly", {
+        permission,
+        code: (chunks) => (
+          <code className="text-foreground font-mono [overflow-wrap:anywhere]">{chunks}</code>
+        ),
+      })}
     </p>
   );
 }
@@ -247,8 +250,9 @@ export function SettingsSection({
   dirty = false,
   saving = false,
   error,
-  saveLabel = "Save",
+  saveLabel,
 }: SettingsSectionProps) {
+  const t = useTranslations("shared.settings");
   const readOnly = React.useContext(ReadOnlyContext);
   return (
     <Section title={title} description={description} divided>
@@ -280,11 +284,11 @@ export function SettingsSection({
                 onClick={onCancel}
                 disabled={!dirty || saving}
               >
-                Cancel
+                {t("cancel")}
               </Button>
             )}
             <Button type="submit" size="sm" disabled={!dirty || saving}>
-              {saving ? "Saving…" : saveLabel}
+              {saving ? t("saving") : (saveLabel ?? t("save"))}
             </Button>
           </div>
         )}

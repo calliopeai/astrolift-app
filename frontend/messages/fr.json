@@ -3939,6 +3939,20 @@
         "type": "Saisissez votre recherche.",
         "pick": "Sélectionner {name}"
       }
+    },
+    "settings": {
+      "sections": "Sections des paramètres",
+      "section": "Section des paramètres",
+      "dangerZone": "Zone de danger",
+      "dangerDescription": "Ces actions sont irréversibles. Chacune demande une confirmation avant de s’exécuter.",
+      "readOnly": "Vous pouvez consulter ces paramètres. Pour les modifier, l’autorisation <code>{permission}</code> est nécessaire.",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "cancel": "Annuler"
+    },
+    "restricted": {
+      "changing": "Modifier ces paramètres",
+      "needsPermission": "L’action « {verb} » nécessite l’autorisation <code>{permission}</code>."
     }
   },
   "agentSecrets": {

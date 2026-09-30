@@ -3936,6 +3936,20 @@
         "type": "Digite para buscar.",
         "pick": "Selecionar {name}"
       }
+    },
+    "settings": {
+      "sections": "Seções de configurações",
+      "section": "Seção de configurações",
+      "dangerZone": "Zona de perigo",
+      "dangerDescription": "Estas ações não podem ser desfeitas. Cada uma pede confirmação antes de ser executada.",
+      "readOnly": "Você pode visualizar estas configurações. Para alterá-las, é necessária a permissão <code>{permission}</code>.",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "cancel": "Cancelar"
+    },
+    "restricted": {
+      "changing": "Alterar estas configurações",
+      "needsPermission": "Para a ação “{verb}”, é necessária a permissão <code>{permission}</code>."
     }
   },
   "agentSecrets": {

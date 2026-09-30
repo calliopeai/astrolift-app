@@ -4016,6 +4016,20 @@
         "type": "Type to search.",
         "pick": "Pick {name}"
       }
+    },
+    "settings": {
+      "sections": "Settings sections",
+      "section": "Settings section",
+      "dangerZone": "Danger zone",
+      "dangerDescription": "These cannot be undone. Each one asks before it runs.",
+      "readOnly": "You can view these settings. Changing them needs the <code>{permission}</code> permission.",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "restricted": {
+      "changing": "Changing these",
+      "needsPermission": "{verb} needs the <code>{permission}</code> permission."
     }
   },
   "agentSecrets": {

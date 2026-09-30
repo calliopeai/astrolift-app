@@ -3939,6 +3939,20 @@
         "type": "Zum Suchen Text eingeben.",
         "pick": "{name} auswählen"
       }
+    },
+    "settings": {
+      "sections": "Einstellungsbereiche",
+      "section": "Einstellungsbereich",
+      "dangerZone": "Gefahrenbereich",
+      "dangerDescription": "Diese Aktionen können nicht rückgängig gemacht werden. Jede Aktion erfordert vor der Ausführung eine Bestätigung.",
+      "readOnly": "Du kannst diese Einstellungen ansehen. Zum Ändern benötigst du die Berechtigung <code>{permission}</code>.",
+      "save": "Speichern",
+      "saving": "Wird gespeichert…",
+      "cancel": "Abbrechen"
+    },
+    "restricted": {
+      "changing": "Diese Einstellungen ändern",
+      "needsPermission": "Für „{verb}“ benötigst du die Berechtigung <code>{permission}</code>."
     }
   },
   "agentSecrets": {

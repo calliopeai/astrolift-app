@@ -3936,6 +3936,20 @@
         "type": "输入搜索内容。",
         "pick": "选择{name}"
       }
+    },
+    "settings": {
+      "sections": "设置分区列表",
+      "section": "设置分区",
+      "dangerZone": "危险操作区",
+      "dangerDescription": "这些操作无法撤销。每项操作都会在执行前要求确认。",
+      "readOnly": "你可以查看这些设置。更改设置需要 <code>{permission}</code> 权限。",
+      "save": "保存",
+      "saving": "正在保存…",
+      "cancel": "取消"
+    },
+    "restricted": {
+      "changing": "更改这些设置",
+      "needsPermission": "“{verb}”操作需要 <code>{permission}</code> 权限。"
     }
   },
   "agentSecrets": {

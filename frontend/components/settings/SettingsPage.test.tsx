@@ -1,9 +1,19 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render as renderView, screen } from "@testing-library/react";
 import * as React from "react";
+import { NextIntlClientProvider } from "next-intl";
+import en from "@/messages/en.json";
 import { describe, expect, it } from "vitest";
 
 import { SettingsPage, type SettingsSectionSpec } from "./SettingsPage";
 import { sectionHref, useLocalSettingsSection } from "./use-settings-section";
+
+function render(ui: React.ReactNode) {
+  return renderView(
+    <NextIntlClientProvider locale="en" messages={en}>
+      {ui}
+    </NextIntlClientProvider>
+  );
+}
 
 const SECTIONS: SettingsSectionSpec[] = [
   { id: "config", title: "Configuration", content: <p>config editor</p> },
