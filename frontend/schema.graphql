@@ -3704,6 +3704,24 @@ type AstroliftPipelineRunPage {
   pageSize: Int
 }
 
+type AstroliftPipelineSecret {
+  id: GUID!
+  name: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftPipelineSecretChange {
+  pipelineId: GUID!
+  name: String!
+}
+
+type AstroliftPipelineSecretChangeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftPipelineSecretChange
+}
+
 type AstroliftPodResourceUsage {
   reason: AstroliftObservabilityPanelReason!
   podName: String!
@@ -6318,6 +6336,11 @@ input DeleteGroupRoleMappingInput {
   id: GUID!
 }
 
+input DeletePipelineSecretInput {
+  pipelineId: GUID!
+  name: String!
+}
+
 input DeleteRoleInput {
   id: GUID!
 }
@@ -7155,6 +7178,8 @@ type Mutation {
   deleteFormDefinition(input: DeleteFormDefinitionInput!): AstroliftFormDefinitionMutationResult!
   submitForm(slug: String!, payload: JSON!): AstroliftFormSubmissionMutationResult!
   updateSubmissionStatus(submissionId: GUID!, status: String!): AstroliftFormSubmissionMutationResult!
+  setPipelineSecret(input: SetPipelineSecretInput!): AstroliftPipelineSecretChangeMutationResult!
+  deletePipelineSecret(input: DeletePipelineSecretInput!): AstroliftPipelineSecretChangeMutationResult!
   createPipeline(input: CreatePipelineInput!): AstroliftPipelineMutationResult!
   updatePipeline(id: GUID!, input: UpdatePipelineInput!): AstroliftPipelineMutationResult!
   deletePipeline(id: GUID!): AstroliftPipelineMutationResult!
@@ -7860,6 +7885,7 @@ type Query {
   formDefinition(slug: String!): AstroliftFormDefinition
   formSubmissions(slug: String!, status: String = null): [AstroliftFormSubmission!]!
   formFieldTypes: [String!]!
+  astroliftPipelineSecrets(pipelineId: GUID!): [AstroliftPipelineSecret!]!
   astroliftPipelines(limit: Int! = 100): [AstroliftPipeline!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage.")
   astroliftPipelinesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftPipelinePage!
   astroliftPipeline(id: String!): AstroliftPipeline
@@ -8450,6 +8476,12 @@ input SetNotificationProfileInput {
 input SetOrganizationModuleInput {
   key: String!
   enabled: Boolean!
+}
+
+input SetPipelineSecretInput {
+  pipelineId: GUID!
+  name: String!
+  value: String!
 }
 
 input SetPreviewPinnedInput {

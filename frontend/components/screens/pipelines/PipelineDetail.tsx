@@ -4,6 +4,7 @@ import { QueryError } from "@/components/QueryError";
 
 import { ActivityIcon, DownloadIcon, ScrollIcon, SettingsIcon, UsersIcon } from "lucide-react";
 import type * as React from "react";
+import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ const TAB_LABELS: Record<PipelineDetailTab, string> = {
 };
 
 export type PipelineDetailScreenProps = ReturnType<typeof usePipelineDetail> & {
+  pipelineId?: string;
   /** The latest run's graph (a RunGraphView behind its hook), keyed on the run id. */
   runGraph?: React.ReactNode;
   /** The Secrets tab (a PipelineSecretsView behind its hook). */
@@ -43,25 +45,37 @@ export function PipelineDetailScreen({
   onRetryRuns,
   runGraph,
   secrets,
+  pipelineId,
 }: PipelineDetailScreenProps) {
   return (
     <div className="space-y-4">
       {/* Tab bar */}
       <div className="flex gap-1 border-b pb-0">
-        {PIPELINE_DETAIL_TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => onTabChange(t)}
-            className={[
-              "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-              t === tab
-                ? "border-primary text-foreground"
-                : "text-muted-foreground hover:text-foreground border-transparent",
-            ].join(" ")}
-          >
-            {TAB_LABELS[t]}
-          </button>
-        ))}
+        {PIPELINE_DETAIL_TABS.map((t) =>
+          t === "secrets" && pipelineId ? (
+            <Link
+              key={t}
+              href={`/pipelines/${pipelineId}/secrets`}
+              aria-current={tab === t ? "page" : undefined}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${t === tab ? "border-primary text-foreground" : "text-muted-foreground hover:text-foreground border-transparent"}`}
+            >
+              {TAB_LABELS[t]}
+            </Link>
+          ) : (
+            <button
+              key={t}
+              onClick={() => onTabChange(t)}
+              className={[
+                "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                t === tab
+                  ? "border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground border-transparent",
+              ].join(" ")}
+            >
+              {TAB_LABELS[t]}
+            </button>
+          )
+        )}
       </div>
 
       {/* Runs tab — latest-run DAG + run list (#107) */}

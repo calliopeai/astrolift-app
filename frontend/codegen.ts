@@ -41,11 +41,6 @@ const config: CodegenConfig = {
     "!graphql/forms/forms.queries.ts",
     "!graphql/forms/forms.mutations.ts",
     "!graphql/permissions/permissions.queries.ts",
-    // Pipelines queries/mutations reference schema fields that don't exist yet
-    // (slug, description, secrets on AstroliftPipeline; SetPipelineSecretInput).
-    // Excluded until the backend schema catches up.
-    "!graphql/pipelines/pipelines.queries.ts",
-    "!graphql/pipelines/pipelines.mutations.ts",
     // These files interpolate PLAIN template-literal constants (bare field
     // lists, not gql-tagged fragments) into their gql documents, e.g.
     // `${AGENT_LIST_ITEM_FIELDS}`. graphql-tag-pluck can't resolve those,

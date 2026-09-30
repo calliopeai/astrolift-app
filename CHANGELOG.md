@@ -33,6 +33,19 @@
   (#2095). Both paths serialize name and namespace allocation per app, including
   duplicate concurrent requests. Explicit occupied names return validation on
   `environmentName`. See [preview naming](docs/operators/preview-names-and-workload-identity.md).
+- Pipelines expose scoped write-only secret APIs backed by encrypted
+  `OrgSecret` storage (#2171). Secret metadata reads and writes resolve live actual owners
+  and retain bearer organization/team ceilings. Runtime dispatch reads the
+  same pipeline namespace, refuses stale owners and does not fall back to
+  bare or sibling names. The Secrets route opens its section; failed refreshes
+  after committed writes remain distinct from rejected writes. See
+  [pipeline secret access](docs/operators/pipeline-secrets-access.md).
+
+- App cards provide separate app, pin and failed-deployment keyboard actions
+  without nested links or buttons (#2144). Email bounce and complaint details
+  expose their disclosure state and named details region. The one-time webhook
+  secret reveal uses the shared modal with a title, description, focus trap,
+  Escape dismissal and focus return after rotation.
 
 - Core legacy APIs enforce active account, platform-operator and bearer
   ceilings without removing GraphQL declarations (#2110). Permission analysis

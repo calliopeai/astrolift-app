@@ -3539,6 +3539,24 @@ export type AstroliftPipelineRunPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftPipelineSecret = {
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftPipelineSecretChange = {
+  name: Scalars['String']['output'];
+  pipelineId: Scalars['GUID']['output'];
+};
+
+export type AstroliftPipelineSecretChangeMutationResult = {
+  data?: Maybe<AstroliftPipelineSecretChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftPodResourceUsage = {
   lastRestartAt?: Maybe<Scalars['DateTime']['output']>;
   podName: Scalars['String']['output'];
@@ -5947,6 +5965,11 @@ export type DeleteGroupRoleMappingInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DeletePipelineSecretInput = {
+  name: Scalars['String']['input'];
+  pipelineId: Scalars['GUID']['input'];
+};
+
 export type DeleteRoleInput = {
   id: Scalars['GUID']['input'];
 };
@@ -6508,6 +6531,7 @@ export type Mutation = {
   deleteGroupRoleMapping: SoftdeletepayloadMutationResult;
   deleteInvitation: AstroliftInvitationMutationResult;
   deletePipeline: AstroliftPipelineMutationResult;
+  deletePipelineSecret: AstroliftPipelineSecretChangeMutationResult;
   deleteProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   deleteProjectSecretBundle: AstroliftSecretBundleMutationResult;
   deleteSkill: AstroliftSkillMutationResult;
@@ -6716,6 +6740,7 @@ export type Mutation = {
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
+  setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
@@ -7351,6 +7376,11 @@ export type MutationDeleteInvitationArgs = {
 
 export type MutationDeletePipelineArgs = {
   id: Scalars['GUID']['input'];
+};
+
+
+export type MutationDeletePipelineSecretArgs = {
+  input: DeletePipelineSecretInput;
 };
 
 
@@ -8273,6 +8303,11 @@ export type MutationSetNotificationProfileArgs = {
 
 export type MutationSetOrganizationModuleArgs = {
   input: SetOrganizationModuleInput;
+};
+
+
+export type MutationSetPipelineSecretArgs = {
+  input: SetPipelineSecretInput;
 };
 
 
@@ -9210,6 +9245,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage. */
   astroliftPipelineRuns: Array<AstroliftPipelineRun>;
   astroliftPipelineRunsPage: AstroliftPipelineRunPage;
+  astroliftPipelineSecrets: Array<AstroliftPipelineSecret>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage. */
   astroliftPipelines: Array<AstroliftPipeline>;
   astroliftPipelinesPage: AstroliftPipelinePage;
@@ -10399,6 +10435,11 @@ export type QueryAstroliftPipelineRunsPageArgs = {
 };
 
 
+export type QueryAstroliftPipelineSecretsArgs = {
+  pipelineId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftPipelinesArgs = {
   limit?: Scalars['Int']['input'];
 };
@@ -11559,6 +11600,12 @@ export type SetNotificationProfileInput = {
 export type SetOrganizationModuleInput = {
   enabled: Scalars['Boolean']['input'];
   key: Scalars['String']['input'];
+};
+
+export type SetPipelineSecretInput = {
+  name: Scalars['String']['input'];
+  pipelineId: Scalars['GUID']['input'];
+  value: Scalars['String']['input'];
 };
 
 export type SetPreviewPinnedInput = {

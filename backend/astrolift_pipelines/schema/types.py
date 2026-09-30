@@ -11,6 +11,22 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="AstroliftPipelineSecret")
+class PipelineSecretType:
+    """Secret metadata only; values and ciphertext have no GraphQL field."""
+
+    id: GUID
+    name: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftPipelineSecretChange")
+class PipelineSecretChangeType:
+    pipeline_id: GUID
+    name: str
+
+
 @strawberry.type(name="AstroliftTrigger")
 class TriggerType:
     id: GUID
