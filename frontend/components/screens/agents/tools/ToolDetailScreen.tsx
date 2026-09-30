@@ -10,7 +10,7 @@ import {
   ServerCrashIcon,
   TrashIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
@@ -78,21 +78,27 @@ export function ToolDetailScreen({
   remove,
   initialErrors = {},
 }: ToolDetailScreenProps) {
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [description, setDescription] = useState("");
-  const [adapter, setAdapter] = useState<ToolAdapter>("python_fn");
-  const [handlerRef, setHandlerRef] = useState("");
-  const [inputSchemaText, setInputSchemaText] = useState("{}");
-  const [outputSchemaText, setOutputSchemaText] = useState("{}");
+  const [name, setName] = useState(tool?.name ?? "");
+  const [slug, setSlug] = useState(tool?.slug ?? "");
+  const [description, setDescription] = useState(tool?.description ?? "");
+  const [adapter, setAdapter] = useState<ToolAdapter>(
+    (tool?.adapter as ToolAdapter) || "python_fn"
+  );
+  const [handlerRef, setHandlerRef] = useState(tool?.handlerRef ?? "");
+  const [inputSchemaText, setInputSchemaText] = useState(prettyJson(tool?.inputSchema ?? {}));
+  const [outputSchemaText, setOutputSchemaText] = useState(prettyJson(tool?.outputSchema ?? {}));
   const [errors, setErrors] = useState<ToolErrors>(initialErrors);
   const [dirty, setDirty] = useState(false);
+  const editVersion = useRef(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Seed the form when the tool loads, and again after a save.
-  useEffect(() => {
-    if (tool && !dirty) {
-      /* eslint-disable react-hooks/set-state-in-effect -- the fields copy the loaded tool until the person edits them */
+  const [sourceRecord, setSourceRecord] = useState(tool);
+  if (
+    JSON.stringify(tool) !== JSON.stringify(sourceRecord) &&
+    (!dirty || tool?.id !== sourceRecord?.id)
+  ) {
+    setSourceRecord(tool);
+    if (tool && (!dirty || tool.id !== sourceRecord?.id)) {
       setName(tool.name);
       setSlug(tool.slug);
       setDescription(tool.description);
@@ -100,12 +106,13 @@ export function ToolDetailScreen({
       setHandlerRef(tool.handlerRef);
       setInputSchemaText(prettyJson(tool.inputSchema));
       setOutputSchemaText(prettyJson(tool.outputSchema));
-      /* eslint-enable react-hooks/set-state-in-effect */
+      if (tool.id !== sourceRecord?.id) setDirty(false);
     }
-  }, [tool, dirty]);
+  }
 
   function edit<T>(set: (v: T) => void, field: ToolField) {
     return (v: T) => {
+      editVersion.current += 1;
       set(v);
       setDirty(true);
       setErrors((e) => ({ ...e, [field]: undefined, form: undefined }));
@@ -114,6 +121,7 @@ export function ToolDetailScreen({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    const version = editVersion.current;
     const found = await save({
       name,
       slug,
@@ -124,7 +132,7 @@ export function ToolDetailScreen({
       outputSchemaText,
     });
     setErrors(found);
-    if (Object.values(found).every((v) => !v)) setDirty(false);
+    if (editVersion.current === version && Object.values(found).every((v) => !v)) setDirty(false);
   }
 
   if (!tool) {

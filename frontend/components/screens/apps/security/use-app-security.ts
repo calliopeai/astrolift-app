@@ -84,7 +84,10 @@ export function useAppSecurity(slug: string) {
   });
 
   const a = app.data?.astroliftApp ?? null;
-  const allEvents = events.data?.astroliftEvents ?? [];
+  const allEvents = React.useMemo(
+    () => events.data?.astroliftEvents ?? [],
+    [events.data?.astroliftEvents]
+  );
 
   const appEvents = React.useMemo(() => {
     if (!a) return [];

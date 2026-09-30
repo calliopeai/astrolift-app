@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { DELETE_SKILL, UPDATE_SKILL } from "@/graphql/agents/agents.mutations";
 
 import { type FieldErrors, hasErrors, splitErrors } from "./catalog";
@@ -55,6 +57,7 @@ export function useSkillBuilder(id: string) {
 
   const [updateSkill, { loading: saving }] = useMutation<UpdateSkillData>(UPDATE_SKILL, {
     refetchQueries: ["GetSkill"],
+    onQueryUpdated: refetchAfterMutation,
   });
 
   const [deleteSkillMutation, { loading: deleting }] = useMutation<DeleteSkillData>(DELETE_SKILL, {

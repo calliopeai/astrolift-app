@@ -120,6 +120,15 @@
   account permissions allow it. The existing `mcp:dispatch` scope now includes
   `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
   enforced (#2188).
+- Frontend forms retain edits across query refreshes and failed retries (#2147).
+  Successful tool and skill saves keep their accepted values until fresh data
+  arrives, without clearing edits made while the save was pending. Reopened
+  strategy and source connection dialogs start with current values; workload
+  changes select a valid container, and stale agent discovery responses are
+  ignored. Bundle names keep generating their slug until it is edited, and
+  bundle and resource dialogs keep separate cluster selections. Browser storage,
+  shared playground sessions and cron countdowns initialize after hydration.
+
 - Frontend action failures show a toast or an inline form reason, while rejected
   confirmation actions keep their dialog and selection (#2146). Successful
   dispatches and token creation retain their result when a follow-up refresh

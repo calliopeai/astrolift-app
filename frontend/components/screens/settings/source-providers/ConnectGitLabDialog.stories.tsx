@@ -66,6 +66,9 @@ export const LongStrings: Story = {
   ),
   play: async () => {
     const s = await sheet();
-    await userEvent.type(s.getByLabelText("GitLab group (optional)"), LONG_TEXT);
+    const group = s.getByLabelText("GitLab group (optional)");
+    await userEvent.click(group);
+    await userEvent.paste(LONG_TEXT);
+    await expect(group).toHaveValue(LONG_TEXT);
   },
 };

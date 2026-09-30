@@ -121,8 +121,12 @@ export function useRepoPicker<S extends RepoPickerFields>({
     skip: !hasCluster,
   });
 
-  const usable = (connections.data?.astroliftSourceConnections ?? []).filter(
-    (c) => c.isActive && !c.isOauthAppConfig
+  const usable = React.useMemo(
+    () =>
+      (connections.data?.astroliftSourceConnections ?? []).filter(
+        (c) => c.isActive && !c.isOauthAppConfig
+      ),
+    [connections.data?.astroliftSourceConnections]
   );
 
   // Auto-pick the first connection when there's exactly one.

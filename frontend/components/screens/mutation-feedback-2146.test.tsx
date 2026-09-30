@@ -18,6 +18,8 @@ import { useRoleHolders } from "./administration/permissions/use-role-holders";
 import { useDispatchAgent } from "./agents/detail/use-dispatch-agent";
 import { DETAIL } from "./agents/tools/agent-tools.fixtures";
 import { useToolDetail } from "./agents/tools/use-tool-detail";
+import { useSkillBuilder } from "./agents/skills/use-skill-builder";
+import { GET_SKILL } from "@/graphql/agents/agents.queries";
 import { AgentConfigFormPane } from "./apps/config/AgentConfigFormPane";
 import { PANE_PROPS } from "./apps/config/app-config-agent.fixtures";
 import { useEnvironmentControls, useWorkloadOps } from "./apps/controls/use-controls-section";
@@ -414,6 +416,45 @@ describe("clipboard completion", () => {
 });
 
 describe("real Apollo refetch rejection", () => {
+  it("keeps a committed skill save successful when its active query refresh fails", async () => {
+    state.queries.GetSkill = {
+      skill: {
+        id: "skill-1",
+        name: "Original",
+        slug: "original",
+        description: "",
+        content: "",
+        skillVersion: 1,
+        isGlobal: false,
+        isActive: true,
+      },
+    };
+    ok("updateSkill", { id: "skill-1", slug: "edited" });
+    const { result } = renderHook(
+      () => {
+        useNetworkQuery(GET_SKILL, { variables: { id: "skill-1" }, fetchPolicy: "network-only" });
+        return useSkillBuilder("skill-1");
+      },
+      { wrapper }
+    );
+    await waitFor(() => expect(requests.some((r) => r.operation === "GetSkill")).toBe(true));
+    queryFails = true;
+    await act(async () => {
+      expect(
+        await result.current.saveSkill({
+          name: "Edited",
+          slug: "edited",
+          description: "",
+          content: "Edited content",
+        })
+      ).toEqual({});
+    });
+    expect(state.success).toHaveBeenCalledWith("Skill saved");
+    expect(state.warning).toHaveBeenCalled();
+    expect(requests.filter((r) => r.operation === "GetSkill")).toHaveLength(2);
+    expect(requests.filter((r) => r.operation === "UpdateSkill")).toHaveLength(1);
+  });
+
   it("preserves a newly minted token and resolves success when the active list refetch fails", async () => {
     const reveal = {
       plaintext: "one-time-token",

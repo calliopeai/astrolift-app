@@ -101,7 +101,11 @@ const VISIBILITY_SCOPES: { value: ScmVisibilityScope; label: string }[] = [
 ];
 
 /** "Connect a source host": the generic any-kind connect sheet. */
-export function ConnectSourceDialogView({
+export function ConnectSourceDialogView(props: ConnectSourceDialogViewProps) {
+  return props.open ? <ConnectSourceDialogViewForm {...props} /> : null;
+}
+
+function ConnectSourceDialogViewForm({
   open,
   onOpenChange,
   loading,
@@ -120,21 +124,6 @@ export function ConnectSourceDialogView({
   const [appClientId, setAppClientId] = React.useState("");
   const [oauthRedirectUri, setOauthRedirectUri] = React.useState("");
   const [scopes, setScopes] = React.useState<ScmVisibilityScope[]>([]);
-
-  React.useEffect(() => {
-    if (!open) {
-      setKind("github_pat");
-      setDisplayName("");
-      setAccountLogin("");
-      setInstallationId("");
-      setApiBaseUrl("");
-      setSecret("");
-      setOauthClientId("");
-      setAppClientId("");
-      setOauthRedirectUri("");
-      setScopes([]);
-    }
-  }, [open]);
 
   const meta = KINDS.find((k) => k.value === kind);
   const isOauthApp = meta?.takesOauthApp ?? false;

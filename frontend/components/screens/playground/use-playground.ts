@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+import { useBrowserReady } from "@/hooks/use-browser-ready";
 import { toast } from "sonner";
 
 import {
@@ -50,22 +52,26 @@ export function usePlayground() {
   // Refresh sidebar when persisted state changes.
   const refreshSidebar = () => setSavedSessions(listSavedSessions());
 
-  // Initial mount: hydrate sidebar + replay shared session if the URL
-  // hash carries one.
-  useEffect(() => {
-    refreshSidebar();
-    if (typeof window === "undefined") return;
-    const hash = window.location.hash;
-    const shared = decodeShareHash(hash);
+  const browserReady = useBrowserReady();
+  const [initialized, setInitialized] = useState(false);
+  if (browserReady && !initialized) {
+    setInitialized(true);
+    setSavedSessions(listSavedSessions());
+    const shared = decodeShareHash(window.location.hash);
     if (shared) {
       setMessages(shared.messages);
       setModel(shared.model);
       setTitle(shared.title);
-      toast.info(`Loaded shared session: ${shared.title}`);
-      // Clear the hash so a refresh doesn't re-load forever.
-      window.history.replaceState(null, "", window.location.pathname);
     }
-  }, []);
+  }
+  useEffect(() => {
+    if (!browserReady) return;
+    const shared = decodeShareHash(window.location.hash);
+    if (shared) {
+      toast.info(`Loaded shared session: ${shared.title}`);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, [browserReady]);
 
   const handleSend = () => {
     if (!prompt.trim()) return;

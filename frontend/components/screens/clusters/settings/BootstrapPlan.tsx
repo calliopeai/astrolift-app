@@ -27,27 +27,30 @@ export function BootstrapPlanView({
   installing,
   onInstall,
 }: BootstrapPlanViewProps) {
-  // Local selection state. Defaults derive from the recipe — the operator
-  // sees the driver's opinion checked already; they un-check what they
-  // don't want and pick non-default option values for what they do.
-  const [selected, setSelected] = React.useState<Record<string, boolean>>({});
-  const [optionValues, setOptionValues] = React.useState<Record<string, Record<string, string>>>(
-    {}
-  );
-
-  React.useEffect(() => {
-    if (!plan) return;
-    const nextSel: Record<string, boolean> = {};
-    const nextOpts: Record<string, Record<string, string>> = {};
-    for (const c of plan.components) {
-      nextSel[c.key] = preselected(c);
-      const opts: Record<string, string> = {};
-      for (const o of c.options) opts[o.key] = o.default || o.choices[0]?.value || "";
-      nextOpts[c.key] = opts;
+  const [draft, setDraft] = React.useState<{
+    clusterId: string | null;
+    selected: Record<string, boolean>;
+    options: Record<string, Record<string, string>>;
+  }>({ clusterId: plan?.clusterId ?? null, selected: {}, options: {} });
+  if (plan && draft.clusterId !== plan.clusterId) {
+    setDraft({ clusterId: plan.clusterId, selected: {}, options: {} });
+  }
+  const sameCluster = plan?.clusterId === draft.clusterId;
+  const selected: Record<string, boolean> = {};
+  const optionValues: Record<string, Record<string, string>> = {};
+  for (const component of plan?.components ?? []) {
+    selected[component.key] = sameCluster
+      ? (draft.selected[component.key] ?? preselected(component))
+      : preselected(component);
+    optionValues[component.key] = {};
+    for (const option of component.options) {
+      const picked = sameCluster ? draft.options[component.key]?.[option.key] : undefined;
+      optionValues[component.key][option.key] =
+        picked && option.choices.some((c) => c.value === picked)
+          ? picked
+          : option.default || option.choices[0]?.value || "";
     }
-    setSelected(nextSel);
-    setOptionValues(nextOpts);
-  }, [plan]);
+  }
 
   if (loading) {
     return (
@@ -111,7 +114,12 @@ export function BootstrapPlanView({
               <input
                 type="checkbox"
                 checked={!!selected[c.key]}
-                onChange={(e) => setSelected((s) => ({ ...s, [c.key]: e.target.checked }))}
+                onChange={(e) =>
+                  setDraft((s) => ({
+                    ...s,
+                    selected: { ...s.selected, [c.key]: e.target.checked },
+                  }))
+                }
                 className="mt-1 size-4 cursor-pointer"
               />
               <div className="min-w-0 flex-1">
@@ -148,11 +156,11 @@ export function BootstrapPlanView({
                     <select
                       value={optionValues[c.key]?.[o.key] ?? o.default}
                       onChange={(e) =>
-                        setOptionValues((prev) => ({
+                        setDraft((prev) => ({
                           ...prev,
-                          [c.key]: {
-                            ...(prev[c.key] ?? {}),
-                            [o.key]: e.target.value,
+                          options: {
+                            ...prev.options,
+                            [c.key]: { ...prev.options[c.key], [o.key]: e.target.value },
                           },
                         }))
                       }

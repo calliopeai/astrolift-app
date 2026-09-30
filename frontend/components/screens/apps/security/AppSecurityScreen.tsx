@@ -300,7 +300,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
   const payload = (event && asObject(event.payload)) as ScanPayload | null;
   const hasEvent = event !== null && payload !== null;
   const counts = payload?.counts ?? { critical: 0, high: 0, medium: 0, low: 0 };
-  const findings = payload?.findings ?? [];
+  const findings = React.useMemo(() => payload?.findings ?? [], [payload?.findings]);
 
   const list = useLocalListState(useFindingsList());
   const page = selectRows(
