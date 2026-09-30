@@ -3268,6 +3268,21 @@
     "versionMismatch": {
       "changed": "다른 세션에서 이 항목을 수정했습니다. 새로고침 후 다시 시도하세요.",
       "refresh": "새로고침"
+    },
+    "pagination": {
+      "rowsPerPage": "페이지당 행 수",
+      "perPage": "/ 페이지",
+      "pages": "페이지",
+      "previousPage": "이전 페이지",
+      "nextPage": "다음 페이지",
+      "page": "{page, number}페이지",
+      "range": "총 {total, number}개 중 {start, number}~{end, number}개",
+      "emptyRange": "총 0개 중 0개",
+      "showing": "<shownCount>{shown, number}</shownCount>개 표시",
+      "showingOf": "총 <totalCount>{total}</totalCount>개 중 <shownCount>{shown, number}</shownCount>개 표시",
+      "approximately": "약 {count}",
+      "newer": "최신 항목",
+      "older": "이전 항목"
     }
   }
 }

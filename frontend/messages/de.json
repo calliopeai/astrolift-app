@@ -3271,6 +3271,21 @@
     "versionMismatch": {
       "changed": "Dieses Element wurde in einer anderen Sitzung geändert. Aktualisieren Sie es und versuchen Sie es erneut.",
       "refresh": "Aktualisieren"
+    },
+    "pagination": {
+      "rowsPerPage": "Zeilen pro Seite",
+      "perPage": "/ Seite",
+      "pages": "Seiten",
+      "previousPage": "Vorherige Seite",
+      "nextPage": "Nächste Seite",
+      "page": "Seite {page, number}",
+      "range": "{start, number}–{end, number} von {total, number}",
+      "emptyRange": "0 von 0",
+      "showing": "<shownCount>{shown, number}</shownCount> angezeigt",
+      "showingOf": "<shownCount>{shown, number}</shownCount> von <totalCount>{total}</totalCount> angezeigt",
+      "approximately": "etwa {count}",
+      "newer": "Neuere",
+      "older": "Ältere"
     }
   }
 }

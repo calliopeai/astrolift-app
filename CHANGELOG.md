@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Shared numbered and cursor pagination translates controls and count sentences
+  in all eight locales, retaining page/cursor callbacks and unknown totals.
+
 - Shared version-conflict feedback can supply translated fallback text and
   refresh actions without replacing server diagnostics or replaying mutations.
 

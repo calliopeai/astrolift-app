@@ -2,6 +2,7 @@
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-import { countLabel, pageWindow, rangeLabel } from "./paging";
+import { pageWindow } from "./paging";
 
 /**
  * The two paging modes a list declares (spec 44 §5.1):
@@ -56,6 +57,8 @@ export type ListPaginationProps = PageSizeProps & { className?: string } & (
   );
 
 export function ListPagination(props: ListPaginationProps) {
+  const t = useTranslations("shared.pagination");
+  const fmt = useFormatter();
   const { pageSize, pageSizes, onPageSize, className } = props;
 
   return (
@@ -68,18 +71,18 @@ export function ListPagination(props: ListPaginationProps) {
       {props.mode === "numbered" ? <Numbered {...props} /> : <Cursor {...props} />}
       <label className="flex items-center gap-2">
         <Select value={String(pageSize)} onValueChange={(v) => onPageSize(Number(v))}>
-          <SelectTrigger size="sm" className="w-18 font-mono" aria-label="Rows per page">
+          <SelectTrigger size="sm" className="w-18 font-mono" aria-label={t("rowsPerPage")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {pageSizes.map((n) => (
               <SelectItem key={n} value={String(n)} className="font-mono">
-                {n}
+                {fmt.number(n)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <span aria-hidden>/ page</span>
+        <span aria-hidden>{t("perPage")}</span>
       </label>
     </div>
   );
@@ -91,11 +94,21 @@ function Numbered({
   totalCount,
   onPage,
 }: Extract<ListPaginationProps, { mode: "numbered" }>) {
+  const t = useTranslations("shared.pagination");
+  const fmt = useFormatter();
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const current = Math.min(page, pageCount);
   return (
-    <nav aria-label="Pages" className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-      <span className="font-mono tabular-nums">{rangeLabel(current, pageSize, totalCount)}</span>
+    <nav aria-label={t("pages")} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+      <span className="font-mono tabular-nums">
+        {totalCount === 0
+          ? t("emptyRange")
+          : t("range", {
+              start: (current - 1) * pageSize + 1,
+              end: Math.min(current * pageSize, totalCount),
+              total: totalCount,
+            })}
+      </span>
       {pageCount > 1 && (
         <div className="flex items-center gap-1">
           <Button
@@ -104,7 +117,7 @@ function Numbered({
             className="size-8"
             onClick={() => onPage(current - 1)}
             disabled={current <= 1}
-            aria-label="Previous page"
+            aria-label={t("previousPage")}
           >
             <ChevronLeftIcon className="size-4" />
           </Button>
@@ -123,10 +136,10 @@ function Numbered({
                   item === current && "text-foreground"
                 )}
                 aria-current={item === current ? "page" : undefined}
-                aria-label={`Page ${item}`}
+                aria-label={t("page", { page: item })}
                 onClick={() => onPage(item)}
               >
-                {item}
+                {fmt.number(item)}
               </Button>
             )
           )}
@@ -136,7 +149,7 @@ function Numbered({
             className="size-8"
             onClick={() => onPage(current + 1)}
             disabled={current >= pageCount}
-            aria-label="Next page"
+            aria-label={t("nextPage")}
           >
             <ChevronRightIcon className="size-4" />
           </Button>
@@ -156,25 +169,34 @@ function Cursor({
   totalCount,
   approximate = false,
 }: Extract<ListPaginationProps, { mode: "cursor" }>) {
+  const t = useTranslations("shared.pagination");
+  const fmt = useFormatter();
+  const total =
+    totalCount == null
+      ? null
+      : approximate
+        ? t("approximately", {
+            count: fmt.number(totalCount, { notation: "compact", maximumFractionDigits: 1 }),
+          })
+        : fmt.number(totalCount);
+  const numeric = (chunks: React.ReactNode) => (
+    <span className="font-mono tabular-nums">{chunks}</span>
+  );
   return (
-    <nav aria-label="Pages" className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+    <nav aria-label={t("pages")} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
       <span className="min-w-0">
-        Showing <span className="font-mono tabular-nums">{shown}</span>
-        {totalCount != null && (
-          <>
-            {" "}
-            of <span className="font-mono tabular-nums">{countLabel(totalCount, approximate)}</span>
-          </>
-        )}
+        {total == null
+          ? t.rich("showing", { shown, shownCount: numeric })
+          : t.rich("showingOf", { shown, total, shownCount: numeric, totalCount: numeric })}
         {order && <> · {order}</>}
       </span>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="sm" onClick={onNewer} disabled={!hasNewer}>
           <ChevronLeftIcon className="size-4" />
-          Newer
+          {t("newer")}
         </Button>
         <Button variant="ghost" size="sm" onClick={onOlder} disabled={!hasOlder}>
-          Older
+          {t("older")}
           <ChevronRightIcon className="size-4" />
         </Button>
       </div>

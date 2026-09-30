@@ -3268,6 +3268,21 @@
     "versionMismatch": {
       "changed": "此项目已被其他会话修改。请刷新后重试。",
       "refresh": "刷新"
+    },
+    "pagination": {
+      "rowsPerPage": "每页行数",
+      "perPage": "/ 页",
+      "pages": "页码",
+      "previousPage": "上一页",
+      "nextPage": "下一页",
+      "page": "第{page, number}页",
+      "range": "共{total, number}项，第{start, number}–{end, number}项",
+      "emptyRange": "共0项，显示0项",
+      "showing": "显示<shownCount>{shown, number}</shownCount>项",
+      "showingOf": "共<totalCount>{total}</totalCount>项，显示<shownCount>{shown, number}</shownCount>项",
+      "approximately": "约{count}",
+      "newer": "较新项",
+      "older": "较早项"
     }
   }
 }

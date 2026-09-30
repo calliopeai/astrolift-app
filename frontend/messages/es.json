@@ -3271,6 +3271,21 @@
     "versionMismatch": {
       "changed": "Otra sesión modificó este elemento. Actualiza y vuelve a intentarlo.",
       "refresh": "Actualizar"
+    },
+    "pagination": {
+      "rowsPerPage": "Filas por página",
+      "perPage": "/ página",
+      "pages": "Páginas",
+      "previousPage": "Página anterior",
+      "nextPage": "Página siguiente",
+      "page": "Página {page, number}",
+      "range": "{start, number}–{end, number} de {total, number}",
+      "emptyRange": "0 de 0",
+      "showing": "Mostrando <shownCount>{shown, number}</shownCount>",
+      "showingOf": "Mostrando <shownCount>{shown, number}</shownCount> de <totalCount>{total}</totalCount>",
+      "approximately": "aproximadamente {count}",
+      "newer": "Más recientes",
+      "older": "Más antiguos"
     }
   }
 }

@@ -3268,6 +3268,21 @@
     "versionMismatch": {
       "changed": "この項目は別のセッションで変更されました。更新して再試行してください。",
       "refresh": "更新"
+    },
+    "pagination": {
+      "rowsPerPage": "1ページの行数",
+      "perPage": "/ ページ",
+      "pages": "ページ",
+      "previousPage": "前のページ",
+      "nextPage": "次のページ",
+      "page": "{page, number}ページ",
+      "range": "{total, number}件中{start, number}～{end, number}件",
+      "emptyRange": "0件中0件",
+      "showing": "<shownCount>{shown, number}</shownCount>件表示",
+      "showingOf": "<totalCount>{total}</totalCount>件中<shownCount>{shown, number}</shownCount>件表示",
+      "approximately": "約{count}",
+      "newer": "新しい項目",
+      "older": "古い項目"
     }
   }
 }
