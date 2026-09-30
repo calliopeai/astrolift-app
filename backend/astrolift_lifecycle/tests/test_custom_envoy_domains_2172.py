@@ -418,3 +418,85 @@ def test_policy_refresh_is_retried_instead_of_recorded_as_success(error_type):
         _apply_post_install_manifests(fake, "c", [component], {component.key}, "astrolift-system")
     assert not exc.value.non_retryable
     assert "must retry" in str(exc.value)
+
+
+def test_pending_custom_policy_does_not_hold_up_shared_edge_apply(deployment, manifest, domain, driver):
+    from _sdk.cluster import ApplyError, ApplyResult
+    from temporalio.exceptions import ApplicationError
+
+    from astrolift_workflows.activities.install_prereqs import _apply_post_install_manifests
+    from providers.k8s_native.edge_gateway import edge_component
+
+    domain.edge_auth_enabled = True
+    domain.save()
+    custom_policy = next(item for item in render(deployment, manifest) if item["kind"] == "SecurityPolicy")
+    entry = {
+        "hosts": [],
+        "groups": [],
+        "users": [],
+        "custom_routes": [
+            {
+                "name": custom_policy["metadata"]["name"],
+                "hostname": domain.hostname,
+                "labels": custom_policy["metadata"]["labels"],
+            }
+        ],
+    }
+    component = edge_component(CONFIG, ingress_class="envoy", access_rules=[entry])
+    batches = []
+
+    def apply(cluster, namespace, manifests):
+        batches.append(manifests)
+        if any(item["metadata"]["labels"].get("astrolift.dev/custom-domain") for item in manifests):
+            return ApplyResult(
+                created=[],
+                updated=[],
+                unchanged=[],
+                errors=[
+                    ApplyError(
+                        kind="SecurityPolicy",
+                        name="custom",
+                        namespace="astrolift-edge",
+                        exception_type="CustomDomainAuthPending",
+                        exception_message="pending",
+                        is_retryable=True,
+                    )
+                ],
+            )
+        return ApplyResult(
+            created=[item["metadata"]["name"] for item in manifests], updated=[], unchanged=[], errors=[]
+        )
+
+    with pytest.raises(ApplicationError):
+        _apply_post_install_manifests(
+            SimpleNamespace(apply_manifests=apply), "c", [component], {component.key}, "astrolift-system"
+        )
+    assert len(batches) == 2
+    assert any(item["kind"] == "Gateway" for item in batches[0])
+    assert any(
+        item["kind"] == "SecurityPolicy" and item["metadata"]["name"] == "edge-oidc" for item in batches[0]
+    )
+    assert all(item["metadata"]["labels"].get("astrolift.dev/custom-domain") for item in batches[1])
+
+
+def test_custom_renderer_selects_public_service_even_after_private_portless_workload(
+    deployment, manifest, domain, driver
+):
+    from dataclasses import replace
+
+    private = replace(
+        manifest.workloads[0],
+        name="internal",
+        is_public=False,
+        containers=(replace(manifest.workloads[0].containers[0], port=0),),
+    )
+    mixed = replace(manifest, workloads=(private, *manifest.workloads))
+    expected = render(deployment, mixed)
+    assert (
+        _render_app_ingresses_and_tls(
+            deployment.pk, namespace_for_environment(deployment.app_environment), mixed
+        )
+        == expected
+    )
+    route = next(item for item in expected if item["kind"] == "HTTPRoute")
+    assert route["spec"]["rules"][0]["backendRefs"][0]["name"] == "web"

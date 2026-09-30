@@ -156,6 +156,8 @@ is Cognito in the edge's AWS account and region:
   policy and are refreshed when access changes. Custom hostnames are kept
   out of the shared central authorization targets. Adding a custom domain
   does not alter the central callback, cookie names or cookie domain.
+  The installer applies the shared edge manifests in a separate batch;
+  waiting for a custom policy never prevents that shared batch from applying.
 - A new or changed gate is staged behind an explicit Envoy direct-response
   503 filter. The backend batch is refused until the edge Gateway's policy
   ancestor reports `Accepted=True` with `observedGeneration` equal to the

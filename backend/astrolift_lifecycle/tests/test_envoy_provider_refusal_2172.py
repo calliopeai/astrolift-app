@@ -11,6 +11,7 @@ from astrolift_clusters.models import TenantCluster
 from astrolift_clusters.schema.mutations import (
     ClustersMutation,
     InstallClusterPrereqsInputType,
+    RegisterTenantClusterInput,
     UpdateTenantClusterInput,
 )
 from astrolift_graphql import GUID
@@ -49,6 +50,45 @@ def test_class_update_refuses_without_saving_or_starting(
     assert cluster.ingress_class != "envoy"
     assert cluster.version == old_version
     assert starts == []
+
+
+def test_graphql_registration_refuses_envoy_but_preserves_existing_ingress(
+    unsupported_cluster, permission_resolver
+):
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+    cluster = unsupported_cluster
+    info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=None), user=None))
+    count = TenantCluster.all_objects.count()
+    with tenant_context(TenantContext(organization_id=cluster.organization_id)):
+        result = ClustersMutation().register_tenant_cluster(
+            info,
+            RegisterTenantClusterInput(
+                slug="unsupported-envoy-graphql",
+                name="Unsupported edge",
+                provider_plugin_slug=cluster.provider_plugin.slug,
+                auth_method="kubeconfig",
+                ingress_class="envoy",
+            ),
+        )
+        assert not result.ok
+        assert "no supported TLS front" in result.errors[0].message
+        assert TenantCluster.all_objects.count() == count
+
+        result = ClustersMutation().register_tenant_cluster(
+            info,
+            RegisterTenantClusterInput(
+                slug="supported-existing-ingress",
+                name="Existing ingress",
+                provider_plugin_slug=cluster.provider_plugin.slug,
+                auth_method="kubeconfig",
+                ingress_class="nginx",
+            ),
+        )
+    assert result.ok
+    registered = TenantCluster.objects.get(slug="supported-existing-ingress")
+    assert registered.organization_id == cluster.organization_id
+    assert registered.ingress_class == "nginx"
+    assert TenantCluster.all_objects.count() == count + 1
 
 
 def test_install_refuses_before_driver_creation(unsupported_cluster, monkeypatch):
