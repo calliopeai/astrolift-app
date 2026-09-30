@@ -900,9 +900,12 @@ def _run_install_sync(  # noqa: ANN001
     keys, so no cloud calls are made."""
     import astrolift_clusters.models as models
     import core.cluster_management as cm
+    from astrolift_workflows.activities import install_prereqs
     from astrolift_workflows.activities.install_prereqs import _install_cluster_prereqs_sync
 
-    fake_cluster = type("FakeCluster", (), {"provider_plugin": type("PP", (), {"slug": "test"})()})()
+    fake_cluster = type("FakeCluster", (), {"provider_plugin": type("PP", (), {"slug": "aws"})()})()
+    monkeypatch.setattr(install_prereqs, "_provision_ebs_csi_irsa_role", lambda *a, **k: None)
+    monkeypatch.setattr(install_prereqs, "_provision_aws_controller_irsa_role", lambda *a, **k: None)
 
     class _FakeManager:
         def select_related(self, *a, **k):  # noqa: ANN002, ANN003

@@ -1222,6 +1222,10 @@ def render_resources_for_deployment(
     if refusal:
         raise AppDeployError(refusal)
     _ingress_count = 0
+    if cluster is not None and cluster.ingress_class == "envoy":
+        resources.extend(
+            envoy_custom_domain_routes(deployment, manifest, namespace=namespace, cluster=cluster)
+        )
     if managed_domain is not None and cluster is not None:
         ingress_resources = (
             _render_managed_subdomain_ingress(deployment, manifest, namespace, managed_domain, cluster) or []
@@ -1438,6 +1442,11 @@ def custom_domain_edge_auth_state(cluster: Any, hostname: str, *, opted_in: bool
     if cluster is None or not hostname:
         return EDGE_AUTH_NO_GATE
 
+    if getattr(cluster, "ingress_class", "") == "envoy":
+        if oidc_auth_for_cluster(cluster) is None:
+            return EDGE_AUTH_NO_GATE
+        return EDGE_AUTH_GATED if opted_in else EDGE_AUTH_UNGATED
+
     # #1631: a domain that has opted in and sits on a cluster with a gate is
     # `gated`, because the renderer stamps a first-party `/oauth2` endpoint
     # on the domain itself. That endpoint is what makes the cookie-scope
@@ -1483,6 +1492,117 @@ def custom_domain_edge_auth_state(cluster: Any, hostname: str, *, opted_in: bool
     return EDGE_AUTH_GATED if covered else EDGE_AUTH_UNGATED
 
 
+def envoy_custom_domain_routes(
+    deployment: Any,
+    manifest: Any,
+    *,
+    namespace: str,
+    cluster: Any,
+) -> list[dict[str, Any]]:
+    """Only live validated domains of the deployment's canonical app environment."""
+    from _sdk._kube_health import PLATFORM_NAMESPACE
+
+    from astrolift_clusters.edge_install import edge_support_refusal
+    from astrolift_lifecycle.models import CustomDomain
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+    from core.edge_access import app_access
+    from core.ingress_reconcile import _edge_config
+    from providers.k8s_native.edge_gateway import render_custom_domain_routes
+
+    if refusal := edge_support_refusal(cluster):
+        raise AppDeployError(refusal)
+    app = deployment.registered_app
+    env = deployment.app_environment
+    domains = list(
+        CustomDomain.objects.filter(
+            registered_app_id=app.pk,
+            is_active=True,
+            validation_status=CustomDomain.ValidationStatus.VALIDATED,
+            certificate_state__in=[CustomDomain.CertificateState.ACTIVE, CustomDomain.CertificateState.BYO],
+        ).order_by("pk")
+    )
+    if not domains:
+        return []
+    if env is None or env.registered_app_id != app.pk or env.tenant_cluster_id != cluster.pk:
+        raise AppDeployError("custom-domain deployment has an incoherent app environment or cluster")
+    if cluster.organization_id not in (None, app.organization_id):
+        raise AppDeployError("custom-domain cluster belongs to another organization")
+    if (env.k8s_namespace or "").strip():
+        return []  # Custom domains serve the canonical app namespace, never a preview.
+    if namespace != namespace_for_environment(env):
+        raise AppDeployError("custom-domain namespace does not match its app environment")
+    workload = next((w for w in manifest.workloads if w.kind == "deployment" and w.is_public), None)
+    if workload is None or not workload.containers:
+        raise AppDeployError("custom-domain routing requires a public deployment workload")
+    container = next((c for c in workload.containers if c.is_primary), workload.containers[0])
+    if container.port <= 0:
+        raise AppDeployError("custom-domain routing requires a public service port")
+    config = cluster.oidc_auth_config or {}
+    group = str(config.get("custom_domain_alb_group") or "")
+    if not group:
+        raise AppDeployError(
+            "install a custom_domain_alb_group on the existing Envoy ALB before deploying custom domains"
+        )
+    driver = _driver_for_cluster(cluster)
+    validate = getattr(driver, "validate_edge_custom_domain", None)
+    if not callable(validate):
+        raise AppDeployError("cluster driver cannot verify the custom-domain TLS front and callback")
+    ctx = _context_for_cluster(cluster)
+    out = []
+    edge = _edge_config(app) or {}
+    for domain in domains:
+        if domain.is_wildcard:
+            raise AppDeployError(
+                "Envoy custom-domain routing requires an exact hostname; wildcard domain cutover is unsupported"
+            )
+        if (
+            domain.path_routes.filter(deleted_at__isnull=True).exists()
+            or domain.redirect_rules.filter(deleted_at__isnull=True).exists()
+        ):
+            raise AppDeployError(
+                "Envoy custom-domain cutover does not support stored path routes or redirect rules; keep the existing ingress"
+            )
+        gated = bool(domain.edge_auth_enabled)
+        if gated and oidc_auth_for_cluster(cluster) is None:
+            raise AppDeployError("custom-domain edge auth was requested but the cluster has no OIDC gate")
+        if gated and edge.get("identity_headers"):
+            raise AppDeployError("Envoy custom-domain auth does not support per-app identity_headers")
+        try:
+            validate(
+                ctx.slug,
+                hostname=domain.hostname,
+                certificate_arn=domain.certificate_id,
+                alb_group=group,
+                discovery_url=str(config.get("discovery_url") or ""),
+                client_id=str(config.get("client_id") or ""),
+                gated=gated,
+            )
+        except ValueError as exc:
+            raise AppDeployError(str(exc)) from None
+        except Exception:
+            raise AppDeployError(
+                "custom-domain TLS front or OAuth callback could not be verified; no routes were applied"
+            ) from None
+        out.extend(
+            render_custom_domain_routes(
+                app_slug=app.slug,
+                namespace=namespace,
+                hostname=domain.hostname,
+                service=workload.name,
+                port=int(container.port),
+                paused=env.ingress_paused,
+                gated=gated,
+                config=config,
+                access=app_access(app),
+                certificate_arn=domain.certificate_id,
+                alb_group=group,
+                platform_namespace=PLATFORM_NAMESPACE,
+                gateway_secret_header=str(edge.get("gateway_secret_header") or ""),
+            )
+        )
+    return out
+
+
 def envoy_edge_routes(
     app: Any,
     *,
@@ -1498,9 +1618,12 @@ def envoy_edge_routes(
     Both render paths call this, for the reason the ALB branch warns about:
     an app's authentication must not depend on which path ran.
     """
+    from astrolift_clusters.edge_install import edge_support_refusal
     from core.ingress_reconcile import _edge_config
     from providers.k8s_native.edge_gateway import render_app_routes
 
+    if refusal := edge_support_refusal(cluster):
+        raise AppDeployError(refusal)
     oidc_auth = oidc_auth_for_cluster(cluster)
     edge = _edge_config(app) or {}
     if oidc_auth is not None and edge.get("identity_headers"):
@@ -1594,6 +1717,9 @@ def prune_edge_leftovers(
         EDGE_NAMESPACE,
         GATEWAY_NAME,
         ROUTE_NAMESPACE_LABEL,
+        custom_domain_hostname,
+        custom_domain_policy_accepted,
+        custom_domain_route_matches,
     )
 
     def _labels(obj: dict[str, Any]) -> dict[str, Any]:
@@ -1609,10 +1735,80 @@ def prune_edge_leftovers(
         conditions = ((gateway or {}).get("status") or {}).get("conditions") or []
         return any(c.get("type") == "Programmed" and c.get("status") == "True" for c in conditions)
 
+    def _custom_serving(hostname: str) -> bool:
+        desired = next(
+            (
+                item
+                for item in rendered
+                if item.get("kind") == "HTTPRoute" and custom_domain_hostname(item) == hostname
+            ),
+            None,
+        )
+        if desired is None or not _edge_serving():
+            return False
+        name = desired["metadata"]["name"]
+        current = (
+            driver.get_manifest(ctx_slug, EDGE_NAMESPACE, "gateway.networking.k8s.io/v1/HTTPRoute", name)
+            or {}
+        )
+        generation = current.get("metadata", {}).get("generation")
+        parents = [
+            parent
+            for parent in current.get("status", {}).get("parents", [])
+            if parent.get("controllerName") == "gateway.envoyproxy.io/gatewayclass-controller"
+            and parent.get("parentRef", {}).get("name") == GATEWAY_NAME
+            and parent.get("parentRef", {}).get("namespace", EDGE_NAMESPACE) == EDGE_NAMESPACE
+        ]
+        if (
+            generation is None
+            or not parents
+            or not all(
+                all(
+                    any(
+                        row.get("type") == kind
+                        and row.get("status") == "True"
+                        and row.get("observedGeneration") == generation
+                        for row in parent.get("conditions", [])
+                    )
+                    for kind in ("Accepted", "ResolvedRefs")
+                )
+                for parent in parents
+            )
+        ):
+            return False
+        if not custom_domain_route_matches(current, desired):
+            return False  # An accepted temporary 503 route does not finish the cutover.
+        policy = next(
+            (
+                item
+                for item in rendered
+                if item.get("kind") == "SecurityPolicy" and item.get("metadata", {}).get("name") == name
+            ),
+            None,
+        )
+        if policy is not None:
+            actual = driver.get_manifest(
+                ctx_slug, EDGE_NAMESPACE, "gateway.envoyproxy.io/v1alpha1/SecurityPolicy", name
+            )
+            if not custom_domain_policy_accepted(actual, policy):
+                return False
+        front = driver.get_manifest(ctx_slug, PLATFORM_NAMESPACE, "networking.k8s.io/v1/Ingress", name) or {}
+        return any(
+            row.get("hostname") for row in front.get("status", {}).get("loadBalancer", {}).get("ingress", [])
+        )
+
     keep = {
         (r.get("kind"), (r.get("metadata") or {}).get("name"))
         for r in rendered
-        if r.get("kind") in ("HTTPRoute", "HTTPRouteFilter", "Ingress")
+        if r.get("kind")
+        in (
+            "HTTPRoute",
+            "HTTPRouteFilter",
+            "Ingress",
+            "SecurityPolicy",
+            "BackendTrafficPolicy",
+            "ReferenceGrant",
+        )
     }
     removed: list[str] = []
     try:
@@ -1624,7 +1820,13 @@ def prune_edge_leftovers(
             }
             for obj in driver.list_manifests(ctx_slug, namespace, "networking.k8s.io/v1/Ingress")
             if _labels(obj).get("astrolift.dev/app") == app_slug
-            and _labels(obj).get("astrolift.dev/managed-subdomain") == "true"
+            and (
+                _labels(obj).get("astrolift.dev/managed-subdomain") == "true"
+                or (
+                    _labels(obj).get("astrolift.dev/custom-domain")
+                    and _custom_serving(str(_labels(obj)["astrolift.dev/custom-domain"]))
+                )
+            )
         ]
         if legacy and not _edge_serving():
             log.warning(
@@ -1641,6 +1843,9 @@ def prune_edge_leftovers(
         for where, kind, api, marker in (
             (EDGE_NAMESPACE, "HTTPRoute", "gateway.networking.k8s.io/v1", None),
             (EDGE_NAMESPACE, "HTTPRouteFilter", "gateway.envoyproxy.io/v1alpha1", None),
+            (EDGE_NAMESPACE, "SecurityPolicy", "gateway.envoyproxy.io/v1alpha1", None),
+            (EDGE_NAMESPACE, "BackendTrafficPolicy", "gateway.envoyproxy.io/v1alpha1", None),
+            (namespace, "ReferenceGrant", "gateway.networking.k8s.io/v1beta1", None),
             # The environment's own ALB rule onto the edge (#2124).
             (PLATFORM_NAMESPACE, "Ingress", "networking.k8s.io/v1", EDGE_FRONT_LABEL),
         ):

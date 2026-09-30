@@ -815,13 +815,19 @@ def _render_app_ingresses_and_tls(
     )
 
     out: list[dict[str, Any]] = []
+    if edge_cluster is not None and edge_cluster.ingress_class == "envoy":
+        from core.app_deploy import envoy_custom_domain_routes
+
+        out.extend(envoy_custom_domain_routes(d, manifest, namespace=namespace, cluster=edge_cluster))
     domains = CustomDomain.objects.filter(
         registered_app=d.registered_app,
         deleted_at__isnull=True,
         is_active=True,
         validation_status=CustomDomain.ValidationStatus.VALIDATED,
     )
-    if (getattr(d.app_environment, "k8s_namespace", "") or "").strip():
+    if (edge_cluster is not None and edge_cluster.ingress_class == "envoy") or (
+        getattr(d.app_environment, "k8s_namespace", "") or ""
+    ).strip():
         # A custom domain is the app's, served from the app namespace. An
         # environment in a namespace of its own (a preview, #1922) emitting
         # it too would be a second Ingress for the same host on the cluster.

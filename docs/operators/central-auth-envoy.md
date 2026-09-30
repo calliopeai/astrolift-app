@@ -92,7 +92,107 @@ each renders its ALB Ingress again and external-dns writes its record,
 which is more specific than the edge's wildcard. The edge's routes for
 those apps stay behind, unreachable, until they are pruned.
 
-## Known gaps
+## Custom domains on EKS
 
-- Custom domains are not routed through the edge yet.
-- The edge is wired into the EKS recipe only.
+Validated, active exact custom hostnames with a serving certificate now render an
+Envoy `HTTPRoute` and an ALB host rule. They use the app's public Deployment
+Service in its canonical namespace. Preview namespaces never claim the same
+hostname. The renderer refuses a mismatched app, environment, namespace or
+cluster owner before it contacts a provider.
+
+Prepare the existing edge front before moving a custom domain:
+
+1. Choose an explicit ALB group and set
+   `oidcAuthConfig.custom_domain_alb_group` to its name. Install the edge
+   additively, then verify the `astrolift-system/astrolift-edge` Ingress has
+   that group and a provisioned ALB hostname. Adding a group to an existing
+   ungrouped ALB can replace the load balancer: schedule this as a separate
+   DNS/TLS cutover and keep the previous front until its replacement works.
+   This change never happens implicitly when a custom domain is added.
+2. Point the custom domain at this edge front, check its CNAME chain and
+   HTTPS target, and complete its ownership/DNS validation. An old stored
+   CNAME target or an old nginx load balancer is not the new edge. Revalidate
+   after changing the target; certificate validation alone does not move DNS.
+3. Select an **issued ACM certificate** covering the exact hostname, from
+   the edge's AWS account and region. Imported certificates work when their
+   ACM ARN is stored as the domain's `certificateId`. An inline BYO PEM or a
+   cert-manager Secret cannot terminate TLS at this ALB: import/select the
+   certificate separately. The renderer refuses these unsupported shapes
+   instead of creating an nginx Ingress or copying a private key.
+4. Redeploy the canonical environment. The provider verifies the installed
+   front's DNS target, actual ALB ARN/account/region and ingress-group tag,
+   then reads the ACM certificate's status, host coverage and validity.
+   Every custom rule joins that verified group; it cannot silently create
+   a different load balancer. A failed verification returns no custom
+   manifest set.
+
+The provider needs read access to `sts:GetCallerIdentity`,
+`elasticloadbalancing:DescribeLoadBalancers`,
+`elasticloadbalancing:DescribeListeners`,
+`elasticloadbalancing:DescribeTags`, and `acm:DescribeCertificate`, using
+the cluster's configured credential. These checks do not import a
+certificate, change DNS, or write to AWS APIs.
+
+### Independent custom-host authentication
+
+`edgeAuthEnabled` remains **off by default**, including a custom hostname
+inside the central cookie zone. Opting in requires configured cluster OIDC
+and an independently verified first-party callback. The supported verifier
+is Cognito in the edge's AWS account and region:
+
+- Register `https://<custom hostname>/oauth2/callback` on the configured
+  client and enable the authorization-code flow. Keep the central callback.
+  The provider reads `DescribeUserPool` and `DescribeUserPoolClient` before
+  deployment and refuses missing, different or unverifiable callbacks.
+  Callback registration is an explicit operator/IdP configuration step;
+  the renderer never changes the shared client's callback list. Preserve
+  those registrations in the IdP's own infrastructure configuration.
+- Each opted-in hostname gets a route-specific `SecurityPolicy`. Its token
+  cookie names differ from the central policy and every other custom host,
+  and `cookieDomain` is omitted so the cookies are host-only. A central or
+  sibling-domain session cannot satisfy this policy. Login and logout use
+  the custom hostname's own `/oauth2/*` endpoints.
+- The app's existing group/email access rules apply to this independent
+  policy and are refreshed when access changes. Custom hostnames are kept
+  out of the shared central authorization targets. Adding a custom domain
+  does not alter the central callback, cookie names or cookie domain.
+- A new or changed gate is staged behind an explicit Envoy direct-response
+  503 filter. The backend batch is refused until the edge Gateway's policy
+  ancestor reports `Accepted=True` with `observedGeneration` equal to the
+  policy's current generation and the desired policy spec. A stale,
+  missing, rejected or overridden status never opens the backend. Retrying
+  after acceptance removes the temporary filter, including policy-only
+  access refreshes. A failed policy apply leaves the staged route closed.
+
+The staging filter uses the pinned Envoy 1.9
+[direct-response API](https://gateway.envoyproxy.io/v1.9/tasks/traffic/direct-response/).
+It does not rely on a missing Service or unresolved backend reference.
+An unavailable Kubernetes API can prevent a requested change from reaching
+the running edge; inspect the failed workflow and retry. An API response
+does not promise that an existing gate was revoked during that outage.
+
+Old custom-domain Ingresses are removed only after the current Envoy route
+is accepted with resolved references, its intended auth policy is accepted,
+and the ALB host Ingress has a provisioned target. If controllers are still
+converging, the old Ingress stays; verify the new HTTPS/auth behavior and
+redeploy to finish cleanup. Teardown prunes only this environment's routes,
+policies, host fronts and custom Service reference grants.
+
+### Explicitly unsupported fronts
+
+AKS, GKE and `k8s_native` currently have no complete Envoy TLS-front and DNS
+recipe. Choosing `envoy` during registration or cluster update, selecting
+`envoy-gateway` for installation, or deploying through a persisted Envoy
+configuration on these providers is refused before the relevant write or
+workflow start. A controller-only chart installation is not a supported
+HTTPS edge. Keep the existing nginx/ALB ingress class until a complete front
+is available. Non-Cognito callback verification, inline BYO TLS termination,
+and moving custom hosts to another cluster are also explicit operator
+prerequisites rather than automatic migrations.
+
+Wildcard custom domains and domains with stored path-routing or redirect
+rules are refused during this cutover. Keep their existing ingress until
+their complete routing shape is supported; the edge does not silently
+serve an apex hostname or discard an existing rule set. Long exact
+hostnames keep their full value in route hostnames and an annotation, with
+a short ownership label that stays within Kubernetes' label limit.

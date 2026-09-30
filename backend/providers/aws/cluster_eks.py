@@ -30,6 +30,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
@@ -299,6 +300,7 @@ class EKSClusterDriver(ClusterDriver):
         ec2_client: Any | None = None,
         cognito_idp_client: Any | None = None,
         acm_client: Any | None = None,
+        elbv2_client: Any | None = None,
         iam_client: Any | None = None,
         k8s_client_factory: Callable[..., Any] | None = None,
         pod_backend: PodBackend | None = None,
@@ -330,6 +332,7 @@ class EKSClusterDriver(ClusterDriver):
         # flows don't pay for a client they never use. Injectable for moto
         # tests, mirroring eks/sts/ec2 above.
         self._acm: Any | None = acm_client
+        self._elbv2 = elbv2_client
         # IAM client is built lazily on first ``ensure_agent_model_identity``
         # call (the managed-model path) so the common apply / observability
         # flows don't pay for a client they never touch. Injectable for moto
@@ -394,6 +397,50 @@ class EKSClusterDriver(ClusterDriver):
         updated: list[str] = []
         unchanged: list[str] = []
         errors: list[ApplyError] = []
+
+        if not dry_run:
+            from k8s_native.edge_gateway import prepare_custom_domain_auth
+
+            try:
+                pending = prepare_custom_domain_auth(client, manifests)
+            except Exception:
+                return ApplyResult(
+                    created=[],
+                    updated=[],
+                    unchanged=[],
+                    errors=[
+                        ApplyError(
+                            kind="SecurityPolicy",
+                            name="custom-domain-auth",
+                            namespace="astrolift-edge",
+                            exception_type="CustomDomainAuthApplyFailed",
+                            is_retryable=True,
+                            exception_message=(
+                                "custom-domain authentication preparation failed; " "no backend batch was applied"
+                            ),
+                        )
+                    ],
+                )
+            if pending:
+                return ApplyResult(
+                    created=[],
+                    updated=[],
+                    unchanged=[],
+                    errors=[
+                        ApplyError(
+                            kind="SecurityPolicy",
+                            name=name,
+                            namespace="astrolift-edge",
+                            exception_type="CustomDomainAuthPending",
+                            is_retryable=True,
+                            exception_message=(
+                                "custom-domain route serves 503 until its authentication "
+                                "policy is Accepted; retry the apply"
+                            ),
+                        )
+                        for name in pending
+                    ],
+                )
 
         for manifest in manifests:
             # Per-manifest heartbeat: a 100-manifest apply against a slow
@@ -1221,7 +1268,10 @@ class EKSClusterDriver(ClusterDriver):
             # Pin the SA name (chart default) so the IRSA trust subject the
             # platform mints (astrolift-system:aws-load-balancer-controller) is
             # deterministic and doesn't drift with the Flux release name (#1044).
-            "serviceAccount": {**_sa_with_irsa("aws-load-balancer-controller"), "name": "aws-load-balancer-controller"},
+            "serviceAccount": {
+                **_sa_with_irsa("aws-load-balancer-controller"),
+                "name": "aws-load-balancer-controller",
+            },
         }
         if vpc_id:
             alb_values["vpcId"] = vpc_id
@@ -2172,6 +2222,106 @@ class EKSClusterDriver(ClusterDriver):
         return self._cognito_idp
 
     # ---- certificate discovery (#858) ------------------------------
+
+    def validate_edge_custom_domain(
+        self,
+        cluster: str,
+        *,
+        hostname: str,
+        certificate_arn: str,
+        alb_group: str,
+        discovery_url: str,
+        client_id: str,
+        gated: bool,
+    ) -> None:
+        """Read-only proof of the installed TLS front and exact OAuth callback.
+
+        No provider response is logged: Cognito's client description contains
+        a client secret. Callers surface a fixed failure message on SDK errors.
+        """
+        from aws.identity_users_cognito import cognito_pool_from_issuer
+        from aws.tls_acm import _cert_covers_host
+
+        def arn_matches(arn: str, service: str, account: str) -> bool:
+            parts = arn.split(":", 5)
+            return len(parts) == 6 and parts[0] == "arn" and parts[2:5] == [service, self._config.region, account]
+
+        account = str(self._sts.get_caller_identity()["Account"])
+        credential = self._config.credential
+        if credential and credential.declared_account and credential.declared_account != account:
+            raise ValueError("edge AWS credential does not match the cluster's declared account")
+        front = self.get_manifest(cluster, PLATFORM_NAMESPACE, "networking.k8s.io/v1/Ingress", "astrolift-edge")
+        annotations = ((front or {}).get("metadata") or {}).get("annotations") or {}
+        if not alb_group or annotations.get("alb.ingress.kubernetes.io/group.name") != alb_group:
+            raise ValueError("custom-domain ALB group is not installed on the edge front")
+        ingress = ((front or {}).get("status") or {}).get("loadBalancer", {}).get("ingress", [])
+        target = next((str(row.get("hostname") or "") for row in ingress if row.get("hostname")), "")
+        if not target:
+            raise ValueError("edge ALB has no provisioned DNS target")
+        if self._elbv2 is None:
+            self._elbv2 = aws_client("elbv2", region=self._config.region, credential=self._config.credential)
+        lbs = self._elbv2.get_paginator("describe_load_balancers").paginate()
+        lb = next(
+            (row for page in lbs for row in page.get("LoadBalancers", []) if row.get("DNSName") == target),
+            None,
+        )
+        if lb is None or not arn_matches(str(lb.get("LoadBalancerArn") or ""), "elasticloadbalancing", account):
+            raise ValueError("edge ALB target does not belong to the active AWS account and region")
+        if (
+            lb.get("Type") != "application"
+            or lb.get("Scheme") != "internet-facing"
+            or lb.get("State", {}).get("Code") != "active"
+        ):
+            raise ValueError("edge TLS front must be an active internet-facing application load balancer")
+        listeners = self._elbv2.get_paginator("describe_listeners").paginate(LoadBalancerArn=lb["LoadBalancerArn"])
+        if not any(
+            listener.get("Protocol") == "HTTPS"
+            and listener.get("Port") == 443
+            and any(
+                arn_matches(str(cert.get("CertificateArn") or ""), "acm", account)
+                for cert in listener.get("Certificates", [])
+            )
+            for page in listeners
+            for listener in page.get("Listeners", [])
+        ):
+            raise ValueError("edge ALB has no certified HTTPS listener on port 443")
+        tags = self._elbv2.describe_tags(ResourceArns=[lb["LoadBalancerArn"]]).get("TagDescriptions", [])
+        tag_values = {tag["Key"]: tag["Value"] for row in tags for tag in row.get("Tags", [])}
+        if tag_values.get("ingress.k8s.aws/stack") != alb_group:
+            raise ValueError("edge ALB target does not belong to the configured ingress group")
+        if not arn_matches(certificate_arn, "acm", account):
+            raise ValueError("custom-domain certificate must be an ACM ARN in the edge AWS account and region")
+        cert = self._acm_client().describe_certificate(CertificateArn=certificate_arn)["Certificate"]
+        now = datetime.now(UTC)
+        names = [str(cert.get("DomainName") or ""), *cert.get("SubjectAlternativeNames", [])]
+        if cert.get("Status") != "ISSUED" or not _cert_covers_host(hostname, names):
+            raise ValueError("custom-domain ACM certificate is not issued for this hostname")
+        if not cert.get("NotBefore") or not cert.get("NotAfter") or not cert["NotBefore"] <= now < cert["NotAfter"]:
+            raise ValueError("custom-domain ACM certificate is outside its validity period")
+        if not gated:
+            return
+        pool = cognito_pool_from_issuer(discovery_url)
+        if pool is None or pool[0] != self._config.region:
+            raise ValueError("custom-domain auth requires a verifiable Cognito client in the edge region")
+        from k8s_native.central_auth import issuer_from_discovery_url
+
+        if issuer_from_discovery_url(discovery_url) != f"https://cognito-idp.{pool[0]}.amazonaws.com/{pool[1]}":
+            raise ValueError("custom-domain auth requires the exact Cognito issuer")
+        pool_info = self._cognito_idp_client().describe_user_pool(UserPoolId=pool[1])["UserPool"]
+        if not arn_matches(str(pool_info.get("Arn") or ""), "cognito-idp", account):
+            raise ValueError("custom-domain Cognito pool belongs to another AWS account or region")
+        client = self._cognito_idp_client().describe_user_pool_client(UserPoolId=pool[1], ClientId=client_id)[
+            "UserPoolClient"
+        ]
+        callback = f"https://{hostname}/oauth2/callback"
+        if (
+            client.get("ClientId") != client_id
+            or client.get("UserPoolId") != pool[1]
+            or callback not in client.get("CallbackURLs", [])
+            or not client.get("AllowedOAuthFlowsUserPoolClient")
+            or "code" not in client.get("AllowedOAuthFlows", [])
+        ):
+            raise ValueError("register the exact custom-domain OAuth callback and enable the authorization-code flow")
 
     @driver_op(cloud="aws", driver="cluster")
     def list_certificates(self, cluster: ClusterContext) -> list[CertificateInfo]:

@@ -424,6 +424,18 @@ def edge_post_install_manifests(
                 ),
             ]
         )
+    if edge_configured(config):
+        for entry in access_rules or []:
+            for route in entry.get("custom_routes", []):
+                out.extend(
+                    custom_domain_security_policies(
+                        config,
+                        hostname=route["hostname"],
+                        name=route["name"],
+                        labels=route["labels"],
+                        access=entry,
+                    )
+                )
     out.extend(front or [])
     return out
 
@@ -477,7 +489,284 @@ def alb_front(oidc_auth_config: dict[str, Any] | None, *, namespace: str) -> lis
         "alb.ingress.kubernetes.io/healthcheck-path": "/",
         "alb.ingress.kubernetes.io/success-codes": "200-499",
     }
+    if group := (oidc_auth_config or {}).get("custom_domain_alb_group"):
+        ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/group.name"] = str(group)
     return [ingress]
+
+
+def custom_domain_security_policies(
+    config: dict[str, Any],
+    *,
+    hostname: str,
+    name: str,
+    labels: dict[str, str],
+    access: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Independent session and authorization for exactly one custom route."""
+    suffix = hashlib.sha256(hostname.encode()).hexdigest()[:16]
+    policy = edge_security_policy(config, [{**access, "hosts": [hostname], "name": name}])
+    policy["metadata"]["name"] = name
+    policy["metadata"]["labels"].update(labels)
+    policy["metadata"]["annotations"] = {"astrolift.dev/custom-domain-host": hostname}
+    policy["spec"].pop("targetSelectors")
+    policy["spec"]["targetRefs"] = [{"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": name}]
+    oidc = policy["spec"]["oidc"]
+    oidc["redirectURL"] = f"https://{hostname}{CALLBACK_PATH}"
+    oidc.pop("cookieDomain")  # Host-only; even sibling custom hosts cannot share a session.
+    oidc["cookieNames"] = {
+        "accessToken": f"AccessToken-custom-{suffix}",
+        "idToken": f"IdToken-custom-{suffix}",
+    }
+    denied = edge_access_denied_policy()
+    denied["metadata"]["name"] = name
+    denied["metadata"]["labels"].update(policy["metadata"]["labels"])
+    denied["metadata"]["annotations"] = {"astrolift.dev/custom-domain-host": hostname}
+    denied["spec"].pop("targetSelectors")
+    denied["spec"]["targetRefs"] = policy["spec"]["targetRefs"]
+    return [policy, denied]
+
+
+def custom_domain_hostname(item: dict[str, Any]) -> str:
+    meta = item.get("metadata") or {}
+    return str(
+        (meta.get("annotations") or {}).get("astrolift.dev/custom-domain-host")
+        or (meta.get("labels") or {}).get("astrolift.dev/custom-domain")
+        or ""
+    )
+
+
+def _contains_desired(actual: Any, desired: Any) -> bool:
+    if isinstance(desired, dict):
+        return isinstance(actual, dict) and all(
+            key in actual and _contains_desired(actual[key], value) for key, value in desired.items()
+        )
+    if isinstance(desired, list):
+        return (
+            isinstance(actual, list)
+            and len(actual) == len(desired)
+            and all(_contains_desired(a, d) for a, d in zip(actual, desired, strict=True))
+        )
+    return actual == desired
+
+
+def custom_domain_route_matches(actual: dict[str, Any], desired: dict[str, Any]) -> bool:
+    """Allow server defaults, but never an extra temporary guard or hostname."""
+    return _contains_desired(actual.get("spec", {}), desired["spec"])
+
+
+def custom_domain_policy_accepted(current: dict[str, Any] | None, desired: dict[str, Any]) -> bool:
+    """Pinned Envoy PolicyStatus: this edge ancestor accepted the desired generation."""
+
+    spec = (current or {}).get("spec") or {}
+    generation = ((current or {}).get("metadata") or {}).get("generation")
+    namespace = ((current or {}).get("metadata") or {}).get("namespace", EDGE_NAMESPACE)
+    ancestors = [
+        ancestor
+        for ancestor in ((current or {}).get("status") or {}).get("ancestors", [])
+        if ancestor.get("controllerName") == "gateway.envoyproxy.io/gatewayclass-controller"
+        and ancestor.get("ancestorRef", {}).get("name") == GATEWAY_NAME
+        and ancestor.get("ancestorRef", {}).get("namespace", namespace) == EDGE_NAMESPACE
+        and ancestor.get("ancestorRef", {}).get("kind", "Gateway") == "Gateway"
+        and ancestor.get("ancestorRef", {}).get("group", "gateway.networking.k8s.io") == "gateway.networking.k8s.io"
+    ]
+    accepted = (
+        generation is not None
+        and bool(ancestors)
+        and all(
+            any(
+                row.get("type") == "Accepted"
+                and row.get("status") == "True"
+                and row.get("observedGeneration") == generation
+                for row in ancestor.get("conditions", [])
+            )
+            and not any(
+                row.get("type") == "Overridden"
+                and row.get("status") == "True"
+                and row.get("observedGeneration") == generation
+                for row in ancestor.get("conditions", [])
+            )
+            for ancestor in ancestors
+        )
+    )
+    exact = _contains_desired(spec, desired["spec"]) and (
+        "authorization" in desired["spec"] or "authorization" not in spec
+    )
+    return accepted and exact
+
+
+def prepare_custom_domain_auth(client: Any, manifests: list[dict[str, Any]]) -> list[str]:
+    """Keep a new or changed custom gate on a 503 route until accepted.
+
+    Kubernetes applies objects sequentially. A route published before its
+    policy would otherwise be public while the controller reconciles. The
+    provider calls this before its real batch, including policy-only refreshes.
+    A pending result stops the batch and lets the normal deploy retry converge.
+    """
+
+    pending = []
+    for policy in manifests:
+        meta = policy.get("metadata") or {}
+        labels = meta.get("labels") or {}
+        if policy.get("kind") != "SecurityPolicy" or not labels.get("astrolift.dev/custom-domain"):
+            continue
+        name, namespace = meta["name"], meta["namespace"]
+        current = client.get(kind="gateway.envoyproxy.io/v1alpha1/SecurityPolicy", namespace=namespace, name=name)
+        ready = custom_domain_policy_accepted(current, policy)
+        route = next(
+            (
+                item
+                for item in manifests
+                if item.get("kind") == "HTTPRoute"
+                and item.get("metadata", {}).get("name") == name
+                and item.get("metadata", {}).get("namespace") == namespace
+            ),
+            None,
+        )
+        if route is None:
+            route = client.get(kind="gateway.networking.k8s.io/v1/HTTPRoute", namespace=namespace, name=name)
+        if route is None:
+            # A deleted route is never recreated by a policy-only access refresh.
+            if not ready:
+                pending.append(name)
+            continue
+        guard_name = f"{name[:50]}-auth-pending"
+        guard_filter = {
+            "type": "ExtensionRef",
+            "extensionRef": {
+                "group": "gateway.envoyproxy.io",
+                "kind": "HTTPRouteFilter",
+                "name": guard_name,
+            },
+        }
+        if ready:
+            clean_rules = [
+                {**rule, "filters": [filter_ for filter_ in rule.get("filters", []) if filter_ != guard_filter]}
+                for rule in route["spec"]["rules"]
+            ]
+            if clean_rules != route["spec"]["rules"]:
+                restored = _manifest(
+                    "gateway.networking.k8s.io/v1",
+                    "HTTPRoute",
+                    name,
+                    namespace,
+                    spec={**route["spec"], "rules": clean_rules},
+                )
+                restored["metadata"]["labels"].update(labels)
+                restored["metadata"]["annotations"] = {
+                    "astrolift.dev/custom-domain-host": custom_domain_hostname(policy)
+                }
+                client.server_side_apply(namespace=namespace, manifest=restored, dry_run=False)
+            continue
+        filter_ = _manifest(
+            "gateway.envoyproxy.io/v1alpha1",
+            "HTTPRouteFilter",
+            guard_name,
+            namespace,
+            spec={
+                "directResponse": {
+                    "statusCode": 503,
+                    "body": {"type": "Inline", "inline": "Astrolift: custom-domain authentication is preparing"},
+                }
+            },
+        )
+        filter_["metadata"]["labels"].update(labels)
+        guarded = _manifest(
+            "gateway.networking.k8s.io/v1",
+            "HTTPRoute",
+            name,
+            namespace,
+            spec={
+                **route["spec"],
+                "rules": [
+                    {
+                        **rule,
+                        "filters": [filter_ for filter_ in rule.get("filters", []) if filter_ != guard_filter]
+                        + [guard_filter],
+                    }
+                    if rule.get("backendRefs")
+                    else rule
+                    for rule in route["spec"]["rules"]
+                ],
+            },
+        )
+        guarded["metadata"]["labels"].update(labels)
+        guarded["metadata"]["annotations"] = {"astrolift.dev/custom-domain-host": custom_domain_hostname(policy)}
+        client.server_side_apply(namespace=namespace, manifest=filter_, dry_run=False)
+        client.server_side_apply(namespace=namespace, manifest=guarded, dry_run=False)
+        client.server_side_apply(namespace=namespace, manifest=policy, dry_run=False)
+        pending.append(name)
+    return pending
+
+
+def render_custom_domain_routes(
+    *,
+    app_slug: str,
+    namespace: str,
+    hostname: str,
+    service: str,
+    port: int,
+    paused: bool,
+    gated: bool,
+    config: dict[str, Any],
+    access: dict[str, Any],
+    certificate_arn: str,
+    alb_group: str,
+    platform_namespace: str,
+    gateway_secret_header: str = "",
+) -> list[dict[str, Any]]:
+    """One first-party host, with no shared central session or auth target."""
+    suffix = hashlib.sha256(hostname.encode()).hexdigest()[:16]
+    name = route_name(namespace, f"custom-{suffix}")
+    out = render_app_routes(
+        app_slug=app_slug,
+        namespace=namespace,
+        workloads={service: ([hostname], port)},
+        gated=gated,
+        paused=paused,
+        gateway_secret=str(config.get("gateway_secret") or "") if gated else "",
+        gateway_secret_header=gateway_secret_header,
+    )
+    for item in out:
+        kind = item["kind"]
+        item["metadata"]["labels"].pop("astrolift.dev/managed-subdomain", None)
+        item["metadata"]["labels"]["astrolift.dev/custom-domain"] = (
+            hostname if len(hostname) <= 63 else f"host-{suffix}"
+        )
+        item["metadata"]["annotations"] = {"astrolift.dev/custom-domain-host": hostname}
+        item["metadata"]["labels"][ROUTE_NAMESPACE_LABEL] = namespace
+        if kind == "ReferenceGrant":
+            item["metadata"]["name"] = f"custom-{suffix}"
+        else:
+            item["metadata"]["name"] = name
+        if kind == "HTTPRoute":
+            item["metadata"]["labels"][GATE_LABEL] = "custom-gated" if gated else "ungated"
+            for rule in item["spec"]["rules"]:
+                for filter_ in rule.get("filters", []):
+                    if filter_.get("type") == "ExtensionRef":
+                        filter_["extensionRef"]["name"] = name
+    if gated:
+        out.extend(
+            custom_domain_security_policies(
+                config,
+                hostname=hostname,
+                name=name,
+                labels=out[0]["metadata"]["labels"],
+                access=access,
+            )
+        )
+    front = alb_host_ingress(
+        app_slug=app_slug,
+        namespace=namespace,
+        hostnames=[hostname],
+        platform_namespace=platform_namespace,
+        group_annotations={"alb.ingress.kubernetes.io/group.name": alb_group},
+    )
+    front["metadata"]["name"] = name
+    front["metadata"]["labels"]["astrolift.dev/custom-domain"] = hostname if len(hostname) <= 63 else f"host-{suffix}"
+    front["metadata"]["annotations"]["astrolift.dev/custom-domain-host"] = hostname
+    front["metadata"]["annotations"]["alb.ingress.kubernetes.io/certificate-arn"] = certificate_arn
+    out.append(front)
+    return out
 
 
 def edge_component(

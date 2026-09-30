@@ -389,6 +389,21 @@ def _apply_post_install_manifests(
         namespace = _post_install_namespace(manifests, default=target_namespace)
         result = driver.apply_manifests(ctx_slug, namespace, manifests)
 
+        if any(
+            getattr(error, "exception_type", "")
+            in {
+                "CustomDomainAuthPending",
+                "CustomDomainAuthApplyFailed",
+            }
+            for error in result.errors
+        ):
+            from temporalio.exceptions import ApplicationError
+
+            raise ApplicationError(
+                "custom-domain authentication is not ready; its backend remains guarded and the edge install must retry",
+                non_retryable=False,
+            )
+
         if result.ok:
             log.info(
                 "install_cluster_prereqs: post-install %s applied "
@@ -690,6 +705,11 @@ def _install_cluster_prereqs_sync(
     cluster = TenantCluster.objects.select_related(
         "provider_plugin",
     ).get(pk=cluster_id)
+    if "envoy-gateway" in selected_keys:
+        from astrolift_clusters.edge_install import edge_support_refusal
+
+        if refusal := edge_support_refusal(cluster):
+            raise AppDeployError(refusal)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
 
