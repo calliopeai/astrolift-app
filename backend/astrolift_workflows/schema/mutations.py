@@ -18,6 +18,7 @@ import strawberry
 from django.db import transaction
 from strawberry.types import Info
 
+from astrolift_identity.operation_context import agent_region_operation, execution_operation
 from astrolift_workflows.client import (
     cancel_workflow,
     signal_workflow,
@@ -144,7 +145,11 @@ def _gate_instance_op(user, workflow_id: str) -> MutationResult | None:
     if _has_elevated_viewer_access(user):
         return None
     caller = _caller_org_pk()
-    check_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_run_scope(workflow_id, caller))
+    from astrolift_identity.abac import operation_attributes
+    from astrolift_identity.operation_context import workflow_operation
+
+    with operation_attributes(**workflow_operation(workflow_id).attributes()):
+        check_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_run_scope(workflow_id, caller))
     if caller is None:
         raise TenantRequired("instance ops on org-owned runs require a resolved tenant context")
     if _run_owner_org_id(workflow_id) != caller:
@@ -322,7 +327,9 @@ class WorkflowsMutation:
     update/delete/reorder #966 did not build."""
 
     @strawberry.mutation(description="Cancel, terminate, or retry cleanup for an exact owned execution.")
-    @require_permission(Permission.WORKFLOW_TRIGGER, scope=execution_scope_by_id())
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER, scope=execution_scope_by_id(), operation=execution_operation
+    )
     @tenant_scoped()
     def control_workflow_execution(
         self,
@@ -561,7 +568,11 @@ class WorkflowsMutation:
     # ── run mapping (spec 40 §3) ────────────────────────────────────────
 
     @strawberry.mutation(description="Run a configured Workflow now via Temporal (spec 40 §3).")
-    @require_permission(Permission.WORKFLOW_TRIGGER, scope=workflow_scope_by_guid("workflow_id"))
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=workflow_scope_by_guid("workflow_id"),
+        operation=agent_region_operation,
+    )
     @tenant_scoped()
     def run_workflow(
         self,

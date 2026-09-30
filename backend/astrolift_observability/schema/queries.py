@@ -58,12 +58,12 @@ from astrolift_observability.schema.types import (
     WorkloadResourceGauge,
     WorkloadResourceUsage,
 )
+from astrolift_observability.scopes import managed_service_metrics_scope
 from astrolift_operations import prometheus_client
 from astrolift_operations.prometheus_client import PrometheusError
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models.managed_service import ManagedService
-from astrolift_services.scopes import managed_service_scope_by_guid
 from core.cluster_observability import namespace_for_app_environment
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -71,6 +71,30 @@ from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
+
+# Internal metric catalogs must not become Strawberry root fields (#2111).
+_POSTGRES_METRICS: tuple[tuple[str, str], ...] = (
+    ("connections", "count"),
+    ("cpu", "seconds"),
+    ("iops", "rps"),
+    ("slow_queries", "rps"),
+    ("replica_lag", "seconds"),
+)
+_OBJECT_STORE_METRICS: tuple[tuple[str, str], ...] = (
+    ("bucket_size", "bytes"),
+    ("request_count", "rps"),
+    ("errors_4xx", "rps"),
+    ("errors_5xx", "rps"),
+    ("egress_bytes", "rps"),
+)
+
+_MODEL_ENDPOINT_METRICS: tuple[tuple[str, str], ...] = (
+    ("tokens_per_second", "rps"),
+    ("requests_running", "count"),
+    ("requests_waiting", "count"),
+    ("ttft_p95", "seconds"),
+    ("kv_cache_usage", "ratio"),
+)
 
 # Default window when the FE doesn't pass one — 1h matches the time-
 # range picker's "1h" default.
@@ -375,7 +399,9 @@ def _instant_resource_gauge(
 @strawberry.type
 class GoldenSignalsQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_golden_signals(
         self,
@@ -586,7 +612,9 @@ class GoldenSignalsQuery:
         return AppGoldenSignalsResult(reason=reason, signals=out)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_status_code_breakdown(
         self,
@@ -733,7 +761,9 @@ class GoldenSignalsQuery:
     # cadence under sustained load.
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_workload_resource_usage(
         self,
@@ -837,7 +867,9 @@ class GoldenSignalsQuery:
     # arbitrary HTTP fetcher.
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_url_health(
         self,
@@ -896,7 +928,9 @@ class GoldenSignalsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_url_probe_history(
         self,
@@ -969,31 +1003,8 @@ class GoldenSignalsQuery:
     # sidecars (postgres-exporter / s3-exporter). The exporters tag
     # series with the managed-service guid so we can scope per-row.
 
-    _POSTGRES_METRICS: tuple[tuple[str, str], ...] = (
-        ("connections", "count"),
-        ("cpu", "seconds"),
-        ("iops", "rps"),
-        ("slow_queries", "rps"),
-        ("replica_lag", "seconds"),
-    )
-    _OBJECT_STORE_METRICS: tuple[tuple[str, str], ...] = (
-        ("bucket_size", "bytes"),
-        ("request_count", "rps"),
-        ("errors_4xx", "rps"),
-        ("errors_5xx", "rps"),
-        ("egress_bytes", "rps"),
-    )
-
-    _MODEL_ENDPOINT_METRICS: tuple[tuple[str, str], ...] = (
-        ("tokens_per_second", "rps"),
-        ("requests_running", "count"),
-        ("requests_waiting", "count"),
-        ("ttft_p95", "seconds"),
-        ("kv_cache_usage", "ratio"),
-    )
-
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=managed_service_scope_by_guid("managed_service_id"))
+    @require_permission(Permission.APP_READ, scope=managed_service_metrics_scope("managed_service_id"))
     @tenant_scoped()
     def astrolift_app_managed_service_metrics(
         self,
@@ -1028,13 +1039,13 @@ class GoldenSignalsQuery:
 
         kind = svc.kind
         if kind == ManagedService.Kind.POSTGRES:
-            metric_set = self._POSTGRES_METRICS
+            metric_set = _POSTGRES_METRICS
             builder = prom_queries.build_managed_service_postgres_query
         elif kind == ManagedService.Kind.OBJECT_STORE:
-            metric_set = self._OBJECT_STORE_METRICS
+            metric_set = _OBJECT_STORE_METRICS
             builder = prom_queries.build_managed_service_object_store_query
         elif kind == ManagedService.Kind.MODEL_ENDPOINT and svc.variant == "vllm":
-            metric_set = self._MODEL_ENDPOINT_METRICS
+            metric_set = _MODEL_ENDPOINT_METRICS
             builder = prom_queries.build_managed_service_model_endpoint_query
         else:
             return None
@@ -1111,7 +1122,9 @@ class GoldenSignalsQuery:
     # "how often it restarts" and the live resource consumption).
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_pod_resource_usage(
         self,
@@ -1269,7 +1282,9 @@ class GoldenSignalsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_metric_names(
         self,
@@ -1359,7 +1374,9 @@ class GoldenSignalsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_execute_promql(
         self,
@@ -1447,7 +1464,9 @@ class GoldenSignalsQuery:
         return ExecutePromqlResult(ok=True, error="", series=series)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_traces(
         self,
@@ -1520,7 +1539,9 @@ class GoldenSignalsQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_trace_spans(
         self,
@@ -1576,7 +1597,9 @@ class GoldenSignalsQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_endpoint_metrics(
         self,

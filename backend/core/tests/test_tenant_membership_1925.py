@@ -14,11 +14,13 @@ import pytest
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.backends.db import SessionStore
+from django.http import HttpResponse
 from django.test import RequestFactory
 
 from astrolift_identity.models import Member, Organization, Project, Team
 from core.middleware.tenant import TenantContextMiddleware
 from core.schema.ws_auth import _resolve_tenant_for_user
+from core.tenancy import get_current_tenant
 
 pytestmark = pytest.mark.django_db
 User = get_user_model()
@@ -58,7 +60,7 @@ def _tenant(user, *, org=None, session_org=None, team=None, project=None):
     request.session = SessionStore()
     if session_org is not None:
         request.session["organization_id"] = session_org.pk
-    TenantContextMiddleware(lambda r: None).process_request(request)
+    TenantContextMiddleware(lambda r: HttpResponse())(request)
     return request.astrolift_tenant
 
 
@@ -66,6 +68,7 @@ def test_a_member_selects_their_org():
     org = _org("a")
     user = _member(org, _user("u"))
     assert _tenant(user, org=org).organization_id == org.pk
+    assert get_current_tenant() is None
 
 
 def test_a_non_member_cannot_select_an_org_by_guid():

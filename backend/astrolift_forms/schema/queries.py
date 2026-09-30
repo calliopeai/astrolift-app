@@ -23,6 +23,7 @@ from strawberry.types import Info
 
 from astrolift_forms.models import FormDefinition, FormSubmission
 from astrolift_forms.schema.types import FormDefinitionType, FormSubmissionType
+from astrolift_forms.scopes import form_org_scope
 from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -120,7 +121,7 @@ _SUBMISSIONS_LIMIT = 500
 @strawberry.type
 class FormsQuery:
     @strawberry.field
-    @require_permission(Permission.FORM_READ)
+    @require_permission(Permission.FORM_READ, scope=form_org_scope(Permission.FORM_READ))
     @tenant_scoped()
     def form_definitions(
         self,
@@ -135,7 +136,7 @@ class FormsQuery:
         return [form_to_type(f) for f in qs]
 
     @strawberry.field
-    @require_permission(Permission.FORM_READ)
+    @require_permission(Permission.FORM_READ, scope=form_org_scope(Permission.FORM_READ))
     @tenant_scoped()
     def form_definition(
         self,
@@ -156,7 +157,7 @@ class FormsQuery:
         return form_to_type(form)
 
     @strawberry.field
-    @require_permission(Permission.FORM_READ)
+    @require_permission(Permission.FORM_READ, scope=form_org_scope(Permission.FORM_READ))
     @tenant_scoped()
     def form_submissions(
         self,

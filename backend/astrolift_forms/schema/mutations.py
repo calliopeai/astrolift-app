@@ -37,6 +37,7 @@ from strawberry.types import Info
 from astrolift_forms.models import FormDefinition, FormSubmission
 from astrolift_forms.schema.queries import form_to_type, submission_to_type
 from astrolift_forms.schema.types import FormDefinitionType, FormSubmissionType
+from astrolift_forms.scopes import form_org_scope, form_organization_scope
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -186,7 +187,7 @@ class DeleteFormDefinitionInput:
 class FormsMutation:
     @strawberry.field
     @mutation_audit(action="form.create")
-    @require_permission(Permission.FORM_CREATE)
+    @require_permission(Permission.FORM_CREATE, scope=form_org_scope(Permission.FORM_CREATE))
     @tenant_scoped()
     def create_form_definition(
         self,
@@ -252,7 +253,7 @@ class FormsMutation:
 
     @strawberry.field
     @mutation_audit(action="form.update")
-    @require_permission(Permission.FORM_UPDATE)
+    @require_permission(Permission.FORM_UPDATE, scope=form_org_scope(Permission.FORM_UPDATE))
     @tenant_scoped()
     def update_form_definition(
         self,
@@ -311,7 +312,7 @@ class FormsMutation:
 
     @strawberry.field
     @mutation_audit(action="form.publish")
-    @require_permission(Permission.FORM_UPDATE)
+    @require_permission(Permission.FORM_UPDATE, scope=form_org_scope(Permission.FORM_UPDATE))
     @tenant_scoped()
     def publish_form(
         self,
@@ -349,7 +350,7 @@ class FormsMutation:
 
     @strawberry.field
     @mutation_audit(action="form.archive")
-    @require_permission(Permission.FORM_UPDATE)
+    @require_permission(Permission.FORM_UPDATE, scope=form_org_scope(Permission.FORM_UPDATE))
     @tenant_scoped()
     def archive_form(
         self,
@@ -374,7 +375,7 @@ class FormsMutation:
 
     @strawberry.field
     @mutation_audit(action="form.delete")
-    @require_permission(Permission.FORM_DELETE)
+    @require_permission(Permission.FORM_DELETE, scope=form_org_scope(Permission.FORM_DELETE))
     @tenant_scoped()
     def delete_form_definition(
         self,
@@ -399,7 +400,7 @@ class FormsMutation:
         # ``deleted_at__isnull=True`` by default via SoftDeleteManager)
         # stop returning them. Loop rather than ``update()`` so
         # ``soft_delete`` runs the version-bumping save path on each row.
-        for sub in FormSubmission.objects.filter(form=form, deleted_at__isnull=True):
+        for sub in FormSubmission.objects.filter(form=form, organization=org, deleted_at__isnull=True):
             sub.soft_delete(by=actor)
         form.soft_delete(by=actor)
         return gql_success(form_to_type(form))
@@ -448,7 +449,9 @@ class FormsMutation:
             from core.permissions import PermissionDenied, check_permission
 
             try:
-                check_permission(Permission.FORM_SUBMIT)
+                check_permission(
+                    Permission.FORM_SUBMIT, scope=form_organization_scope(Permission.FORM_SUBMIT)
+                )
             except PermissionDenied as exc:
                 return gql_failure(ErrorCode.PERMISSION_DENIED.value, exc.reason)
 
@@ -493,7 +496,7 @@ class FormsMutation:
 
     @strawberry.field
     @mutation_audit(action="form.submission.update_status")
-    @require_permission(Permission.FORM_MODERATE)
+    @require_permission(Permission.FORM_MODERATE, scope=form_org_scope(Permission.FORM_MODERATE))
     @tenant_scoped()
     def update_submission_status(
         self,
@@ -517,6 +520,8 @@ class FormsMutation:
             FormSubmission.objects.filter(
                 guid=str(submission_id),
                 organization=org,
+                form__organization=org,
+                form__deleted_at__isnull=True,
             )
             .select_related("form", "submitter")
             .first()

@@ -240,10 +240,21 @@ def covered_project_ids(org_id: int | None, permission: Permission):
     if scopes.org:
         return None
     return Project.objects.filter(
-        Q(pk__in=scopes.project_ids) | Q(team_id__in=scopes.team_ids, team__deleted_at__isnull=True),
+        Q(pk__in=scopes.project_ids | scopes.exact_project_ids)
+        | Q(team_id__in=scopes.team_ids, team__deleted_at__isnull=True),
         organization_id=org_id,
         deleted_at__isnull=True,
     ).values("pk")
+
+
+def visible_project_owned(qs, org_id: int | None, permission: Permission, path: str):
+    projects = covered_project_ids(org_id, permission)
+    if projects is None:
+        return qs
+    visible = Q(**{f"{path}_id__in": projects})
+    if granted_scopes(get_current_tenant(), permission).org_only:
+        visible |= Q(**{f"{path}__isnull": True})
+    return qs.filter(visible)
 
 
 def visible_runs(qs, org_id: int | None, permission: Permission):
@@ -254,7 +265,10 @@ def visible_runs(qs, org_id: int | None, permission: Permission):
     app's project and team cover it only while they are live, as in the
     resolver's ``_app_scope_chains``.
     """
+    from astrolift_identity.operation_visibility import visible_workflow_operation_rows
     from astrolift_registry.models import RegisteredApp
+
+    qs = visible_workflow_operation_rows(qs, permission)
 
     projects = covered_project_ids(org_id, permission)
     if projects is None:
@@ -267,10 +281,12 @@ def visible_runs(qs, org_id: int | None, permission: Permission):
         organization_id=org_id,
         deleted_at__isnull=True,
     )
-    return qs.filter(
-        Q(registered_app_id__in=apps.values("pk"))
-        | Q(registered_app__isnull=True, workflow_definition__project_id__in=projects)
+    visible = Q(registered_app_id__in=apps.values("pk")) | Q(
+        registered_app__isnull=True, workflow_definition__project_id__in=projects
     )
+    if scopes.org_only:
+        visible |= Q(registered_app__isnull=True, workflow_definition__project__isnull=True)
+    return qs.filter(visible)
 
 
 def may_decide_human_gate(user, approvers: list | None) -> bool:

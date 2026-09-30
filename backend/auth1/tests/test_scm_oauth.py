@@ -17,7 +17,9 @@ from django.test import Client
 
 from astrolift_identity.models import Member, Organization
 from astrolift_scm.models import SourceConnection
+from core.permissions import Permission
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
+from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
@@ -53,6 +55,9 @@ def org_user_member():
         scope_kind="ORG",
         scope_id=org.pk,
         is_active=True,
+    )
+    bind_role(
+        user, permissions=[Permission.SCM_CONNECT], kind="ORG", scope_id=org.pk, slug=f"scm-connect-{org.pk}"
     )
     return org, user
 

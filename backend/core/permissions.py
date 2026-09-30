@@ -21,11 +21,14 @@ import enum
 import functools
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 
 from core.tenancy import TenantContext, get_current_tenant
+
+if TYPE_CHECKING:
+    from astrolift_identity.operation_context import OperationContext
 
 
 class Permission(enum.StrEnum):
@@ -526,10 +529,14 @@ class GrantedScopes:
     # A reader that ignores these under-grants, which is the safe side.
     exact_team_ids: frozenset[int] = frozenset()
     exact_project_ids: frozenset[int] = frozenset()
+    # Non-inheriting org grants and policies may allow the org row while
+    # excluding descendants. This flag covers only organization-owned rows.
+    org_only: bool = False
 
     def __bool__(self) -> bool:
         return (
             self.org
+            or self.org_only
             or bool(self.team_ids)
             or bool(self.project_ids)
             or bool(self.app_ids)
@@ -666,6 +673,7 @@ def require_permission(
     *permissions: Permission,
     scope: Callable[[dict[str, Any]], PermissionScope | None] | None = None,
     any_scope: bool = False,
+    operation: Callable[[dict[str, Any]], Iterable[OperationContext]] | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Resolver-entry permission gate.
 
@@ -681,6 +689,11 @@ def require_permission(
     falls back to the plain tenant-context check.
 
     Multiple permissions in one call require *all* (logical AND).
+
+    ``operation`` supplies authoritative ABAC facts for the targeted
+    environment(s). Every target must allow every permission. One target's
+    context stays bound through the resolver's nested checks; app-wide
+    operations check all affected environments before any side effect.
 
     ``any_scope=True`` switches the gate to "holds this permission at
     any scope in the active org" -- the only correct gate for a
@@ -709,6 +722,28 @@ def require_permission(
 
         signature = inspect.signature(fn)
 
+        from contextlib import contextmanager
+
+        @contextmanager
+        def authorization_context(context=None):
+            memo = _scopes_memo.set({}) if any_scope or operation is not None else None
+            try:
+                if operation is None:
+                    yield
+                else:
+                    from astrolift_identity.abac import operation_attributes
+
+                    facts = (
+                        context.attributes()
+                        if context is not None
+                        else {"environment": None, "region": None, "approvals": None}
+                    )
+                    with operation_attributes(**facts):
+                        yield
+            finally:
+                if memo is not None:
+                    _scopes_memo.reset(memo)
+
         def check(args, kwargs) -> None:
             if any_scope:
                 for perm in permissions:
@@ -722,43 +757,72 @@ def require_permission(
             for perm in permissions:
                 check_permission(perm, scope=target_scope)
 
-        if inspect.isasyncgenfunction(fn):
+        def operation_contexts(args, kwargs):
+            contexts = (None,)
+            if operation is not None:
+                bound = signature.bind(*args, **kwargs)
+                bound.apply_defaults()
+                contexts = tuple(operation(bound.arguments))
+                if not contexts:
+                    raise PermissionDenied(permissions[0], None, "operation target could not be resolved")
+            return contexts
 
-            def admitted(args, kwargs) -> bool:
-                try:
+        def admitted_context(args, kwargs):
+            contexts = operation_contexts(args, kwargs)
+            for context in contexts:
+                with authorization_context(context):
                     check(args, kwargs)
-                except PermissionDenied:
-                    return False
-                return True
+            return contexts[0] if len(contexts) == 1 else None
+
+        if inspect.isasyncgenfunction(fn):
 
             @functools.wraps(fn)
             async def wrapper(*args, **kwargs):
                 from asgiref.sync import sync_to_async
 
-                if not await sync_to_async(admitted)(args, kwargs):
+                try:
+                    context = await sync_to_async(admitted_context)(args, kwargs)
+                except PermissionDenied:
                     return
-                # ``async for`` alone never closes the inner generator when the
-                # subscriber goes away; close it so its own teardown runs now.
                 inner = fn(*args, **kwargs)
                 try:
-                    async for item in inner:
+                    while True:
+                        with authorization_context(context):
+                            try:
+                                item = await inner.__anext__()
+                            except StopAsyncIteration:
+                                break
+                        # A suspended subscription must not lend operation
+                        # facts or ContextVar tokens to its consumer's task.
                         yield item
                 finally:
-                    await inner.aclose()
+                    with authorization_context(context):
+                        await inner.aclose()
+
+        elif inspect.iscoroutinefunction(fn):
+
+            @functools.wraps(fn)
+            async def wrapper(*args, **kwargs):
+                from asgiref.sync import sync_to_async
+
+                context = await sync_to_async(admitted_context)(args, kwargs)
+                with authorization_context(context):
+                    return await fn(*args, **kwargs)
 
         else:
 
             @functools.wraps(fn)
             def wrapper(*args, **kwargs):
-                if any_scope:
-                    token = _scopes_memo.set({})
-                    try:
+                contexts = operation_contexts(args, kwargs)
+                if len(contexts) == 1:
+                    with authorization_context(contexts[0]):
                         check(args, kwargs)
                         return fn(*args, **kwargs)
-                    finally:
-                        _scopes_memo.reset(token)
-                check(args, kwargs)
-                return fn(*args, **kwargs)
+                for context in contexts:
+                    with authorization_context(context):
+                        check(args, kwargs)
+                with authorization_context():
+                    return fn(*args, **kwargs)
 
         # Strawberry resolver introspection follows __wrapped__ but
         # also reads __signature__ when present; set both so the

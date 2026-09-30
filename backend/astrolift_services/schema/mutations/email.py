@@ -9,6 +9,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import managed_service_operation
 from astrolift_services.models import (
     ManagedService,
 )
@@ -57,7 +58,14 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def send_managed_service_test_email(
@@ -238,7 +246,14 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def add_email_suppression_entry(
@@ -368,7 +383,14 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def remove_email_suppression_entry(
@@ -473,7 +495,14 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def create_email_template(
@@ -603,7 +632,14 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def update_email_template(
@@ -728,7 +764,14 @@ class EmailServiceMutations:
     @require_permission(
         Permission.APP_UPDATE,
         Permission.MANAGED_SERVICE_UPDATE,
-        scope=managed_service_scope_by_guid("input.managed_service_id"),
+        scope=managed_service_scope_by_guid(
+            "input.managed_service_id",
+            permissions=(
+                Permission.APP_UPDATE,
+                Permission.MANAGED_SERVICE_UPDATE,
+            ),
+        ),
+        operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
     def delete_email_template(

@@ -47,16 +47,25 @@ def _resolve_org(guid: GUID, org_id: int | None) -> Organization | None:
 
 def _resolve_team(guid: GUID, org_id: int | None) -> Team | None:
     """Resolve a team by guid, scoped to the caller's org."""
-    return Team.objects.filter(guid=str(guid), organization_id=org_id).first()
+    return Team.objects.filter(
+        guid=str(guid), organization_id=org_id, organization__deleted_at__isnull=True
+    ).first()
 
 
 def _resolve_project(guid: GUID, org_id: int | None) -> Project | None:
     """Resolve a project by guid, scoped to the caller's org.
 
-    ``organization_id`` is denormalized onto Project, so no team join is
-    needed to enforce the boundary.
+    Both the denormalized organization and the live owning team must
+    agree. An old project row cannot keep authority after its team is
+    removed or moved to another organization.
     """
-    return Project.objects.filter(guid=str(guid), organization_id=org_id).first()
+    return Project.objects.filter(
+        guid=str(guid),
+        organization_id=org_id,
+        organization__deleted_at__isnull=True,
+        team__organization_id=org_id,
+        team__deleted_at__isnull=True,
+    ).first()
 
 
 def _validate_idp_config(input) -> MutationResultType | None:
@@ -112,16 +121,17 @@ def _resolve_scope_pk_in_org(scope_kind: str, scope_guid: str, org_id: int | Non
     if kind == "ORG":
         row = Organization.objects.filter(guid=scope_guid, pk=org_id).first()
     elif kind == "TEAM":
-        row = Team.objects.filter(guid=scope_guid, organization_id=org_id).first()
+        row = _resolve_team(scope_guid, org_id)
     elif kind == "PROJECT":
-        row = Project.objects.filter(guid=scope_guid, organization_id=org_id).first()
+        row = _resolve_project(scope_guid, org_id)
     elif kind == "APP":
         from astrolift_registry.models import RegisteredApp
+        from astrolift_registry.scopes import live_app_owners
 
-        row = RegisteredApp.objects.filter(
-            guid=scope_guid,
-            organization_id=org_id,
-            deleted_at__isnull=True,
+        row = live_app_owners(
+            RegisteredApp.objects.filter(
+                guid=scope_guid, organization_id=org_id, organization__deleted_at__isnull=True
+            )
         ).first()
     else:
         return None

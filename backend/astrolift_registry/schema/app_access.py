@@ -90,14 +90,18 @@ def _to_type(app: RegisteredApp) -> AppAccessType:
 @strawberry.type
 class AppAccessQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_access(self, info: Info, app_slug: str) -> AppAccessType | None:
         app = _app(app_slug)
         return _to_type(app) if app is not None else None
 
     @strawberry.field
-    @require_permission(Permission.APP_ACCESS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_ACCESS, scope=app_scope_by_slug("app_slug", permission=Permission.APP_ACCESS)
+    )
     @tenant_scoped()
     def astrolift_app_access_preview(
         self, info: Info, app_slug: str, groups: list[str], users: list[str]
@@ -124,7 +128,9 @@ class AppAccessQuery:
 class AppAccessMutation:
     @strawberry.field
     @mutation_audit(action="app.access.set")
-    @require_permission(Permission.APP_ACCESS, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_ACCESS, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_ACCESS)
+    )
     @tenant_scoped()
     def set_app_access(self, info: Info, input: SetAppAccessInput) -> MutationResultType[AppAccessType]:
         from core.edge_access import set_app_access

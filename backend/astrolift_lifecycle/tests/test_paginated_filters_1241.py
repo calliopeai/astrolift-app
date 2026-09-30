@@ -17,13 +17,22 @@ import pytest
 
 from astrolift_lifecycle.models import PreviewEnvironment
 from astrolift_lifecycle.schema.queries import _preview_environments_qs
+from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
+from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def previews(org, app, env):
+def previews(org, app, env, actor):
+    bind_role(
+        actor,
+        permissions=[Permission.APP_READ],
+        kind="ORG",
+        scope_id=org.pk,
+        slug="preview-status-reader",
+    )
     for branch, status in (
         ("feat-a", "running"),
         ("feat-b", "failed"),
@@ -33,18 +42,18 @@ def previews(org, app, env):
         PreviewEnvironment.objects.create(
             registered_app=app, app_environment=env, branch=branch, status=status
         )
-    return org, app, env
+    return org, app, env, actor
 
 
-def _branches(org, **kwargs):
-    with tenant_context(TenantContext(organization_id=org.id)):
+def _branches(org, actor, **kwargs):
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.pk)):
         return sorted(p.branch for p in _preview_environments_qs(**kwargs))
 
 
 def test_without_statuses_every_preview_is_returned(previews):
-    org, _, _ = previews
+    org, _, _, actor = previews
 
-    assert _branches(org, app_slug=None) == ["feat-a", "feat-b", "feat-c", "feat-d"]
+    assert _branches(org, actor, app_slug=None) == ["feat-a", "feat-b", "feat-c", "feat-d"]
 
 
 def test_the_default_view_is_expressible_as_a_positive_list(previews):
@@ -52,41 +61,48 @@ def test_the_default_view_is_expressible_as_a_positive_list(previews):
     own, which is why the pills had to be dropped rather than ported.
     Enumerating the wanted statuses is how it comes back, and it is why the
     argument is a list rather than a single status."""
-    org, _, _ = previews
+    org, _, _, actor = previews
 
-    assert _branches(org, app_slug=None, statuses=["running", "failed"]) == ["feat-a", "feat-b"]
+    assert _branches(org, actor, app_slug=None, statuses=["running", "failed"]) == ["feat-a", "feat-b"]
 
 
 def test_a_single_status_pill(previews):
-    org, _, _ = previews
+    org, _, _, actor = previews
 
-    assert _branches(org, app_slug=None, statuses=["failed"]) == ["feat-b"]
+    assert _branches(org, actor, app_slug=None, statuses=["failed"]) == ["feat-b"]
 
 
 def test_an_empty_list_is_treated_as_no_filter(previews):
     """A client that built its variables carelessly should not be told the app
     has no previews."""
-    org, _, _ = previews
+    org, _, _, actor = previews
 
-    assert len(_branches(org, app_slug=None, statuses=[])) == 4
+    assert len(_branches(org, actor, app_slug=None, statuses=[])) == 4
 
 
 def test_an_unknown_status_returns_nothing_rather_than_everything(previews):
     """Failing open would show torn-down rows on a pill that excludes them."""
-    org, _, _ = previews
+    org, _, _, actor = previews
 
-    assert _branches(org, app_slug=None, statuses=["nosuchstatus"]) == []
+    assert _branches(org, actor, app_slug=None, statuses=["nosuchstatus"]) == []
 
 
 def test_statuses_composes_with_the_app_scope(previews):
-    org, app, env = previews
+    org, app, env, actor = previews
 
-    assert _branches(org, app_slug=app.slug, statuses=["running"]) == ["feat-a"]
-    assert _branches(org, app_slug="not-a-real-app", statuses=["running"]) == []
+    assert _branches(org, actor, app_slug=app.slug, statuses=["running"]) == ["feat-a"]
+    assert _branches(org, actor, app_slug="not-a-real-app", statuses=["running"]) == []
 
 
 def test_statuses_narrows_within_the_tenant_and_never_across_it(previews):
     """A filter must not become a way out of the org scope (#1183)."""
-    org, _, _ = previews
+    org, _, _, actor = previews
     with tenant_context(TenantContext(organization_id=None)):
         assert list(_preview_environments_qs(app_slug=None, statuses=["running"])) == []
+
+
+def test_status_filter_does_not_admit_anonymous_or_ungranted_actor(previews, other_actor):
+    org, _, _, _ = previews
+    for actor_id in (None, other_actor.pk):
+        with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=actor_id)):
+            assert list(_preview_environments_qs(app_slug=None, statuses=["running"])) == []

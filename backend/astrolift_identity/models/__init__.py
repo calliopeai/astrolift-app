@@ -16,6 +16,7 @@ from astrolift_identity.models.preferences import UserPreferences
 from astrolift_identity.models.project import Project
 from astrolift_identity.models.role import Role
 from astrolift_identity.models.role_binding import RoleBinding
+from astrolift_identity.models.scim_group import ScimGroup
 from astrolift_identity.models.session import (
     DEFAULT_MAX_SESSIONS_PER_CLIENT_KIND,
     DEFAULT_STALE_SESSION_TTL_SECONDS,
@@ -54,6 +55,7 @@ __all__ = [
     "RevocationReason",
     "Role",
     "RoleBinding",
+    "ScimGroup",
     "Team",
     "UserPreferences",
 ]

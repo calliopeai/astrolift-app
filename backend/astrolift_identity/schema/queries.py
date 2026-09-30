@@ -113,8 +113,11 @@ from astrolift_identity.schema.types import (
     ui_preferences_to_type,
     user_to_type,
 )
-from astrolift_identity.scope_visibility import visible_projects, visible_teams
-from astrolift_identity.scopes import team_scope_by_guid
+from astrolift_identity.scopes import (
+    identity_organization_scope,
+    project_slug_available_scope,
+    team_scope_by_guid,
+)
 from core.decorators import tenant_scoped
 from core.naming import PROJECT_SLUG, TEAM_SLUG, NamingViolation
 from core.permissions import (
@@ -251,7 +254,9 @@ def _teams_qs(*, search: str | None = None):
     org_id = tenant.organization_id if tenant else None
     if org_id is None:
         return Team.objects.none()
-    qs = visible_teams(
+    from astrolift_identity.visibility import visible_identity_teams
+
+    qs = visible_identity_teams(
         Team.objects.filter(organization_id=org_id).select_related("organization"),
         Permission.TEAM_READ,
     )
@@ -273,7 +278,9 @@ def _projects_qs(*, search: str | None = None):
     org_id = tenant.organization_id if tenant else None
     if org_id is None:
         return Project.objects.none()
-    qs = visible_projects(
+    from astrolift_identity.visibility import visible_identity_projects
+
+    qs = visible_identity_projects(
         Project.objects.filter(organization_id=org_id).select_related("organization", "team"),
         Permission.PROJECT_READ,
     )
@@ -387,7 +394,11 @@ def _role_bindings_qs(*, search: str | None = None, app_slug: str | None = None)
     org_id = tenant.organization_id if tenant else None
     if org_id is None:
         return RoleBinding.objects.none()
-    qs = RoleBinding.objects.select_related("user", "role").filter(_org_scope_q(org_id))
+    from astrolift_identity.visibility import visible_identity_bindings
+
+    qs = visible_identity_bindings(
+        RoleBinding.objects.select_related("user", "role").filter(_org_scope_q(org_id))
+    )
     if app_slug:
         # scope_id is a generic BigInt rather than a FK, so the app has to be
         # resolved to its pk first. Deny-by-default: an unknown slug matches
@@ -469,7 +480,7 @@ class IdentityQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_organization(self, info: Info, slug: str) -> OrganizationType | None:
         from core.tenancy import get_current_tenant
@@ -612,7 +623,9 @@ class IdentityQuery:
         return page.map(project_to_type)
 
     @strawberry.field
-    @require_permission(Permission.TEAM_UPDATE)
+    @require_permission(
+        Permission.TEAM_UPDATE, scope=team_scope_by_guid("exclude_id", permission=Permission.TEAM_UPDATE)
+    )
     @tenant_scoped()
     def astrolift_team_slug_available(self, info: Info, slug: str, exclude_id: GUID | None = None) -> bool:
         """Live check backing the team-rename form (debounced as the
@@ -642,7 +655,7 @@ class IdentityQuery:
         return not qs.exists()
 
     @strawberry.field
-    @require_permission(Permission.PROJECT_UPDATE, scope=team_scope_by_guid("team_id"))
+    @require_permission(Permission.PROJECT_UPDATE, scope=project_slug_available_scope)
     @tenant_scoped()
     def astrolift_project_slug_available(
         self, info: Info, team_id: GUID, slug: str, exclude_id: GUID | None = None
@@ -926,7 +939,9 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage."
     )
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_members(self, info: Info, search: str | None = None) -> list[MemberType]:
         """Org-member listing with discoverability affordances.
@@ -948,7 +963,9 @@ class IdentityQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_members_page(
         self,
@@ -1003,7 +1020,9 @@ class IdentityQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.TEAM_READ, scope=team_scope_by_guid("team_id"))
+    @require_permission(
+        Permission.TEAM_READ, scope=team_scope_by_guid("team_id", permission=Permission.TEAM_READ)
+    )
     @tenant_scoped()
     def astrolift_team_members(self, info: Info, team_id: GUID) -> list[MemberType]:
         """Members attached to one team, by team GUID.
@@ -1037,7 +1056,9 @@ class IdentityQuery:
         return [member_to_type(m, team=team) for m in qs]
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_org_members_for_approval_picker(self, info: Info, org_slug: str) -> list[ApproverUserType]:
         """Active org members shaped for the approval-policy picker (#410).
@@ -1103,7 +1124,9 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage."
     )
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_invitations(self, info: Info, status: str | None = None) -> list[InvitationType]:
         """Org-scoped invitation list. Filter by status (pending /
@@ -1119,7 +1142,9 @@ class IdentityQuery:
         return [invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id) for r in rows]
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_invitations_page(
         self,
@@ -1168,13 +1193,13 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage."
     )
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_roles(self, info: Info) -> list[RoleType]:
         return [role_to_type(r) for r in _roles_qs().order_by("scope_level", "slug")[:200]]
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_roles_page(
         self,
@@ -1229,7 +1254,9 @@ class IdentityQuery:
     # ---- Invite-flow polish (#418) -------------------------------------
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_searchable_users(self, info: Info, query: str) -> list[SearchableUserType]:
         """De-dupe search the InviteDialog runs before letting the
@@ -1346,7 +1373,9 @@ class IdentityQuery:
         return rows
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_roles_i_can_grant(self, info: Info) -> list[RoleType]:
         """Roles the active viewer is permitted to grant on invite (#418).
@@ -1395,7 +1424,7 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage."
     )
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS, any_scope=True)
     @tenant_scoped()
     def astrolift_role_bindings(self, info: Info) -> list[RoleBindingType]:
         """Org-wide role bindings with human-readable source-scope labels.
@@ -1415,7 +1444,7 @@ class IdentityQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS, any_scope=True)
     @tenant_scoped()
     def astrolift_role_bindings_page(
         self,
@@ -1475,7 +1504,9 @@ class IdentityQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_group_role_mappings_page(
         self,
@@ -1516,7 +1547,9 @@ class IdentityQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_access_on(
         self,
@@ -1563,7 +1596,9 @@ class IdentityQuery:
     # ---- Access UX (#2126, after #2157) ---------------------------------
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_principal_search(
         self,
@@ -1596,7 +1631,9 @@ class IdentityQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_grant_preview(
         self, info: Info, input: GrantPreviewInput, limit: int | None = None
@@ -1620,7 +1657,9 @@ class IdentityQuery:
         return preview(tenant, org_id, input, limit=size)
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_policy_simulation(
         self,
@@ -1646,7 +1685,7 @@ class IdentityQuery:
         return simulate(org_id, draft, days=days, limit=size)
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_policy_condition_catalog(self, info: Info) -> ConditionCatalogType:
         """The condition kinds, their fields, and the resource and actor keys
@@ -1656,7 +1695,7 @@ class IdentityQuery:
         return condition_catalog()
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_role(self, info: Info, id: GUID) -> RoleType | None:
         """One role (#2126): this org's own or a system role, with its
@@ -1678,7 +1717,7 @@ class IdentityQuery:
         return role_to_type(role, bindings_count=role._bindings_count)
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_policy(self, info: Info, id: GUID) -> PolicyType | None:
         """One ABAC policy of this org (#2126); another org's reads as null."""
@@ -1701,13 +1740,17 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftApiTokensPage."
     )
-    @require_permission(Permission.API_TOKEN_CREATE)
+    @require_permission(
+        Permission.API_TOKEN_CREATE, scope=identity_organization_scope(Permission.API_TOKEN_CREATE)
+    )
     @tenant_scoped()
     def astrolift_api_tokens(self, info: Info) -> list[ApiTokenType]:
         return [api_token_to_type(t) for t in _api_tokens_qs().order_by("-created_at")[:200]]
 
     @strawberry.field
-    @require_permission(Permission.API_TOKEN_CREATE)
+    @require_permission(
+        Permission.API_TOKEN_CREATE, scope=identity_organization_scope(Permission.API_TOKEN_CREATE)
+    )
     @tenant_scoped()
     def astrolift_api_token_scope_catalog(self, info: Info) -> ApiTokenScopeCatalogType:
         """The scopes a token may carry, what each unlocks, and which the
@@ -1742,7 +1785,9 @@ class IdentityQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.API_TOKEN_CREATE)
+    @require_permission(
+        Permission.API_TOKEN_CREATE, scope=identity_organization_scope(Permission.API_TOKEN_CREATE)
+    )
     @tenant_scoped()
     def astrolift_api_tokens_page(
         self,
@@ -1774,13 +1819,13 @@ class IdentityQuery:
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage."
     )
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_policies(self, info: Info) -> list[PolicyType]:
         return [policy_to_type(p) for p in _policies_qs().order_by("scope_level", "slug")[:200]]
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_policies_page(
         self,
@@ -1828,7 +1873,9 @@ class IdentityQuery:
     # ---- Domain allowlist --------------------------------------------
 
     @strawberry.field
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def astrolift_organization_allowlist_domains(self, info: Info) -> list[OrganizationAllowlistedDomainType]:
         """Trusted email domains that auto-join SSO users into this org."""
@@ -1851,7 +1898,7 @@ class IdentityQuery:
     # ---- Identity providers ------------------------------------------
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_identity_providers(self, info: Info) -> list[IdentityProviderType]:
         from core.tenancy import get_current_tenant

@@ -51,8 +51,15 @@ from astrolift_identity.schema.types import (
     RoleBindingType,
     role_binding_to_type,
 )
-from astrolift_identity.scopes import team_scope_by_guid
+from astrolift_identity.scopes import (
+    binding_owner_scope,
+    grant_destination_scope,
+    identity_organization_scope,
+    role_binding_scope,
+    team_scope_by_guid,
+)
 from astrolift_identity.step_up import requires_elevation
+from astrolift_identity.visibility import visible_identity_bindings
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import (
@@ -60,6 +67,7 @@ from core.permissions import (
     PermissionDenied,
     PermissionScope,
     ScopeKind,
+    check_permission,
     require_permission,
 )
 from core.tenancy import TenantContext, get_current_tenant
@@ -123,14 +131,16 @@ def _revoke_refusal(
 
     key = (binding.scope_kind, binding.scope_id)
     if key not in ceilings:
+        owner = binding_owner_scope(binding)
+        try:
+            check_permission(Permission.ORG_MANAGE_MEMBERS, scope=owner)
+        except PermissionDenied as exc:
+            return exc.reason
         tenant = get_current_tenant() or TenantContext()
-        kind, scope_id = key
-        if not _scope_ancestry(tenant, PermissionScope(kind=ScopeKind(kind), id=scope_id)):
-            # The team, project or app was deleted, so the binding grants
-            # nothing until it is restored; the org's own ceiling decides
-            # who may clear it.
-            kind, scope_id = RoleBinding.ScopeKind.ORG, org_id
-        ceilings[key] = grant_ceiling(tenant, scope_kind=kind, scope_id=scope_id)
+        # The gate and the ceiling must use the same coherent owner. A
+        # stale owner falls back to ORG and cannot borrow a former team's
+        # wider permissions when its leftover binding is cleared.
+        ceilings[key] = grant_ceiling(tenant, scope_kind=owner.kind.value, scope_id=owner.id)
     ceiling = ceilings[key]
     if not ceiling.allows(binding.role.permissions):
         return REFUSAL
@@ -165,7 +175,7 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="role_binding.grant", target=_grant_target)
     @requires_elevation(action_label="role_binding.grant")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS, scope=grant_destination_scope)
     @tenant_scoped()
     def grant_role(self, info: Info, input: GrantRoleInput) -> MutationResultType[RoleBindingType]:
         from django.contrib.auth import get_user_model
@@ -298,7 +308,7 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="role_binding.update")
     @requires_elevation(action_label="role_binding.update")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS, scope=role_binding_scope)
     @tenant_scoped()
     def update_role_binding(
         self, info: Info, input: UpdateRoleBindingInput
@@ -387,7 +397,9 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="group_role_mapping.create")
     @requires_elevation(action_label="group_role_mapping.create")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def create_group_role_mapping(
         self, info: Info, input: CreateGroupRoleMappingInput
@@ -445,7 +457,9 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="group_role_mapping.delete")
     @requires_elevation(action_label="group_role_mapping.delete")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def delete_group_role_mapping(
         self, info: Info, input: DeleteGroupRoleMappingInput
@@ -479,7 +493,7 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="role_binding.revoke", target=_revoke_target)
     @requires_elevation(action_label="role_binding.revoke")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS, scope=role_binding_scope)
     @tenant_scoped()
     def revoke_role_binding(
         self, info: Info, input: RevokeRoleBindingInput
@@ -527,7 +541,7 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="role_binding.bulk_revoke")
     @requires_elevation(action_label="role_binding.bulk_revoke")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(Permission.ORG_MANAGE_MEMBERS, any_scope=True)
     @tenant_scoped()
     def bulk_revoke_astrolift_role_bindings(
         self, info: Info, input: BulkRevokeRoleBindingsInput
@@ -573,9 +587,11 @@ class RoleBindingMutations:
         # not-found (fail closed) instead of being revocable cross-tenant.
         bindings_by_guid = {
             str(b.guid): b
-            for b in RoleBinding.objects.select_related("user", "role")
-            .filter(guid__in=ordered_unique, deleted_at__isnull=True)
-            .filter(_org_scope_q(org_id))
+            for b in visible_identity_bindings(
+                RoleBinding.objects.select_related("user", "role")
+                .filter(guid__in=ordered_unique, deleted_at__isnull=True)
+                .filter(_org_scope_q(org_id))
+            )
         }
 
         results: list[_BulkOpItemResult] = []
@@ -687,7 +703,10 @@ class RoleBindingMutations:
     @strawberry.field
     @mutation_audit(action="role_binding.bulk_assign_team")
     @requires_elevation(action_label="role_binding.bulk_assign_team")
-    @require_permission(Permission.TEAM_MANAGE_MEMBERS, scope=team_scope_by_guid("input.team_id"))
+    @require_permission(
+        Permission.TEAM_MANAGE_MEMBERS,
+        scope=team_scope_by_guid("input.team_id", permission=Permission.TEAM_MANAGE_MEMBERS),
+    )
     @tenant_scoped()
     def bulk_assign_astrolift_team_member_roles(
         self, info: Info, input: BulkAssignTeamMemberRolesInput

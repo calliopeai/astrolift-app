@@ -32,7 +32,7 @@ from astrolift_identity.schema.types import (
     TeamType,
     team_to_type,
 )
-from astrolift_identity.scopes import team_scope_by_guid
+from astrolift_identity.scopes import identity_organization_scope, team_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.naming import TEAM_SLUG, NamingViolation
@@ -46,7 +46,7 @@ class TeamMutations:
 
     @strawberry.field
     @mutation_audit(action="team.create")
-    @require_permission(Permission.TEAM_CREATE)
+    @require_permission(Permission.TEAM_CREATE, scope=identity_organization_scope(Permission.TEAM_CREATE))
     @tenant_scoped()
     def create_team(self, info: Info, input: CreateTeamInput) -> MutationResultType[TeamType]:
         tenant = get_current_tenant()
@@ -72,7 +72,9 @@ class TeamMutations:
 
     @strawberry.field
     @mutation_audit(action="team.update")
-    @require_permission(Permission.TEAM_UPDATE, scope=team_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.TEAM_UPDATE, scope=team_scope_by_guid("input.id", permission=Permission.TEAM_UPDATE)
+    )
     @tenant_scoped()
     def update_team(self, info: Info, input: UpdateTeamInput) -> MutationResultType[TeamType]:
         tenant = get_current_tenant()
@@ -114,7 +116,9 @@ class TeamMutations:
 
     @strawberry.field
     @mutation_audit(action="team.delete")
-    @require_permission(Permission.TEAM_DELETE, scope=team_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.TEAM_DELETE, scope=team_scope_by_guid("input.id", permission=Permission.TEAM_DELETE)
+    )
     @tenant_scoped()
     def soft_delete_team(
         self, info: Info, input: SoftDeleteByGuidInput

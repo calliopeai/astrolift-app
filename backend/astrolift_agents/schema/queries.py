@@ -122,6 +122,7 @@ from astrolift_graphql import (
     resolve_list_sort,
     search_q,
 )
+from astrolift_identity.operation_context import agent_region_operation, agent_task_operation
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission, require_platform_operator
 from core.tenancy import get_current_tenant
@@ -1158,7 +1159,11 @@ class AgentsQuery:
         return agent_tasks_to_types(qs)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=agent_task_scope("id", Permission.APP_READ))
+    @require_permission(
+        Permission.APP_READ,
+        scope=agent_task_scope("id", Permission.APP_READ),
+        operation=agent_task_operation("id"),
+    )
     @tenant_scoped()
     def agent_task(self, info: Info, id: strawberry.ID) -> AgentTaskType | None:
         """One AgentTask by GUID, scoped to the caller's org."""
@@ -1230,7 +1235,9 @@ class AgentsQuery:
 
     @strawberry.field
     @require_permission(
-        Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT)
+        Permission.AGENT_TASK_SEND_INPUT,
+        scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT),
+        operation=agent_task_operation("task_id"),
     )
     @tenant_scoped()
     def agent_task_input_message(
@@ -1294,7 +1301,9 @@ class AgentsQuery:
         return agent_task_to_type(task) if task is not None else None
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ, scope=agent_task_scope("task_id"))
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_task_scope("task_id"), operation=agent_task_operation("task_id")
+    )
     @tenant_scoped()
     def agent_task_interactions(
         self,
@@ -1343,7 +1352,9 @@ class AgentsQuery:
         return [agent_interaction_to_type(r) for r in qs]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ, scope=agent_task_scope("task_id"))
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_task_scope("task_id"), operation=agent_task_operation("task_id")
+    )
     @tenant_scoped()
     def agent_task_events(
         self,
@@ -1396,7 +1407,9 @@ class AgentsQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ, scope=agent_task_scope("id"))
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_task_scope("id"), operation=agent_task_operation("id")
+    )
     @tenant_scoped()
     def agent_task_logs(self, info: Info, id: strawberry.ID, tail: int = 200) -> list[str]:
         """Recent stdout/stderr lines from an AgentTask's pod.
@@ -1612,7 +1625,7 @@ class AgentsQuery:
         return agent_env_spec_to_type(row) if row is not None else None
 
     @strawberry.field
-    @require_permission(Permission.SECRET_LIST, any_scope=True)
+    @require_permission(Permission.SECRET_LIST, any_scope=True, operation=agent_region_operation)
     @tenant_scoped()
     def agent_environment_spec_secret_status(self, info: Info, slug: str) -> list[AgentSecretStatusType]:
         """Per-ref presence status for a spec's ``secret_refs`` — metadata
@@ -1656,7 +1669,7 @@ class AgentsQuery:
         return [agent_secret_status_to_type(r) for r in rows]
 
     @strawberry.field
-    @require_permission(Permission.SECRET_LIST, any_scope=True)
+    @require_permission(Permission.SECRET_LIST, any_scope=True, operation=agent_region_operation)
     @tenant_scoped()
     def agent_environment_spec_secret_status_page(
         self,
@@ -1746,7 +1759,7 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.SECRET_LIST, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_LIST, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def agent_secret_bundles(self, info: Info, env_spec_slug: str) -> list[AgentSecretBundleType]:
         """Reusable bundles visible to this agent's organization.
@@ -1794,7 +1807,12 @@ class AgentsQuery:
         return [agent_secret_bundle_to_type(bundle, capabilities) for bundle in visible]
 
     @strawberry.field
-    @require_permission(Permission.SECRET_READ, Permission.SECRET_LIST, scope=agent_org_scope)
+    @require_permission(
+        Permission.SECRET_READ,
+        Permission.SECRET_LIST,
+        scope=agent_org_scope,
+        operation=agent_region_operation,
+    )
     @tenant_scoped()
     def agent_environment_spec_secret_bundle_attachments(
         self, info: Info, slug: str
@@ -2007,7 +2025,9 @@ class AgentsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("slug"))
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_workload_app_scope("slug"), operation=agent_region_operation
+    )
     @tenant_scoped()
     def agent(self, info: Info, org_id: strawberry.ID, slug: str) -> AgentDetailType | None:
         """One agent's full read bundle by slug (spec 38 Phase 4).
@@ -2050,7 +2070,9 @@ class AgentsQuery:
             "Use agentTriggersPage instead."
         )
     )
-    @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("agent_slug"))
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_workload_app_scope("agent_slug"), operation=agent_region_operation
+    )
     @tenant_scoped()
     def agent_triggers(self, info: Info, org_id: strawberry.ID, agent_slug: str) -> list[AgentTriggerType]:
         """Inbound trigger webhooks bound to one agent (spec 33, PR-6 / #951).
@@ -2068,7 +2090,9 @@ class AgentsQuery:
         return [agent_trigger_to_type(h) for h in hooks]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_READ, scope=agent_workload_app_scope("agent_slug"))
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_workload_app_scope("agent_slug"), operation=agent_region_operation
+    )
     @tenant_scoped()
     def agent_triggers_page(
         self,

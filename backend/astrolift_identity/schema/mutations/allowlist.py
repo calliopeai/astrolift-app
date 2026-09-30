@@ -32,6 +32,7 @@ from astrolift_identity.schema.types import (
     OrganizationAllowlistedDomainType,
     organization_allowlisted_domain_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -44,7 +45,9 @@ class AllowlistMutations:
 
     @strawberry.field
     @mutation_audit(action="organization_allowlist_domain.add")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def add_organization_allowlist_domain(
         self, info: Info, input: AddOrganizationAllowlistDomainInput
@@ -114,7 +117,9 @@ class AllowlistMutations:
 
     @strawberry.field
     @mutation_audit(action="organization_allowlist_domain.remove")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def remove_organization_allowlist_domain(
         self, info: Info, input: RemoveOrganizationAllowlistDomainInput

@@ -28,7 +28,7 @@ from django.contrib.auth import get_user_model
 
 from astrolift_identity.models import Organization, Project, Role, RoleBinding, Team
 from astrolift_identity.schema.queries import IdentityQuery, MeType
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.schema.queries import RegistryQuery
 from core.permissions import Permission, PermissionDenied, granted_scopes
 from core.tenancy import TenantContext, tenant_context
@@ -341,8 +341,12 @@ def test_app_scoped_binding_does_not_open_another_app(world, reba, info):
         RegistryQuery().astrolift_app(info, slug=world.platform_app.slug)
 
 
-def test_team_scoped_binding_opens_that_teams_workloads(world, reba, info):
-    """A TEAM grant inherits down to the team's apps."""
+@pytest.mark.parametrize("resolver", ["astrolift_workloads", "astrolift_workloads_page"])
+def test_team_scoped_binding_opens_that_teams_workloads(world, reba, info, resolver):
+    """Collection admission retains only rows covered by the TEAM grant."""
+
+    own = Workload.objects.create(registered_app=world.medops_app, name="Own", slug="own-1717")
+    Workload.objects.create(registered_app=world.platform_app, name="Sibling", slug="sibling-1717")
 
     _bind(
         reba,
@@ -352,9 +356,24 @@ def test_team_scoped_binding_opens_that_teams_workloads(world, reba, info):
         slug="tw-1717",
     )
     with _as(world, reba):
-        assert RegistryQuery().astrolift_workloads(info, app_slug=world.medops_app.slug) == []
+        query = getattr(RegistryQuery(), resolver)
+        for slug, expected in (
+            (None, [str(own.guid)]),
+            (world.medops_app.slug, [str(own.guid)]),
+            (world.platform_app.slug, []),
+        ):
+            result = query(info, app_slug=slug)
+            rows = result.items if resolver.endswith("_page") else result
+            assert [str(row.id) for row in rows] == expected
+            if resolver.endswith("_page"):
+                assert result.total_count == len(expected)
+
+
+@pytest.mark.parametrize("resolver", ["astrolift_workloads", "astrolift_workloads_page"])
+def test_workload_collection_without_any_read_grant_is_denied(world, reba, info, resolver):
+    Workload.objects.create(registered_app=world.medops_app, name="Own", slug="own-1717")
     with _as(world, reba), pytest.raises(PermissionDenied):
-        RegistryQuery().astrolift_workloads(info, app_slug=world.platform_app.slug)
+        getattr(RegistryQuery(), resolver)(info, app_slug=world.medops_app.slug)
 
 
 def test_team_scoped_binding_reads_its_own_team_members(world, reba, info):

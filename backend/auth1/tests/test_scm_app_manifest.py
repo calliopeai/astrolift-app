@@ -33,7 +33,9 @@ from django.utils import timezone
 
 from astrolift_identity.models import Member, Organization
 from astrolift_scm.models import SourceConnection
+from core.permissions import Permission
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
+from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
@@ -70,6 +72,9 @@ def org_user_member(settings):
         scope_kind="ORG",
         scope_id=org.pk,
         is_active=True,
+    )
+    bind_role(
+        user, permissions=[Permission.SCM_CONNECT], kind="ORG", scope_id=org.pk, slug=f"scm-connect-{org.pk}"
     )
     return org, user
 
@@ -501,6 +506,9 @@ def _make_installed_app(
 def _org_with_member(user, *, name, slug):
     org = Organization.objects.create(name=name, slug=slug)
     Member.objects.create(user=user, scope_kind="ORG", scope_id=org.pk, is_active=True)
+    bind_role(
+        user, permissions=[Permission.SCM_CONNECT], kind="ORG", scope_id=org.pk, slug=f"scm-connect-{org.pk}"
+    )
     return org
 
 

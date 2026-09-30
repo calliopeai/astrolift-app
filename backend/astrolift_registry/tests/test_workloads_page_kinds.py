@@ -10,11 +10,14 @@ rendered empty with Next still enabled.
 from __future__ import annotations
 
 import pytest
+from django.contrib.auth import get_user_model
 
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.schema.queries import _workloads_qs
+from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
+from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
@@ -44,7 +47,10 @@ def app_with_workloads():
 
 
 def _slugs(org, **kwargs):
-    with tenant_context(TenantContext(organization_id=org.id)):
+    user, created = get_user_model().objects.get_or_create(username=f"kinds-reader-{org.slug}")
+    if created:
+        bind_role(user, permissions=[Permission.APP_READ], kind="ORG", scope_id=org.pk, slug="reader")
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.pk)):
         return sorted(w.slug for w in _workloads_qs(app_slug=None, **kwargs))
 
 
@@ -108,3 +114,9 @@ def test_kinds_still_respects_the_tenant_boundary(app_with_workloads):
 def test_no_tenant_context_matches_nothing_even_with_kinds():
     """Deny-by-default survives the new argument."""
     assert list(_workloads_qs(app_slug=None, kinds=["function"])) == []
+
+
+def test_kind_filter_does_not_expose_rows_without_an_actor(app_with_workloads):
+    org, _ = app_with_workloads
+    with tenant_context(TenantContext(organization_id=org.pk)):
+        assert list(_workloads_qs(app_slug=None, kinds=["function"])) == []

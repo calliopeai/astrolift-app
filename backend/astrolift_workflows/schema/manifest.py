@@ -25,6 +25,11 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_manifest.parser import ManifestError
+from astrolift_workflows.import_scopes import (
+    import_definition_owner_scope,
+    manifest_destination_scope,
+    workflow_manifest_import_scope,
+)
 from core.decorators import tenant_scoped
 from core.permissions import Permission, check_permission, require_permission
 from core.schema.common import MutationResult, ValidationError
@@ -36,7 +41,7 @@ from workflows.manifest import (
     parse_workflow_manifest,
 )
 from workflows.models import WorkflowDefinition
-from workflows.scopes import definition_scope, definition_scope_by_slug
+from workflows.scopes import definition_scope_by_slug
 
 
 @strawberry.type
@@ -130,7 +135,7 @@ def _preview_type(parsed: ParsedWorkflowManifest) -> WorkflowManifestPreviewType
 @strawberry.type
 class WorkflowManifestQuery:
     @strawberry.field
-    @require_permission(Permission.WORKFLOW_READ)
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
     @tenant_scoped()
     def preview_workflow_manifest(self, info: Info, toml: str) -> WorkflowManifestPreviewType:
         """Parse a workflow manifest TOML into its structured preview.
@@ -213,7 +218,7 @@ class WorkflowManifestMutation:
             "one's bindings."
         )
     )
-    @require_permission(Permission.WORKFLOW_CREATE)
+    @require_permission(Permission.WORKFLOW_CREATE, scope=workflow_manifest_import_scope)
     @tenant_scoped()
     def import_workflow_manifest(
         self,
@@ -273,24 +278,50 @@ def _import_replace(info: Info, parsed: ParsedWorkflowManifest, org) -> ImportWo
     directly: checked once, at the definition's own scope, since every
     configured Workflow being repointed shares that scope by construction.
     """
-    from workflows.manifest import replace_definition_from_manifest
+    from django.db import transaction
+
+    from workflows.manifest import (
+        ReplaceOutcome,
+        create_definition_from_manifest,
+        replace_definition_from_manifest,
+    )
     from workflows.schema.mutations import _definition_write_error
 
     user = info.context.user
-    existing = WorkflowDefinition.objects.filter(
-        organization=org, slug=parsed.definition.slug, deleted_at__isnull=True
-    ).first()
-    if existing is not None:
-        write_err = _definition_write_error(user, existing)
-        if write_err is not None:
-            return ImportWorkflowManifestResult(
-                ok=False, errors=[ValidationError(field=write_err[0], messages=[write_err[1]])]
+    with transaction.atomic():
+        existing = (
+            WorkflowDefinition.objects.select_for_update(of=("self",))
+            .filter(organization=org, slug=parsed.definition.slug, deleted_at__isnull=True)
+            .select_related("project__team")
+            .first()
+        )
+        if existing is not None:
+            # Freeze the shape before deciding whether this writes a project
+            # recipe or creates a new organization version.
+            list(
+                existing.stages.select_for_update()
+                .filter(deleted_at__isnull=True)
+                .values_list("pk", flat=True)
             )
-        check_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope(existing, org.pk))
-
-    # replace_definition_from_manifest is its own transaction: a "blocked"
-    # outcome has already rolled back the candidate new version.
-    outcome = replace_definition_from_manifest(parsed, organization=org, created_by=user)
+            write_err = _definition_write_error(user, existing)
+            if write_err is not None:
+                return ImportWorkflowManifestResult(
+                    ok=False, errors=[ValidationError(field=write_err[0], messages=[write_err[1]])]
+                )
+            check_permission(
+                Permission.WORKFLOW_UPDATE,
+                scope=import_definition_owner_scope(existing, permission=Permission.WORKFLOW_UPDATE),
+            )
+        check_permission(Permission.WORKFLOW_CREATE, scope=manifest_destination_scope(parsed, existing))
+        if existing is None:
+            # A concurrent new same-slug row must never become an unchecked
+            # replacement target; normal create only uniquifies its slug.
+            outcome = ReplaceOutcome(
+                definition=create_definition_from_manifest(parsed, organization=org, created_by=user),
+                mode="created",
+            )
+        else:
+            outcome = replace_definition_from_manifest(parsed, organization=org, created_by=user)
 
     if outcome.mode == "blocked":
         errors = [

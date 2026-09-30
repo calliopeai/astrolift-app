@@ -9,6 +9,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import migration_operation
 from astrolift_lifecycle.models import (
     AppEnvironment,
     Deployment,
@@ -47,7 +48,11 @@ class MigrationMutations:
 
     @strawberry.field
     @mutation_audit(action="app.migrate_to_cluster")
-    @require_permission(Permission.APP_DEPLOY, scope=environment_app_scope("input.app_environment_id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=environment_app_scope("input.app_environment_id"),
+        operation=migration_operation,
+    )
     @tenant_scoped()
     def migrate_app_to_cluster(
         self, info: Info, input: MigrateAppInputGql

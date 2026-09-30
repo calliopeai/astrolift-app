@@ -56,6 +56,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.scopes import require_scm_connect
+from core.permissions import Permission, route_auth
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
 GITHUB_AUTHORIZE = "https://github.com/login/oauth/authorize"
@@ -226,7 +228,11 @@ def _resolve_user_token_via_post(
 
 @login_required
 @require_GET
+@route_auth(
+    credential="session or API bearer", scope="active organization", permissions=[Permission.SCM_CONNECT]
+)
 def github_start(request: HttpRequest) -> Any:
+    require_scm_connect()
     config_id = request.GET.get("config_id", "")
     return_to = _safe_return_to(request.GET.get("return_to"))
 
@@ -292,6 +298,9 @@ def github_start(request: HttpRequest) -> Any:
 @login_required
 @csrf_exempt  # GitHub redirect doesn't carry our CSRF token; state cookie is the auth.
 @require_GET
+@route_auth(
+    credential="session or API bearer", scope="active organization", permissions=[Permission.SCM_CONNECT]
+)
 def github_callback(request: HttpRequest) -> Any:
     """Unified GitHub OAuth callback — handles both the regular per-user
     "Connect my GitHub" dance and the install-time OAuth flow triggered
@@ -312,6 +321,7 @@ def github_callback(request: HttpRequest) -> Any:
       what ``github_app_manifest_setup`` and ``github_start →
       github_callback`` used to do in two separate trips.
     """
+    require_scm_connect()
     installation_id = (request.GET.get("installation_id") or "").strip()
     setup_action = (request.GET.get("setup_action") or "").strip()
 
@@ -417,6 +427,9 @@ def _github_install_time_callback(request: HttpRequest) -> Any:
     if connection is None:
         return _redirect_with_error(return_to, "connection_missing")
 
+    if _active_org_id(request) != connection.organization_id:
+        return _redirect_with_error(return_to, "org_mismatch")
+
     client_id = connection.app_client_id
     if not client_id:
         return _redirect_with_error(return_to, "config_missing_client_id")
@@ -489,7 +502,11 @@ def _resolve_github_login(token: str) -> str:
 
 @login_required
 @require_GET
+@route_auth(
+    credential="session or API bearer", scope="active organization", permissions=[Permission.SCM_CONNECT]
+)
 def gitlab_start(request: HttpRequest) -> Any:
+    require_scm_connect()
     config_id = request.GET.get("config_id", "")
     return_to = _safe_return_to(request.GET.get("return_to"))
 
@@ -538,7 +555,11 @@ def gitlab_start(request: HttpRequest) -> Any:
 @login_required
 @csrf_exempt  # GitLab redirect doesn't carry our CSRF token; state cookie is the auth.
 @require_GET
+@route_auth(
+    credential="session or API bearer", scope="active organization", permissions=[Permission.SCM_CONNECT]
+)
 def gitlab_callback(request: HttpRequest) -> Any:
+    require_scm_connect()
     state_in = request.GET.get("state", "")
     code = request.GET.get("code", "")
     pending = _pop_pending_state(request, "gitlab")

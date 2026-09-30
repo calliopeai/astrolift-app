@@ -8,6 +8,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import named_environment
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import (
     AppEnvironment,
@@ -58,7 +59,10 @@ class RecoveryMutations:
     )
     @requires_elevation(action_label="app.force_redeploy")
     @require_permission(
-        Permission.APP_DEPLOY, Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug")
+        Permission.APP_DEPLOY,
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("input.app_slug"),
+        operation=named_environment(all_if_absent=True),
     )
     @tenant_scoped()
     def force_astrolift_redeploy(
@@ -160,7 +164,9 @@ class RecoveryMutations:
 
     @strawberry.field
     @mutation_audit(action="app.job.run_once")
-    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+    )
     @tenant_scoped()
     def run_astrolift_job_once(
         self,

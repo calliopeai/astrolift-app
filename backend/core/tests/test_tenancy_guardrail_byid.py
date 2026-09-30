@@ -307,15 +307,6 @@ EXEMPT: dict[str, str] = {
         "registered_app=app)`` where ``app`` was resolved org-scoped just "
         "above — the workload is reachable only through the caller's app."
     ),
-    # --- Org-narrowing in a following statement (``qs = M.objects.filter
-    #     (guid=..)`` then ``if org_id: qs = qs.filter(...__organization_id
-    #     =org_id)``). The narrowing is a separate statement the per-call
-    #     rule can't chain to.
-    "astrolift_lifecycle::LifecycleQuery.astrolift_compare_deployments": (
-        "org-narrowed below: the nested ``_get_deploy`` helper filters by "
-        "``registered_app__organization_id=org_id`` after the by-guid fetch "
-        "when a tenant org is present."
-    ),
     # --- Authorization gate on the resolved row (workflow ops).
     "astrolift_workflows::WorkflowsMutation.update_workflow_stage": (
         "gated by ``_definition_write_error(user, stage.definition)`` after "

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import fnmatch
 import functools
 from collections.abc import Iterable
 from typing import Any
@@ -181,7 +182,7 @@ def _live_grants(tenant: TenantContext, scopes: Iterable[tuple[str, int]] | None
     principal = Q(user_id=tenant.actor_user_id)
     if groups:
         principal |= Q(user__isnull=True, group_external_id__in=sorted(groups))
-    qs = RoleBinding.objects.select_related("role").filter(principal)
+    qs = RoleBinding.objects.select_related("role").filter(principal, role__deleted_at__isnull=True)
     if scope_list is not None:
         qs = qs.filter(_scope_filter(scope_list))
     out: list[Grant] = []
@@ -207,6 +208,7 @@ def _live_grants(tenant: TenantContext, scopes: Iterable[tuple[str, int]] | None
             Q(role__organization_id=tenant.organization_id) | Q(role__organization__isnull=True),
             organization_id=tenant.organization_id,
             group_external_id__in=sorted(groups),
+            role__deleted_at__isnull=True,
         )
         if scope_list is not None:
             mappings = mappings.filter(_scope_filter(scope_list))
@@ -494,6 +496,201 @@ def _org_confined_bindings(tenant: TenantContext) -> list[Grant]:
     return [g for g in live if g.scope_id in allowed.get(g.scope_kind, set())]
 
 
+def _target_policies(tenant: TenantContext, slugs: Iterable[str]) -> bool:
+    from astrolift_identity import abac
+
+    attrs = abac.attributes_for(tenant.actor_user_id)
+    return any(
+        not abac.applies_everywhere(policy)
+        and any(fnmatch.fnmatchcase(slug, policy.action_pattern or "*") for slug in slugs)
+        for policy in abac.org_policies(tenant.organization_id, attrs)
+    )
+
+
+def _policy_scope_permissions(tenant: TenantContext, slugs: set[str]) -> dict[str, dict[int, set[str]]]:
+    """Concrete permitted scopes; a denied parent never lends inheritance.
+
+    Load the live scope tree and operation facts once per request. App
+    navigation is usable if at least one of its environments allows the
+    permission; individual operations still check their exact environment.
+    """
+    from astrolift_identity import abac
+    from astrolift_identity.models import Project, Team
+    from astrolift_identity.operation_context import OperationContext, environment_context
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+
+    attrs = abac.attributes_for(tenant.actor_user_id)
+    key = ("policy_scope_tree", tenant.organization_id)
+    if key not in attrs.cache:
+        org = ("ORG", tenant.organization_id)
+        points = [(org, [org], (OperationContext(),))]
+        teams = set(Team.objects.filter(organization_id=tenant.organization_id).values_list("pk", flat=True))
+        points.extend((("TEAM", ident), [("TEAM", ident), org], (OperationContext(),)) for ident in teams)
+        for ident, team_id, slug in Project.objects.filter(
+            organization_id=tenant.organization_id
+        ).values_list("pk", "team_id", "slug"):
+            attrs.cache[("slug", "PROJECT", ident)] = slug
+            chain = [("PROJECT", ident)]
+            if team_id in teams:
+                chain.append(("TEAM", team_id))
+            points.append((("PROJECT", ident), [*chain, org], (OperationContext(),)))
+        app_ids = []
+        for ident, slug in RegisteredApp.objects.filter(organization_id=tenant.organization_id).values_list(
+            "pk", "slug"
+        ):
+            app_ids.append(ident)
+            attrs.cache[("slug", "APP", ident)] = slug
+        environments = {}
+        for env in AppEnvironment.objects.filter(registered_app_id__in=app_ids).select_related(
+            "tenant_cluster"
+        ):
+            environments.setdefault(env.registered_app_id, []).append(environment_context(env))
+        for ident, chain in _app_scope_chains(tenant, app_ids).items():
+            points.append((("APP", ident), chain, tuple(environments.get(ident) or (OperationContext(),))))
+        operation_kinds = {kind.kind for kind in abac.CONDITION_KINDS if kind.needs == "operation"}
+        if any(
+            any(key in (policy.resource_pattern or {}) for key in ("env", "region"))
+            or isinstance(policy.conditions, list)
+            and any(
+                isinstance(condition, dict) and condition.get("kind") in operation_kinds
+                for condition in policy.conditions
+            )
+            for policy in abac.org_policies(tenant.organization_id, attrs)
+        ):
+            from astrolift_identity.operation_visibility import agent_scope_contexts
+
+            points = agent_scope_contexts(tenant, points)
+        if any(
+            isinstance(policy.conditions, list)
+            and any(
+                isinstance(condition, dict) and condition.get("kind") == "approval_required"
+                for condition in policy.conditions
+            )
+            for policy in abac.org_policies(tenant.organization_id, attrs)
+        ):
+            points = _recorded_approval_contexts(tenant, points)
+        attrs.cache[key] = (points, app_ids)
+    points, app_ids = attrs.cache[key]
+    grants = _org_confined_bindings(tenant)
+    shares = _share_grants(tenant, app_ids)
+    allowed = {kind: {} for kind in ("ORG", "TEAM", "PROJECT", "APP")}
+    for (kind, ident), chain, contexts in points:
+        if attrs.environment is not None or attrs.region is not None or attrs.approvals is not None:
+            contexts = (OperationContext(attrs.environment, attrs.region, attrs.approvals),)
+        covering = [grant for grant in grants if grant.covers(chain)]
+        candidates = {slug for grant in covering for slug in slugs if grant.carries(slug)}
+        # Team shares have a permission ceiling and must be evaluated with
+        # their real role at the shared app, as the object resolver does.
+        extra = shares.get(ident, ()) if kind == "APP" else ()
+        candidates.update(
+            slug
+            for share in extra
+            for slug in slugs
+            if share.grant.carries(slug) and share.access_level in share_levels(slug)
+        )
+        kept = set()
+        for context in contexts:
+            with abac.operation_attributes(**context.attributes()):
+                for slug in candidates:
+                    roles = [
+                        *covering,
+                        *(share.grant for share in extra if share.access_level in share_levels(slug)),
+                    ]
+                    kept.update(_abac_filter(tenant, {slug}, chain, roles))
+        if kept:
+            allowed[kind][ident] = kept
+    return allowed
+
+
+def _recorded_approval_contexts(tenant, points):
+    """Browse capabilities at actual approved operations without lending votes.
+
+    Exact actions override these candidates with their own facts, and
+    collection filters check each execution's count before returning it.
+    """
+    from django.db.models import Count, Q
+
+    from astrolift_identity.operation_context import agent_region_operation
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_services.models import SecretChangeApproval
+    from workflows.models import WorkflowStageExecution
+
+    index = {point: i for i, (point, _chain, _contexts) in enumerate(points)}
+
+    def add(point, count, *, environment=None, default=None):
+        position = index.get(point)
+        if position is None or count < 1:
+            return
+        key, chain, contexts = points[position]
+        candidates = [
+            context for context in contexts if environment is None or context.environment == environment
+        ]
+        if default is not None:
+            candidates = [default]
+        points[position] = (
+            key,
+            chain,
+            tuple(
+                dict.fromkeys(
+                    (*contexts, *(dataclasses.replace(context, approvals=count) for context in candidates))
+                )
+            ),
+        )
+
+    for row in (
+        Deployment.objects.filter(registered_app__organization_id=tenant.organization_id)
+        .annotate(
+            count=Count(
+                "approval_votes__voter_user_id",
+                filter=Q(approval_votes__deleted_at__isnull=True),
+                distinct=True,
+            )
+        )
+        .values("registered_app_id", "app_environment__name", "count")
+    ):
+        add(("APP", row["registered_app_id"]), row["count"], environment=row["app_environment__name"])
+    for row in (
+        SecretChangeApproval.objects.filter(
+            proposal__registered_app__organization_id=tenant.organization_id,
+            proposal__deleted_at__isnull=True,
+            decision="approved",
+        )
+        .values("proposal_id", "proposal__registered_app_id", "proposal__app_environment__name")
+        .annotate(count=Count("approver_id", distinct=True))
+    ):
+        add(
+            ("APP", row["proposal__registered_app_id"]),
+            row["count"],
+            environment=row["proposal__app_environment__name"],
+        )
+    votes = {}
+    for run_id, app_id, env_name, project_id, user_id in WorkflowStageExecution.objects.filter(
+        workflow_run__organization_id=tenant.organization_id,
+        workflow_run__deleted_at__isnull=True,
+        status="completed",
+        stage__kind="human_gate",
+        output__human_gate__decision="approved",
+    ).values_list(
+        "workflow_run_id",
+        "workflow_run__registered_app_id",
+        "workflow_run__app_environment__name",
+        "workflow_run__workflow_definition__project_id",
+        "output__human_gate__decided_by_user_id",
+    ):
+        if isinstance(user_id, int) and not isinstance(user_id, bool) and user_id > 0:
+            votes.setdefault((run_id, app_id, env_name, project_id), set()).add(user_id)
+    agent = agent_region_operation({})[0] if votes else None
+    for (_run_id, app_id, env_name, project_id), voters in votes.items():
+        point = (
+            ("APP", app_id)
+            if app_id
+            else (("PROJECT", project_id) if project_id else ("ORG", tenant.organization_id))
+        )
+        add(point, len(voters), environment=env_name, default=agent if env_name is None else None)
+    return points
+
+
 @_memoized
 def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScopes:
     """RoleBinding-backed :data:`core.permissions.GrantedScopesProvider`.
@@ -501,8 +698,8 @@ def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScop
     Every scope in the active org where ``tenant``'s actor holds
     ``permission``. A non-inheriting TEAM or PROJECT grant lands in the
     ``exact_*`` sets (that scope and nothing below it); a non-inheriting
-    ORG grant covers the org row itself and no row beneath it, so it adds
-    nothing here. A policy that denies the permission everywhere empties
+    ORG grant sets ``org_only``: organization-owned rows and no descendants.
+    A policy that denies the permission everywhere empties
     the answer.
     """
 
@@ -514,9 +711,20 @@ def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScop
         return NO_SCOPES
     if _denied_everywhere(tenant, [permission.value]):
         return NO_SCOPES
+    if _target_policies(tenant, [permission.value]):
+        allowed = _policy_scope_permissions(tenant, {permission.value})
+        return GrantedScopes(
+            org=False,
+            team_ids=frozenset(),
+            project_ids=frozenset(),
+            app_ids=frozenset(allowed["APP"]),
+            exact_team_ids=frozenset(allowed["TEAM"]),
+            exact_project_ids=frozenset(allowed["PROJECT"]),
+            org_only=bool(allowed["ORG"]),
+        )
 
     by_kind: dict[str, set[int]] = {"ORG": set(), "TEAM": set(), "PROJECT": set(), "APP": set()}
-    exact: dict[str, set[int]] = {"TEAM": set(), "PROJECT": set()}
+    exact: dict[str, set[int]] = {"ORG": set(), "TEAM": set(), "PROJECT": set()}
     for grant in _org_confined_bindings(tenant):
         if not grant.carries(permission.value):
             continue
@@ -534,6 +742,7 @@ def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScop
         app_ids=frozenset(by_kind["APP"]),
         exact_team_ids=frozenset(exact["TEAM"] - by_kind["TEAM"]),
         exact_project_ids=frozenset(exact["PROJECT"] - by_kind["PROJECT"]),
+        org_only=bool(exact["ORG"]),
     )
 
 
@@ -564,7 +773,11 @@ def resolve_effective_permissions_anywhere(tenant: TenantContext) -> set[str]:
     effective: set[str] = set()
     for grant in _org_confined_bindings(tenant):
         effective.update(grant.role.permissions or ())
-    return effective - _denied_everywhere(tenant, effective)
+    effective -= _denied_everywhere(tenant, effective)
+    if _target_policies(tenant, effective):
+        allowed = _policy_scope_permissions(tenant, effective)
+        return {slug for scopes in allowed.values() for slugs in scopes.values() for slug in slugs}
+    return effective
 
 
 def _scope_ancestry(tenant: TenantContext, scope: PermissionScope) -> list[tuple[str, int]]:

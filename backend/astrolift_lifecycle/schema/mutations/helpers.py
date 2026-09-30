@@ -447,7 +447,7 @@ def _record_approval_vote_and_maybe_start(
     actor: Actor,
     organization_id: int | None,
 ) -> None:
-    """Increment ``approvals_received`` and, if quorum is now met,
+    """Record one distinct voter and, if quorum is now met,
     transition the deploy to PENDING + enqueue the DeployAppWorkflow.
 
     Shared by :meth:`approve_deployment` (auth-required, called by an
@@ -456,9 +456,36 @@ def _record_approval_vote_and_maybe_start(
     ``transaction.atomic`` and persist the deployment row themselves
     when no transition fires.
     """
-    deployment.approvals_received += 1
+    from astrolift_lifecycle.models import DeploymentApproval
+
+    # Callers hold an atomic transaction. Serialize repeated/concurrent
+    # requests before inspecting either the ledger or the rollout state.
+    Deployment.objects.select_for_update().get(pk=deployment.pk)
+    deployment.refresh_from_db()
+    identity = (
+        {"voter_user_id": actor.user_id, "credential_hash": ""}
+        if actor.user_id
+        else {"voter_user_id": None, "credential_hash": deployment.approval_token_hash}
+    )
+    if not actor.user_id and not identity["credential_hash"]:
+        raise ValueError("approval requires an authenticated voter or a verified approval token")
+    if deployment.status != Deployment.Status.PENDING_APPROVAL.value:
+        if DeploymentApproval.objects.filter(deployment=deployment, **identity).exists():
+            return
+        raise ValueError("deployment is no longer pending approval")
+    _vote, created = DeploymentApproval.objects.get_or_create(deployment=deployment, **identity)
+    if not created:
+        return
+    # Historical counters have no trustworthy identity evidence. Pending
+    # quorum is reconstructed from the ledger, never from that old counter.
+    votes = deployment.approval_votes
+    deployment.approvals_received = (
+        votes.count()
+        if deployment.approvals_required <= 1
+        else votes.filter(voter_user_id__isnull=False).values("voter_user_id").distinct().count()
+    )
+    deployment.save(update_fields=["approvals_received", "updated_at", "version"])
     if deployment.approvals_received < deployment.approvals_required:
-        deployment.save(update_fields=["approvals_received", "updated_at", "version"])
         return
 
     deployment.transition_to(Deployment.Status.PENDING)
@@ -503,6 +530,24 @@ def _bulk_item_failure(deployment_id: str, code: str, message: str, *, field: st
     )
 
 
+def _bulk_approval_permission_failure(deployment, deployment_id):
+    """Match the single-row gate before any vote, save, signal or audit."""
+    from astrolift_identity.abac import operation_attributes
+    from astrolift_identity.operation_context import deployment_approval_count, environment_context
+    from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
+
+    context = environment_context(deployment.app_environment, approvals=deployment_approval_count(deployment))
+    try:
+        with operation_attributes(**context.attributes()):
+            check_permission(
+                Permission.APP_APPROVE_DEPLOY,
+                scope=PermissionScope(kind=ScopeKind.APP, id=deployment.registered_app_id),
+            )
+    except PermissionDenied as exc:
+        return _bulk_item_failure(deployment_id, ErrorCode.PERMISSION_DENIED.value, str(exc))
+    return None
+
+
 def _process_bulk_approve_one(
     *,
     deployment_id: str,
@@ -515,8 +560,8 @@ def _process_bulk_approve_one(
     Mirrors :meth:`LifecycleMutation.approve_deployment` minus the
     @mutation_audit decorator (we emit per-id audit entries
     ourselves below) and minus the @require_permission decorator (the
-    outer bulk resolver already gated on the org-scope permission;
-    the per-id eligibility check still runs)."""
+    outer bulk resolver admits a holder somewhere in the org, and each
+    deployment is checked at its own app and operation facts here)."""
     from core.mutations import AuditEntry, emit_audit
     from core.mutations import ErrorCode as CoreErrorCode
 
@@ -524,7 +569,7 @@ def _process_bulk_approve_one(
     # by the bulk resolver). Fails closed (NOT_FOUND) when organization_id
     # is None (#1183).
     deployment = (
-        Deployment.objects.select_related("registered_app", "app_environment", "workload")
+        Deployment.objects.select_related("registered_app", "app_environment__tenant_cluster", "workload")
         .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=organization_id)
         .first()
     )
@@ -534,6 +579,9 @@ def _process_bulk_approve_one(
             ErrorCode.NOT_FOUND.value,
             "deployment not found",
         )
+    failure = _bulk_approval_permission_failure(deployment, deployment_id)
+    if failure is not None:
+        return failure
     if deployment.status != Deployment.Status.PENDING_APPROVAL.value:
         return _bulk_item_failure(
             deployment_id,
@@ -622,7 +670,7 @@ def _process_bulk_reject_one(
     # by the bulk resolver). Fails closed (NOT_FOUND) when organization_id
     # is None (#1183).
     deployment = (
-        Deployment.objects.select_related("registered_app", "app_environment", "workload")
+        Deployment.objects.select_related("registered_app", "app_environment__tenant_cluster", "workload")
         .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=organization_id)
         .first()
     )
@@ -632,6 +680,9 @@ def _process_bulk_reject_one(
             ErrorCode.NOT_FOUND.value,
             "deployment not found",
         )
+    failure = _bulk_approval_permission_failure(deployment, deployment_id)
+    if failure is not None:
+        return failure
     if deployment.status != Deployment.Status.PENDING_APPROVAL.value:
         return _bulk_item_failure(
             deployment_id,
