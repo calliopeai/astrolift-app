@@ -1239,84 +1239,85 @@
     "settings": {
       "links": {
         "manifestEditor": {
-          "title": "编辑 manifest TOML",
-          "description": "打开完整的 astrolift.toml 编辑器 — 镜像构建、环境、触发器、审批和发布策略。"
+          "title": "编辑 TOML 清单",
+          "description": "打开完整的 astrolift.toml 编辑器，配置镜像构建、环境、触发方式、批准和部署策略。"
         },
         "deployTokens": {
           "title": "部署令牌",
-          "description": "Long-lived bearer tokens that let external CI hand off deployments without an interactive session."
+          "description": "长期有效的 Bearer 令牌，允许外部 CI 在没有交互式会话的情况下移交部署。"
         },
         "secrets": {
-          "title": "密钥 + 环境变量",
-          "description": "Per-environment encrypted secrets and plaintext env vars mounted into workloads at deploy time."
+          "title": "密钥与环境变量",
+          "description": "每个环境的加密密钥和平文环境变量，在部署时挂载到工作负载中。"
         },
         "managedServices": {
           "title": "托管服务",
-          "description": "Provisioned dependencies — Postgres, Redis, object storage — attached and routed via Astrolift."
+          "description": "通过 Astrolift 连接和路由的已配置依赖资源，如 Postgres、Redis 和对象存储。"
         },
         "domains": {
           "title": "自定义域名",
-          "description": "Map your own hostnames to environments. Validation, ACME-issued certs, and BYO certificate upload."
+          "description": "将自己的主机名映射到环境。支持验证、ACME 证书签发和自有证书上传。"
         },
         "webhooks": {
           "title": "Webhook",
-          "description": "Outbound deployment, build, and lifecycle events delivered to your endpoints with HMAC signatures."
+          "description": "带有 HMAC 签名并发送到您的端点的部署、构建和生命周期事件。"
         },
         "members": {
           "title": "团队成员",
-          "description": "App-scoped role bindings layered on top of org and team grants. Manage who can deploy, rotate, or destroy."
+          "description": "在组织和团队授权之外，叠加应用范围的角色绑定。管理谁可以部署、轮换或删除资源。"
         },
         "observability": {
           "title": "可观测性",
-          "description": "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default."
-        }
+          "description": "此应用的日志、指标、跟踪和 SLO 状态。默认集成 Prometheus、Loki 和 Tempo。"
+        },
+        "modified": "{when}修改"
       },
       "title": "设置",
       "loading": "正在加载…",
       "description": "<slug></slug> 的运行控制和配置。",
       "controls": {
-        "title": "Controls",
-        "description": "Live operational toggles. Take effect immediately — no CI roundtrip.",
-        "emptyEnvs": "No environments yet — sync the manifest to populate this section.",
-        "paused": "Paused",
-        "active": "Active",
-        "pause": "Pause",
-        "resume": "Resume",
-        "deployNow": "Deploy now",
-        "rebuildAndDeploy": "Rebuild & deploy",
-        "imageTagPlaceholder": "image tag (latest)",
-        "tooltipResumeFirst": "Resume deploys first.",
-        "tooltipDeployNow": "Deploys an existing image tag. Use 'Rebuild & deploy' to rebuild from source.",
-        "tooltipRebuildAndDeploy": "Rebuilds the image from main and runs the deploy end-to-end. Use 'Deploy now' if you want to redeploy an existing image tag.",
-        "approvalsRequired": "{count, plural, one {Requires # approval before rollout} other {Requires # approvals before rollout}}",
-        "workloadsHeader": "Workloads",
-        "workloadsEmpty": "No Deployment workloads yet — sync the manifest to populate this section.",
-        "readyCount": "{ready}/{desired} ready",
-        "apply": "Apply",
-        "applyScale": "Apply scale ({count})",
-        "decreaseReplica": "Decrease replicas",
-        "increaseReplica": "Increase replicas",
-        "rollingRestart": "Rolling restart",
-        "rollingRestartTooltip": "Pod is wedged. Replace pods one-by-one without changing the image. Same image tag, same env, same secrets.",
-        "ariaDecrease": "Decrease replicas",
-        "ariaIncrease": "Increase replicas",
-        "ariaWorkloadActions": "Workload actions for {workload}",
+        "title": "控制",
+        "description": "实时运行设置，立即生效，无需经过 CI。",
+        "emptyEnvs": "暂无环境；同步清单后即可填充此部分。",
+        "paused": "已暂停",
+        "active": "运行中",
+        "pause": "暂停",
+        "resume": "恢复",
+        "deployNow": "立即部署",
+        "rebuildAndDeploy": "重新构建并部署",
+        "imageTagPlaceholder": "镜像标签（最新）",
+        "tooltipResumeFirst": "请先恢复部署。",
+        "tooltipDeployNow": "部署已有的镜像标签。如需从源代码重新构建，请使用“重新构建并部署”。",
+        "tooltipRebuildAndDeploy": "从 main 重新构建镜像并执行完整部署。如需重新部署已有的镜像标签，请使用“立即部署”。",
+        "approvalsRequired": "{count, plural, one {部署前需要 # 项批准} other {部署前需要 # 项批准}}",
+        "workloadsHeader": "工作负载",
+        "workloadsEmpty": "暂无 Deployment 工作负载；同步清单后即可填充此部分。",
+        "readyCount": "{ready}/{desired} 已就绪",
+        "apply": "应用",
+        "applyScale": "应用扩缩容（{count}）",
+        "decreaseReplica": "减少副本",
+        "increaseReplica": "增加副本",
+        "rollingRestart": "滚动重启",
+        "rollingRestartTooltip": "Pod 已卡住。在不更改镜像的情况下逐个替换 Pod。镜像标签、环境和密钥保持不变。",
+        "ariaDecrease": "减少副本",
+        "ariaIncrease": "增加副本",
+        "ariaWorkloadActions": "{workload} 的工作负载操作",
         "dropdownLabel": "{workload} · {env}",
-        "confirmRestart": "Restart all replicas of {workload} in {env}? Pods roll one-by-one — long-running connections drain.",
-        "toastDeploysPaused": "Deploys paused for {env}.",
-        "toastDeploysResumed": "Deploys resumed for {env}.",
-        "toastDeployStarted": "Deploy started for {env} · {tag}.",
-        "toastDeployFailed": "Deploy failed.",
-        "toastActionFailed": "Action failed.",
-        "toastCiDispatched": "CI workflow dispatched.",
-        "toastCiBranch": "Branch: {branch}",
-        "toastCiOpenRun": "Open run →",
-        "toastRebuildFailed": "Rebuild & deploy failed.",
-        "toastRestartIssued": "Rolling restart issued for {workload} in {env}.",
-        "toastRestartFailed": "Rolling restart failed.",
-        "toastScaled": "{workload} in {env} scaled to {count, plural, one {# replica} other {# replicas}}.",
-        "toastScaleFailed": "Scale failed.",
-        "deployCaption": "Deploy now ships the image tag above (defaults to the latest build). Rebuild & deploy dispatches CI to rebuild from the branch first."
+        "confirmRestart": "重启 {env} 中 {workload} 的所有副本？Pod 将逐个替换，长连接会有序结束。",
+        "toastDeploysPaused": "已暂停 {env} 的部署。",
+        "toastDeploysResumed": "已恢复 {env} 的部署。",
+        "toastDeployStarted": "已开始 {env} 的部署 · {tag}。",
+        "toastDeployFailed": "部署失败。",
+        "toastActionFailed": "操作失败。",
+        "toastCiDispatched": "已触发 CI 工作流。",
+        "toastCiBranch": "分支：{branch}",
+        "toastCiOpenRun": "打开运行记录 →",
+        "toastRebuildFailed": "重新构建并部署失败。",
+        "toastRestartIssued": "已请求滚动重启 {env} 中的 {workload}。",
+        "toastRestartFailed": "滚动重启失败。",
+        "toastScaled": "已将 {env} 中的 {workload} 扩缩至 {count, plural, one {# 个副本} other {# 个副本}}。",
+        "toastScaleFailed": "扩缩容失败。",
+        "deployCaption": "“立即部署”使用上方的镜像标签（默认为最新构建）。“重新构建并部署”将触发 CI，先从分支重新构建。"
       },
       "resync": {
         "title": "从源代码重新同步",

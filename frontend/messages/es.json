@@ -1239,84 +1239,85 @@
     "settings": {
       "links": {
         "manifestEditor": {
-          "title": "Editar manifest TOML",
-          "description": "Abre el editor completo de astrolift.toml — build de imagen, entornos, triggers, aprobaciones y estrategia de rollout."
+          "title": "Editar manifiesto TOML",
+          "description": "Abre el editor completo de astrolift.toml: compilación de imágenes, entornos, desencadenantes, aprobaciones y estrategia de despliegue."
         },
         "deployTokens": {
-          "title": "Deploy tokens",
-          "description": "Long-lived bearer tokens that let external CI hand off deployments without an interactive session."
+          "title": "Tokens de despliegue",
+          "description": "Tokens bearer de larga duración que permiten a CI externo iniciar despliegues sin una sesión interactiva."
         },
         "secrets": {
-          "title": "Secrets + env",
-          "description": "Per-environment encrypted secrets and plaintext env vars mounted into workloads at deploy time."
+          "title": "Secretos y variables de entorno",
+          "description": "Secretos cifrados y variables de entorno en texto plano por entorno, montados en las cargas de trabajo al desplegar."
         },
         "managedServices": {
-          "title": "Managed services",
-          "description": "Provisioned dependencies — Postgres, Redis, object storage — attached and routed via Astrolift."
+          "title": "Servicios gestionados",
+          "description": "Dependencias provisionadas (Postgres, Redis, almacenamiento de objetos) conectadas y enrutadas mediante Astrolift."
         },
         "domains": {
-          "title": "Custom domains",
-          "description": "Map your own hostnames to environments. Validation, ACME-issued certs, and BYO certificate upload."
+          "title": "Dominios personalizados",
+          "description": "Asocia tus nombres de host a los entornos. Incluye validación, certificados emitidos por ACME y carga de certificados propios."
         },
         "webhooks": {
           "title": "Webhooks",
-          "description": "Outbound deployment, build, and lifecycle events delivered to your endpoints with HMAC signatures."
+          "description": "Eventos de despliegue, compilación y ciclo de vida enviados a tus endpoints con firmas HMAC."
         },
         "members": {
-          "title": "Team members",
-          "description": "App-scoped role bindings layered on top of org and team grants. Manage who can deploy, rotate, or destroy."
+          "title": "Miembros del equipo",
+          "description": "Vinculaciones de roles de la aplicación que se añaden a los permisos de la organización y del equipo. Gestiona quién puede desplegar, rotar o eliminar recursos."
         },
         "observability": {
-          "title": "Observability",
-          "description": "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default."
-        }
+          "title": "Observabilidad",
+          "description": "Logs, métricas, trazas y estado de los SLO de esta aplicación. Prometheus, Loki y Tempo están integrados por defecto."
+        },
+        "modified": "Modificado {when}"
       },
       "title": "Configuración",
       "loading": "Cargando…",
       "description": "Controles operativos y configuración de <slug></slug>.",
       "controls": {
-        "title": "Controls",
-        "description": "Live operational toggles. Take effect immediately — no CI roundtrip.",
-        "emptyEnvs": "No environments yet — sync the manifest to populate this section.",
-        "paused": "Paused",
-        "active": "Active",
-        "pause": "Pause",
-        "resume": "Resume",
-        "deployNow": "Deploy now",
-        "rebuildAndDeploy": "Rebuild & deploy",
-        "imageTagPlaceholder": "image tag (latest)",
-        "tooltipResumeFirst": "Resume deploys first.",
-        "tooltipDeployNow": "Deploys an existing image tag. Use 'Rebuild & deploy' to rebuild from source.",
-        "tooltipRebuildAndDeploy": "Rebuilds the image from main and runs the deploy end-to-end. Use 'Deploy now' if you want to redeploy an existing image tag.",
-        "approvalsRequired": "{count, plural, one {Requires # approval before rollout} other {Requires # approvals before rollout}}",
-        "workloadsHeader": "Workloads",
-        "workloadsEmpty": "No Deployment workloads yet — sync the manifest to populate this section.",
-        "readyCount": "{ready}/{desired} ready",
-        "apply": "Apply",
-        "applyScale": "Apply scale ({count})",
-        "decreaseReplica": "Decrease replicas",
-        "increaseReplica": "Increase replicas",
-        "rollingRestart": "Rolling restart",
-        "rollingRestartTooltip": "Pod is wedged. Replace pods one-by-one without changing the image. Same image tag, same env, same secrets.",
-        "ariaDecrease": "Decrease replicas",
-        "ariaIncrease": "Increase replicas",
-        "ariaWorkloadActions": "Workload actions for {workload}",
+        "title": "Controles",
+        "description": "Ajustes operativos en vivo. Se aplican de inmediato, sin pasar por CI.",
+        "emptyEnvs": "Aún no hay entornos; sincroniza el manifiesto para completar esta sección.",
+        "paused": "Pausado",
+        "active": "Activo",
+        "pause": "Pausar",
+        "resume": "Reanudar",
+        "deployNow": "Desplegar ahora",
+        "rebuildAndDeploy": "Reconstruir y desplegar",
+        "imageTagPlaceholder": "etiqueta de imagen (última)",
+        "tooltipResumeFirst": "Primero reanuda los despliegues.",
+        "tooltipDeployNow": "Despliega una etiqueta de imagen existente. Usa «Reconstruir y desplegar» para reconstruir desde el código fuente.",
+        "tooltipRebuildAndDeploy": "Reconstruye la imagen desde main y ejecuta todo el despliegue. Usa «Desplegar ahora» para volver a desplegar una etiqueta de imagen existente.",
+        "approvalsRequired": "{count, plural, one {Requiere # aprobación antes del despliegue} other {Requiere # aprobaciones antes del despliegue}}",
+        "workloadsHeader": "Cargas de trabajo",
+        "workloadsEmpty": "Aún no hay cargas de trabajo de tipo Deployment; sincroniza el manifiesto para completar esta sección.",
+        "readyCount": "{ready}/{desired} listos",
+        "apply": "Aplicar",
+        "applyScale": "Aplicar escala ({count})",
+        "decreaseReplica": "Reducir réplicas",
+        "increaseReplica": "Aumentar réplicas",
+        "rollingRestart": "Reinicio progresivo",
+        "rollingRestartTooltip": "El pod está bloqueado. Sustituye los pods uno a uno sin cambiar la imagen. Se mantienen la etiqueta de imagen, el entorno y los secretos.",
+        "ariaDecrease": "Reducir réplicas",
+        "ariaIncrease": "Aumentar réplicas",
+        "ariaWorkloadActions": "Acciones de la carga de trabajo {workload}",
         "dropdownLabel": "{workload} · {env}",
-        "confirmRestart": "Restart all replicas of {workload} in {env}? Pods roll one-by-one — long-running connections drain.",
-        "toastDeploysPaused": "Deploys paused for {env}.",
-        "toastDeploysResumed": "Deploys resumed for {env}.",
-        "toastDeployStarted": "Deploy started for {env} · {tag}.",
-        "toastDeployFailed": "Deploy failed.",
-        "toastActionFailed": "Action failed.",
-        "toastCiDispatched": "CI workflow dispatched.",
-        "toastCiBranch": "Branch: {branch}",
-        "toastCiOpenRun": "Open run →",
-        "toastRebuildFailed": "Rebuild & deploy failed.",
-        "toastRestartIssued": "Rolling restart issued for {workload} in {env}.",
-        "toastRestartFailed": "Rolling restart failed.",
-        "toastScaled": "{workload} in {env} scaled to {count, plural, one {# replica} other {# replicas}}.",
-        "toastScaleFailed": "Scale failed.",
-        "deployCaption": "Deploy now ships the image tag above (defaults to the latest build). Rebuild & deploy dispatches CI to rebuild from the branch first."
+        "confirmRestart": "¿Reiniciar todas las réplicas de {workload} en {env}? Los pods se sustituyen uno a uno y las conexiones de larga duración se cierran de forma ordenada.",
+        "toastDeploysPaused": "Despliegues pausados en {env}.",
+        "toastDeploysResumed": "Despliegues reanudados en {env}.",
+        "toastDeployStarted": "Despliegue iniciado en {env} · {tag}.",
+        "toastDeployFailed": "El despliegue ha fallado.",
+        "toastActionFailed": "La acción ha fallado.",
+        "toastCiDispatched": "Flujo de trabajo de CI enviado.",
+        "toastCiBranch": "Rama: {branch}",
+        "toastCiOpenRun": "Abrir ejecución →",
+        "toastRebuildFailed": "La reconstrucción y el despliegue han fallado.",
+        "toastRestartIssued": "Reinicio progresivo solicitado para {workload} en {env}.",
+        "toastRestartFailed": "El reinicio progresivo ha fallado.",
+        "toastScaled": "{workload} en {env} escalado a {count, plural, one {# réplica} other {# réplicas}}.",
+        "toastScaleFailed": "El cambio de escala ha fallado.",
+        "deployCaption": "«Desplegar ahora» usa la etiqueta de imagen indicada arriba (por defecto, la última compilación). «Reconstruir y desplegar» envía el flujo de CI para reconstruir primero desde la rama."
       },
       "resync": {
         "title": "Resincronizar desde el código fuente",

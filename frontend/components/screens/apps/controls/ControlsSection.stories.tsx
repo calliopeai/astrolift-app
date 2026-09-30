@@ -1,5 +1,7 @@
 import { expect, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
@@ -159,5 +161,15 @@ export const ScaleOnly: Story = {
         },
       ]}
     />
+  ),
+};
+
+export const JapaneseEnvironmentWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <div style={{ width: 768 }}>
+        <EnvironmentControlsView {...envControls(ENV_PROD)} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

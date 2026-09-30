@@ -55,6 +55,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Deployment controls and settings destination cards use all eight locales.
+  Section modification captions localize both the sentence and relative time;
+  image-tag retries, replica staging and actual destination routes remain intact (#2145).
+
 - Source resync, ingress, webhook pause and one-shot job controls use all eight
   locales, including audit attribution and operational help. Actual job and
   environment selections and rejected-pause reasons remain intact (#2145).

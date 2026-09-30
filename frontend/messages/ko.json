@@ -1239,84 +1239,85 @@
     "settings": {
       "links": {
         "manifestEditor": {
-          "title": "Manifest TOML 편집",
-          "description": "전체 astrolift.toml 편집기를 엽니다 — 이미지 빌드, 환경, 트리거, 승인 및 롤아웃 전략."
+          "title": "TOML 매니페스트 편집",
+          "description": "이미지 빌드, 환경, 트리거, 승인, 롤아웃 전략을 다루는 전체 astrolift.toml 편집기를 엽니다."
         },
         "deployTokens": {
           "title": "배포 토큰",
-          "description": "Long-lived bearer tokens that let external CI hand off deployments without an interactive session."
+          "description": "외부 CI가 대화형 세션 없이 배포를 전달할 수 있는 장기 유효 Bearer 토큰입니다."
         },
         "secrets": {
-          "title": "시크릿 + 환경",
-          "description": "Per-environment encrypted secrets and plaintext env vars mounted into workloads at deploy time."
+          "title": "시크릿 및 환경 변수",
+          "description": "환경별 암호화 시크릿과 평문 환경 변수로, 배포 시 워크로드에 마운트됩니다."
         },
         "managedServices": {
-          "title": "매니지드 서비스",
-          "description": "Provisioned dependencies — Postgres, Redis, object storage — attached and routed via Astrolift."
+          "title": "관리형 서비스",
+          "description": "Astrolift를 통해 연결되고 라우팅되는 프로비저닝된 종속 리소스(Postgres, Redis, 객체 스토리지)입니다."
         },
         "domains": {
-          "title": "사용자 정의 도메인",
-          "description": "Map your own hostnames to environments. Validation, ACME-issued certs, and BYO certificate upload."
+          "title": "사용자 지정 도메인",
+          "description": "자체 호스트 이름을 환경에 연결합니다. 검증, ACME 인증서 발급 및 자체 인증서 업로드를 지원합니다."
         },
         "webhooks": {
-          "title": "Webhook",
-          "description": "Outbound deployment, build, and lifecycle events delivered to your endpoints with HMAC signatures."
+          "title": "웹훅",
+          "description": "HMAC 서명을 사용하여 엔드포인트로 전달되는 배포, 빌드, 수명 주기 이벤트입니다."
         },
         "members": {
           "title": "팀 멤버",
-          "description": "App-scoped role bindings layered on top of org and team grants. Manage who can deploy, rotate, or destroy."
+          "description": "조직 및 팀 권한에 추가되는 앱 범위 역할 바인딩입니다. 배포, 교체, 리소스 삭제 권한을 관리합니다."
         },
         "observability": {
           "title": "관측성",
-          "description": "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default."
-        }
+          "description": "이 앱의 로그, 메트릭, 트레이스 및 SLO 상태입니다. Prometheus, Loki, Tempo가 기본으로 연동됩니다."
+        },
+        "modified": "{when} 변경"
       },
       "title": "설정",
       "loading": "불러오는 중…",
       "description": "<slug></slug>의 운영 제어 및 구성.",
       "controls": {
-        "title": "Controls",
-        "description": "Live operational toggles. Take effect immediately — no CI roundtrip.",
-        "emptyEnvs": "No environments yet — sync the manifest to populate this section.",
-        "paused": "Paused",
-        "active": "Active",
-        "pause": "Pause",
-        "resume": "Resume",
-        "deployNow": "Deploy now",
-        "rebuildAndDeploy": "Rebuild & deploy",
-        "imageTagPlaceholder": "image tag (latest)",
-        "tooltipResumeFirst": "Resume deploys first.",
-        "tooltipDeployNow": "Deploys an existing image tag. Use 'Rebuild & deploy' to rebuild from source.",
-        "tooltipRebuildAndDeploy": "Rebuilds the image from main and runs the deploy end-to-end. Use 'Deploy now' if you want to redeploy an existing image tag.",
-        "approvalsRequired": "{count, plural, one {Requires # approval before rollout} other {Requires # approvals before rollout}}",
-        "workloadsHeader": "Workloads",
-        "workloadsEmpty": "No Deployment workloads yet — sync the manifest to populate this section.",
-        "readyCount": "{ready}/{desired} ready",
-        "apply": "Apply",
-        "applyScale": "Apply scale ({count})",
-        "decreaseReplica": "Decrease replicas",
-        "increaseReplica": "Increase replicas",
-        "rollingRestart": "Rolling restart",
-        "rollingRestartTooltip": "Pod is wedged. Replace pods one-by-one without changing the image. Same image tag, same env, same secrets.",
-        "ariaDecrease": "Decrease replicas",
-        "ariaIncrease": "Increase replicas",
-        "ariaWorkloadActions": "Workload actions for {workload}",
+        "title": "제어",
+        "description": "운영 설정을 직접 전환합니다. CI를 거치지 않고 즉시 적용됩니다.",
+        "emptyEnvs": "아직 환경이 없습니다. 매니페스트를 동기화하면 이 섹션에 표시됩니다.",
+        "paused": "일시 중지됨",
+        "active": "활성",
+        "pause": "일시 중지",
+        "resume": "재개",
+        "deployNow": "지금 배포",
+        "rebuildAndDeploy": "다시 빌드하고 배포",
+        "imageTagPlaceholder": "이미지 태그(최신)",
+        "tooltipResumeFirst": "먼저 배포를 재개하세요.",
+        "tooltipDeployNow": "기존 이미지 태그를 배포합니다. 소스에서 다시 빌드하려면 ‘다시 빌드하고 배포’를 사용하세요.",
+        "tooltipRebuildAndDeploy": "main에서 이미지를 다시 빌드하고 전체 배포를 실행합니다. 기존 이미지 태그를 다시 배포하려면 ‘지금 배포’를 사용하세요.",
+        "approvalsRequired": "{count, plural, one {롤아웃 전에 승인 #개 필요} other {롤아웃 전에 승인 #개 필요}}",
+        "workloadsHeader": "워크로드",
+        "workloadsEmpty": "아직 Deployment 워크로드가 없습니다. 매니페스트를 동기화하면 이 섹션에 표시됩니다.",
+        "readyCount": "{ready}/{desired} 준비됨",
+        "apply": "적용",
+        "applyScale": "스케일 적용({count})",
+        "decreaseReplica": "복제본 줄이기",
+        "increaseReplica": "복제본 늘리기",
+        "rollingRestart": "롤링 재시작",
+        "rollingRestartTooltip": "Pod가 멈췄습니다. 이미지를 바꾸지 않고 Pod를 하나씩 교체합니다. 이미지 태그, 환경, 시크릿은 유지됩니다.",
+        "ariaDecrease": "복제본 줄이기",
+        "ariaIncrease": "복제본 늘리기",
+        "ariaWorkloadActions": "{workload} 워크로드 작업",
         "dropdownLabel": "{workload} · {env}",
-        "confirmRestart": "Restart all replicas of {workload} in {env}? Pods roll one-by-one — long-running connections drain.",
-        "toastDeploysPaused": "Deploys paused for {env}.",
-        "toastDeploysResumed": "Deploys resumed for {env}.",
-        "toastDeployStarted": "Deploy started for {env} · {tag}.",
-        "toastDeployFailed": "Deploy failed.",
-        "toastActionFailed": "Action failed.",
-        "toastCiDispatched": "CI workflow dispatched.",
-        "toastCiBranch": "Branch: {branch}",
-        "toastCiOpenRun": "Open run →",
-        "toastRebuildFailed": "Rebuild & deploy failed.",
-        "toastRestartIssued": "Rolling restart issued for {workload} in {env}.",
-        "toastRestartFailed": "Rolling restart failed.",
-        "toastScaled": "{workload} in {env} scaled to {count, plural, one {# replica} other {# replicas}}.",
-        "toastScaleFailed": "Scale failed.",
-        "deployCaption": "Deploy now ships the image tag above (defaults to the latest build). Rebuild & deploy dispatches CI to rebuild from the branch first."
+        "confirmRestart": "{env}의 {workload} 복제본을 모두 재시작할까요? Pod를 하나씩 교체하며 장기 연결은 순차적으로 종료됩니다.",
+        "toastDeploysPaused": "{env}의 배포가 일시 중지되었습니다.",
+        "toastDeploysResumed": "{env}의 배포가 재개되었습니다.",
+        "toastDeployStarted": "{env}의 배포가 시작되었습니다 · {tag}.",
+        "toastDeployFailed": "배포에 실패했습니다.",
+        "toastActionFailed": "작업에 실패했습니다.",
+        "toastCiDispatched": "CI 워크플로가 시작되었습니다.",
+        "toastCiBranch": "브랜치: {branch}",
+        "toastCiOpenRun": "실행 열기 →",
+        "toastRebuildFailed": "다시 빌드하고 배포하는 데 실패했습니다.",
+        "toastRestartIssued": "{env}의 {workload}에 롤링 재시작을 요청했습니다.",
+        "toastRestartFailed": "롤링 재시작에 실패했습니다.",
+        "toastScaled": "{env}의 {workload}를 {count, plural, one {복제본 #개} other {복제본 #개}}로 스케일했습니다.",
+        "toastScaleFailed": "스케일에 실패했습니다.",
+        "deployCaption": "‘지금 배포’는 위의 이미지 태그를 사용합니다(기본값은 최신 빌드). ‘다시 빌드하고 배포’는 먼저 브랜치에서 다시 빌드하도록 CI를 시작합니다."
       },
       "resync": {
         "title": "소스에서 다시 동기화",

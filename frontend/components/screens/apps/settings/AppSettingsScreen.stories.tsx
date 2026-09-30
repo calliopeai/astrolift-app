@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 
 import { AppTabsView } from "@/components/screens/apps/detail/AppTabs";
 
@@ -115,5 +117,20 @@ export const LongStrings: Story = {
       app={{ ...APP, slug: LONG, name: LONG }}
       sections={{ dangerZone: <DangerZoneView {...DANGER_ZONE} appName={LONG} /> }}
     />
+  ),
+};
+
+export const FrenchLinksWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider
+      locale="fr"
+      messages={fr}
+      timeZone="UTC"
+      now={new Date("2026-09-30T12:00:00Z")}
+    >
+      <div style={{ width: 768 }}>
+        <AppSettingsScreen {...SETTINGS} compactLinks />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

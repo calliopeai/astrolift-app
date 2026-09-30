@@ -2203,7 +2203,8 @@
         "observability": {
           "title": "Observability",
           "description": "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default."
-        }
+        },
+        "modified": "Modified {when}"
       },
       "forceRedeploy": {
         "title": "Force redeploy",

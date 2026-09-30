@@ -1239,84 +1239,85 @@
     "settings": {
       "links": {
         "manifestEditor": {
-          "title": "Manifest TOML を編集",
-          "description": "完全な astrolift.toml エディタを開きます — イメージビルド、環境、トリガー、承認、ロールアウト戦略。"
+          "title": "TOML マニフェストを編集",
+          "description": "astrolift.toml の完全なエディターを開きます。イメージビルド、環境、トリガー、承認、ロールアウト戦略を編集できます。"
         },
         "deployTokens": {
           "title": "デプロイトークン",
-          "description": "Long-lived bearer tokens that let external CI hand off deployments without an interactive session."
+          "description": "外部 CI が対話型セッションなしでデプロイを引き渡せる、長期有効な Bearer トークン。"
         },
         "secrets": {
-          "title": "シークレット + 環境変数",
-          "description": "Per-environment encrypted secrets and plaintext env vars mounted into workloads at deploy time."
+          "title": "シークレットと環境変数",
+          "description": "環境ごとの暗号化シークレットと平文の環境変数。デプロイ時にワークロードへマウントされます。"
         },
         "managedServices": {
           "title": "マネージドサービス",
-          "description": "Provisioned dependencies — Postgres, Redis, object storage — attached and routed via Astrolift."
+          "description": "Astrolift を介して接続・ルーティングされる、プロビジョニング済みの依存リソース（Postgres、Redis、オブジェクトストレージ）。"
         },
         "domains": {
           "title": "カスタムドメイン",
-          "description": "Map your own hostnames to environments. Validation, ACME-issued certs, and BYO certificate upload."
+          "description": "独自のホスト名を環境に関連付けます。検証、ACME 証明書の発行、独自証明書のアップロードに対応しています。"
         },
         "webhooks": {
           "title": "Webhook",
-          "description": "Outbound deployment, build, and lifecycle events delivered to your endpoints with HMAC signatures."
+          "description": "HMAC 署名付きでエンドポイントに配信される、デプロイ、ビルド、ライフサイクルのイベント。"
         },
         "members": {
           "title": "チームメンバー",
-          "description": "App-scoped role bindings layered on top of org and team grants. Manage who can deploy, rotate, or destroy."
+          "description": "組織とチームの権限に加えて適用される、アプリ単位のロールバインディング。デプロイ、ローテーション、リソース削除を行えるユーザーを管理します。"
         },
         "observability": {
-          "title": "オブザーバビリティ",
-          "description": "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default."
-        }
+          "title": "可観測性",
+          "description": "このアプリのログ、メトリクス、トレース、SLO の状態。Prometheus、Loki、Tempo が既定で統合されています。"
+        },
+        "modified": "{when}に変更"
       },
       "title": "設定",
       "loading": "読み込み中…",
       "description": "<slug></slug> の運用制御と設定。",
       "controls": {
-        "title": "Controls",
-        "description": "Live operational toggles. Take effect immediately — no CI roundtrip.",
-        "emptyEnvs": "No environments yet — sync the manifest to populate this section.",
-        "paused": "Paused",
-        "active": "Active",
-        "pause": "Pause",
-        "resume": "Resume",
-        "deployNow": "Deploy now",
-        "rebuildAndDeploy": "Rebuild & deploy",
-        "imageTagPlaceholder": "image tag (latest)",
-        "tooltipResumeFirst": "Resume deploys first.",
-        "tooltipDeployNow": "Deploys an existing image tag. Use 'Rebuild & deploy' to rebuild from source.",
-        "tooltipRebuildAndDeploy": "Rebuilds the image from main and runs the deploy end-to-end. Use 'Deploy now' if you want to redeploy an existing image tag.",
-        "approvalsRequired": "{count, plural, one {Requires # approval before rollout} other {Requires # approvals before rollout}}",
-        "workloadsHeader": "Workloads",
-        "workloadsEmpty": "No Deployment workloads yet — sync the manifest to populate this section.",
-        "readyCount": "{ready}/{desired} ready",
-        "apply": "Apply",
-        "applyScale": "Apply scale ({count})",
-        "decreaseReplica": "Decrease replicas",
-        "increaseReplica": "Increase replicas",
-        "rollingRestart": "Rolling restart",
-        "rollingRestartTooltip": "Pod is wedged. Replace pods one-by-one without changing the image. Same image tag, same env, same secrets.",
-        "ariaDecrease": "Decrease replicas",
-        "ariaIncrease": "Increase replicas",
-        "ariaWorkloadActions": "Workload actions for {workload}",
+        "title": "操作",
+        "description": "運用中の設定を直接切り替えます。CI を経由せずに即座に反映されます。",
+        "emptyEnvs": "環境はまだありません。マニフェストを同期するとこのセクションに表示されます。",
+        "paused": "一時停止中",
+        "active": "稼働中",
+        "pause": "一時停止",
+        "resume": "再開",
+        "deployNow": "今すぐデプロイ",
+        "rebuildAndDeploy": "再ビルドしてデプロイ",
+        "imageTagPlaceholder": "イメージタグ（最新）",
+        "tooltipResumeFirst": "先にデプロイを再開してください。",
+        "tooltipDeployNow": "既存のイメージタグをデプロイします。ソースから再ビルドするには「再ビルドしてデプロイ」を使用してください。",
+        "tooltipRebuildAndDeploy": "main からイメージを再ビルドして、デプロイを最後まで実行します。既存のイメージタグを再デプロイするには「今すぐデプロイ」を使用してください。",
+        "approvalsRequired": "{count, plural, one {ロールアウト前に # 件の承認が必要} other {ロールアウト前に # 件の承認が必要}}",
+        "workloadsHeader": "ワークロード",
+        "workloadsEmpty": "Deployment ワークロードはまだありません。マニフェストを同期するとこのセクションに表示されます。",
+        "readyCount": "{ready}/{desired} 準備完了",
+        "apply": "適用",
+        "applyScale": "スケールを適用（{count}）",
+        "decreaseReplica": "レプリカを減らす",
+        "increaseReplica": "レプリカを増やす",
+        "rollingRestart": "ローリング再起動",
+        "rollingRestartTooltip": "Pod が停止しています。イメージを変更せずに Pod を 1 つずつ置き換えます。イメージタグ、環境、シークレットは変わりません。",
+        "ariaDecrease": "レプリカを減らす",
+        "ariaIncrease": "レプリカを増やす",
+        "ariaWorkloadActions": "{workload} のワークロード操作",
         "dropdownLabel": "{workload} · {env}",
-        "confirmRestart": "Restart all replicas of {workload} in {env}? Pods roll one-by-one — long-running connections drain.",
-        "toastDeploysPaused": "Deploys paused for {env}.",
-        "toastDeploysResumed": "Deploys resumed for {env}.",
-        "toastDeployStarted": "Deploy started for {env} · {tag}.",
-        "toastDeployFailed": "Deploy failed.",
-        "toastActionFailed": "Action failed.",
-        "toastCiDispatched": "CI workflow dispatched.",
-        "toastCiBranch": "Branch: {branch}",
-        "toastCiOpenRun": "Open run →",
-        "toastRebuildFailed": "Rebuild & deploy failed.",
-        "toastRestartIssued": "Rolling restart issued for {workload} in {env}.",
-        "toastRestartFailed": "Rolling restart failed.",
-        "toastScaled": "{workload} in {env} scaled to {count, plural, one {# replica} other {# replicas}}.",
-        "toastScaleFailed": "Scale failed.",
-        "deployCaption": "Deploy now ships the image tag above (defaults to the latest build). Rebuild & deploy dispatches CI to rebuild from the branch first."
+        "confirmRestart": "{env} の {workload} の全レプリカを再起動しますか？Pod は 1 つずつ置き換えられ、長時間接続は順次終了します。",
+        "toastDeploysPaused": "{env} のデプロイを一時停止しました。",
+        "toastDeploysResumed": "{env} のデプロイを再開しました。",
+        "toastDeployStarted": "{env} のデプロイを開始しました · {tag}。",
+        "toastDeployFailed": "デプロイに失敗しました。",
+        "toastActionFailed": "操作に失敗しました。",
+        "toastCiDispatched": "CI ワークフローを開始しました。",
+        "toastCiBranch": "ブランチ：{branch}",
+        "toastCiOpenRun": "実行を開く →",
+        "toastRebuildFailed": "再ビルドとデプロイに失敗しました。",
+        "toastRestartIssued": "{env} の {workload} のローリング再起動を要求しました。",
+        "toastRestartFailed": "ローリング再起動に失敗しました。",
+        "toastScaled": "{env} の {workload} を {count, plural, one {# レプリカ} other {# レプリカ}}にスケールしました。",
+        "toastScaleFailed": "スケールに失敗しました。",
+        "deployCaption": "「今すぐデプロイ」は上のイメージタグを使用します（既定は最新のビルド）。「再ビルドしてデプロイ」は先にブランチから再ビルドするため CI を開始します。"
       },
       "resync": {
         "title": "ソースから再同期",
