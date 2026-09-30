@@ -260,8 +260,7 @@ export function DeploymentDetailScreen({
   );
 
   const nonMerge = releaseNotes?.commits.filter((c) => !c.isMerge) ?? [];
-  // Kept as it was: platform events that name an app.
-  const appEvents = events.filter((e) => e.registeredAppId && e.registeredAppId.length > 0);
+  const appEvents = events;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">

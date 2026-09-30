@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Dashboard polling and refreshes keep the active filtered page current (#2143).
+  The app header owns the shared deploy poll across tabs; task and security
+  reads filter before limits. App alert counts cover every visible firing and
+  deployment charts walk their complete fourteen-day window. Direct event,
+  alert and rule reads keep old links independent of recent-list caps, with
+  owner, bearer and environment-policy filters preserved. See
+  [dashboard query freshness](docs/operators/frontend-query-freshness.md).
+
 - Core legacy APIs enforce active account, platform-operator and bearer
   ceilings without removing GraphQL declarations (#2110). Permission analysis
   checks explicit organization management; legacy self-deletion keeps

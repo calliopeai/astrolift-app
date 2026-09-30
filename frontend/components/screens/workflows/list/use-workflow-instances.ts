@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useConfirm } from "@/hooks/use-confirm";
 import {
   useCancelWorkflowInstance,
@@ -36,8 +37,9 @@ export function useWorkflowInstancesList() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
 
+  const type = useDebounce(list.filters.type ?? "");
   const { instances, loading, error, refetch } = useWorkflowInstances(
-    instancesVariables(list.filters)
+    instancesVariables({ ...list.filters, type })
   );
   const { rows, totalCount } = selectInstances(instances, {
     filters: list.filters,

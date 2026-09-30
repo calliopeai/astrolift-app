@@ -17,6 +17,7 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
+import { useNow } from "@/components/screens/deployments/run-support";
 import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ export function AlertsScreen({
 }: AlertsScreenProps) {
   const t = useTranslations("lists.alerts");
   const fmt = useFormatters();
+  const now = useNow(rows.some((r) => Boolean(r.activeMute)));
   const [createOpen, setCreateOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AlertRule | null>(null);
   const [muteTarget, setMuteTarget] = React.useState<AlertRule | null>(null);
@@ -81,7 +83,7 @@ export function AlertsScreen({
           </span>
           {r.activeMute && (
             <Badge variant="secondary" className="text-2xs">
-              {t("mute.badge", { remaining: formatRemaining(r.activeMute.ttlUntil) })}
+              {t("mute.badge", { remaining: formatRemaining(r.activeMute.ttlUntil, now) })}
             </Badge>
           )}
         </span>

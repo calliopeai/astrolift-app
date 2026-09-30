@@ -1164,3 +1164,21 @@ export const LIST_AGENT_RUNS_PAGE = gql`
     }
   }
 `;
+
+export const GET_APP_DEPLOYMENT_ACTIVITY = gql`
+  query GetAppDeploymentActivity(
+    $appSlug: String!
+    $filter: AstroliftDeploymentsFilter
+    $after: String
+  ) {
+    astroliftDeploymentsPage(appSlug: $appSlug, filter: $filter, limit: 100, after: $after) {
+      items {
+        id
+        status
+        createdAt
+        startedAt
+      }
+      nextCursor
+    }
+  }
+`;

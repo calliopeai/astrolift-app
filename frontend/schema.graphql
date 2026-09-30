@@ -832,6 +832,11 @@ type AstroliftAlertEventPage {
   pageSize: Int
 }
 
+type AstroliftAlertEventSummary {
+  unresolvedCount: Int!
+  criticalCount: Int!
+}
+
 type AstroliftAlertMute {
   id: GUID!
   ttlUntil: DateTime!
@@ -7655,6 +7660,10 @@ type Query {
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
+  astroliftEvent(id: GUID!): AstroliftEvent
+  astroliftAlertRule(id: GUID!): AstroliftAlertRule
+  astroliftAlertEvent(id: GUID!): AstroliftAlertEvent
+  astroliftAlertEventSummary(appSlug: String!): AstroliftAlertEventSummary!
   astroliftAppUptime(appSlug: String!, windowHours: Int! = 24): AstroliftAppUptime
   astroliftEvents(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null): [AstroliftEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage.")
   astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]! @deprecated(reason: "Caps at 500 buckets folded from a bounded 10k-row scan, so activity older than the scan window is unreachable. Use astroliftEventsAggregatedPage.")
@@ -7681,11 +7690,11 @@ type Query {
   astroliftMyNotificationPreferences(channel: String = null): [AstroliftNotificationPreference!]!
   astroliftMyDevices: [AstroliftDeviceRegistration!]!
   astroliftMyAlertSubscriptions(appSlug: String = null): [AstroliftUserAlertSubscription!]!
-  astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
-  astroliftAlertRulesPage(target: String = null, targetId: String = null, activeOnly: Boolean! = true, search: String = null, limit: Int! = 50, after: String = null): AstroliftAlertRulePage!
+  astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true, appSlug: String = null): [AstroliftAlertRule!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
+  astroliftAlertRulesPage(target: String = null, targetId: String = null, activeOnly: Boolean! = true, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertRulePage!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
-  astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
-  astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null): AstroliftAlertEventPage!
+  astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100, appSlug: String = null): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
+  astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertEventPage!
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
   astroliftAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, sortBy: AppsListSortKey! = CREATED_DESC, cursor: String = null, limit: Int! = 50, includeArchived: Boolean! = false, filter: AstroliftAppsListFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftRegisteredAppPage!

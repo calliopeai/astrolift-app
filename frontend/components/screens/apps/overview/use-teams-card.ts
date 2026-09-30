@@ -112,7 +112,7 @@ export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs)
   const [addGrant, { loading: adding }] = useMutation<{
     grantTeamAccessToApp: MutationResult<AstroliftAppTeamAccess>;
   }>(GRANT_TEAM_ACCESS_TO_APP, {
-    refetchQueries: [{ query: LIST_APP_TEAM_ACCESSES, variables: { appSlug } }],
+    refetchQueries: refetch,
     awaitRefetchQueries: true,
   });
 

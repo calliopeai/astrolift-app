@@ -6,6 +6,7 @@ import {
   type Dot,
 } from "@/components/detail/EntityDetailShell";
 import { Badge } from "@/components/ui/badge";
+import { QueryError } from "@/components/QueryError";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { prettyJson } from "./alert-format";
@@ -19,14 +20,17 @@ const SEVERITY_TONE: Record<string, Dot> = {
   error: "error",
 };
 
-export type AlertRuleDetailProps = ReturnType<typeof useAlertRuleDetail>;
+export type AlertRuleDetailProps = Omit<
+  ReturnType<typeof useAlertRuleDetail>,
+  "error" | "onRetry"
+> & { error?: string | null; onRetry?: () => void };
 
 /** Alert rule detail (#1106): state, target, mute, and the raw predicate/channels. */
-export function AlertRuleDetail({ id, rule: r, loading }: AlertRuleDetailProps) {
+export function AlertRuleDetail({ id, rule: r, loading, error, onRetry }: AlertRuleDetailProps) {
   return (
     <EntityDetailShell
       loading={loading}
-      notFound={!r}
+      notFound={!r && !error}
       breadcrumb={{ label: "Alerts", href: "/alerts" }}
       heading={r ? r.name : `Rule ${id.slice(0, 8)}`}
       status={r?.severity}
@@ -93,6 +97,7 @@ export function AlertRuleDetail({ id, rule: r, loading }: AlertRuleDetailProps) 
           : []
       }
     >
+      {error ? <QueryError title="Could not load detail" error={error} onRetry={onRetry} /> : null}
       {r ? (
         <>
           <Card>

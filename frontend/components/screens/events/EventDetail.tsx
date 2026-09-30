@@ -4,16 +4,20 @@ import { ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
 
 import { DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
+import { QueryError } from "@/components/QueryError";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DefinitionListItem } from "@/components/ui/definition-list";
 
 import { resolveSourceHref } from "./event-source";
 import type { useEventDetail } from "./use-events";
 
-export type EventDetailProps = ReturnType<typeof useEventDetail>;
+export type EventDetailProps = Omit<ReturnType<typeof useEventDetail>, "error" | "onRetry"> & {
+  error?: string | null;
+  onRetry?: () => void;
+};
 
 /** Event detail (#1106) — full payload + metadata for a single platform event. */
-export function EventDetail({ id, event: e, loading }: EventDetailProps) {
+export function EventDetail({ id, event: e, loading, error, onRetry }: EventDetailProps) {
   const sourceHref = e
     ? resolveSourceHref(e.resourceKind ?? "", e.resourceId ?? "", e.payload ?? {})
     : null;
@@ -73,12 +77,13 @@ export function EventDetail({ id, event: e, loading }: EventDetailProps) {
   return (
     <EntityDetailShell
       loading={loading}
-      notFound={!e}
+      notFound={!e && !error}
       breadcrumb={{ label: "Events", href: "/events" }}
       heading={e ? e.eventType : `Event ${id.slice(0, 8)}`}
       notFoundLabel="event"
       overview={overview}
     >
+      {error ? <QueryError title="Could not load detail" error={error} onRetry={onRetry} /> : null}
       {e ? (
         <Card>
           <CardHeader>

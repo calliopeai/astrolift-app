@@ -14,6 +14,7 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import type { Column } from "@/components/data-table";
+import { QueryError } from "@/components/QueryError";
 import { EmptyState } from "@/components/EmptyState";
 import { ListPage } from "@/components/list/ListPage";
 import { type SelectRowsSpec, selectRows } from "@/components/list/select-rows";
@@ -104,6 +105,10 @@ export function AppSecurityScreen({
   app: a,
   loading,
   eventsLoading,
+  error,
+  onRetry,
+  eventsError,
+  onRetryEvents,
   latestSigning,
   latestSbom,
   latestScan,
@@ -119,6 +124,14 @@ export function AppSecurityScreen({
     return (
       <PageShell title={t("loadingTitle")} description={tCommon("loading")}>
         <Skeleton className="h-32 w-full" />
+      </PageShell>
+    );
+  }
+
+  if (error && !a) {
+    return (
+      <PageShell title={t("loadingTitle")}>
+        <QueryError title="Could not load app security" error={error} onRetry={onRetry} />
       </PageShell>
     );
   }
@@ -148,9 +161,19 @@ export function AppSecurityScreen({
       {tabs}
 
       {access}
-      <SigningCard event={latestSigning} loading={eventsLoading} />
-      <SbomCard event={latestSbom} loading={eventsLoading} />
-      <ScanCard event={latestScan} loading={eventsLoading} />
+      {eventsError ? (
+        <QueryError
+          title="Could not load security events"
+          error={eventsError}
+          onRetry={onRetryEvents}
+        />
+      ) : (
+        <>
+          <SigningCard event={latestSigning} loading={eventsLoading} />
+          <SbomCard event={latestSbom} loading={eventsLoading} />
+          <ScanCard event={latestScan} loading={eventsLoading} />
+        </>
+      )}
       <PolicyCard
         initialPolicy={a.securityPolicy ?? DEFAULT_POLICY}
         saving={savingPolicy}

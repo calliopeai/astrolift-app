@@ -7,7 +7,7 @@ import hashlib
 from datetime import timedelta
 
 import strawberry
-from django.db.models import Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -34,6 +34,7 @@ from astrolift_operations.schema.run_audit import RunAuditFilterInput, RunAuditI
 from astrolift_operations.schema.types import (
     ActivityPageType,
     AggregatedEventType,
+    AlertEventSummaryType,
     AlertEventType,
     AlertRuleType,
     AppMetricsPointType,
@@ -68,7 +69,7 @@ from astrolift_operations.schema.types import (
     zentinelle_connection_to_type,
 )
 from astrolift_operations.scopes import org_scope, provider_read_operation, webhook_scope
-from astrolift_operations.visibility import visible_events, visible_rules, visible_webhooks
+from astrolift_operations.visibility import rules_for_app, visible_events, visible_rules, visible_webhooks
 from astrolift_registry.scopes import app_scope_by_slug, live_app_owners
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -227,6 +228,7 @@ def _alert_rules_qs(
     target_id: str | None,
     active_only: bool,
     search: str | None = None,
+    app_slug: str | None = None,
 ):
     """Filtered, unordered alert rules for the caller's org.
 
@@ -255,6 +257,8 @@ def _alert_rules_qs(
         .filter(organization_id=org_id),
         Permission.APP_READ,
     )
+    if app_slug is not None:
+        qs = rules_for_app(qs, app_slug)
     if active_only:
         qs = qs.filter(is_active=True)
     if target:
@@ -271,6 +275,7 @@ def _alert_events_qs(
     rule_id: GUID | None,
     unresolved_only: bool,
     search: str | None = None,
+    app_slug: str | None = None,
 ):
     """Filtered, unordered alert-firing history for the caller's org.
 
@@ -286,8 +291,11 @@ def _alert_events_qs(
     org_id = _caller_org_id()
     if org_id is None:
         return AlertEvent.objects.none()
+    rules = visible_rules(AlertRule.objects.all(), Permission.APP_READ)
+    if app_slug is not None:
+        rules = rules_for_app(rules, app_slug)
     qs = AlertEvent.objects.select_related("rule").filter(
-        organization_id=org_id, rule__in=visible_rules(AlertRule.objects.all(), Permission.APP_READ)
+        organization_id=org_id, rule__in=rules, deleted_at__isnull=True
     )
     if rule_id is not None:
         qs = qs.filter(rule__guid=str(rule_id))
@@ -300,6 +308,45 @@ def _alert_events_qs(
 
 @strawberry.type
 class OperationsQuery:
+    # GUID is a runtime Strawberry scalar; mypy cannot use it as a static type.
+    @strawberry.field
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_event(self, info: Info, id: GUID) -> EventType | None:  # type: ignore[valid-type]
+        row = _events_qs().filter(guid=str(id), organization_id=_caller_org_id()).first()
+        return event_to_type(row) if row else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_alert_rule(self, info: Info, id: GUID) -> AlertRuleType | None:  # type: ignore[valid-type]
+        row = (
+            _alert_rules_qs(target=None, target_id=None, active_only=False)
+            .filter(guid=str(id), organization_id=_caller_org_id())
+            .first()
+        )
+        return alert_rule_to_type(row) if row else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_alert_event(self, info: Info, id: GUID) -> AlertEventType | None:  # type: ignore[valid-type]
+        row = (
+            _alert_events_qs(rule_id=None, unresolved_only=False)
+            .filter(guid=str(id), organization_id=_caller_org_id())
+            .first()
+        )
+        return alert_event_to_type(row) if row else None
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_alert_event_summary(self, info: Info, app_slug: str) -> AlertEventSummaryType:
+        counts = _alert_events_qs(rule_id=None, unresolved_only=True, app_slug=app_slug).aggregate(
+            unresolved=Count("pk"), critical=Count("pk", filter=Q(severity="critical"))
+        )
+        return AlertEventSummaryType(unresolved_count=counts["unresolved"], critical_count=counts["critical"])
+
     @strawberry.field
     @require_permission(
         Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
@@ -1212,6 +1259,7 @@ class OperationsQuery:
         target: str | None = None,
         target_id: str | None = None,
         active_only: bool = True,
+        app_slug: str | None = None,
     ) -> list[AlertRuleType]:
         """List alert rules.
 
@@ -1222,6 +1270,7 @@ class OperationsQuery:
             target=target,
             target_id=target_id,
             active_only=active_only,
+            app_slug=app_slug,
         ).order_by("-created_at")[:200]
         return [alert_rule_to_type(r) for r in qs]
 
@@ -1237,6 +1286,7 @@ class OperationsQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        app_slug: str | None = None,
     ) -> PageType[AlertRuleType]:
         """Cursor-paginated alert rules (#1235).
 
@@ -1253,6 +1303,7 @@ class OperationsQuery:
                 target=target,
                 target_id=target_id,
                 active_only=active_only,
+                app_slug=app_slug,
                 search=search,
             ),
             cursor=after,
@@ -1374,8 +1425,11 @@ class OperationsQuery:
         rule_id: GUID | None = None,
         unresolved_only: bool = False,
         limit: int = 100,
+        app_slug: str | None = None,
     ) -> list[AlertEventType]:
-        qs = _alert_events_qs(rule_id=rule_id, unresolved_only=unresolved_only).order_by("-fired_at")
+        qs = _alert_events_qs(rule_id=rule_id, unresolved_only=unresolved_only, app_slug=app_slug).order_by(
+            "-fired_at"
+        )
         return [alert_event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
@@ -1389,6 +1443,7 @@ class OperationsQuery:
         search: str | None = None,
         limit: int = 50,
         after: str | None = None,
+        app_slug: str | None = None,
     ) -> PageType[AlertEventType]:
         """Cursor-paginated alert-firing history (#1235).
 
@@ -1405,6 +1460,7 @@ class OperationsQuery:
             _alert_events_qs(
                 rule_id=rule_id,
                 unresolved_only=unresolved_only,
+                app_slug=app_slug,
                 search=search,
             ),
             cursor=after,

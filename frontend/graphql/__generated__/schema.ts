@@ -811,6 +811,11 @@ export type AstroliftAlertEventPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftAlertEventSummary = {
+  criticalCount: Scalars['Int']['output'];
+  unresolvedCount: Scalars['Int']['output'];
+};
+
 export type AstroliftAlertMute = {
   createdBy: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -9026,9 +9031,12 @@ export type Query = {
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
   astroliftAgentRuns: Array<AstroliftAgentRun>;
   astroliftAgentRunsPage: AstroliftAgentRunPage;
+  astroliftAlertEvent?: Maybe<AstroliftAlertEvent>;
+  astroliftAlertEventSummary: AstroliftAlertEventSummary;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage. */
   astroliftAlertEvents: Array<AstroliftAlertEvent>;
   astroliftAlertEventsPage: AstroliftAlertEventPage;
+  astroliftAlertRule?: Maybe<AstroliftAlertRule>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage. */
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftAlertRulesPage: AstroliftAlertRulePage;
@@ -9120,6 +9128,7 @@ export type Query = {
   astroliftEmailTemplates: Array<AstroliftEmailTemplate>;
   astroliftEnvironments: Array<AstroliftAppEnvironment>;
   astroliftEnvironmentsPage: AstroliftAppEnvironmentPage;
+  astroliftEvent?: Maybe<AstroliftEvent>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage. */
   astroliftEvents: Array<AstroliftEvent>;
   /** @deprecated Caps at 500 buckets folded from a bounded 10k-row scan, so activity older than the scan window is unreachable. Use astroliftEventsAggregatedPage. */
@@ -9564,7 +9573,18 @@ export type QueryAstroliftAgentRunsPageArgs = {
 };
 
 
+export type QueryAstroliftAlertEventArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftAlertEventSummaryArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftAlertEventsArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   ruleId?: InputMaybe<Scalars['GUID']['input']>;
   unresolvedOnly?: Scalars['Boolean']['input'];
@@ -9573,6 +9593,7 @@ export type QueryAstroliftAlertEventsArgs = {
 
 export type QueryAstroliftAlertEventsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   ruleId?: InputMaybe<Scalars['GUID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -9580,8 +9601,14 @@ export type QueryAstroliftAlertEventsPageArgs = {
 };
 
 
+export type QueryAstroliftAlertRuleArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftAlertRulesArgs = {
   activeOnly?: Scalars['Boolean']['input'];
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   target?: InputMaybe<Scalars['String']['input']>;
   targetId?: InputMaybe<Scalars['String']['input']>;
 };
@@ -9590,6 +9617,7 @@ export type QueryAstroliftAlertRulesArgs = {
 export type QueryAstroliftAlertRulesPageArgs = {
   activeOnly?: Scalars['Boolean']['input'];
   after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   target?: InputMaybe<Scalars['String']['input']>;
@@ -10101,6 +10129,11 @@ export type QueryAstroliftEnvironmentsPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftEventArgs = {
+  id: Scalars['GUID']['input'];
 };
 
 

@@ -123,7 +123,9 @@ export function useEnvironmentControls(
     awaitRefetchQueries: true,
   });
   const [deploy, { loading: deploying }] = useMutation<StartResp>(START_DEPLOYMENT, {
-    refetchQueries: [{ query: LIST_DEPLOYMENTS, variables: { appSlug, limit: 10 } }],
+    refetchQueries: ["ListDeployments"],
+    onQueryUpdated: refetchAfterMutation,
+    awaitRefetchQueries: true,
   });
   const [rebuildAndDeploy, { loading: rebuilding }] = useMutation<TriggerDeployResp>(
     TRIGGER_DEPLOY_WORKFLOW,

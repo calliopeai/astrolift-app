@@ -95,6 +95,7 @@ export const LIST_ALERT_RULES_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $appSlug: String
   ) {
     astroliftAlertRulesPage(
       target: $target
@@ -103,6 +104,7 @@ export const LIST_ALERT_RULES_PAGE = gql`
       search: $search
       limit: $limit
       after: $after
+      appSlug: $appSlug
     ) {
       items {
         ${ALERT_RULE_FIELDS}
@@ -120,6 +122,7 @@ export const LIST_ALERT_EVENTS_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $appSlug: String
   ) {
     astroliftAlertEventsPage(
       ruleId: $ruleId
@@ -127,6 +130,7 @@ export const LIST_ALERT_EVENTS_PAGE = gql`
       search: $search
       limit: $limit
       after: $after
+      appSlug: $appSlug
     ) {
       items {
         ${ALERT_EVENT_FIELDS}
@@ -199,6 +203,27 @@ export const UNMUTE_ALERT_RULE = gql`
       ok
       errors { code message field }
       data { ${ALERT_RULE_FIELDS} }
+    }
+  }
+`;
+
+export const GET_ALERT_RULE = gql`
+  query GetAlertRule($id: GUID!) {
+    astroliftAlertRule(id: $id) { ${ALERT_RULE_FIELDS} }
+  }
+`;
+
+export const GET_ALERT_EVENT = gql`
+  query GetAlertEvent($id: GUID!) {
+    astroliftAlertEvent(id: $id) { ${ALERT_EVENT_FIELDS} }
+  }
+`;
+
+export const GET_APP_ALERT_SUMMARY = gql`
+  query GetAppAlertSummary($appSlug: String!) {
+    astroliftAlertEventSummary(appSlug: $appSlug) {
+      unresolvedCount
+      criticalCount
     }
   }
 `;

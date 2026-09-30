@@ -1,30 +1,31 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import * as React from "react";
 
-import { LIST_ALERT_EVENTS } from "@/graphql/operations/alerts.queries";
+import { GET_ALERT_EVENT } from "@/graphql/operations/alerts.queries";
 
 import type { AlertEvent } from "./use-alerts";
 
 interface Resp {
-  astroliftAlertEvents: AlertEvent[];
+  astroliftAlertEvent: AlertEvent | null;
 }
 
-/**
- * The data half of AlertEventDetail (#1106). Reuses the global
- * LIST_ALERT_EVENTS window (no singular query exists).
- */
+/** Direct owner-filtered detail read, independent of the list window. */
 export function useAlertEventDetail(id: string) {
-  const { data, loading } = useQuery<Resp>(LIST_ALERT_EVENTS, {
-    variables: { unresolvedOnly: false, limit: 100 },
+  const { data, loading, error, refetch } = useQuery<Resp>(GET_ALERT_EVENT, {
+    variables: { id },
     fetchPolicy: "cache-and-network",
   });
 
-  const event = React.useMemo(
-    () => (data?.astroliftAlertEvents ?? []).find((row) => row.id === id) ?? null,
-    [data, id]
-  );
+  const event = data?.astroliftAlertEvent ?? null;
 
-  return { id, event, loading };
+  return {
+    id,
+    event,
+    loading: loading && !data,
+    error: data ? null : error?.message,
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
+  };
 }

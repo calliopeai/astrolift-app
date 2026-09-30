@@ -140,7 +140,7 @@ export function useDeploymentDetail(id: string) {
   });
 
   const events = useQuery<EventsResp>(LIST_EVENTS, {
-    variables: { limit: 50 },
+    variables: { appSlug: deployment?.registeredAppSlug ?? null, limit: 50 },
     skip: !deployment,
     fetchPolicy: "cache-and-network",
   });
