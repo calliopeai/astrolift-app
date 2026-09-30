@@ -23,6 +23,7 @@ from astrolift_lifecycle.schema.types import (
     env_setting_to_type,
 )
 from astrolift_lifecycle.scopes import environment_app_scope
+from astrolift_lifecycle.visibility import live_lifecycle_rows
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -39,7 +40,7 @@ class EnvironmentSettingMutations:
     @mutation_audit(action="app.env.setting.set")
     @require_permission(
         Permission.APP_UPDATE,
-        scope=environment_app_scope("input.environment_id"),
+        scope=environment_app_scope("input.environment_id", permission=Permission.APP_UPDATE),
         operation=environment_operation("input.environment_id"),
     )
     @tenant_scoped()
@@ -50,7 +51,8 @@ class EnvironmentSettingMutations:
     ) -> MutationResultType[EnvironmentSettingType]:
         tenant = get_current_tenant()
         env = (
-            AppEnvironment.objects.select_related("registered_app")
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related("registered_app")
             .filter(guid=str(input.environment_id), deleted_at__isnull=True)
             .first()
         )
@@ -86,7 +88,7 @@ class EnvironmentSettingMutations:
     @mutation_audit(action="app.env.setting.clear")
     @require_permission(
         Permission.APP_UPDATE,
-        scope=environment_app_scope("input.environment_id"),
+        scope=environment_app_scope("input.environment_id", permission=Permission.APP_UPDATE),
         operation=environment_operation("input.environment_id"),
     )
     @tenant_scoped()
@@ -97,7 +99,8 @@ class EnvironmentSettingMutations:
     ) -> MutationResultType[EnvironmentSettingType]:
         tenant = get_current_tenant()
         env = (
-            AppEnvironment.objects.select_related("registered_app")
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related("registered_app")
             .filter(guid=str(input.environment_id), deleted_at__isnull=True)
             .first()
         )

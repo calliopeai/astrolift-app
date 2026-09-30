@@ -23,6 +23,7 @@ from astrolift_lifecycle.schema.types import (
     DeploymentType,
     deployment_to_type,
 )
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_operations.models import WorkflowRun
 from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.client import (
@@ -314,14 +315,16 @@ def _resolve_app_env(
     # against a sibling org's app. Fails closed (None) when org_id is None,
     # since organization_id is a non-null FK (#1183).
     app = (
-        RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+        live_app_rows(RegisteredApp.objects.all())
+        .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .select_related("approver_team")
         .first()
     )
     if app is None:
         return None
     env = (
-        AppEnvironment.objects.filter(
+        live_lifecycle_rows(AppEnvironment.objects.all())
+        .filter(
             registered_app=app,
             name=environment_name,
             deleted_at__isnull=True,
@@ -433,6 +436,13 @@ def _lookup_deployment_by_token(
     )
     if deployment is None:
         return None, INVALID
+    from core.tenancy import TenantContext, tenant_context
+
+    # This public capability resolves its organization from the hash-verified
+    # deployment, independently of any selected tenant.
+    with tenant_context(TenantContext(organization_id=deployment.registered_app.organization_id)):
+        if not live_lifecycle_rows(Deployment.objects.all()).filter(pk=deployment.pk).exists():
+            return None, INVALID
     if deployment.approval_token_used_at is not None:
         return None, INVALID
     if deployment.approval_token_expires_at is None or deployment.approval_token_expires_at <= timezone.now():
@@ -534,14 +544,17 @@ def _bulk_approval_permission_failure(deployment, deployment_id):
     """Match the single-row gate before any vote, save, signal or audit."""
     from astrolift_identity.abac import operation_attributes
     from astrolift_identity.operation_context import deployment_approval_count, environment_context
-    from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
+    from astrolift_lifecycle.scopes import deployment_app_scope
+    from core.permissions import Permission, PermissionDenied, check_permission
 
     context = environment_context(deployment.app_environment, approvals=deployment_approval_count(deployment))
     try:
         with operation_attributes(**context.attributes()):
             check_permission(
                 Permission.APP_APPROVE_DEPLOY,
-                scope=PermissionScope(kind=ScopeKind.APP, id=deployment.registered_app_id),
+                scope=deployment_app_scope("id", permission=Permission.APP_APPROVE_DEPLOY)(
+                    {"id": deployment.guid}
+                ),
             )
     except PermissionDenied as exc:
         return _bulk_item_failure(deployment_id, ErrorCode.PERMISSION_DENIED.value, str(exc))
@@ -569,7 +582,8 @@ def _process_bulk_approve_one(
     # by the bulk resolver). Fails closed (NOT_FOUND) when organization_id
     # is None (#1183).
     deployment = (
-        Deployment.objects.select_related("registered_app", "app_environment__tenant_cluster", "workload")
+        live_lifecycle_rows(Deployment.objects.all())
+        .select_related("registered_app", "app_environment__tenant_cluster", "workload")
         .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=organization_id)
         .first()
     )
@@ -670,7 +684,8 @@ def _process_bulk_reject_one(
     # by the bulk resolver). Fails closed (NOT_FOUND) when organization_id
     # is None (#1183).
     deployment = (
-        Deployment.objects.select_related("registered_app", "app_environment__tenant_cluster", "workload")
+        live_lifecycle_rows(Deployment.objects.all())
+        .select_related("registered_app", "app_environment__tenant_cluster", "workload")
         .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=organization_id)
         .first()
     )

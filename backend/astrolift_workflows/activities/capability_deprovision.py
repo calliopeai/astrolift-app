@@ -82,6 +82,10 @@ def _cluster_for_app(app) -> Any:
             "bind the app to a cluster before deprovisioning per-app "
             "capabilities",
         )
+    from astrolift_lifecycle.visibility import cluster_owned_and_live
+
+    if not cluster_owned_and_live(cluster, app.organization_id):
+        raise CapabilityDeprovisionError("app cluster is not a live organization-owned target")
     return cluster
 
 

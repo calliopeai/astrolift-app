@@ -15,6 +15,8 @@ from astrolift_lifecycle.schema.mutations.types import (
     DeregisterAppInput,
     DeregisterAppPayload,
 )
+from astrolift_lifecycle.scopes import deregister_workflow_scope
+from astrolift_lifecycle.visibility import live_app_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_workflows.client import (
@@ -44,7 +46,9 @@ class DeregisterMutations:
     @strawberry.field
     @mutation_audit(action="app.deregister")
     @requires_elevation(action_label="app.deregister")
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def deregister_astrolift_app(
         self,
@@ -91,7 +95,8 @@ class DeregisterMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -160,7 +165,7 @@ class DeregisterMutations:
 
     @strawberry.field
     @mutation_audit(action="app.deregister.cancel")
-    @require_permission(Permission.APP_DELETE)
+    @require_permission(Permission.APP_DELETE, scope=deregister_workflow_scope)
     @tenant_scoped()
     def cancel_astrolift_deregister(
         self,
@@ -194,7 +199,8 @@ class DeregisterMutations:
         org_id = tenant.organization_id if tenant else None
         app_guid = wf_id[len("DeregisterAppWorkflow-") :]
         app = (
-            RegisteredApp.objects.filter(guid=app_guid, organization_id=org_id)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(guid=app_guid, organization_id=org_id)
             .select_related("organization")
             .first()
         )

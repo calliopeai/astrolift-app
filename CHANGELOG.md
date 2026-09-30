@@ -14,6 +14,13 @@
   Bulk actions authorize every app and affected operation before acting, and
   secret attachment also authorizes its source bundle. Audit trails, retention,
   notification settings and Zentinelle management require organization authority.
+- Lifecycle gates authorize coherent live app owners and preserve bearer
+  team/share ceilings before collection counts and side effects (#2104).
+  Builder requests check the stored owner and destination; invalid clusters
+  cannot reach provider calls. Lifecycle events recheck persisted operation
+  facts, current identity and policies per event, and close broker queues on
+  cancellation. Historical deployment links and public approval-token
+  contracts remain supported. See [lifecycle access scopes](docs/operators/lifecycle-access-scopes.md).
 
 - Managed-resource gates resolve live app, project, team or organization owners
   and preserve bearer ceilings across GraphQL and all ten project-resource MCP

@@ -1,0 +1,47 @@
+# Lifecycle access scopes
+
+Lifecycle actions authorize the persisted app owner, independent of selected
+team and project headers. App ancestors must be live, belong to the active
+organization and agree on the home team. Deployment, environment, preview,
+domain, deploy-token and run targets use that app's scope. Task runs without
+an environment retain their workload's app owner. Missing, malformed, deleted
+or incoherent targets take explicit organization scope; selecting a team does
+not supply fallback authority.
+
+Bearer credentials retain their organization, team and action-specific share
+ceiling even when their user has an organization role. Collections apply this
+ceiling and operation policies before limits, pagination and counts. A viewer
+share supports reads; it cannot authorize a deploy-token write. Agent-box pod
+reads authorize and refetch the box's recorded owner at `agent_box.attach`.
+Deregister cancellation derives the actual app from the workflow identifier.
+
+Every populated environment and workload must agree with its row's app. A
+cluster target must be active, live, and owned by the organization or be a
+supported platform cluster with no organization. Invalid persisted targets
+are refused before writes, workflow signals and provider calls. A named but
+invalid environment cannot fall back to the app's default cluster. The legacy
+observability fallback for a name that was never registered remains available.
+
+Deployment direct links, approval history, logs and release notes retain their
+organization-confined snapshots after app or environment teardown. An explicit
+organization operator can read those historical rows, while lists continue to
+hide retired owners. A public approval token retains its existing capability
+contract: its hash identifies the deployment, after which its own organization,
+coherent live target, expiry, status and approver checks still apply.
+
+The builder HTTP API requires a bearer token, its existing `write:apps` scope,
+and permissions on the live destination team. Sync and promote also check the
+dev environment's actual owner and retain the creator-or-admin rule. A row with
+no team requires organization authority and an organization credential; a team
+credential cannot supply its own team as a replacement. Re-promoting an app
+with incoherent or retired ancestry is refused before workflows start.
+
+The lifecycle event stream authenticates the WebSocket identity and requires
+`app.read` at an available scope. It filters every event through the persisted
+live deployment, environment, cluster, approvals and permission policy. Event
+payload labels do not establish ownership, environment or region. Events are
+normalized to the stored app and environment. Each event rechecks the pinned
+actor and bearer with a fresh permission cache, so membership, role, policy and
+token revocation stop delivery. Denied streams close silently; cancellation and
+cross-task generator closure remove their broker queue. GraphQL SDL and HTTP
+request and response shapes remain unchanged.

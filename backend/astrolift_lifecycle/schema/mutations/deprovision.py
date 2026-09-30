@@ -20,6 +20,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     _CapabilityDeprovisionPayload,
 )
 from astrolift_lifecycle.scopes import custom_domain_app_scope
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_guid
 from core.decorators import tenant_scoped
@@ -34,7 +35,9 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.dns_record.delete")
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def delete_app_dns_record(
         self,
@@ -58,9 +61,11 @@ class DeprovisionMutations:
         # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(
-            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
-        ).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
+            .first()
+        )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         host = (input.hostname or "").strip()
@@ -88,7 +93,10 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.certificate.revoke")
-    @require_permission(Permission.APP_DELETE, scope=custom_domain_app_scope("input.custom_domain_id"))
+    @require_permission(
+        Permission.APP_DELETE,
+        scope=custom_domain_app_scope("input.custom_domain_id", permission=Permission.APP_DELETE),
+    )
     @tenant_scoped()
     def revoke_app_certificate(
         self,
@@ -114,11 +122,15 @@ class DeprovisionMutations:
         # closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        domain = CustomDomain.objects.filter(
-            guid=str(input.custom_domain_id),
-            deleted_at__isnull=True,
-            registered_app__organization_id=org_id,
-        ).first()
+        domain = (
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(
+                guid=str(input.custom_domain_id),
+                deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
+            )
+            .first()
+        )
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "custom domain not found")
         try:
@@ -143,7 +155,9 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.identity_role.delete")
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def delete_app_identity_role(
         self,
@@ -166,9 +180,11 @@ class DeprovisionMutations:
         # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(
-            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
-        ).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
+            .first()
+        )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         try:
@@ -185,7 +201,9 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.registry_repo.archive")
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def archive_app_registry_repo(
         self,
@@ -209,9 +227,11 @@ class DeprovisionMutations:
         # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(
-            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
-        ).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
+            .first()
+        )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         try:
@@ -232,7 +252,9 @@ class DeprovisionMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ingress.delete")
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def delete_app_ingress(
         self,
@@ -258,9 +280,11 @@ class DeprovisionMutations:
         # effect. Fails closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(
-            guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True
-        ).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(guid=str(input.app_id), organization_id=org_id, deleted_at__isnull=True)
+            .first()
+        )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         host = (input.hostname or "").strip() or None

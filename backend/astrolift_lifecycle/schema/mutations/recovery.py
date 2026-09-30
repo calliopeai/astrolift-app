@@ -24,6 +24,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     RunJobOnceInput,
     RunJobOncePayload,
 )
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
@@ -61,7 +62,7 @@ class RecoveryMutations:
     @require_permission(
         Permission.APP_DEPLOY,
         Permission.APP_UPDATE,
-        scope=app_scope_by_slug("input.app_slug"),
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
         operation=named_environment(all_if_absent=True),
     )
     @tenant_scoped()
@@ -101,7 +102,8 @@ class RecoveryMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -124,7 +126,8 @@ class RecoveryMutations:
         environment_id: int | None = None
         if input.environment_name:
             env = (
-                AppEnvironment.objects.filter(
+                live_lifecycle_rows(AppEnvironment.objects.all())
+                .filter(
                     registered_app=app,
                     name=input.environment_name,
                     deleted_at__isnull=True,
@@ -165,7 +168,9 @@ class RecoveryMutations:
     @strawberry.field
     @mutation_audit(action="app.job.run_once")
     @require_permission(
-        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
+        operation=named_environment(),
     )
     @tenant_scoped()
     def run_astrolift_job_once(
@@ -206,7 +211,8 @@ class RecoveryMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -276,7 +282,9 @@ class RecoveryMutations:
         ),
     )
     @require_permission(
-        Permission.APP_UPDATE, Permission.APP_CREATE, scope=app_scope_by_slug("input.app_slug")
+        Permission.APP_UPDATE,
+        Permission.APP_CREATE,
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE),
     )
     @tenant_scoped()
     def rerun_astrolift_onboarding(
@@ -315,7 +323,8 @@ class RecoveryMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )

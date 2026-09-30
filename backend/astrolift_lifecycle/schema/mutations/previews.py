@@ -38,6 +38,7 @@ from astrolift_lifecycle.schema.types import (
     preview_to_type,
 )
 from astrolift_lifecycle.scopes import preview_environment_app_scope
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_workflows.client import (
@@ -97,7 +98,7 @@ class PreviewMutations:
     @mutation_audit(action="preview.tear_down")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=preview_environment_app_scope("input.id"),
+        scope=preview_environment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=row_operation("astrolift_lifecycle.PreviewEnvironment", "input.id"),
     )
     @tenant_scoped()
@@ -113,7 +114,8 @@ class PreviewMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         preview = (
-            PreviewEnvironment.objects.select_related("registered_app")
+            live_lifecycle_rows(PreviewEnvironment.objects.all())
+            .select_related("registered_app")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -145,7 +147,8 @@ class PreviewMutations:
             )
 
         latest = (
-            Deployment.objects.filter(
+            live_lifecycle_rows(Deployment.objects.all())
+            .filter(
                 registered_app_id=preview.registered_app_id,
                 deleted_at__isnull=True,
             )
@@ -163,7 +166,7 @@ class PreviewMutations:
     @mutation_audit(action="preview.extend_ttl")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=preview_environment_app_scope("input.id"),
+        scope=preview_environment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=row_operation("astrolift_lifecycle.PreviewEnvironment", "input.id"),
     )
     @tenant_scoped()
@@ -195,7 +198,8 @@ class PreviewMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         preview = (
-            PreviewEnvironment.objects.select_related(
+            live_lifecycle_rows(PreviewEnvironment.objects.all())
+            .select_related(
                 "registered_app",
                 "registered_app__organization",
                 "registered_app__default_tenant_cluster",
@@ -227,7 +231,7 @@ class PreviewMutations:
     @mutation_audit(action="preview.set_pinned", target=_set_preview_pinned_target)
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=preview_environment_app_scope("input.id"),
+        scope=preview_environment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=row_operation("astrolift_lifecycle.PreviewEnvironment", "input.id"),
     )
     @tenant_scoped()
@@ -260,7 +264,8 @@ class PreviewMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         preview = (
-            PreviewEnvironment.objects.select_related(
+            live_lifecycle_rows(PreviewEnvironment.objects.all())
+            .select_related(
                 "registered_app",
                 "pinned_by",
             )
@@ -294,7 +299,9 @@ class PreviewMutations:
     @strawberry.field
     @mutation_audit(action="preview.create_manual")
     @require_permission(
-        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"), operation=preview_creation_operation
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
+        operation=preview_creation_operation,
     )
     @tenant_scoped()
     def create_preview_environment(
@@ -333,7 +340,8 @@ class PreviewMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization", "default_tenant_cluster")
             .first()
         )
@@ -372,7 +380,8 @@ class PreviewMutations:
         # same (app, branch) returns success rather than racing a
         # second namespace through the unique index.
         existing = (
-            PreviewEnvironment.objects.select_related("registered_app")
+            live_lifecycle_rows(PreviewEnvironment.objects.all())
+            .select_related("registered_app")
             .filter(
                 registered_app=app,
                 branch=branch,

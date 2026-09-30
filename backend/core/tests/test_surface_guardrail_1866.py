@@ -240,46 +240,6 @@ ALLOWED: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 GAPS: dict[str, tuple[str, ...]] = {
-    # TODO(#2104): lifecycle routes without a scoped gate; the issue says what each checks today.
-    "#2104": (
-        "Query.astroliftDeployment",
-        "Query.astroliftDeploymentApprovalHistory",
-        "Query.astroliftDeploymentReleaseNotes",
-        "Query.astroliftDeploymentLog",
-        "Query.astroliftScheduledJobRun",
-        "Query.astroliftCommandRun",
-        "Query.agentBoxPods",
-        "Query.astroliftTaskRun",
-        "Mutation.approveDeployment",
-        "Mutation.rejectDeployment",
-        "Mutation.abortDeployment",
-        "Mutation.deleteDeployment",
-        "Mutation.rollbackDeployment",
-        "Mutation.redeployApp",
-        "Mutation.pauseEnvironment",
-        "Mutation.resumeEnvironment",
-        "Mutation.pauseAppIngress",
-        "Mutation.resumeAppIngress",
-        "Mutation.tearDownPreview",
-        "Mutation.extendPreviewTtl",
-        "Mutation.setPreviewPinned",
-        "Mutation.migrateAppToCluster",
-        "Mutation.removeAppDomain",
-        "Mutation.recheckDomainValidation",
-        "Mutation.uploadCustomDomainCertificate",
-        "Mutation.setDomainRedirects",
-        "Mutation.setDomainPathRoutes",
-        "Mutation.rotateDeployToken",
-        "Mutation.revokeDeployToken",
-        "Mutation.revokeAppCertificate",
-        "Mutation.cancelAstroliftDeregister",
-        "Mutation.setEnvironmentSetting",
-        "Mutation.clearEnvironmentSetting",
-        "Subscription.astroliftDeploymentLifecycleStream",
-        "/api/builder/v1/dev-environments/",
-        "/api/builder/v1/dev-environments/<str:guid>/files/",
-        "/api/builder/v1/dev-environments/<str:guid>/promote/",
-    ),
 }
 
 

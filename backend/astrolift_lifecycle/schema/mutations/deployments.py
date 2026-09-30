@@ -66,6 +66,7 @@ from astrolift_lifecycle.schema.types import (
     deployment_to_type,
 )
 from astrolift_lifecycle.scopes import deployment_app_scope
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.capability_projection import check_promotion
@@ -92,7 +93,9 @@ class DeploymentMutations:
         extras=lambda result: _start_extras(result),
     )
     @require_permission(
-        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
+        operation=named_environment(),
     )
     @tenant_scoped()
     def start_deployment(self, info: Info, input: StartDeploymentInput) -> MutationResultType[DeploymentType]:
@@ -286,7 +289,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_APPROVE_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_APPROVE_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -300,7 +303,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment", "workload")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment", "workload")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -349,7 +353,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_APPROVE_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_APPROVE_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -381,7 +385,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment", "workload")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment", "workload")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -613,7 +618,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -639,7 +644,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -696,7 +702,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -719,7 +725,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -762,7 +769,7 @@ class DeploymentMutations:
     @mutation_audit(action="deployment.rollback")
     @require_permission(
         Permission.APP_ROLLBACK,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_ROLLBACK),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -777,7 +784,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -790,7 +798,8 @@ class DeploymentMutations:
             )
 
         prior = (
-            Deployment.objects.filter(
+            live_lifecycle_rows(Deployment.objects.all())
+            .filter(
                 registered_app_id=deployment.registered_app_id,
                 app_environment_id=deployment.app_environment_id,
                 status=Deployment.Status.SUPERSEDED.value,
@@ -849,7 +858,7 @@ class DeploymentMutations:
     @mutation_audit(action="deployment.redeploy")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -860,7 +869,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         source = (
-            Deployment.objects.select_related("registered_app", "app_environment")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -927,7 +937,7 @@ class DeploymentMutations:
     @mutation_audit(action="deployment.promote")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=app_scope_by_slug("input.app_slug"),
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
         operation=named_environment(environment_field="input.target_environment_name"),
     )
     @tenant_scoped()
@@ -955,7 +965,8 @@ class DeploymentMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, f"app {input.app_slug!r} not found")
 
         app = (
-            RegisteredApp.objects.filter(
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(
                 slug=input.app_slug,
                 organization_id=org_id,
                 deleted_at__isnull=True,
@@ -968,7 +979,8 @@ class DeploymentMutations:
 
         def _env(name: str) -> AppEnvironment | None:
             return (
-                AppEnvironment.objects.filter(
+                live_lifecycle_rows(AppEnvironment.objects.all())
+                .filter(
                     registered_app=app,
                     name=name,
                     deleted_at__isnull=True,
@@ -1004,7 +1016,8 @@ class DeploymentMutations:
             )
 
         source = (
-            Deployment.objects.filter(
+            live_lifecycle_rows(Deployment.objects.all())
+            .filter(
                 registered_app=app,
                 app_environment=source_env,
                 status=Deployment.Status.RUNNING.value,

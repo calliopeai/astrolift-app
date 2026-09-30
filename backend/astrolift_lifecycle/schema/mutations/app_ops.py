@@ -30,6 +30,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     ValidateAstroliftCiSecretsPayload,
     _WorkloadOpPayload,
 )
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug, app_scope_by_workload_guid
 from core.decorators import tenant_scoped
@@ -44,7 +45,7 @@ class AppOpsMutations:
     @mutation_audit(action="app.ci.dispatch")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=app_scope_by_slug("input.app_slug"),
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
         operation=named_environment(environment_field="_absent", all_if_absent=True),
     )
     @tenant_scoped()
@@ -74,7 +75,8 @@ class AppOpsMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -91,11 +93,15 @@ class AppOpsMutations:
         # to take the regular deploy path with approvers.
         gates_on_approval = bool(app.requires_approval)
         if not gates_on_approval:
-            gates_on_approval = AppEnvironment.objects.filter(
-                registered_app=app,
-                required_approvals__gt=0,
-                deleted_at__isnull=True,
-            ).exists()
+            gates_on_approval = (
+                live_lifecycle_rows(AppEnvironment.objects.all())
+                .filter(
+                    registered_app=app,
+                    required_approvals__gt=0,
+                    deleted_at__isnull=True,
+                )
+                .exists()
+            )
         if gates_on_approval:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
@@ -145,7 +151,7 @@ class AppOpsMutations:
     @mutation_audit(action="app.workload.restart")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=app_scope_by_workload_guid("input.workload_id"),
+        scope=app_scope_by_workload_guid("input.workload_id", permission=Permission.APP_DEPLOY),
         operation=workload_operation(),
     )
     @tenant_scoped()
@@ -202,7 +208,7 @@ class AppOpsMutations:
     @mutation_audit(action="app.workload.scale")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=app_scope_by_workload_guid("input.workload_id"),
+        scope=app_scope_by_workload_guid("input.workload_id", permission=Permission.APP_DEPLOY),
         operation=workload_operation(),
     )
     @tenant_scoped()
@@ -266,7 +272,9 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.install_webhook")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def install_astrolift_source_webhook(
         self,
@@ -306,7 +314,8 @@ class AppOpsMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -365,7 +374,9 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.push_secrets")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def push_astrolift_ci_secrets_to_repo(
         self,
@@ -401,7 +412,8 @@ class AppOpsMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -450,7 +462,9 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.validate_secrets")
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def validate_astrolift_ci_secrets(
         self,
@@ -480,7 +494,8 @@ class AppOpsMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -525,7 +540,9 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.push_workflow")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def push_astrolift_ci_workflow_to_repo(
         self,
@@ -553,7 +570,8 @@ class AppOpsMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -602,7 +620,9 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.ci.retry_autowire")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def retry_astrolift_autowire(
         self,
@@ -627,7 +647,8 @@ class AppOpsMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )

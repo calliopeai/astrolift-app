@@ -120,7 +120,9 @@ class LifecycleSubscription:
     @strawberry.subscription
     @ws_identity
     @require_permission(
-        Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"), operation=_log_operation()
+        Permission.APP_READ_LOGS,
+        scope=live_app_scope("app_slug", permission=Permission.APP_READ_LOGS),
+        operation=_log_operation(),
     )
     @tenant_scoped()
     async def astrolift_on_app_log(
@@ -192,7 +194,9 @@ class LifecycleSubscription:
     @strawberry.subscription
     @ws_identity
     @require_permission(
-        Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"), operation=_log_operation(plural=True)
+        Permission.APP_READ_LOGS,
+        scope=live_app_scope("app_slug", permission=Permission.APP_READ_LOGS),
+        operation=_log_operation(plural=True),
     )
     @tenant_scoped()
     async def astrolift_on_app_logs(
