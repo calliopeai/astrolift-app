@@ -239,8 +239,7 @@ ALLOWED: dict[str, str] = {
 # every route here and what it checks today.
 # ---------------------------------------------------------------------------
 
-GAPS: dict[str, tuple[str, ...]] = {
-}
+GAPS: dict[str, tuple[str, ...]] = {}
 
 
 # ---------------------------------------------------------------------------
