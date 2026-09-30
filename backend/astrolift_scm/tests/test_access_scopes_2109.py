@@ -12,7 +12,7 @@ from django.test import Client
 from django.utils import timezone
 
 from astrolift_identity.api_tokens import mint_token, reset_current_api_token, set_current_api_token
-from astrolift_identity.models import ApiToken, Member, Organization, RoleBinding
+from astrolift_identity.models import ApiToken, Member, Organization, Policy, RoleBinding
 from astrolift_registry.models import AppTeamAccess
 from astrolift_scm.models import ScmWebhookInstallation, SourceConnection, SshDeployKey
 from astrolift_scm.schema import mutations as mut
@@ -652,3 +652,64 @@ def test_revoked_org_binding_cannot_finish_previously_authorized_connect(world):
     assert response.status_code == 403
     assert client.session["scm_oauth_state"] == pending
     assert _snapshot() == before and world.calls == []
+
+
+@pytest.mark.parametrize("route", COLLECTIONS)
+@pytest.mark.parametrize("kind", ["ORG", "TEAM"])
+@pytest.mark.parametrize("scope", ["APP", "PROJECT", "resource"])
+def test_key_collections_preserve_scoped_policy_denials_under_owner_and_share_grants(
+    world, route, kind, scope
+):
+    _grant(world, kind)
+    AppTeamAccess.objects.create(registered_app=world.platform_app, team=world.medops, access_level="owner")
+    Policy.objects.create(
+        organization=world.org,
+        name="Deny own key metadata",
+        slug=f"scm-deny-{uuid.uuid4().hex}",
+        effect="DENY",
+        action_pattern="scm.read",
+        scope_level=scope if scope != "resource" else "ORG",
+        scope_id=(
+            world.medops_app.pk if scope == "APP" else world.medops_project.pk if scope == "PROJECT" else None
+        ),
+        resource_pattern={"app_slug": world.medops_app.slug} if scope == "resource" else {},
+        actor_pattern={},
+        conditions=[],
+    )
+    with _tenant(world):
+        result = _invoke(world, route)
+    rows = result.items if route.endswith("_page") else result
+    expected = {str(world.sibling_key.guid)}
+    if kind == "ORG":
+        expected.add(str(world.org_key.guid))
+    assert {str(row.id) for row in rows} == expected
+    if route.endswith("_page"):
+        assert result.total_count == len(expected)
+
+
+def test_http_team_bearer_shared_key_collection_does_not_restore_a_policy_denied_app(world):
+    _grant(world)
+    AppTeamAccess.objects.create(registered_app=world.platform_app, team=world.medops, access_level="owner")
+    Policy.objects.create(
+        organization=world.org,
+        name="Deny shared key metadata",
+        slug=f"scm-share-deny-{uuid.uuid4().hex}",
+        scope_level="APP",
+        scope_id=world.platform_app.pk,
+        effect="DENY",
+        action_pattern="scm.read",
+        resource_pattern={},
+        actor_pattern={},
+        conditions=[],
+    )
+    client, headers = _http_client(world, bearer=True)
+    response = client.post(
+        f"/{settings.BASE_URL}gql/config/",
+        data={"query": "{ astroliftSshDeployKeysPage { items { name } totalCount } }"},
+        content_type="application/json",
+        **headers,
+    )
+    assert response.status_code == 200
+    page = response.json()["data"]["astroliftSshDeployKeysPage"]
+    assert [row["name"] for row in page["items"]] == ["own"]
+    assert page["totalCount"] == 1

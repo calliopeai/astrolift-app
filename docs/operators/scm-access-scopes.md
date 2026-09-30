@@ -18,6 +18,9 @@ app owner before sorting, pagination and counts. Organization keys require an
 organization read grant. Existing team shares retain their permission ceilings:
 deployer/owner shares can carry SCM permissions; viewer shares cannot. Deleted
 apps and keys, foreign organization rows and stale app owners are excluded.
+App/project policies also narrow these collections before pagination and counts;
+an owner role or team share cannot restore a key whose app is denied. SSH key
+metadata has no operation environment, so it does not borrow deployment facts.
 Missing or stale object targets check an explicit organization scope instead
 of falling back to the selected team/project.
 
