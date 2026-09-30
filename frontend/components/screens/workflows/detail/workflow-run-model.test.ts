@@ -14,6 +14,7 @@ import {
 } from "./workflow-run.fixtures";
 import {
   configuredRunOutcome,
+  configuredRunSubject,
   liveRunsSnapshot,
   placeExecutions,
   runLogLines,
@@ -203,6 +204,20 @@ describe("runLogLines", () => {
 });
 
 describe("configuredRunOutcome", () => {
+  it("keeps expired history terminal with an unknown outcome", () => {
+    const run = {
+      guid: "expired",
+      currentState: "expired",
+      isCompleted: false,
+      startedAt: new Date(NOW).toISOString(),
+      completedAt: new Date(NOW).toISOString(),
+      temporalWorkflowId: "expired",
+      temporalRunId: "old",
+      triggerKind: "manual",
+    };
+    expect(configuredRunOutcome(run)).toBe("unknown");
+    expect(configuredRunSubject(run).live).toBe(false);
+  });
   it("reads free-text states through the terminal check", () => {
     const base = {
       guid: "g",

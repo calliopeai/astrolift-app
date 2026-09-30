@@ -261,7 +261,7 @@ def test_explicit_image_reaches_the_box_job_and_survives_restart(org, cluster, w
     agent = _persistent_agent(org) if with_agent else None
     if agent:
         Container.objects.create(workload=agent, name="app", is_primary=True, image_ref="agent-default:old")
-    kwargs = {"organization": org, "image": image, "agent_slug": agent.slug if agent else ""}
+    kwargs = {"organization": org, "image": image, "agent": agent}
     first = box_service.ensure_agent_box(**kwargs)
     first.refresh_from_db()
     assert first.image == image
@@ -284,22 +284,22 @@ def test_agent_box_restart_without_override_uses_current_workload_image(org, clu
     container = Container.objects.create(
         workload=agent, name="app", is_primary=True, image_ref="agent-default:old"
     )
-    first = box_service.ensure_agent_box(organization=org, agent_slug=agent.slug)
+    first = box_service.ensure_agent_box(organization=org, agent=agent)
     box_service.stop_agent_box(first)
     container.image_ref = "agent-default:new"
     container.save(update_fields=["image_ref", "updated_at", "version"])
-    restarted = box_service.ensure_agent_box(organization=org, agent_slug=agent.slug)
+    restarted = box_service.ensure_agent_box(organization=org, agent=agent)
     assert restarted.pk == first.pk
     assert _container_of(_job_of(cluster.driver.applied[-1]))["image"] == "agent-default:new"
 
 
 def test_spec_box_restart_uses_current_spec_image(org, cluster):
     spec = _spec(org, image="agent-spec:old")
-    first = box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+    first = box_service.ensure_agent_box(organization=org, environment_spec=spec)
     box_service.stop_agent_box(first)
     spec.image_tag = "agent-spec:new"
     spec.save(update_fields=["image_tag", "updated_at", "version"])
-    restarted = box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+    restarted = box_service.ensure_agent_box(organization=org, environment_spec=spec)
     assert restarted.pk == first.pk
     assert _container_of(_job_of(cluster.driver.applied[-1]))["image"] == "agent-spec:new"
 
@@ -1584,7 +1584,7 @@ def test_a_workspace_box_sets_up_the_agents_payload_before_its_session(org, clus
     spec = _workspace_spec(org)
     agent = _agent_with_payload(org, slug=spec.slug)
 
-    box = box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+    box = box_service.ensure_agent_box(organization=org, environment_spec=spec)
 
     job = _job_of(cluster.driver.applied[-1])
     container = _container_of(job)
@@ -1621,7 +1621,7 @@ def test_the_boxs_own_agent_supplies_the_payload(org, cluster, minted):
     _agent_with_payload(org, slug=spec.slug, storage_key="box-org/payloads/spec-agent.zip")
     chosen = _agent_with_payload(org, slug="claude-box", storage_key="box-org/payloads/box-agent.zip")
 
-    box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug, agent_slug=chosen.slug)
+    box_service.ensure_agent_box(organization=org, environment_spec=spec, agent=chosen)
 
     assert [call["blob_key"] for call in minted] == ["box-org/payloads/box-agent.zip"]
 
@@ -1633,7 +1633,7 @@ def test_a_spec_cannot_redirect_the_workspace_setup(org, cluster, minted):
     )
     _agent_with_payload(org, slug=spec.slug)
 
-    box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+    box_service.ensure_agent_box(organization=org, environment_spec=spec)
 
     env = _env_of(_job_of(cluster.driver.applied[-1]))
     assert env["ASTROLIFT_WORKSPACE"]["value"] == "/workspace"
@@ -1685,7 +1685,7 @@ def test_a_workspace_box_without_a_payload_refuses_to_start(org, other_org, clus
         _agent_with_payload(org, slug=spec.slug, storage_key="", snapshot={"requires_payload": False})
 
     with pytest.raises(box_service.AgentBoxError, match=reason):
-        box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+        box_service.ensure_agent_box(organization=org, environment_spec=spec)
 
     box = AgentBox.objects.get(organization=org)
     assert box.status == AgentBox.Status.FAILED
@@ -1709,7 +1709,7 @@ def test_a_payload_that_cannot_be_delivered_refuses_to_start(org, cluster, monke
     with pytest.raises(
         box_service.AgentBoxError, match="could not deliver agent claude-dev's payload to the box"
     ):
-        box_service.ensure_agent_box(organization=org, environment_spec_slug=spec.slug)
+        box_service.ensure_agent_box(organization=org, environment_spec=spec)
 
     assert "no blob store is configured" in AgentBox.objects.get(organization=org).last_error
     assert cluster.driver.applied == []

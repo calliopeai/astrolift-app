@@ -1209,9 +1209,11 @@ def _dry_run_deploy_set(
     the deploy with nothing written; ``apply_manifests`` dry-runs again
     against whatever changed in between.
     """
+    from astrolift_workflows.activities.image_retention import retain_deployment_images
     from core.app_deploy import AppDeployError, render_resources_for_deployment
 
     workloads = render_resources_for_deployment(d)
+    retain_deployment_images(d, workloads)
     dry = cluster_driver.apply_manifests(cluster_slug, namespace, [*secrets, *workloads], dry_run=True)
     if not dry.ok:
         raise AppDeployError(
@@ -1271,6 +1273,9 @@ def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
             f"manifest for app {d.registered_app.slug!r} rendered to zero resources — "
             "check the workloads/services block in astrolift.toml",
         )
+    from astrolift_workflows.activities.image_retention import retain_deployment_images
+
+    retain_deployment_images(d, resources)
     try:
         result = apply_with_dry_run(driver, ctx.slug, namespace, resources)
     except DryRunFailed as exc:
@@ -1899,6 +1904,14 @@ def _mark_running_sync(deployment_id: int) -> None:
         # standing, or drift would be measured against config that never
         # ran.
         _write_config_snapshot(d)
+
+    # Registry cleanup must never turn a healthy rollout into a failed one.
+    try:
+        from astrolift_workflows.activities.image_retention import release_obsolete_deployment_images
+
+        release_obsolete_deployment_images(d)
+    except Exception:
+        log.warning("could not retire old ECR pins for deploy %s", deployment_id, exc_info=True)
 
     # Best-effort GitHub reflection, OUTSIDE the transaction so a slow
     # GitHub API never holds the select_for_update row locks (#1124).

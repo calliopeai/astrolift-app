@@ -18,16 +18,28 @@ class AgentTaskPreparationError(RuntimeError):
 
 
 def default_environment_spec(workload):
-    """Return the org-scoped environment recipe matching ``workload.slug``."""
+    """Return the environment recipe matching ``workload.slug`` that the
+    workload's app may run with, else ``None``.
+
+    Spec slugs are unique per org while agent slugs are unique per app, so
+    the same-slug spec can belong to another project's agent; it is never
+    this one's default (#1866).
+    """
     if workload is None or getattr(workload, "registered_app", None) is None:
         return None
     from astrolift_agents.models import AgentEnvironmentSpec
+    from astrolift_agents.visibility import spec_usable_by_app
 
-    return AgentEnvironmentSpec.objects.filter(
-        organization_id=workload.registered_app.organization_id,
-        slug=workload.slug,
-        deleted_at__isnull=True,
-    ).first()
+    spec = (
+        AgentEnvironmentSpec.objects.filter(
+            organization_id=workload.registered_app.organization_id,
+            slug=workload.slug,
+            deleted_at__isnull=True,
+        )
+        .select_related("team", "project")
+        .first()
+    )
+    return spec if spec_usable_by_app(spec, workload.registered_app) else None
 
 
 def _compatibility_brief(workload, environment_spec):

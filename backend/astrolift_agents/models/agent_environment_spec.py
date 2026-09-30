@@ -27,6 +27,26 @@ class AgentEnvironmentSpec(BaseCoreModel):
         related_name="agent_environment_specs",
         on_delete=models.CASCADE,
     )
+    # Who owns the recipe (#1866): a project, else a team. Neither means the
+    # spec is org-shared, explicitly: every spec reader in the org sees it and
+    # every team's agents may run with it. The project wins when both are set,
+    # and a deleted owner leaves the spec to org-level grants only. RESTRICT,
+    # not SET_NULL, because clearing the owner would share a team's secret
+    # packet with the whole org.
+    team = models.ForeignKey(
+        "astrolift_identity.Team",
+        related_name="agent_environment_specs",
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+    )
+    project = models.ForeignKey(
+        "astrolift_identity.Project",
+        related_name="agent_environment_specs",
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+    )
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=128)
     # Explicit image ref (e.g. a pinned ECR/private URI) the dispatcher pulls

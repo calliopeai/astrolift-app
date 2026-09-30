@@ -104,10 +104,10 @@ def _patch_relay(
     async def _box_in_tenant(*, box_slug, tenant_org_id):
         return is_box
 
-    async def _exec_perm(*, tenant_org_id, actor_user_id):
+    async def _exec_perm(*, tenant_org_id, actor_user_id, **_kw):
         return exec_pod
 
-    async def _attach_perm(*, tenant_org_id, actor_user_id):
+    async def _attach_perm(*, tenant_org_id, actor_user_id, **_kw):
         return box_attach
 
     async def _record(**kw):
@@ -372,11 +372,18 @@ def test_attach_gate_needs_its_own_grant() -> None:
 
     org = _org("acme")
     user = _user("dev@example.com")
+    box = _box(org)
 
     try:
-        assert _check_box_attach_permission.func(tenant_org_id=org.id, actor_user_id=user.id) is False
+        assert (
+            _check_box_attach_permission.func(box_slug=box.slug, tenant_org_id=org.id, actor_user_id=user.id)
+            is False
+        )
         _bind(user, org, Permission.AGENT_BOX_ATTACH)
-        assert _check_box_attach_permission.func(tenant_org_id=org.id, actor_user_id=user.id) is True
+        assert (
+            _check_box_attach_permission.func(box_slug=box.slug, tenant_org_id=org.id, actor_user_id=user.id)
+            is True
+        )
     finally:
         # The gate installs the tenant contextvar; don't leak it.
         clear_current_tenant()
@@ -392,10 +399,19 @@ def test_attach_gate_is_org_scoped() -> None:
     elsewhere = _org("elsewhere-org")
     user = _user("dev@example.com")
     _bind(user, home, Permission.AGENT_BOX_ATTACH)
+    box = _box(home)
 
     try:
-        assert _check_box_attach_permission.func(tenant_org_id=home.id, actor_user_id=user.id) is True
-        assert _check_box_attach_permission.func(tenant_org_id=elsewhere.id, actor_user_id=user.id) is False
+        assert (
+            _check_box_attach_permission.func(box_slug=box.slug, tenant_org_id=home.id, actor_user_id=user.id)
+            is True
+        )
+        assert (
+            _check_box_attach_permission.func(
+                box_slug=box.slug, tenant_org_id=elsewhere.id, actor_user_id=user.id
+            )
+            is False
+        )
     finally:
         clear_current_tenant()
 

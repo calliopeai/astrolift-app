@@ -24,8 +24,11 @@ import hashlib
 import json
 from types import SimpleNamespace
 
+import boto3
 import pytest
 from asgiref.sync import async_to_sync
+from aws.registry_ecr import ECRConfig, ECRDriver
+from botocore.stub import Stubber
 from temporalio.testing import ActivityEnvironment
 
 from astrolift_clusters.models import ManagedDomain, ProviderPlugin, TenantCluster
@@ -200,13 +203,20 @@ def placed(org, app, env, cluster, settings, monkeypatch):
         monkeypatch.setattr(f"{target}._driver_for_cluster", lambda _cluster: driver)
         monkeypatch.setattr(f"{target}._context_for_cluster", lambda _cluster: ctx)
 
+    client = boto3.client(
+        "ecr", region_name="us-east-1", aws_access_key_id="testing", aws_secret_access_key="testing"
+    )
+    registry = ECRDriver(config=ECRConfig(region="us-east-1", account_id="111122223333"), client=client)
+
     def _capability(_cluster, capability):
-        return identity if capability == "identity" else _SecretsBackend()
+        return {"identity": identity, "registry": registry, "secrets": _SecretsBackend()}[capability]
 
     monkeypatch.setattr("core.app_deploy.driver_for_capability", _capability)
-    return SimpleNamespace(
-        app=app, env=env, deployment=deployment, source=source, driver=driver, identity=identity
-    )
+    # Relative images retain their historical render and must never call ECR.
+    with Stubber(client):
+        yield SimpleNamespace(
+            app=app, env=env, deployment=deployment, source=source, driver=driver, identity=identity
+        )
 
 
 def _capture(placed) -> dict:

@@ -8,8 +8,8 @@ mutates. Before #1183, any resolver that fetched a ``TenantCluster`` /
 read or mutate another org's rows.
 
 Both models carry a NULLABLE ``organization`` FK: org-owned rows plus
-platform-shared (``organization=None``) rows that every tenant may
-operate. The fix scopes every by-id/slug fetch with
+platform-shared (``organization=None``) rows every tenant can read,
+while only the platform operator writes them. The fix scopes every by-id/slug fetch with
 ``Q(organization_id=<caller org>) | Q(organization_id__isnull=True)``.
 
 Each test pins BOTH halves of that contract:
@@ -312,7 +312,7 @@ def test_record_bootstrap_other_org_slug_is_not_found_and_writes_nothing(
     assert ClusterBootstrapRun.objects.filter(tenant_cluster=theirs).count() == 0
 
 
-def test_record_bootstrap_shared_cluster_slug_writes_row(org_a, permission_resolver, captured_events):
+def test_record_bootstrap_shared_cluster_is_the_operators(org_a, permission_resolver, captured_events):
     shared = _cluster(None)
     permission_resolver.grant(Permission.CLUSTER_MANAGE)
     with _ctx(org_a):
@@ -320,8 +320,10 @@ def test_record_bootstrap_shared_cluster_slug_writes_row(org_a, permission_resol
             _info(),
             _bootstrap_input(shared.slug),
         )
-    assert result.ok is True
-    assert ClusterBootstrapRun.objects.filter(tenant_cluster=shared).count() == 1
+    assert result.ok is False
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert not ClusterBootstrapRun.objects.filter(tenant_cluster=shared).exists()
+    assert captured_events == []
 
 
 # ---- ManagedDomain: softDeleteManagedDomain -----------------------

@@ -64,6 +64,7 @@ const failedWord = (s: string) =>
 
 /** A configured workflow's run: its state is free text, so the terminal check is the backstop. */
 export function configuredRunOutcome(run: TieredWorkflowRun): RunOutcome {
+  if (run.currentState.toLowerCase() === "expired") return "unknown";
   const known = outcomeOf("workflow", run.currentState);
   if (known !== "unknown") return known;
   if (!isRunTerminal(run)) return "running";

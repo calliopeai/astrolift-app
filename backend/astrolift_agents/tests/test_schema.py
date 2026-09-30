@@ -512,7 +512,10 @@ def test_delete_spec_soft_deletes(permission_resolver, info, org, with_tenant_or
 def test_cli_env_spec_scope_can_delete_without_app_delete(permission_resolver, info, org, with_tenant_org):
     permission_resolver.grant(Permission.AGENT_ENV_SPEC_DELETE)
     spec = _mk_spec(org, "cli-delete")
-    context_token = set_current_api_token(SimpleNamespace(scopes=[SCOPE_AGENT_ENV_SPEC_WRITE]))
+    # The spec read narrows on the token's org and team, as a real ApiToken carries them (#1866).
+    context_token = set_current_api_token(
+        SimpleNamespace(scopes=[SCOPE_AGENT_ENV_SPEC_WRITE], organization_id=org.pk, team_id=None)
+    )
     try:
         with with_tenant_org(org):
             result = AgentsMutation().delete_agent_environment_spec(info(), slug=spec.slug)

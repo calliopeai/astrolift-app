@@ -45,6 +45,7 @@ const DEFINITION_TERMINAL = new Set([
   "cancelled",
   "terminated",
   "timed_out",
+  "expired",
 ]);
 
 /** A run state that means it failed (the engine's and the tier-2 row's spellings). */
@@ -61,6 +62,7 @@ export function workflowStatus(subject: WorkflowFrameSubject): { dot: Dot; label
   if (!run) return { dot: "muted", label: "Never run" };
   if (isFailedState(run.state)) return { dot: "error", label: "Last run failed" };
   const s = run.state.toLowerCase();
+  if (s === "expired") return { dot: "muted", label: "Last run history expired" };
   if (s.includes("cancel") || s.includes("terminat"))
     return { dot: "muted", label: "Last run cancelled" };
   return { dot: "ok", label: "Last run succeeded" };

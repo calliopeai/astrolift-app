@@ -184,7 +184,7 @@ async def test_dispatcher_routes_frames_to_backend(
     async def _ok_app(*, app_slug, tenant_org_id):
         return True
 
-    async def _ok_perm(*, tenant_org_id, actor_user_id):
+    async def _ok_perm(*, tenant_org_id, actor_user_id, **_kw):
         return True
 
     async def _noop_audit(**_kw):
@@ -348,7 +348,7 @@ def _patch_authed(monkeypatch, *, perm_ok: bool, audit_sink: list | None = None)
     async def _ok_app(*, app_slug, tenant_org_id):
         return True
 
-    async def _perm(*, tenant_org_id, actor_user_id):
+    async def _perm(*, tenant_org_id, actor_user_id, **_kw):
         return perm_ok
 
     async def _audit(**kw):

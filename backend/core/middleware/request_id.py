@@ -47,25 +47,23 @@ class RequestIdMiddleware(MiddlewareMixin):
         if rid is not None:
             response["X-Request-Id"] = rid
 
-        token = getattr(request, "_astrolift_request_id_token", None)
-        if token is not None:
-            reset_request_id(token)
-
-        token = getattr(request, "_astrolift_trace_token", None)
-        if token is not None:
-            reset_trace_context(token)
-
+        self._reset_context(request)
         return response
 
     def process_exception(self, request, exception):
-        token = getattr(request, "_astrolift_request_id_token", None)
-        if token is not None:
-            reset_request_id(token)
-
-        token = getattr(request, "_astrolift_trace_token", None)
-        if token is not None:
-            reset_trace_context(token)
+        self._reset_context(request)
         return None
+
+    @staticmethod
+    def _reset_context(request):
+        for name, reset in (
+            ("_astrolift_request_id_token", reset_request_id),
+            ("_astrolift_trace_token", reset_trace_context),
+        ):
+            token = getattr(request, name, None)
+            if token is not None:
+                delattr(request, name)
+                reset(token)
 
 
 def _parse_traceparent(value: str) -> TraceContext | None:

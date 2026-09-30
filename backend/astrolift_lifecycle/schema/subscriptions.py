@@ -1,14 +1,11 @@
-"""Lifecycle GraphQL subscriptions — currently just ``onAppLog``.
+"""Lifecycle GraphQL subscriptions — the app log streams.
 
-Pattern mirrors ``core.schema.subscriptions.Subscription``:
-- ``@strawberry.subscription`` async generator
-- Reads the WS-resolved tenant from ``info.context._ws_tenant``,
-  pins it on the contextvar so ``@tenant_scoped`` + the cluster
-  resolution code see the right org.
-- Permission check (``Permission.APP_READ_LOGS``) happens
-  *inside* the generator body — strawberry doesn't run decorator
-  chains across async-generator boundaries the way it does for
-  fields, so we call ``check_permission`` ourselves.
+Each is a ``@strawberry.subscription`` async generator gated like a field:
+``@ws_identity`` pins the tenant and API token the WS handshake resolved,
+then ``@require_permission(Permission.APP_READ_LOGS)`` checks at the app's
+own scope and ``@tenant_scoped`` asserts the org, both when the stream is
+first iterated (#1866). A refused or tenantless subscriber gets a stream
+that completes without an event.
 
 The actual log byte stream lives in
 :mod:`core.cluster_observability`, which dispatches through the
@@ -23,11 +20,18 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_lifecycle.schema.types import AppLogLineType
+from astrolift_lifecycle.scopes import live_app_scope
+from core.decorators import tenant_scoped
+from core.permissions import Permission, require_permission
+from core.schema.ws_auth import ws_identity
 
 
 @strawberry.type
 class LifecycleSubscription:
     @strawberry.subscription
+    @ws_identity
+    @require_permission(Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"))
+    @tenant_scoped()
     async def astrolift_on_app_log(
         self,
         info: Info,
@@ -49,7 +53,7 @@ class LifecycleSubscription:
         Yields ``AstroliftAppLogLine`` events; completes silently
         when:
           - the WS tenant can't be resolved (anonymous connect)
-          - APP_READ_LOGS isn't granted for the tenant
+          - APP_READ_LOGS isn't granted at the app's scope
           - the app has no cluster wired
           - the backend signals EOF
 
@@ -61,37 +65,9 @@ class LifecycleSubscription:
         from astrolift_lifecycle.models import AppEnvironment
         from astrolift_registry.models import RegisteredApp
         from core.cluster_observability import stream_app_logs
-        from core.permissions import (
-            Permission,
-            PermissionDenied,
-            check_permission,
-        )
-        from core.tenancy import (
-            TenantContext,
-            get_current_tenant,
-            set_current_tenant,
-        )
+        from core.tenancy import get_current_tenant
 
-        # The WS handshake stashed the resolved tenant on the
-        # context object. Pin it on the contextvar so the rest of
-        # the tenant-aware code (managers, permission resolver)
-        # sees it.
-        ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
-        if ws_tenant is not None:
-            set_current_tenant(ws_tenant)
-        from core.schema.ws_auth import pin_ws_identity
-
-        pin_ws_identity(info.context)  # the bearer's scope ceiling (#1943)
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return
-
-        try:
-            check_permission(Permission.APP_READ_LOGS)
-        except PermissionDenied:
-            return
+        org_id = get_current_tenant().organization_id
 
         # Look up app + cluster off the main thread — Django ORM
         # is sync.
@@ -169,6 +145,9 @@ class LifecycleSubscription:
             await inner.aclose()
 
     @strawberry.subscription
+    @ws_identity
+    @require_permission(Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"))
+    @tenant_scoped()
     async def astrolift_on_app_logs(
         self,
         info: Info,
@@ -204,33 +183,9 @@ class LifecycleSubscription:
             namespace_for_environment,
             stream_app_logs_multi,
         )
-        from core.permissions import (
-            Permission,
-            PermissionDenied,
-            check_permission,
-        )
-        from core.tenancy import (
-            TenantContext,
-            get_current_tenant,
-            set_current_tenant,
-        )
+        from core.tenancy import get_current_tenant
 
-        ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
-        if ws_tenant is not None:
-            set_current_tenant(ws_tenant)
-        from core.schema.ws_auth import pin_ws_identity
-
-        pin_ws_identity(info.context)  # the bearer's scope ceiling (#1943)
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        if org_id is None:
-            return
-
-        try:
-            check_permission(Permission.APP_READ_LOGS)
-        except PermissionDenied:
-            return
+        org_id = get_current_tenant().organization_id
 
         def _resolve():
             app = (

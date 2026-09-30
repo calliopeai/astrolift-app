@@ -32,6 +32,7 @@ export function isRunTerminal(run: TieredWorkflowRun | null): boolean {
   if (run.isCompleted) return true;
   const s = run.currentState.toLowerCase();
   return (
+    s === "expired" ||
     s.includes("fail") ||
     s.includes("error") ||
     s.includes("terminat") ||

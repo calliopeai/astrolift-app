@@ -2,6 +2,99 @@
 
 ## Unreleased
 
+- Backend startup exits when schema migration fails, before dependent
+  bootstrap commands or the HTTP server (#2187). Successful migrations keep
+  the existing production/development server behavior, and other startup
+  commands remain best-effort. The operator upgrade procedure requires a
+  verified migration task before the paired web/worker rollout.
+
+- The deployment detail Redeploy action sends the selected deployment ID required
+  by the API, and reports server or network failures in a toast (#2173).
+
+- AWS deployments and rollbacks protect ECR images with immutable per-environment,
+  per-deployment tags before writing Secrets or applying workloads, and pin
+  container references to the protected digest. Tags include the full digest to
+  prevent collisions in adopted mutable repositories. FaaS and private static
+  builder images are protected before service, identity or Job writes. Each
+  rollout stage merges into the current snapshot and reuses its first protected
+  digest, keeping existing pins even when a source tag moves. Successful rollout
+  history retains ten deployments per workload; live, failed and in-flight deployments remain protected. Repositories
+  enroll in the preview-first age/count cleanup job on creation or adoption
+  (calliopeai/astrolift-opscode#69).
+- Outbound webhooks retry transient failures with Temporal's replay-safe jitter
+  instead of failing the workflow sandbox (#2165). Permanent HTTP errors and
+  unsubscribe responses still stop immediately; retries retain signed delivery
+  records and replay without sending new requests.
+- Workflow reconciliation settles exact executions with purged Temporal history
+  once, logs at INFO and stops looking them up (#2166). Running mirrors display
+  History expired with an unknown outcome, existing final results stay intact,
+  and owned-task cleanup continues without querying missing history. Apply
+  additive migration `astrolift_operations.0027` before worker rollout.
+
+- Upload confirmation by URL and ID now requires the uploader and active
+  membership in the upload's organization; a platform operator can manage
+  another uploader's file only within the selected organization (#2174).
+  Deleted files cannot be confirmed again. Generic upload bearer writes need
+  `admin` and the same organization GUID across the legacy upload and token
+  identities. `/app/metrics/` requires an active platform operator, with
+  `admin` for bearer requests; the Sentry and OpenTelemetry debug routes are
+  removed. Existing anonymous Prometheus scrapes must use an operator bearer.
+  Upload initiation retries a caller-supplied UUID only for the same uploader
+  and organization; another owner's, another organization's or a deleted
+  upload cannot be reassigned through that UUID (#2110, partial).
+- Request-ID and trace context cleanup now consumes each token once, so a
+  handled view exception preserves its original HTTP status and request-ID
+  header when Django subsequently runs response middleware (#2174).
+- Cluster, managed-domain and provider-configuration routes require their
+  explicit organization owner scope (#2108). Team/project grants and
+  team-bound bearer tokens, including operator/admin tokens, cannot authorize
+  organization resources through a selected team. Shared domain workflow writes
+  check both the cluster and domain; shared bootstrap history requires the
+  platform operator. All 48 tracked routes have real RoleBinding coverage and
+  no surface-guardrail exemptions remain for this issue.
+
+- Agent surfaces are isolated per team and project, and a guardrail keeps
+  every surface declaring its permission and scope (#1866).
+  `AgentEnvironmentSpec` and `AgentBox` gain nullable `team` and `project`
+  owners; a null spec owner means org-shared, explicitly. Migration 0039
+  gives each spec the project of the one agent that shares its slug, and a
+  spec-only box its spec's owner; a slug two apps' agents share stays
+  org-shared. Spec reads narrow to the org-shared specs and the ones a grant
+  covers (new `teamId`/`projectId` on `AstroliftAgentEnvironmentSpec`), and
+  spec writes check at the owner, org-shared ones at the org
+  (`createAgentEnvironmentSpec` takes an optional `teamId`/`projectId`).
+  Dispatch, `ensureAgentBox` and workflow agent stages run an agent only with
+  a spec its own app may use, so a team can no longer run with another
+  team's secret packet. Boxes are read, destroyed, ensured and attached at
+  their own scope (recorded project or team, else the agent's app, else the
+  org), and a live box is never handed to an ensure from another scope.
+  Skills, tool defs, briefs, org skill repos, secret values, secret bindings
+  and org secret bundles check at the explicit org scope instead of the
+  selected team. The exec relay checks `app.exec_pod` on the app and
+  `agent_box.attach` on the box, under the bearer's scope ceiling; the app
+  log subscriptions check `app.read_logs` on the app. The Dispatch Service
+  log and meter ingest routes, which took any caller's writes into any run,
+  now require the dispatcher key and stay in its org. MCP agent tools
+  declare their scope; `astrolift_sync_agent_repo` and
+  `astrolift_import_agent_spec` check at the named project, and an import
+  no longer moves another project's agent. Manifest sync and agent import
+  stamp a new spec's owner and refuse to rewrite another scope's spec.
+  Rewriting an org-shared spec during registration requires an explicit
+  org-level spec-update grant. Team-scoped credentials cannot create,
+  update or delete shared specs even when their user has an org role;
+  shared reads and owned-spec registration remain available.
+  Registering against a team-shared recipe also requires its owning team's
+  spec-update grant and respects the credential's team ceiling; a project
+  grant alone cannot rewrite the recipe used by the team's other projects.
+  Team-scoped credentials create specs only inside their own team and
+  cannot launch org-level image-only or shared-spec boxes. They can still
+  launch their own agent with a shared recipe or a box on an owned spec.
+  `core/tests/test_surface_guardrail_1866.py` walks the served GraphQL
+  schemas, the URL conf, the WebSocket routes and the MCP registry, and
+  fails on any route without a declared scope that is not on its allowlist;
+  the remaining gaps outside the agent surfaces are tracked per area there.
+  Still open (#2102): agent secret refs are confined per org only, so a spec
+  writer can bind another team's secret location.
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).
   `restore.snapshot_id` and `restore.source_handle` came from the manifest

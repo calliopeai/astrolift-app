@@ -39,6 +39,7 @@ from astrolift_clusters.schema.types import (
     cluster_to_type,
     domain_to_type,
 )
+from astrolift_clusters.scopes import cluster_catalog_org_scope, cluster_org_scope, domain_org_scope
 from astrolift_graphql import GUID, MutationErrorType, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -638,7 +639,9 @@ def _carry_oidc_secrets(existing: Any, incoming: Any) -> Any:
 class ClustersMutation:
     @strawberry.field
     @mutation_audit(action="cluster.register")
-    @require_permission(Permission.CLUSTER_REGISTER)
+    @require_permission(
+        Permission.CLUSTER_REGISTER, scope=cluster_catalog_org_scope(Permission.CLUSTER_REGISTER)
+    )
     @tenant_scoped()
     def register_tenant_cluster(
         self, info: Info, input: RegisterTenantClusterInput
@@ -697,7 +700,9 @@ class ClustersMutation:
         action="cluster.issue_agent_key",
         target=lambda root, info, input: ("cluster", str(input.cluster_id)),
     )
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(
+        Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
+    )
     @tenant_scoped()
     def issue_cluster_agent_key(
         self, info: Info, input: IssueClusterAgentKeyInput
@@ -764,7 +769,9 @@ class ClustersMutation:
         action="cluster.deploy_agent",
         target=lambda root, info, input: ("cluster", str(input.cluster_id)),
     )
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(
+        Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
+    )
     @tenant_scoped()
     def deploy_cluster_agent(
         self, info: Info, input: DeployClusterAgentInput
@@ -839,7 +846,9 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.update")
-    @require_permission(Permission.CLUSTER_UPDATE)
+    @require_permission(
+        Permission.CLUSTER_UPDATE, scope=cluster_org_scope(Permission.CLUSTER_UPDATE, "input.id")
+    )
     @tenant_scoped()
     def update_tenant_cluster(
         self, info: Info, input: UpdateTenantClusterInput
@@ -942,7 +951,9 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.reconcile_ingresses")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(
+        Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
+    )
     @tenant_scoped()
     def reconcile_cluster_ingresses(
         self, info: Info, input: ReconcileClusterIngressesInput
@@ -993,7 +1004,9 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.bring_into_management")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(
+        Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
+    )
     @tenant_scoped()
     def bring_cluster_into_management(
         self, info: Info, input: BringClusterIntoManagementInputType
@@ -1036,7 +1049,9 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.refresh_management")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(
+        Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
+    )
     @tenant_scoped()
     def refresh_cluster_management(
         self, info: Info, input: RefreshClusterManagementInputType
@@ -1075,7 +1090,10 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.decommission")
-    @require_permission(Permission.CLUSTER_UNREGISTER)
+    @require_permission(
+        Permission.CLUSTER_UNREGISTER,
+        scope=cluster_org_scope(Permission.CLUSTER_UNREGISTER, "input.cluster_id"),
+    )
     @tenant_scoped()
     def decommission_cluster(
         self, info: Info, input: DecommissionClusterInputType
@@ -1129,7 +1147,9 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.install_prereqs")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(
+        Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
+    )
     @tenant_scoped()
     def install_cluster_prereqs(
         self, info: Info, input: InstallClusterPrereqsInputType
@@ -1191,7 +1211,10 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.record_bootstrap_run")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(
+        Permission.CLUSTER_MANAGE,
+        scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_slug", by_slug=True),
+    )
     @tenant_scoped()
     def record_cluster_bootstrap_run(
         self, info: Info, input: RecordClusterBootstrapRunInput
@@ -1271,6 +1294,7 @@ class ClustersMutation:
             slug=input.cluster_slug,
             deleted_at__isnull=True,
         ).first()
+        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -1325,7 +1349,9 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="cluster.unregister")
-    @require_permission(Permission.CLUSTER_UNREGISTER)
+    @require_permission(
+        Permission.CLUSTER_UNREGISTER, scope=cluster_org_scope(Permission.CLUSTER_UNREGISTER, "input.id")
+    )
     @tenant_scoped()
     def unregister_tenant_cluster(
         self, info: Info, input: UnregisterTenantClusterInput
@@ -1355,7 +1381,10 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="domain.create")
-    @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE),
+    )
     @tenant_scoped()
     def create_managed_domain(
         self, info: Info, input: CreateManagedDomainInput
@@ -1442,15 +1471,15 @@ class ClustersMutation:
                         actor=_actor_from_request(info),
                     ),
                 ],
-                workflow_id=(
-                    f"ProvisionManagedDomainWorkflow-{cluster.guid}-" f"{input.zone.replace('.', '-')}"
-                ),
+                workflow_id=(f"ProvisionManagedDomainWorkflow-{cluster.guid}-{input.zone.replace('.', '-')}"),
             )
         return gql_success(domain_to_type(domain))
 
     @strawberry.field
     @mutation_audit(action="domain.update")
-    @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE, scope=domain_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    )
     @tenant_scoped()
     def update_managed_domain(
         self, info: Info, input: UpdateManagedDomainInput
@@ -1474,7 +1503,9 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="domain.delete")
-    @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE, scope=domain_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    )
     @tenant_scoped()
     def soft_delete_managed_domain(
         self, info: Info, input: SoftDeleteManagedDomainInput
@@ -1505,14 +1536,17 @@ class ClustersMutation:
                     ),
                 ],
                 workflow_id=(
-                    f"DeprovisionManagedDomainWorkflow-{cluster.guid}-" f"{domain.zone.replace('.', '-')}"
+                    f"DeprovisionManagedDomainWorkflow-{cluster.guid}-{domain.zone.replace('.', '-')}"
                 ),
             )
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
     @strawberry.field
     @mutation_audit(action="domain.verify")
-    @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=domain_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE, "input.zone", by_zone=True),
+    )
     @tenant_scoped()
     def verify_managed_domain(
         self, info: Info, input: VerifyManagedDomainInput
@@ -1610,7 +1644,7 @@ class ClustersMutation:
 
     @strawberry.mutation
     @mutation_audit(action="cluster.managed_domain.provision")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE))
     @tenant_scoped()
     def provision_managed_domain(
         self,
@@ -1654,7 +1688,9 @@ class ClustersMutation:
         _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
-        if managed_domain_for_zone(zone, tenant.organization_id) is None:
+        domain = managed_domain_for_zone(zone, tenant.organization_id)
+        _require_operator_for_shared(info, domain, Permission.CLUSTER_MANAGE)
+        if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
@@ -1685,7 +1721,7 @@ class ClustersMutation:
 
     @strawberry.mutation
     @mutation_audit(action="cluster.managed_domain.revalidate")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE))
     @tenant_scoped()
     def revalidate_managed_domain(
         self,
@@ -1715,7 +1751,9 @@ class ClustersMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         # The signal, or the restart below, drives the provisioning run for
         # this zone, so the zone must be the org's own or shared (#1909).
-        if managed_domain_for_zone(zone, tenant.organization_id) is None:
+        domain = managed_domain_for_zone(zone, tenant.organization_id)
+        _require_operator_for_shared(info, domain, Permission.CLUSTER_MANAGE)
+        if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
@@ -1747,7 +1785,7 @@ class ClustersMutation:
                     " issuance on the next activity slot."
                     if signaled
                     else (
-                        "A new provisioning run was started and will re-check" " public DNS delegation."
+                        "A new provisioning run was started and will re-check public DNS delegation."
                         if restarted
                         else "Temporal is disabled or the workflow was not found; no signal sent."
                     )
@@ -1757,7 +1795,7 @@ class ClustersMutation:
 
     @strawberry.mutation
     @mutation_audit(action="cluster.managed_domain.reissue_cert")
-    @require_permission(Permission.CLUSTER_MANAGE)
+    @require_permission(Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE))
     @tenant_scoped()
     def reissue_managed_domain_cert(
         self,
@@ -1787,7 +1825,9 @@ class ClustersMutation:
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         # A reissue revokes the zone's certificate (#1909).
-        if managed_domain_for_zone(zone, tenant.organization_id) is None:
+        domain = managed_domain_for_zone(zone, tenant.organization_id)
+        _require_operator_for_shared(info, domain, Permission.CLUSTER_MANAGE)
+        if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
@@ -1809,7 +1849,10 @@ class ClustersMutation:
 
     @strawberry.field
     @mutation_audit(action="provider_plugin.configure")
-    @require_permission(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE),
+    )
     @tenant_scoped()
     def configure_provider_plugin(
         self, info: Info, input: ConfigureProviderPluginInput
