@@ -389,7 +389,12 @@ def test_plain_heartbeat_carries_no_input_keys_and_delivers_nothing(org, dispatc
 
     assert resp.status_code == 200, resp.content
     body = resp.json()
-    assert body == {"ok": True, "continue": True}
+    assert body == {
+        "ok": True,
+        "continue": True,
+        "task_backlog_protocol_version": 1,
+        "backlog_revision": 0,
+    }
     assert AgentTaskInputMessage.objects.filter(delivered_at__isnull=True).count() == 1
 
 
