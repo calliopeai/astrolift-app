@@ -366,11 +366,11 @@ def test_agent_query_count_is_bounded(permission_resolver, info, with_tenant_org
     how many skills/tools the agent carries — select_related the brief +
     app, prefetch the skill→tool join + containers.
 
-    The query budget covers: org resolution (_caller_org_id), the
-    workload+brief+app row, the agent_skill_refs prefetch, the
-    skill prefetch, the tool_defs prefetch, and the containers
-    prefetch. Adding more skills/tools must NOT increase it (the proof
-    against a per-skill or per-tool N+1)."""
+    The query budget covers the authoritative organization/managed-cluster
+    lookup, the owner-workload gate, org resolution (_caller_org_id), the
+    workload+brief+app row and the four skill/ref/tool/container prefetches.
+    Adding more skills/tools must NOT increase it (the proof against a
+    per-skill or per-tool N+1)."""
     org = _org("acme")
     project, team = _project(org, "demo")
     app = _app(org, project, team, "hello")
@@ -408,4 +408,4 @@ def test_agent_query_count_is_bounded(permission_resolver, info, with_tenant_org
         f"queries\nlarge:\n" + "\n".join(q["sql"] for q in large_ctx.captured_queries)
     )
     # And the absolute budget stays tight (sanity bound).
-    assert len(small_ctx) <= 8
+    assert len(small_ctx) <= 9

@@ -25,7 +25,7 @@ from astrolift_identity.models.organization import Organization
 
 
 @pytest.mark.django_db
-def test_an_org_is_created_when_no_website_is_given():
+def test_an_org_is_created_when_no_website_is_given(system_role_catalog):
     """The path every install takes: nobody passes --org-website."""
     call_command(
         "bootstrap_admin",
@@ -41,7 +41,7 @@ def test_an_org_is_created_when_no_website_is_given():
 
 
 @pytest.mark.django_db
-def test_a_website_is_kept_when_one_is_given():
+def test_a_website_is_kept_when_one_is_given(system_role_catalog):
     """The other half, so the fix cannot become "always blank"."""
     call_command(
         "bootstrap_admin",
