@@ -36,6 +36,7 @@ from astrolift_operations.schema.types import (
     WebhookTestResultType,
     webhook_to_type,
 )
+from astrolift_operations.scopes import apps, webhook_creation_scope, webhook_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -47,7 +48,7 @@ from core.tenancy import get_current_tenant
 class WebhookMutations:
     @strawberry.field
     @mutation_audit(action="webhook.create")
-    @require_permission(Permission.WEBHOOK_CREATE)
+    @require_permission(Permission.WEBHOOK_CREATE, scope=webhook_creation_scope(Permission.WEBHOOK_CREATE))
     @tenant_scoped()
     def create_webhook_subscription(
         self, info: Info, input: CreateWebhookSubscriptionInput
@@ -62,15 +63,15 @@ class WebhookMutations:
 
         team = None
         if input.team_slug:
-            team = Team.objects.filter(organization=org, slug=input.team_slug).first()
+            team = Team.objects.filter(
+                organization=org, slug=input.team_slug, deleted_at__isnull=True
+            ).first()
             if team is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug")
 
         registered_app = None
         if input.app_slug:
-            from astrolift_registry.models import RegisteredApp
-
-            registered_app = RegisteredApp.objects.filter(organization=org, slug=input.app_slug).first()
+            registered_app = apps().filter(organization=org, slug=input.app_slug).first()
             if registered_app is None:
                 return gql_failure(
                     ErrorCode.NOT_FOUND.value,
@@ -109,7 +110,7 @@ class WebhookMutations:
 
     @strawberry.field
     @mutation_audit(action="webhook.update")
-    @require_permission(Permission.WEBHOOK_UPDATE)
+    @require_permission(Permission.WEBHOOK_UPDATE, scope=webhook_scope(Permission.WEBHOOK_UPDATE))
     @tenant_scoped()
     def update_webhook_subscription(
         self, info: Info, input: UpdateWebhookSubscriptionInput
@@ -161,7 +162,7 @@ class WebhookMutations:
 
     @strawberry.field
     @mutation_audit(action="webhook.delete")
-    @require_permission(Permission.WEBHOOK_DELETE)
+    @require_permission(Permission.WEBHOOK_DELETE, scope=webhook_scope(Permission.WEBHOOK_DELETE))
     @tenant_scoped()
     def delete_webhook_subscription(
         self, info: Info, input: DeleteWebhookSubscriptionInput
@@ -177,7 +178,7 @@ class WebhookMutations:
 
     @strawberry.field
     @mutation_audit(action="webhook.test")
-    @require_permission(Permission.WEBHOOK_UPDATE)
+    @require_permission(Permission.WEBHOOK_UPDATE, scope=webhook_scope(Permission.WEBHOOK_UPDATE))
     @tenant_scoped()
     def test_webhook_subscription(
         self, info: Info, input: TestWebhookInput
@@ -279,7 +280,7 @@ class WebhookMutations:
 
     @strawberry.field
     @mutation_audit(action="webhook.rotate_secret")
-    @require_permission(Permission.WEBHOOK_UPDATE)
+    @require_permission(Permission.WEBHOOK_UPDATE, scope=webhook_scope(Permission.WEBHOOK_UPDATE))
     @tenant_scoped()
     def rotate_outbound_webhook_secret(
         self, info: Info, input: RotateOutboundWebhookSecretInput

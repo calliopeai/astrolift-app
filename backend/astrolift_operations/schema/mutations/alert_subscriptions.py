@@ -19,8 +19,11 @@ from astrolift_operations.schema.types import (
     UserAlertSubscriptionType,
     user_alert_subscription_to_type,
 )
+from astrolift_operations.scopes import subscription_scope
+from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
+from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
 
@@ -30,6 +33,9 @@ class AlertSubscriptionMutations:
 
     @strawberry.field
     @mutation_audit(action="alert_subscription.set")
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def set_alert_subscription(
         self,
@@ -98,6 +104,7 @@ class AlertSubscriptionMutations:
 
     @strawberry.field
     @mutation_audit(action="alert_subscription.clear")
+    @require_permission(Permission.APP_READ, scope=subscription_scope(Permission.APP_READ))
     @tenant_scoped()
     def clear_alert_subscription(
         self,
@@ -116,6 +123,7 @@ class AlertSubscriptionMutations:
 
         sub = UserAlertSubscription.objects.filter(
             guid=input.id,
+            registered_app__organization_id=tenant.organization_id,
             user_id=tenant.actor_user_id,
             deleted_at__isnull=True,
         ).first()

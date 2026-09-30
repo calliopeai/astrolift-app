@@ -35,6 +35,7 @@ from astrolift_operations.schema.types import (
     zentinelle_cluster_gateway_to_type,
     zentinelle_connection_to_type,
 )
+from astrolift_operations.scopes import org_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -135,7 +136,7 @@ class ZentinelleMutations:
     @strawberry.field
     @mutation_audit(action="zentinelle.connect", extras=_connect_extras)
     @requires_elevation(action_label="Connect to Zentinelle")
-    @require_permission(Permission.ZENTINELLE_CONNECT)
+    @require_permission(Permission.ZENTINELLE_CONNECT, scope=org_scope(Permission.ZENTINELLE_CONNECT))
     @tenant_scoped()
     def connect_zentinelle(
         self, info: Info, input: ConnectZentinelleInput
@@ -165,7 +166,7 @@ class ZentinelleMutations:
     @strawberry.field
     @mutation_audit(action="zentinelle.disconnect", target=_connection_target, extras=_disconnect_extras)
     @requires_elevation(action_label="Disconnect from Zentinelle")
-    @require_permission(Permission.ZENTINELLE_CONNECT)
+    @require_permission(Permission.ZENTINELLE_CONNECT, scope=org_scope(Permission.ZENTINELLE_CONNECT))
     @tenant_scoped()
     def disconnect_zentinelle(
         self, info: Info, input: DisconnectZentinelleInput
@@ -189,7 +190,9 @@ class ZentinelleMutations:
     @strawberry.field
     @mutation_audit(action="zentinelle.cluster.register", target=_cluster_target, extras=_gateway_extras)
     @requires_elevation(action_label="Register a cluster with Zentinelle")
-    @require_permission(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    @require_permission(
+        Permission.ZENTINELLE_GATEWAY_MANAGE, scope=org_scope(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    )
     @tenant_scoped()
     def register_zentinelle_cluster(
         self, info: Info, input: ZentinelleClusterInput
@@ -215,7 +218,9 @@ class ZentinelleMutations:
     @strawberry.field
     @mutation_audit(action="zentinelle.gateway.set_enabled", target=_cluster_target, extras=_gateway_extras)
     @requires_elevation(action_label="Turn the Zentinelle gateway on or off")
-    @require_permission(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    @require_permission(
+        Permission.ZENTINELLE_GATEWAY_MANAGE, scope=org_scope(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    )
     @tenant_scoped()
     def set_zentinelle_gateway_enabled(
         self, info: Info, input: SetZentinelleGatewayEnabledInput
@@ -234,7 +239,7 @@ class ZentinelleMutations:
     @strawberry.field
     @mutation_audit(action="zentinelle.gateway.rotate_credential", target=_cluster_target)
     @requires_elevation(action_label="Rotate the Zentinelle gateway credential")
-    @require_permission(Permission.ZENTINELLE_CONNECT)
+    @require_permission(Permission.ZENTINELLE_CONNECT, scope=org_scope(Permission.ZENTINELLE_CONNECT))
     @tenant_scoped()
     def rotate_zentinelle_gateway_credential(
         self, info: Info, input: RotateZentinelleGatewayCredentialInput
@@ -257,7 +262,9 @@ class ZentinelleMutations:
     @strawberry.field
     @mutation_audit(action="zentinelle.cluster.unregister", target=_cluster_target)
     @requires_elevation(action_label="Unregister a cluster from Zentinelle")
-    @require_permission(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    @require_permission(
+        Permission.ZENTINELLE_GATEWAY_MANAGE, scope=org_scope(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    )
     @tenant_scoped()
     def unregister_zentinelle_cluster(
         self, info: Info, input: ZentinelleClusterInput

@@ -8,6 +8,12 @@
   elevation and the last-owner floor. Live directory/upload ownership filters
   and declared export/support route gates close all 42 remaining guardrail
   gaps. Unavailable legacy actions refuse before resolving supplied IDs.
+- Operations gates resolve app, project, team or organization owners and retain
+  bearer ceilings (#2107). Events, alerts and webhook collections filter before
+  aggregation, paging and counts; alert subscriptions require app read access.
+  Bulk actions authorize every app and affected operation before acting, and
+  secret attachment also authorizes its source bundle. Audit trails, retention,
+  notification settings and Zentinelle management require organization authority.
 
 - Managed-resource gates resolve live app, project, team or organization owners
   and preserve bearer ceilings across GraphQL and all ten project-resource MCP

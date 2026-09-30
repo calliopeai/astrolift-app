@@ -7,12 +7,14 @@ import hashlib
 from datetime import timedelta
 
 import strawberry
+from django.db.models import Prefetch
 from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import GUID, PageType, clamp_limit, encode_cursor, keyset_page, search_q
 from astrolift_operations.models import (
     AlertEvent,
+    AlertMute,
     AlertRule,
     AuditEvent,
     DeviceRegistration,
@@ -65,7 +67,9 @@ from astrolift_operations.schema.types import (
     workflow_run_to_type,
     zentinelle_connection_to_type,
 )
-from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_operations.scopes import org_scope, provider_read_operation, webhook_scope
+from astrolift_operations.visibility import visible_events, visible_rules, visible_webhooks
+from astrolift_registry.scopes import app_scope_by_slug, live_app_owners
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
@@ -146,7 +150,7 @@ def _events_qs(
     org_id = _caller_org_id()
     if org_id is None:
         return Event.objects.none()
-    qs = Event.objects.filter(organization_id=org_id)
+    qs = visible_events(Event.objects.filter(organization_id=org_id), Permission.AUDIT_LOG_READ)
     if event_type:
         qs = qs.filter(event_type=event_type)
     if severity:
@@ -181,7 +185,9 @@ def _webhook_subscriptions_qs(*, app_slug: str | None, search: str | None = None
     org_id = _caller_org_id()
     if org_id is None:
         return WebhookSubscription.objects.none()
-    qs = WebhookSubscription.objects.filter(organization_id=org_id)
+    qs = visible_webhooks(
+        WebhookSubscription.objects.filter(organization_id=org_id), Permission.WEBHOOK_CREATE
+    )
     if app_slug:
         qs = qs.filter(registered_app__slug=app_slug)
     else:
@@ -235,7 +241,20 @@ def _alert_rules_qs(
     org_id = _caller_org_id()
     if org_id is None:
         return AlertRule.objects.none()
-    qs = AlertRule.objects.select_related("organization").filter(organization_id=org_id)
+    qs = visible_rules(
+        AlertRule.objects.select_related("organization", "managed_service")
+        .prefetch_related(
+            Prefetch(
+                "mutes",
+                queryset=AlertMute.objects.filter(deleted_at__isnull=True, ttl_until__gt=timezone.now())
+                .select_related("muted_by")
+                .order_by("-ttl_until"),
+                to_attr="_active_mutes",
+            )
+        )
+        .filter(organization_id=org_id),
+        Permission.APP_READ,
+    )
     if active_only:
         qs = qs.filter(is_active=True)
     if target:
@@ -267,7 +286,9 @@ def _alert_events_qs(
     org_id = _caller_org_id()
     if org_id is None:
         return AlertEvent.objects.none()
-    qs = AlertEvent.objects.select_related("rule").filter(rule__organization_id=org_id)
+    qs = AlertEvent.objects.select_related("rule").filter(
+        organization_id=org_id, rule__in=visible_rules(AlertRule.objects.all(), Permission.APP_READ)
+    )
     if rule_id is not None:
         qs = qs.filter(rule__guid=str(rule_id))
     if unresolved_only:
@@ -280,7 +301,9 @@ def _alert_events_qs(
 @strawberry.type
 class OperationsQuery:
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_uptime(
         self,
@@ -298,10 +321,12 @@ class OperationsQuery:
         from astrolift_operations.models import AppUptimeResult
         from astrolift_registry.models import RegisteredApp
 
-        app = RegisteredApp.objects.filter(
-            slug=app_slug,
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
+        app = live_app_owners(
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
         ).first()
         if app is None:
             return None
@@ -335,7 +360,7 @@ class OperationsQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage.")
     )
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_events(
         self,
@@ -359,7 +384,7 @@ class OperationsQuery:
             "astroliftEventsAggregatedPage."
         )
     )
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_events_aggregated(
         self,
@@ -406,7 +431,7 @@ class OperationsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_events_aggregated_page(
         self,
@@ -484,7 +509,7 @@ class OperationsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_events_page(
         self,
@@ -571,7 +596,7 @@ class OperationsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_recent_activity(
         self,
@@ -617,6 +642,7 @@ class OperationsQuery:
         qs = Event.objects.select_related("actor_user", "registered_app").filter(
             _lifecycle_event_filter(), organization_id=org_id
         )
+        qs = visible_events(qs, Permission.AUDIT_LOG_READ)
         page = keyset_page(
             qs,
             cursor=cursor,
@@ -631,7 +657,7 @@ class OperationsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, scope=org_scope(Permission.AUDIT_LOG_READ))
     @tenant_scoped()
     def astrolift_audit_events(
         self,
@@ -673,7 +699,7 @@ class OperationsQuery:
         return [audit_to_type(a) for a in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, scope=org_scope(Permission.AUDIT_LOG_READ))
     @tenant_scoped()
     def astrolift_audit_events_page(
         self,
@@ -794,7 +820,7 @@ class OperationsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ)
+    @require_permission(Permission.AUDIT_LOG_READ, scope=org_scope(Permission.AUDIT_LOG_READ))
     @tenant_scoped()
     def astrolift_audit_retention(self, info: Info) -> AuditRetentionType:
         """The caller org's audit-log retention window, in days.
@@ -819,7 +845,7 @@ class OperationsQuery:
         return AuditRetentionType(days=max(1, int(days)))
 
     @strawberry.field
-    @require_permission(Permission.ORG_READ)
+    @require_permission(Permission.ORG_READ, scope=org_scope(Permission.ORG_READ))
     @tenant_scoped()
     def astrolift_observability_retention(self, info: Info) -> list[ObservabilityRetentionType]:
         """The caller org's effective retention for all four streams (#1602).
@@ -875,7 +901,7 @@ class OperationsQuery:
         return out
 
     @strawberry.field
-    @require_permission(Permission.ZENTINELLE_CONNECT)
+    @require_permission(Permission.ZENTINELLE_CONNECT, scope=org_scope(Permission.ZENTINELLE_CONNECT))
     @tenant_scoped()
     def astrolift_zentinelle_connection(self, info: Info) -> ZentinelleConnectionType | None:
         """This organization's Zentinelle connection and registered clusters (#1887),
@@ -916,7 +942,7 @@ class OperationsQuery:
             "Caps at 200 rows with no way to reach the 201st. " "Use astroliftWebhookSubscriptionsPage."
         )
     )
-    @require_permission(Permission.WEBHOOK_CREATE)
+    @require_permission(Permission.WEBHOOK_CREATE, any_scope=True)
     @tenant_scoped()
     def astrolift_webhook_subscriptions(
         self,
@@ -932,7 +958,7 @@ class OperationsQuery:
         return [webhook_to_type(w) for w in qs[:200]]
 
     @strawberry.field
-    @require_permission(Permission.WEBHOOK_CREATE)
+    @require_permission(Permission.WEBHOOK_CREATE, any_scope=True)
     @tenant_scoped()
     def astrolift_webhook_subscriptions_page(
         self,
@@ -961,7 +987,9 @@ class OperationsQuery:
             "Caps at 100 attempts with no way to reach the 101st. " "Use astroliftWebhookDeliveriesPage."
         )
     )
-    @require_permission(Permission.WEBHOOK_CREATE)
+    @require_permission(
+        Permission.WEBHOOK_CREATE, scope=webhook_scope(Permission.WEBHOOK_CREATE, "subscription_id")
+    )
     @tenant_scoped()
     def astrolift_webhook_deliveries(
         self,
@@ -981,7 +1009,9 @@ class OperationsQuery:
         return [webhook_delivery_to_type(d) for d in qs]
 
     @strawberry.field
-    @require_permission(Permission.WEBHOOK_CREATE)
+    @require_permission(
+        Permission.WEBHOOK_CREATE, scope=webhook_scope(Permission.WEBHOOK_CREATE, "subscription_id")
+    )
     @tenant_scoped()
     def astrolift_webhook_deliveries_page(
         self,
@@ -1174,7 +1204,7 @@ class OperationsQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
     )
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_alert_rules(
         self,
@@ -1196,7 +1226,7 @@ class OperationsQuery:
         return [alert_rule_to_type(r) for r in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_alert_rules_page(
         self,
@@ -1231,7 +1261,11 @@ class OperationsQuery:
         return page.map(alert_rule_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_METRICS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ_METRICS,
+        scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ_METRICS),
+        operation=provider_read_operation(Permission.APP_READ_METRICS, metrics=True),
+    )
     @tenant_scoped()
     def astrolift_app_metrics(
         self,
@@ -1279,7 +1313,9 @@ class OperationsQuery:
         if org_id is None:
             return None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_owners(
+                RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            )
             .only("id", "guid", "slug", "k8s_namespace")
             .first()
         )
@@ -1330,7 +1366,7 @@ class OperationsQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
     )
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_alert_events(
         self,
@@ -1343,7 +1379,7 @@ class OperationsQuery:
         return [alert_event_to_type(e) for e in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_alert_events_page(
         self,
@@ -1568,6 +1604,9 @@ def _resolve_metrics_endpoint(app) -> tuple[str | None, str]:
     if env is None or env.tenant_cluster_id is None:
         return None, ""
     cluster = env.tenant_cluster
+    from astrolift_services.scopes import assert_provider_cluster
+
+    assert_provider_cluster(cluster, permission=Permission.APP_READ_METRICS)
     cfg = cluster.provider_config or {}
     endpoint = (cfg.get("prometheus_endpoint") or "").strip()
     if not endpoint:
