@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import strawberry
 from strawberry.types import Info
 
@@ -187,7 +189,10 @@ class AppOpsMutations:
             if mismatch is not None:
                 return mismatch
             if environment is None:
-                return gql_failure(ErrorCode.PRECONDITION.value, "workload has no active environment")
+                return cast(
+                    MutationResultType[_WorkloadOpPayload],
+                    gql_failure(ErrorCode.PRECONDITION.value, "workload has no active environment"),
+                )
             recheck_action(Permission.APP_DEPLOY, workload, environment)
 
             try:
@@ -241,7 +246,10 @@ class AppOpsMutations:
             if mismatch is not None:
                 return mismatch
             if environment is None:
-                return gql_failure(ErrorCode.PRECONDITION.value, "workload has no active environment")
+                return cast(
+                    MutationResultType[_WorkloadOpPayload],
+                    gql_failure(ErrorCode.PRECONDITION.value, "workload has no active environment"),
+                )
             recheck_action(Permission.APP_DEPLOY, workload, environment)
 
             try:

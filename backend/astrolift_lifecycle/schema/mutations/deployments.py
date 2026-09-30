@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import strawberry
 from django.db import transaction
 from django.utils import timezone
@@ -801,15 +803,19 @@ class DeploymentMutations:
             current = (
                 live_lifecycle_rows(Deployment.objects.all())
                 .filter(
-                    app_environment_id=deployment.app_environment_id, status=Deployment.Status.RUNNING.value
+                    app_environment_id=deployment.app_environment_id, status=str(Deployment.Status.RUNNING)
                 )
                 .order_by("-created_at", "-guid")
                 .values_list("pk", flat=True)
                 .first()
             )
             if current != deployment.pk:
-                return gql_failure(
-                    ErrorCode.PRECONDITION.value, "only the current running deployment is a rollback target"
+                return cast(
+                    MutationResultType[DeploymentType],
+                    gql_failure(
+                        ErrorCode.PRECONDITION.value,
+                        "only the current running deployment is a rollback target",
+                    ),
                 )
 
             prior = (
