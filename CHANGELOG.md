@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Core legacy APIs enforce active account, platform-operator and bearer
+  ceilings without removing GraphQL declarations (#2110). Permission analysis
+  checks explicit organization management; legacy self-deletion keeps
+  elevation and the last-owner floor. Live directory/upload ownership filters
+  and declared export/support route gates close all 42 remaining guardrail
+  gaps. Unavailable legacy actions refuse before resolving supplied IDs.
+
 - Managed-resource gates resolve live app, project, team or organization owners
   and preserve bearer ceilings across GraphQL and all ten project-resource MCP
   tools (#2106). Collections filter before limits and counts; attachments check

@@ -4,15 +4,15 @@ from typing import Optional
 
 import strawberry
 import strawberry_django
+from strawberry.types import Info
+
 from astrolift_graphql import MAX_PAGE_LIMIT, PageType, keyset_page, search_q
-from graphql import GraphQLError
 from organization.models import Organization
 from organization.models.organization import OrganizationMember
 from organization.schema.types import (
     OrganizationMemberType,
     OrganizationType,
 )
-from strawberry.types import Info
 
 
 def _caller_org_ids(info: Info) -> list[int] | None:
@@ -25,29 +25,33 @@ def _caller_org_ids(info: Info) -> list[int] | None:
 
     Returns:
         None — caller is a superuser and may see all orgs.
-        [] — anonymous or no memberships; resolvers should return empty.
+        [] — no live memberships; resolvers return empty.
         [int, ...] — concrete allow-list of organization ids.
     """
-    user = info.context.user
-    if not getattr(user, "is_authenticated", False):
-        return []
-    if getattr(user, "is_superuser", False):
+    from astrolift_identity.api_tokens import SCOPE_ADMIN, get_current_api_token, has_scope
+    from core.schema.legacy_access import is_operator_with_credential, require_account_access
+
+    user = require_account_access(info)
+    token = get_current_api_token()
+    if token is None and is_operator_with_credential(user):
         return None
-    return list(
-        OrganizationMember.objects.filter(
-            member=user,
-            is_active=True,
-            deleted_at__isnull=True,
-        ).values_list("organization_id", flat=True)
+    memberships = OrganizationMember.objects.filter(
+        member=user, is_active=True, deleted_at__isnull=True, organization__deleted_at__isnull=True
     )
+    if token is not None:
+        if not has_scope(token, SCOPE_ADMIN):
+            return []
+        memberships = memberships.filter(organization__guid=token.organization.guid)
+    return list(memberships.values_list("organization_id", flat=True))
 
 
 def _require_authenticated(info: Info) -> None:
-    if not info.context.user.is_authenticated:
-        raise GraphQLError("Authentication required")
+    from core.schema.legacy_access import require_account_access
+
+    require_account_access(info)
 
 
-def _organizations_qs(info: Info, *, search: Optional[str] = None):
+def _organizations_qs(info: Info, *, search: str | None = None):
     """Filtered, unordered org list scoped to the caller's memberships.
 
     Shared by the list field and its paginated sibling so the two can
@@ -68,7 +72,7 @@ def _organizations_qs(info: Info, *, search: Optional[str] = None):
     """
     allowed = _caller_org_ids(info)
     if allowed is None:
-        qs = Organization.objects.all()
+        qs = Organization.objects.filter(deleted_at__isnull=True)
     else:
         qs = Organization.objects.filter(id__in=allowed)
     if search:
@@ -80,12 +84,11 @@ def _organizations_qs(info: Info, *, search: Optional[str] = None):
     return qs
 
 
-def _members_qs(info: Info, *, search: Optional[str] = None):
+def _members_qs(info: Info, *, search: str | None = None):
     """Filtered, unordered membership rows for the caller's orgs.
 
-    Shared by the list field and its paginated sibling. Soft-deleted
-    memberships are deliberately NOT filtered out: the list field has
-    always included them and both fields must agree on what a row is.
+    The list and its paginated sibling omit removed memberships,
+    inactive accounts and deleted organizations (#2110).
 
     ``_caller_org_ids`` returns ``[]`` for anonymous / membership-less
     callers, so ``organization_id__in=[]`` fails closed; ``None`` is the
@@ -93,9 +96,16 @@ def _members_qs(info: Info, *, search: Optional[str] = None):
     """
     allowed = _caller_org_ids(info)
     if allowed is None:
-        qs = OrganizationMember.objects.all()
+        qs = OrganizationMember.objects.filter(
+            is_active=True,
+            deleted_at__isnull=True,
+            organization__deleted_at__isnull=True,
+            member__is_active=True,
+        )
     else:
-        qs = OrganizationMember.objects.filter(organization_id__in=allowed)
+        qs = OrganizationMember.objects.filter(
+            organization_id__in=allowed, is_active=True, deleted_at__isnull=True, member__is_active=True
+        )
     if search:
         qs = qs.filter(
             search_q(
