@@ -26,6 +26,11 @@
 - Shared page chrome uses a common context outside app routes. Remove unreachable
   active-provider/session toast callbacks and unused approval/download props;
   approval history uses semantic theme tokens (#2148).
+- Agent run controls read stored replicas, loop concurrency and scaling schedules
+  before saving. Logs and shell share live pod/container targeting, including
+  container deep links; ingress Apply reflects every busy phase. App and agent
+  wizards share repository/progress UI and refresh their active-org project
+  destination before registering (#2148).
 
 - Team and project create sheets generate backend-compatible slugs and preserve
   a requested visible team. Workflow configuration waits for and scopes reads
@@ -586,7 +591,7 @@
   `astrolift_io_managed_service_id`, reserved against tenant labels, with
   the create-time description (`resource=<managed-service id>`) read back
   as evidence; Cloud Operations bundle ids end in `--<digest of the
-  managed-service id>`. New Spanner and PSC derived names get the same
+managed-service id>`. New Spanner and PSC derived names get the same
   digest. Existing resources keep their recorded names. One made before this
   change, and so without the marker, is accepted (and, on provision or
   update, stamped) only when the platform's record of its handle is
@@ -643,7 +648,7 @@
   `softDeleteApp`. A data migration backfills the ledger from every
   existing app, keeping the first claimant (oldest app) on any
   pre-existing collision and logging the rest. `manage.py
-  report_shared_zone_hostname_collisions` is a new read-only command that
+report_shared_zone_hostname_collisions` is a new read-only command that
   renders every live app's public hostnames in shared zones independently
   of the ledger and lists every hostname two or more organizations render
   : the way to find what the migration left unclaimed, and to audit the
@@ -1059,7 +1064,7 @@
   None of the eleven is a credential, so reveal shows them unmasked.
 
 - Make the binding-envelope guardrail read conditional bindings, and separate
-  a value's *encoding* from its *provenance*. `binding()` bodies branch, and
+  a value's _encoding_ from its _provenance_. `binding()` bodies branch, and
   reading only the last branch mis-reported three ledgers at once: the Aurora
   postgres drivers read as emitting the MySQL envelope and none of
   `POSTGRES_*`, and every AWS/GCP Redis driver's `REDIS_URL` was recorded as

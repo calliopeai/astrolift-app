@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  KIND_TO_SOURCE_KIND,
+  usableSourceConnections,
+} from "@/components/wizard/source-connection";
+
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
@@ -31,22 +36,6 @@ interface ReposResp {
 interface AgentFleetResp {
   agentFleet: AstroliftAgentListItem[];
 }
-
-const KIND_TO_SOURCE_KIND: Record<ScmConnectionKind, SourceKind> = {
-  github_pat: "github",
-  github_app_install: "github",
-  github_oauth_app: "github",
-  github_oauth_user: "github",
-  gitlab_pat: "gitlab",
-  gitlab_oauth_app: "gitlab",
-  gitlab_oauth_user: "gitlab",
-  bitbucket_pat: "bitbucket",
-  bitbucket_oauth_app: "bitbucket",
-  bitbucket_oauth_user: "bitbucket",
-  gitea_pat: "gitea",
-  gitea_oauth_app: "gitea",
-  gitea_oauth_user: "gitea",
-};
 
 /** The agent-wizard-state fields step 1 reads and writes. */
 export interface AgentRepoPickerFields {
@@ -105,11 +94,17 @@ export function useAgentRepoPicker<S extends AgentRepoPickerFields>({
   // dispatched on demand and the dispatch path enforces that requirement
   // later. Gating registration on a cluster would be wrong.
   const connections = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS, {
+    skip: !orgId,
     fetchPolicy: "cache-and-network",
   });
 
-  const usable = (connections.data?.astroliftSourceConnections ?? []).filter(
-    (c) => c.isActive && !c.isOauthAppConfig
+  const usable = React.useMemo(
+    () => usableSourceConnections(connections.data?.astroliftSourceConnections ?? []),
+    [connections.data]
+  );
+  const selectedConnection = usable.find((connection) => connection.id === state.connectionId);
+  const connectionValid = Boolean(
+    orgId && selectedConnection && !connections.loading && !connections.error
   );
 
   // Auto-pick the first connection when there's exactly one.
@@ -132,7 +127,7 @@ export function useAgentRepoPicker<S extends AgentRepoPickerFields>({
       search: search || null,
       limit: 100,
     },
-    skip: !state.connectionId,
+    skip: !connectionValid,
     fetchPolicy: "cache-and-network",
   });
   const repoList = repos.data?.astroliftAvailableRepos;
@@ -140,12 +135,12 @@ export function useAgentRepoPicker<S extends AgentRepoPickerFields>({
   // A repo is picked when sourceRepo + connectionId are both set. (No cluster
   // gate — see above.)
   React.useEffect(() => {
-    setValid(Boolean(state.connectionId && state.sourceRepo));
-  }, [state.connectionId, state.sourceRepo, setValid]);
+    setValid(Boolean(connectionValid && state.sourceRepo));
+  }, [connectionValid, state.sourceRepo, setValid]);
 
   function onPickRepo(fullName: string) {
     const repo = repoList?.repos.find((r) => r.fullName === fullName);
-    if (!repo) return;
+    if (!repo || !connectionValid) return;
     const conn = usable.find((c) => c.id === state.connectionId);
     const inferredKind = conn
       ? (KIND_TO_SOURCE_KIND[conn.kind as ScmConnectionKind] ?? "git_url")

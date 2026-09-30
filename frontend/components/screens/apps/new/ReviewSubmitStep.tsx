@@ -1,31 +1,22 @@
 "use client";
 
-import {
-  AlertCircleIcon,
-  CheckCircle2Icon,
-  CircleDashedIcon,
-  EditIcon,
-  Loader2Icon,
-} from "lucide-react";
+import { AlertCircleIcon, Loader2Icon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import type { SourceKind, TriggerMode } from "@/graphql/registry/registry.types";
 import { TOPOLOGY_META } from "@/lib/topology";
-import { cn } from "@/lib/utils";
 
 import { deployPreview } from "./deploy-preview";
 
-export type StepStatus = "pending" | "running" | "done" | "failed" | "skipped";
-
-export interface SideEffectStep {
-  key: string;
-  label: string;
-  status: StepStatus;
-  error?: string;
-  note?: string;
-}
+import {
+  SummaryCard,
+  CheckboxLocked,
+  errorFor,
+  statusFor,
+  StatusBadge,
+} from "@/components/wizard/ReviewParts";
+import type { SideEffectStep } from "@/components/wizard/ReviewParts";
+export type { SideEffectStep, StepStatus } from "@/components/wizard/ReviewParts";
 
 /** The wizard-state fields the review step reads. */
 export interface ReviewSubmitFields {
@@ -113,7 +104,7 @@ export function ReviewSubmitStepView({
     <div className="flex flex-col gap-5">
       <section className="grid min-w-0 gap-3 sm:grid-cols-2">
         <SummaryCard
-          stepIdx={1}
+          step={1}
           title="Source"
           onJump={onJumpToStep}
           rows={[
@@ -132,7 +123,7 @@ export function ReviewSubmitStepView({
           ]}
         />
         <SummaryCard
-          stepIdx={2}
+          step={2}
           title="Run"
           onJump={onJumpToStep}
           rows={[
@@ -273,111 +264,6 @@ export function ReviewSubmitStepView({
         </p>
       )}
     </div>
-  );
-}
-
-function SummaryCard({
-  stepIdx,
-  title,
-  onJump,
-  rows,
-}: {
-  stepIdx: 1 | 2;
-  title: string;
-  onJump: (step: 1 | 2) => void;
-  rows: Array<{ label: string; value: string; mono?: boolean }>;
-}) {
-  return (
-    <Card className="border-muted-foreground/20 min-w-0">
-      <CardContent className="flex flex-col gap-2 p-4 text-sm">
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            {title}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onJump(stepIdx)}
-            className="text-muted-foreground hover:text-foreground -mt-1 -mr-2 h-7 gap-1 px-2 text-xs"
-            aria-label={`Edit ${title}`}
-          >
-            <EditIcon className="size-3" />
-            Edit
-          </Button>
-        </div>
-        <dl className="grid gap-1">
-          {rows.map((r) => (
-            <div key={r.label} className="grid grid-cols-3 gap-2">
-              <dt className="text-muted-foreground text-xs">{r.label}</dt>
-              <dd
-                className={cn("col-span-2 min-w-0 truncate", r.mono && "font-mono text-xs")}
-                title={r.value}
-              >
-                {r.value || "—"}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </CardContent>
-    </Card>
-  );
-}
-
-function CheckboxLocked({ checked, disabled }: { checked: boolean; disabled: boolean }) {
-  return (
-    <input
-      type="checkbox"
-      checked={checked}
-      disabled={disabled}
-      readOnly
-      className="pointer-events-none"
-      aria-disabled={disabled}
-    />
-  );
-}
-
-function statusFor(effects: SideEffectStep[], key: string): StepStatus {
-  return effects.find((e) => e.key === key)?.status ?? "pending";
-}
-
-function errorFor(effects: SideEffectStep[], key: string): string | undefined {
-  return effects.find((e) => e.key === key)?.error;
-}
-
-function StatusBadge({ status, error }: { status: StepStatus; error?: string }) {
-  if (status === "running") {
-    return (
-      <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-        <Loader2Icon className="size-3.5 animate-spin" /> Running
-      </span>
-    );
-  }
-  if (status === "done") {
-    return (
-      <span className="text-success-fg inline-flex items-center gap-1 text-xs">
-        <CheckCircle2Icon className="size-3.5" /> Done
-      </span>
-    );
-  }
-  if (status === "failed") {
-    return (
-      <span className="text-destructive inline-flex items-center gap-1 text-xs" title={error}>
-        <AlertCircleIcon className="size-3.5" /> Failed
-      </span>
-    );
-  }
-  if (status === "skipped") {
-    return (
-      <Badge variant="outline" className="text-2xs">
-        Skipped
-      </Badge>
-    );
-  }
-  return (
-    <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-      <CircleDashedIcon className="size-3.5" /> Pending
-    </span>
   );
 }
 

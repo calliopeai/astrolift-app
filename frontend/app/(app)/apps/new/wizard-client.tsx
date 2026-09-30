@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { useWizardProjects } from "@/components/wizard/use-wizard-projects";
+
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { REGISTER_APP } from "@/graphql/registry/registry.mutations";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
@@ -157,7 +160,20 @@ export function initialWizardState(): WizardState {
  * step can continue once all of its parts are valid.
  */
 export function WizardClient() {
+  const { org } = useActiveOrg();
+  return <ScopedWizardClient key={org?.id ?? "unresolved"} />;
+}
+
+function ScopedWizardClient() {
   const router = useRouter();
+  const projects = useWizardProjects();
+  const mounted = React.useRef(true);
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [state, setState] = React.useState<WizardState>(initialWizardState);
   const [partValid, setPartValid] = React.useState<Record<Part, boolean>>({
     repo: false,
@@ -219,7 +235,7 @@ export function WizardClient() {
 
   async function submit() {
     // The project field says what is missing, beside itself, on Run.
-    if (!state.projectId) {
+    if (!projects.allProjects.some((project) => project.id === state.projectId)) {
       goTo(2);
       return;
     }
@@ -264,6 +280,8 @@ export function WizardClient() {
       setSideEffects((prev) => prev.map((s) => (s.key === key ? { ...s, ...patch } : s)));
 
     try {
+      await projects.confirmDestination(state.projectId);
+      if (!mounted.current) return;
       update("register", { status: "running" });
       // Approval policy (#410) is only sent when the deploy-strategy
       // step is active *and* the operator turned the gate on. "skip"
@@ -312,6 +330,7 @@ export function WizardClient() {
           },
         },
       });
+      if (!mounted.current) return;
       const result = data?.registerApp;
       if (!result?.ok || !result.data) {
         const msg = result?.errors?.[0]?.message ?? "Register failed";
@@ -339,6 +358,7 @@ export function WizardClient() {
               },
             },
           });
+          if (!mounted.current) return;
           const pushResult = pushData?.pushCiWorkflow;
           if (!pushResult?.ok || !pushResult.data) {
             const msg = pushResult?.errors?.[0]?.message ?? "pushCiWorkflow failed";
@@ -357,6 +377,8 @@ export function WizardClient() {
         }
       }
 
+      if (!mounted.current) return;
+
       // Land the operator where the next action is:
       //   - manifest-later (#1172): the Manifest tab, to add/sync the
       //     astrolift.toml they deferred — takes precedence since a missing
@@ -372,6 +394,7 @@ export function WizardClient() {
             : `/apps/${result.data.slug}`
       );
     } catch (err) {
+      if (!mounted.current) return;
       const msg = err instanceof Error ? err.message : "Register failed";
       update("register", { status: "failed", error: msg });
       setSubmitError(msg);

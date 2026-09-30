@@ -31,8 +31,8 @@ Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 a
 | 5. Cluster status flashes 'No agent' cards while live state loads | Fixed | cluster-connectivity.test.tsx proves unknown/error states do not report No agent or mount provider query slots. |
 | 6. Activity tab copy reads 'BringClusterInto- Management' | Pre-existing | Earlier display copy fix separates bring-into-management workflow words. |
 | 7. Cluster settings allowlist reason omits the bootstrap history table | Pre-existing | frontend/bootstrap.md points at the exact allowlist; raw-table-allowlist.mjs now has an empty baseline. |
-| 8. IngressAuth spinners are inconsistent between Save & Apply and Apply | Remaining | IngressAuth still spins Save & Apply on busy and Apply only on reconciling. |
-| 9. Agent wizard steps are drifting copies of the apps wizard steps | Remaining | AgentReviewSubmitStep still declares local SideEffectStep/StepStatus; wizard copies remain separate. |
+| 8. IngressAuth spinners are inconsistent between Save & Apply and Apply | Fixed | Both actions spin for every busy phase, including a save before reconciliation. React and Chromium checks cover the pre-reconcile state. |
+| 9. Agent wizard steps are drifting copies of the apps wizard steps | Fixed | SourceRepositoryPicker and ReviewParts share selection/progress markup, status types and host mappings. App cluster/CI behavior and agent scan/ref behavior remain explicit. Project validity uses live active-org rows, and submission refreshes the actual destination before registering. |
 | 10. Manifest preview Retry never shows its success or failure toast | Pre-existing | useManifestPreviewStep.auto now takes no options; retry reports its result in the inline banner, without a toast contract. |
 | 11. ObservabilitySection doc comment names the wrong link target | Pre-existing | Earlier observability documentation-link correction is included in the audited base. |
 | 12. CI reference workflow hard-codes aws-region us-west-2 | External | Parent/forms agent owns canonical CI region and CiSetup work; requires their integration, not edits in this branch. |
@@ -54,8 +54,8 @@ Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 a
 | 28. Clearing an environment override has no busy state | Fixed | Environment/key-scoped pending admission survives the awaited refetch; the clear button disables and spins only its row. pending-operations.test.tsx covers duplicates, denial and refresh completion. |
 | 29. Command runner Run does nothing when no container is selected | Fixed | Operational React and Chromium checks require a nonempty containerName before Run. |
 | 30. Run command page highlights the Deployments tab | Fixed | Command runner fallback uses commands; canonical AppCommandsRedirect already resolves Logs & metrics Commands. |
-| 31. Observability duplicates pod selection and ignores ?container= | Remaining | use-app-observability.ts still has KNOWN_SIDECARS/pickDefaultContainer and does not consume container deep-link state. |
-| 32. Agent list item Pick omits fields the schema now provides | Remaining | Agent list facade omits run-spec baseline fields; AgentControl retains save-to-set fallback notices. Verify current reads before altering DTO. |
+| 31. Observability duplicates pod selection and ignores ?container= | Fixed | Logs and shell use the shared live-target helpers. Observability honors container URLs, resets local picks for new links, and falls back when a linked pod/container is gone; the actual stream variables are checked. |
+| 32. Agent list item Pick omits fields the schema now provides | Fixed | All fleet/workload list documents read the supported replica, loop-cap and scheduled-scaling fields. The editor seeds stored values before saving, preserves zero/null and keeps drafts during polling. Actual SDL validation covers all four documents. |
 | 33. Run status spellings drift between terminal set and tones | Fixed | Terminal aliases are shared and case normalized; actual Apollo polling stops both task/log reads, canceled timeline is skipped. |
 | 34. Agent and apps repo pickers link to different provider routes | Fixed | Agent and app repository pickers now link directly to /providers#source. The affected story and Chromium check assert the canonical destination. |
 | 35. Run content comment disagrees with StatusCell badge variants | Pre-existing | AgentRunScreen now uses StatusDot/runDot; the obsolete outline/secondary status-badge comment is absent. |
@@ -118,5 +118,26 @@ Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 a
 ## Dependencies and limits
 
 - Rotation grace (#21) needs a truthful configured value before confirmation; do not replace it with another guessed default. Agent environment-spec association (#41) needs the actual persisted relationship rather than a slug convention.
-- Copies of the wizard, the app Chrome context location, unused props/flags, and presentation-token cleanup remain listed explicitly; this bounded fix does not redesign those surfaces.
+- Wizard selection/progress copies are now shared. The app Chrome context location, unused props/flags, and presentation-token cleanup retain their own audit rows.
 - The only locale edit changes the existing identical English manifest-conflict description in all eight catalogs to describe an unsaved draft. Full translation work remains #2145.
+
+## Wizard and target follow-up
+
+Items 8, 9, 31 and 32 were validated with 383 affected Vitest checks, 257
+portable Storybook states and four Chromium checks, including both repository
+pickers at 480px. TypeScript and changed-file ESLint pass. The agent list query
+contract tests validate against the committed SDL; no server schema changes are
+required.
+
+The app and agent wizards keep their distinct registration contracts. Both wait
+for an active organization and require a live project returned for that org;
+a fresh destination read precedes registration, and the mutation still enforces
+access. A changed organization remounts the wizard so source, project and scan
+choices start again. An unresolved or no-longer-visible source connection cannot
+advance the repository step. Personal source connections remain eligible when
+the API returns them; OAuth app configuration rows remain excluded.
+
+Pod names and container names in URLs are temporary selections, so a replaced
+pod or missing container resolves to a live fallback. The shared helper does not
+add pod reads to inactive metrics panels. This follow-up does not infer an agent
+or environment-spec association; item 41 retains its separate status.

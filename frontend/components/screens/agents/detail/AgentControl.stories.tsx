@@ -26,8 +26,8 @@ export default meta;
 type Story = StoryObj<typeof AgentControlScreen>;
 
 /**
- * A Service with scheduled scaling, after a save has read the persisted spec
- * back (replicas + scaling crons seeded, no "save to set" notes).
+ * Stored Service replicas and scheduled scaling are visible on first load;
+ * saving reads back the persisted spec.
  */
 export const Full: Story = {
   args: { ...CONTROL_SAVES_SERVICE, agent: { ...CONTROL_AGENT, ...PERSISTED_SERVICE_SPEC } },
