@@ -2223,6 +2223,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- certificate discovery (#858) ------------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def validate_edge_custom_domain(
         self,
         cluster: str,
