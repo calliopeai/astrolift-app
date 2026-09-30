@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Managed AWS CI previews use the backend workflow and the private ECR registry
+  region. Unconfigured deploy-only workflows omit AWS authentication; invalid
+  owner/registry coordinates refuse before driver or repository writes. Reference
+  workflows retain the actual deployment branch (#2148).
+
 - Managed clusters offer an explicit full-preflight refresh. Cluster status waits
   for observed connectivity before reporting an absent agent, and metrics charts
   use distinct SVG gradients when multiple clusters render together (#2148).
