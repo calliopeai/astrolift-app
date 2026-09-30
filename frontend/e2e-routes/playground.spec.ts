@@ -4,6 +4,9 @@ test("real playground route sends an explicit prompt through the controlled Grap
   page,
   context,
 }, testInfo) => {
+  const api = `http://127.0.0.1:${process.env.ROUTE_API_PORT ?? 6172}`;
+  const reset = await context.request.post(`${api}/observations/reset`);
+  expect(reset.status()).toBe(204);
   page.setDefaultTimeout(15000);
   page.setDefaultNavigationTimeout(20000);
   await context.addCookies([
@@ -61,6 +64,17 @@ test("real playground route sends an explicit prompt through the controlled Grap
   await expect(
     page.getByRole("link", { name: "Controlled observed reply", exact: true })
   ).toBeVisible();
+  const observations = await context.request.get(`${api}/observations`);
+  expect(await observations.json()).toEqual({
+    errors: [],
+    mutations: 0,
+    promptInvocations: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        prompt: "Answer 2 plus 2 for the local browser regression.",
+      },
+    ],
+  });
   for (const path of ["/playground/topology", "/playground/observability"]) {
     const result = await context.request.get(path);
     if (result.status() !== 404) {

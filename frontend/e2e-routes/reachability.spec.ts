@@ -13,6 +13,10 @@ test("owner can reach every active page from rendered navigation", async ({
 }, testInfo) => {
   // The complete graph visits hundreds of URLs; each navigation stays bounded.
   test.setTimeout(900_000);
+  const reset = await context.request.post(
+    `http://127.0.0.1:${process.env.ROUTE_API_PORT ?? 6172}/observations/reset`
+  );
+  expect(reset.status()).toBe(204);
   await context.addCookies([
     { name: "sessionid", value: "owner", url: testInfo.project.use.baseURL! },
     { name: "backend_jwt", value: "route-fixture-token", url: testInfo.project.use.baseURL! },
@@ -150,7 +154,7 @@ test("owner can reach every active page from rendered navigation", async ({
   expect(
     await observations.json(),
     "Every fixture query must match SDL and the walk must be read-only"
-  ).toEqual({ errors: [], mutations: 0 });
+  ).toEqual({ errors: [], mutations: 0, promptInvocations: [] });
   expect(
     missing,
     "Active pages must have a path from actual nav, account menu, and in-page links"

@@ -156,6 +156,14 @@ createServer(async (req, res) => {
     res.end("ok");
     return;
   }
+  if (req.url === "/observations/reset" && req.method === "POST") {
+    observations.errors.length = 0;
+    observations.mutations = 0;
+    observations.promptInvocations.length = 0;
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
   if (req.url === "/observations") {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(observations));
