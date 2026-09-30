@@ -13,6 +13,10 @@
   Agents (#2178), with server search/filter/sort/counts and live owner/bearer
   visibility. Optional detail `orgId` validates the explicit tenant; the client
   separates identical slugs and refresh snapshots by organization.
+- Human-gate email delivery records a failed, error-severity event when no
+  recipient resolves, the mail transport refuses the message or returns zero
+  deliveries (#1823). The gate remains reviewable; accepted transport delivery
+  is distinct from inbox receipt. See [sender setup](docs/operators/human-gate-email.md).
 
 - Core legacy APIs enforce active account, platform-operator and bearer
   ceilings without removing GraphQL declarations (#2110). Permission analysis
