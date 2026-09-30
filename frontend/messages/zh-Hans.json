@@ -3950,6 +3950,17 @@
     "restricted": {
       "changing": "更改这些设置",
       "needsPermission": "“{verb}”操作需要 <code>{permission}</code> 权限。"
+    },
+    "feed": {
+      "loading": "加载中…",
+      "loadFailed": "无法加载{label}",
+      "empty": "暂无{label}",
+      "loadOlder": "加载更早的条目",
+      "retry": "重试",
+      "noOlderItems": "没有更早的条目",
+      "today": "今天",
+      "yesterday": "昨天",
+      "unknownDate": "日期未知"
     }
   },
   "agentSecrets": {

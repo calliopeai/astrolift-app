@@ -70,3 +70,17 @@ Existing behavior tests use `test/render-with-intl.tsx` to retain the real app
 locale context around their Apollo/permissions wrappers. Legacy screen-specific
 translation mocks delegate shared namespaces to next-intl, preserving their
 existing screen assertions while exercising actual shared ICU messages.
+
+## Shared feeds
+
+`Feed` uses the selected locale and configured timezone for both calendar-day
+grouping and headings (`shared.feed`, nine keys in every locale). Today and
+yesterday compare local calendar dates, including DST transitions, rather than
+subtracting 24 hours from an instant. Unknown dates remain explicitly unknown.
+The pure `groupItems`/`dayLabel` helpers keep their optional legacy presentation
+contract; rendered feeds always supply the real next-intl context. Labels, item
+content, caller grouping labels, explicit state/load-button overrides and server
+diagnostics remain caller data. Cursor admission and scroll retention are
+unchanged. Locale interaction tests cover all eight languages, a New York
+midnight/DST boundary, original failures and bounded load callbacks; French and
+Japanese stories exercise the shared frame.

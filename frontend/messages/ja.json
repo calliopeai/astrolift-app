@@ -3950,6 +3950,17 @@
     "restricted": {
       "changing": "これらの設定の変更",
       "needsPermission": "「{verb}」には <code>{permission}</code> 権限が必要です。"
+    },
+    "feed": {
+      "loading": "読み込み中…",
+      "loadFailed": "{label}を読み込めませんでした",
+      "empty": "まだ{label}がありません",
+      "loadOlder": "以前の項目を読み込む",
+      "retry": "再試行",
+      "noOlderItems": "以前の項目はありません",
+      "today": "今日",
+      "yesterday": "昨日",
+      "unknownDate": "日付不明"
     }
   },
   "agentSecrets": {

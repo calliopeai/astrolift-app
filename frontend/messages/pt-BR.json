@@ -3950,6 +3950,17 @@
     "restricted": {
       "changing": "Alterar estas configurações",
       "needsPermission": "Para a ação “{verb}”, é necessária a permissão <code>{permission}</code>."
+    },
+    "feed": {
+      "loading": "Carregando…",
+      "loadFailed": "Não foi possível carregar {label}",
+      "empty": "Ainda não há registros de {label}",
+      "loadOlder": "Carregar anteriores",
+      "retry": "Tentar novamente",
+      "noOlderItems": "Não há itens anteriores",
+      "today": "Hoje",
+      "yesterday": "Ontem",
+      "unknownDate": "Data desconhecida"
     }
   },
   "agentSecrets": {

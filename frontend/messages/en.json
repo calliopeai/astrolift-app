@@ -4030,6 +4030,17 @@
     "restricted": {
       "changing": "Changing these",
       "needsPermission": "{verb} needs the <code>{permission}</code> permission."
+    },
+    "feed": {
+      "loading": "Loading…",
+      "loadFailed": "Could not load {label}",
+      "empty": "No {label} yet",
+      "loadOlder": "Load older",
+      "retry": "Retry",
+      "noOlderItems": "No older items",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "unknownDate": "Unknown date"
     }
   },
   "agentSecrets": {

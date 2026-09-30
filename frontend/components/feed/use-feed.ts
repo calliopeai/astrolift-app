@@ -129,26 +129,54 @@ export interface FeedGroup<T> {
   items: T[];
 }
 
-function dayKey(at: string | number | Date): string {
+function dayKey(at: string | number | Date, timeZone?: string): string {
   const d = new Date(at);
   if (Number.isNaN(d.getTime())) return "unknown";
+  if (timeZone) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(d);
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)!.value;
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  }
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** "Today", "Yesterday", or the date, in the reader's locale and time zone. */
-export function dayLabel(at: string | number | Date, now: Date = new Date()): string {
+/** Rendered feeds supply their actual next-intl locale/time-zone context.
+ * Optional presentation keeps pure legacy helpers/source fixtures compatible. */
+export interface FeedDayPresentation {
+  timeZone?: string;
+  now?: Date;
+  today?: string;
+  yesterday?: string;
+  unknownDate?: string;
+  formatDate?: (date: Date) => string;
+}
+
+export function dayLabel(
+  at: string | number | Date,
+  now: Date = new Date(),
+  presentation: FeedDayPresentation = {}
+): string {
   const d = new Date(at);
-  if (Number.isNaN(d.getTime())) return "Unknown date";
-  const key = dayKey(d);
-  if (key === dayKey(now)) return "Today";
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (key === dayKey(yesterday)) return "Yesterday";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(d);
+  if (Number.isNaN(d.getTime())) return presentation.unknownDate ?? "Unknown date";
+  const key = dayKey(d, presentation.timeZone);
+  const today = dayKey(now, presentation.timeZone);
+  if (key === today) return presentation.today ?? "Today";
+  // Calendar arithmetic on the local day key, not a 24-hour subtraction
+  // from the instant: yesterday remains correct across DST transitions.
+  const yesterday = new Date(`${today}T00:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  if (key === yesterday.toISOString().slice(0, 10)) return presentation.yesterday ?? "Yesterday";
+  return (
+    presentation.formatDate?.(d) ??
+    new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(d)
+  );
 }
 
 /**
@@ -156,12 +184,17 @@ export function dayLabel(at: string | number | Date, now: Date = new Date()): st
  * key that comes back later (a run's round 2 after round 3) starts a new
  * group rather than pulling items out of order.
  */
-export function groupItems<T>(items: T[], groupBy: FeedGroupBy<T> | undefined): FeedGroup<T>[] {
+export function groupItems<T>(
+  items: T[],
+  groupBy: FeedGroupBy<T> | undefined,
+  presentation: FeedDayPresentation = {}
+): FeedGroup<T>[] {
   if (!groupBy) return [{ key: "all", label: null, items }];
   const groups: FeedGroup<T>[] = [];
   let lastKey: string | null = null;
   for (const item of items) {
-    const key = "day" in groupBy ? dayKey(groupBy.day(item)) : groupBy.key(item);
+    const key =
+      "day" in groupBy ? dayKey(groupBy.day(item), presentation.timeZone) : groupBy.key(item);
     const last = groups[groups.length - 1];
     if (last && lastKey === key) {
       last.items.push(item);
@@ -169,7 +202,9 @@ export function groupItems<T>(items: T[], groupBy: FeedGroupBy<T> | undefined): 
     }
     lastKey = key;
     const label =
-      "day" in groupBy ? dayLabel(groupBy.day(item)) : (groupBy.label?.(key, item) ?? key);
+      "day" in groupBy
+        ? dayLabel(groupBy.day(item), presentation.now, presentation)
+        : (groupBy.label?.(key, item) ?? key);
     groups.push({ key: `${key}#${groups.length}`, label, items: [item] });
   }
   return groups;

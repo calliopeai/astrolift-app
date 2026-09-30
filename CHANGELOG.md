@@ -8,6 +8,9 @@
 - Shared settings navigation, danger-zone notices, default save/cancel actions
   and read-only permission sentences use all eight locales. Actual permission
   IDs, caller labels, server diagnostics and draft/retry behavior are preserved
+- Shared feeds translate defaults and calendar-day headings in all eight
+  locales. Grouping follows the configured timezone across daylight-saving
+  transitions; paging callbacks, caller overrides and server errors stay intact
   (#2145).
 
 - The explicit agent environment-spec picker translates access boundaries,

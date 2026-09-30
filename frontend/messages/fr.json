@@ -3953,6 +3953,17 @@
     "restricted": {
       "changing": "Modifier ces paramètres",
       "needsPermission": "L’action « {verb} » nécessite l’autorisation <code>{permission}</code>."
+    },
+    "feed": {
+      "loading": "Chargement…",
+      "loadFailed": "Impossible de charger {label}",
+      "empty": "Aucun élément de {label} pour le moment",
+      "loadOlder": "Charger les éléments précédents",
+      "retry": "Réessayer",
+      "noOlderItems": "Aucun élément précédent",
+      "today": "Aujourd’hui",
+      "yesterday": "Hier",
+      "unknownDate": "Date inconnue"
     }
   },
   "agentSecrets": {
