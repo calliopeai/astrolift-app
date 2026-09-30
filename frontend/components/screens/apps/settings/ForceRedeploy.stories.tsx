@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 
 import { FORCE_REDEPLOY, FORCE_REDEPLOY_PREVIEW, LONG } from "./app-settings-members.fixtures";
 import { ForceRedeployView } from "./ForceRedeploy";
@@ -55,4 +57,18 @@ export const LongStrings: Story = {
     },
   },
   play: async ({ canvasElement }) => openDialog(canvasElement),
+};
+
+export const JapaneseWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <div style={{ width: 768 }}>
+        <ForceRedeployView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "強制再デプロイ" }));
+    await expect(await within(document.body).findByRole("alertdialog")).toBeInTheDocument();
+  },
 };

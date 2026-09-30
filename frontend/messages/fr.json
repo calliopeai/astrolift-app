@@ -1364,55 +1364,55 @@
         "toastNoResponse": "No response from backend."
       },
       "forceRedeploy": {
-        "title": "Force redeploy",
-        "description": "Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the rollout window opens.",
-        "button": "Force redeploy",
-        "buttonTooltip": "Recovery for stuck deploys. Cancels pending deploys, deletes K8s objects, and re-fires the deploy workflow. Brief downtime while pods recreate.",
-        "hint": "Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a rename or a deploy row that won't reconcile.",
-        "confirmTitle": "Force redeploy {slug}?",
-        "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
-        "typeToConfirm": "Type <slug></slug> to confirm:",
-        "cancel": "Cancel",
+        "title": "Forcer le redéploiement",
+        "description": "Récupération d’une application bloquée. Annule les déploiements en cours, supprime les objets Kubernetes par charge de travail et relance le workflow de déploiement CI. Une brève interruption se produit au démarrage du déploiement.",
+        "button": "Forcer le redéploiement",
+        "buttonTooltip": "Récupération des déploiements bloqués. Annule les déploiements en attente, supprime les objets K8s et relance le workflow de déploiement. Une brève interruption se produit pendant la recréation des pods.",
+        "hint": "À utiliser uniquement si un redéploiement normal ne débloque pas l’application, par exemple pour des objets K8s orphelins après un renommage ou un déploiement impossible à réconcilier.",
+        "confirmTitle": "Forcer le redéploiement de {slug} ?",
+        "confirmDescription": "Cette action annule les déploiements en attente, supprime les objets Kubernetes actifs de l’application (Deployments, Services, Ingresses, CronJobs) et relance le workflow CI. Le trafic est brièvement interrompu au démarrage. Les environnements nécessitant une approbation suivent toujours ce processus.",
+        "typeToConfirm": "Saisissez <slug></slug> pour confirmer :",
+        "cancel": "Annuler",
         "preview": {
-          "loading": "Loading in-flight deployments…",
-          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
-          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "loading": "Chargement des déploiements en cours…",
+          "header": "{count, plural, =0 {Aucun déploiement en cours à annuler.} one {1 déploiement en cours sera annulé :} other {# déploiements en cours seront annulés :}}",
+          "noInflight": "Aucun déploiement en cours ne sera interrompu par la récupération.",
           "triggeredBy": "{actor} · {when}",
-          "ciRun": "CI run"
+          "ciRun": "Exécution CI"
         }
       },
       "dangerZone": {
-        "title": "Danger zone",
-        "description": "Hard deregister this app and tear down every attached resource — workloads, environments, secrets, domains, managed services. Irreversible.",
-        "button": "Deregister app",
-        "stillLive": "Last attempt left {count} resource class(es) live:",
-        "retry": "Retry deregister",
-        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
-        "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
-        "typeToConfirm": "To confirm, type the app's name:",
-        "deregistering": "Deregistering…",
-        "cancel": "Cancel",
-        "toastNoResponse": "Deregister failed: no response from backend.",
-        "toastNoPayload": "Deregister returned no payload.",
-        "toastFailed": "Deregister failed.",
-        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
-        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "title": "Zone de danger",
+        "description": "Désenregistrez cette application et détruisez toutes les ressources associées : charges de travail, environnements, secrets, domaines et services gérés. Cette action est irréversible.",
+        "button": "Désenregistrer l’application",
+        "stillLive": "La dernière tentative a laissé {count} catégories de ressources actives :",
+        "retry": "Réessayer le désenregistrement",
+        "softHint": "Pour une suppression récupérable, utilisez Supprimer l’application dans son menu ⋯ (suppression réversible, avec un délai de récupération de 30 jours).",
+        "confirmTitle": "Désenregistrer {name} ?",
+        "confirmIntro": "Cette action détruit les ressources de cette application répertoriées ci-dessous. Elle est irréversible : vérifiez les ressources concernées avant de confirmer.",
+        "typeToConfirm": "Pour confirmer, saisissez le nom de l’application :",
+        "deregistering": "Désenregistrement…",
+        "cancel": "Annuler",
+        "toastNoResponse": "Échec du désenregistrement : aucune réponse du serveur.",
+        "toastNoPayload": "Le désenregistrement n’a renvoyé aucun résultat.",
+        "toastFailed": "Échec du désenregistrement.",
+        "toastResumePending": "Reprise en attente : {count} catégories de ressources sont encore actives.",
+        "toastKickoff": "Désenregistrement en cours : workflow {workflowId}. Vous avez 5 minutes pour l’annuler depuis la page de détail de l’application.",
         "preview": {
-          "loading": "Loading blast-radius preview…",
-          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
-          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
-          "sourceWebhookLabel": "Source-host webhook",
-          "registryRepoLabel": "Image registry repo",
+          "loading": "Chargement de l’aperçu des ressources concernées…",
+          "header": "{count, plural, =0 {Aucune ressource ne sera détruite.} one {1 ressource sera détruite :} other {# ressources seront détruites :}}",
+          "noResources": "Aucune ressource associée : seul l’enregistrement de la plateforme sera marqué comme supprimé.",
+          "sourceWebhookLabel": "Webhook de l’hébergeur du code",
+          "registryRepoLabel": "Dépôt d’images",
           "groups": {
-            "k8s": "Kubernetes objects",
-            "managedServices": "Managed services",
-            "secrets": "Cluster secrets",
-            "deployTokens": "Deploy tokens",
-            "identity": "Workload identity roles",
-            "network": "Network / integrations"
+            "k8s": "Objets Kubernetes",
+            "managedServices": "Services gérés",
+            "secrets": "Secrets du cluster",
+            "deployTokens": "Jetons de déploiement",
+            "identity": "Rôles d’identité des charges de travail",
+            "network": "Réseau / intégrations"
           },
-          "unavailable": "L’aperçu des ressources est indisponible."
+          "unavailable": "Aperçu des ressources indisponible."
         }
       },
       "runJob": {
@@ -1554,12 +1554,12 @@
     },
     "dangerZone": {
       "pendingBanner": {
-        "title": "Teardown pending",
-        "body": "Cancel within {countdown} or the destructive workflow starts.",
-        "cancel": "Cancel teardown",
-        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
-        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
-        "toastError": "Cancel failed."
+        "title": "Destruction en attente",
+        "body": "Annulez dans les {countdown} avant le début du workflow de destruction irréversible.",
+        "cancel": "Annuler la destruction",
+        "toastCancelled": "Destruction annulée pendant le délai de grâce.",
+        "toastNotDelivered": "Impossible de joindre le workflow : les étapes de destruction ont peut-être commencé. Consultez l’onglet Workflows.",
+        "toastError": "Échec de l’annulation."
       }
     },
     "wizard": {

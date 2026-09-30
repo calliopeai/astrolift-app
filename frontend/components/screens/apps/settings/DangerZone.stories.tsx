@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 
 import { DANGER_ZONE, DEREGISTER_PREVIEW, LONG } from "./app-settings-members.fixtures";
 import { DangerZoneView } from "./DangerZone";
@@ -75,4 +77,19 @@ export const Width768: Story = {
       <DangerZoneView {...args} />
     </div>
   ),
+};
+
+export const FrenchWidth768: Story = {
+  args: { preview: DEREGISTER_PREVIEW },
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <div style={{ width: 768 }}>
+        <DangerZoneView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /Désenregistrer/ }));
+    await expect(await within(document.body).findByRole("alertdialog")).toBeInTheDocument();
+  },
 };

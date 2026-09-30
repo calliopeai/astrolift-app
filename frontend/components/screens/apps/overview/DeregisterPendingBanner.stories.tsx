@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import es from "@/messages/es.json";
 
 import { DEREGISTER } from "./app-overview-banners.fixtures";
 import { DeregisterPendingBannerView } from "./DeregisterPendingBanner";
@@ -39,4 +41,14 @@ export const ErrorState: Story = {
 /** The copy is fixed; the longest countdown is the full five minutes. */
 export const LongStrings: Story = {
   render: () => <DeregisterPendingBannerView {...DEREGISTER} msRemaining={300_000} />,
+};
+
+export const SpanishWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={es}>
+      <div style={{ width: 768 }}>
+        <DeregisterPendingBannerView {...DEREGISTER} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

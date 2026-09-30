@@ -1365,52 +1365,52 @@
       },
       "forceRedeploy": {
         "title": "强制重新部署",
-        "description": "Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the rollout window opens.",
+        "description": "恢复卡住的应用。中止进行中的部署，删除每个工作负载的 Kubernetes 对象，然后重新触发 CI 部署工作流。部署启动时会短暂中断服务。",
         "button": "强制重新部署",
-        "hint": "Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a rename or a deploy row that won't reconcile.",
-        "confirmTitle": "Force redeploy {slug}?",
-        "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
-        "typeToConfirm": "Type <slug></slug> to confirm:",
+        "hint": "仅在普通重新部署无法恢复应用时使用，例如重命名后遗留了 K8s 对象，或部署记录无法同步状态。",
+        "confirmTitle": "强制重新部署 {slug}？",
+        "confirmDescription": "这将中止等待中的部署，删除应用正在运行的 Kubernetes 对象（Deployments、Services、Ingresses、CronJobs），然后重新触发 CI 工作流。启动时流量会短暂中断。需要批准的环境仍然执行批准流程。",
+        "typeToConfirm": "请输入 <slug></slug> 以确认：",
         "cancel": "取消",
         "preview": {
-          "loading": "Loading in-flight deployments…",
-          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
-          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "loading": "正在加载进行中的部署…",
+          "header": "{count, plural, =0 {没有需要中止的进行中部署。} one {将中止 1 次进行中的部署：} other {将中止 # 次进行中的部署：}}",
+          "noInflight": "没有进行中的部署，因此恢复操作不会中止任何部署。",
           "triggeredBy": "{actor} · {when}",
-          "ciRun": "CI run"
+          "ciRun": "CI 运行"
         },
-        "buttonTooltip": "Recovery for stuck deploys. Cancels pending deploys, deletes K8s objects, and re-fires the deploy workflow. Brief downtime while pods recreate."
+        "buttonTooltip": "恢复卡住的部署。中止等待中的部署，删除 K8s 对象，然后重新触发部署工作流。重新创建 Pod 时会短暂中断服务。"
       },
       "dangerZone": {
         "title": "危险区域",
-        "description": "Hard deregister this app and tear down every attached resource — workloads, environments, secrets, domains, managed services. Irreversible.",
+        "description": "注销此应用并删除所有关联资源：工作负载、环境、密钥、域名和托管服务。此操作不可撤销。",
         "button": "注销应用",
-        "stillLive": "Last attempt left {count} resource class(es) live:",
+        "stillLive": "上次尝试后仍有 {count} 类资源处于运行状态：",
         "retry": "重试注销",
-        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
-        "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
-        "typeToConfirm": "To confirm, type the app's name:",
-        "deregistering": "注销中…",
+        "softHint": "如需可恢复的删除，请在应用的 ⋯ 菜单中使用“删除应用”（软删除，恢复期限为 30 天）。",
+        "confirmTitle": "注销 {name}？",
+        "confirmIntro": "这将删除下面列出的此应用资源。此操作不可撤销，请在确认前检查影响范围。",
+        "typeToConfirm": "请输入应用名称以确认：",
+        "deregistering": "正在注销…",
         "cancel": "取消",
-        "toastNoResponse": "Deregister failed: no response from backend.",
-        "toastNoPayload": "Deregister returned no payload.",
-        "toastFailed": "Deregister failed.",
-        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
-        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "toastNoResponse": "注销失败：未收到服务器响应。",
+        "toastNoPayload": "注销未返回结果。",
+        "toastFailed": "注销失败。",
+        "toastResumePending": "等待恢复：仍有 {count} 类资源处于运行状态。",
+        "toastKickoff": "正在注销：工作流 {workflowId}。您可以在 5 分钟内从应用详情页取消。",
         "preview": {
-          "loading": "Loading blast-radius preview…",
-          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
-          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
-          "sourceWebhookLabel": "Source-host webhook",
-          "registryRepoLabel": "Image registry repo",
+          "loading": "正在加载受影响的资源预览…",
+          "header": "{count, plural, =0 {不会删除任何资源。} one {将删除 1 项资源：} other {将删除 # 项资源：}}",
+          "noResources": "没有关联资源；仅对平台记录执行软删除。",
+          "sourceWebhookLabel": "代码托管平台 Webhook",
+          "registryRepoLabel": "镜像仓库",
           "groups": {
-            "k8s": "Kubernetes objects",
-            "managedServices": "Managed services",
-            "secrets": "Cluster secrets",
-            "deployTokens": "Deploy tokens",
-            "identity": "Workload identity roles",
-            "network": "Network / integrations"
+            "k8s": "Kubernetes 对象",
+            "managedServices": "托管服务",
+            "secrets": "集群密钥",
+            "deployTokens": "部署令牌",
+            "identity": "工作负载身份角色",
+            "network": "网络 / 集成"
           },
           "unavailable": "资源预览不可用。"
         }
@@ -1554,12 +1554,12 @@
     },
     "dangerZone": {
       "pendingBanner": {
-        "title": "Teardown pending",
-        "body": "Cancel within {countdown} or the destructive workflow starts.",
-        "cancel": "Cancel teardown",
-        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
-        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
-        "toastError": "Cancel failed."
+        "title": "等待删除资源",
+        "body": "请在 {countdown} 内取消，否则将开始不可撤销的删除工作流。",
+        "cancel": "取消删除资源",
+        "toastCancelled": "已在宽限期内取消删除资源。",
+        "toastNotDelivered": "无法连接到工作流，删除步骤可能已经开始。请检查“工作流”选项卡。",
+        "toastError": "取消失败。"
       }
     },
     "wizard": {

@@ -1364,55 +1364,55 @@
         "toastNoResponse": "No response from backend."
       },
       "forceRedeploy": {
-        "title": "Force redeploy",
-        "description": "Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the rollout window opens.",
-        "button": "Force redeploy",
-        "buttonTooltip": "Recovery for stuck deploys. Cancels pending deploys, deletes K8s objects, and re-fires the deploy workflow. Brief downtime while pods recreate.",
-        "hint": "Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a rename or a deploy row that won't reconcile.",
-        "confirmTitle": "Force redeploy {slug}?",
-        "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
-        "typeToConfirm": "Type <slug></slug> to confirm:",
-        "cancel": "Cancel",
+        "title": "Forçar reimplantação",
+        "description": "Recuperação de um aplicativo travado. Cancela as implantações em andamento, exclui os objetos Kubernetes por carga de trabalho e reinicia o fluxo de implantação de CI. Haverá uma breve interrupção quando a implantação começar.",
+        "button": "Forçar reimplantação",
+        "buttonTooltip": "Recuperação de implantações travadas. Cancela as pendentes, exclui os objetos K8s e reinicia o fluxo de implantação. Haverá uma breve interrupção enquanto os pods são recriados.",
+        "hint": "Use somente quando uma reimplantação normal não recuperar o aplicativo, por exemplo, se houver objetos K8s órfãos após renomear ou um registro de implantação cujo estado não pode ser reconciliado.",
+        "confirmTitle": "Forçar a reimplantação de {slug}?",
+        "confirmDescription": "Isso cancela as implantações pendentes, exclui os objetos Kubernetes ativos do aplicativo (Deployments, Services, Ingresses, CronJobs) e reinicia o fluxo de CI. O tráfego é interrompido brevemente no início. Ambientes que exigem aprovação continuam seguindo o processo de aprovação.",
+        "typeToConfirm": "Digite <slug></slug> para confirmar:",
+        "cancel": "Cancelar",
         "preview": {
-          "loading": "Loading in-flight deployments…",
-          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
-          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "loading": "Carregando implantações em andamento…",
+          "header": "{count, plural, =0 {Não há implantações em andamento para cancelar.} one {1 implantação em andamento será cancelada:} other {# implantações em andamento serão canceladas:}}",
+          "noInflight": "Não há implantações em andamento que possam ser interrompidas pela recuperação.",
           "triggeredBy": "{actor} · {when}",
-          "ciRun": "CI run"
+          "ciRun": "Execução de CI"
         }
       },
       "dangerZone": {
-        "title": "Danger zone",
-        "description": "Hard deregister this app and tear down every attached resource — workloads, environments, secrets, domains, managed services. Irreversible.",
-        "button": "Deregister app",
-        "stillLive": "Last attempt left {count} resource class(es) live:",
-        "retry": "Retry deregister",
-        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
-        "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
-        "typeToConfirm": "To confirm, type the app's name:",
-        "deregistering": "Deregistering…",
-        "cancel": "Cancel",
-        "toastNoResponse": "Deregister failed: no response from backend.",
-        "toastNoPayload": "Deregister returned no payload.",
-        "toastFailed": "Deregister failed.",
-        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
-        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "title": "Zona de perigo",
+        "description": "Cancele o registro deste aplicativo e exclua todos os recursos associados: cargas de trabalho, ambientes, secrets, domínios e serviços gerenciados. A ação é irreversível.",
+        "button": "Cancelar registro do aplicativo",
+        "stillLive": "A última tentativa deixou {count} classes de recursos ativas:",
+        "retry": "Tentar cancelar o registro novamente",
+        "softHint": "Para uma exclusão recuperável, use Excluir aplicativo no menu ⋯ do aplicativo (exclusão reversível, com prazo de recuperação de 30 dias).",
+        "confirmTitle": "Cancelar o registro de {name}?",
+        "confirmIntro": "Isso destrói os recursos deste aplicativo listados abaixo. A ação é irreversível: revise os recursos afetados antes de confirmar.",
+        "typeToConfirm": "Para confirmar, digite o nome do aplicativo:",
+        "deregistering": "Cancelando registro…",
+        "cancel": "Cancelar",
+        "toastNoResponse": "Falha ao cancelar o registro: nenhuma resposta do servidor.",
+        "toastNoPayload": "O cancelamento do registro não retornou um resultado.",
+        "toastFailed": "Falha ao cancelar o registro.",
+        "toastResumePending": "Retomada pendente: {count} classes de recursos ainda estão ativas.",
+        "toastKickoff": "Cancelando registro: fluxo de trabalho {workflowId}. Você tem 5 minutos para cancelar na página de detalhes do aplicativo.",
         "preview": {
-          "loading": "Loading blast-radius preview…",
-          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
-          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
-          "sourceWebhookLabel": "Source-host webhook",
-          "registryRepoLabel": "Image registry repo",
+          "loading": "Carregando a prévia dos recursos afetados…",
+          "header": "{count, plural, =0 {Nenhum recurso será destruído.} one {1 recurso será destruído:} other {# recursos serão destruídos:}}",
+          "noResources": "Não há recursos associados: apenas o registro da plataforma será marcado como excluído.",
+          "sourceWebhookLabel": "Webhook do provedor de código",
+          "registryRepoLabel": "Repositório de imagens",
           "groups": {
-            "k8s": "Kubernetes objects",
-            "managedServices": "Managed services",
-            "secrets": "Cluster secrets",
-            "deployTokens": "Deploy tokens",
-            "identity": "Workload identity roles",
-            "network": "Network / integrations"
+            "k8s": "Objetos Kubernetes",
+            "managedServices": "Serviços gerenciados",
+            "secrets": "Secrets do cluster",
+            "deployTokens": "Tokens de implantação",
+            "identity": "Funções de identidade das cargas de trabalho",
+            "network": "Rede / integrações"
           },
-          "unavailable": "A prévia dos recursos não está disponível."
+          "unavailable": "Prévia dos recursos indisponível."
         }
       },
       "runJob": {
@@ -1554,12 +1554,12 @@
     },
     "dangerZone": {
       "pendingBanner": {
-        "title": "Teardown pending",
-        "body": "Cancel within {countdown} or the destructive workflow starts.",
-        "cancel": "Cancel teardown",
-        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
-        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
-        "toastError": "Cancel failed."
+        "title": "Exclusão de recursos pendente",
+        "body": "Cancele em {countdown} antes que o fluxo de exclusão irreversível comece.",
+        "cancel": "Cancelar exclusão de recursos",
+        "toastCancelled": "Exclusão de recursos cancelada dentro do prazo de tolerância.",
+        "toastNotDelivered": "Não foi possível contactar o fluxo; as etapas de exclusão podem já ter começado. Verifique a aba Fluxos de trabalho.",
+        "toastError": "Falha ao cancelar."
       }
     },
     "wizard": {

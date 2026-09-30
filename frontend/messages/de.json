@@ -1364,55 +1364,55 @@
         "toastNoResponse": "No response from backend."
       },
       "forceRedeploy": {
-        "title": "Force redeploy",
-        "description": "Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the rollout window opens.",
-        "button": "Force redeploy",
-        "buttonTooltip": "Recovery for stuck deploys. Cancels pending deploys, deletes K8s objects, and re-fires the deploy workflow. Brief downtime while pods recreate.",
-        "hint": "Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a rename or a deploy row that won't reconcile.",
-        "confirmTitle": "Force redeploy {slug}?",
-        "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
-        "typeToConfirm": "Type <slug></slug> to confirm:",
-        "cancel": "Cancel",
+        "title": "Erneute Bereitstellung erzwingen",
+        "description": "Wiederherstellung einer blockierten App. Bricht laufende Bereitstellungen ab, löscht die Kubernetes-Objekte je Workload und startet den CI-Bereitstellungsworkflow erneut. Beim Start der Bereitstellung kommt es zu einer kurzen Ausfallzeit.",
+        "button": "Erneute Bereitstellung erzwingen",
+        "buttonTooltip": "Wiederherstellung blockierter Bereitstellungen. Bricht ausstehende Bereitstellungen ab, löscht K8s-Objekte und startet den Bereitstellungsworkflow erneut. Während Pods neu erstellt werden, kommt es zu einer kurzen Ausfallzeit.",
+        "hint": "Nur verwenden, wenn eine normale erneute Bereitstellung die App nicht wiederherstellt, etwa bei verwaisten K8s-Objekten nach einer Umbenennung oder einem nicht abgleichbaren Bereitstellungsdatensatz.",
+        "confirmTitle": "Erneute Bereitstellung von {slug} erzwingen?",
+        "confirmDescription": "Dies bricht ausstehende Bereitstellungen ab, löscht die laufenden Kubernetes-Objekte der App (Deployments, Services, Ingresses, CronJobs) und startet den CI-Workflow erneut. Der Datenverkehr wird beim Start kurz unterbrochen. Umgebungen mit erforderlichen Genehmigungen durchlaufen weiterhin den Genehmigungsprozess.",
+        "typeToConfirm": "Geben Sie <slug></slug> zur Bestätigung ein:",
+        "cancel": "Abbrechen",
         "preview": {
-          "loading": "Loading in-flight deployments…",
-          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
-          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "loading": "Laufende Bereitstellungen werden geladen…",
+          "header": "{count, plural, =0 {Keine laufenden Bereitstellungen abzubrechen.} one {1 laufende Bereitstellung wird abgebrochen:} other {# laufende Bereitstellungen werden abgebrochen:}}",
+          "noInflight": "Es sind keine laufenden Bereitstellungen vorhanden, die durch die Wiederherstellung unterbrochen werden könnten.",
           "triggeredBy": "{actor} · {when}",
-          "ciRun": "CI run"
+          "ciRun": "CI-Lauf"
         }
       },
       "dangerZone": {
-        "title": "Danger zone",
-        "description": "Hard deregister this app and tear down every attached resource — workloads, environments, secrets, domains, managed services. Irreversible.",
-        "button": "Deregister app",
-        "stillLive": "Last attempt left {count} resource class(es) live:",
-        "retry": "Retry deregister",
-        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
-        "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
-        "typeToConfirm": "To confirm, type the app's name:",
-        "deregistering": "Deregistering…",
-        "cancel": "Cancel",
-        "toastNoResponse": "Deregister failed: no response from backend.",
-        "toastNoPayload": "Deregister returned no payload.",
-        "toastFailed": "Deregister failed.",
-        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
-        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "title": "Gefahrenbereich",
+        "description": "Deregistrieren Sie diese App und löschen Sie alle zugehörigen Ressourcen: Workloads, Umgebungen, Secrets, Domains und verwaltete Dienste. Dieser Vorgang ist nicht rückgängig zu machen.",
+        "button": "App deregistrieren",
+        "stillLive": "Nach dem letzten Versuch sind noch {count} Ressourcenklassen aktiv:",
+        "retry": "Deregistrierung erneut versuchen",
+        "softHint": "Für eine wiederherstellbare Löschung verwenden Sie App löschen im ⋯-Menü der App (vorläufige Löschung mit 30 Tagen Wiederherstellungsfrist).",
+        "confirmTitle": "{name} deregistrieren?",
+        "confirmIntro": "Dies löscht die unten aufgeführten Ressourcen dieser App. Der Vorgang ist nicht rückgängig zu machen. Prüfen Sie die betroffenen Ressourcen, bevor Sie bestätigen.",
+        "typeToConfirm": "Geben Sie zur Bestätigung den Namen der App ein:",
+        "deregistering": "Wird deregistriert…",
+        "cancel": "Abbrechen",
+        "toastNoResponse": "Deregistrierung fehlgeschlagen: Keine Antwort vom Server.",
+        "toastNoPayload": "Die Deregistrierung hat kein Ergebnis zurückgegeben.",
+        "toastFailed": "Deregistrierung fehlgeschlagen.",
+        "toastResumePending": "Fortsetzung ausstehend: {count} Ressourcenklassen sind noch aktiv.",
+        "toastKickoff": "Deregistrierung läuft: Workflow {workflowId}. Sie haben 5 Minuten, um ihn auf der Detailseite der App abzubrechen.",
         "preview": {
-          "loading": "Loading blast-radius preview…",
-          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
-          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
-          "sourceWebhookLabel": "Source-host webhook",
-          "registryRepoLabel": "Image registry repo",
+          "loading": "Vorschau der betroffenen Ressourcen wird geladen…",
+          "header": "{count, plural, =0 {Es werden keine Ressourcen gelöscht.} one {1 Ressource wird gelöscht:} other {# Ressourcen werden gelöscht:}}",
+          "noResources": "Keine Ressourcen zugeordnet: Nur der Plattformdatensatz wird als gelöscht markiert.",
+          "sourceWebhookLabel": "Webhook des Code-Anbieters",
+          "registryRepoLabel": "Image-Registry-Repository",
           "groups": {
-            "k8s": "Kubernetes objects",
-            "managedServices": "Managed services",
-            "secrets": "Cluster secrets",
-            "deployTokens": "Deploy tokens",
-            "identity": "Workload identity roles",
-            "network": "Network / integrations"
+            "k8s": "Kubernetes-Objekte",
+            "managedServices": "Verwaltete Dienste",
+            "secrets": "Cluster-Secrets",
+            "deployTokens": "Bereitstellungs-Tokens",
+            "identity": "Workload-Identitätsrollen",
+            "network": "Netzwerk / Integrationen"
           },
-          "unavailable": "Die Ressourcenvorschau ist nicht verfügbar."
+          "unavailable": "Ressourcenvorschau nicht verfügbar."
         }
       },
       "runJob": {
@@ -1554,12 +1554,12 @@
     },
     "dangerZone": {
       "pendingBanner": {
-        "title": "Teardown pending",
-        "body": "Cancel within {countdown} or the destructive workflow starts.",
-        "cancel": "Cancel teardown",
-        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
-        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
-        "toastError": "Cancel failed."
+        "title": "Ressourcenabbau ausstehend",
+        "body": "Brechen Sie innerhalb von {countdown} ab, bevor der Workflow zur endgültigen Löschung startet.",
+        "cancel": "Ressourcenabbau abbrechen",
+        "toastCancelled": "Ressourcenabbau innerhalb der Schonfrist abgebrochen.",
+        "toastNotDelivered": "Der Workflow ist nicht erreichbar. Die endgültige Löschung könnte bereits begonnen haben. Prüfen Sie den Tab Workflows.",
+        "toastError": "Abbruch fehlgeschlagen."
       }
     },
     "wizard": {

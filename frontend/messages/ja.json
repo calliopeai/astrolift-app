@@ -1365,54 +1365,54 @@
       },
       "forceRedeploy": {
         "title": "強制再デプロイ",
-        "description": "Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the rollout window opens.",
+        "description": "停止したアプリを復旧します。進行中のデプロイを中止し、ワークロードごとの Kubernetes オブジェクトを削除して、CI デプロイワークフローを再実行します。デプロイの開始時に短い停止時間が発生します。",
         "button": "強制再デプロイ",
-        "hint": "Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a rename or a deploy row that won't reconcile.",
-        "confirmTitle": "Force redeploy {slug}?",
-        "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
-        "typeToConfirm": "Type <slug></slug> to confirm:",
+        "hint": "通常の再デプロイでアプリを復旧できない場合にのみ使用してください。例：名前変更後に残った K8s オブジェクトや、状態を同期できないデプロイレコード。",
+        "confirmTitle": "{slug} を強制再デプロイしますか？",
+        "confirmDescription": "待機中のデプロイを中止し、アプリの稼働中の Kubernetes オブジェクト（Deployments、Services、Ingresses、CronJobs）を削除して CI ワークフローを再実行します。開始時にトラフィックが短時間停止します。承認が必要な環境では、引き続き承認フローが適用されます。",
+        "typeToConfirm": "確認するには <slug></slug> を入力してください：",
         "cancel": "キャンセル",
         "preview": {
-          "loading": "Loading in-flight deployments…",
-          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
-          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "loading": "進行中のデプロイを読み込み中…",
+          "header": "{count, plural, =0 {中止する進行中のデプロイはありません。} one {進行中のデプロイを 1 件中止します：} other {進行中のデプロイを # 件中止します：}}",
+          "noInflight": "進行中のデプロイはなく、復旧処理で中止されるものはありません。",
           "triggeredBy": "{actor} · {when}",
-          "ciRun": "CI run"
+          "ciRun": "CI 実行"
         },
-        "buttonTooltip": "Recovery for stuck deploys. Cancels pending deploys, deletes K8s objects, and re-fires the deploy workflow. Brief downtime while pods recreate."
+        "buttonTooltip": "停止したデプロイを復旧します。待機中のデプロイを中止し、K8s オブジェクトを削除して、デプロイワークフローを再実行します。Pod の再作成中に短い停止時間が発生します。"
       },
       "dangerZone": {
-        "title": "危険ゾーン",
-        "description": "Hard deregister this app and tear down every attached resource — workloads, environments, secrets, domains, managed services. Irreversible.",
-        "button": "アプリの登録解除",
-        "stillLive": "Last attempt left {count} resource class(es) live:",
+        "title": "危険な操作",
+        "description": "このアプリの登録を解除し、関連するすべてのリソース（ワークロード、環境、シークレット、ドメイン、マネージドサービス）を削除します。元に戻すことはできません。",
+        "button": "アプリの登録を解除",
+        "stillLive": "前回の試行後も {count} 種類のリソースが稼働しています：",
         "retry": "登録解除を再試行",
-        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
-        "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
-        "typeToConfirm": "To confirm, type the app's name:",
+        "softHint": "復元可能な削除には、アプリの ⋯ メニューから「アプリを削除」を使用してください（論理削除、復元可能期間は 30 日）。",
+        "confirmTitle": "{name} の登録を解除しますか？",
+        "confirmIntro": "以下に示すこのアプリのリソースを削除します。この操作は元に戻せません。確認する前に影響範囲を確認してください。",
+        "typeToConfirm": "確認するにはアプリ名を入力してください：",
         "deregistering": "登録解除中…",
         "cancel": "キャンセル",
-        "toastNoResponse": "Deregister failed: no response from backend.",
-        "toastNoPayload": "Deregister returned no payload.",
-        "toastFailed": "Deregister failed.",
-        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
-        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "toastNoResponse": "登録解除に失敗しました：サーバーから応答がありません。",
+        "toastNoPayload": "登録解除の結果が返されませんでした。",
+        "toastFailed": "登録解除に失敗しました。",
+        "toastResumePending": "再開待ち：{count} 種類のリソースがまだ稼働しています。",
+        "toastKickoff": "登録解除中：ワークフロー {workflowId}。アプリの詳細ページから 5 分以内にキャンセルできます。",
         "preview": {
-          "loading": "Loading blast-radius preview…",
-          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
-          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
-          "sourceWebhookLabel": "Source-host webhook",
-          "registryRepoLabel": "Image registry repo",
+          "loading": "削除対象のリソースを読み込み中…",
+          "header": "{count, plural, =0 {削除されるリソースはありません。} one {1 件のリソースを削除します：} other {# 件のリソースを削除します：}}",
+          "noResources": "関連リソースはありません。プラットフォームのレコードを論理削除するだけです。",
+          "sourceWebhookLabel": "ソースコードホストの Webhook",
+          "registryRepoLabel": "イメージレジストリのリポジトリ",
           "groups": {
-            "k8s": "Kubernetes objects",
-            "managedServices": "Managed services",
-            "secrets": "Cluster secrets",
-            "deployTokens": "Deploy tokens",
-            "identity": "Workload identity roles",
-            "network": "Network / integrations"
+            "k8s": "Kubernetes オブジェクト",
+            "managedServices": "マネージドサービス",
+            "secrets": "クラスターのシークレット",
+            "deployTokens": "デプロイトークン",
+            "identity": "ワークロード ID ロール",
+            "network": "ネットワーク / 連携"
           },
-          "unavailable": "リソースのプレビューを利用できません。"
+          "unavailable": "リソースのプレビューを取得できません。"
         }
       },
       "runJob": {
@@ -1554,12 +1554,12 @@
     },
     "dangerZone": {
       "pendingBanner": {
-        "title": "Teardown pending",
-        "body": "Cancel within {countdown} or the destructive workflow starts.",
-        "cancel": "Cancel teardown",
-        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
-        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
-        "toastError": "Cancel failed."
+        "title": "リソース削除待ち",
+        "body": "元に戻せない削除ワークフローが始まる前に、{countdown} 以内にキャンセルしてください。",
+        "cancel": "リソース削除をキャンセル",
+        "toastCancelled": "猶予期間内にリソース削除をキャンセルしました。",
+        "toastNotDelivered": "ワークフローに接続できませんでした。削除処理がすでに始まっている可能性があります。「ワークフロー」タブを確認してください。",
+        "toastError": "キャンセルに失敗しました。"
       }
     },
     "wizard": {

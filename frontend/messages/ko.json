@@ -1365,52 +1365,52 @@
       },
       "forceRedeploy": {
         "title": "강제 재배포",
-        "description": "Recovery for a wedged app. Cancels in-flight deploys, deletes the per-workload Kubernetes objects, and re-fires the CI deploy workflow. Brief downtime while the rollout window opens.",
+        "description": "멈춘 앱을 복구합니다. 진행 중인 배포를 중단하고 워크로드별 Kubernetes 객체를 삭제한 후 CI 배포 워크플로를 다시 실행합니다. 배포가 시작될 때 잠시 서비스가 중단됩니다.",
         "button": "강제 재배포",
-        "hint": "Use only when a normal redeploy can't unstick the app — e.g. orphaned k8s objects after a rename or a deploy row that won't reconcile.",
-        "confirmTitle": "Force redeploy {slug}?",
-        "confirmDescription": "This cancels any pending deploys, deletes the app's running Kubernetes objects (Deployments, Services, Ingresses, CronJobs), and re-fires the CI workflow. Live traffic drops briefly while the rollout window opens. Environments with required approvals still go through the approver flow.",
-        "typeToConfirm": "Type <slug></slug> to confirm:",
+        "hint": "일반 재배포로 앱을 복구할 수 없을 때만 사용하세요. 예를 들어 이름 변경 후 남은 K8s 객체나 상태를 조정할 수 없는 배포 레코드에 사용할 수 있습니다.",
+        "confirmTitle": "{slug}를 강제 재배포할까요?",
+        "confirmDescription": "대기 중인 배포를 중단하고 앱의 실행 중인 Kubernetes 객체(Deployments, Services, Ingresses, CronJobs)를 삭제한 후 CI 워크플로를 다시 실행합니다. 시작 시 트래픽이 잠시 끊깁니다. 승인이 필요한 환경은 계속 승인 절차를 거칩니다.",
+        "typeToConfirm": "확인하려면 <slug></slug>를 입력하세요:",
         "cancel": "취소",
         "preview": {
-          "loading": "Loading in-flight deployments…",
-          "header": "{count, plural, =0 {No in-flight deployments to cancel.} one {This will cancel 1 in-flight deployment:} other {This will cancel # in-flight deployments:}}",
-          "noInflight": "Nothing in flight — the recovery path is safe to fire.",
+          "loading": "진행 중인 배포를 불러오는 중…",
+          "header": "{count, plural, =0 {중단할 진행 중인 배포가 없습니다.} one {진행 중인 배포 1개를 중단합니다:} other {진행 중인 배포 #개를 중단합니다:}}",
+          "noInflight": "진행 중인 배포가 없어 복구로 중단되는 배포가 없습니다.",
           "triggeredBy": "{actor} · {when}",
-          "ciRun": "CI run"
+          "ciRun": "CI 실행"
         },
-        "buttonTooltip": "Recovery for stuck deploys. Cancels pending deploys, deletes K8s objects, and re-fires the deploy workflow. Brief downtime while pods recreate."
+        "buttonTooltip": "멈춘 배포를 복구합니다. 대기 중인 배포를 중단하고 K8s 객체를 삭제한 후 배포 워크플로를 다시 실행합니다. Pod를 다시 만드는 동안 잠시 서비스가 중단됩니다."
       },
       "dangerZone": {
         "title": "위험 구역",
-        "description": "Hard deregister this app and tear down every attached resource — workloads, environments, secrets, domains, managed services. Irreversible.",
+        "description": "이 앱의 등록을 해제하고 연결된 모든 리소스(워크로드, 환경, 시크릿, 도메인, 관리형 서비스)를 삭제합니다. 되돌릴 수 없습니다.",
         "button": "앱 등록 해제",
-        "stillLive": "Last attempt left {count} resource class(es) live:",
-        "retry": "등록 해제 다시 시도",
-        "softHint": "For a recoverable delete, use Delete on the overview tab (soft delete, 30-day recovery window).",
-        "confirmTitle": "Deregister {name}?",
-        "confirmIntro": "This destroys the resources listed below for this app. The action is irreversible — review the blast radius before you confirm.",
-        "typeToConfirm": "To confirm, type the app's name:",
+        "stillLive": "마지막 시도 후에도 리소스 종류 {count}개가 활성 상태입니다:",
+        "retry": "등록 해제 재시도",
+        "softHint": "복구 가능한 삭제를 원하면 앱의 ⋯ 메뉴에서 앱 삭제를 사용하세요(소프트 삭제, 30일 복구 기간).",
+        "confirmTitle": "{name}의 등록을 해제할까요?",
+        "confirmIntro": "아래에 나열된 이 앱의 리소스를 삭제합니다. 되돌릴 수 없는 작업이므로 확인하기 전에 영향 범위를 검토하세요.",
+        "typeToConfirm": "확인하려면 앱 이름을 입력하세요:",
         "deregistering": "등록 해제 중…",
         "cancel": "취소",
-        "toastNoResponse": "Deregister failed: no response from backend.",
-        "toastNoPayload": "Deregister returned no payload.",
-        "toastFailed": "Deregister failed.",
-        "toastResumePending": "Resume pending — {count} resource class(es) still live.",
-        "toastKickoff": "Deregistering — workflow {workflowId}. You have 5 minutes to cancel from the app detail page.",
+        "toastNoResponse": "등록 해제 실패: 서버에서 응답을 받지 못했습니다.",
+        "toastNoPayload": "등록 해제 결과가 반환되지 않았습니다.",
+        "toastFailed": "등록 해제에 실패했습니다.",
+        "toastResumePending": "재개 대기: 리소스 종류 {count}개가 아직 활성 상태입니다.",
+        "toastKickoff": "등록 해제 중: 워크플로 {workflowId}. 앱 상세 페이지에서 5분 이내에 취소할 수 있습니다.",
         "preview": {
-          "loading": "Loading blast-radius preview…",
-          "header": "{count, plural, =0 {No resources will be destroyed.} one {1 resource will be destroyed:} other {# resources will be destroyed:}}",
-          "noResources": "Nothing attached — the deregister is a no-op except for the platform-row soft-delete.",
-          "sourceWebhookLabel": "Source-host webhook",
-          "registryRepoLabel": "Image registry repo",
+          "loading": "삭제 대상 리소스를 불러오는 중…",
+          "header": "{count, plural, =0 {삭제할 리소스가 없습니다.} one {리소스 1개가 삭제됩니다:} other {리소스 #개가 삭제됩니다:}}",
+          "noResources": "연결된 리소스가 없습니다. 플랫폼 레코드를 소프트 삭제하는 작업만 수행합니다.",
+          "sourceWebhookLabel": "소스 코드 호스트 웹훅",
+          "registryRepoLabel": "이미지 레지스트리 저장소",
           "groups": {
-            "k8s": "Kubernetes objects",
-            "managedServices": "Managed services",
-            "secrets": "Cluster secrets",
-            "deployTokens": "Deploy tokens",
-            "identity": "Workload identity roles",
-            "network": "Network / integrations"
+            "k8s": "Kubernetes 객체",
+            "managedServices": "관리형 서비스",
+            "secrets": "클러스터 시크릿",
+            "deployTokens": "배포 토큰",
+            "identity": "워크로드 ID 역할",
+            "network": "네트워크 / 연동"
           },
           "unavailable": "리소스 미리보기를 사용할 수 없습니다."
         }
@@ -1554,12 +1554,12 @@
     },
     "dangerZone": {
       "pendingBanner": {
-        "title": "Teardown pending",
-        "body": "Cancel within {countdown} or the destructive workflow starts.",
-        "cancel": "Cancel teardown",
-        "toastCancelled": "Teardown cancelled — workflow was within the grace window.",
-        "toastNotDelivered": "Couldn't reach the workflow — it may have started the destructive steps. Check the Workflows tab.",
-        "toastError": "Cancel failed."
+        "title": "리소스 삭제 대기",
+        "body": "되돌릴 수 없는 삭제 워크플로가 시작되기 전에 {countdown} 이내에 취소하세요.",
+        "cancel": "리소스 삭제 취소",
+        "toastCancelled": "유예 기간 안에 리소스 삭제를 취소했습니다.",
+        "toastNotDelivered": "워크플로에 연결할 수 없습니다. 삭제 단계가 이미 시작되었을 수 있습니다. 워크플로 탭을 확인하세요.",
+        "toastError": "취소에 실패했습니다."
       }
     },
     "wizard": {

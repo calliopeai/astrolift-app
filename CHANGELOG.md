@@ -44,6 +44,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Recovery, deregistration resource previews and grace-period cancellation
+  warnings use all eight locales. Exact app-name/slug confirmation guards,
+  resource identifiers, workflow IDs and rejected-action retry remain intact (#2145).
+
 - Deployment action menus, reasons, target warnings and outcomes use all eight
   locales. Missing mutation responses now reject confirmations; pending requests
   block resubmission and failures retain the entered reason for retry (#2145).
