@@ -15,7 +15,8 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     timezoneId: "UTC",
     locale: "en-US",
-    trace: "retain-on-failure",
+    trace: { mode: "retain-on-failure", snapshots: false, screenshots: false, sources: true },
+    screenshot: "only-on-failure",
   },
   webServer: [
     {

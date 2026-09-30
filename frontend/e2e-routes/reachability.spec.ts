@@ -11,6 +11,8 @@ test("owner can reach every active page from rendered navigation", async ({
   page,
   context,
 }, testInfo) => {
+  // The complete graph visits hundreds of URLs; each navigation stays bounded.
+  test.setTimeout(900_000);
   await context.addCookies([
     { name: "sessionid", value: "owner", url: testInfo.project.use.baseURL! },
     { name: "backend_jwt", value: "route-fixture-token", url: testInfo.project.use.baseURL! },
