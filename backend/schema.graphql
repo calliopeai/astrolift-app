@@ -623,6 +623,7 @@ type AstroliftAgentTaskEvent {
   text: String!
   createdAt: DateTime!
   request: JSON
+  data: JSON
 }
 
 type AstroliftAgentTaskInputMessage {
