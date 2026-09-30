@@ -7,8 +7,8 @@ gate is only as good as the weakest factory:
 
 * it resolves the named object to the scope that owns it,
 * it never resolves an object outside the caller's org,
-* registry misses return an explicit org scope, so a selected team cannot
-  substitute for the missing target (#2105). Other factories have tracked gaps.
+* registry and lifecycle misses return an explicit org scope, so a selected
+  team cannot substitute for the missing target (#2104, #2105).
 
 The third is the one with teeth. Route params arrive verbatim -- a page
 like ``/agents/runs/overview`` sends ``id="overview"`` -- and the factory
@@ -33,8 +33,9 @@ from astrolift_registry.scopes import (
     app_scope_by_slug,
     app_scope_by_workload_guid,
 )
-from core.permissions import Permission, ScopeKind
+from core.permissions import Permission, PermissionDenied, ScopeKind, check_permission
 from core.scope_args import read_arg, read_guid
+from core.tenancy import TenantContext, tenant_context
 from core.tests.utils.scope_world import ScopeWorld, as_tenant, bind_role, make_cluster, make_user
 
 pytestmark = pytest.mark.django_db
@@ -195,7 +196,28 @@ def test_an_object_in_another_org_resolves_to_nothing(world, reba):
     "key",
     ["", None, "overview", "01920000-0000-7000-8000-000000000000"],
 )
-def test_an_unresolvable_key_resolves_to_nothing(world, reba, key):
-    with as_tenant(world, reba):
-        assert deployment_app_scope("id")({"id": key}) is None
-        assert environment_app_scope("id")({"id": key}) is None
+def test_an_unresolvable_lifecycle_key_requires_org_authority(world, reba, key):
+    bind_role(
+        reba,
+        permissions=[Permission.APP_READ],
+        kind="TEAM",
+        scope_id=world.medops.pk,
+        slug="selected-team-read",
+    )
+    with tenant_context(
+        TenantContext(
+            organization_id=world.org.pk,
+            actor_user_id=reba.pk,
+            team_id=world.medops.pk,
+            project_id=world.medops_project.pk,
+        )
+    ):
+        check_permission(
+            Permission.APP_READ,
+            scope=environment_app_scope("id", permission=Permission.APP_READ)({"id": str(world.env.guid)}),
+        )
+        for factory in (deployment_app_scope, environment_app_scope):
+            scope = factory("id", permission=Permission.APP_READ)({"id": key})
+            assert (scope.kind, scope.id) == (ScopeKind.ORG, world.org.pk)
+            with pytest.raises(PermissionDenied):
+                check_permission(Permission.APP_READ, scope=scope)
