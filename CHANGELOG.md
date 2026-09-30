@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add explicit, reviewed agent secret-owner maintenance tools (#2102): private
+  metadata-only plans, full-payload copies before atomic ref changes, operator and
+  paused-writer checks, and resumable application without source deletion. Runtime
+  owner enforcement remains a separate release after migration; existing refs
+  continue to resolve. See [the maintenance sequence](docs/operators/agent-secret-owners.md).
+
 - Dashboard polling and refreshes keep the active filtered page current (#2143).
   The app header owns the shared deploy poll across tabs; task and security
   reads filter before limits. App alert counts cover every visible firing and
