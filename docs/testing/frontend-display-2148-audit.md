@@ -74,7 +74,7 @@ Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 a
 | 38. Secret bundle Attach and key Delete can fire twice | Fixed | Bundle actions keep independent pending keys; Attach and key-delete controls disable their operation. Real Apollo regressions prove duplicate calls reach the transport once and failures release admission. |
 | 39. Add / update ref button stays clickable during save | Fixed | Reference mutation variables and pending keys use the trimmed environment variable. The view disables that ref save and keeps drafts changed during an earlier request. |
 | 40. Agent secrets dialog leaks reveal timers on close | Fixed | Closing, changing the environment spec or unmounting cancels timers and invalidates late reveal responses; a cleared older timer cannot hide a later reveal. Real Apollo/timer regressions cover each boundary. |
-| 41. Agent secrets page assumes env spec slug equals agent slug | Remaining | Current SecretsContent still passes agent slug directly as envSpecSlug and documents that assumption; an actual association read is needed. |
+| 41. Agent secrets page assumes env spec slug equals agent slug | Fixed | Explicit active-org environment-spec choice uses bounded server search/pages and verifies the returned ID and slug through the owner-filtered singular API. Values/bundles use only that confirmed recipe; agent/org changes and unavailable/error checks close editors and discard revealed values. Edits are spec-wide; no agent default or dispatch association is claimed. |
 | 42. Register tool form has two duplicate close buttons | Pre-existing | AddToolForm dialog was replaced by AddToolScreen/use-add-tool page flow; duplicate dialog cancellation path is absent. |
 | 43. PageShell imports from app/, breaking the components rule | Fixed | Shared app chrome context now lives in lib/app-chrome-context.tsx; PageShell and every route/story consumer import the same shared module. Existing navigation/hydration and new framed/agent-shell tests preserve behavior. |
 | 44. Profile identity copy points to the old organization settings path | Pre-existing | Earlier profile organization-link correction is included in the audited base. |
@@ -127,7 +127,7 @@ Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 a
 
 ## Dependencies and limits
 
-- Rotation grace (#21) needs a truthful configured value before confirmation; do not replace it with another guessed default. Agent environment-spec association (#41) needs the actual persisted relationship rather than a slug convention.
+- Rotation grace (#21) reads the configured value before confirmation. Agent secrets (#41) require an explicit verified recipe choice; workloads have no singular persisted default recipe, and per-run/box recipe FKs may differ.
 - Wizard selection/progress copies are now shared. The app Chrome context location, unused props/flags, and presentation-token cleanup retain their own audit rows.
 - The only locale edit changes the existing identical English manifest-conflict description in all eight catalogs to describe an unsaved draft. Full translation work remains #2145.
 
@@ -151,3 +151,11 @@ Pod names and container names in URLs are temporary selections, so a replaced
 pod or missing container resolves to a live fallback. The shared helper does not
 add pod reads to inactive metrics panels. This follow-up does not infer an agent
 or environment-spec association; item 41 retains its separate status.
+
+### Explicit agent secret source (#41)
+
+The page starts without a recipe selection, including when an unrelated spec happens to share the agent slug. The existing `agentEnvironmentSpecsPage` searches and pages at 20 rows, scoped to the active organization. Only a returned choice can be selected; `agentEnvironmentSpec` must then return its exact ID and slug before either editor mounts. Loading, failed verification, deleted/recreated slugs and missing visibility close editors. Agent/organization changes reset search, selection, drafts and revealed values. Known missing/unknown `agent_env_spec.read` skips source queries; missing `secret.list` skips editors, and missing `secret.read` skips bundle attachment queries. These permission hints are not authority: server owner, credential and mutation guards remain authoritative.
+
+The choice is read-time verified, with a manual refresh control. It is a recipe-wide editor, not a durable agent default or a dispatch association. Existing secret mutations remain slug-addressed; this change does not add an atomic spec-ID precondition or a new backend association API. Dispatch must select the recipe independently.
+
+Validation covers real Apollo queries/mutation envelopes, bounded search/pagination, same-slug nonselection, visibility loss, reused slug IDs, verification errors, agent/org reset and revealed-value cleanup; both new documents validate against the committed schema. Existing real PostgreSQL owner/token/HTTP tests pass for environment-spec pages (10) and secret owners/mutations (6). Portable source/value/bundle stories and Chromium unselected/unavailable/480px long-recipe checks pass. No backend schema, migration, fleet association, live cloud operation or secret-provider write was changed.

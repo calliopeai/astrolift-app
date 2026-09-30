@@ -12668,6 +12668,24 @@ export type AccessOnQueryVariables = Exact<{
 
 export type AccessOnQuery = { astroliftAccessOn: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ principalKind: string, source: string, bindingId: string, memberId?: string | null, groupExternalId?: string | null, groupMemberCount?: number | null, teamId?: string | null, teamSlug?: string | null, teamName?: string | null, accessLevel?: string | null, shareId?: string | null, scopeKind: string, scopeGuid?: string | null, sourceScopeLabel: string, inherited: boolean, inherits: boolean, expiresAt?: string | null, user?: { id: string, username: string, email: string } | null, role?: { id: string, slug: string, name: string, description: string, scopeLevel: string, permissions: Array<string>, isSystem: boolean } | null }> } };
 
+export type AgentSecretSourceOptionsQueryVariables = Exact<{
+  orgId: Scalars['ID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type AgentSecretSourceOptionsQuery = { agentEnvironmentSpecsPage: { totalCount: number, page: number, pageSize: number, items: Array<{ id: string, slug: string, name: string, teamId?: string | null, projectId?: string | null }> } };
+
+export type AgentSecretSourceDetailQueryVariables = Exact<{
+  orgId: Scalars['ID']['input'];
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type AgentSecretSourceDetailQuery = { agentEnvironmentSpec?: { id: string, slug: string, name: string, teamId?: string | null, projectId?: string | null } | null };
+
 export type CreateSkillMutationVariables = Exact<{
   orgId: Scalars['ID']['input'];
   input: SkillInput;

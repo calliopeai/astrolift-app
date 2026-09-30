@@ -183,7 +183,7 @@ export function AgentSecretValues({
           icon: <KeyRoundIcon className="size-5" />,
           title: "No secret bindings",
           description:
-            "This agent binds no secrets directly. Add a binding, or attach a reusable bundle under Bundles.",
+            "This environment spec binds no secrets directly. Add a binding, or attach a reusable bundle under Bundles.",
         }}
         rowActions={(r) => (
           <>
@@ -229,8 +229,8 @@ export function AgentSecretValues({
             <SheetHeader>
               <SheetTitle>Add a secret binding</SheetTitle>
               <SheetDescription>
-                The agent receives the provider value as this environment variable. Binding the same
-                variable again updates it.
+                Runs and boxes using this recipe receive the provider value as this environment
+                variable. Binding the same variable again updates it.
               </SheetDescription>
             </SheetHeader>
             <div className="flex min-w-0 flex-col gap-4 px-4">
@@ -322,7 +322,7 @@ export function AgentSecretValues({
         open={unbindTarget !== null}
         onOpenChange={(open) => !open && setUnbindTarget(null)}
         title={`Remove the ${unbindTarget?.envVar ?? "secret"} binding?`}
-        description="The agent stops receiving this variable. The provider-side value is kept and can be bound again."
+        description="Runs and boxes using this recipe stop receiving this variable. The provider-side value is kept and can be bound again."
         confirmLabel="Remove binding"
         destructive
         onConfirm={async () => {

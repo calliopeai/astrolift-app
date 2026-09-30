@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Agent secrets require an explicit visible environment-spec choice, verify its
+  current identity before opening editors, and target that recipe instead of
+  guessing from the agent slug. Recipe-wide edits are labeled; switching agents
+  or organizations clears selection and revealed values (#2148).
+
 - Deregistration loads its authorized resource preview before displaying the
   count badge, refreshes on confirmation and treats unavailable/refused reads
   as unknown. Confirmation waits for a usable preview (#2148).

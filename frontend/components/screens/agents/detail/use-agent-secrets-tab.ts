@@ -18,8 +18,8 @@ interface SecretStatusPageResp {
 }
 
 /**
- * Secrets › Values: one numbered page of the env spec's secret refs (the
- * spec slug is the agent slug) from `agentEnvironmentSpecSecretStatusPage`
+ * Secrets › Values: one numbered page of the explicitly selected env spec's
+ * secret refs from `agentEnvironmentSpecSecretStatusPage`
  * (#2155), on URL list state, plus the mutations the dispatch dialog uses.
  * The server probes the store, filters, sorts and counts. The data half of
  * AgentSecretValues.
