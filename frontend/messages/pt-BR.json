@@ -1590,49 +1590,95 @@
       }
     },
     "deployments": {
-      "title": "{name} · Deployments",
-      "description": "{slug} · full historical deploy log with filters",
+      "title": "{name} · Implantações",
+      "description": "{slug} · histórico completo de implantações com filtros",
       "filters": {
-        "search": "Search commit, tag, branch, workload…",
-        "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "search": "Buscar commit, tag, branch, carga de trabalho…",
+        "anyEnv": "Qualquer ambiente",
+        "counts": "{filtered} de {total}",
+        "searchCurrent": "Buscar tags, commits, branches…"
       },
       "table": {
-        "when": "When",
-        "env": "Env",
-        "imageCommit": "Image / commit",
-        "trigger": "Trigger",
+        "when": "Quando",
+        "env": "Ambiente",
+        "imageCommit": "Imagem / commit",
+        "trigger": "Gatilho",
         "status": "Status",
-        "duration": "Duration",
+        "duration": "Duração",
         "ci": "CI"
       },
       "row": {
         "prMissing": "PR —",
-        "authorBy": "by {name}",
-        "authorMissing": "by —"
+        "authorBy": "por {name}",
+        "authorMissing": "por —"
       },
-      "emptyTitle": "No deployments match your filters",
-      "emptyNever": "This app hasn't been deployed yet.",
-      "emptyTryAgain": "Loosen the filters or clear the search to see more results.",
-      "emptyStart": "Start a deployment",
-      "approvalsCount": "{received}/{required} approvals",
-      "footer": "Showing the latest {count} deployments. Older rollouts are accessible via the API — pagination ships once the list grows past a single window.",
-      "rollNew": "Roll a new deployment",
+      "emptyTitle": "Nenhuma implantação corresponde aos filtros",
+      "emptyNever": "Este aplicativo ainda não foi implantado.",
+      "emptyTryAgain": "Amplie os filtros ou limpe a busca para ver mais resultados.",
+      "emptyStart": "Iniciar uma implantação",
+      "approvalsCount": "{received}/{required} aprovações",
+      "footer": "Exibindo as últimas {count} implantações. As anteriores estão disponíveis pela API; a paginação ficará disponível quando a lista ultrapassar uma única página.",
+      "rollNew": "Iniciar uma nova implantação",
       "statusBuckets": {
-        "all": "Any status",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "inFlight": "In flight",
-        "other": "Rolled back / superseded"
+        "all": "Qualquer status",
+        "succeeded": "Concluída",
+        "failed": "Falhou",
+        "inFlight": "Em andamento",
+        "other": "Revertida / substituída"
       },
       "triggers": {
-        "all": "Any trigger",
+        "all": "Qualquer gatilho",
         "push": "push",
         "manual": "manual",
         "ci": "ci",
-        "scheduled": "scheduled",
-        "rollback": "rollback",
-        "promotion": "promotion"
+        "scheduled": "agendado",
+        "rollback": "reversão",
+        "promotion": "promoção"
+      },
+      "label": "Implantações",
+      "emptyCurrentTitle": "Ainda não há implantações",
+      "emptyCurrentDescription": "Este aplicativo ainda não foi implantado. Implante pelo cabeçalho ou inicie uma implantação a partir de um ambiente.",
+      "columns": {
+        "deployment": "Implantação",
+        "status": "Status",
+        "environment": "Ambiente",
+        "commit": "Commit",
+        "trigger": "Gatilho",
+        "started": "Início",
+        "duration": "Duração"
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "waiting": "Aguardando aprovação",
+        "failed": "Com falha",
+        "today": "Hoje",
+        "previews": "Prévias",
+        "mineNote": "Implantações que você iniciou."
+      },
+      "statuses": {
+        "pending_approval": "Aguardando aprovação",
+        "pending": "Pendente",
+        "deploying": "Implantando",
+        "redeploying": "Reimplantando",
+        "running": "Em execução",
+        "failed": "Falhou",
+        "superseded": "Substituída",
+        "rolled_back": "Revertida"
+      },
+      "compare": {
+        "action": "Comparar",
+        "selectTwo": "Comparar (selecione exatamente 2)",
+        "source": "Ver no provedor de código",
+        "loading": "Carregando comparação...",
+        "image": "Diferenças de imagem",
+        "noImage": "Não há diferenças de imagem disponíveis para este par.",
+        "manifest": "Diferenças de manifesto",
+        "changes": "({count, plural, one {# alteração} other {# alterações}})",
+        "identical": "Os manifestos destas duas implantações são idênticos.",
+        "add": "+ adicionar",
+        "remove": "− remover",
+        "replace": "~ substituir"
       }
     },
     "secrets": {

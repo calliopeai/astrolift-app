@@ -1590,49 +1590,95 @@
       }
     },
     "deployments": {
-      "title": "{name} · Deployments",
-      "description": "{slug} · full historical deploy log with filters",
+      "title": "{name} · Déploiements",
+      "description": "{slug} · historique complet des déploiements avec filtres",
       "filters": {
-        "search": "Search commit, tag, branch, workload…",
-        "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "search": "Rechercher un commit, une étiquette, une branche, une charge de travail…",
+        "anyEnv": "Tous les environnements",
+        "counts": "{filtered} sur {total}",
+        "searchCurrent": "Rechercher des étiquettes, des commits, des branches…"
       },
       "table": {
-        "when": "When",
-        "env": "Env",
+        "when": "Date",
+        "env": "Environnement",
         "imageCommit": "Image / commit",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Duration",
+        "trigger": "Déclencheur",
+        "status": "État",
+        "duration": "Durée",
         "ci": "CI"
       },
       "row": {
         "prMissing": "PR —",
-        "authorBy": "by {name}",
-        "authorMissing": "by —"
+        "authorBy": "par {name}",
+        "authorMissing": "par —"
       },
-      "emptyTitle": "No deployments match your filters",
-      "emptyNever": "This app hasn't been deployed yet.",
-      "emptyTryAgain": "Loosen the filters or clear the search to see more results.",
-      "emptyStart": "Start a deployment",
-      "approvalsCount": "{received}/{required} approvals",
-      "footer": "Showing the latest {count} deployments. Older rollouts are accessible via the API — pagination ships once the list grows past a single window.",
-      "rollNew": "Roll a new deployment",
+      "emptyTitle": "Aucun déploiement ne correspond aux filtres",
+      "emptyNever": "Cette application n’a pas encore été déployée.",
+      "emptyTryAgain": "Élargissez les filtres ou effacez la recherche pour voir plus de résultats.",
+      "emptyStart": "Lancer un déploiement",
+      "approvalsCount": "{received}/{required} approbations",
+      "footer": "Les {count} derniers déploiements sont affichés. Les déploiements plus anciens sont accessibles via l’API ; la pagination sera disponible lorsque la liste dépassera une seule page.",
+      "rollNew": "Lancer un nouveau déploiement",
       "statusBuckets": {
-        "all": "Any status",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "inFlight": "In flight",
-        "other": "Rolled back / superseded"
+        "all": "Tous les états",
+        "succeeded": "Réussi",
+        "failed": "Échoué",
+        "inFlight": "En cours",
+        "other": "Restauré / remplacé"
       },
       "triggers": {
-        "all": "Any trigger",
+        "all": "Tous les déclencheurs",
         "push": "push",
-        "manual": "manual",
+        "manual": "manuel",
         "ci": "ci",
-        "scheduled": "scheduled",
-        "rollback": "rollback",
+        "scheduled": "planifié",
+        "rollback": "restauration",
         "promotion": "promotion"
+      },
+      "label": "Déploiements",
+      "emptyCurrentTitle": "Aucun déploiement pour le moment",
+      "emptyCurrentDescription": "Cette application n’a pas encore été déployée. Déployez-la depuis l’en-tête ou lancez un déploiement depuis un environnement.",
+      "columns": {
+        "deployment": "Déploiement",
+        "status": "État",
+        "environment": "Environnement",
+        "commit": "Commit",
+        "trigger": "Déclencheur",
+        "started": "Début",
+        "duration": "Durée"
+      },
+      "views": {
+        "all": "Tous",
+        "mine": "Les miens",
+        "waiting": "En attente d’approbation",
+        "failed": "Échoués",
+        "today": "Aujourd’hui",
+        "previews": "Aperçus",
+        "mineNote": "Déploiements que vous avez déclenchés."
+      },
+      "statuses": {
+        "pending_approval": "En attente d’approbation",
+        "pending": "En attente",
+        "deploying": "Déploiement en cours",
+        "redeploying": "Redéploiement en cours",
+        "running": "En exécution",
+        "failed": "Échoué",
+        "superseded": "Remplacé",
+        "rolled_back": "Restauré"
+      },
+      "compare": {
+        "action": "Comparer",
+        "selectTwo": "Comparer (sélectionnez exactement 2)",
+        "source": "Voir sur l’hébergeur du code",
+        "loading": "Chargement de la comparaison...",
+        "image": "Différences d’image",
+        "noImage": "Aucune différence d’image disponible pour cette paire.",
+        "manifest": "Différences de manifeste",
+        "changes": "({count, plural, one {# modification} other {# modifications}})",
+        "identical": "Les manifestes de ces deux déploiements sont identiques.",
+        "add": "+ ajouter",
+        "remove": "− supprimer",
+        "replace": "~ remplacer"
       }
     },
     "secrets": {

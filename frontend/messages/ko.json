@@ -1590,49 +1590,95 @@
       }
     },
     "deployments": {
-      "title": "{name} · Deployments",
-      "description": "{slug} · full historical deploy log with filters",
+      "title": "{name} · 배포",
+      "description": "{slug} · 필터가 포함된 전체 배포 기록",
       "filters": {
-        "search": "Search commit, tag, branch, workload…",
-        "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "search": "커밋, 태그, 브랜치, 워크로드 검색…",
+        "anyEnv": "모든 환경",
+        "counts": "{total}개 중 {filtered}개",
+        "searchCurrent": "태그, 커밋, 브랜치 검색…"
       },
       "table": {
-        "when": "When",
-        "env": "Env",
-        "imageCommit": "Image / commit",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Duration",
+        "when": "시각",
+        "env": "환경",
+        "imageCommit": "이미지 / 커밋",
+        "trigger": "트리거",
+        "status": "상태",
+        "duration": "소요 시간",
         "ci": "CI"
       },
       "row": {
         "prMissing": "PR —",
-        "authorBy": "by {name}",
-        "authorMissing": "by —"
+        "authorBy": "실행자: {name}",
+        "authorMissing": "실행자: —"
       },
-      "emptyTitle": "No deployments match your filters",
-      "emptyNever": "This app hasn't been deployed yet.",
-      "emptyTryAgain": "Loosen the filters or clear the search to see more results.",
-      "emptyStart": "Start a deployment",
-      "approvalsCount": "{received}/{required} approvals",
-      "footer": "Showing the latest {count} deployments. Older rollouts are accessible via the API — pagination ships once the list grows past a single window.",
-      "rollNew": "Roll a new deployment",
+      "emptyTitle": "필터와 일치하는 배포가 없습니다",
+      "emptyNever": "이 앱은 아직 배포되지 않았습니다.",
+      "emptyTryAgain": "더 많은 결과를 보려면 필터를 완화하거나 검색을 지우세요.",
+      "emptyStart": "배포 시작",
+      "approvalsCount": "승인 {received}/{required}",
+      "footer": "최근 배포 {count}개를 표시합니다. 이전 배포는 API로 확인할 수 있으며, 목록이 한 페이지를 넘으면 페이지 나누기를 사용할 수 있습니다.",
+      "rollNew": "새 배포 시작",
       "statusBuckets": {
-        "all": "Any status",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "inFlight": "In flight",
-        "other": "Rolled back / superseded"
+        "all": "모든 상태",
+        "succeeded": "성공",
+        "failed": "실패",
+        "inFlight": "진행 중",
+        "other": "롤백됨 / 대체됨"
       },
       "triggers": {
-        "all": "Any trigger",
-        "push": "push",
-        "manual": "manual",
+        "all": "모든 트리거",
+        "push": "푸시",
+        "manual": "수동",
         "ci": "ci",
-        "scheduled": "scheduled",
-        "rollback": "rollback",
-        "promotion": "promotion"
+        "scheduled": "예약",
+        "rollback": "롤백",
+        "promotion": "승격"
+      },
+      "label": "배포",
+      "emptyCurrentTitle": "아직 배포가 없습니다",
+      "emptyCurrentDescription": "이 앱은 아직 배포되지 않았습니다. 헤더에서 배포하거나 환경에서 배포를 시작하세요.",
+      "columns": {
+        "deployment": "배포",
+        "status": "상태",
+        "environment": "환경",
+        "commit": "커밋",
+        "trigger": "트리거",
+        "started": "시작 시각",
+        "duration": "소요 시간"
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 배포",
+        "waiting": "승인 대기",
+        "failed": "실패",
+        "today": "오늘",
+        "previews": "미리보기",
+        "mineNote": "내가 시작한 배포입니다."
+      },
+      "statuses": {
+        "pending_approval": "승인 대기",
+        "pending": "대기 중",
+        "deploying": "배포 중",
+        "redeploying": "재배포 중",
+        "running": "실행 중",
+        "failed": "실패",
+        "superseded": "대체됨",
+        "rolled_back": "롤백됨"
+      },
+      "compare": {
+        "action": "비교",
+        "selectTwo": "비교(정확히 2개 선택)",
+        "source": "소스 코드 호스트에서 보기",
+        "loading": "비교를 불러오는 중...",
+        "image": "이미지 차이",
+        "noImage": "이 두 배포의 이미지 차이를 확인할 수 없습니다.",
+        "manifest": "매니페스트 차이",
+        "changes": "({count, plural, one {변경 #개} other {변경 #개}})",
+        "identical": "이 두 배포의 매니페스트는 동일합니다.",
+        "add": "+ 추가",
+        "remove": "− 삭제",
+        "replace": "~ 교체"
       }
     },
     "secrets": {

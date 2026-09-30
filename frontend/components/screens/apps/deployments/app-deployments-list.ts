@@ -79,6 +79,32 @@ export function appDeploymentsList(
   };
 }
 
+/** Translate presentation only; views, filter values and page variables stay canonical. */
+export function localizedAppDeploymentsList(
+  t: (key: string) => string,
+  environments: string[],
+  options: { previews?: boolean } = {}
+): ListDefinition {
+  const definition = appDeploymentsList(environments, options);
+  return {
+    ...definition,
+    searchPlaceholder: t("filters.searchCurrent"),
+    fields: definition.fields.map((field) => ({
+      ...field,
+      label: t(`columns.${field.key === "env" ? "environment" : field.key}`),
+      options:
+        field.key === "status"
+          ? field.options?.map((option) => ({ ...option, label: t(`statuses.${option.value}`) }))
+          : field.options,
+    })),
+    views: definition.views.map((view) => ({
+      ...view,
+      label: t(`views.${view.key}`),
+      ...(view.key === "mine" ? { note: t("views.mineNote") } : {}),
+    })),
+  };
+}
+
 /** The previews view: the app's preview environments, searched on the server. */
 export const APP_PREVIEWS_LIST: ListDefinition = {
   id: "apps.previews",

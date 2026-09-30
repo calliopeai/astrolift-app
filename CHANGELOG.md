@@ -36,6 +36,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- App deployment history, views, filters and comparison sheets use all eight
+  locales. Compare still requires two actual deployments in chronological order;
+  source links, manifest paths and values remain intact (#2145).
+
 - App access views, grant/source removal copy, home-team labels and outcomes
   use all eight locales. Removal confirmations retain the actual grant or team
   share across failure and retry; home-team shares remain protected (#2145).

@@ -1590,49 +1590,95 @@
       }
     },
     "deployments": {
-      "title": "{name} · Deployments",
-      "description": "{slug} · full historical deploy log with filters",
+      "title": "{name} · 部署",
+      "description": "{slug} · 完整部署历史与筛选",
       "filters": {
-        "search": "Search commit, tag, branch, workload…",
-        "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "search": "搜索提交、标签、分支、工作负载…",
+        "anyEnv": "所有环境",
+        "counts": "共 {total} 项，显示 {filtered} 项",
+        "searchCurrent": "搜索标签、提交、分支…"
       },
       "table": {
-        "when": "When",
-        "env": "Env",
-        "imageCommit": "Image / commit",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Duration",
+        "when": "时间",
+        "env": "环境",
+        "imageCommit": "镜像 / 提交",
+        "trigger": "触发方式",
+        "status": "状态",
+        "duration": "耗时",
         "ci": "CI"
       },
       "row": {
         "prMissing": "PR —",
-        "authorBy": "by {name}",
-        "authorMissing": "by —"
+        "authorBy": "由 {name} 执行",
+        "authorMissing": "执行者 —"
       },
-      "emptyTitle": "No deployments match your filters",
-      "emptyNever": "This app hasn't been deployed yet.",
-      "emptyTryAgain": "Loosen the filters or clear the search to see more results.",
-      "emptyStart": "Start a deployment",
-      "approvalsCount": "{received}/{required} approvals",
-      "footer": "Showing the latest {count} deployments. Older rollouts are accessible via the API — pagination ships once the list grows past a single window.",
-      "rollNew": "Roll a new deployment",
+      "emptyTitle": "没有符合筛选条件的部署",
+      "emptyNever": "此应用尚未部署。",
+      "emptyTryAgain": "放宽筛选条件或清除搜索以查看更多结果。",
+      "emptyStart": "开始部署",
+      "approvalsCount": "{received}/{required} 项批准",
+      "footer": "显示最近 {count} 次部署。较早的部署可通过 API 访问；当列表超过一页时将提供分页功能。",
+      "rollNew": "开始新部署",
       "statusBuckets": {
-        "all": "Any status",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "inFlight": "In flight",
-        "other": "Rolled back / superseded"
+        "all": "所有状态",
+        "succeeded": "成功",
+        "failed": "失败",
+        "inFlight": "进行中",
+        "other": "已回滚 / 已取代"
       },
       "triggers": {
-        "all": "Any trigger",
-        "push": "push",
-        "manual": "manual",
+        "all": "所有触发方式",
+        "push": "推送",
+        "manual": "手动",
         "ci": "ci",
-        "scheduled": "scheduled",
-        "rollback": "rollback",
-        "promotion": "promotion"
+        "scheduled": "定时",
+        "rollback": "回滚",
+        "promotion": "提升"
+      },
+      "label": "部署",
+      "emptyCurrentTitle": "暂无部署",
+      "emptyCurrentDescription": "此应用尚未部署。请从页头部署，或从某个环境开始部署。",
+      "columns": {
+        "deployment": "部署",
+        "status": "状态",
+        "environment": "环境",
+        "commit": "提交",
+        "trigger": "触发方式",
+        "started": "开始时间",
+        "duration": "耗时"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "waiting": "等待批准",
+        "failed": "失败",
+        "today": "今天",
+        "previews": "预览",
+        "mineNote": "由您触发的部署。"
+      },
+      "statuses": {
+        "pending_approval": "等待批准",
+        "pending": "等待中",
+        "deploying": "部署中",
+        "redeploying": "重新部署中",
+        "running": "运行中",
+        "failed": "失败",
+        "superseded": "已取代",
+        "rolled_back": "已回滚"
+      },
+      "compare": {
+        "action": "比较",
+        "selectTwo": "比较（请选择恰好 2 项）",
+        "source": "在代码托管平台查看",
+        "loading": "正在加载比较...",
+        "image": "镜像差异",
+        "noImage": "无法获取这两个部署的镜像差异。",
+        "manifest": "清单差异",
+        "changes": "({count, plural, one {# 项更改} other {# 项更改}})",
+        "identical": "这两个部署的清单完全相同。",
+        "add": "+ 添加",
+        "remove": "− 删除",
+        "replace": "~ 替换"
       }
     },
     "secrets": {

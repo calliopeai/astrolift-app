@@ -1590,49 +1590,95 @@
       }
     },
     "deployments": {
-      "title": "{name} · Deployments",
-      "description": "{slug} · full historical deploy log with filters",
+      "title": "{name} · デプロイ",
+      "description": "{slug} · フィルター付きの全デプロイ履歴",
       "filters": {
-        "search": "Search commit, tag, branch, workload…",
-        "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "search": "コミット、タグ、ブランチ、ワークロードを検索…",
+        "anyEnv": "すべての環境",
+        "counts": "{total} 件中 {filtered} 件",
+        "searchCurrent": "タグ、コミット、ブランチを検索…"
       },
       "table": {
-        "when": "When",
-        "env": "Env",
-        "imageCommit": "Image / commit",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Duration",
+        "when": "日時",
+        "env": "環境",
+        "imageCommit": "イメージ / コミット",
+        "trigger": "トリガー",
+        "status": "状態",
+        "duration": "所要時間",
         "ci": "CI"
       },
       "row": {
         "prMissing": "PR —",
-        "authorBy": "by {name}",
-        "authorMissing": "by —"
+        "authorBy": "実行者：{name}",
+        "authorMissing": "実行者：—"
       },
-      "emptyTitle": "No deployments match your filters",
-      "emptyNever": "This app hasn't been deployed yet.",
-      "emptyTryAgain": "Loosen the filters or clear the search to see more results.",
-      "emptyStart": "Start a deployment",
-      "approvalsCount": "{received}/{required} approvals",
-      "footer": "Showing the latest {count} deployments. Older rollouts are accessible via the API — pagination ships once the list grows past a single window.",
-      "rollNew": "Roll a new deployment",
+      "emptyTitle": "フィルターに一致するデプロイはありません",
+      "emptyNever": "このアプリはまだデプロイされていません。",
+      "emptyTryAgain": "フィルターを緩めるか検索をクリアすると、より多くの結果を表示できます。",
+      "emptyStart": "デプロイを開始",
+      "approvalsCount": "承認 {received}/{required}",
+      "footer": "最新の {count} 件のデプロイを表示しています。過去のデプロイは API からアクセスできます。一覧が 1 ページを超えるとページ分割が利用可能になります。",
+      "rollNew": "新しいデプロイを開始",
       "statusBuckets": {
-        "all": "Any status",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "inFlight": "In flight",
-        "other": "Rolled back / superseded"
+        "all": "すべての状態",
+        "succeeded": "成功",
+        "failed": "失敗",
+        "inFlight": "進行中",
+        "other": "ロールバック済み / 置き換え済み"
       },
       "triggers": {
-        "all": "Any trigger",
-        "push": "push",
-        "manual": "manual",
+        "all": "すべてのトリガー",
+        "push": "プッシュ",
+        "manual": "手動",
         "ci": "ci",
-        "scheduled": "scheduled",
-        "rollback": "rollback",
-        "promotion": "promotion"
+        "scheduled": "スケジュール",
+        "rollback": "ロールバック",
+        "promotion": "昇格"
+      },
+      "label": "デプロイ",
+      "emptyCurrentTitle": "デプロイはまだありません",
+      "emptyCurrentDescription": "このアプリはまだデプロイされていません。ヘッダーからデプロイするか、環境からデプロイを開始してください。",
+      "columns": {
+        "deployment": "デプロイ",
+        "status": "状態",
+        "environment": "環境",
+        "commit": "コミット",
+        "trigger": "トリガー",
+        "started": "開始日時",
+        "duration": "所要時間"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分のデプロイ",
+        "waiting": "承認待ち",
+        "failed": "失敗",
+        "today": "今日",
+        "previews": "プレビュー",
+        "mineNote": "自分が開始したデプロイ。"
+      },
+      "statuses": {
+        "pending_approval": "承認待ち",
+        "pending": "待機中",
+        "deploying": "デプロイ中",
+        "redeploying": "再デプロイ中",
+        "running": "実行中",
+        "failed": "失敗",
+        "superseded": "置き換え済み",
+        "rolled_back": "ロールバック済み"
+      },
+      "compare": {
+        "action": "比較",
+        "selectTwo": "比較（2 件を選択）",
+        "source": "ソースコードのホストで表示",
+        "loading": "比較を読み込み中...",
+        "image": "イメージの差分",
+        "noImage": "この組み合わせのイメージ差分はありません。",
+        "manifest": "マニフェストの差分",
+        "changes": "({count, plural, one {# 件の変更} other {# 件の変更}})",
+        "identical": "この 2 件のデプロイのマニフェストは同一です。",
+        "add": "+ 追加",
+        "remove": "− 削除",
+        "replace": "~ 置換"
       }
     },
     "secrets": {

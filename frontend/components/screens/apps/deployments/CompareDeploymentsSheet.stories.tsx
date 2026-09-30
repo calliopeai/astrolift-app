@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 
 import { COMPARE, DEPLOY_LONG, json, LONG } from "./app-deployments-logs.fixtures";
 import { CompareDeploymentsSheetView } from "./CompareDeploymentsSheet";
@@ -52,5 +54,15 @@ export const LongStrings: Story = {
         ],
       }}
     />
+  ),
+};
+
+export const JapaneseWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <div style={{ width: 768 }}>
+        <CompareDeploymentsSheetView {...COMPARE} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

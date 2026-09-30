@@ -887,7 +887,8 @@
       "filters": {
         "search": "Search commit, tag, branch, workload…",
         "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "counts": "{filtered} of {total}",
+        "searchCurrent": "Search tags, commits, branches…"
       },
       "table": {
         "when": "When",
@@ -925,6 +926,51 @@
         "scheduled": "scheduled",
         "rollback": "rollback",
         "promotion": "promotion"
+      },
+      "label": "Deployments",
+      "emptyCurrentTitle": "No deployments yet",
+      "emptyCurrentDescription": "This app hasn't been deployed yet. Deploy from the header, or start one from an environment.",
+      "columns": {
+        "deployment": "Deployment",
+        "status": "Status",
+        "environment": "Environment",
+        "commit": "Commit",
+        "trigger": "Trigger",
+        "started": "Started",
+        "duration": "Took"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "waiting": "Waiting approval",
+        "failed": "Failed",
+        "today": "Today",
+        "previews": "Previews",
+        "mineNote": "Deployments you triggered."
+      },
+      "statuses": {
+        "pending_approval": "Pending approval",
+        "pending": "Pending",
+        "deploying": "Deploying",
+        "redeploying": "Redeploying",
+        "running": "Running",
+        "failed": "Failed",
+        "superseded": "Superseded",
+        "rolled_back": "Rolled back"
+      },
+      "compare": {
+        "action": "Compare",
+        "selectTwo": "Compare (select exactly 2)",
+        "source": "View on source host",
+        "loading": "Loading comparison...",
+        "image": "Image diff",
+        "noImage": "No image diff available for this pair.",
+        "manifest": "Manifest diff",
+        "changes": "({count, plural, one {# change} other {# changes}})",
+        "identical": "Manifests are identical between these two deploys.",
+        "add": "+ add",
+        "remove": "− remove",
+        "replace": "~ replace"
       }
     },
     "observability": {

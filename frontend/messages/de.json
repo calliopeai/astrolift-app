@@ -1590,49 +1590,95 @@
       }
     },
     "deployments": {
-      "title": "{name} · Deployments",
-      "description": "{slug} · full historical deploy log with filters",
+      "title": "{name} · Bereitstellungen",
+      "description": "{slug} · vollständiger Bereitstellungsverlauf mit Filtern",
       "filters": {
-        "search": "Search commit, tag, branch, workload…",
-        "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "search": "Commit, Tag, Branch oder Workload suchen…",
+        "anyEnv": "Alle Umgebungen",
+        "counts": "{filtered} von {total}",
+        "searchCurrent": "Tags, Commits oder Branches suchen…"
       },
       "table": {
-        "when": "When",
-        "env": "Env",
-        "imageCommit": "Image / commit",
-        "trigger": "Trigger",
+        "when": "Zeitpunkt",
+        "env": "Umgebung",
+        "imageCommit": "Image / Commit",
+        "trigger": "Auslöser",
         "status": "Status",
-        "duration": "Duration",
+        "duration": "Dauer",
         "ci": "CI"
       },
       "row": {
         "prMissing": "PR —",
-        "authorBy": "by {name}",
-        "authorMissing": "by —"
+        "authorBy": "von {name}",
+        "authorMissing": "von —"
       },
-      "emptyTitle": "No deployments match your filters",
-      "emptyNever": "This app hasn't been deployed yet.",
-      "emptyTryAgain": "Loosen the filters or clear the search to see more results.",
-      "emptyStart": "Start a deployment",
-      "approvalsCount": "{received}/{required} approvals",
-      "footer": "Showing the latest {count} deployments. Older rollouts are accessible via the API — pagination ships once the list grows past a single window.",
-      "rollNew": "Roll a new deployment",
+      "emptyTitle": "Keine Bereitstellung entspricht den Filtern",
+      "emptyNever": "Diese App wurde noch nicht bereitgestellt.",
+      "emptyTryAgain": "Erweitern Sie die Filter oder löschen Sie die Suche, um mehr Ergebnisse zu sehen.",
+      "emptyStart": "Bereitstellung starten",
+      "approvalsCount": "{received}/{required} Genehmigungen",
+      "footer": "Die letzten {count} Bereitstellungen werden angezeigt. Ältere Bereitstellungen sind über die API erreichbar; die Seitennavigation wird verfügbar, sobald die Liste mehr als eine Seite umfasst.",
+      "rollNew": "Neue Bereitstellung starten",
       "statusBuckets": {
-        "all": "Any status",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "inFlight": "In flight",
-        "other": "Rolled back / superseded"
+        "all": "Alle Status",
+        "succeeded": "Erfolgreich",
+        "failed": "Fehlgeschlagen",
+        "inFlight": "In Bearbeitung",
+        "other": "Zurückgesetzt / ersetzt"
       },
       "triggers": {
-        "all": "Any trigger",
-        "push": "push",
-        "manual": "manual",
+        "all": "Alle Auslöser",
+        "push": "Push",
+        "manual": "manuell",
         "ci": "ci",
-        "scheduled": "scheduled",
-        "rollback": "rollback",
-        "promotion": "promotion"
+        "scheduled": "geplant",
+        "rollback": "Zurücksetzen",
+        "promotion": "Hochstufung"
+      },
+      "label": "Bereitstellungen",
+      "emptyCurrentTitle": "Noch keine Bereitstellungen",
+      "emptyCurrentDescription": "Diese App wurde noch nicht bereitgestellt. Starten Sie eine Bereitstellung über die Kopfzeile oder eine Umgebung.",
+      "columns": {
+        "deployment": "Bereitstellung",
+        "status": "Status",
+        "environment": "Umgebung",
+        "commit": "Commit",
+        "trigger": "Auslöser",
+        "started": "Gestartet",
+        "duration": "Dauer"
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "waiting": "Warten auf Genehmigung",
+        "failed": "Fehlgeschlagen",
+        "today": "Heute",
+        "previews": "Vorschauen",
+        "mineNote": "Von Ihnen ausgelöste Bereitstellungen."
+      },
+      "statuses": {
+        "pending_approval": "Warten auf Genehmigung",
+        "pending": "Ausstehend",
+        "deploying": "Wird bereitgestellt",
+        "redeploying": "Wird erneut bereitgestellt",
+        "running": "Läuft",
+        "failed": "Fehlgeschlagen",
+        "superseded": "Ersetzt",
+        "rolled_back": "Zurückgesetzt"
+      },
+      "compare": {
+        "action": "Vergleichen",
+        "selectTwo": "Vergleichen (genau 2 auswählen)",
+        "source": "Beim Code-Anbieter ansehen",
+        "loading": "Vergleich wird geladen...",
+        "image": "Image-Unterschiede",
+        "noImage": "Für dieses Paar sind keine Image-Unterschiede verfügbar.",
+        "manifest": "Manifest-Unterschiede",
+        "changes": "({count, plural, one {# Änderung} other {# Änderungen}})",
+        "identical": "Die Manifeste dieser beiden Bereitstellungen sind identisch.",
+        "add": "+ hinzufügen",
+        "remove": "− entfernen",
+        "replace": "~ ersetzen"
       }
     },
     "secrets": {
