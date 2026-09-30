@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 
 import strawberry
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -99,11 +100,23 @@ class _ModelIdentity:
 
 
 def _locked_cluster(cluster_id, expected_provider_id):
-    cluster = TenantCluster.objects.select_for_update().filter(guid=_guid(cluster_id)).first()
+    org_id = current_org_id()
+    if org_id is None:
+        return None
+    cluster = (
+        TenantCluster.objects.filter(Q(organization_id=org_id) | Q(organization_id__isnull=True))
+        .select_for_update()
+        .filter(guid=_guid(cluster_id))
+        .first()
+    )
     if cluster is None:
         return None
     provider = (
-        ProviderPlugin.objects.select_for_update()
+        ProviderPlugin.objects.filter(
+            Q(clusters__organization_id=org_id) | Q(clusters__organization_id__isnull=True),
+            clusters__pk=cluster.pk,
+        )
+        .select_for_update(of=("self",))
         .filter(pk=cluster.provider_plugin_id, guid=_guid(expected_provider_id))
         .first()
     )
@@ -204,15 +217,24 @@ def _locked_environment(guid):
 
     initial = (
         _environment_rows(Permission.APP_UPDATE)
-        .filter(guid=_guid(guid))
+        .filter(guid=_guid(guid), registered_app__organization_id=current_org_id())
         .values_list("pk", "registered_app_id")
         .first()
     )
     if initial is None:
         return None
-    RegisteredApp.objects.select_for_update().get(pk=initial[1])
+    if (
+        RegisteredApp.objects.select_for_update()
+        .filter(pk=initial[1], organization_id=current_org_id())
+        .first()
+        is None
+    ):
+        return None
     return (
-        _environment_rows(Permission.APP_UPDATE).select_for_update(of=("self",)).filter(pk=initial[0]).first()
+        _environment_rows(Permission.APP_UPDATE)
+        .select_for_update(of=("self",))
+        .filter(pk=initial[0], registered_app__organization_id=current_org_id())
+        .first()
     )
 
 
@@ -317,7 +339,8 @@ class ClusterModelMutations:
             with transaction.atomic():
                 from astrolift_identity.models import Organization
 
-                if not Organization.objects.select_for_update().filter(pk=current_org_id()).exists():
+                org_id = current_org_id()
+                if not Organization.objects.select_for_update().filter(pk=org_id).exists():
                     return _refusal()
                 cluster = _locked_cluster(input.cluster_id, input.expected_provider_id)
                 if cluster is None:
@@ -510,7 +533,11 @@ class ClusterModelMutations:
                         kind="Model deployment",
                     )
                 env_guid = (
-                    ManagedServiceAttachment.objects.filter(guid=_guid(input.id), managed_service=service)
+                    ManagedServiceAttachment.objects.filter(
+                        guid=_guid(input.id),
+                        managed_service=service,
+                        managed_service__organization_id=current_org_id(),
+                    )
                     .values_list("app_environment__guid", flat=True)
                     .first()
                 )
@@ -520,12 +547,19 @@ class ClusterModelMutations:
                 row = (
                     ManagedServiceAttachment.objects.select_for_update(of=("self",))
                     .select_related("app_environment__registered_app")
-                    .filter(guid=_guid(input.id), model_subscription=True, managed_service=service)
+                    .filter(
+                        guid=_guid(input.id),
+                        model_subscription=True,
+                        managed_service=service,
+                        managed_service__organization_id=current_org_id(),
+                    )
                     .first()
                 )
                 if (
                     row is None
-                    or not _environment_rows(Permission.APP_UPDATE).filter(pk=row.app_environment_id).exists()
+                    or not _environment_rows(Permission.APP_UPDATE)
+                    .filter(pk=row.app_environment_id, registered_app__organization_id=current_org_id())
+                    .exists()
                 ):
                     return _refusal()
                 _recheck_authority(info, Permission.APP_UPDATE, service.tenant_cluster, environment=env)

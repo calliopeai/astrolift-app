@@ -87,6 +87,33 @@ def test_third_owner_is_not_an_app_or_project_alias(world):
     assert live_cluster_model_by_guid(world.model.guid) is None
 
 
+@pytest.mark.parametrize("placement", ["organization", "install_shared", "foreign"])
+def test_locked_cluster_lookup_preserves_only_current_org_and_install_shared_placement(world, placement):
+    from astrolift_services.schema.cluster_model_mutations import _locked_cluster
+
+    if placement != "organization":
+        world.cluster.organization = None if placement == "install_shared" else world.other_org
+        world.cluster.save()
+    with subject(world):
+        result = _locked_cluster(world.cluster.guid, world.cluster.provider_plugin.guid)
+    if placement == "foreign":
+        assert result is None
+    else:
+        assert result.pk == world.cluster.pk
+        assert result.provider_plugin.guid == world.cluster.provider_plugin.guid
+
+
+def test_locked_install_shared_cluster_refuses_without_tenant_before_any_row_read(
+    world, django_assert_num_queries
+):
+    from astrolift_services.schema.cluster_model_mutations import _locked_cluster
+
+    world.cluster.organization = None
+    world.cluster.save()
+    with django_assert_num_queries(0):
+        assert _locked_cluster(world.cluster.guid, world.cluster.provider_plugin.guid) is None
+
+
 @pytest.mark.parametrize(
     "mutation", ["foreign_cluster", "deleted_cluster", "deleted_provider", "deleted_org", "deleted_model"]
 )

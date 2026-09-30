@@ -245,7 +245,9 @@ class ClusterModelsQuery:
             )
         cluster = available_model_clusters(
             TenantCluster.objects.filter(
-                guid=_guid(input.cluster_id), provider_plugin__guid=_guid(input.expected_provider_id)
+                Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
+                guid=_guid(input.cluster_id),
+                provider_plugin__guid=_guid(input.expected_provider_id),
             ),
             current_org_id(),
         ).first()
@@ -304,7 +306,11 @@ class ClusterModelsQuery:
             admitted = (
                 admitted
                 and available_model_clusters(
-                    TenantCluster.objects.filter(pk=service.tenant_cluster_id), current_org_id()
+                    TenantCluster.objects.filter(
+                        Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
+                        pk=service.tenant_cluster_id,
+                    ),
+                    current_org_id(),
                 ).exists()
             )
             decision = cluster_model_to_type(service)
@@ -388,7 +394,9 @@ class ClusterModelsQuery:
             rows = rows.none()
         rows = rows.annotate(
             _can_revoke=Exists(
-                _environment_rows(Permission.APP_UPDATE).filter(pk=OuterRef("app_environment_id"))
+                _environment_rows(Permission.APP_UPDATE).filter(
+                    pk=OuterRef("app_environment_id"), registered_app__organization_id=current_org_id()
+                )
             )
         )
         return _page(

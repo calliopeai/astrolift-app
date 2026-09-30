@@ -4,6 +4,7 @@ from functools import wraps
 
 import strawberry
 from django.db import transaction
+from django.db.models import Q
 from graphql import GraphQLError
 from strawberry.types import Info
 
@@ -14,6 +15,7 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.operation_context import OperationContext
 from astrolift_services.cluster_models import cluster_model_org_scope, live_cluster_model_by_guid
+from astrolift_services.model_admission import current_org_id
 from astrolift_services.model_prompt import (
     PromptReadinessState,
     shared_agent_test_target,
@@ -72,12 +74,30 @@ def _target(guid, cluster_id, provider_id, version, *, lock=False):
         return None
     if lock:
         # Configuration/subscription mutations serialize on this same owner row.
-        ManagedService.objects.select_for_update().get(pk=service.pk)
+        if (
+            ManagedService.objects.select_for_update()
+            .filter(pk=service.pk, organization_id=current_org_id())
+            .first()
+            is None
+        ):
+            return None
         service = live_cluster_model_by_guid(guid)
         if service is None:
             return None
-        cluster = TenantCluster.objects.select_for_update().get(pk=service.tenant_cluster_id)
-        type(cluster.provider_plugin).objects.select_for_update().get(pk=cluster.provider_plugin_id)
+        cluster = (
+            TenantCluster.objects.filter(
+                Q(organization_id=current_org_id()) | Q(organization_id__isnull=True)
+            )
+            .select_for_update()
+            .filter(pk=service.tenant_cluster_id)
+            .first()
+        )
+        if cluster is None:
+            return None
+        type(cluster.provider_plugin).objects.filter(
+            Q(clusters__organization_id=current_org_id()) | Q(clusters__organization_id__isnull=True),
+            clusters__pk=cluster.pk,
+        ).select_for_update(of=("self",)).get(pk=cluster.provider_plugin_id)
         service = live_cluster_model_by_guid(guid)
         if service is None:
             return None

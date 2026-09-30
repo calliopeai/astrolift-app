@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared model by-ID reads and locks include current organization constraints
+  directly, including exact cluster-scoped provider locks. Install-shared
+  placement remains available only within a current tenant context (#2213).
+
 - Add server-side Hugging Face search with bounded filter-bound pagination,
   immutable revision resolution, source timestamps and honest unavailable or
   unknown metadata (#2214).
