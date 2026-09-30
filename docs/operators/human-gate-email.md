@@ -42,6 +42,12 @@ quota permission and identity-scoped send permission for
 verification/DKIM and sending disabled. The publicly delegated Route53 zone is
 `Z00297308K0JGG1ZSOAA`; the other public zone with the same name is not delegated.
 The identity's `_amazonses` TXT record is absent from the delegated zone.
+All four identity verification/DKIM records are absent. A read-only plan was
+prepared against that exact public delegation; it proposes only creation of the
+missing records and refuses conflicting existing values. No DNS/SES mutation ran.
+The SES account is sending-enabled but has no production access, so a test
+recipient must also be verified while the account remains in the
+[SES sandbox](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html).
 
 Web definition `:47` and worker definition `:37` contain no explicit sender or
 SES settings in environment or secret references, so the backend's default
