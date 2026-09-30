@@ -11,6 +11,16 @@ class AgentTaskEvent(BaseCoreModel):
         INPUT_REQUIRED = "input_required"
         APPROVAL_REQUIRED = "approval_required"
         INPUT_RESOLVED = "input_resolved"
+        TURN_STARTED = "turn_started"
+        TURN_COMPLETED = "turn_completed"
+        TURN_FAILED = "turn_failed"
+        TURN_CANCELLED = "turn_cancelled"
+        STOP_REQUESTED = "stop_requested"
+        TOOL_CALL_STARTED = "tool_call_started"
+        TOOL_CALL_INPUT = "tool_call_input"
+        TOOL_CALL_RESULT = "tool_call_result"
+        TOOL_CALL_COMPLETED = "tool_call_completed"
+        TOOL_CALL_FAILED = "tool_call_failed"
 
     organization = models.ForeignKey("astrolift_identity.Organization", on_delete=models.CASCADE)
     agent_task = models.ForeignKey(
@@ -22,6 +32,7 @@ class AgentTaskEvent(BaseCoreModel):
     kind = models.CharField(max_length=32, choices=Kind.choices)
     text = models.TextField(blank=True, default="")
     request = models.JSONField(null=True, blank=True)
+    data = models.JSONField(null=True, blank=True)
 
     class Meta:
         ordering = ["sequence"]

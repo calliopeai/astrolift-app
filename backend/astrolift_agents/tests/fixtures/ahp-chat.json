@@ -1,0 +1,1790 @@
+{
+  "upstreamCommit": "08d4889f9ec4a1685d257b9b95de036c8e1ce1e5",
+  "protocolVersion": "1.0.0",
+  "scenarios": [
+    {
+      "name": "text and completion",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/responsePart",
+            "turnId": "turn-1",
+            "part": {
+              "kind": "markdown",
+              "id": "m",
+              "content": ""
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "markdown",
+                  "id": "m",
+                  "content": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/delta",
+            "turnId": "turn-1",
+            "partId": "m",
+            "content": "Hello"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "markdown",
+                  "id": "m",
+                  "content": "Hello"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnComplete",
+            "turnId": "turn-1",
+            "duration": 130
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.130Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 130,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "markdown",
+                    "id": "m",
+                    "content": "Hello"
+                  }
+                ],
+                "state": "complete"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "tool approval True",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallStart",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "toolName": "Bash",
+            "displayName": "Bash"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "status": "streaming"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallReady",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "invocationMessage": "Review shell",
+            "toolInput": "{\"command\":\"pwd\"}",
+            "riskAssessment": {
+              "kind": "judge",
+              "status": "complete",
+              "reason": "Approval required",
+              "safety": 0.5
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 24,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "pending-confirmation",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "riskAssessment": {
+                      "kind": "judge",
+                      "status": "complete",
+                      "reason": "Approval required",
+                      "safety": 0.5
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallConfirmed",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "approved": true,
+            "confirmed": "user-action"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "running",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "confirmed": "user-action"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnComplete",
+            "turnId": "turn-1",
+            "duration": 0
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 0,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "toolCall",
+                    "toolCall": {
+                      "status": "cancelled",
+                      "toolCallId": "request-1",
+                      "toolName": "Bash",
+                      "displayName": "Bash",
+                      "invocationMessage": "Review shell",
+                      "toolInput": "{\"command\":\"pwd\"}",
+                      "reason": "skipped"
+                    }
+                  }
+                ],
+                "state": "complete"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "tool approval False",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallStart",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "toolName": "Bash",
+            "displayName": "Bash"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "status": "streaming"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallReady",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "invocationMessage": "Review shell",
+            "toolInput": "{\"command\":\"pwd\"}",
+            "riskAssessment": {
+              "kind": "judge",
+              "status": "complete",
+              "reason": "Approval required",
+              "safety": 0.5
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 24,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "pending-confirmation",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "riskAssessment": {
+                      "kind": "judge",
+                      "status": "complete",
+                      "reason": "Approval required",
+                      "safety": 0.5
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallConfirmed",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "approved": false,
+            "reason": "denied",
+            "reasonMessage": "Denied by reviewer"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "cancelled",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "reason": "denied",
+                    "reasonMessage": "Denied by reviewer"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnComplete",
+            "turnId": "turn-1",
+            "duration": 0
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 0,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "toolCall",
+                    "toolCall": {
+                      "status": "cancelled",
+                      "toolCallId": "request-1",
+                      "toolName": "Bash",
+                      "displayName": "Bash",
+                      "invocationMessage": "Review shell",
+                      "toolInput": "{\"command\":\"pwd\"}",
+                      "reason": "denied",
+                      "reasonMessage": "Denied by reviewer"
+                    }
+                  }
+                ],
+                "state": "complete"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel pending tool",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallStart",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "toolName": "Bash",
+            "displayName": "Bash"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "status": "streaming"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallReady",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "invocationMessage": "Review shell",
+            "toolInput": "{\"command\":\"pwd\"}",
+            "riskAssessment": {
+              "kind": "judge",
+              "status": "complete",
+              "reason": "Approval required",
+              "safety": 0.5
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 24,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "pending-confirmation",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "riskAssessment": {
+                      "kind": "judge",
+                      "status": "complete",
+                      "reason": "Approval required",
+                      "safety": 0.5
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnCancelled",
+            "turnId": "turn-1",
+            "duration": 140
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.140Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 140,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "toolCall",
+                    "toolCall": {
+                      "status": "cancelled",
+                      "toolCallId": "request-1",
+                      "toolName": "Bash",
+                      "displayName": "Bash",
+                      "invocationMessage": "Review shell",
+                      "toolInput": "{\"command\":\"pwd\"}",
+                      "reason": "skipped"
+                    }
+                  }
+                ],
+                "state": "cancelled"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel streaming tool",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallStart",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "toolName": "Bash",
+            "displayName": "Bash"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "status": "streaming"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnCancelled",
+            "turnId": "turn-1",
+            "duration": 140
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.140Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 140,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "toolCall",
+                    "toolCall": {
+                      "status": "cancelled",
+                      "toolCallId": "request-1",
+                      "toolName": "Bash",
+                      "displayName": "Bash",
+                      "invocationMessage": "",
+                      "reason": "skipped"
+                    }
+                  }
+                ],
+                "state": "cancelled"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "error",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/error",
+            "turnId": "turn-1",
+            "duration": 140,
+            "error": {
+              "errorType": "failed",
+              "message": "Execution failed"
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 2,
+            "modifiedAt": "2026-09-29T00:00:01.140Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 140,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [],
+                "state": "error",
+                "error": {
+                  "errorType": "failed",
+                  "message": "Execution failed"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "question answer",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/inputRequested",
+            "request": {
+              "id": "request-2",
+              "message": "Pick",
+              "questions": [
+                {
+                  "id": "q",
+                  "kind": "text",
+                  "message": "Name",
+                  "required": true
+                }
+              ]
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 24,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "inputRequest",
+                  "request": {
+                    "id": "request-2",
+                    "message": "Pick",
+                    "questions": [
+                      {
+                        "id": "q",
+                        "kind": "text",
+                        "message": "Name",
+                        "required": true
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/inputCompleted",
+            "requestId": "request-2",
+            "response": "accept",
+            "answers": {
+              "q": {
+                "state": "submitted",
+                "value": {
+                  "kind": "text",
+                  "value": "Hello"
+                }
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "inputRequest",
+                  "request": {
+                    "id": "request-2",
+                    "message": "Pick",
+                    "questions": [
+                      {
+                        "id": "q",
+                        "kind": "text",
+                        "message": "Name",
+                        "required": true
+                      }
+                    ],
+                    "answers": {
+                      "q": {
+                        "state": "submitted",
+                        "value": {
+                          "kind": "text",
+                          "value": "Hello"
+                        }
+                      }
+                    }
+                  },
+                  "response": "accept"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnComplete",
+            "turnId": "turn-1",
+            "duration": 140
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.140Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 140,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "inputRequest",
+                    "request": {
+                      "id": "request-2",
+                      "message": "Pick",
+                      "questions": [
+                        {
+                          "id": "q",
+                          "kind": "text",
+                          "message": "Name",
+                          "required": true
+                        }
+                      ],
+                      "answers": {
+                        "q": {
+                          "state": "submitted",
+                          "value": {
+                            "kind": "text",
+                            "value": "Hello"
+                          }
+                        }
+                      }
+                    },
+                    "response": "accept"
+                  }
+                ],
+                "state": "complete"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "steering",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/pendingMessageSet",
+            "kind": "steering",
+            "id": "steer-1",
+            "message": {
+              "text": "Review",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:00.000Z",
+            "turns": [],
+            "steeringMessage": {
+              "id": "steer-1",
+              "message": {
+                "text": "Review",
+                "origin": {
+                  "kind": "user"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ignore another turn",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/responsePart",
+            "turnId": "other",
+            "part": {
+              "kind": "markdown",
+              "id": "m",
+              "content": "wrong"
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/error",
+            "turnId": "other",
+            "duration": 0,
+            "error": {
+              "errorType": "failed",
+              "message": "wrong"
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnComplete",
+            "turnId": "turn-1",
+            "duration": 140
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.140Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 140,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [],
+                "state": "complete"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "observed tool result True",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallStart",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "toolName": "Bash",
+            "displayName": "Bash"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "status": "streaming"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallReady",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "invocationMessage": "Review shell",
+            "toolInput": "{\"command\":\"pwd\"}",
+            "confirmed": "not-needed"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "running",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "confirmed": "not-needed"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallComplete",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "result": {
+              "success": true,
+              "pastTenseMessage": "Command finished",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed output"
+                }
+              ]
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "completed",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "confirmed": "not-needed",
+                    "success": true,
+                    "pastTenseMessage": "Command finished",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Observed output"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnComplete",
+            "turnId": "turn-1",
+            "duration": 100
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.100Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 100,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "toolCall",
+                    "toolCall": {
+                      "status": "completed",
+                      "toolCallId": "request-1",
+                      "toolName": "Bash",
+                      "displayName": "Bash",
+                      "invocationMessage": "Review shell",
+                      "toolInput": "{\"command\":\"pwd\"}",
+                      "confirmed": "not-needed",
+                      "success": true,
+                      "pastTenseMessage": "Command finished",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Observed output"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "state": "complete"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "observed tool result False",
+      "initial": {
+        "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+        "title": "Task",
+        "status": 1,
+        "modifiedAt": "2026-09-29T00:00:00.000Z",
+        "turns": []
+      },
+      "steps": [
+        {
+          "action": {
+            "type": "chat/turnStarted",
+            "turnId": "turn-1",
+            "startedAt": "2026-09-29T00:00:01.000Z",
+            "message": {
+              "text": "Inspect",
+              "origin": {
+                "kind": "user"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": []
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallStart",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "toolName": "Bash",
+            "displayName": "Bash"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "status": "streaming"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallReady",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "invocationMessage": "Review shell",
+            "toolInput": "{\"command\":\"pwd\"}",
+            "confirmed": "not-needed"
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "running",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "confirmed": "not-needed"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/toolCallComplete",
+            "turnId": "turn-1",
+            "toolCallId": "request-1",
+            "result": {
+              "success": false,
+              "pastTenseMessage": "Command failed",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed output"
+                }
+              ],
+              "error": {
+                "errorType": "tool",
+                "message": "Observed failure"
+              }
+            }
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 8,
+            "modifiedAt": "2026-09-29T00:00:01.000Z",
+            "turns": [],
+            "activeTurn": {
+              "id": "turn-1",
+              "startedAt": "2026-09-29T00:00:01.000Z",
+              "message": {
+                "text": "Inspect",
+                "origin": {
+                  "kind": "user"
+                }
+              },
+              "responseParts": [
+                {
+                  "kind": "toolCall",
+                  "toolCall": {
+                    "status": "completed",
+                    "toolCallId": "request-1",
+                    "toolName": "Bash",
+                    "displayName": "Bash",
+                    "invocationMessage": "Review shell",
+                    "toolInput": "{\"command\":\"pwd\"}",
+                    "confirmed": "not-needed",
+                    "success": false,
+                    "pastTenseMessage": "Command failed",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Observed output"
+                      }
+                    ],
+                    "error": {
+                      "errorType": "tool",
+                      "message": "Observed failure"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "chat/turnComplete",
+            "turnId": "turn-1",
+            "duration": 100
+          },
+          "expected": {
+            "resource": "ahp-session:/00000000-0000-0000-0000-000000000001/chat",
+            "title": "Task",
+            "status": 1,
+            "modifiedAt": "2026-09-29T00:00:01.100Z",
+            "turns": [
+              {
+                "id": "turn-1",
+                "startedAt": "2026-09-29T00:00:01.000Z",
+                "duration": 100,
+                "message": {
+                  "text": "Inspect",
+                  "origin": {
+                    "kind": "user"
+                  }
+                },
+                "responseParts": [
+                  {
+                    "kind": "toolCall",
+                    "toolCall": {
+                      "status": "completed",
+                      "toolCallId": "request-1",
+                      "toolName": "Bash",
+                      "displayName": "Bash",
+                      "invocationMessage": "Review shell",
+                      "toolInput": "{\"command\":\"pwd\"}",
+                      "confirmed": "not-needed",
+                      "success": false,
+                      "pastTenseMessage": "Command failed",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Observed output"
+                        }
+                      ],
+                      "error": {
+                        "errorType": "tool",
+                        "message": "Observed failure"
+                      }
+                    }
+                  }
+                ],
+                "state": "complete"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

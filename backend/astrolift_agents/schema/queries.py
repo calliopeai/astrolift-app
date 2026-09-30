@@ -1379,6 +1379,7 @@ class AgentsQuery:
                 text=row.text,
                 created_at=row.created_at,
                 request=row.request,
+                data=row.data,
             )
             for row in rows
         ]
