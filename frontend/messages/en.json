@@ -4573,6 +4573,53 @@
         "searchTargets": "Search app environments",
         "eligible": "Eligible",
         "selectedTarget": "Selected: {target}"
+      },
+      "catalogue": {
+        "title": "Hugging Face catalogue",
+        "description": "Find a model, resolve an immutable revision, then review a cluster and explicit CPU or GPU runtime.",
+        "compatibilityUnknown": "Runtime compatibility unknown",
+        "accessNotice": "Catalogue metadata does not prove model access, license acceptance, hardware fit or vLLM support.",
+        "unknown": "Unknown",
+        "source": "Source: {source} · observed {time}",
+        "rateLimited": "The catalogue source is rate limited. No replacement results are supplied.",
+        "unavailable": "The catalogue source is unavailable. Model availability cannot be determined.",
+        "retryAfter": "Source suggests retrying after {seconds} seconds.",
+        "retry": "Retry",
+        "empty": "No catalogue matches",
+        "emptyDescription": "Search or adjust the server filters to find a public model.",
+        "repository": "Repository / publisher",
+        "metadata": "Task / library / license",
+        "gating": "Access requirements",
+        "popularity": "Reported popularity",
+        "downloads": "Downloads: {value}",
+        "likes": "Likes: {value}",
+        "revision": "Revision, branch or tag",
+        "revisionHelp": "Leave blank to resolve the current default revision. Deployment uses the verified immutable SHA, never a moving branch or tag.",
+        "resolving": "Verifying the immutable revision…",
+        "noVerifiedRevision": "No immutable revision has been verified for this selection.",
+        "useRevision": "Use verified revision",
+        "search": "Search models on Hugging Face",
+        "all": "All",
+        "author": "Publisher",
+        "pipelineTag": "Task",
+        "library": "Library",
+        "license": "License",
+        "ordering": "Order",
+        "sort": {
+          "downloads": "Most downloaded",
+          "likes": "Most liked",
+          "lastModified": "Recently updated",
+          "createdAt": "Recently created",
+          "trendingScore": "Trending"
+        },
+        "gated": {
+          "NONE": "Not gated",
+          "AUTO": "Automatic access approval required",
+          "MANUAL": "Manual access approval required",
+          "UNKNOWN": "Access requirements unknown"
+        },
+        "filterGated": "Gated",
+        "filterUngated": "Not gated"
       }
     }
   }

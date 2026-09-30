@@ -4493,6 +4493,53 @@
         "searchTargets": "Buscar ambientes de aplicativos",
         "eligible": "Elegível",
         "selectedTarget": "Selecionado: {target}"
+      },
+      "catalogue": {
+        "title": "Catálogo do Hugging Face",
+        "description": "Encontre um modelo, resolva uma revisão imutável e revise um cluster com runtime CPU ou GPU explícito.",
+        "compatibilityUnknown": "Compatibilidade do runtime desconhecida",
+        "accessNotice": "Os metadados do catálogo não comprovam acesso ao modelo, aceitação da licença, adequação do hardware ou suporte ao vLLM.",
+        "unknown": "Desconhecido",
+        "source": "Fonte: {source} · observado em {time}",
+        "rateLimited": "A fonte do catálogo limitou as solicitações. Nenhum resultado substituto é fornecido.",
+        "unavailable": "A fonte do catálogo está indisponível. Não é possível determinar a disponibilidade dos modelos.",
+        "retryAfter": "A fonte sugere tentar novamente após {seconds} segundos.",
+        "retry": "Tentar novamente",
+        "empty": "Nenhum resultado no catálogo",
+        "emptyDescription": "Pesquise ou ajuste os filtros do servidor para encontrar um modelo público.",
+        "repository": "Repositório / publicador",
+        "metadata": "Tarefa / biblioteca / licença",
+        "gating": "Requisitos de acesso",
+        "popularity": "Popularidade informada",
+        "downloads": "Downloads: {value}",
+        "likes": "Curtidas: {value}",
+        "revision": "Revisão, branch ou tag",
+        "revisionHelp": "Deixe em branco para resolver a revisão padrão atual. A implantação usa o SHA imutável verificado, nunca uma branch ou tag variável.",
+        "resolving": "Verificando a revisão imutável…",
+        "noVerifiedRevision": "Nenhuma revisão imutável foi verificada para esta seleção.",
+        "useRevision": "Usar revisão verificada",
+        "search": "Buscar modelos no Hugging Face",
+        "all": "Todos",
+        "author": "Publicador",
+        "pipelineTag": "Tarefa",
+        "library": "Biblioteca",
+        "license": "Licença",
+        "ordering": "Ordem",
+        "sort": {
+          "downloads": "Mais baixados",
+          "likes": "Mais curtidos",
+          "lastModified": "Atualizados recentemente",
+          "createdAt": "Criados recentemente",
+          "trendingScore": "Em alta"
+        },
+        "gated": {
+          "NONE": "Sem restrição de acesso",
+          "AUTO": "Aprovação automática de acesso necessária",
+          "MANUAL": "Aprovação manual de acesso necessária",
+          "UNKNOWN": "Requisitos de acesso desconhecidos"
+        },
+        "filterGated": "Com restrição",
+        "filterUngated": "Sem restrição"
       }
     }
   }

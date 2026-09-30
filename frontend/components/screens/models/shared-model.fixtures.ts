@@ -96,3 +96,39 @@ export function fakeModelPage<T>(patch: Partial<ModelPage<T>> = {}): ModelPage<T
     ...patch,
   };
 }
+
+import type { HuggingFaceCataloguePanelProps } from "./HuggingFaceCataloguePanel";
+export const hfCatalogueProps: HuggingFaceCataloguePanelProps = {
+  page: fakeModelPage({
+    rows: [
+      {
+        repoId: "Qwen/Qwen3-8B",
+        revisionSha: null,
+        author: "Qwen",
+        pipelineTag: "text-generation",
+        library: "transformers",
+        license: "apache-2.0",
+        architectures: ["Qwen3ForCausalLM"],
+        gated: "NONE",
+        downloads: 15234,
+        likes: null,
+        compatibility: "UNKNOWN",
+      },
+    ],
+  }),
+  state: "AVAILABLE",
+  source: "https://huggingface.co/api/models",
+  observedAt: "2026-09-30T15:30:00Z",
+  retryAfterSeconds: null,
+  selectedRepoId: null,
+  revision: "",
+  onSelect: () => {},
+  onRevisionChange: () => {},
+  resolving: false,
+  resolvedModel: null,
+  resolutionError: null,
+  resolutionSource: null,
+  resolutionObservedAt: null,
+  onRetryResolution: () => {},
+  onUseRevision: () => {},
+};

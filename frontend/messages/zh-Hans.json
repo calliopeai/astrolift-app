@@ -4493,6 +4493,53 @@
         "searchTargets": "搜索应用环境",
         "eligible": "符合条件",
         "selectedTarget": "已选择：{target}"
+      },
+      "catalogue": {
+        "title": "Hugging Face 目录",
+        "description": "查找模型，解析不可变的修订版本，然后确认集群及明确的 CPU 或 GPU 运行时。",
+        "compatibilityUnknown": "运行时兼容性未知",
+        "accessNotice": "目录元数据不能证明模型访问权限、许可证接受情况、硬件适配或 vLLM 支持。",
+        "unknown": "未知",
+        "source": "来源：{source} · 观测时间：{time}",
+        "rateLimited": "目录来源已限制请求频率，不提供替代结果。",
+        "unavailable": "目录来源不可用，无法确定模型的可用性。",
+        "retryAfter": "来源建议在 {seconds} 秒后重试。",
+        "retry": "重试",
+        "empty": "没有匹配的目录结果",
+        "emptyDescription": "搜索或调整服务器筛选条件以查找公开模型。",
+        "repository": "仓库 / 发布者",
+        "metadata": "任务 / 库 / 许可证",
+        "gating": "访问要求",
+        "popularity": "来源报告的热度",
+        "downloads": "下载量：{value}",
+        "likes": "点赞数：{value}",
+        "revision": "修订版本、分支或标签",
+        "revisionHelp": "留空以解析当前默认修订版本。部署使用已验证的不可变 SHA，不使用会变动的分支或标签。",
+        "resolving": "正在验证不可变的修订版本…",
+        "noVerifiedRevision": "尚未验证此选择的不可变修订版本。",
+        "useRevision": "使用已验证的修订版本",
+        "search": "在 Hugging Face 搜索模型",
+        "all": "全部",
+        "author": "发布者",
+        "pipelineTag": "任务",
+        "library": "库",
+        "license": "许可证",
+        "ordering": "排序",
+        "sort": {
+          "downloads": "下载量最多",
+          "likes": "点赞最多",
+          "lastModified": "最近更新",
+          "createdAt": "最近创建",
+          "trendingScore": "热门趋势"
+        },
+        "gated": {
+          "NONE": "无访问门槛",
+          "AUTO": "需要自动访问审批",
+          "MANUAL": "需要人工访问审批",
+          "UNKNOWN": "访问要求未知"
+        },
+        "filterGated": "有访问门槛",
+        "filterUngated": "无访问门槛"
       }
     }
   }

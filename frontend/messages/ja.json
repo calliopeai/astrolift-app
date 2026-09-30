@@ -4493,6 +4493,53 @@
         "searchTargets": "アプリ環境を検索",
         "eligible": "利用可能",
         "selectedTarget": "選択中：{target}"
+      },
+      "catalogue": {
+        "title": "Hugging Face カタログ",
+        "description": "モデルを検索して不変のリビジョンを確定し、クラスターと CPU または GPU ランタイムを確認します。",
+        "compatibilityUnknown": "ランタイムの互換性は不明",
+        "accessNotice": "カタログのメタデータは、モデルへのアクセス、ライセンスへの同意、ハードウェアへの適合、vLLM の対応を保証しません。",
+        "unknown": "不明",
+        "source": "ソース：{source} · 観測日時：{time}",
+        "rateLimited": "カタログのソースでリクエストが制限されています。代替の検索結果は提供されません。",
+        "unavailable": "カタログのソースを利用できません。モデルの利用可否を確認できません。",
+        "retryAfter": "ソースは {seconds} 秒後の再試行を推奨しています。",
+        "retry": "再試行",
+        "empty": "カタログに一致するモデルなし",
+        "emptyDescription": "検索条件やサーバーのフィルターを変更して、公開モデルを探してください。",
+        "repository": "リポジトリ / 公開者",
+        "metadata": "タスク / ライブラリ / ライセンス",
+        "gating": "アクセス要件",
+        "popularity": "報告された人気度",
+        "downloads": "ダウンロード：{value}",
+        "likes": "いいね：{value}",
+        "revision": "リビジョン、ブランチ、タグ",
+        "revisionHelp": "空欄の場合、現在のデフォルトのリビジョンを解決します。デプロイには確認済みの不変 SHA を使用し、変更されるブランチやタグは使用しません。",
+        "resolving": "不変のリビジョンを確認中…",
+        "noVerifiedRevision": "この選択で不変のリビジョンは確認されていません。",
+        "useRevision": "確認済みリビジョンを使用",
+        "search": "Hugging Face でモデルを検索",
+        "all": "すべて",
+        "author": "公開者",
+        "pipelineTag": "タスク",
+        "library": "ライブラリ",
+        "license": "ライセンス",
+        "ordering": "並び順",
+        "sort": {
+          "downloads": "ダウンロード順",
+          "likes": "いいね順",
+          "lastModified": "更新日時順",
+          "createdAt": "作成日時順",
+          "trendingScore": "トレンド順"
+        },
+        "gated": {
+          "NONE": "アクセス制限なし",
+          "AUTO": "自動承認が必要",
+          "MANUAL": "手動承認が必要",
+          "UNKNOWN": "アクセス要件不明"
+        },
+        "filterGated": "アクセス制限あり",
+        "filterUngated": "アクセス制限なし"
       }
     }
   }

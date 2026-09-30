@@ -4496,6 +4496,53 @@
         "searchTargets": "App-Umgebungen suchen",
         "eligible": "Geeignet",
         "selectedTarget": "Ausgewählt: {target}"
+      },
+      "catalogue": {
+        "title": "Hugging-Face-Katalog",
+        "description": "Suchen Sie ein Modell, ermitteln Sie eine unveränderliche Revision und prüfen Sie dann einen Cluster mit expliziter CPU- oder GPU-Laufzeit.",
+        "compatibilityUnknown": "Laufzeitkompatibilität unbekannt",
+        "accessNotice": "Katalogmetadaten bestätigen weder Modellzugriff oder Lizenzannahme noch passende Hardware oder vLLM-Unterstützung.",
+        "unknown": "Unbekannt",
+        "source": "Quelle: {source} · beobachtet {time}",
+        "rateLimited": "Die Katalogquelle begrenzt Anfragen. Es werden keine Ersatztreffer bereitgestellt.",
+        "unavailable": "Die Katalogquelle ist nicht verfügbar. Die Verfügbarkeit von Modellen lässt sich nicht bestimmen.",
+        "retryAfter": "Die Quelle empfiehlt einen neuen Versuch nach {seconds} Sekunden.",
+        "retry": "Erneut versuchen",
+        "empty": "Keine Katalogtreffer",
+        "emptyDescription": "Suchen Sie nach einem öffentlichen Modell oder ändern Sie die Serverfilter.",
+        "repository": "Repository / Herausgeber",
+        "metadata": "Aufgabe / Bibliothek / Lizenz",
+        "gating": "Zugriffsvoraussetzungen",
+        "popularity": "Gemeldete Beliebtheit",
+        "downloads": "Downloads: {value}",
+        "likes": "Gefällt mir: {value}",
+        "revision": "Revision, Branch oder Tag",
+        "revisionHelp": "Leer lassen, um die aktuelle Standardrevision zu ermitteln. Das Deployment verwendet den geprüften unveränderlichen SHA, nie einen veränderlichen Branch oder Tag.",
+        "resolving": "Unveränderliche Revision wird geprüft…",
+        "noVerifiedRevision": "Für diese Auswahl wurde keine unveränderliche Revision bestätigt.",
+        "useRevision": "Geprüfte Revision verwenden",
+        "search": "Modelle auf Hugging Face suchen",
+        "all": "Alle",
+        "author": "Herausgeber",
+        "pipelineTag": "Aufgabe",
+        "library": "Bibliothek",
+        "license": "Lizenz",
+        "ordering": "Reihenfolge",
+        "sort": {
+          "downloads": "Meistgeladen",
+          "likes": "Meiste Gefällt-mir-Angaben",
+          "lastModified": "Kürzlich aktualisiert",
+          "createdAt": "Kürzlich erstellt",
+          "trendingScore": "Im Trend"
+        },
+        "gated": {
+          "NONE": "Ohne Zugangsbeschränkung",
+          "AUTO": "Automatische Zugriffsgenehmigung erforderlich",
+          "MANUAL": "Manuelle Zugriffsgenehmigung erforderlich",
+          "UNKNOWN": "Zugriffsvoraussetzungen unbekannt"
+        },
+        "filterGated": "Zugangsbeschränkt",
+        "filterUngated": "Ohne Beschränkung"
       }
     }
   }

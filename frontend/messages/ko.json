@@ -4493,6 +4493,53 @@
         "searchTargets": "앱 환경 검색",
         "eligible": "사용 가능",
         "selectedTarget": "선택됨: {target}"
+      },
+      "catalogue": {
+        "title": "Hugging Face 카탈로그",
+        "description": "모델을 찾고 불변 리비전을 확인한 다음 클러스터와 명시적인 CPU 또는 GPU 런타임을 검토하세요.",
+        "compatibilityUnknown": "런타임 호환성 알 수 없음",
+        "accessNotice": "카탈로그 메타데이터는 모델 접근 권한, 라이선스 동의, 하드웨어 적합성 또는 vLLM 지원을 증명하지 않습니다.",
+        "unknown": "알 수 없음",
+        "source": "출처: {source} · 관측 시각: {time}",
+        "rateLimited": "카탈로그 출처에서 요청을 제한하고 있습니다. 대체 결과는 제공되지 않습니다.",
+        "unavailable": "카탈로그 출처를 사용할 수 없습니다. 모델 가용성을 확인할 수 없습니다.",
+        "retryAfter": "출처에서 {seconds}초 후에 다시 시도할 것을 권장합니다.",
+        "retry": "다시 시도",
+        "empty": "일치하는 카탈로그 결과 없음",
+        "emptyDescription": "검색하거나 서버 필터를 조정하여 공개 모델을 찾으세요.",
+        "repository": "저장소 / 게시자",
+        "metadata": "작업 / 라이브러리 / 라이선스",
+        "gating": "접근 요구 사항",
+        "popularity": "보고된 인기도",
+        "downloads": "다운로드: {value}",
+        "likes": "좋아요: {value}",
+        "revision": "리비전, 브랜치 또는 태그",
+        "revisionHelp": "비워 두면 현재 기본 리비전을 확인합니다. 배포에는 검증된 불변 SHA를 사용하며 변경될 수 있는 브랜치나 태그는 사용하지 않습니다.",
+        "resolving": "불변 리비전 확인 중…",
+        "noVerifiedRevision": "이 선택 항목의 불변 리비전이 확인되지 않았습니다.",
+        "useRevision": "검증된 리비전 사용",
+        "search": "Hugging Face 모델 검색",
+        "all": "전체",
+        "author": "게시자",
+        "pipelineTag": "작업",
+        "library": "라이브러리",
+        "license": "라이선스",
+        "ordering": "정렬 기준",
+        "sort": {
+          "downloads": "다운로드 많은 순",
+          "likes": "좋아요 많은 순",
+          "lastModified": "최근 업데이트 순",
+          "createdAt": "최근 생성 순",
+          "trendingScore": "인기 급상승"
+        },
+        "gated": {
+          "NONE": "접근 제한 없음",
+          "AUTO": "자동 접근 승인 필요",
+          "MANUAL": "수동 접근 승인 필요",
+          "UNKNOWN": "접근 요구 사항 알 수 없음"
+        },
+        "filterGated": "접근 제한 있음",
+        "filterUngated": "접근 제한 없음"
       }
     }
   }

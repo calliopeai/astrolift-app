@@ -17,6 +17,10 @@
   not yet expose deployment or subscription operations; unavailable placements
   remain inspectable while infrastructure transport requires managed, active
   clusters and enabled providers (#2213).
+- Add translated Hugging Face catalogue and immutable revision-selection views
+  backed by the actual paged API, with honest unavailable/unknown metadata and
+  no inferred CPU/GPU fit or catalogue fallback rows (#2215).
+
 - Add Storybook subscription reviews for shared model deployments in all eight
   locales, with named aliases, immutable target/version checks, restart-impact
   warnings and distinct accepted versus applied states. Production adapter and

@@ -4496,6 +4496,53 @@
         "searchTargets": "Buscar entornos de aplicaciones",
         "eligible": "Apto",
         "selectedTarget": "Seleccionado: {target}"
+      },
+      "catalogue": {
+        "title": "Catálogo de Hugging Face",
+        "description": "Busca un modelo, resuelve una revisión inmutable y revisa un clúster con un entorno de ejecución CPU o GPU explícito.",
+        "compatibilityUnknown": "Compatibilidad del entorno de ejecución desconocida",
+        "accessNotice": "Los metadatos del catálogo no demuestran acceso al modelo, aceptación de la licencia, capacidad del hardware ni compatibilidad con vLLM.",
+        "unknown": "Desconocido",
+        "source": "Fuente: {source} · observado {time}",
+        "rateLimited": "La fuente del catálogo ha limitado las solicitudes. No se proporcionan resultados de reemplazo.",
+        "unavailable": "La fuente del catálogo no está disponible. No se puede determinar la disponibilidad de los modelos.",
+        "retryAfter": "La fuente sugiere reintentar después de {seconds} segundos.",
+        "retry": "Reintentar",
+        "empty": "Sin coincidencias en el catálogo",
+        "emptyDescription": "Busca o ajusta los filtros del servidor para encontrar un modelo público.",
+        "repository": "Repositorio / publicador",
+        "metadata": "Tarea / biblioteca / licencia",
+        "gating": "Requisitos de acceso",
+        "popularity": "Popularidad declarada",
+        "downloads": "Descargas: {value}",
+        "likes": "Me gusta: {value}",
+        "revision": "Revisión, rama o etiqueta",
+        "revisionHelp": "Déjalo vacío para resolver la revisión predeterminada actual. El despliegue usa el SHA inmutable verificado, nunca una rama o etiqueta cambiante.",
+        "resolving": "Verificando la revisión inmutable…",
+        "noVerifiedRevision": "No se ha verificado ninguna revisión inmutable para esta selección.",
+        "useRevision": "Usar revisión verificada",
+        "search": "Buscar modelos en Hugging Face",
+        "all": "Todos",
+        "author": "Publicador",
+        "pipelineTag": "Tarea",
+        "library": "Biblioteca",
+        "license": "Licencia",
+        "ordering": "Orden",
+        "sort": {
+          "downloads": "Más descargados",
+          "likes": "Más populares",
+          "lastModified": "Actualizados recientemente",
+          "createdAt": "Creados recientemente",
+          "trendingScore": "Tendencias"
+        },
+        "gated": {
+          "NONE": "Sin restricciones de acceso",
+          "AUTO": "Requiere aprobación automática del acceso",
+          "MANUAL": "Requiere aprobación manual del acceso",
+          "UNKNOWN": "Requisitos de acceso desconocidos"
+        },
+        "filterGated": "Con restricciones",
+        "filterUngated": "Sin restricciones"
       }
     }
   }
