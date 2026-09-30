@@ -118,3 +118,25 @@ The list and translated filter callbacks render in all eight locales. Pure
 stories retain long/narrow, loading, stale, empty, failed and unknown states.
 The primary read route is wired; shared detail/create/subscription/playground
 adapters and complete production browser journeys remain separate acceptance.
+
+## Shared deployment detail read
+
+`/models/shared/[id]` uses the actual organization-and-ID detail query. A returned
+foreign organization or deployment identity cannot populate the screen. Read
+denials remain diagnostic frames and do not claim that the deployment is missing.
+Failed refreshes retain explicitly stale prior facts with an enabled retry;
+inspection and refresh do not write.
+
+The detail separates desired resources, last-applied resources, subscription
+revisions and reconciliation operation facts. Stored quantities remain literal;
+missing resources stay unknown. Reconciliation confirmation requires the returned
+recorded time and positive generation and is labeled as a historical fact rather
+than live health or capacity. Display timestamps use explicit UTC in every locale.
+
+Actual route-client Apollo HTTP tests cover exact identities, mismatched replies,
+permission errors, refresh/retry and tenant changes. Eight locales preserve model
+IDs, SHA and resource units; French/Japanese SSR hydration regressions check
+timestamp stability. Portable stories cover missing/failed/loading/stale reads,
+CPU, unsupported runtime and long/narrow frames. The metadata route is wired;
+subscription, observation and playground panels and production browser journeys
+remain the following integration work.

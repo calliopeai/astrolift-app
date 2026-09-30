@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add the actual organization-bound shared-model detail read, separating desired
+  and last-applied resources from recorded readiness and operation facts. Failed
+  refreshes retain marked prior data; translated UTC timestamps hydrate without
+  changing the recorded facts (#2215).
+
 - List snapshots can explicitly hide free-text search when the server exposes no
   search contract, while existing searchable lists retain their behavior (#2215).
 
