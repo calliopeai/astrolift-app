@@ -65,6 +65,36 @@ const sharedModel = {
   desiredResources: sharedResources,
   appliedResources: sharedResources,
 };
+let currentSharedModel = sharedModel;
+const activeSubscription = {
+  id: "88888888-8888-4888-8888-888888888888",
+  version: 2,
+  modelDeploymentId: sharedModelId,
+  appId: "66666666-6666-4666-8666-666666666666",
+  appSlug: "controlled-app",
+  appName: "Controlled consumer",
+  environmentId: "55555555-5555-4555-8555-555555555555",
+  environmentName: "production",
+  alias: "chat",
+  bindingPrefix: "MODEL_CHAT_",
+  status: "active",
+  canRevoke: true,
+  desiredEnabled: true,
+  desiredRevision: 2,
+  appliedRevision: 2,
+  reason: null,
+  reconcileStartedAt: observedAt,
+  reconciledAt: observedAt,
+};
+const siblingSubscription = {
+  ...activeSubscription,
+  id: "99999999-9999-4999-8999-999999999999",
+  environmentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  environmentName: "staging",
+  alias: "search",
+  bindingPrefix: "MODEL_SEARCH_",
+};
+let subscriptionRows = [activeSubscription, siblingSubscription];
 const hubModel = {
   repoId: sharedModel.modelRepo,
   revisionSha: sharedModel.revisionSha,
@@ -92,7 +122,7 @@ function value(type, field, args, role) {
   if (isNonNullType(type)) return value(type.ofType, field, args, role);
   if (field === "clusterModelDeploymentsPage")
     return object({
-      items: [sharedModel],
+      items: [currentSharedModel],
       totalCount: 1,
       nextCursor: null,
       page: args.page,
@@ -100,14 +130,39 @@ function value(type, field, args, role) {
     });
   if (field === "clusterModelDeployment")
     return args.id === sharedModelId
-      ? sharedModel
+      ? currentSharedModel
       : args.id === acceptedModel?.id
         ? acceptedModel
         : null;
-  if (field === "clusterModelSubscriptionsPage" || field === "clusterModelSubscriptionTargetsPage")
+  if (field === "clusterModelSubscriptionsPage")
     return object({
-      items: [],
-      totalCount: 0,
+      items: args.modelDeploymentId === sharedModelId ? subscriptionRows : [],
+      totalCount: args.modelDeploymentId === sharedModelId ? subscriptionRows.length : 0,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelSubscriptionTargetsPage")
+    return object({
+      items:
+        args.modelDeploymentId === sharedModelId
+          ? [
+              object({
+                environmentId: activeSubscription.environmentId,
+                environmentVersion: 4,
+                appId: activeSubscription.appId,
+                appSlug: activeSubscription.appSlug,
+                appName: activeSubscription.appName,
+                environmentName: activeSubscription.environmentName,
+                clusterId: sharedClusterId,
+                eligible: currentSharedModel.ready,
+                reason: currentSharedModel.ready
+                  ? null
+                  : "Controlled reconciliation remains pending.",
+              }),
+            ]
+          : [],
+      totalCount: args.modelDeploymentId === sharedModelId ? 1 : 0,
       nextCursor: null,
       page: args.page,
       pageSize: args.pageSize,
@@ -154,7 +209,11 @@ function value(type, field, args, role) {
       model: args.repoId === hubModel.repoId ? hubModel : null,
     });
   if (field === "astroliftSharedModelPromptReadiness") {
-    const ready = role === "owner" && args.id === sharedModelId && args.expectedVersion === 5;
+    const ready =
+      role === "owner" &&
+      args.id === sharedModelId &&
+      args.expectedVersion === currentSharedModel.version &&
+      currentSharedModel.ready;
     return object({
       state: ready ? "READY" : "INACTIVE",
       eligible: ready,
@@ -362,6 +421,8 @@ createServer(async (req, res) => {
     observations.promptInvocations.length = 0;
     modelWriteRequests.length = 0;
     acceptedModel = null;
+    currentSharedModel = sharedModel;
+    subscriptionRows = [activeSubscription, siblingSubscription];
     res.statusCode = 204;
     res.end();
     return;
@@ -389,6 +450,64 @@ createServer(async (req, res) => {
       rootValue: {},
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
+          const input = args.input;
+          const subscribe = info.fieldName === "subscribeClusterModel";
+          const revoke = info.fieldName === "revokeModelSubscription";
+          if (
+            (subscribe || revoke) &&
+            role === "owner" &&
+            modelWriteRequests.length === 0 &&
+            input.organizationId === id &&
+            input.expectedClusterId === sharedClusterId &&
+            input.expectedProviderId === sharedProviderId &&
+            (subscribe
+              ? input.modelDeploymentId === sharedModelId &&
+                input.appEnvironmentId === activeSubscription.environmentId &&
+                input.alias === "assistant" &&
+                input.ifMatchVersion === 5 &&
+                input.ifMatchEnvironmentVersion === 4
+              : input.id === activeSubscription.id &&
+                input.ifMatchVersion === 2 &&
+                input.ifMatchDeploymentVersion === 5)
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            currentSharedModel = {
+              ...sharedModel,
+              version: 7,
+              status: "updating",
+              ready: false,
+              readinessObservedAt: null,
+              readinessGeneration: null,
+              desiredSubscriptionRevision: 3,
+              operationId: "controlled-accepted-subscription",
+              operationCompletedAt: null,
+            };
+            const row = {
+              ...activeSubscription,
+              id: subscribe ? "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" : activeSubscription.id,
+              version: subscribe ? 1 : 3,
+              alias: subscribe ? input.alias : activeSubscription.alias,
+              bindingPrefix: subscribe ? "MODEL_ASSISTANT_" : activeSubscription.bindingPrefix,
+              status: subscribe ? "pending" : "revoking",
+              desiredEnabled: subscribe,
+              desiredRevision: 3,
+              appliedRevision: subscribe ? 0 : 2,
+              reconciledAt: null,
+              canRevoke: false,
+            };
+            subscriptionRows = subscribe
+              ? [...subscriptionRows, row]
+              : subscriptionRows.map((existing) => (existing.id === row.id ? row : existing));
+            return object({
+              ok: true,
+              errors: [],
+              data: object({
+                restartRequired: true,
+                deployment: currentSharedModel,
+                subscription: row,
+              }),
+            });
+          }
           if (
             info.fieldName === "provisionClusterModel" &&
             role === "owner" &&

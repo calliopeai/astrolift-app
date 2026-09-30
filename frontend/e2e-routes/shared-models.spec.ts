@@ -4,6 +4,98 @@ const modelId = "22222222-2222-4222-8222-222222222222";
 const clusterId = "33333333-3333-4333-8333-333333333333";
 const providerId = "44444444-4444-4444-8444-444444444444";
 
+for (const action of ["subscribe", "revoke"] as const) {
+  test(`shared model ${action} reviews exact app credentials and remains pending after acceptance`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    const api = `http://127.0.0.1:${process.env.ROUTE_API_PORT ?? 6172}`;
+    expect((await context.request.post(`${api}/observations/reset`)).status()).toBe(204);
+    await context.addCookies([
+      { name: "sessionid", value: "owner", url: testInfo.project.use.baseURL! },
+      { name: "backend_jwt", value: "route-fixture-token", url: testInfo.project.use.baseURL! },
+    ]);
+    page.setDefaultTimeout(15_000);
+    await page.goto("/models");
+    await page.getByRole("link", { name: /Controlled shared CPU model/ }).click();
+    const section = page.getByRole("region", { name: "App subscriptions", exact: true });
+    if (action === "subscribe") {
+      await section
+        .getByRole("button", { name: "controlled-app / production", exact: true })
+        .click();
+      await section.getByLabel("Subscription alias", { exact: true }).fill("assistant");
+      await section.getByRole("button", { name: "Review subscription", exact: true }).click();
+    } else {
+      await section
+        .getByRole("row")
+        .filter({ hasText: "MODEL_CHAT_" })
+        .getByRole("button", { name: "Review revocation", exact: true })
+        .click();
+    }
+    const confirmation = page.getByRole("alertdialog");
+    await expect(confirmation).toContainText("All consumers may temporarily lose access.");
+    expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual(
+      []
+    );
+    await confirmation
+      .getByRole("button", {
+        name: action === "subscribe" ? "Request subscription" : "Request revocation",
+        exact: true,
+      })
+      .click();
+    await expect(
+      section.getByText(
+        "Request accepted. Waiting for restart and readiness; the requested access change is not yet confirmed.",
+        { exact: true }
+      )
+    ).toBeVisible();
+    await expect(
+      section
+        .getByRole("row")
+        .filter({ hasText: action === "subscribe" ? "MODEL_ASSISTANT_" : "MODEL_CHAT_" })
+    ).toContainText(
+      action === "subscribe"
+        ? "Pending restart and readiness"
+        : "Revocation pending restart and readiness"
+    );
+    await expect(section.getByRole("row").filter({ hasText: "MODEL_SEARCH_" })).toContainText(
+      "Active"
+    );
+    const input =
+      action === "subscribe"
+        ? {
+            organizationId: "11111111-1111-4111-8111-111111111111",
+            modelDeploymentId: modelId,
+            expectedClusterId: clusterId,
+            expectedProviderId: providerId,
+            appEnvironmentId: "55555555-5555-4555-8555-555555555555",
+            alias: "assistant",
+            ifMatchVersion: 5,
+            ifMatchEnvironmentVersion: 4,
+          }
+        : {
+            organizationId: "11111111-1111-4111-8111-111111111111",
+            id: "88888888-8888-4888-8888-888888888888",
+            expectedClusterId: clusterId,
+            expectedProviderId: providerId,
+            ifMatchVersion: 2,
+            ifMatchDeploymentVersion: 5,
+          };
+    expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual([
+      {
+        operationName: action === "subscribe" ? "SubscribeClusterModel" : "RevokeModelSubscription",
+        input,
+      },
+    ]);
+    await expect(page.getByRole("button", { name: "Run model test", exact: true })).toBeDisabled();
+    expect(await (await context.request.get(`${api}/observations`)).json()).toEqual({
+      errors: [],
+      mutations: 0,
+      promptInvocations: [],
+    });
+  });
+}
+
 test("Hugging Face CPU deployment creates a cluster operation without app ownership or claiming readiness", async ({
   page,
   context,
