@@ -318,3 +318,70 @@ def test_architecture_only_is_not_runtime_compatibility_proof():
     config["cpu"]["node_selector"] = {"kubernetes.io/arch": "amd64"}
     with pytest.raises(ValueError, match="Architecture alone"):
         shared_runtime(config, spec.config, "python")
+
+
+@pytest.mark.parametrize(
+    "cpu,memory",
+    [
+        ("0", "16Gi"),
+        ("0m", "16Gi"),
+        ("4", "0"),
+        ("257", "16Gi"),
+        ("4", "2Ti"),
+        ("1Gi", "16Gi"),
+        ("4", "4Gi"),
+        ("NaN", "16Gi"),
+    ],
+)
+def test_shared_resource_admission_refuses_zero_unbounded_or_cache_only_memory(cpu, memory):
+    _, cluster, secrets, spec = setup()
+    spec = replace(spec, config={**spec.config, "cpu": cpu, "memory": memory})
+    driver = VLLMDriver(
+        config=VLLMConfig(cluster_driver=cluster, secrets_backend=secrets, shared_runtimes=declaration())
+    )
+    assert not driver.provision(spec).ok
+    assert not secrets.writes and not cluster.writes
+
+
+@pytest.mark.parametrize("key", ["https://unsafe/label", "Upper.domain/label", "a..b/label", "/label", "a/b/label"])
+def test_shared_selector_prefix_is_validated_before_credentials(key):
+    _, cluster, secrets, spec = setup()
+    runtime = declaration()
+    runtime["cpu"]["node_selector"] = {key: "compatible"}
+    driver = VLLMDriver(config=VLLMConfig(cluster_driver=cluster, secrets_backend=secrets, shared_runtimes=runtime))
+    assert not driver.provision(spec).ok
+    assert not secrets.writes and not cluster.writes
+
+
+@pytest.mark.parametrize(
+    "mode,expected,actual,admitted",
+    [
+        ("cpu", "0.15.1+cpu", "0.15.1+cpu", True),
+        ("gpu", "0.15.1", "0.15.1", True),
+        ("gpu", "0.15.1+cu128", "0.15.1+cu128", True),
+        ("cpu", "0.15.1+cpu", "0.15.1", False),
+        ("gpu", "0.15.1", "0.15.1+cpu", False),
+        ("cpu", "0.15.1+cpu", "0.15.1.dev1+cpu", False),
+        ("gpu", "0.15.1+cu128", "0.15.1+cu129", False),
+        ("cpu", "0.16.0+cpu", "0.16.0+cpu", False),
+    ],
+)
+def test_launcher_mode_bound_actual_distribution_version_admission(monkeypatch, mode, expected, actual, admitted):
+    import importlib.metadata
+
+    from k8s_native.managed import shared_model_auth
+
+    monkeypatch.setitem(sys.modules, "astrolift_shared_model_auth", shared_model_auth)
+    monkeypatch.setenv("ASTROLIFT_MODEL_COMPUTE_MODE", mode)
+    monkeypatch.setenv("ASTROLIFT_MODEL_RUNTIME_PACKAGE_VERSION", expected)
+    monkeypatch.setenv("ASTROLIFT_MODEL_AUTH_REVISION", "1")
+    monkeypatch.setattr(importlib.metadata, "version", lambda package: actual)
+
+    def snapshot(**kwargs):
+        raise RuntimeError("snapshot reached")
+
+    monkeypatch.setattr(shared_model_auth, "load_key_snapshot", snapshot)
+    namespace = {"__name__": "launcher_test"}
+    exec(LAUNCHER, namespace)
+    with pytest.raises(RuntimeError, match="snapshot reached" if admitted else "Unsupported"):
+        namespace["main"]()

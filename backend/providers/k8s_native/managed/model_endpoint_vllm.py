@@ -890,6 +890,10 @@ class VLLMDriver(ManagedServiceDriver):
                 },
             ]
         if runtime is not None:
+            env += [
+                {"name": "ASTROLIFT_MODEL_COMPUTE_MODE", "value": runtime.mode},
+                {"name": "ASTROLIFT_MODEL_RUNTIME_PACKAGE_VERSION", "value": runtime.package_version},
+            ]
             pod["nodeSelector"] = runtime.node_selector
         if gpu:
             pod["tolerations"] = [
