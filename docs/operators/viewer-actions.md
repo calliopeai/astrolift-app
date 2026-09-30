@@ -51,9 +51,14 @@ targets likewise require a refreshed snapshot. Input validation and transport
 errors retain their normal error handling. This does not promise exactly-once
 execution after transport uncertainty.
 
-This is a partial foundation for APP #1867. Other object actions, web navigation
-and remaining action consumption, CLI `whoami --permissions` and early permission
-diagnosis, common denial envelopes across transports, and stock-role web/CLI
-acceptance remain outstanding. Existing union-based capability lists are not
-object authority and should not substitute for `viewerCan`. The pinned CLI
-release does not yet implement the requested `whoami` contract.
+CLI main `618d120` adds verified `whoami --permissions` and repairs account
+permission diagnosis. Those informational reports do not establish the current
+credential's target authority or mutation environment and approval requirements.
+They do not preflight another operation; the tagged CLI distribution remains a
+separate release step.
+
+This is a partial foundation for APP #1867. Other object actions, web navigation,
+remaining action consumption, operation-specific early refusal, common denial
+envelopes across transports and complete stock-role web/CLI acceptance remain
+outstanding. Existing union-based capability lists are not object authority and
+should not substitute for `viewerCan`.
