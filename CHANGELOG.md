@@ -8,6 +8,10 @@
 - Object and queue snapshot refreshes keep their dialogs open, disable duplicate
   refreshes while pending and retain the selected service’s last snapshot with
   visible read diagnostics on failure. Initial read errors no longer look empty.
+- First enabling workload HPA preserves an existing Deployment's observed
+  replica count through a conditional, non-forcing ownership handover. Shared
+  cloud apply drivers refuse stale/replaced targets or unconfirmed handovers;
+  dry runs remain non-mutating.
 
 - The browser workload-controls regression checks the actual three-replica web
   and zero-replica worker fixtures independently, keeping unobserved readiness

@@ -407,6 +407,145 @@ def test_ssa_requires_name() -> None:
 # ---- get ---------------------------------------------------------
 
 
+def _replica_observation(*managers: str, replicas: Any = 3, version: str = "10") -> dict[str, Any]:
+    return {
+        "metadata": {
+            "name": "web",
+            "uid": "observed-deployment-uid",
+            "resourceVersion": version,
+            "generation": 2,
+            "managedFields": [{"manager": manager, "fieldsV1": {"f:spec": {"f:replicas": {}}}} for manager in managers],
+        },
+        "spec": {"replicas": replicas},
+    }
+
+
+def _hpa_manifest() -> dict[str, Any]:
+    return {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {"name": "web", "annotations": {"astrolift.dev/replica-owner": "hpa"}},
+        "spec": {"template": {"metadata": {"labels": {"revision": "after"}}}},
+    }
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("replicas", [0, 3])
+def test_hpa_handover_preserves_observation_and_conditions_both_apply_requests(dry_run, replicas) -> None:
+    before = _replica_observation("astrolift", replicas=replicas)
+    transferred = _replica_observation("astrolift", "astrolift-hpa-handover", replicas=replicas, version="11")
+    after = _replica_observation("astrolift-hpa-handover", replicas=replicas, version="12")
+    after["metadata"]["generation"] = 3
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=after)
+    resource.server_side_apply.side_effect = [_resource_instance(transferred), _resource_instance(after)]
+    manifest = _hpa_manifest()
+
+    assert client.server_side_apply(namespace="ns", manifest=manifest, dry_run=dry_run) == "updated"
+
+    handover, full_apply = resource.server_side_apply.call_args_list
+    assert handover.kwargs["field_manager"] == "astrolift-hpa-handover"
+    assert handover.kwargs["force_conflicts"] is False
+    assert handover.kwargs["body"] == {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {"name": "web", "uid": "observed-deployment-uid", "resourceVersion": "10"},
+        "spec": {"replicas": replicas},
+    }
+    assert full_apply.kwargs["body"]["metadata"]["resourceVersion"] == "11"
+    assert full_apply.kwargs["body"]["metadata"]["uid"] == "observed-deployment-uid"
+    assert full_apply.kwargs["body"]["spec"] == manifest["spec"]
+    assert "resourceVersion" not in manifest["metadata"]
+    for call in (handover, full_apply):
+        assert call.kwargs.get("dry_run") == ("All" if dry_run else None)
+
+
+@pytest.mark.parametrize("managers", [("horizontal-pod-autoscaler",), ("astrolift", "horizontal-pod-autoscaler")])
+def test_hpa_owned_replicas_are_never_written_by_handover(managers) -> None:
+    client, resource, _tok = _ssa_test_setup(
+        pre_get_payload=_replica_observation(*managers),
+        post_apply_payload=_replica_observation(*managers),
+    )
+    client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
+    resource.server_side_apply.assert_called_once()
+    request = resource.server_side_apply.call_args.kwargs
+    assert request["field_manager"] == "astrolift"
+    assert "replicas" not in request["body"]["spec"]
+    assert request["body"]["metadata"]["resourceVersion"] == "10"
+
+
+@pytest.mark.parametrize("missing", ["uid", "resourceVersion", "managedFields", "replicas"])
+def test_hpa_missing_observation_refuses_before_any_apply(missing) -> None:
+    before = _replica_observation("astrolift")
+    (before["spec"] if missing == "replicas" else before["metadata"]).pop(missing)
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=before)
+    with pytest.raises(ValueError, match="cannot safely transfer"):
+        client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
+    resource.server_side_apply.assert_not_called()
+
+
+@pytest.mark.parametrize("replicas", [None, True, -1, "3", 2.5])
+def test_hpa_invalid_replica_observation_is_never_fabricated(replicas) -> None:
+    before = _replica_observation("astrolift", replicas=replicas)
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=before)
+    with pytest.raises(ValueError, match="count"):
+        client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
+    resource.server_side_apply.assert_not_called()
+
+
+@pytest.mark.parametrize("managers", [(), (None,), ("",), (0,)])
+def test_hpa_unknown_replica_owner_refuses_without_a_write(managers) -> None:
+    before = _replica_observation(*managers)
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=before)
+    with pytest.raises(ValueError, match="unknown field ownership"):
+        client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
+    resource.server_side_apply.assert_not_called()
+
+
+def test_hpa_handover_failure_never_releases_existing_owner() -> None:
+    before = _replica_observation("astrolift")
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=before)
+    resource.server_side_apply.side_effect = RuntimeError("conditional handover was refused")
+    with pytest.raises(RuntimeError, match="refused"):
+        client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
+    resource.server_side_apply.assert_called_once()
+    assert resource.server_side_apply.call_args.kwargs["field_manager"] == "astrolift-hpa-handover"
+
+
+@pytest.mark.parametrize("change", ["uid", "count", "version", "ownership"])
+def test_hpa_handover_requires_confirmed_returned_identity_count_and_ownership(change) -> None:
+    before = _replica_observation("astrolift")
+    transferred = _replica_observation("astrolift", "astrolift-hpa-handover", version="11")
+    if change == "uid":
+        transferred["metadata"]["uid"] = "replacement"
+    elif change == "count":
+        transferred["spec"]["replicas"] = 5
+    elif change == "version":
+        transferred["metadata"].pop("resourceVersion")
+    else:
+        transferred["metadata"]["managedFields"] = before["metadata"]["managedFields"]
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=transferred)
+    with pytest.raises(ValueError, match="not confirmed"):
+        client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
+    resource.server_side_apply.assert_called_once()
+
+
+@pytest.mark.parametrize("intent", ["fixed", "unmarked", "new"])
+def test_other_deployment_applies_keep_existing_wire_contract(intent) -> None:
+    before = _replica_observation("astrolift")
+    client, resource, _tok = _ssa_test_setup(
+        pre_get_payload=before, post_apply_payload=before, pre_get_raises_404=intent == "new"
+    )
+    manifest = _hpa_manifest()
+    if intent == "fixed":
+        manifest["spec"]["replicas"] = 2
+    elif intent == "unmarked":
+        manifest["metadata"].pop("annotations")
+    with patch("kubernetes.dynamic.exceptions.NotFoundError", _FakeDynNotFoundError):
+        client.server_side_apply(namespace="ns", manifest=manifest, dry_run=False)
+    resource.server_side_apply.assert_called_once()
+    assert resource.server_side_apply.call_args.kwargs["body"] == manifest
+
+
 def test_get_returns_dict_on_success() -> None:
     client = _make_client()
     fake_resource = MagicMock()

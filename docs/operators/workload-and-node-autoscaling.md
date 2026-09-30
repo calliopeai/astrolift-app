@@ -41,10 +41,22 @@ the existing manifest parser does not comprehensively validate those inputs.
 Kubernetes rejects an invalid HPA. The default CPU target remains 80%; the
 example explicitly chooses 75%.
 
-For an existing deployment, establish a healthy HPA and verify that its `/scale`
-update owns `spec.replicas` before the first deploy that releases Astrolift's
-ownership. Kubernetes can otherwise default the field to one during transfer.
-Watch managed fields, desired replicas and availability during this transition.
+Rendered autoscaled Deployments declare `astrolift.dev/replica-owner: hpa`.
+The shared EKS/GKE/AKS/native apply client reads existing managed fields before
+releasing Astrolift's replica ownership. When Astrolift is the sole owner, it
+first shares the exact observed count with a temporary `astrolift-hpa-handover`
+manager using a replicas-only, non-forcing apply. The handover and subsequent
+full apply carry UID and resourceVersion preconditions: a concurrent scale,
+replacement or status update refuses the apply rather than overwriting newer
+state. Retry the deployment after reviewing that failure. Missing or invalid
+observations and an unconfirmed handover also refuse the Deployment apply.
+Dry-run requests do not persist either ownership or workload changes.
+
+The temporary owner preserves even a zero count until HPA changes `/scale`;
+it does not fabricate capacity, prove Metrics Server readiness or wait for
+healthy pods. Watch desired replicas and availability during this transition.
+External GitOps controllers must implement their own safe SSA ownership
+transfer; the Astrolift driver guard does not run inside Argo CD or Flux.
 An externally installed HPA requires matching manifest bounds before Astrolift
 can release ownership; otherwise its manifest still expresses fixed replicas.
 Manual scaling is transient while an HPA remains active. To return to fixed
@@ -93,18 +105,24 @@ cold-start budget and node-pool policy.
 
 ## Verification and references
 
-The local Kubernetes regression replays a legacy Astrolift SSA owning replicas,
-a simulated HPA `/scale` update from three to five, and an image redeploy with
-replicas omitted. It checks that five survive, Astrolift releases the field,
-an unchanged reapply stays at five, and an explicit fixed-size transition works.
+The local Kubernetes regressions cover first enabling HPA before it ever
+changes replicas through each actual cloud driver's apply batch, a later
+simulated HPA `/scale` update from three to five, unchanged reapply, dry-run,
+fixed-size restoration and concurrent scale/replacement at both write stages.
+They check that replica ownership transfers without a reset, or that a stale
+write is refused without changing the newer image/count.
 It proves apiserver field ownership, not live Metrics Server, HPA load behavior,
 AWS node scaling or a production cutover. Run against a disposable local cluster:
 
 ```sh
 ASTROLIFT_TEST_KUBECONFIG=/path/to/local-kind.yaml \
   python -m pytest astrolift_manifest/tests/test_hpa_scale_ownership_integration.py
+# From backend/providers, with the provider SDK extras installed:
+ASTROLIFT_TEST_KUBECONFIG=/path/to/local-kind.yaml \
+  python -m pytest tests/_sdk/test_hpa_handover_integration.py
 ```
 
 Sources: [Kubernetes HPA](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/),
+[SSA ownership transfer](https://kubernetes.io/docs/reference/using-api/server-side-apply/#transferring-ownership),
 [Cluster Autoscaler FAQ](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md),
 [EKS autoscaling guidance](https://docs.aws.amazon.com/eks/latest/best-practices/cas.html).
