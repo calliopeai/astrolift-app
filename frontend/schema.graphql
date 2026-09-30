@@ -6078,6 +6078,21 @@ input ClusterAuthUserRefInput {
   username: String!
 }
 
+type ClusterModelDensity {
+  clusterId: GUID!
+  start: DateTime!
+  end: DateTime!
+  retrievedAt: DateTime!
+  modelCount: Int!
+  returnedCount: Int!
+  items: [SharedModelDensityRow!]!
+  capacity: ModelClusterCapacity!
+  scope: String!
+  source: String!
+  inventoryLimit: Int!
+  truncated: Boolean!
+}
+
 type Clusteragentkeyissuedpayload {
   clusterId: GUID!
   agentKey: String!
@@ -6928,8 +6943,31 @@ input MigrateAppInputGql {
   drainSource: Boolean! = true
 }
 
+type ModelClusterCapacity {
+  state: ModelObservationState!
+  source: String!
+  observedAt: DateTime
+  gpuDevices: [ModelGpuCapacity!]!
+  cpuCores: Float
+  memoryBytes: Float
+  vramBytes: Float
+  freshnessSeconds: Int!
+}
+
 enum ModelCompatibility {
   UNKNOWN
+}
+
+type ModelDeploymentMetrics {
+  serviceId: GUID!
+  clusterId: GUID!
+  start: DateTime!
+  end: DateTime!
+  retrievedAt: DateTime!
+  stepSeconds: Int!
+  metrics: [ModelMetricObservation!]!
+  scope: String!
+  sampleLimit: Int!
 }
 
 enum ModelGating {
@@ -6937,6 +6975,49 @@ enum ModelGating {
   AUTO
   MANUAL
   UNKNOWN
+}
+
+type ModelGpuCapacity {
+  resource: String!
+  devices: Int!
+}
+
+type ModelMetricObservation {
+  key: String!
+  unit: String!
+  source: String!
+  state: ModelObservationState!
+  observedAt: DateTime
+  value: Float
+  samples: [ModelObservationSample!]!
+  aggregationWindowSeconds: Int!
+}
+
+type ModelObservationSample {
+  timestamp: DateTime!
+  value: Float!
+}
+
+enum ModelObservationState {
+  AVAILABLE
+  NO_DATA
+  STALE
+  UNCONFIGURED
+  UNAVAILABLE
+  UNSUPPORTED
+}
+
+type ModelResourceRequests {
+  source: String!
+  observedAt: DateTime
+  replicas: Int
+  cpuCoresPerReplica: Float
+  memoryBytesPerReplica: Float
+  gpuDevicesPerReplica: Int
+  gpuResource: String
+  totalCpuCores: Float
+  totalMemoryBytes: Float
+  totalGpuDevices: Int
 }
 
 input MoveAppToTeamInput {
@@ -8013,6 +8094,8 @@ type Query {
   astroliftEmailEngagementMetrics(managedServiceId: GUID!, days: Int! = 30): AstroliftEmailEngagementMetrics
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
+  astroliftModelDeploymentMetrics(serviceId: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ModelDeploymentMetrics
+  astroliftClusterModelDensity(clusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ClusterModelDensity
   astroliftHuggingFaceModels(search: String! = "", author: String! = "", pipelineTag: String! = "", library: String! = "", license: String! = "", gated: Boolean = null, sortBy: String! = "downloads", first: Int! = 20, after: String = null): HuggingFaceModelsPage!
   astroliftHuggingFaceModel(repoId: String!, revision: String = null): HuggingFaceModelResult!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
@@ -8655,6 +8738,15 @@ input SetZentinelleGatewayEnabledInput {
 type SharedDirectoryType {
   fileCount: Int!
   directoryCount: Int!
+}
+
+type SharedModelDensityRow {
+  serviceId: GUID!
+  name: String!
+  status: String!
+  desired: ModelResourceRequests!
+  applied: ModelResourceRequests
+  observations: [ModelMetricObservation!]!
 }
 
 input SkillInput {

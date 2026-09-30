@@ -5712,6 +5712,21 @@ export type ClusterAuthUserRefInput = {
   username: Scalars['String']['input'];
 };
 
+export type ClusterModelDensity = {
+  capacity: ModelClusterCapacity;
+  clusterId: Scalars['GUID']['output'];
+  end: Scalars['DateTime']['output'];
+  inventoryLimit: Scalars['Int']['output'];
+  items: Array<SharedModelDensityRow>;
+  modelCount: Scalars['Int']['output'];
+  retrievedAt: Scalars['DateTime']['output'];
+  returnedCount: Scalars['Int']['output'];
+  scope: Scalars['String']['output'];
+  source: Scalars['String']['output'];
+  start: Scalars['DateTime']['output'];
+  truncated: Scalars['Boolean']['output'];
+};
+
 export type Clusteragentkeyissuedpayload = {
   agentKey: Scalars['String']['output'];
   clusterId: Scalars['GUID']['output'];
@@ -6540,14 +6555,79 @@ export type MigrateAppInputGql = {
   targetClusterId: Scalars['GUID']['input'];
 };
 
+export type ModelClusterCapacity = {
+  cpuCores?: Maybe<Scalars['Float']['output']>;
+  freshnessSeconds: Scalars['Int']['output'];
+  gpuDevices: Array<ModelGpuCapacity>;
+  memoryBytes?: Maybe<Scalars['Float']['output']>;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  source: Scalars['String']['output'];
+  state: ModelObservationState;
+  vramBytes?: Maybe<Scalars['Float']['output']>;
+};
+
 export type ModelCompatibility =
   | 'UNKNOWN';
+
+export type ModelDeploymentMetrics = {
+  clusterId: Scalars['GUID']['output'];
+  end: Scalars['DateTime']['output'];
+  metrics: Array<ModelMetricObservation>;
+  retrievedAt: Scalars['DateTime']['output'];
+  sampleLimit: Scalars['Int']['output'];
+  scope: Scalars['String']['output'];
+  serviceId: Scalars['GUID']['output'];
+  start: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+};
 
 export type ModelGating =
   | 'AUTO'
   | 'MANUAL'
   | 'NONE'
   | 'UNKNOWN';
+
+export type ModelGpuCapacity = {
+  devices: Scalars['Int']['output'];
+  resource: Scalars['String']['output'];
+};
+
+export type ModelMetricObservation = {
+  aggregationWindowSeconds: Scalars['Int']['output'];
+  key: Scalars['String']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  samples: Array<ModelObservationSample>;
+  source: Scalars['String']['output'];
+  state: ModelObservationState;
+  unit: Scalars['String']['output'];
+  value?: Maybe<Scalars['Float']['output']>;
+};
+
+export type ModelObservationSample = {
+  timestamp: Scalars['DateTime']['output'];
+  value: Scalars['Float']['output'];
+};
+
+export type ModelObservationState =
+  | 'AVAILABLE'
+  | 'NO_DATA'
+  | 'STALE'
+  | 'UNAVAILABLE'
+  | 'UNCONFIGURED'
+  | 'UNSUPPORTED';
+
+export type ModelResourceRequests = {
+  cpuCoresPerReplica?: Maybe<Scalars['Float']['output']>;
+  gpuDevicesPerReplica?: Maybe<Scalars['Int']['output']>;
+  gpuResource?: Maybe<Scalars['String']['output']>;
+  memoryBytesPerReplica?: Maybe<Scalars['Float']['output']>;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  replicas?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  totalCpuCores?: Maybe<Scalars['Float']['output']>;
+  totalGpuDevices?: Maybe<Scalars['Int']['output']>;
+  totalMemoryBytes?: Maybe<Scalars['Float']['output']>;
+};
 
 export type MoveAppToTeamInput = {
   appId: Scalars['GUID']['input'];
@@ -9292,6 +9372,7 @@ export type Query = {
   astroliftClusterHealth?: Maybe<AstroliftClusterHealth>;
   astroliftClusterLifecycleAudit: Array<AstroliftClusterLifecycleAuditEntry>;
   astroliftClusterLiveState?: Maybe<AstroliftClusterLiveState>;
+  astroliftClusterModelDensity?: Maybe<ClusterModelDensity>;
   astroliftClusterPrometheusMetrics: AstroliftClusterPrometheusMetrics;
   astroliftClusterPrometheusRangeMetrics: AstroliftClusterPrometheusRangeMetrics;
   astroliftClusterSystemMetrics: AstroliftClusterSystemMetrics;
@@ -9360,6 +9441,7 @@ export type Query = {
   astroliftMembers: Array<AstroliftMember>;
   astroliftMembersCsv: AstroliftIdentityCsvExport;
   astroliftMembersPage: AstroliftMemberPage;
+  astroliftModelDeploymentMetrics?: Maybe<ModelDeploymentMetrics>;
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
@@ -10160,6 +10242,14 @@ export type QueryAstroliftClusterLiveStateArgs = {
 };
 
 
+export type QueryAstroliftClusterModelDensityArgs = {
+  clusterId: Scalars['GUID']['input'];
+  end: Scalars['DateTime']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+};
+
+
 export type QueryAstroliftClusterPrometheusMetricsArgs = {
   clusterId: Scalars['GUID']['input'];
 };
@@ -10540,6 +10630,15 @@ export type QueryAstroliftMembersPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftModelDeploymentMetricsArgs = {
+  end: Scalars['DateTime']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  serviceId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
 };
 
 
@@ -11850,6 +11949,15 @@ export type SetZentinelleGatewayEnabledInput = {
 export type SharedDirectoryType = {
   directoryCount: Scalars['Int']['output'];
   fileCount: Scalars['Int']['output'];
+};
+
+export type SharedModelDensityRow = {
+  applied?: Maybe<ModelResourceRequests>;
+  desired: ModelResourceRequests;
+  name: Scalars['String']['output'];
+  observations: Array<ModelMetricObservation>;
+  serviceId: Scalars['GUID']['output'];
+  status: Scalars['String']['output'];
 };
 
 export type SkillInput = {
@@ -14193,6 +14301,27 @@ export type ListClusterGpusQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type ListClusterGpusQuery = { astroliftClusters: Array<{ id: string, capabilities: Record<string, unknown> }> };
+
+export type GetModelDeploymentMetricsQueryVariables = Exact<{
+  serviceId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+  end: Scalars['DateTime']['input'];
+}>;
+
+
+export type GetModelDeploymentMetricsQuery = { astroliftModelDeploymentMetrics?: { serviceId: string, clusterId: string, start: string, end: string, retrievedAt: string, stepSeconds: number, scope: string, sampleLimit: number, metrics: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> } | null };
+
+export type GetClusterModelDensityQueryVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+  end: Scalars['DateTime']['input'];
+}>;
+
+
+export type GetClusterModelDensityQuery = { astroliftClusterModelDensity?: { clusterId: string, start: string, end: string, retrievedAt: string, modelCount: number, returnedCount: number, scope: string, source: string, inventoryLimit: number, truncated: boolean, capacity: { state: ModelObservationState, source: string, observedAt?: string | null, cpuCores?: number | null, memoryBytes?: number | null, vramBytes?: number | null, freshnessSeconds: number, gpuDevices: Array<{ resource: string, devices: number }> }, items: Array<{ serviceId: string, name: string, status: string, desired: { source: string, observedAt?: string | null, replicas?: number | null, cpuCoresPerReplica?: number | null, memoryBytesPerReplica?: number | null, gpuDevicesPerReplica?: number | null, gpuResource?: string | null, totalCpuCores?: number | null, totalMemoryBytes?: number | null, totalGpuDevices?: number | null }, applied?: { source: string, observedAt?: string | null, replicas?: number | null, cpuCoresPerReplica?: number | null, memoryBytesPerReplica?: number | null, gpuDevicesPerReplica?: number | null, gpuResource?: string | null, totalCpuCores?: number | null, totalMemoryBytes?: number | null, totalGpuDevices?: number | null } | null, observations: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> }> } | null };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

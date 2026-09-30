@@ -8,8 +8,7 @@ metrics surface; richer features (admin alerts API, raw label
 listing) belong in a dedicated PromQL service.
 
 Network: ``urllib.request`` — no new dependency. Failures map to
-:class:`PrometheusUnavailable` so the resolver can fall back to
-synthetic data without breaking the UI.
+:class:`PrometheusUnavailable` so callers can report unavailable observations.
 
 Cache: a tiny in-memory TTL cache keyed by (endpoint, query,
 time-window) protects Prometheus from hammering when many UI panels
@@ -33,8 +32,7 @@ from collections.abc import Iterable, Mapping
 
 
 class PrometheusError(Exception):
-    """Base for any failure querying Prometheus. Resolver catches
-    this and falls back to synthetic data."""
+    """Base for failures querying Prometheus; callers choose their error state."""
 
 
 class PrometheusUnavailable(PrometheusError):
@@ -175,7 +173,9 @@ def _sign_request_sigv4(req: urllib.request.Request, *, host: str) -> None:
             "no AWS credentials available to sign the Amazon Managed Prometheus request"
         )
     region = _amp_region_from_host(host)
-    aws_request = AWSRequest(method=req.get_method(), url=req.full_url, data=req.data)
+    aws_request = AWSRequest(
+        method=req.get_method(), url=req.full_url, data=req.data, headers=dict(req.header_items())
+    )
     SigV4Auth(credentials, "aps", region).add_auth(aws_request)
     for header, value in aws_request.headers.items():
         req.add_unredirected_header(header, value)
@@ -185,9 +185,14 @@ def _sign_request_sigv4(req: urllib.request.Request, *, host: str) -> None:
 
 
 def _request_json(
-    url: str, *, timeout: float, auth: str | None = None, max_response_bytes: int | None = None
+    url: str,
+    *,
+    timeout: float,
+    auth: str | None = None,
+    max_response_bytes: int | None = None,
+    form_data: bytes | None = None,
 ) -> Mapping:
-    """Issue a GET, parse the body as JSON, return the decoded payload.
+    """Issue a GET or form POST, parse JSON, return the decoded payload.
 
     HTTP error codes map to PrometheusQueryError (4xx) or
     PrometheusUnavailable (5xx + network failures) so the resolver
@@ -203,7 +208,10 @@ def _request_json(
             "Accept": "application/json",
             "User-Agent": "astrolift-metrics",
         },
+        data=form_data,
     )
+    if form_data is not None:
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
     host = _endpoint_host(url)
     if _should_sign_sigv4(host, auth):
         _sign_request_sigv4(req, host=host)
@@ -372,8 +380,10 @@ def query_range(
     max_series: int | None = None,
     max_samples: int | None = None,
     max_response_bytes: int | None = None,
+    request_method: str = "GET",
+    max_request_bytes: int | None = None,
 ) -> tuple[RangeQueryResult, ...]:
-    """``GET /api/v1/query_range`` over (start, end, step).
+    """``GET`` or form ``POST /api/v1/query_range`` over (start, end, step).
 
     ``auth`` forwards to the transport for SigV4 gating (see
     :func:`query_instant`)."""
@@ -381,6 +391,8 @@ def query_range(
         raise PrometheusQueryError("step_seconds must be positive")
     if end_unix <= start_unix:
         raise PrometheusQueryError("end_unix must be > start_unix")
+    if request_method not in {"GET", "POST"}:
+        raise PrometheusQueryError("range query supports GET or POST only")
 
     base = endpoint.rstrip("/")
     qs = urllib.parse.urlencode(
@@ -391,7 +403,10 @@ def query_range(
             "step": str(step_seconds),
         }
     )
-    url = f"{base}/api/v1/query_range?{qs}"
+    encoded = qs.encode("utf-8")
+    if max_request_bytes is not None and len(encoded) > max_request_bytes:
+        raise PrometheusQueryError("prometheus request exceeds the byte limit")
+    url = f"{base}/api/v1/query_range" + (f"?{qs}" if request_method == "GET" else "")
     cache_key = (
         "range",
         base,
@@ -404,12 +419,17 @@ def query_range(
         max_samples,
         max_response_bytes,
         auth,
+        request_method,
+        max_request_bytes,
     )
     cached = _cache.get(cache_key)
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    payload = _request_json(url, timeout=timeout, auth=auth, max_response_bytes=max_response_bytes)
+    request_options = {"form_data": encoded} if request_method == "POST" else {}
+    payload = _request_json(
+        url, timeout=timeout, auth=auth, max_response_bytes=max_response_bytes, **request_options
+    )
     data = payload.get("data") or {}
     if not isinstance(data, Mapping):
         raise PrometheusQueryError("matrix data is not an object")

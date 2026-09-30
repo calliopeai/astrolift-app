@@ -15,6 +15,13 @@
   new matching runtime revision before revocation can be reported (#2213).
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
+- Shared-model density separates tenant-owned inventory, desired and last-applied
+  requests from exact-service observed running/ready pods and CPU/memory usage
+  and requests. Owner-authorized vLLM metrics
+  and pod-mapped CPU/memory reads expose units, windows, timestamps and explicit
+  no-data/stale/failure states; GPU/VRAM usage and shared-hardware capacity remain
+  unsupported without verified attribution (#2214).
+
 - Add bounded server-side public Hugging Face model search and revision reads,
   filter-bound paging, immutable SHA proof and explicit unavailable/unknown
   metadata without browser credentials or inferred runtime fit (#2214).
