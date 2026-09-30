@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -38,8 +40,8 @@ interface SecretRevealResp {
   };
 }
 
-function firstError(errs: { message: string }[]): string {
-  return errs[0]?.message ?? "unknown error";
+function firstError(errs: { message: string }[], fallback: string): string {
+  return errs[0]?.message ?? fallback;
 }
 
 /**
@@ -52,12 +54,23 @@ function firstError(errs: { message: string }[]): string {
  * resolve true on success.
  */
 export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) {
+  const t = useTranslations("agentSecrets.feedback");
+  const failure = (operation: string, message: string, name?: string) =>
+    t("failure", { operation: t(operation, { name: name ?? "" }), message });
   const client = useApolloClient();
-  const { data, loading } = useQuery<SecretStatusResp>(AGENT_ENV_SPEC_SECRET_STATUS, {
+  const query = useQuery<SecretStatusResp>(AGENT_ENV_SPEC_SECRET_STATUS, {
     variables: { slug: envSpecSlug },
     skip: !open || !envSpecSlug,
     fetchPolicy: "cache-and-network",
   });
+  const { data, loading, error } = query;
+  const onRetry = () => {
+    void query
+      .refetch()
+      .catch((err) =>
+        toast.error(failure("readFailed", err instanceof Error ? err.message : String(err)))
+      );
+  };
   const refetch = () =>
     client.refetchQueries({ include: [AGENT_ENV_SPEC_SECRET_STATUS, AGENT_SECRET_STATUS_PAGE] });
   const rows = data?.agentEnvironmentSpecSecretStatus ?? [];
@@ -100,7 +113,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
 
   async function onSave(envVar: string, value: string): Promise<boolean> {
     if (!value) {
-      toast.error("Enter a value first");
+      toast.error(t("enterValue"));
       return false;
     }
     const action = envVar;
@@ -111,14 +124,18 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       });
       const payload = res.data?.setAgentSecretValue;
       if (!payload?.ok) {
-        toast.error(`Set ${envVar} failed: ${firstError(payload?.errors ?? [])}`);
+        toast.error(
+          failure("setValueFailed", firstError(payload?.errors ?? [], t("unknownError")), envVar)
+        );
         return false;
       }
-      toast.success(`Saved ${envVar}`);
+      toast.success(t("valueSaved", { name: envVar }));
       await refetch();
       return true;
     } catch (err) {
-      toast.error(`Set ${envVar} failed: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(
+        failure("setValueFailed", err instanceof Error ? err.message : String(err), envVar)
+      );
       return false;
     } finally {
       finish(action);
@@ -134,14 +151,24 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       });
       const payload = res.data?.deleteAgentSecretValue;
       if (!payload?.ok) {
-        toast.error(`Delete ${target.envVar} failed: ${firstError(payload?.errors ?? [])}`);
+        toast.error(
+          failure(
+            "deleteValueFailed",
+            firstError(payload?.errors ?? [], t("unknownError")),
+            target.envVar
+          )
+        );
         return;
       }
-      toast.success(`Deleted ${target.envVar}`);
+      toast.success(t("valueDeleted", { name: target.envVar }));
       await refetch();
     } catch (err) {
       toast.error(
-        `Delete ${target.envVar} failed: ${err instanceof Error ? err.message : String(err)}`
+        failure(
+          "deleteValueFailed",
+          err instanceof Error ? err.message : String(err),
+          target.envVar
+        )
       );
     } finally {
       finish(action);
@@ -151,7 +178,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
   async function onUpsertRef(rawEnvVar: string, uri: string): Promise<boolean> {
     const envVar = rawEnvVar.trim();
     if (!envVar || !uri.trim()) {
-      toast.error("Environment variable and provider URI are required");
+      toast.error(t("refRequired"));
       return false;
     }
     const action = `ref:${envVar}`;
@@ -162,14 +189,14 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       });
       const payload = res.data?.upsertAgentSecretRef;
       if (!payload?.ok) {
-        toast.error(`Save ref failed: ${firstError(payload?.errors ?? [])}`);
+        toast.error(failure("saveRefFailed", firstError(payload?.errors ?? [], t("unknownError"))));
         return false;
       }
-      toast.success(`Saved binding ${envVar}`);
+      toast.success(t("bindingSaved", { name: envVar }));
       await refetch();
       return true;
     } catch (err) {
-      toast.error(`Save ref failed: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(failure("saveRefFailed", err instanceof Error ? err.message : String(err)));
       return false;
     } finally {
       finish(action);
@@ -183,12 +210,12 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       const res = await removeRef({ variables: { slug: envSpecSlug, envVar: row.envVar } });
       const payload = res.data?.removeAgentSecretRef;
       if (!payload?.ok) {
-        throw new Error(`Remove ref failed: ${firstError(payload?.errors ?? [])}`);
+        throw new Error(firstError(payload?.errors ?? [], t("unknownError")));
       }
-      toast.success(`Removed binding ${row.envVar}`);
+      toast.success(t("bindingRemoved", { name: row.envVar }));
       await refetch();
     } catch (err) {
-      toast.error(`Remove ref failed: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(failure("removeRefFailed", err instanceof Error ? err.message : String(err)));
     } finally {
       finish(action);
     }
@@ -213,7 +240,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       if (generation !== revealGeneration.current) return;
       const payload = res.data?.revealAgentSecretValue;
       if (!payload?.ok || !payload.data) {
-        toast.error(`Reveal failed: ${firstError(payload?.errors ?? [])}`);
+        toast.error(failure("revealFailed", firstError(payload?.errors ?? [], t("unknownError"))));
         return;
       }
       setReveals((current) => ({ ...current, [row.envVar]: payload.data!.value }));
@@ -228,7 +255,7 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
       }, 30_000);
     } catch (err) {
       if (generation !== revealGeneration.current) return;
-      toast.error(`Reveal failed: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(failure("revealFailed", err instanceof Error ? err.message : String(err)));
     } finally {
       finish(action);
     }
@@ -237,6 +264,8 @@ export function useAgentSecrets(envSpecSlug: string, open: boolean | undefined) 
   return {
     rows,
     loading,
+    error: error ? { message: error.message } : null,
+    onRetry,
     refNamespace,
     reveals,
     busyVar,

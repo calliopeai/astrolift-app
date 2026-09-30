@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import {
   EyeIcon,
   EyeOffIcon,
@@ -23,6 +25,8 @@ import type {
   AstroliftAgentSecretBundleAttachment,
 } from "@/graphql/agents/agents.types";
 
+import { AgentSecretReadError } from "./AgentSecretReadError";
+
 import type { useAgentSecretBundles } from "./use-agent-secret-bundles";
 
 type ConfirmationTarget =
@@ -45,6 +49,8 @@ export function AgentSecretBundlesView({
   bundles,
   defaultAttachments,
   loading,
+  error,
+  onRetry,
   busy,
   pending,
   reveals,
@@ -57,6 +63,7 @@ export function AgentSecretBundlesView({
   onDeleteKey,
   onRevealKey,
 }: AgentSecretBundlesViewProps) {
+  const t = useTranslations("agentSecrets.bundles");
   const attachedByBundle = new Map(defaultAttachments.map((ref) => [ref.bundleId, ref]));
 
   const [createName, setCreateName] = React.useState("");
@@ -108,279 +115,300 @@ export function AgentSecretBundlesView({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Reusable secret bundles</CardTitle>
-        <CardDescription>
-          Share a provider-backed key set across agents. Bundles merge in attachment order; direct
-          refs above override a bundle key with the same environment variable.
-        </CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_1fr_1.4fr_auto]">
-          <Input
-            placeholder="Bundle name"
-            value={createName}
-            onChange={(event) => {
-              setCreateName(event.target.value);
-              if (!createSlug) setCreateSlug(slugify(event.target.value));
-            }}
-          />
-          <Input
-            placeholder="bundle-slug"
-            value={createSlug}
-            onChange={(e) => setCreateSlug(e.target.value)}
-          />
-          <Input
-            placeholder="Provider ref (optional)"
-            value={createBackendRef}
-            onChange={(e) => setCreateBackendRef(e.target.value)}
-          />
-          <Button onClick={handleCreate} disabled={pending.has("create") || busy === "create"}>
-            {pending.has("create") || busy === "create" ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <PlusIcon className="size-4" />
-            )}
-            Create
-          </Button>
-        </div>
-
-        {loading && bundles.length === 0 ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2Icon className="size-4 animate-spin" /> Loading bundles…
-          </div>
-        ) : bundles.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No reusable bundles yet.</p>
+        {error ? (
+          <AgentSecretReadError label={t("title")} message={error.message} onRetry={onRetry} />
+        ) : loading ? (
+          <p role="status" className="text-muted-foreground text-sm">
+            {t("loading")}
+          </p>
         ) : (
-          <div className="space-y-3">
-            {bundles.map((bundle) => {
-              const attachment = attachedByBundle.get(bundle.id);
-              const draft = keyDrafts[bundle.id] ?? { key: "", value: "" };
-              const editing = editingId === bundle.id;
-              return (
-                <div key={bundle.id} className="space-y-3 rounded-md border p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      {editing ? (
-                        <div className="grid gap-2 md:grid-cols-2">
-                          <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-                          <Input
-                            value={editBackendRef}
-                            onChange={(e) => setEditBackendRef(e.target.value)}
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium">{bundle.name}</p>
-                            <Badge variant="outline">{bundle.provider}</Badge>
-                            {attachment && <Badge>Attached #{attachment.position + 1}</Badge>}
-                          </div>
-                          <p className="text-muted-foreground truncate font-mono text-xs">
-                            {bundle.backendRef}
-                          </p>
-                          {!bundle.canReveal && bundle.readLimitation && (
-                            <p className="text-muted-foreground mt-1 text-xs">
-                              {bundle.readLimitation}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1">
-                      {editing ? (
-                        <Button
-                          size="sm"
-                          onClick={() => handleUpdate(bundle)}
-                          disabled={
-                            pending.has(`update:${bundle.id}`) || busy === `update:${bundle.id}`
-                          }
-                        >
-                          <SaveIcon className="size-4" /> Save
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingId(bundle.id);
-                            setEditName(bundle.name);
-                            setEditBackendRef(bundle.backendRef);
-                          }}
-                        >
-                          <PencilIcon className="size-4" /> Edit
-                        </Button>
-                      )}
-                      {attachment ? (
-                        <>
-                          <Input
-                            className="h-8 w-28"
-                            aria-label={`Prefix for ${bundle.name}`}
-                            placeholder="ENV_ prefix"
-                            value={prefixDrafts[bundle.id] ?? attachment.prefix}
-                            onChange={(event) =>
-                              setPrefixDrafts((current) => ({
-                                ...current,
-                                [bundle.id]: event.target.value,
-                              }))
-                            }
-                          />
-                          <Input
-                            className="h-8 w-20"
-                            type="number"
-                            min={0}
-                            aria-label={`Merge position for ${bundle.name}`}
-                            value={positionDrafts[bundle.id] ?? attachment.position}
-                            onChange={(event) =>
-                              setPositionDrafts((current) => ({
-                                ...current,
-                                [bundle.id]: Math.max(0, Number(event.target.value) || 0),
-                              }))
-                            }
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAttach(bundle, attachment)}
-                            disabled={
-                              pending.has(`attach:${bundle.id}`) || busy === `attach:${bundle.id}`
-                            }
-                          >
-                            <SaveIcon className="size-4" /> Save attachment
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              setConfirmationTarget({ kind: "attachment", attachment })
-                            }
-                          >
-                            <UnlinkIcon className="size-4" /> Detach
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Input
-                            className="h-8 w-28"
-                            placeholder="ENV_ prefix"
-                            value={prefixDrafts[bundle.id] ?? ""}
-                            onChange={(e) =>
-                              setPrefixDrafts((current) => ({
-                                ...current,
-                                [bundle.id]: e.target.value,
-                              }))
-                            }
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAttach(bundle)}
-                            disabled={
-                              pending.has(`attach:${bundle.id}`) || busy === `attach:${bundle.id}`
-                            }
-                          >
-                            {pending.has(`attach:${bundle.id}`) ||
-                            busy === `attach:${bundle.id}` ? (
-                              <Loader2Icon className="size-4 animate-spin" />
-                            ) : (
-                              <LinkIcon className="size-4" />
-                            )}{" "}
-                            Attach
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={`Delete ${bundle.name}`}
-                        onClick={() => setConfirmationTarget({ kind: "bundle", bundle })}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
+          <>
+            <div className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_1fr_1.4fr_auto]">
+              <Input
+                placeholder={t("name")}
+                value={createName}
+                onChange={(event) => {
+                  setCreateName(event.target.value);
+                  if (!createSlug) setCreateSlug(slugify(event.target.value));
+                }}
+              />
+              <Input
+                placeholder="bundle-slug"
+                value={createSlug}
+                onChange={(e) => setCreateSlug(e.target.value)}
+              />
+              <Input
+                placeholder={t("providerRef")}
+                value={createBackendRef}
+                onChange={(e) => setCreateBackendRef(e.target.value)}
+              />
+              <Button onClick={handleCreate} disabled={pending.has("create") || busy === "create"}>
+                {pending.has("create") || busy === "create" ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <PlusIcon className="size-4" />
+                )}
+                {t("create")}
+              </Button>
+            </div>
 
-                  <div className="space-y-2">
-                    {bundle.keyNames.map((key) => {
-                      const revealId = `${bundle.id}:${key}`;
-                      return (
-                        <div
-                          key={key}
-                          className="bg-muted/40 flex items-center gap-2 rounded px-2 py-1.5"
-                        >
-                          <span className="min-w-0 flex-1 truncate font-mono text-xs">{key}</span>
-                          {reveals[revealId] && (
-                            <code className="bg-background max-w-[45%] truncate rounded px-2 py-1 text-xs">
-                              {reveals[revealId]}
-                            </code>
+            {bundles.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("empty")}</p>
+            ) : (
+              <div className="space-y-3">
+                {bundles.map((bundle) => {
+                  const attachment = attachedByBundle.get(bundle.id);
+                  const draft = keyDrafts[bundle.id] ?? { key: "", value: "" };
+                  const editing = editingId === bundle.id;
+                  return (
+                    <div
+                      key={bundle.id}
+                      role="group"
+                      aria-label={bundle.name}
+                      className="space-y-3 rounded-md border p-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          {editing ? (
+                            <div className="grid gap-2 md:grid-cols-2">
+                              <Input
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                              />
+                              <Input
+                                value={editBackendRef}
+                                onChange={(e) => setEditBackendRef(e.target.value)}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-medium">{bundle.name}</p>
+                                <Badge variant="outline">{bundle.provider}</Badge>
+                                {attachment && (
+                                  <Badge>
+                                    {t("attachedAt", { position: attachment.position + 1 })}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-muted-foreground truncate font-mono text-xs">
+                                {bundle.backendRef}
+                              </p>
+                              {!bundle.canReveal && bundle.readLimitation && (
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                  {bundle.readLimitation}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {editing ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleUpdate(bundle)}
+                              disabled={
+                                pending.has(`update:${bundle.id}`) || busy === `update:${bundle.id}`
+                              }
+                            >
+                              <SaveIcon className="size-4" /> {t("save")}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingId(bundle.id);
+                                setEditName(bundle.name);
+                                setEditBackendRef(bundle.backendRef);
+                              }}
+                            >
+                              <PencilIcon className="size-4" /> {t("edit")}
+                            </Button>
+                          )}
+                          {attachment ? (
+                            <>
+                              <Input
+                                className="h-8 w-28"
+                                aria-label={t("prefixFor", { name: bundle.name })}
+                                placeholder={t("prefixPlaceholder")}
+                                value={prefixDrafts[bundle.id] ?? attachment.prefix}
+                                onChange={(event) =>
+                                  setPrefixDrafts((current) => ({
+                                    ...current,
+                                    [bundle.id]: event.target.value,
+                                  }))
+                                }
+                              />
+                              <Input
+                                className="h-8 w-20"
+                                type="number"
+                                min={0}
+                                aria-label={t("positionFor", { name: bundle.name })}
+                                value={positionDrafts[bundle.id] ?? attachment.position}
+                                onChange={(event) =>
+                                  setPositionDrafts((current) => ({
+                                    ...current,
+                                    [bundle.id]: Math.max(0, Number(event.target.value) || 0),
+                                  }))
+                                }
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAttach(bundle, attachment)}
+                                disabled={
+                                  pending.has(`attach:${bundle.id}`) ||
+                                  busy === `attach:${bundle.id}`
+                                }
+                              >
+                                <SaveIcon className="size-4" /> {t("saveAttachment")}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setConfirmationTarget({ kind: "attachment", attachment })
+                                }
+                              >
+                                <UnlinkIcon className="size-4" /> {t("detach")}
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Input
+                                className="h-8 w-28"
+                                placeholder={t("prefixPlaceholder")}
+                                value={prefixDrafts[bundle.id] ?? ""}
+                                onChange={(e) =>
+                                  setPrefixDrafts((current) => ({
+                                    ...current,
+                                    [bundle.id]: e.target.value,
+                                  }))
+                                }
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAttach(bundle)}
+                                disabled={
+                                  pending.has(`attach:${bundle.id}`) ||
+                                  busy === `attach:${bundle.id}`
+                                }
+                              >
+                                {pending.has(`attach:${bundle.id}`) ||
+                                busy === `attach:${bundle.id}` ? (
+                                  <Loader2Icon className="size-4 animate-spin" />
+                                ) : (
+                                  <LinkIcon className="size-4" />
+                                )}{" "}
+                                {t("attach")}
+                              </Button>
+                            </>
                           )}
                           <Button
                             size="icon-sm"
                             variant="ghost"
-                            disabled={
-                              !bundle.canReveal ||
-                              pending.has(`key-reveal:${revealId}`) ||
-                              busy === `key-reveal:${revealId}`
-                            }
-                            onClick={() => onRevealKey(bundle, key)}
-                            aria-label={`${reveals[revealId] ? "Hide" : "Reveal"} ${key}`}
-                          >
-                            {reveals[revealId] ? (
-                              <EyeOffIcon className="size-4" />
-                            ) : (
-                              <EyeIcon className="size-4" />
-                            )}
-                          </Button>
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            onClick={() => setConfirmationTarget({ kind: "key", bundle, key })}
-                            aria-label={`Delete ${key}`}
-                            disabled={
-                              pending.has(`key-delete:${bundle.id}:${key}`) ||
-                              busy === `key-delete:${bundle.id}:${key}`
-                            }
+                            aria-label={t("deleteNamed", { name: bundle.name })}
+                            onClick={() => setConfirmationTarget({ kind: "bundle", bundle })}
                           >
                             <Trash2Icon className="size-4" />
                           </Button>
                         </div>
-                      );
-                    })}
-                    <div className="grid gap-2 md:grid-cols-[1fr_1.6fr_auto]">
-                      <Input
-                        placeholder="ENV_KEY"
-                        value={draft.key}
-                        onChange={(e) =>
-                          setKeyDrafts((current) => ({
-                            ...current,
-                            [bundle.id]: { ...draft, key: e.target.value },
-                          }))
-                        }
-                      />
-                      <Input
-                        type="password"
-                        autoComplete="new-password"
-                        placeholder="Value"
-                        value={draft.value}
-                        onChange={(e) =>
-                          setKeyDrafts((current) => ({
-                            ...current,
-                            [bundle.id]: { ...draft, value: e.target.value },
-                          }))
-                        }
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => handleSetKey(bundle)}
-                        disabled={!draft.key || !draft.value}
-                      >
-                        <PlusIcon className="size-4" /> Set key
-                      </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {bundle.keyNames.map((key) => {
+                          const revealId = `${bundle.id}:${key}`;
+                          return (
+                            <div
+                              key={key}
+                              className="bg-muted/40 flex items-center gap-2 rounded px-2 py-1.5"
+                            >
+                              <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                                {key}
+                              </span>
+                              {reveals[revealId] && (
+                                <code className="bg-background max-w-[45%] truncate rounded px-2 py-1 text-xs">
+                                  {reveals[revealId]}
+                                </code>
+                              )}
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                disabled={
+                                  !bundle.canReveal ||
+                                  pending.has(`key-reveal:${revealId}`) ||
+                                  busy === `key-reveal:${revealId}`
+                                }
+                                onClick={() => onRevealKey(bundle, key)}
+                                aria-label={t(reveals[revealId] ? "hideNamed" : "revealNamed", {
+                                  name: key,
+                                })}
+                              >
+                                {reveals[revealId] ? (
+                                  <EyeOffIcon className="size-4" />
+                                ) : (
+                                  <EyeIcon className="size-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => setConfirmationTarget({ kind: "key", bundle, key })}
+                                aria-label={t("deleteNamed", { name: key })}
+                                disabled={
+                                  pending.has(`key-delete:${bundle.id}:${key}`) ||
+                                  busy === `key-delete:${bundle.id}:${key}`
+                                }
+                              >
+                                <Trash2Icon className="size-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        <div className="grid gap-2 md:grid-cols-[1fr_1.6fr_auto]">
+                          <Input
+                            placeholder="ENV_KEY"
+                            value={draft.key}
+                            onChange={(e) =>
+                              setKeyDrafts((current) => ({
+                                ...current,
+                                [bundle.id]: { ...draft, key: e.target.value },
+                              }))
+                            }
+                          />
+                          <Input
+                            type="password"
+                            autoComplete="new-password"
+                            placeholder={t("value")}
+                            value={draft.value}
+                            onChange={(e) =>
+                              setKeyDrafts((current) => ({
+                                ...current,
+                                [bundle.id]: { ...draft, value: e.target.value },
+                              }))
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleSetKey(bundle)}
+                            disabled={!draft.key || !draft.value}
+                          >
+                            <PlusIcon className="size-4" /> {t("setKey")}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </CardContent>
       <ConfirmDialog
@@ -390,23 +418,26 @@ export function AgentSecretBundlesView({
         }}
         title={
           confirmationTarget?.kind === "bundle"
-            ? `Delete “${confirmationTarget.bundle.name}”?`
+            ? t("deleteBundleTitle", { name: confirmationTarget.bundle.name })
             : confirmationTarget?.kind === "attachment"
-              ? `Detach “${confirmationTarget.attachment.bundleName}”?`
+              ? t("detachTitle", { name: confirmationTarget.attachment.bundleName })
               : confirmationTarget?.kind === "key"
-                ? `Delete ${confirmationTarget.key}?`
-                : "Confirm secret change"
+                ? t("deleteKeyTitle", { key: confirmationTarget.key })
+                : t("confirmTitle")
         }
         description={
           confirmationTarget?.kind === "bundle"
-            ? "This deletes both the bundle definition and its provider-side secret. The provider's recovery policy may allow restoration for a limited time."
+            ? t("deleteBundleDescription")
             : confirmationTarget?.kind === "attachment"
-              ? "This agent will no longer receive values from the bundle. The bundle and its provider-side values are retained."
+              ? t("detachDescription")
               : confirmationTarget?.kind === "key"
-                ? `This permanently deletes ${confirmationTarget.key} from “${confirmationTarget.bundle.name}” in the configured secret provider.`
+                ? t("deleteKeyDescription", {
+                    key: confirmationTarget.key,
+                    name: confirmationTarget.bundle.name,
+                  })
                 : undefined
         }
-        confirmLabel={confirmationTarget?.kind === "attachment" ? "Detach bundle" : "Delete"}
+        confirmLabel={t(confirmationTarget?.kind === "attachment" ? "detachBundle" : "delete")}
         destructive
         onConfirm={async () => {
           if (!confirmationTarget) return;

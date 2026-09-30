@@ -1,13 +1,16 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useQuery } from "@apollo/client/react";
+import * as React from "react";
 
 import { useListState } from "@/components/list/use-list-state";
 import { useAgentSecrets } from "@/components/screens/agents/list/use-agent-secrets";
 import { AGENT_SECRET_STATUS_PAGE } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 
-import { AGENT_SECRETS_LIST, agentSecretsPageVariables } from "./agent-secrets-list";
+import { localizedAgentSecretsList, agentSecretsPageVariables } from "./agent-secrets-list";
 
 interface SecretStatusPageResp {
   agentEnvironmentSpecSecretStatusPage: {
@@ -26,7 +29,9 @@ interface SecretStatusPageResp {
  */
 export function useAgentSecretValues(slug: string) {
   const secrets = useAgentSecrets(slug, false);
-  const list = useListState(AGENT_SECRETS_LIST);
+  const t = useTranslations("agentSecrets.values");
+  const definition = React.useMemo(() => localizedAgentSecretsList(t), [t]);
+  const list = useListState(definition);
   const { state } = list;
   const query = useQuery<SecretStatusPageResp>(AGENT_SECRET_STATUS_PAGE, {
     variables: {

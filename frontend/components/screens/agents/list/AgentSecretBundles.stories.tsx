@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
@@ -26,10 +28,7 @@ export const Empty: Story = {
   render: () => <AgentSecretBundlesView {...BUNDLES} bundles={[]} defaultAttachments={[]} />,
 };
 
-/**
- * The card has no error state: failed queries render as Empty and failed
- * writes are toasts. Closest real state: a key being revealed while busy.
- */
+/** Values disclosed by a successful audited provider read. */
 export const Revealed: Story = {
   render: () => (
     <AgentSecretBundlesView
@@ -73,4 +72,26 @@ export const PendingWrites: Story = {
     await expect(attach[1]).toBeEnabled();
     await expect(canvas.getByRole("button", { name: "Delete GITHUB_APP_ID" })).toBeDisabled();
   },
+};
+
+export const ReadFailure: Story = {
+  render: () => (
+    <AgentSecretBundlesView
+      {...BUNDLES}
+      error={{ message: "ATTACHMENT_READ_REFUSED: the selected recipe could not be read" }}
+    />
+  ),
+};
+
+export const GermanReadFailureLongStrings: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" timeZone="Europe/Berlin" messages={de}>
+      <div style={{ width: 768 }}>
+        <AgentSecretBundlesView
+          {...BUNDLES}
+          error={{ message: "PROVIDER_DIAGNOSTIC: " + "request-identifier/".repeat(30) }}
+        />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

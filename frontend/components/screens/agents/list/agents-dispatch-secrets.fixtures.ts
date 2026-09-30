@@ -166,6 +166,8 @@ export const SECRET_ROW_ERROR: AstroliftAgentSecretStatus = {
 export const SECRETS: AgentSecretsViewProps = {
   rows: SECRET_ROWS,
   loading: false,
+  error: null,
+  onRetry: () => {},
   refNamespace: "agents/org-1",
   reveals: {},
   busyVar: "",
@@ -236,6 +238,8 @@ export const BUNDLES: AgentSecretBundlesViewProps = {
   bundles: BUNDLES_LIST,
   defaultAttachments: [ATTACHMENT],
   loading: false,
+  error: null,
+  onRetry: () => {},
   busy: "",
   pending: new Set(),
   reveals: {},

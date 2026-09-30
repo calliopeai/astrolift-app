@@ -70,3 +70,17 @@ export function agentSecretsPageVariables(q: NumberedListQuery) {
   if (f.provider) filter.provider = [f.provider];
   return numberedPageVariables(q, filter, AGENT_SECRETS_LIST.defaultSort);
 }
+
+/** Presentation only; stable field/view IDs and backend status flags stay intact. */
+export function localizedAgentSecretsList(t: (key: string) => string): ListDefinition {
+  return {
+    ...AGENT_SECRETS_LIST,
+    fields: AGENT_SECRETS_LIST.fields.map((field) => ({
+      ...field,
+      label: t(field.key),
+      options: field.options?.map((option) => ({ ...option, label: t(`state.${option.value}`) })),
+    })),
+    searchPlaceholder: t("search"),
+    views: AGENT_SECRETS_LIST.views.map((view) => ({ ...view, label: t("all") })),
+  };
+}

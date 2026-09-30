@@ -8,6 +8,12 @@
 - Shared settings navigation, danger-zone notices, default save/cancel actions
   and read-only permission sentences use all eight locales. Actual permission
   IDs, caller labels, server diagnostics and draft/retry behavior are preserved
+- Agent secret value and bundle editors translate presentation and feedback in
+  all eight locales, identify the explicitly selected environment recipe and
+  retain provider identifiers and server diagnostics. Failed status/catalog
+  reads show retryable errors; attachment reads finish before empty states or
+  attach controls appear (#2145).
+
 - Shared feeds translate defaults and calendar-day headings in all eight
   locales. Grouping follows the configured timezone across daylight-saving
   transitions; paging callbacks, caller overrides and server errors stay intact

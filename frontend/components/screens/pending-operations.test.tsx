@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import { renderWithIntl as render } from "@/test/render-with-intl";
 import { ApolloClient, ApolloLink, InMemoryCache, type Operation } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
@@ -40,7 +42,9 @@ function network(reply: (operation: Operation, observer: Observer) => void) {
     link: new ApolloLink((operation) => new Observable((observer) => reply(operation, observer))),
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <ApolloProvider client={client}>{children}</ApolloProvider>
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <ApolloProvider client={client}>{children}</ApolloProvider>
+    </NextIntlClientProvider>
   );
   return { client, wrapper };
 }

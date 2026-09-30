@@ -1,3 +1,7 @@
+import de from "@/messages/de.json";
+import ja from "@/messages/ja.json";
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -14,7 +18,7 @@ import {
   serveSecrets,
 } from "../list/agents-dispatch-secrets.fixtures";
 import { AgentSecretBundlesView } from "../list/AgentSecretBundles";
-import { AGENT_SECRETS_LIST } from "./agent-secrets-list";
+import { localizedAgentSecretsList } from "./agent-secrets-list";
 import { AgentSecretsTab, AgentSecretValues } from "./AgentSecretsTab";
 
 /**
@@ -41,7 +45,9 @@ function Values({
   reveals?: Record<string, string>;
   readError?: string | null;
 }) {
-  const list = useLocalListState(AGENT_SECRETS_LIST);
+  const t = useTranslations("agentSecrets.values");
+  const definition = React.useMemo(() => localizedAgentSecretsList(t), [t]);
+  const list = useLocalListState(definition);
   const { state } = list;
   const page = serveSecrets(rows, {
     filters: list.filters,
@@ -142,5 +148,24 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <Tab rows={[LONG_SECRET_ROW, ...SECRET_ROWS]} />
     </div>
+  ),
+};
+
+export const GermanLongStrings: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" timeZone="Europe/Berlin" messages={de}>
+      <div style={{ width: 768 }}>
+        <Tab rows={[LONG_SECRET_ROW, ...SECRET_ROWS]} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseBundlesWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" timeZone="Asia/Tokyo" messages={ja}>
+      <div style={{ width: 768 }}>
+        <Tab initial="bundles" />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

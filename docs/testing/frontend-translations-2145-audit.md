@@ -84,3 +84,30 @@ diagnostics remain caller data. Cursor admission and scroll retention are
 unchanged. Locale interaction tests cover all eight languages, a New York
 midnight/DST boundary, original failures and bounded load callbacks; French and
 Japanese stories exercise the shared frame.
+
+## Agent secret values and attached bundles
+
+The value list, legacy value dialog, bundle consumers and their feedback use
+119 translated keys under `agentSecrets.values`, `agentSecrets.bundles` and
+`agentSecrets.feedback` in every locale. The existing `agentSecrets.source`
+picker and access-boundary messages are preserved. Copy identifies the
+explicitly selected environment recipe rather than implying that a secret
+recipe is a persisted binding to an agent. Bundle attachments affect that
+recipe's default environment; direct references override matching variables.
+
+The English static list definition remains available to parser tests; rendered
+consumers use its translated presentation factory. Field IDs, filter values,
+sort/paging callbacks, provider URIs, namespace boundaries, variable and bundle
+keys, permissions, mutation inputs and exact server diagnostics remain intact.
+Failed status/catalog/attachment reads display the original diagnostic and an
+actual read retry. Initial attachment loading blocks attach forms, so an
+unknown attachment list cannot masquerade as empty. Cached data is retained
+while refreshing. These changes do not infer an agent-to-recipe association or
+change the backend/source-verification contract.
+
+All-eight-locale React/Apollo regressions verify ICU argument/tag parity,
+actual selected-recipe mutation inputs, failed-write drafts, exact destructive
+targets, untranslated provider diagnostics, and read/loading/empty distinctions.
+Portable German/French/Japanese stories cover ready, long, loading and failed
+states. Committed-write versus failed-refresh feedback is tracked separately
+from this localization slice.

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import { CronjobHome } from "./cronjob-home";

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -28,8 +30,8 @@ import { usePendingActions } from "@/hooks/use-pending-actions";
 type MutationError = { message: string };
 type MutationEnvelope<T> = { ok: boolean; errors: MutationError[]; data: T | null };
 
-function errorMessage(payload: MutationEnvelope<unknown> | undefined): string {
-  return payload?.errors?.[0]?.message ?? "unknown error";
+function errorMessage(payload: MutationEnvelope<unknown> | undefined, fallback: string): string {
+  return payload?.errors?.[0]?.message ?? fallback;
 }
 
 /**
@@ -40,6 +42,9 @@ function errorMessage(payload: MutationEnvelope<unknown> | undefined): string {
  * resolve true on success.
  */
 export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
+  const t = useTranslations("agentSecrets.feedback");
+  const failure = (operation: string, message: string) =>
+    t("failure", { operation: t(operation), message });
   const bundlesQuery = useQuery<{ agentSecretBundles: AstroliftAgentSecretBundle[] }>(
     AGENT_SECRET_BUNDLES,
     {
@@ -101,7 +106,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
 
   async function onCreate(name: string, bundleSlug: string, backendRef: string): Promise<boolean> {
     if (!name.trim() || !bundleSlug.trim()) {
-      toast.error("Bundle name and slug are required");
+      toast.error(t("bundleRequired"));
       return false;
     }
     const action = "create";
@@ -118,14 +123,12 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.createAgentSecretBundle as
         | MutationEnvelope<AstroliftAgentSecretBundle>
         | undefined;
-      if (!payload?.ok) throw new Error(errorMessage(payload));
-      toast.success("Secret bundle created");
+      if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
+      toast.success(t("created"));
       await refresh();
       return true;
     } catch (error) {
-      toast.error(
-        `Create bundle failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      toast.error(failure("createFailed", error instanceof Error ? error.message : String(error)));
       return false;
     } finally {
       finish(action);
@@ -151,12 +154,12 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.updateAgentSecretBundle as
         | MutationEnvelope<AstroliftAgentSecretBundle>
         | undefined;
-      if (!payload?.ok) throw new Error(errorMessage(payload));
-      toast.success("Bundle updated");
+      if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
+      toast.success(t("updated"));
       await refresh();
       return true;
     } catch (error) {
-      toast.error(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(failure("updateFailed", error instanceof Error ? error.message : String(error)));
       return false;
     } finally {
       finish(action);
@@ -173,12 +176,12 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.deleteAgentSecretBundle as
         | MutationEnvelope<AstroliftAgentSecretBundle>
         | undefined;
-      if (!payload?.ok) throw new Error(errorMessage(payload));
-      toast.success("Bundle deleted");
+      if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
+      toast.success(t("bundleDeleted"));
       await refresh();
     } catch (error) {
       toast.error(
-        `Delete bundle failed: ${error instanceof Error ? error.message : String(error)}`
+        failure("deleteBundleFailed", error instanceof Error ? error.message : String(error))
       );
     } finally {
       finish(action);
@@ -205,12 +208,12 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.attachAgentSecretBundle as
         | MutationEnvelope<AstroliftAgentSecretBundleAttachment>
         | undefined;
-      if (!payload?.ok) throw new Error(errorMessage(payload));
-      toast.success(attachment ? "Attachment updated" : "Bundle attached");
+      if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
+      toast.success(t(attachment ? "attachmentUpdated" : "attached"));
       await refresh();
       return true;
     } catch (error) {
-      toast.error(`Attach failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(failure("attachFailed", error instanceof Error ? error.message : String(error)));
       return false;
     } finally {
       finish(action);
@@ -227,11 +230,11 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.detachAgentSecretBundle as
         | MutationEnvelope<AstroliftAgentSecretBundleAttachment>
         | undefined;
-      if (!payload?.ok) throw new Error(errorMessage(payload));
-      toast.success("Bundle detached");
+      if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
+      toast.success(t("detached"));
       await refresh();
     } catch (error) {
-      toast.error(`Detach failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(failure("detachFailed", error instanceof Error ? error.message : String(error)));
     } finally {
       finish(action);
     }
@@ -243,7 +246,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
     value: string
   ): Promise<boolean> {
     if (!key || !value) {
-      toast.error("Key and value are required");
+      toast.error(t("keyValueRequired"));
       return false;
     }
     const action = `key:${bundle.id}`;
@@ -260,12 +263,12 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.setAgentBundleSecretValue as
         | MutationEnvelope<AstroliftAgentSecretBundle>
         | undefined;
-      if (!payload?.ok) throw new Error(errorMessage(payload));
-      toast.success(`Saved ${key}`);
+      if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
+      toast.success(t("keySaved", { key }));
       await refresh();
       return true;
     } catch (error) {
-      toast.error(`Save key failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(failure("saveKeyFailed", error instanceof Error ? error.message : String(error)));
       return false;
     } finally {
       finish(action);
@@ -282,11 +285,13 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.deleteAgentBundleSecretValue as
         | MutationEnvelope<AstroliftAgentSecretBundle>
         | undefined;
-      if (!payload?.ok) throw new Error(errorMessage(payload));
-      toast.success(`Deleted ${key}`);
+      if (!payload?.ok) throw new Error(errorMessage(payload, t("unknownError")));
+      toast.success(t("keyDeleted", { key }));
       await refresh();
     } catch (error) {
-      toast.error(`Delete key failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(
+        failure("deleteKeyFailed", error instanceof Error ? error.message : String(error))
+      );
     } finally {
       finish(action);
     }
@@ -312,7 +317,7 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
       const payload = response.data?.revealAgentBundleSecretValue as
         | MutationEnvelope<{ value: string }>
         | undefined;
-      if (!payload?.ok || !payload.data) throw new Error(errorMessage(payload));
+      if (!payload?.ok || !payload.data) throw new Error(errorMessage(payload, t("unknownError")));
       setReveals((current) => ({ ...current, [revealId]: payload.data!.value }));
       revealTimers.current[revealId] = setTimeout(() => {
         setReveals((current) => {
@@ -322,18 +327,28 @@ export function useAgentSecretBundles(envSpecSlug: string, active: boolean) {
         });
       }, 30_000);
     } catch (error) {
-      toast.error(`Reveal failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(failure("revealFailed", error instanceof Error ? error.message : String(error)));
     } finally {
       finish(action);
     }
   }
 
-  const loading = bundlesQuery.loading || attachmentsQuery.loading;
+  const loading =
+    (bundlesQuery.loading && !bundlesQuery.data) ||
+    (attachmentsQuery.loading && !attachmentsQuery.data);
+  const error = bundlesQuery.error ?? attachmentsQuery.error;
+  const onRetry = () => {
+    void refresh().catch((error) =>
+      toast.error(failure("readFailed", error instanceof Error ? error.message : String(error)))
+    );
+  };
 
   return {
     bundles,
     defaultAttachments,
     loading,
+    error: error ? { message: error.message } : null,
+    onRetry,
     busy,
     pending,
     reveals,

@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 import { expect, userEvent, within } from "storybook/test";
@@ -84,4 +86,24 @@ export const SavingReference: Story = {
     await expect(canvas.getByRole("button", { name: "Add / update ref" })).toBeDisabled();
     await expect(canvas.getByPlaceholderText("ENV_VAR")).toHaveValue(" API_KEY ");
   },
+};
+
+export const ReadFailure: StoryObj = {
+  render: () => (
+    <AgentSecretsView
+      {...SECRETS}
+      embedded
+      error={{ message: "SECRET_STATUS_READ_REFUSED: the selected recipe could not be read" }}
+    />
+  ),
+};
+
+export const FrenchWidth768: StoryObj = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" timeZone="Europe/Paris" messages={fr}>
+      <div style={{ width: 768 }}>
+        <AgentSecretsView {...SECRETS} embedded />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };
