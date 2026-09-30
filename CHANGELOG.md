@@ -21,6 +21,13 @@
   checks. Cold workflow-run pages wait for workflow context before rendering.
   See [route navigation checks](docs/testing/route-navigation.md).
 
+- Identity lists export every authorized matching member, invitation and role
+  binding as CSV, preserving filters and stable sorting without the old 5,000-row
+  cutoff or blank member roles. Invitation activity uses only unambiguous live
+  current-org membership and audit evidence; subject aliases and role/policy
+  sort declarations complete the existing paging contract (#2153). See
+  [identity list exports](docs/operators/identity-list-exports.md).
+
 - Persisted deployment logs retain actual owner deny policies and current bearer
   ceilings after app/environment teardown or cluster retirement. Failed history
   diagnostics preserve the original provider failure; completion writes still

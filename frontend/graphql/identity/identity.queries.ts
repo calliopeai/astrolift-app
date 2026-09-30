@@ -352,6 +352,7 @@ export const LIST_ROLES_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $sortBy: AstroliftListSortKey
     $filter: AstroliftRolesListFilter
     $sort: String
     $page: Int
@@ -361,6 +362,7 @@ export const LIST_ROLES_PAGE = gql`
       search: $search
       limit: $limit
       after: $after
+      sortBy: $sortBy
       filter: $filter
       sort: $sort
       page: $page
@@ -648,6 +650,7 @@ export const LIST_POLICIES_PAGE = gql`
     $search: String
     $limit: Int
     $after: String
+    $sortBy: AstroliftListSortKey
     $filter: AstroliftPoliciesListFilter
     $sort: String
     $page: Int
@@ -657,6 +660,7 @@ export const LIST_POLICIES_PAGE = gql`
       search: $search
       limit: $limit
       after: $after
+      sortBy: $sortBy
       filter: $filter
       sort: $sort
       page: $page
@@ -874,6 +878,7 @@ const INVITATION_FIELDS = gql`
     invitedByEmail
     invitedByAvatarUrl
     createdAt
+    lastActiveAt
   }
 `;
 
@@ -1006,6 +1011,55 @@ export const GET_ELEVATION_STATUS = gql`
       secondsRemaining
       method
       requiredFor
+    }
+  }
+`;
+
+/** Complete matching lists: paging variables never truncate these exports. */
+export const EXPORT_MEMBERS_CSV = gql`
+  query ExportMembersCsv($search: String, $filter: AstroliftMembersListFilter, $sort: String) {
+    astroliftMembersCsv(search: $search, filter: $filter, sort: $sort) {
+      filename
+      content
+      rowCount
+      contentType
+    }
+  }
+`;
+export const EXPORT_INVITATIONS_CSV = gql`
+  query ExportInvitationsCsv(
+    $status: String
+    $search: String
+    $filter: AstroliftInvitationsListFilter
+    $sort: String
+  ) {
+    astroliftInvitationsCsv(status: $status, search: $search, filter: $filter, sort: $sort) {
+      filename
+      content
+      rowCount
+      contentType
+    }
+  }
+`;
+export const EXPORT_ROLE_BINDINGS_CSV = gql`
+  query ExportRoleBindingsCsv(
+    $search: String
+    $appSlug: String
+    $roleId: GUID
+    $filter: AstroliftRoleBindingsListFilter
+    $sort: String
+  ) {
+    astroliftRoleBindingsCsv(
+      search: $search
+      appSlug: $appSlug
+      roleId: $roleId
+      filter: $filter
+      sort: $sort
+    ) {
+      filename
+      content
+      rowCount
+      contentType
     }
   }
 `;

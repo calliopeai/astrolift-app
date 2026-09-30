@@ -59,6 +59,12 @@ from astrolift_identity.schema.access_ux import (
     PrincipalType,
     condition_catalog,
 )
+from astrolift_identity.schema.identity_csv import (
+    IdentityCsvExport,
+    bindings_csv,
+    invitations_csv,
+    members_csv,
+)
 from astrolift_identity.schema.identity_lists import (
     InvitationsListFilterInput,
     MembersListFilterInput,
@@ -312,7 +318,7 @@ def _members_qs(*, search: str | None = None):
     # Scope to members of the caller org's own scopes (PII): the org
     # itself plus its teams / projects / apps. Without this the
     # resolver returned every Member row across every tenant.
-    qs = Member.objects.select_related("user").filter(_org_scope_q(org_id))
+    qs = Member.objects.select_related("user").filter(_org_scope_q(org_id, coherent=True))
     term = (search or "").strip()
     if term:
         qs = qs.filter(search_q(term, "user__username", "user__email", "user__first_name", "user__last_name"))
@@ -333,11 +339,15 @@ def _invitations_qs(*, status: str | None = None, search: str | None = None):
     org_id = tenant.organization_id if tenant else None
     if org_id is None:
         return Invitation.objects.none()
-    qs = Invitation.objects.filter(
-        scope_kind=Invitation.ScopeKind.ORG,
-        scope_id=org_id,
-        deleted_at__isnull=True,
-    ).select_related("role", "invited_by")
+    qs = (
+        Invitation.objects.filter(
+            scope_kind=Invitation.ScopeKind.ORG,
+            scope_id=org_id,
+            deleted_at__isnull=True,
+        )
+        .filter(Q(role__organization_id=org_id) | Q(role__organization__isnull=True))
+        .select_related("role", "invited_by")
+    )
     if status:
         qs = qs.filter(status=status)
     term = (search or "").strip()
@@ -397,7 +407,10 @@ def _role_bindings_qs(*, search: str | None = None, app_slug: str | None = None)
     from astrolift_identity.visibility import visible_identity_bindings
 
     qs = visible_identity_bindings(
-        RoleBinding.objects.select_related("user", "role").filter(_org_scope_q(org_id))
+        RoleBinding.objects.select_related("user", "role").filter(
+            _org_scope_q(org_id, coherent=True),
+            Q(role__organization_id=org_id) | Q(role__organization__isnull=True),
+        )
     )
     if app_slug:
         # scope_id is a generic BigInt rather than a FK, so the app has to be
@@ -462,8 +475,91 @@ def _policies_qs(*, search: str | None = None):
     return qs
 
 
+def _members_list_qs(*, search=None, filter=None):
+    org_id, viewer_id = _tenant_ids()
+    qs = _members_qs(search=search)
+    return lists.filter_members(qs, filter, org_id=org_id, viewer_id=viewer_id) if filter is not None else qs
+
+
+def _invitations_list_qs(*, status=None, search=None, filter=None, sort=None):
+    org_id, viewer_id = _tenant_ids()
+    qs = _invitations_qs(status=status, search=search).filter(
+        filter_q(filter, lists.INVITATIONS_FILTERS, me=viewer_id)
+    )
+    return lists.annotate_invitation_activity(qs, org_id) if sort and "lastActive" in sort else qs
+
+
+def _bindings_list_qs(*, search=None, app_slug=None, role_id=None, filter=None):
+    org_id, viewer_id = _tenant_ids()
+    qs = _role_bindings_qs(search=search, app_slug=app_slug)
+    if role_id is not None:
+        role = lists.visible_role(org_id, role_id)
+        qs = qs.filter(role_id=role.pk) if role is not None else qs.none()
+    return (
+        lists.filter_role_bindings(qs, filter, org_id=org_id, viewer_id=viewer_id)
+        if filter is not None
+        else qs
+    )
+
+
 @strawberry.type
 class IdentityQuery:
+    @strawberry.field
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
+    @tenant_scoped()
+    def astrolift_members_csv(
+        self,
+        info: Info,
+        search: str | None = None,
+        filter: MembersListFilterInput | None = None,
+        sort: str | None = None,
+    ) -> IdentityCsvExport:
+        """Export the entire authorized matching member list; no paging cap."""
+        org_id, _ = _tenant_ids()
+        order = resolve_list_sort(sort, lists.members_sort_keys(org_id), default=lists.MEMBERS_DEFAULT_SORT)
+        return members_csv(_members_list_qs(search=search, filter=filter).order_by(*order), org_id)
+
+    @strawberry.field
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
+    @tenant_scoped()
+    def astrolift_invitations_csv(
+        self,
+        info: Info,
+        status: str | None = None,
+        search: str | None = None,
+        filter: InvitationsListFilterInput | None = None,
+        sort: str | None = None,
+    ) -> IdentityCsvExport:
+        """Export all matching invitations without exposing invitation credentials."""
+        order = resolve_list_sort(sort, lists.INVITATIONS_SORT_KEYS, default=lists.INVITATIONS_DEFAULT_SORT)
+        return invitations_csv(
+            _invitations_list_qs(status=status, search=search, filter=filter, sort=sort).order_by(*order)
+        )
+
+    @strawberry.field
+    @require_permission(Permission.ORG_MANAGE_MEMBERS, any_scope=True)
+    @tenant_scoped()
+    def astrolift_role_bindings_csv(
+        self,
+        info: Info,
+        search: str | None = None,
+        app_slug: str | None = None,
+        role_id: GUID | None = None,  # type: ignore[valid-type]
+        filter: RoleBindingsListFilterInput | None = None,
+        sort: str | None = None,
+    ) -> IdentityCsvExport:
+        """Export matching grants after actual scope and bearer visibility filtering."""
+        org_id, _ = _tenant_ids()
+        order = resolve_list_sort(
+            sort, lists.role_bindings_sort_keys(org_id), default=lists.ROLE_BINDINGS_DEFAULT_SORT
+        )
+        qs = _bindings_list_qs(search=search, app_slug=app_slug, role_id=role_id, filter=filter)
+        return bindings_csv(qs.order_by(*order))
+
     @strawberry.field
     def me(self, info: Info) -> MeType | None:
         """Return the currently authenticated user."""
@@ -997,10 +1093,8 @@ class IdentityQuery:
         numbered paging. Every row names its team (``teamId`` / ``teamSlug``
         / ``teamName`` on a TEAM row) and lists the user's teams (``teams``).
         """
-        org_id, viewer_id = _tenant_ids()
-        qs = _members_qs(search=search)
-        if filter is not None:
-            qs = lists.filter_members(qs, filter, org_id=org_id, viewer_id=viewer_id)
+        org_id, _ = _tenant_ids()
+        qs = _members_list_qs(search=search, filter=filter)
         if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
             order_by = resolve_list_sort(
                 sort, lists.members_sort_keys(org_id), default=lists.MEMBERS_DEFAULT_SORT
@@ -1173,13 +1267,10 @@ class IdentityQuery:
 
         The list contract (#2153): ``filter`` takes status, role and
         invitedBy ("me" is the viewer); ``sort`` takes email, created,
-        expires, status and role (default -created). Any of ``sort``,
+        expires, status, role and lastActive (default -created). Any of ``sort``,
         ``page`` or ``pageSize`` selects numbered paging.
         """
-        _org_id, viewer_id = _tenant_ids()
-        qs = _invitations_qs(status=status, search=search).filter(
-            filter_q(filter, lists.INVITATIONS_FILTERS, me=viewer_id)
-        )
+        qs = _invitations_list_qs(status=status, search=search, filter=filter, sort=sort)
         if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
             order_by = resolve_list_sort(
                 sort, lists.INVITATIONS_SORT_KEYS, default=lists.INVITATIONS_DEFAULT_SORT
@@ -1187,6 +1278,7 @@ class IdentityQuery:
             result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
         else:
             result = keyset_page(qs, cursor=after, limit=limit)
+        lists.invitation_activity(result.rows, _tenant_ids()[0])
         userinfo_by_user_id = _userinfo_by_inviter_id(result.rows)
         return result.map(lambda r: invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id))
 
@@ -1482,13 +1574,8 @@ class IdentityQuery:
         lastActive (default -created). Any of ``sort``, ``page`` or
         ``pageSize`` selects numbered paging.
         """
-        org_id, viewer_id = _tenant_ids()
-        qs = _role_bindings_qs(search=search, app_slug=app_slug)
-        if role_id is not None:
-            role = lists.visible_role(org_id, role_id)
-            qs = qs.filter(role_id=role.pk) if role is not None else qs.none()
-        if filter is not None:
-            qs = lists.filter_role_bindings(qs, filter, org_id=org_id, viewer_id=viewer_id)
+        org_id, _ = _tenant_ids()
+        qs = _bindings_list_qs(search=search, app_slug=app_slug, role_id=role_id, filter=filter)
         if lists.wants_numbered(sort=sort, page=page, page_size=page_size):
             order_by = resolve_list_sort(
                 sort, lists.role_bindings_sort_keys(org_id), default=lists.ROLE_BINDINGS_DEFAULT_SORT
@@ -2125,7 +2212,7 @@ def _row_team(member, teams: dict):
     return teams.get(member.scope_id) if member.scope_kind == Member.ScopeKind.TEAM else None
 
 
-def _org_scope_q(org_id: int | None) -> Q:
+def _org_scope_q(org_id: int | None, *, coherent: bool = False) -> Q:
     """Q over ``(scope_kind, scope_id)`` matching every scope owned by ``org_id``.
 
     ``RoleBinding`` / ``Member`` rows key their scope with a generic
@@ -2137,15 +2224,27 @@ def _org_scope_q(org_id: int | None) -> Q:
     Soft-deleted scope rows are included (``all_objects``) so a binding
     whose team/project/app was later removed still resolves to *this*
     org — the row is still org-owned, and the source-scope label
-    machinery already renders a fallback for a vanished scope. A ``None``
-    org_id (no resolved tenant) yields a Q that matches nothing, i.e.
+    machinery already renders a fallback for a vanished scope.
+    Lists opt into ``coherent`` parent chains, excluding foreign ancestry even
+    for an org admin. The default retains mutation cleanup lookups so their
+    owner fallback and grant-ceiling error contracts remain unchanged.
+    A ``None`` org_id (no resolved tenant) yields a Q that matches nothing, i.e.
     fail closed.
     """
+    from django.db.models import F
+
     from astrolift_registry.models import RegisteredApp
 
     team_ids = list(Team.all_objects.filter(organization_id=org_id).values_list("pk", flat=True))
-    project_ids = list(Project.all_objects.filter(organization_id=org_id).values_list("pk", flat=True))
-    app_ids = list(RegisteredApp.all_objects.filter(organization_id=org_id).values_list("pk", flat=True))
+    projects = Project.all_objects.filter(organization_id=org_id)
+    apps = RegisteredApp.all_objects.filter(organization_id=org_id)
+    if coherent:
+        projects = projects.filter(team__organization_id=org_id)
+        apps = apps.filter(team__organization_id=org_id).filter(
+            Q(project_id__isnull=True) | Q(project__organization_id=org_id, project__team_id=F("team_id"))
+        )
+    project_ids = list(projects.values_list("pk", flat=True))
+    app_ids = list(apps.values_list("pk", flat=True))
     return (
         Q(scope_kind="ORG", scope_id=org_id)
         | Q(scope_kind="TEAM", scope_id__in=team_ids)

@@ -110,6 +110,9 @@ class RoleBindingsListFilterInput:
             "bindings and those on the IdP groups the viewer is in."
         ),
     )
+    subject: list[str] | None = strawberry.field(
+        default=None, description='Alias of holder, including "me" and "group:<external id>".'
+    )
 
 
 @strawberry.input(name="AstroliftPoliciesListFilter")
@@ -194,7 +197,7 @@ def _org_bindings(org_id: int | None):
 
     if org_id is None:
         return RoleBinding.objects.none()
-    return RoleBinding.objects.filter(_org_scope_q(org_id))
+    return RoleBinding.objects.filter(_org_scope_q(org_id, coherent=True))
 
 
 def _last_active_expr(org_id: int | None, user_field: str = "user_id"):
@@ -248,7 +251,12 @@ def members_sort_keys(org_id: int | None) -> dict[str, SortKey]:
 def filter_members(qs, filter_input, *, org_id: int | None, viewer_id: int | None):
     """Apply the People list's filters to an org-scoped Member queryset."""
     values = filter_values(filter_input)
-    bindings = _org_bindings(org_id).filter(user__isnull=False)
+    bindings = _org_bindings(org_id).filter(
+        Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
+        Q(role__organization_id=org_id) | Q(role__organization__isnull=True),
+        user__isnull=False,
+        role__deleted_at__isnull=True,
+    )
     fields: dict[str, FilterField] = {
         "scope_kind": FilterField("scope_kind"),
         "lifecycle": FilterField("lifecycle"),
@@ -327,12 +335,71 @@ def member_teams(rows, org_id: int | None):
 INVITATIONS_DEFAULT_SORT = "-created"
 
 INVITATIONS_SORT_KEYS = {
+    "name": SortKey(Lower("email")),
     "email": SortKey(Lower("email")),
     "created": SortKey("created_at"),
     "expires": SortKey("expires_at"),
     "status": SortKey("status"),
     "role": SortKey(Lower("role__slug"), nulls_low=True),
+    "lastActive": SortKey("_last_active", nulls_low=True),
 }
+
+
+def _live_invitation_members(org_id):
+    return Member.objects.filter(
+        scope_kind="ORG",
+        scope_id=org_id,
+        is_active=True,
+        lifecycle=Member.Lifecycle.ACTIVE,
+        user__is_active=True,
+    )
+
+
+def annotate_invitation_activity(qs, org_id):
+    """Only an unambiguous live org member's audit activity matches an email."""
+    from django.db.models import Min, OuterRef, Value
+
+    member = (
+        _live_invitation_members(org_id)
+        .filter(user__email__iexact=OuterRef("email"))
+        .order_by()
+        .annotate(_group=Value(1))
+        .values("_group")
+        .annotate(_n=Count("pk"), _user=Min("user_id"))
+        .filter(_n=1)
+        .values("_user")
+    )
+    qs = qs.annotate(_invitee_id=Subquery(member, output_field=models.BigIntegerField()))
+    return qs.annotate(_last_active=_last_active_expr(org_id, "_invitee_id"))
+
+
+def invitation_activity(rows, org_id):
+    """Batch enrichment for other sorts, without correlated work for every row."""
+    from django.db.models import Max
+
+    from astrolift_operations.models.audit_event import AuditEvent
+
+    pending = [row for row in rows if not hasattr(row, "_last_active")]
+    emails = {row.email.lower() for row in pending}
+    by_email: dict[str, list[int]] = {}
+    for email, user_id in (
+        _live_invitation_members(org_id)
+        .annotate(_email=Lower("user__email"))
+        .filter(_email__in=emails)
+        .values_list("_email", "user_id")
+    ):
+        by_email.setdefault(email, []).append(user_id)
+    ids = {str(users[0]) for users in by_email.values() if len(users) == 1}
+    active = {
+        row["actor_id"]: row["last_at"]
+        for row in AuditEvent.objects.filter(organization_id=org_id, actor_kind="user", actor_id__in=ids)
+        .values("actor_id")
+        .annotate(last_at=Max("occurred_at"))
+    }
+    for row in pending:
+        users = by_email.get(row.email.lower(), [])
+        row._last_active = active.get(str(users[0])) if len(users) == 1 else None
+
 
 INVITATIONS_FILTERS = {
     "status": FilterField("status"),
@@ -455,6 +522,7 @@ def filter_role_bindings(qs, filter_input, *, org_id: int | None, viewer_id: int
             | (Q(user__isnull=True) if "group" in kinds else Q(pk__in=[]))
         ),
         "holder": FilterField(q=lambda values: _holder_q(values, org_id=org_id, viewer_id=viewer_id)),
+        "subject": FilterField(q=lambda values: _holder_q(values, org_id=org_id, viewer_id=viewer_id)),
     }
     return qs.filter(filter_q(filter_input, fields))
 

@@ -631,6 +631,8 @@ class InvitationType:
     invited_by_email: str | None
     invited_by_avatar_url: str | None
     created_at: dt.datetime
+    # Current-org audit activity of a unique live member matching the invite email.
+    last_active_at: dt.datetime | None = None
 
 
 @strawberry.type(name="AstroliftInvitationCreated")
@@ -682,6 +684,7 @@ def invitation_to_type(inv, *, userinfo_by_user_id: dict[int, object] | None = N
         if inviter is not None
         else None,
         created_at=inv.created_at,
+        last_active_at=getattr(inv, "_last_active", None),
     )
 
 

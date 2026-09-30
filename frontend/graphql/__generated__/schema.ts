@@ -2822,6 +2822,13 @@ export type AstroliftHeartbeatSessionPayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftIdentityCsvExport = {
+  content: Scalars['String']['output'];
+  contentType: Scalars['String']['output'];
+  filename: Scalars['String']['output'];
+  rowCount: Scalars['Int']['output'];
+};
+
 export type AstroliftIdentityProvider = {
   activatedAt?: Maybe<Scalars['DateTime']['output']>;
   clientId: Scalars['String']['output'];
@@ -2881,6 +2888,7 @@ export type AstroliftInvitation = {
   invitedByEmail?: Maybe<Scalars['String']['output']>;
   invitedByUserId?: Maybe<Scalars['String']['output']>;
   invitedByUsername?: Maybe<Scalars['String']['output']>;
+  lastActiveAt?: Maybe<Scalars['DateTime']['output']>;
   roleSlug?: Maybe<Scalars['String']['output']>;
   scopeId: Scalars['String']['output'];
   scopeKind: Scalars['String']['output'];
@@ -4311,6 +4319,8 @@ export type AstroliftRoleBindingsListFilter = {
   role: InputMaybe<Array<Scalars['String']['input']>>;
   /** ORG, TEAM, PROJECT, APP. */
   scopeKind: InputMaybe<Array<Scalars['String']['input']>>;
+  /** Alias of holder, including "me" and "group:<external id>". */
+  subject: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type AstroliftRoleLineage = {
@@ -9235,6 +9245,7 @@ export type Query = {
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
+  astroliftInvitationsCsv: AstroliftIdentityCsvExport;
   astroliftInvitationsPage: AstroliftInvitationPage;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftManagedServiceCostPreview?: Maybe<AstroliftManagedServiceCostPreview>;
@@ -9245,6 +9256,7 @@ export type Query = {
   astroliftManagedServicesPage: AstroliftManagedServicePage;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftMembersPage. */
   astroliftMembers: Array<AstroliftMember>;
+  astroliftMembersCsv: AstroliftIdentityCsvExport;
   astroliftMembersPage: AstroliftMemberPage;
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
@@ -9306,6 +9318,7 @@ export type Query = {
   astroliftRole?: Maybe<AstroliftRole>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftRoleBindingsPage. */
   astroliftRoleBindings: Array<AstroliftRoleBinding>;
+  astroliftRoleBindingsCsv: AstroliftIdentityCsvExport;
   astroliftRoleBindingsPage: AstroliftRoleBindingPage;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage. */
   astroliftRoles: Array<AstroliftRole>;
@@ -10323,6 +10336,14 @@ export type QueryAstroliftInvitationsArgs = {
 };
 
 
+export type QueryAstroliftInvitationsCsvArgs = {
+  filter?: InputMaybe<AstroliftInvitationsListFilter>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftInvitationsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   filter?: InputMaybe<AstroliftInvitationsListFilter>;
@@ -10368,6 +10389,13 @@ export type QueryAstroliftManagedServicesPageArgs = {
 
 export type QueryAstroliftMembersArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftMembersCsvArgs = {
+  filter?: InputMaybe<AstroliftMembersListFilter>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -10621,6 +10649,15 @@ export type QueryAstroliftRenderedManifestArgs = {
 
 export type QueryAstroliftRoleArgs = {
   id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftRoleBindingsCsvArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftRoleBindingsListFilter>;
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
