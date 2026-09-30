@@ -4,6 +4,10 @@
 
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
+- Add bounded server-side public Hugging Face model search and revision reads,
+  filter-bound paging, immutable SHA proof and explicit unavailable/unknown
+  metadata without browser credentials or inferred runtime fit (#2214).
+
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
 - Model prompt relay admission, dispatch and result transitions atomically retain

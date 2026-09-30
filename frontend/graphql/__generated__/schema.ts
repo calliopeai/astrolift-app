@@ -5665,6 +5665,12 @@ export type CancelDeregisterInput = {
   workflowId: Scalars['String']['input'];
 };
 
+export type CatalogueState =
+  | 'AVAILABLE'
+  | 'NO_DATA'
+  | 'RATE_LIMITED'
+  | 'UNAVAILABLE';
+
 export type CiWorkflowSyncActionInput = {
   appId: Scalars['GUID']['input'];
 };
@@ -6335,6 +6341,37 @@ export type GroupOperationInput = {
   userIds: Array<Scalars['ID']['input']>;
 };
 
+export type HuggingFaceModel = {
+  architectures: Array<Scalars['String']['output']>;
+  author?: Maybe<Scalars['String']['output']>;
+  compatibility: ModelCompatibility;
+  downloads?: Maybe<Scalars['Float']['output']>;
+  gated: ModelGating;
+  library?: Maybe<Scalars['String']['output']>;
+  license?: Maybe<Scalars['String']['output']>;
+  likes?: Maybe<Scalars['Float']['output']>;
+  pipelineTag?: Maybe<Scalars['String']['output']>;
+  repoId: Scalars['String']['output'];
+  revisionSha?: Maybe<Scalars['String']['output']>;
+};
+
+export type HuggingFaceModelResult = {
+  model?: Maybe<HuggingFaceModel>;
+  observedAt: Scalars['DateTime']['output'];
+  retryAfterSeconds?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  state: CatalogueState;
+};
+
+export type HuggingFaceModelsPage = {
+  items: Array<HuggingFaceModel>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  observedAt: Scalars['DateTime']['output'];
+  retryAfterSeconds?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  state: CatalogueState;
+};
+
 export type ImportGapType = {
   code: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -6502,6 +6539,15 @@ export type MigrateAppInputGql = {
   drainSource: Scalars['Boolean']['input'];
   targetClusterId: Scalars['GUID']['input'];
 };
+
+export type ModelCompatibility =
+  | 'UNKNOWN';
+
+export type ModelGating =
+  | 'AUTO'
+  | 'MANUAL'
+  | 'NONE'
+  | 'UNKNOWN';
 
 export type MoveAppToTeamInput = {
   appId: Scalars['GUID']['input'];
@@ -9296,6 +9342,8 @@ export type Query = {
   astroliftExecutePromql: AstroliftExecutePromqlResult;
   astroliftGrantPreview: AstroliftGrantPreview;
   astroliftGroupRoleMappingsPage: AstroliftGroupRoleMappingPage;
+  astroliftHuggingFaceModel: HuggingFaceModelResult;
+  astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
@@ -10394,6 +10442,25 @@ export type QueryAstroliftGroupRoleMappingsPageArgs = {
   page?: InputMaybe<Scalars['Int']['input']>;
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftHuggingFaceModelArgs = {
+  repoId: Scalars['String']['input'];
+  revision?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftHuggingFaceModelsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  author?: Scalars['String']['input'];
+  first?: Scalars['Int']['input'];
+  gated?: InputMaybe<Scalars['Boolean']['input']>;
+  library?: Scalars['String']['input'];
+  license?: Scalars['String']['input'];
+  pipelineTag?: Scalars['String']['input'];
+  search?: Scalars['String']['input'];
+  sortBy?: Scalars['String']['input'];
 };
 
 

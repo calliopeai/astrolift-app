@@ -6030,6 +6030,13 @@ input CancelDeregisterInput {
   reason: String = null
 }
 
+enum CatalogueState {
+  AVAILABLE
+  NO_DATA
+  UNAVAILABLE
+  RATE_LIMITED
+}
+
 input CiWorkflowSyncActionInput {
   appId: GUID!
 }
@@ -6717,6 +6724,37 @@ input GroupOperationInput {
   operation: String!
 }
 
+type HuggingFaceModel {
+  repoId: String!
+  revisionSha: String
+  author: String
+  pipelineTag: String
+  library: String
+  license: String
+  gated: ModelGating!
+  architectures: [String!]!
+  downloads: Float
+  likes: Float
+  compatibility: ModelCompatibility!
+}
+
+type HuggingFaceModelResult {
+  state: CatalogueState!
+  observedAt: DateTime!
+  model: HuggingFaceModel
+  source: String!
+  retryAfterSeconds: Int
+}
+
+type HuggingFaceModelsPage {
+  state: CatalogueState!
+  observedAt: DateTime!
+  items: [HuggingFaceModel!]!
+  nextCursor: String
+  retryAfterSeconds: Int
+  source: String!
+}
+
 type ImportGapType {
   code: String!
   message: String!
@@ -6888,6 +6926,17 @@ input MigrateAppInputGql {
   appEnvironmentId: GUID!
   targetClusterId: GUID!
   drainSource: Boolean! = true
+}
+
+enum ModelCompatibility {
+  UNKNOWN
+}
+
+enum ModelGating {
+  NONE
+  AUTO
+  MANUAL
+  UNKNOWN
 }
 
 input MoveAppToTeamInput {
@@ -7964,6 +8013,8 @@ type Query {
   astroliftEmailEngagementMetrics(managedServiceId: GUID!, days: Int! = 30): AstroliftEmailEngagementMetrics
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
+  astroliftHuggingFaceModels(search: String! = "", author: String! = "", pipelineTag: String! = "", library: String! = "", license: String! = "", gated: Boolean = null, sortBy: String! = "downloads", first: Int! = 20, after: String = null): HuggingFaceModelsPage!
+  astroliftHuggingFaceModel(repoId: String!, revision: String = null): HuggingFaceModelResult!
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage

@@ -34,6 +34,7 @@ from typing import Final
 # surface that clients should be able to detect. Removing an entry is
 # a breaking change — bump the apiVersion fingerprint and announce.
 SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
+    "models.hugging_face_catalogue",
     # Audit log surfaces (#293, #310, #383, etc.).
     "audit.read",
     "audit.export",
