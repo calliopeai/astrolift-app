@@ -946,7 +946,7 @@ class ClusterDriver(Protocol):
     """Protocol for applying, querying, and managing Kubernetes objects on a target cluster.
 
     Semantic guarantees:
-    - apply_manifests is idempotent (server-side apply preferred; falls back to client-side patch).
+    - apply_manifests is idempotent unless create_only is requested.
     - ensure_namespace is idempotent.
     - poll_rollout ticks at least every 15s, times out at 10m by default.
     - All operations propagate errors as typed exceptions, not bare strings.
@@ -959,7 +959,15 @@ class ClusterDriver(Protocol):
         manifests: list[dict[str, Any]],
         *,
         dry_run: bool = False,
-    ) -> ApplyResult: ...
+        create_only: bool = False,
+    ) -> ApplyResult:
+        """Create-only uses atomic POST, refuses existing names and stops at the first error.
+
+        Earlier creations remain on a partial failure. Never adopt an existing
+        object or retry using ordinary apply; callers retain responsibility for
+        reconciling a lost create acknowledgement and any owned cleanup.
+        """
+        ...
 
     def delete_manifests(
         self,
@@ -968,7 +976,13 @@ class ClusterDriver(Protocol):
         manifests: list[dict[str, Any]],
         *,
         propagation_policy: str | None = None,
-    ) -> DeleteResult: ...
+    ) -> DeleteResult:
+        """Preserve supplied metadata.uid/resourceVersion as delete preconditions.
+
+        A rejected precondition belongs in DeleteResult.conflicts and must not
+        be retried as a name-only delete. Missing resources are already gone.
+        """
+        ...
 
     def get_namespace(self, cluster: str, name: str) -> NamespaceState | None: ...
 

@@ -87,6 +87,9 @@ from _sdk.k8s_dynamic_client import (
     PortForwardHandle as _PortForwardHandle,  # noqa: F401
 )
 from _sdk.k8s_dynamic_client import (
+    PreconditionFailedError as _PreconditionFailed,
+)
+from _sdk.k8s_dynamic_client import (
     split_kind as _split_kind,  # noqa: F401
 )
 from aws._eks_auth import mint_eks_token
@@ -388,6 +391,7 @@ class EKSClusterDriver(ClusterDriver):
         manifests: list[dict[str, Any]],
         *,
         dry_run: bool = False,
+        create_only: bool = False,
     ) -> ApplyResult:
         client = self._k8s(cluster)
         created: list[str] = []
@@ -414,7 +418,8 @@ class EKSClusterDriver(ClusterDriver):
             # CustomResourceDefinition, ClusterRole/Binding).
             manifest_ns = meta.get("namespace") or namespace
             try:
-                outcome = client.server_side_apply(
+                operation = client.create_manifest if create_only else client.server_side_apply
+                outcome = operation(
                     namespace=manifest_ns,
                     manifest=manifest,
                     dry_run=dry_run,
@@ -430,6 +435,8 @@ class EKSClusterDriver(ClusterDriver):
                         is_retryable=classify_apply_error(exc),
                     )
                 )
+                if create_only:
+                    break
                 continue
             ref = f"{kind}/{name}"
             if outcome == "created":
@@ -458,13 +465,20 @@ class EKSClusterDriver(ClusterDriver):
         deleted: list[str] = []
         not_found: list[str] = []
         errors: list[str] = []
+        conflicts: list[str] = []
         for manifest in manifests:
             api_version = manifest.get("apiVersion", "")
             kind_bare = manifest.get("kind", "")
             # For CRDs (apiVersion is "group/version") construct the
             # "group/version/Kind" form that split_kind accepts.
             kind = f"{api_version}/{kind_bare}" if "/" in api_version else kind_bare
-            name = manifest.get("metadata", {}).get("name", "")
+            meta = manifest.get("metadata", {}) or {}
+            name = meta.get("name", "")
+            preconditions = {}
+            if meta.get("uid"):
+                preconditions["uid"] = meta["uid"]
+            if meta.get("resourceVersion"):
+                preconditions["resource_version"] = meta["resourceVersion"]
             ref = f"{kind}/{name}"
             try:
                 client.delete(
@@ -472,16 +486,20 @@ class EKSClusterDriver(ClusterDriver):
                     namespace=namespace,
                     name=name,
                     propagation_policy=propagation_policy,
+                    **preconditions,
                 )
                 deleted.append(ref)
             except _NotFoundError:
                 not_found.append(ref)
+            except _PreconditionFailed as exc:
+                conflicts.append(f"{ref}: {exc}")
             except Exception as exc:
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
             deleted=deleted,
             not_found=not_found,
             errors=errors,
+            conflicts=conflicts,
         )
 
     # ---- namespaces -----------------------------------------------

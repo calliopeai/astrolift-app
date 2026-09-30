@@ -136,6 +136,7 @@ class K8sNativeClusterDriver(ClusterDriver):
         manifests: list[dict[str, Any]],
         *,
         dry_run: bool = False,
+        create_only: bool = False,
     ) -> ApplyResult:
         client = self._k8s(cluster)
         created: list[str] = []
@@ -147,7 +148,8 @@ class K8sNativeClusterDriver(ClusterDriver):
             kind = manifest.get("kind", "")
             name = manifest.get("metadata", {}).get("name", "")
             try:
-                outcome = client.server_side_apply(
+                operation = client.create_manifest if create_only else client.server_side_apply
+                outcome = operation(
                     namespace=namespace,
                     manifest=manifest,
                     dry_run=dry_run,
@@ -163,6 +165,8 @@ class K8sNativeClusterDriver(ClusterDriver):
                         is_retryable=classify_apply_error(exc),
                     )
                 )
+                if create_only:
+                    break
                 continue
             ref = f"{kind}/{name}"
             if outcome == "created":
