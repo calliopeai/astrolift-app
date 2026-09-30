@@ -39,6 +39,11 @@
   (#2095). Both paths serialize name and namespace allocation per app, including
   duplicate concurrent requests. Explicit occupied names return validation on
   `environmentName`. See [preview naming](docs/operators/preview-names-and-workload-identity.md).
+
+- App Pods preloads import their scoped query-variable builder from a shared
+  server-safe module, so the production Metrics route no longer calls a
+  client export from a server component (#2171).
+
 - `/pipelines/new` opens a real form using the existing organization-owned
   creation contract (#2171). Failed creates retain their draft; navigation
   failure after commit offers the created pipeline link without a duplicate

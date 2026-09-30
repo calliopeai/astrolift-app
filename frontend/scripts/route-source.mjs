@@ -39,9 +39,9 @@ export function redirectOf(file, source) {
         !imports.elements.some((entry) => entry.name.text === factory)
       )
         continue;
-      const module = statement.moduleSpecifier.text;
-      if (!module.startsWith(".")) continue;
-      const stem = resolve(dirname(file), module);
+      const importPath = statement.moduleSpecifier.text;
+      if (!importPath.startsWith(".")) continue;
+      const stem = resolve(dirname(file), importPath);
       const dependency = [stem + ".ts", stem + ".tsx"].find((candidate) => existsSync(candidate));
       if (
         dependency &&
