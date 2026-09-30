@@ -45,6 +45,8 @@ from astrolift_agents.models import (
 from astrolift_agents.schema.types import (
     AgentBoxType,
     AgentDetailType,
+    AgentEnvironmentSpecPageType,
+    AgentEnvironmentSpecsFilterInput,
     AgentEnvironmentSpecType,
     AgentFleetFilterInput,
     AgentInteractionType,
@@ -1553,6 +1555,49 @@ class AgentsQuery:
         return [agent_env_spec_to_type(s) for s in qs]
 
     @strawberry.field
+    @require_permission(Permission.AGENT_ENV_SPEC_READ, any_scope=True)
+    @tenant_scoped()
+    def agent_environment_specs_page(
+        self,
+        info: Info,
+        org_id: strawberry.ID,
+        search: str | None = None,
+        filter: AgentEnvironmentSpecsFilterInput | None = None,
+        sort: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> AgentEnvironmentSpecPageType:
+        """Count and page authorized recipes before slicing, without the legacy cap."""
+        org_pk = _caller_org_id(info, org_id)
+        qs = visible_environment_specs(org_pk, Permission.AGENT_ENV_SPEC_READ)
+        if search and search.strip():
+            qs = qs.filter(search_q(search.strip(), "name", "slug", "runtime", "image_tag", "config_repo"))
+        values = filter_values(filter)
+        qs = qs.filter(
+            filter_q(values, {"agent_type": FilterField("agent_type"), "runtime": FilterField("runtime")})
+        )
+        if "created_by" in values:
+            qs = qs.filter(created_by_id__in=_user_ids(values["created_by"], _viewer_id()))
+        order_by = resolve_list_sort(
+            sort,
+            {
+                "name": SortKey(Lower("name")),
+                "slug": SortKey("slug"),
+                "runtime": SortKey("runtime"),
+                "created": SortKey("created_at"),
+                "updated": SortKey("updated_at"),
+            },
+            default="slug",
+        )
+        result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        return AgentEnvironmentSpecPageType(
+            items=[agent_env_spec_to_type(row) for row in result.rows],
+            total_count=result.total_count,
+            page=result.page,
+            page_size=result.page_size,
+        )
+
+    @strawberry.field
     @require_permission(Permission.AGENT_READ, any_scope=True)
     @tenant_scoped()
     def agent_boxes(
@@ -1601,7 +1646,9 @@ class AgentsQuery:
     @strawberry.field
     @require_permission(Permission.AGENT_ENV_SPEC_READ, any_scope=True)
     @tenant_scoped()
-    def agent_environment_spec(self, info: Info, slug: str) -> AgentEnvironmentSpecType | None:
+    def agent_environment_spec(
+        self, info: Info, slug: str, org_id: strawberry.ID | None = None
+    ) -> AgentEnvironmentSpecType | None:
         """One AgentEnvironmentSpec by slug, among the specs the caller may
         read (#1866).
 
@@ -1611,7 +1658,9 @@ class AgentsQuery:
         resolves to null (not an error) so the surface leaks no existence.
         """
         tenant = get_current_tenant()
-        org_pk = tenant.organization_id if tenant else None
+        org_pk = (
+            _caller_org_id(info, org_id) if org_id is not None else tenant.organization_id if tenant else None
+        )
         row = (
             visible_environment_specs(org_pk, Permission.AGENT_ENV_SPEC_READ)
             .filter(slug=slug, organization_id=org_pk)

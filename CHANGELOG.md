@@ -9,6 +9,10 @@
   alert and rule reads keep old links independent of recent-list caps, with
   owner, bearer and environment-policy filters preserved. See
   [dashboard query freshness](docs/operators/frontend-query-freshness.md).
+- Agent environment specs have an org-scoped paged list and detail home under
+  Agents (#2178), with server search/filter/sort/counts and live owner/bearer
+  visibility. Optional detail `orgId` validates the explicit tenant; the client
+  separates identical slugs and refresh snapshots by organization.
 
 - Core legacy APIs enforce active account, platform-operator and bearer
   ceilings without removing GraphQL declarations (#2110). Permission analysis

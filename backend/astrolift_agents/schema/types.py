@@ -344,6 +344,21 @@ class AgentEnvironmentSpecType:
     updated_at: dt.datetime
 
 
+@strawberry.input(name="AstroliftAgentEnvironmentSpecsFilter")
+class AgentEnvironmentSpecsFilterInput:
+    agent_type: list[str] | None = strawberry.field(default=None)
+    runtime: list[str] | None = strawberry.field(default=None)
+    created_by: list[str] | None = strawberry.field(default=None, description='User ids, or "me".')
+
+
+@strawberry.type(name="AstroliftAgentEnvironmentSpecPage")
+class AgentEnvironmentSpecPageType:
+    items: list[AgentEnvironmentSpecType]
+    total_count: int
+    page: int
+    page_size: int
+
+
 @strawberry.type(name="AstroliftAgentBox")
 class AgentBoxType:
     """One warm pod that exists to be attached to (#128).

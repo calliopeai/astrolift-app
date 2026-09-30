@@ -334,6 +334,21 @@ type AstroliftAgentEnvironmentSpecMutationResult {
   data: AstroliftAgentEnvironmentSpec
 }
 
+type AstroliftAgentEnvironmentSpecPage {
+  items: [AstroliftAgentEnvironmentSpec!]!
+  totalCount: Int!
+  page: Int!
+  pageSize: Int!
+}
+
+input AstroliftAgentEnvironmentSpecsFilter {
+  agentType: [String!] = null
+  runtime: [String!] = null
+
+  """User ids, or "me"."""
+  createdBy: [String!] = null
+}
+
 input AstroliftAgentFleetFilter {
   """Project slugs."""
   project: [String!] = null
@@ -7859,9 +7874,10 @@ type Query {
   agentTaskLogsPage(id: ID!, cursor: String = null, limit: Int! = 100): AstroliftAgentTaskLogPage!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
+  agentEnvironmentSpecsPage(orgId: ID!, search: String = null, filter: AstroliftAgentEnvironmentSpecsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftAgentEnvironmentSpecPage!
   agentBoxes(orgId: ID!, includeEnded: Boolean! = false): [AstroliftAgentBox!]!
   agentBox(slug: String!): AstroliftAgentBox
-  agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
+  agentEnvironmentSpec(slug: String!, orgId: ID = null): AstroliftAgentEnvironmentSpec
   agentEnvironmentSpecSecretStatus(slug: String!): [AstroliftAgentSecretStatus!]!
   agentEnvironmentSpecSecretStatusPage(slug: String!, search: String = null, filter: AstroliftAgentSecretStatusFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftAgentSecretStatusPage!
   agentSecretBundles(envSpecSlug: String!): [AstroliftAgentSecretBundle!]!

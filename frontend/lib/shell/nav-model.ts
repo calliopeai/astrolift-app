@@ -126,6 +126,13 @@ export const NAV: NavArea[] = [
             module: "agents",
           },
           {
+            key: "environment-specs",
+            label: "Environment specs",
+            href: "/agents/environment-specs",
+            icon: BoxesIcon,
+            module: "agents",
+          },
+          {
             key: "models",
             label: "Models",
             href: "/models",

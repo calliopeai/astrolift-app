@@ -11,9 +11,16 @@ import { formatSort, type ListView } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
-export type AgentsFunction = "skills" | "tools" | "models" | "functions" | "workloads";
+export type AgentsFunction =
+  | "skills"
+  | "tools"
+  | "models"
+  | "functions"
+  | "workloads"
+  | "environment-specs";
 
 const LABEL: Record<AgentsFunction, string> = {
+  "environment-specs": "Environment specs",
   skills: "Skills",
   tools: "Tools",
   models: "Models",
@@ -22,6 +29,7 @@ const LABEL: Record<AgentsFunction, string> = {
 };
 
 const HREF: Record<AgentsFunction, string> = {
+  "environment-specs": "/agents/environment-specs",
   skills: "/agents/skills",
   tools: "/agents/tools",
   models: "/models",

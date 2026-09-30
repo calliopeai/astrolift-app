@@ -30,6 +30,7 @@ describe("visibleNav", () => {
       "Functions",
       "Skills",
       "Tools",
+      "Environment specs",
       "Models",
       "Workloads",
     ]);

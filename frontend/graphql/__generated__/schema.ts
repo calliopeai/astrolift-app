@@ -343,6 +343,20 @@ export type AstroliftAgentEnvironmentSpecMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentEnvironmentSpecPage = {
+  items: Array<AstroliftAgentEnvironmentSpec>;
+  page: Scalars['Int']['output'];
+  pageSize: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentEnvironmentSpecsFilter = {
+  agentType: InputMaybe<Array<Scalars['String']['input']>>;
+  /** User ids, or "me". */
+  createdBy: InputMaybe<Array<Scalars['String']['input']>>;
+  runtime: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type AstroliftAgentFleetFilter = {
   /** Cluster slugs; an agent whose app has an environment on one matches. */
   cluster: InputMaybe<Array<Scalars['String']['input']>>;
@@ -9003,6 +9017,7 @@ export type Query = {
   agentEnvironmentSpecSecretStatus: Array<AstroliftAgentSecretStatus>;
   agentEnvironmentSpecSecretStatusPage: AstroliftAgentSecretStatusPage;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
+  agentEnvironmentSpecsPage: AstroliftAgentEnvironmentSpecPage;
   agentFleet: Array<AstroliftAgentListItem>;
   agentFleetPage: AstroliftAgentListItemPage;
   agentGallery: Array<AstroliftAgentTask>;
@@ -9375,6 +9390,7 @@ export type QueryAgentBoxesArgs = {
 
 
 export type QueryAgentEnvironmentSpecArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
   slug: Scalars['String']['input'];
 };
 
@@ -9401,6 +9417,16 @@ export type QueryAgentEnvironmentSpecSecretStatusPageArgs = {
 
 export type QueryAgentEnvironmentSpecsArgs = {
   orgId: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentEnvironmentSpecsPageArgs = {
+  filter?: InputMaybe<AstroliftAgentEnvironmentSpecsFilter>;
+  orgId: Scalars['ID']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
