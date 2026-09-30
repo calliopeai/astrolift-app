@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Approval queue counts and select-all follow currently visible rows after
+  polling. Invalid invitation expiries remain unavailable, alert mute submissions
+  enforce whole hours from 1 through 168 and block pending repeats, manifest
+  diagnostics retain zero coordinates, and blank image tags show the deployment
+  identifier (#2148).
+
 - Production route checks follow rendered navigation for every active route in
   the generated dictionary (#2171), with separate alias, parked-route and role
   checks. Cold workflow-run pages wait for workflow context before rendering.

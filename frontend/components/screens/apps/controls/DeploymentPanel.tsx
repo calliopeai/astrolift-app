@@ -129,7 +129,7 @@ export function DeploymentPanelView({
                 {tone.label}
               </Badge>
               <span className="font-mono text-sm">
-                {(current.imageTag ?? current.id).slice(0, 12)}
+                {(current.imageTag || current.id).slice(0, 12)}
               </span>
               {current.environmentName && (
                 <Badge variant="secondary" className="text-2xs">
@@ -197,7 +197,7 @@ export function DeploymentPanelView({
             <p className="text-muted-foreground mt-1">
               Open the deployment for the full log.{" "}
               {lastGood
-                ? `Rolling back targets ${(lastGood.imageTag ?? lastGood.id).slice(0, 10)}.`
+                ? `Rolling back targets ${(lastGood.imageTag || lastGood.id).slice(0, 10)}.`
                 : "No earlier successful deploy to roll back to."}
             </p>
           </div>
@@ -209,7 +209,7 @@ export function DeploymentPanelView({
         onOpenChange={setConfirmRollback}
         title={
           lastGood
-            ? `Roll back to ${(lastGood.imageTag ?? lastGood.id).slice(0, 10)}?`
+            ? `Roll back to ${(lastGood.imageTag || lastGood.id).slice(0, 10)}?`
             : "Roll back?"
         }
         description="This starts a new deployment using the previous image and supersedes the failed one."

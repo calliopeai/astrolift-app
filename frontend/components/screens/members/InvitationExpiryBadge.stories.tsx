@@ -18,6 +18,10 @@ export const Urgent: Story = { render: () => <InvitationExpiryBadge expiresAt={f
 
 export const Expired: Story = { render: () => <InvitationExpiryBadge expiresAt={fromNow(-2)} /> };
 
+export const InvalidDate: Story = {
+  render: () => <InvitationExpiryBadge expiresAt="invalid-date" />,
+};
+
 /** The longest label the formatter produces, in a narrow cell. */
 export const LongStrings: Story = {
   render: () => (
