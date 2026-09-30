@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import french from "@/messages/fr.json";
 
 import { AdminMetricsScreen } from "./AdminMetricsScreen";
 import { PrometheusPanel, SystemMetricsPanel } from "./ClusterMetricsPanels";
@@ -120,5 +122,24 @@ export const Width768: Story = {
         )}
       />
     </div>
+  ),
+};
+
+/** Expanded French copy and offline notices at the minimum console width. */
+export const FrenchWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <div style={{ width: 768 }}>
+        <AdminMetricsScreen
+          {...METRICS}
+          renderLivePanels={() => (
+            <>
+              <PrometheusPanel {...PROMETHEUS_UNREACHABLE} />
+              <SystemMetricsPanel {...SYSTEM_UNREACHABLE} />
+            </>
+          )}
+        />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

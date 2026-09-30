@@ -9,6 +9,10 @@
 - Scaling feedback passes actual ICU values, and API key/project operation dates
   honor the selected locale and timezone. Project operation states and fallback
   scale errors have translations in all supported locales (#2145).
+- Platform metrics translate fleet states, range controls, metric labels and
+  unavailable-provider guidance in all eight locales while preserving actual
+  cluster/provider identifiers and links (#2145).
+
 - Feature controls, confirmation dialogs and mutation notices use the selected
   language in all eight supported locales, including rich environment-variable
   hints. Failed confirmations remain open for retry (#2145; remaining domains
