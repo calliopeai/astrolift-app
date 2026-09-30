@@ -226,7 +226,7 @@ import json  # noqa: E402
 
 class _RecordingIam:
     """Moto-free recording IAM double covering the provision path
-    (create_role + get/update trust + attach_role_policy). Mirrors the fake
+    (create_role + get/update trust + inline policies + attach_role_policy). Mirrors the fake
     in providers/tests/aws/test_identity_irsa.py so the assertions can reach
     the real IRSADriver trust policy without moto installed."""
 
@@ -239,6 +239,7 @@ class _RecordingIam:
 
     def __init__(self) -> None:
         self.roles: dict[str, dict] = {}
+        self.inline_policies: dict[tuple[str, str], dict] = {}
         self.attached: dict[str, list[str]] = {}
 
     def create_role(self, **kwargs) -> dict:  # noqa: N803 (boto3 PascalCase kwargs)
@@ -264,13 +265,24 @@ class _RecordingIam:
         self.roles[kwargs["RoleName"]]["trust"] = json.loads(kwargs["PolicyDocument"])
 
     def put_role_policy(self, **kwargs) -> None:
-        pass
+        name = kwargs["RoleName"]
+        if name not in self.roles:
+            raise self.exceptions.NoSuchEntityException(name)
+        self.inline_policies[(name, kwargs["PolicyName"])] = json.loads(kwargs["PolicyDocument"])
+
+    def delete_role_policy(self, **kwargs) -> None:
+        key = (kwargs["RoleName"], kwargs["PolicyName"])
+        if key not in self.inline_policies:
+            raise self.exceptions.NoSuchEntityException(kwargs["PolicyName"])
+        del self.inline_policies[key]
 
     def attach_role_policy(self, **kwargs) -> None:
         name = kwargs["RoleName"]
         if name not in self.roles:
             raise self.exceptions.NoSuchEntityException(name)
-        self.attached.setdefault(name, []).append(kwargs["PolicyArn"])
+        policies = self.attached.setdefault(name, [])
+        if kwargs["PolicyArn"] not in policies:
+            policies.append(kwargs["PolicyArn"])
 
 
 class _FakeCluster:
@@ -360,10 +372,20 @@ def test_provision_ebs_csi_role_idempotent(monkeypatch):
     cluster = _FakeCluster({"cluster_name": "astrolift-eks"})
 
     a = _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver"})
+    role = "astrolift-eks-aws-ebs-csi-driver"
+    iam.put_role_policy(
+        RoleName=role,
+        PolicyName="astrolift-workload-policy",
+        PolicyDocument=json.dumps({"Version": "2012-10-17", "Statement": [{"Action": "s3:*"}]}),
+    )
     b = _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver"})
+    assert (role, "astrolift-workload-policy") not in iam.inline_policies
+    c = _provision_ebs_csi_irsa_role(cluster, {"aws-ebs-csi-driver"})
 
-    assert a == b
-    cond = iam.roles["astrolift-eks-aws-ebs-csi-driver"]["trust"]["Statement"][0]["Condition"]["StringEquals"]
+    assert a == b == c
+    assert iam.attached[role] == ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
+    assert (role, "astrolift-workload-policy") not in iam.inline_policies
+    cond = iam.roles[role]["trust"]["Statement"][0]["Condition"]["StringEquals"]
     assert cond[f"{_DISCOVERED_ISSUER}:sub"] == "system:serviceaccount:astrolift-system:ebs-csi-controller-sa"
 
 
