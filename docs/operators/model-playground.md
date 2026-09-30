@@ -36,3 +36,35 @@ Source verification: published `astrolift-agents` main at
 Service hostname against the job's secret namespace. The control plane derives
 that target through `resolve_agent_test_target`, never caller-supplied URLs.
 Tests use controlled HTTP/agent transport replies and make no tenant model calls.
+
+## Browser behavior
+
+`/playground` selects persisted GUIDs from the existing authorized model catalog,
+using server search and numbered pages of ten rows. The picker does not request
+raw model configuration. Selection never invokes a model. Each explicitly
+submitted prompt uses the existing mutation; no conversation roles, previous
+turns, caller URL, or browser API key enter that request.
+
+Chat and batch share one local admission/rate budget. A batch accepts up to six
+plain-text prompt lines and sends them sequentially. Failure stops remaining
+lines; cancellation stops future submissions but an already admitted server job
+can still finish. There are no automatic retries. The server independently
+rechecks permission, state, configuration, and its rate/cluster job limits.
+Late metadata/results and saved-session state cannot cross identity or endpoint
+changes, including A → B → A transitions. Readiness refresh also closes local
+admission until that new read finishes.
+
+History and starred sessions are browser-local records scoped to the active
+organization GUID and current user id; they are not server audit/history. Only
+validated version-2 records are loaded, capped at 30 sessions and 40 messages per
+session, with 4,000-character user prompts and 8,000-character endpoint replies.
+Start a new session after reaching the local message limit. Dates and observed
+metrics are validated; absent metrics remain unknown. Legacy global demo records
+and URL-hash conversations are ignored. Opening a saved session does not invoke
+its stored endpoint: that persisted GUID must pass a fresh readiness read and
+every later mutation authorization check. Clipboard JSON and CSV/JSONL exports
+contain only the locally observed records explicitly selected by the user.
+
+The real prompt, local history, and starred routes are reachable from Models.
+Unrelated `/playground/topology` and `/playground/observability` showcases, and
+`/forms`, remain parked. All new playground notices have all eight UI locales.

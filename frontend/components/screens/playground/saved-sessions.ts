@@ -1,196 +1,142 @@
 "use client";
 
-/**
- * Local-storage layer for playground saved sessions (#437 scope C).
- *
- * Sessions are stored under one key per session
- * (``playground:saved:<uuid>``) plus an index key
- * (``playground:saved:index``) so the sidebar can list them without
- * iterating storage on every render. The schema is intentionally flat
- * — no nested messages array on the index — to keep the index payload
- * small and let the list render with a cached read.
- *
- * Versioning: a top-level ``schema`` field starts at 1 so future
- * shape changes can migrate forward without losing user data.
- */
+/** Browser-local, bounded observed prompt records, isolated by actual org/user. */
+import { buildCsv } from "@/components/list/exportCsv";
 
-const INDEX_KEY = "playground:saved:index";
-const SESSION_PREFIX = "playground:saved:";
-
+const MAX_SESSIONS = 30;
+export const MAX_MESSAGES = 40;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type SavedMessage = {
   role: "user" | "assistant";
   content: string;
+  latencyMs?: number | null;
+  totalTokens?: number | null;
 };
-
 export type SavedSession = {
-  schema: 1;
+  schema: 2;
   id: string;
   title: string;
   model: string;
+  modelName: string;
   messages: SavedMessage[];
   createdAt: string;
   updatedAt: string;
   starred: boolean;
 };
-
-export type SavedSessionIndexEntry = {
-  id: string;
-  title: string;
-  model: string;
-  updatedAt: string;
-  starred: boolean;
-  messageCount: number;
+export type SavedSessionIndexEntry = Pick<
+  SavedSession,
+  "id" | "title" | "model" | "modelName" | "updatedAt" | "starred"
+> & { messageCount: number };
+const key = (scope: string) => {
+  if (!scope || scope.length > 160 || !/^[a-zA-Z0-9:_-]+$/.test(scope))
+    throw new Error("Invalid local scope");
+  return `playground:v2:${scope}`;
 };
-
-const isClient = (): boolean => typeof window !== "undefined";
-
-function safeParse<T>(raw: string | null): T | null {
-  if (!raw) return null;
+function observed(value: unknown): value is number | null | undefined {
+  return (
+    value == null ||
+    (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1e9)
+  );
+}
+function valid(value: unknown): value is SavedSession {
+  if (!value || typeof value !== "object") return false;
+  const s = value as Record<string, unknown>;
+  return (
+    s.schema === 2 &&
+    typeof s.id === "string" &&
+    UUID.test(s.id) &&
+    typeof s.model === "string" &&
+    UUID.test(s.model) &&
+    typeof s.title === "string" &&
+    s.title.length <= 120 &&
+    typeof s.modelName === "string" &&
+    s.modelName.length <= 200 &&
+    typeof s.starred === "boolean" &&
+    typeof s.createdAt === "string" &&
+    Number.isFinite(Date.parse(s.createdAt)) &&
+    typeof s.updatedAt === "string" &&
+    Number.isFinite(Date.parse(s.updatedAt)) &&
+    Array.isArray(s.messages) &&
+    s.messages.length <= MAX_MESSAGES &&
+    s.messages.every((m: unknown) => {
+      if (!m || typeof m !== "object") return false;
+      const row = m as Record<string, unknown>;
+      return (
+        (row.role === "user" || row.role === "assistant") &&
+        typeof row.content === "string" &&
+        row.content.length <= (row.role === "user" ? 4000 : 8000) &&
+        observed(row.latencyMs) &&
+        observed(row.totalTokens)
+      );
+    })
+  );
+}
+function rows(scope: string): SavedSession[] {
+  if (typeof window === "undefined") return [];
+  const raw = localStorage.getItem(key(scope));
+  if (!raw || raw.length > 12000000) return [];
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as T;
+    parsed = JSON.parse(raw);
   } catch {
-    return null;
+    return [];
   }
+  return Array.isArray(parsed) && parsed.length <= MAX_SESSIONS ? parsed.filter(valid) : [];
 }
-
-function readIndex(): SavedSessionIndexEntry[] {
-  if (!isClient()) return [];
-  const list = safeParse<SavedSessionIndexEntry[]>(localStorage.getItem(INDEX_KEY));
-  return Array.isArray(list) ? list : [];
+function write(scope: string, records: SavedSession[]) {
+  localStorage.setItem(key(scope), JSON.stringify(records));
 }
-
-function writeIndex(entries: SavedSessionIndexEntry[]): void {
-  if (!isClient()) return;
-  localStorage.setItem(INDEX_KEY, JSON.stringify(entries));
+export function listSavedSessions(scope: string): SavedSessionIndexEntry[] {
+  return rows(scope)
+    .sort((a, b) => Number(b.starred) - Number(a.starred) || b.updatedAt.localeCompare(a.updatedAt))
+    .map((s) => ({
+      id: s.id,
+      title: s.title,
+      model: s.model,
+      modelName: s.modelName,
+      updatedAt: s.updatedAt,
+      starred: s.starred,
+      messageCount: s.messages.length,
+    }));
 }
-
-export function listSavedSessions(): SavedSessionIndexEntry[] {
-  // Sort starred first, then by most recently updated. Stable
-  // ordering means the sidebar doesn't reflow on every render.
-  const entries = readIndex();
-  return [...entries].sort((a, b) => {
-    if (a.starred !== b.starred) return a.starred ? -1 : 1;
-    return b.updatedAt.localeCompare(a.updatedAt);
-  });
+export function loadSession(scope: string, id: string): SavedSession | null {
+  return UUID.test(id) ? (rows(scope).find((s) => s.id === id) ?? null) : null;
 }
-
-export function loadSession(id: string): SavedSession | null {
-  if (!isClient()) return null;
-  return safeParse<SavedSession>(localStorage.getItem(SESSION_PREFIX + id));
-}
-
 export function saveSession(
-  session: Omit<SavedSession, "schema" | "createdAt" | "updatedAt" | "starred"> & {
-    starred?: boolean;
-    createdAt?: string;
-  }
+  scope: string,
+  session: Omit<SavedSession, "schema" | "createdAt" | "updatedAt" | "starred">
 ): SavedSession {
-  if (!isClient()) {
-    throw new Error("saveSession requires a browser environment");
-  }
+  const previous = rows(scope);
+  const old = previous.find((s) => s.id === session.id);
   const now = new Date().toISOString();
   const full: SavedSession = {
-    schema: 1,
-    id: session.id,
-    title: session.title || untitledFromMessages(session.messages),
-    model: session.model,
-    messages: session.messages,
-    createdAt: session.createdAt ?? now,
+    ...session,
+    schema: 2,
+    createdAt: old?.createdAt ?? now,
     updatedAt: now,
-    starred: session.starred ?? false,
+    starred: old?.starred ?? false,
   };
-  localStorage.setItem(SESSION_PREFIX + full.id, JSON.stringify(full));
-
-  const index = readIndex().filter((e) => e.id !== full.id);
-  index.push({
-    id: full.id,
-    title: full.title,
-    model: full.model,
-    updatedAt: full.updatedAt,
-    starred: full.starred,
-    messageCount: full.messages.length,
-  });
-  writeIndex(index);
+  if (!valid(full)) throw new Error("Invalid local session");
+  const kept = previous
+    .filter((s) => s.id !== full.id)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, MAX_SESSIONS - 1);
+  write(scope, [full, ...kept]);
   return full;
 }
-
-export function deleteSession(id: string): void {
-  if (!isClient()) return;
-  localStorage.removeItem(SESSION_PREFIX + id);
-  writeIndex(readIndex().filter((e) => e.id !== id));
-}
-
-export function toggleStar(id: string): boolean {
-  if (!isClient()) return false;
-  const session = loadSession(id);
-  if (!session) return false;
-  session.starred = !session.starred;
-  session.updatedAt = new Date().toISOString();
-  localStorage.setItem(SESSION_PREFIX + id, JSON.stringify(session));
-  const index = readIndex().map((e) =>
-    e.id === id ? { ...e, starred: session.starred, updatedAt: session.updatedAt } : e
+export function deleteSession(scope: string, id: string): void {
+  write(
+    scope,
+    rows(scope).filter((s) => s.id !== id)
   );
-  writeIndex(index);
-  return session.starred;
 }
-
-function untitledFromMessages(messages: SavedMessage[]): string {
-  const firstUser = messages.find((m) => m.role === "user");
-  if (firstUser) {
-    return firstUser.content.length > 60 ? `${firstUser.content.slice(0, 57)}…` : firstUser.content;
-  }
-  return "Untitled session";
-}
-
-// ─── Shareable links ───────────────────────────────────────────────────
-//
-// Shared sessions ride a URL hash so we never put conversation
-// content into the server's request logs. The hash is base64-URL of
-// the JSON payload — small (~few KB) and survives copy-paste.
-
-const SHARE_HASH_PREFIX = "share=";
-
-export function encodeShareHash(session: SavedSession): string {
-  const trimmed = {
-    schema: session.schema,
-    title: session.title,
-    model: session.model,
-    messages: session.messages,
-  };
-  const json = JSON.stringify(trimmed);
-  // base64-URL: replace + with -, / with _, strip trailing =
-  const b64 = btoa(unescape(encodeURIComponent(json)));
-  const urlSafe = b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  return `#${SHARE_HASH_PREFIX}${urlSafe}`;
-}
-
-export function decodeShareHash(
-  hash: string
-): Pick<SavedSession, "title" | "model" | "messages"> | null {
-  if (!hash) return null;
-  const trimmed = hash.startsWith("#") ? hash.slice(1) : hash;
-  if (!trimmed.startsWith(SHARE_HASH_PREFIX)) return null;
-  const payload = trimmed.slice(SHARE_HASH_PREFIX.length);
-  if (!payload) return null;
-  try {
-    const padded = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
-    const json = decodeURIComponent(escape(atob(padded + pad)));
-    const parsed = JSON.parse(json) as {
-      schema?: number;
-      title?: string;
-      model?: string;
-      messages?: SavedMessage[];
-    };
-    if (!parsed.messages || !Array.isArray(parsed.messages)) return null;
-    return {
-      title: parsed.title || "Shared session",
-      model: parsed.model || "Genesis",
-      messages: parsed.messages,
-    };
-  } catch {
-    return null;
-  }
+export function toggleStar(scope: string, id: string): boolean {
+  const records = rows(scope);
+  const saved = records.find((s) => s.id === id);
+  if (!saved) return false;
+  saved.starred = !saved.starred;
+  write(scope, records);
+  return saved.starred;
 }
 
 // ─── Batch export ─────────────────────────────────────────────────────
@@ -199,17 +145,30 @@ export type BatchResult = {
   input: string;
   output: string;
   ok: boolean;
-  error?: string;
+  error?: import("./playground.types").PromptError;
+  latencyMs?: number | null;
+  totalTokens?: number | null;
 };
 
 export function batchToCsv(results: BatchResult[]): string {
-  const header = "input,output,ok,error";
-  const rows = results.map((r) =>
-    [r.input, r.output, r.ok ? "true" : "false", r.error ?? ""]
-      .map((cell) => `"${cell.replace(/"/g, '""')}"`)
-      .join(",")
+  return buildCsv(results, [
+    { header: "input", value: (r) => r.input },
+    { header: "output", value: (r) => r.output },
+    { header: "ok", value: (r) => r.ok },
+    { header: "error", value: (r) => r.error },
+    { header: "latency_ms", value: (r) => r.latencyMs },
+    { header: "total_tokens", value: (r) => r.totalTokens },
+  ]);
+}
+
+/** Match reported metrics to their actual preceding prompt, excluding later failed attempts. */
+export function latestObservedPrompt(messages: SavedMessage[]) {
+  const index = messages.findLastIndex((m) => m.role === "assistant");
+  const reply = index >= 0 ? messages[index] : undefined;
+  const prompt = (index >= 0 ? messages.slice(0, index) : messages).findLast(
+    (m) => m.role === "user"
   );
-  return [header, ...rows].join("\n");
+  return { prompt, reply };
 }
 
 export function batchToJsonl(results: BatchResult[]): string {
@@ -217,7 +176,7 @@ export function batchToJsonl(results: BatchResult[]): string {
 }
 
 export function downloadBlob(content: string, filename: string, mime: string): void {
-  if (!isClient()) return;
+  if (typeof window === "undefined") return;
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

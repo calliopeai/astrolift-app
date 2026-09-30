@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import {
   buildSchema,
+  GraphQLError,
   graphql,
   getNamedType,
   isListType,
@@ -21,9 +22,40 @@ const permissions = [
 ].map(([_, slug]) => slug);
 const id = "11111111-1111-4111-8111-111111111111";
 const object = (extra = {}) => ({ ...extra });
-const observations = { errors: [], mutations: 0 };
+const observations = { errors: [], mutations: 0, promptInvocations: [] };
 function value(type, field, args, role) {
   if (isNonNullType(type)) return value(type.ofType, field, args, role);
+  if (field === "astroliftModelEndpointsPage")
+    return object({
+      items: [
+        object({
+          id,
+          name: "Controlled local vLLM endpoint",
+          variant: "vllm",
+          status: "active",
+          registeredAppSlug: "fixture",
+          environmentName: "production",
+          config: { model: "Controlled fixture" },
+        }),
+      ],
+      totalCount: 1,
+      page: args.page ?? 1,
+      pageSize: args.pageSize ?? 10,
+    });
+  if (field === "astroliftModelPromptReadiness") {
+    if (role !== "owner")
+      throw new GraphQLError("Controlled prompt permission denial", {
+        extensions: { code: "PERMISSION_DENIED" },
+      });
+    return object({
+      state: "READY",
+      eligible: true,
+      maxPromptChars: 4000,
+      maxOutputTokens: 128,
+      promptsPerMinute: 6,
+      maxWaitSeconds: 40,
+    });
+  }
   if (field === "astroliftMyUiPreferences")
     return object({
       homeLayout: null,
@@ -142,6 +174,30 @@ createServer(async (req, res) => {
       rootValue: {},
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
+          if (
+            info.fieldName === "testModelEndpoint" &&
+            role === "owner" &&
+            args.input.managedServiceId === id &&
+            args.input.prompt === "Answer 2 plus 2 for the local browser regression."
+          ) {
+            observations.promptInvocations.push({
+              id: args.input.managedServiceId,
+              prompt: args.input.prompt,
+            });
+            return object({
+              ok: true,
+              errors: [],
+              data: object({
+                status: "succeeded",
+                reply: "4",
+                latencyMs: 120,
+                promptTokens: 9,
+                completionTokens: 1,
+                totalTokens: 10,
+              }),
+            });
+          }
+
           observations.mutations++;
           throw new Error("Route walk must not perform mutations");
         }

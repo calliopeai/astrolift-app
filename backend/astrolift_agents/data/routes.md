@@ -191,11 +191,11 @@ direct URL show `—`.
 | `/pipelines/[id]/secrets` | page | — |  |
 | `/pipelines/new` | page | — |  |
 | `/platform-activity` | page | nav |  |
-| `/playground` | flagged | — | off via `/playground` in lib/route-flags.ts |
-| `/playground/history` | flagged | — | off via `/playground` in lib/route-flags.ts |
-| `/playground/observability` | flagged | — | off via `/playground` in lib/route-flags.ts |
-| `/playground/starred` | flagged | — | off via `/playground` in lib/route-flags.ts |
-| `/playground/topology` | flagged | — | off via `/playground` in lib/route-flags.ts |
+| `/playground` | page | — |  |
+| `/playground/history` | page | — |  |
+| `/playground/observability` | flagged | — | off via `/playground/observability` in lib/route-flags.ts |
+| `/playground/starred` | page | — |  |
+| `/playground/topology` | flagged | — | off via `/playground/topology` in lib/route-flags.ts |
 | `/previews` | page | nav |  |
 | `/previews/[id]` | page | — |  |
 | `/projects` | redirect → `/administration/projects` | — | thin server alias |

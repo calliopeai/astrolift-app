@@ -7,6 +7,14 @@
 - Shared confirmation dialogs use all eight locales for default actions,
   pending labels and validation feedback, preserving server errors and retry
   behavior (#2145).
+- Connect the model playground to actual authorized vLLM prompt relays with
+  server-paged endpoint selection, advisory readiness, truthful failures and
+  bounded sequential batch cancellation. Replace demo history/starred data with
+  validated browser-local records scoped to the active organization and user;
+  keep unrelated topology/observability showcases and forms parked (#2148).
+
+- Translate actual model-playground readiness, prompt limits, cancellation, and
+  browser-local history notices across all eight UI locales (#2148, #2145).
 
 - Shared version-conflict feedback can supply translated fallback text and
   refresh actions without replacing server diagnostics or replaying mutations.

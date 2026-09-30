@@ -15,20 +15,29 @@ export const Full: Story = {
   render: () => <PlaygroundHistoryScreen sessions={HISTORY} />,
 };
 
-/** The page reads a static list, so there is no loading state; an empty list is the closest. */
+/** No browser-local sessions have been saved. */
 export const Empty: Story = {
   render: () => <PlaygroundHistoryScreen sessions={[]} />,
 };
 
-/** No page-level error exists; a session that ended in error is the closest. */
+/** Browser storage failed; retry is explicit. */
 export const Failed: Story = {
-  render: () => <PlaygroundHistoryScreen sessions={HISTORY.filter((s) => s.status === "error")} />,
+  render: () => <PlaygroundHistoryScreen sessions={[]} error />,
 };
 
 export const LongStrings: Story = {
   render: () => (
     <PlaygroundHistoryScreen
-      sessions={[{ ...HISTORY[0], prompt: LONG, model: "Genesis-long-context-preview-2026-09" }]}
+      sessions={[
+        {
+          ...HISTORY[0],
+          title: LONG,
+          messages: [{ role: "user", content: LONG }],
+          modelName: LONG,
+        },
+      ]}
     />
   ),
 };
+
+export const Loading: Story = { render: () => <PlaygroundHistoryScreen sessions={[]} loading /> };

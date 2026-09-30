@@ -140,7 +140,7 @@ const DEMO_COMMITS: GitOpsCommit[] = [
 ];
 
 export default function ObservabilityPlaygroundPage() {
-  if (!isRouteEnabled("/playground")) notFound();
+  if (!isRouteEnabled("/playground/observability")) notFound();
 
   return (
     <PlaygroundObservabilityScreen

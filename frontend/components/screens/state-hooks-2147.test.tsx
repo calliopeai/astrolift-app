@@ -26,8 +26,6 @@ import { useAppSecrets } from "./apps/secrets/use-app-secrets";
 import type { AppSecret } from "./apps/secrets/secrets.types";
 import { useProjectResources } from "./projects/use-project-resources";
 import { RESOURCES } from "./projects/projects-detail.fixtures";
-import { usePlayground } from "./playground/use-playground";
-import { encodeShareHash, saveSession, type SavedSession } from "./playground/saved-sessions";
 import { useLogin } from "./auth/use-login";
 
 const mocks = vi.hoisted(() => ({
@@ -139,27 +137,11 @@ afterEach(() => {
 });
 
 describe("browser state hydration", () => {
-  it("hydrates shared playground and pending deregistration state after the server snapshot", async () => {
-    const shared: SavedSession = {
-      schema: 1,
-      id: "shared-session",
-      title: "Shared after hydration",
-      model: "gpt-4o",
-      messages: [],
-      createdAt: "2026-09-29T00:00:00Z",
-      updatedAt: "2026-09-29T00:00:00Z",
-      starred: false,
-    };
-    window.history.replaceState(null, "", `/playground?mode=test${encodeShareHash(shared)}`);
+  it("hydrates pending deregistration state after the server snapshot", async () => {
     recordDeregisterPending("app", "workflow");
     function Probe() {
-      const playground = usePlayground();
       const pending = useDeregisterPending("app");
-      return (
-        <p>
-          {playground.title}|{pending.msRemaining === null ? "none" : "pending"}
-        </p>
-      );
+      return <p>{pending.msRemaining === null ? "none" : "pending"}</p>;
     }
     const tree = (
       <NextIntlClientProvider locale="en" messages={messages}>
@@ -168,7 +150,6 @@ describe("browser state hydration", () => {
     );
     const container = document.createElement("div");
     container.innerHTML = renderToString(tree);
-    expect(container.textContent).not.toContain(shared.title);
     expect(container.textContent).toContain("none");
     document.body.append(container);
     const recover = vi.fn();
@@ -176,9 +157,8 @@ describe("browser state hydration", () => {
     await act(async () => {
       root = hydrateRoot(container, tree, { onRecoverableError: recover });
     });
-    expect(container.textContent).toBe(`${shared.title}|pending`);
+    expect(container.textContent).toBe("pending");
     expect(recover).not.toHaveBeenCalled();
-    expect(window.location.search).toBe("?mode=test");
     await act(async () => root.unmount());
     container.remove();
   });
@@ -331,26 +311,7 @@ describe("separate selections", () => {
   });
 });
 
-describe("hydrated playground and live URL filters", () => {
-  it("hydrates saved and shared sessions once while keeping the URL query", () => {
-    const saved = saveSession({ id: "saved-1", title: "Saved", model: "Genesis", messages: [] });
-    const shared = {
-      ...saved,
-      title: "Shared",
-      model: "Explorer",
-      messages: [{ role: "user" as const, content: "Shared message" }],
-    };
-    window.history.replaceState(null, "", `/playground?mode=test${encodeShareHash(shared)}`);
-    const hook = renderHook(usePlayground);
-    expect(hook.result.current.savedSessions).toHaveLength(1);
-    expect(hook.result.current.title).toBe("Shared");
-    expect(hook.result.current.messages).toEqual(shared.messages);
-    expect(window.location.search).toBe("?mode=test");
-    expect(window.location.hash).toBe("");
-    act(() => hook.result.current.setTitle("Local edit"));
-    hook.rerender();
-    expect(hook.result.current.title).toBe("Local edit");
-  });
+describe("live URL filters", () => {
   it("task status follows back/forward URL snapshots instead of a mount-only filter", () => {
     mocks.search = "status=failed";
     const hook = renderHook(() => useListState(RUNS_LIST));

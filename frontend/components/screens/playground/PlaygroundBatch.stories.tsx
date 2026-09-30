@@ -30,7 +30,7 @@ export const Failed: Story = {
       {...BATCH}
       results={[
         BATCH.results[0],
-        { input: BATCH.inputs[1], output: "", ok: false, error: "503 from inference gateway" },
+        { input: BATCH.inputs[1], output: "", ok: false, error: "failed" },
       ]}
     />
   ),
@@ -45,4 +45,11 @@ export const LongStrings: Story = {
       results={[{ input: LONG, output: LONG, ok: true }]}
     />
   ),
+};
+
+export const Cancelled: Story = {
+  render: () => <PlaygroundBatch {...BATCH} cancelled results={BATCH.results.slice(0, 1)} />,
+};
+export const TooManyPrompts: Story = {
+  render: () => <PlaygroundBatch {...BATCH} invalid inputs={Array(7).fill("What is 2+2?")} />,
 };

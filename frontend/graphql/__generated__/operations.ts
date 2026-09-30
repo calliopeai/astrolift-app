@@ -14362,6 +14362,15 @@ export type ModelPromptReadinessQueryVariables = Exact<{
 
 export type ModelPromptReadinessQuery = { astroliftModelPromptReadiness?: { state: AstroliftModelPromptReadinessState, eligible: boolean, maxPromptChars: number, maxOutputTokens: number, promptsPerMinute: number, maxWaitSeconds: number } | null };
 
+export type PlaygroundEndpointsPageQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type PlaygroundEndpointsPageQuery = { astroliftModelEndpointsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, name: string, variant: string, registeredAppSlug: string, environmentName: string }> } };
+
 export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
 
 export type AppFreshnessFieldsFragment = { lastDeployedAt?: string | null, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null };
