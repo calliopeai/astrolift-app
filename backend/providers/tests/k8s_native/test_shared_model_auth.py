@@ -1,6 +1,10 @@
 """Actual ASGI requests distinguish subscriber inference from operator telemetry."""
 
 import json
+import os
+import shutil
+import subprocess
+import sys
 
 import httpx
 import pytest
@@ -10,6 +14,73 @@ from k8s_native.managed import shared_model_auth as auth
 OPERATOR = "operator-" + "o" * 40
 APP_A = "app-a-" + "a" * 40
 APP_B = "app-b-" + "b" * 40
+
+
+def test_mounted_module_runs_without_provider_package_or_site_dependencies(tmp_path):
+    """Exercise the actual bare module import used by the mounted vLLM hook."""
+    shutil.copyfile(auth.__file__, tmp_path / "astrolift_shared_model_auth.py")
+    snapshot_path = tmp_path / "keys.json"
+    snapshot_path.write_text(
+        json.dumps({"version": 1, "revision": 7, "operator_key": OPERATOR, "subscription_keys": [APP_A]})
+    )
+    script = r"""
+import asyncio
+import importlib.util
+import json
+import pathlib
+import sys
+
+directory = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location(
+    "astrolift_shared_model_auth", directory / "astrolift_shared_model_auth.py"
+)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+module.KEYS_FILE = str(directory / "keys.json")
+keys = json.loads((directory / "keys.json").read_text())
+
+async def endpoint(scope, receive, send):
+    await send({"type": "http.response.start", "status": 200, "headers": []})
+    await send({"type": "http.response.body", "body": b"actual-endpoint"})
+
+async def receive():
+    return {"type": "http.request", "body": b"", "more_body": False}
+
+async def verify():
+    guard = module.SharedModelAuth(endpoint)
+    for method, path, key, expected in (
+        ("POST", "/v1/chat/completions", keys["subscription_keys"][0], 200),
+        ("GET", "/metrics", keys["subscription_keys"][0], 401),
+        ("GET", "/metrics", keys["operator_key"], 200),
+    ):
+        messages = []
+        async def send(message):
+            messages.append(message)
+        await guard(
+            {"type": "http", "method": method, "path": path,
+             "headers": [(b"authorization", ("Bearer " + key).encode("ascii"))]},
+            receive, send,
+        )
+        assert messages[0]["status"] == expected
+    assert "k8s_native" not in sys.modules
+    assert "_sdk" not in sys.modules
+
+asyncio.run(verify())
+"""
+    environment = os.environ.copy()
+    environment["ASTROLIFT_MODEL_AUTH_REVISION"] = "7"
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", "-c", script, str(tmp_path)],
+        env=environment,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
 
 
 @pytest.fixture
