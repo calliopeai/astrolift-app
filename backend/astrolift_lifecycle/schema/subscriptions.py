@@ -19,18 +19,109 @@ from collections.abc import AsyncGenerator
 import strawberry
 from strawberry.types import Info
 
+from astrolift_identity.operation_context import OperationContext, environment_context
 from astrolift_lifecycle.schema.types import AppLogLineType
 from astrolift_lifecycle.scopes import live_app_scope
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    PermissionScope,
+    ScopeKind,
+    check_permission,
+    require_permission,
+)
 from core.schema.ws_auth import ws_identity
+
+
+def _log_target(app_slug, *, plural=False, environment_name=None, workload_slug=None):
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+    from core.cluster_observability import namespace_for_app, namespace_for_environment
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    app = (
+        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+        .first()
+    )
+    if app is None:
+        return None
+    environments = list(
+        AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True)
+        .select_related("tenant_cluster", "registered_app__organization")
+        .order_by("created_at")
+    )
+    cluster, namespace = app.default_tenant_cluster, namespace_for_app(app)
+    verified_env = None
+    if plural and environment_name:
+        verified_env = next((env for env in environments if env.name == environment_name), None)
+        if verified_env is None:
+            return None
+        cluster, namespace = verified_env.tenant_cluster, namespace_for_environment(verified_env)
+    elif not plural and workload_slug and environments:
+        cluster = environments[0].tenant_cluster
+    if (
+        cluster is None
+        or not getattr(cluster, "is_active", True)
+        or cluster.deleted_at is not None
+        or cluster.organization_id not in (None, org_id)
+    ):
+        return None
+    if verified_env is None:
+        matches = [
+            env
+            for env in environments
+            if env.tenant_cluster_id == cluster.pk and namespace_for_environment(env) == namespace
+        ]
+        # Legacy pod logs name no environment. Only an unambiguous persisted
+        # cluster/namespace pair proves one; a caller's workload hint does not.
+        verified_env = matches[0] if len(matches) == 1 else None
+    facts = (
+        environment_context(verified_env)
+        if verified_env is not None
+        else OperationContext(region=cluster.region or None)
+    )
+    return app, cluster, namespace, facts
+
+
+def _log_operation(*, plural=False):
+    def load(args):
+        target = _log_target(
+            args["app_slug"],
+            plural=plural,
+            environment_name=args.get("environment_name"),
+            workload_slug=args.get("workload_slug"),
+        )
+        return (target[3] if target is not None else OperationContext(),)
+
+    return load
+
+
+def _admitted_log_target(app_slug, **kwargs):
+    from astrolift_identity.abac import operation_attributes
+
+    target = _log_target(app_slug, **kwargs)
+    if target is None:
+        return None
+    app, cluster, namespace, facts = target
+    try:
+        with operation_attributes(**facts.attributes()):
+            check_permission(Permission.APP_READ_LOGS, scope=PermissionScope(kind=ScopeKind.APP, id=app.pk))
+    except PermissionDenied:
+        return None
+    return app, cluster, namespace
 
 
 @strawberry.type
 class LifecycleSubscription:
     @strawberry.subscription
     @ws_identity
-    @require_permission(Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"), operation=_log_operation()
+    )
     @tenant_scoped()
     async def astrolift_on_app_log(
         self,
@@ -62,55 +153,9 @@ class LifecycleSubscription:
         urllib3 connection is released back to the pool."""
         from asgiref.sync import sync_to_async
 
-        from astrolift_lifecycle.models import AppEnvironment
-        from astrolift_registry.models import RegisteredApp
         from core.cluster_observability import stream_app_logs
-        from core.tenancy import get_current_tenant
 
-        org_id = get_current_tenant().organization_id
-
-        # Look up app + cluster off the main thread — Django ORM
-        # is sync.
-        def _resolve():
-            app = (
-                RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
-                .filter(
-                    slug=app_slug,
-                    organization_id=org_id,
-                    deleted_at__isnull=True,
-                )
-                .first()
-            )
-            if app is None:
-                return None, None, None
-            cluster = None
-            if workload_slug:
-                # workload_slug is informational — the pod name
-                # already encodes the workload — but we use it as
-                # a hint to pick the right environment cluster
-                # when an app has more than one (prefer the env
-                # whose workload matches).
-                env = (
-                    AppEnvironment.objects.select_related("tenant_cluster")
-                    .filter(
-                        registered_app=app,
-                        deleted_at__isnull=True,
-                    )
-                    .order_by("created_at")
-                    .first()
-                )
-                if env and env.tenant_cluster_id:
-                    cluster = env.tenant_cluster
-            if cluster is None:
-                cluster = app.default_tenant_cluster
-            if cluster is None or not getattr(cluster, "is_active", True):
-                return None, None, None
-            from core.cluster_observability import namespace_for_app
-
-            namespace = namespace_for_app(app)
-            return app, cluster, namespace
-
-        resolved = await sync_to_async(_resolve)()
+        resolved = await sync_to_async(_admitted_log_target)(app_slug, workload_slug=workload_slug)
         if resolved is None:
             return
         app, cluster, namespace = resolved
@@ -146,7 +191,9 @@ class LifecycleSubscription:
 
     @strawberry.subscription
     @ws_identity
-    @require_permission(Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=live_app_scope("app_slug"), operation=_log_operation(plural=True)
+    )
     @tenant_scoped()
     async def astrolift_on_app_logs(
         self,
@@ -176,53 +223,11 @@ class LifecycleSubscription:
         """
         from asgiref.sync import sync_to_async
 
-        from astrolift_lifecycle.models import AppEnvironment
-        from astrolift_registry.models import RegisteredApp
-        from core.cluster_observability import (
-            namespace_for_app,
-            namespace_for_environment,
-            stream_app_logs_multi,
+        from core.cluster_observability import stream_app_logs_multi
+
+        resolved = await sync_to_async(_admitted_log_target)(
+            app_slug, plural=True, environment_name=environment_name, workload_slug=workload_slug
         )
-        from core.tenancy import get_current_tenant
-
-        org_id = get_current_tenant().organization_id
-
-        def _resolve():
-            app = (
-                RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
-                .filter(
-                    slug=app_slug,
-                    organization_id=org_id,
-                    deleted_at__isnull=True,
-                )
-                .first()
-            )
-            if app is None:
-                return None
-            cluster = None
-            namespace = namespace_for_app(app)
-            if environment_name:
-                env = (
-                    AppEnvironment.objects.select_related("tenant_cluster")
-                    .filter(
-                        registered_app=app,
-                        name=environment_name,
-                        deleted_at__isnull=True,
-                    )
-                    .first()
-                )
-                if env and env.tenant_cluster_id:
-                    cluster = env.tenant_cluster
-                    # The named environment's own namespace when it has
-                    # one (#1922).
-                    namespace = namespace_for_environment(env)
-            if cluster is None:
-                cluster = app.default_tenant_cluster
-            if cluster is None or not getattr(cluster, "is_active", True):
-                return None
-            return app, cluster, namespace
-
-        resolved = await sync_to_async(_resolve)()
         if resolved is None:
             return
         app, cluster, namespace = resolved

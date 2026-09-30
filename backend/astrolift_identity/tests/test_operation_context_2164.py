@@ -23,6 +23,84 @@ from workflows.models import WorkflowDefinition, WorkflowStage, WorkflowStageExe
 pytestmark = pytest.mark.django_db
 
 
+@pytest.mark.parametrize("regions", [("us-west-2",), ("us-west-2", "us-east-1")])
+def test_any_scope_operation_resets_grants_between_targets(operation_world, regions):
+    from astrolift_identity.operation_context import OperationContext
+    from astrolift_identity.scope_visibility import visible_apps
+    from astrolift_registry.models import RegisteredApp
+    from core.permissions import require_permission
+
+    w = operation_world
+    policy(w, action="app.read", resource={"region": ["us-east-1"]})
+    calls = []
+
+    @require_permission(
+        Permission.APP_READ,
+        any_scope=True,
+        operation=lambda args: tuple(OperationContext(region=region) for region in regions),
+    )
+    def collection():
+        calls.append(current_attributes().region)
+        return list(visible_apps(RegisteredApp.objects.filter(organization=w.world.org), Permission.APP_READ))
+
+    attrs = RequestAttributes(actor_user_id=w.user.pk)
+    with as_tenant(w.world, w.user), request_attributes(attrs):
+        if len(regions) == 1:
+            assert len(collection()) == 2
+            assert calls == ["us-west-2"]
+        else:
+            with pytest.raises(PermissionDenied):
+                collection()
+            assert calls == []
+        assert current_attributes() is attrs and attrs.region is None
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_operation_subscriptions_restore_caller_facts_and_close_in_another_task(operation_world):
+    import asyncio
+
+    import core.permissions as permissions
+    from astrolift_identity.operation_context import OperationContext
+    from core.permissions import PermissionScope, ScopeKind, require_permission
+
+    w = operation_world
+    closed = []
+
+    @require_permission(
+        Permission.APP_READ,
+        scope=lambda args: PermissionScope(kind=ScopeKind.APP, id=w.world.medops_app.pk),
+        operation=lambda args: (OperationContext(region=args["region"]),),
+    )
+    async def stream(region):
+        try:
+            while True:
+                assert permissions._scopes_memo.get() == {}
+                yield current_attributes().region
+        finally:
+            closed.append(current_attributes().region)
+
+    attrs = RequestAttributes(actor_user_id=w.user.pk, region="caller-region")
+    caller_memo = {"caller": "grant"}
+    memo_token = permissions._scopes_memo.set(caller_memo)
+    first, second = stream("us-east-1"), stream("us-west-2")
+    try:
+        with as_tenant(w.world, w.user), request_attributes(attrs):
+            for generator, expected in [(first, "us-east-1"), (second, "us-west-2"), (first, "us-east-1")]:
+                assert await anext(generator) == expected
+                assert current_attributes() is attrs
+                assert permissions._scopes_memo.get() is caller_memo
+            await asyncio.create_task(first.aclose())
+            await asyncio.create_task(second.aclose())
+            assert current_attributes() is attrs
+            assert permissions._scopes_memo.get() is caller_memo
+        assert closed == ["us-east-1", "us-west-2"]
+    finally:
+        await first.aclose()
+        await second.aclose()
+        permissions._scopes_memo.reset(memo_token)
+
+
 @pytest.fixture
 def operation_world():
     tag = uuid4().hex[:8]

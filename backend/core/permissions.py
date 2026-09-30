@@ -743,7 +743,7 @@ def require_permission(
             for perm in permissions:
                 check_permission(perm, scope=target_scope)
 
-        def admitted_context(args, kwargs):
+        def operation_contexts(args, kwargs):
             contexts = (None,)
             if operation is not None:
                 bound = signature.bind(*args, **kwargs)
@@ -751,6 +751,10 @@ def require_permission(
                 contexts = tuple(operation(bound.arguments))
                 if not contexts:
                     raise PermissionDenied(permissions[0], None, "operation target could not be resolved")
+            return contexts
+
+        def admitted_context(args, kwargs):
+            contexts = operation_contexts(args, kwargs)
             for context in contexts:
                 with authorization_context(context):
                     check(args, kwargs)
@@ -766,14 +770,19 @@ def require_permission(
                     context = await sync_to_async(admitted_context)(args, kwargs)
                 except PermissionDenied:
                     return
-                with authorization_context(context):
-                    # Closing the outer subscription also closes the resource
-                    # held by its inner generator, including on cancellation.
-                    inner = fn(*args, **kwargs)
-                    try:
-                        async for item in inner:
-                            yield item
-                    finally:
+                inner = fn(*args, **kwargs)
+                try:
+                    while True:
+                        with authorization_context(context):
+                            try:
+                                item = await inner.__anext__()
+                            except StopAsyncIteration:
+                                break
+                        # A suspended subscription must not lend operation
+                        # facts or ContextVar tokens to its consumer's task.
+                        yield item
+                finally:
+                    with authorization_context(context):
                         await inner.aclose()
 
         elif inspect.iscoroutinefunction(fn):
@@ -790,8 +799,15 @@ def require_permission(
 
             @functools.wraps(fn)
             def wrapper(*args, **kwargs):
-                context = admitted_context(args, kwargs)
-                with authorization_context(context):
+                contexts = operation_contexts(args, kwargs)
+                if len(contexts) == 1:
+                    with authorization_context(contexts[0]):
+                        check(args, kwargs)
+                        return fn(*args, **kwargs)
+                for context in contexts:
+                    with authorization_context(context):
+                        check(args, kwargs)
+                with authorization_context():
                     return fn(*args, **kwargs)
 
         # Strawberry resolver introspection follows __wrapped__ but

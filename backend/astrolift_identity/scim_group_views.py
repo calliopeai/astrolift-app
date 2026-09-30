@@ -28,6 +28,7 @@ from astrolift_identity.scim_views import (
     _json_body,
     _ok,
 )
+from core.permissions import route_auth
 
 
 def _resource(group):
@@ -125,6 +126,7 @@ def _compare(value, filt):
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
+@route_auth(credential="organization SCIM bearer", scope="credential organization")
 def scim_groups(request):
     org = _authenticated_org(request)
     if org is None:
@@ -256,6 +258,7 @@ def _patch_field(group, org, members, op, path, value):
 
 @csrf_exempt
 @require_http_methods(["GET", "PUT", "PATCH", "DELETE"])
+@route_auth(credential="organization SCIM bearer", scope="credential organization")
 def scim_group_detail(request, group_guid):
     org = _authenticated_org(request)
     if org is None:
