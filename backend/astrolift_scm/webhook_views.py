@@ -65,6 +65,7 @@ from __future__ import annotations
 import json
 import logging
 
+from django.db import transaction
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.http import require_http_methods
 
@@ -124,6 +125,7 @@ def _build_pr_context(payload: dict) -> github_pr_dispatch.PrEventContext | None
     )
 
 
+@transaction.atomic
 def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     """Return (preview, created) for the (app, pr_number) auto path.
 
@@ -134,15 +136,20 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     is spun up alongside the preview because activities read the
     bound tenant_cluster off ``preview.app_environment``.
     """
-    from django.db import transaction
-
     from astrolift_lifecycle.models import AppEnvironment, PreviewEnvironment
+    from astrolift_registry.models import RegisteredApp
     from astrolift_registry.namespaces import namespace_for_new_preview
     from astrolift_workflows.preview_build import (
         env_slug_for_preview,
         namespace_for_preview,
     )
 
+    # Both preview paths lock the same app before checking names and idempotency.
+    app = (
+        RegisteredApp.objects.select_for_update(of=("self",))
+        .select_related("organization", "default_tenant_cluster")
+        .get(pk=app.pk)
+    )
     existing = (
         PreviewEnvironment.objects.select_related("app_environment", "registered_app")
         .filter(
@@ -168,7 +175,11 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     org_slug = (getattr(org, "slug", "") or getattr(org, "name", "") or "org").lower()
     app_slug = app.slug
 
-    env_name = env_slug_for_preview(pr_number=pr_ctx.pr_number)
+    from astrolift_lifecycle.services.preview_names import preview_environment_name
+
+    env_name = preview_environment_name(
+        app, env_slug_for_preview(pr_number=pr_ctx.pr_number), source=f"pr:{pr_ctx.pr_number}"
+    )
     # The preview's deploys render into this namespace (#1922), so it may
     # not be one another app or environment already holds.
     namespace = namespace_for_new_preview(

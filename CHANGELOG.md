@@ -17,6 +17,10 @@
   recipient resolves, the mail transport refuses the message or returns zero
   deliveries (#1823). The gate remains reviewable; accepted transport delivery
   is distinct from inbox receipt. See [sender setup](docs/operators/human-gate-email.md).
+- Preview names remain distinct when manual branch `pr-N` and PR #N collide
+  (#2095). Both paths serialize name and namespace allocation per app, including
+  duplicate concurrent requests. Explicit occupied names return validation on
+  `environmentName`. See [preview naming](docs/operators/preview-names-and-workload-identity.md).
 
 - Core legacy APIs enforce active account, platform-operator and bearer
   ceilings without removing GraphQL declarations (#2110). Permission analysis
