@@ -31,8 +31,13 @@ export function buildCsv<TRow>(rows: TRow[], columns: CsvColumn<TRow>[]): string
 
 /** Download `rows` as `filename` (`.csv` is added when missing). */
 export function exportCsv<TRow>(filename: string, rows: TRow[], columns: CsvColumn<TRow>[]) {
+  downloadCsvContent(filename, buildCsv(rows, columns));
+}
+
+/** Download a complete server-produced CSV without reinterpreting its cells. */
+export function downloadCsvContent(filename: string, content: string) {
   // The BOM makes Excel read the file as UTF-8 rather than the locale's codepage.
-  const blob = new Blob(["﻿", buildCsv(rows, columns)], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["﻿", content], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

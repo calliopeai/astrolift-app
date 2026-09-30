@@ -1,17 +1,19 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import type { CursorPage } from "@/components/data-table";
+import { useCsvExport } from "@/components/list/use-csv-export";
 import { useListState } from "@/components/list/use-list-state";
 import {
   BULK_REVOKE_ROLE_BINDINGS,
   REVOKE_ROLE_BINDING,
 } from "@/graphql/identity/identity.mutations";
 import {
+  EXPORT_ROLE_BINDINGS_CSV,
   LIST_ROLE_BINDINGS,
   LIST_ROLE_BINDINGS_PAGE,
   LIST_ROLES,
@@ -24,6 +26,7 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { numberedVariables } from "../access/identity-lists";
 import { useNumberedListQuery } from "../access/use-list-page-query";
 import { ASSIGNMENTS_LIST, bindingsFilter } from "./permissions-lists";
 
@@ -44,6 +47,7 @@ const REVOKE_REFETCH = ["ListRoleBindingsPage", { query: LIST_ROLE_BINDINGS }];
 
 /** The data half of AssignmentsView: the role-bindings page, the roles, and revoke. */
 export function useAssignments() {
+  const client = useApolloClient();
   const perms = useMyPermissions();
   const canManage = perms.can("org.manage_members");
 
@@ -57,6 +61,22 @@ export function useAssignments() {
     (d) => (d as BindingsPageResp | undefined)?.astroliftRoleBindingsPage,
     { toFilter: bindingsFilter }
   );
+
+  const { exportingCsv, onExportCsv } = useCsvExport(async () => {
+    const variables = numberedVariables(
+      { ...list.state, q: list.state.q },
+      bindingsFilter(list.filters)
+    );
+    const result = await client.query<{
+      astroliftRoleBindingsCsv: { filename: string; content: string };
+    }>({
+      query: EXPORT_ROLE_BINDINGS_CSV,
+      variables: { search: variables.search, filter: variables.filter, sort: variables.sort },
+      fetchPolicy: "network-only",
+    });
+    if (!result.data?.astroliftRoleBindingsCsv) throw new Error("The export returned no file");
+    return result.data.astroliftRoleBindingsCsv;
+  });
 
   const roles = useQuery<RolesResp>(LIST_ROLES);
 
@@ -116,5 +136,7 @@ export function useAssignments() {
     bulkRevoking,
     onRevoke,
     onBulkRevoke,
+    exportingCsv,
+    onExportCsv,
   };
 }

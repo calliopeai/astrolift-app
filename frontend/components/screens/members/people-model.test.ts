@@ -120,8 +120,10 @@ describe("each view asks one query", () => {
     expect(
       invitationsVariables(question("view=invited&status=revoked&role=viewer&sort=-joined"))
     ).toMatchObject({ filter: { status: ["revoked"], role: ["viewer"] }, sort: "-created" });
-    // A sort invitations cannot take falls back to newest first, not an error.
-    expect(invitationsVariables(question("view=invited&sort=-lastActive")).sort).toBe("-created");
+    // Invitation activity is current-org evidence, so this column sort reaches the server.
+    expect(invitationsVariables(question("view=invited&sort=-lastActive")).sort).toBe(
+      "-lastActive"
+    );
   });
 
   it("asks the principal search for IdP groups only, searched and paged", () => {
