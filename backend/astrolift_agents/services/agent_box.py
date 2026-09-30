@@ -443,6 +443,7 @@ def start_agent_box(box) -> None:
         _fail(box, detail)
         raise AgentBoxError(detail)
 
+    box.startup_diagnostic = {}
     box.status = AgentBox.Status.PROVISIONING
     box.image = image[:512]
     box.external_id = job_name
@@ -460,6 +461,7 @@ def start_agent_box(box) -> None:
         update_fields=[
             "status",
             "image",
+            "startup_diagnostic",
             "external_id",
             "namespace",
             "pod_name",
@@ -743,6 +745,8 @@ def observe_box(box) -> str | None:
         "Job",
         box.external_id,
     )
+    from astrolift_agents.services.startup_diagnostic import observe_startup
+
     conditions = getattr(status, "conditions", None) or []
     complete = any(str(c.get("type")) == "Complete" and str(c.get("status")) == "True" for c in conditions)
     failed = any(str(c.get("type")) == "Failed" and str(c.get("status")) == "True" for c in conditions)
@@ -759,6 +763,7 @@ def observe_box(box) -> str | None:
     if getattr(status, "ready_replicas", 0) > 0:
         _record_pod_name(box, cluster=cluster, namespace=namespace)
         return AgentBox.Status.RUNNING.value
+    observe_startup(box, cluster=cluster, namespace=namespace)
     return None
 
 
@@ -790,6 +795,10 @@ def _record_pod_name(box, *, cluster, namespace: str) -> None:
     except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
         log.warning("agent_box: could not resolve a pod name for box %s", box.slug, exc_info=True)
         return
+
+    from astrolift_agents.services.startup_diagnostic import record_startup
+
+    record_startup(box, pods)
 
     # A box Job is backoffLimit 0 / restartPolicy Never, so there is one
     # pod per incarnation; prefer a ready one anyway so a terminating
@@ -835,11 +844,17 @@ def describe_box_failure(box) -> str:
         log.warning("agent_box: could not read the failed pod for box %s", box.slug, exc_info=True)
         return "the box's Job reported Failed; its pod could not be read for a cause"
 
+    from astrolift_agents.services.startup_diagnostic import record_startup
+
+    record_startup(box, pods)
+
     pod = _dead_pod(pods)
     if pod is None:
         return "the box's Job reported Failed; no pod remained to read a cause from"
 
-    parts = [_terminated_sentence(pod)]
+    from astrolift_agents.services.startup_diagnostic import startup_failure_suffix
+
+    parts = [_terminated_sentence(pod) + startup_failure_suffix(box)]
     excerpt = _pod_log_excerpt(cluster=cluster, namespace=namespace, pod_name=pod.name)
     if excerpt:
         parts.append(excerpt)

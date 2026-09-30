@@ -495,3 +495,20 @@ def test_fenced_install_applies_the_fence_before_the_job(db, monkeypatch):
     assert result.ok, result.error
     kinds = [m["kind"] for m in driver.applied]
     assert kinds.index("NetworkPolicy") < kinds.index("Job")
+
+
+def test_job_existence_does_not_mean_running_container(monkeypatch):
+    import core.cluster_management as management
+
+    status = SimpleNamespace(conditions=[], ready_replicas=0, desired_replicas=1)
+    monkeypatch.setattr(
+        management, "_driver_for_cluster", lambda _: SimpleNamespace(get_workload_status=lambda *args: status)
+    )
+    monkeypatch.setattr(management, "_context_for_cluster", lambda _: _Ctx())
+    spawner = K8sJobSpawner(cluster=object(), namespace="owned-ns")
+    assert not spawner.status("owned-job").running
+    status.ready_replicas = 1
+    assert spawner.status("owned-job").running
+    status.conditions = [{"type": "Complete", "status": "True"}]
+    assert spawner.status("owned-job").succeeded
+    assert not spawner.status("owned-job").running

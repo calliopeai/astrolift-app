@@ -569,8 +569,8 @@ def test_a_box_whose_pod_has_not_started_stays_provisioning(org, cluster, pod_ba
     assert summary["running"] == 0
     assert box.status == AgentBox.Status.PROVISIONING.value
     assert box.pod_name == ""
-    # Nothing was claimed about the box, so nothing was spent looking.
-    assert backend.calls == []
+    # Pending pods are observed so scheduling failures can reach the client.
+    assert backend.calls
 
 
 def test_the_reaper_settles_a_box_whose_pod_has_gone(org, cluster, monkeypatch):
@@ -768,6 +768,7 @@ def test_restarting_a_settled_box_clears_the_dead_pod_name(org, cluster):
         external_id="agent-box-warm",
         namespace="astrolift-agents-box-org",
         pod_name="agent-box-from-last-time",
+        startup_diagnostic={"message": "old scheduling warning"},
         environment_spec=_spec(org),
     )
 
@@ -776,6 +777,7 @@ def test_restarting_a_settled_box_clears_the_dead_pod_name(org, cluster):
     box.refresh_from_db()
     assert box.status == AgentBox.Status.PROVISIONING.value
     assert box.pod_name == ""
+    assert box.startup_diagnostic == {}
 
 
 # ---------------------------------------------------------------------------
@@ -2188,3 +2190,35 @@ def test_a_box_key_is_revoked_only_through_the_install_that_minted_it(org, gatew
 
     assert gateway.zentinelle.calls == []
     assert gateway.zentinelle.agents[_box_agent_id(box)].status == "active"
+
+
+def test_box_pending_diagnostic_recovers_and_survives_probe_failure(org, cluster, pod_backend):
+    from dataclasses import replace
+
+    pending = replace(
+        _pod_info("owned-box-pod", ready=False),
+        phase="Pending",
+        status="Pending",
+        scheduling_reason="Unschedulable",
+        scheduling_message="2 Insufficient cpu",
+    )
+    backend = pod_backend(_BoxPodBackend(pods=[pending]))
+    cluster.driver.job_status = dict(_FakeDriver.PENDING_JOB_STATUS)
+    box = _box(org, status=AgentBox.Status.PROVISIONING, external_id="owned-box-job", namespace="owned-ns")
+    box_service.reap_agent_boxes()
+    box.refresh_from_db()
+    snapshot = dict(box.startup_diagnostic)
+    assert box.status == AgentBox.Status.PROVISIONING
+    assert snapshot["reason"] == "Unschedulable"
+    backend._explode = True
+    box_service.reap_agent_boxes()
+    box.refresh_from_db()
+    assert box.startup_diagnostic == snapshot
+    backend._explode = False
+    backend._pods = [_pod_info("owned-box-pod")]
+    cluster.driver.job_status = dict(_FakeDriver.RUNNING_JOB_STATUS)
+    box_service.reap_agent_boxes()
+    box.refresh_from_db()
+    assert box.status == AgentBox.Status.RUNNING
+    assert box.startup_diagnostic["phase"] == "Running"
+    assert box.startup_diagnostic["message"] == ""

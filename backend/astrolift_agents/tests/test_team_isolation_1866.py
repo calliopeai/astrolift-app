@@ -855,3 +855,48 @@ def test_log_and_meter_ingest_need_the_dispatchers_key_and_org(world):
     assert client.post(meter, data=usage, content_type="application/json", **own_key).status_code == 201
     run.refresh_from_db()
     assert run.log_excerpt == "hello"
+
+
+@pytest.mark.parametrize("scopes,allowed", [(["mcp:read", "read:apps"], True), (["mcp:dispatch"], False)])
+def test_startup_diagnostic_keeps_token_and_team_boundaries(world, scopes, allowed):
+    snapshot = {
+        "phase": "Pending",
+        "reason": "Unschedulable",
+        "message": "2 Insufficient cpu",
+        "podName": "owned-pod",
+        "observedAt": "2026-09-29T23:16:59+00:00",
+    }
+    for box in (world.medops_box, world.platform_box):
+        box.startup_diagnostic = snapshot
+        box.save(update_fields=["startup_diagnostic"])
+    tasks = [
+        AgentTask.objects.create(
+            organization=world.org,
+            agent_definition=agent,
+            project=project,
+            team=team,
+            startup_diagnostic=snapshot,
+        )
+        for agent, project, team in [
+            (world.medops_agent, world.medops_project, world.medops),
+            (world.platform_agent, world.platform_project, world.platform),
+        ]
+    ]
+    grant(world, Permission.AGENT_READ, Permission.APP_READ)
+    with member(world, selected=True), team_token(world, scopes=scopes):
+        own_reads = [
+            lambda: AgentsQuery().agent_box(world.info, slug=world.medops_box.slug),
+            lambda: AgentsQuery().agent_task(world.info, id=str(tasks[0].guid)),
+        ]
+        for read in own_reads:
+            if allowed:
+                assert read().startup_diagnostic.reason == "Unschedulable"
+            else:
+                with pytest.raises(PermissionDenied):
+                    read()
+        for read in [
+            lambda: AgentsQuery().agent_box(world.info, slug=world.platform_box.slug),
+            lambda: AgentsQuery().agent_task(world.info, id=str(tasks[1].guid)),
+        ]:
+            with pytest.raises(PermissionDenied):
+                read()

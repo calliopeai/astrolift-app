@@ -119,6 +119,7 @@ class AgentBox(NamedBaseCoreModel):
     # The k8s Job name and the namespace it landed in, frozen at spawn. The
     # namespace is stored rather than recomputed for the same reason
     # AgentTask stores it (#891): a recomputed guess can miss the pod.
+    startup_diagnostic = models.JSONField(default=dict, blank=True)
     external_id = models.CharField(max_length=255, blank=True, default="")
     namespace = models.CharField(max_length=255, blank=True, default="")
     # Observed, not frozen: the reaper stamps it when it sees the Job's pod

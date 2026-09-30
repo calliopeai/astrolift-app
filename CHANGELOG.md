@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Agent task and box startup diagnostics expose scoped pod scheduling reasons.
+  Pending Jobs stay provisioning until ready; timeout failures preserve the
+  last startup reason before cleanup, and recovery clears stale warnings (#2190).
+
 - CLI and IDE sign-in credentials can discover and attach to agent boxes when
   account permissions allow it. The existing `mcp:dispatch` scope now includes
   `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
