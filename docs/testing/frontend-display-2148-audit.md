@@ -98,7 +98,7 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 | 76. Playground runs entirely on simulated responses | Parked | Playground remains parked; no simulated inference is wired or advertised as successful. |
 | 77. Invitation expiry badge shows NaN for unparseable dates | Pre-existing | display-logic.test.tsx verifies invalid/nonfinite invitation expiry remains unavailable. |
 | 78. 'New Pipeline' links to a route that does not exist | Pre-existing | pipelines/new has actual page/new-pipeline-client routes; it no longer falls through to a detail id of new. |
-| 79. Pipeline secrets route opens on the Runs tab | Remaining | Pipeline secrets route still passes only pipelineId to PipelineDetailClient, whose hook initially selects runs without tab query. |
+| 79. Pipeline secrets route opens on the Runs tab | Pre-existing | usePipelineDetail selects secrets when the actual pathname ends with /secrets; this branch already honors the route independently of a tab query. |
 | 80. Pipeline detail title is always 'Pipeline' | Remaining | PipelineDetailClient still reads usePipelineDetail runs; no pipeline-name lookup is wired on this audited branch. |
 | 81. Webhook row actions disable the button on every row | Fixed | Real concurrent Apollo request regression verifies synchronous same-row exclusion and independent release on transport/success; row menu uses pendingRows. |
 | 82. Create sheets default slugs the backend rejects | Fixed | Shared default slug generation obeys core/naming.py letter-start/40-char/end-alnum rules; create sheets/hooks refuse invalid submissions. |
