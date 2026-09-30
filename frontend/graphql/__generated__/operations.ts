@@ -5727,6 +5727,57 @@ export type ClusterModelDensity = {
   truncated: Scalars['Boolean']['output'];
 };
 
+export type ClusterModelDeployment = {
+  appliedResources?: Maybe<ModelResources>;
+  appliedSubscriptionRevision: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterName: Scalars['String']['output'];
+  clusterSlug: Scalars['String']['output'];
+  computeMode?: Maybe<Scalars['String']['output']>;
+  desiredResources: ModelResources;
+  desiredSubscriptionRevision: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  modelRepo: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationId?: Maybe<Scalars['String']['output']>;
+  operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  organizationId: Scalars['GUID']['output'];
+  providerId: Scalars['GUID']['output'];
+  readinessGeneration?: Maybe<Scalars['Int']['output']>;
+  readinessObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  ready?: Maybe<Scalars['Boolean']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  revisionSha?: Maybe<Scalars['String']['output']>;
+  runtimeReason?: Maybe<Scalars['String']['output']>;
+  runtimeSupported?: Maybe<Scalars['Boolean']['output']>;
+  status: Scalars['String']['output'];
+  subscriptionsEnabled: Scalars['Boolean']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ClusterModelDeploymentPage = {
+  items: Array<ClusterModelDeployment>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ClusterModelsFilterInput = {
+  clusterId: InputMaybe<Scalars['GUID']['input']>;
+  computeMode: InputMaybe<Scalars['String']['input']>;
+  deployedByMe: InputMaybe<Scalars['Boolean']['input']>;
+  ready: InputMaybe<Scalars['Boolean']['input']>;
+  status: InputMaybe<Scalars['String']['input']>;
+  subscriptionsEnabled: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type Clusteragentkeyissuedpayload = {
   agentKey: Scalars['String']['output'];
   clusterId: Scalars['GUID']['output'];
@@ -6616,6 +6667,27 @@ export type ModelObservationState =
   | 'UNCONFIGURED'
   | 'UNSUPPORTED';
 
+export type ModelPlacementCluster = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  providerId: Scalars['GUID']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  slug: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelPlacementClusterPage = {
+  items: Array<ModelPlacementCluster>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ModelResourceRequests = {
   cpuCoresPerReplica?: Maybe<Scalars['Float']['output']>;
   gpuDevicesPerReplica?: Maybe<Scalars['Int']['output']>;
@@ -6627,6 +6699,81 @@ export type ModelResourceRequests = {
   totalCpuCores?: Maybe<Scalars['Float']['output']>;
   totalGpuDevices?: Maybe<Scalars['Int']['output']>;
   totalMemoryBytes?: Maybe<Scalars['Float']['output']>;
+};
+
+export type ModelResources = {
+  cpuKvCacheGiB?: Maybe<Scalars['Int']['output']>;
+  cpuRequest?: Maybe<Scalars['String']['output']>;
+  gpuCount?: Maybe<Scalars['Int']['output']>;
+  memoryRequest?: Maybe<Scalars['String']['output']>;
+  replicas?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelRuntimeAdmission = {
+  architecture?: Maybe<Scalars['String']['output']>;
+  eligible: Scalars['Boolean']['output'];
+  hardwareAdmission: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  runtimeVersion?: Maybe<Scalars['String']['output']>;
+};
+
+export type ModelSubscription = {
+  alias: Scalars['String']['output'];
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  appliedRevision: Scalars['Int']['output'];
+  bindingPrefix: Scalars['String']['output'];
+  canRevoke: Scalars['Boolean']['output'];
+  desiredEnabled: Scalars['Boolean']['output'];
+  desiredRevision: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  modelDeploymentId: Scalars['GUID']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  reconcileStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  reconciledAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelSubscriptionPage = {
+  items: Array<ModelSubscription>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelSubscriptionTarget = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterId: Scalars['GUID']['output'];
+  eligible: Scalars['Boolean']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelSubscriptionTargetPage = {
+  items: Array<ModelSubscriptionTarget>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type MoveAppToTeamInput = {
@@ -9218,6 +9365,21 @@ export type ProviderpluginconfigpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ProvisionClusterModelInput = {
+  allowSubscriptions: Scalars['Boolean']['input'];
+  clusterId: Scalars['GUID']['input'];
+  computeMode: Scalars['String']['input'];
+  cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
+  cpuRequest: Scalars['String']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  gpuCount: Scalars['Int']['input'];
+  memoryRequest: Scalars['String']['input'];
+  modelRepo: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  revisionSha: Scalars['String']['input'];
+};
+
 export type ProvisionManagedDomainPayload = {
   message: Scalars['String']['output'];
   nameservers: Array<Scalars['String']['output']>;
@@ -9574,6 +9736,12 @@ export type Query = {
   /** Cursor-paginated mutation audit log. Superuser only. */
   auditLogsPage: AuditLogEntryPage;
   brief?: Maybe<AstroliftBrief>;
+  clusterModelDeployment?: Maybe<ClusterModelDeployment>;
+  clusterModelDeploymentsPage: ClusterModelDeploymentPage;
+  clusterModelPlacementClustersPage: ModelPlacementClusterPage;
+  clusterModelRuntimeAdmission: ModelRuntimeAdmission;
+  clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
+  clusterModelSubscriptionsPage: ModelSubscriptionPage;
   dispatchers: Array<AstroliftDispatcherInstance>;
   /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
@@ -11203,6 +11371,53 @@ export type QueryAuditLogsPageArgs = {
 
 export type QueryBriefArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryClusterModelDeploymentArgs = {
+  id: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+
+export type QueryClusterModelDeploymentsPageArgs = {
+  filter?: InputMaybe<ClusterModelsFilterInput>;
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelPlacementClustersPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelRuntimeAdmissionArgs = {
+  input: ProvisionClusterModelInput;
+};
+
+
+export type QueryClusterModelSubscriptionTargetsPageArgs = {
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelSubscriptionsPageArgs = {
+  appEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 

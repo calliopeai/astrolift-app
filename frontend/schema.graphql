@@ -6093,6 +6093,61 @@ type ClusterModelDensity {
   truncated: Boolean!
 }
 
+type ClusterModelDeployment {
+  id: GUID!
+  version: Int!
+  name: String!
+  organizationId: GUID!
+  clusterId: GUID!
+  providerId: GUID!
+  clusterSlug: String!
+  clusterName: String!
+  modelRepo: String!
+  revisionSha: String
+  computeMode: String
+  subscriptionsEnabled: Boolean!
+  runtimeSupported: Boolean
+  runtimeReason: String
+  status: String!
+  reason: String
+  ready: Boolean
+  readinessObservedAt: DateTime
+  readinessGeneration: Int
+  desiredSubscriptionRevision: Int!
+  appliedSubscriptionRevision: Int!
+  operationId: String
+  operationStartedAt: DateTime
+  operationCompletedAt: DateTime
+  desiredResources: ModelResources!
+  appliedResources: ModelResources
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ClusterModelDeploymentPage {
+  items: [ClusterModelDeployment!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+input ClusterModelsFilterInput {
+  clusterId: GUID = null
+  computeMode: String = null
+  status: String = null
+  ready: Boolean = null
+  subscriptionsEnabled: Boolean = null
+  deployedByMe: Boolean = null
+}
+
 type Clusteragentkeyissuedpayload {
   clusterId: GUID!
   agentKey: String!
@@ -7007,6 +7062,31 @@ enum ModelObservationState {
   UNSUPPORTED
 }
 
+type ModelPlacementCluster {
+  id: GUID!
+  providerId: GUID!
+  name: String!
+  slug: String!
+  region: String
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelPlacementClusterPage {
+  items: [ModelPlacementCluster!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type ModelResourceRequests {
   source: String!
   observedAt: DateTime
@@ -7018,6 +7098,89 @@ type ModelResourceRequests {
   totalCpuCores: Float
   totalMemoryBytes: Float
   totalGpuDevices: Int
+}
+
+type ModelResources {
+  cpuRequest: String
+  memoryRequest: String
+  gpuCount: Int
+  replicas: Int
+  cpuKvCacheGiB: Int
+}
+
+type ModelRuntimeAdmission {
+  eligible: Boolean!
+  reason: String
+  runtimeVersion: String
+  architecture: String
+  hardwareAdmission: String!
+}
+
+type ModelSubscription {
+  id: GUID!
+  version: Int!
+  modelDeploymentId: GUID!
+  appId: GUID!
+  appSlug: String!
+  appName: String!
+  environmentId: GUID!
+  environmentName: String!
+  alias: String!
+  bindingPrefix: String!
+  status: String!
+  canRevoke: Boolean!
+  desiredEnabled: Boolean!
+  desiredRevision: Int!
+  appliedRevision: Int!
+  reason: String
+  reconcileStartedAt: DateTime
+  reconciledAt: DateTime
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelSubscriptionPage {
+  items: [ModelSubscription!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type ModelSubscriptionTarget {
+  environmentId: GUID!
+  environmentVersion: Int!
+  appId: GUID!
+  appSlug: String!
+  appName: String!
+  environmentName: String!
+  clusterId: GUID!
+  eligible: Boolean!
+  reason: String
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelSubscriptionTargetPage {
+  items: [ModelSubscriptionTarget!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 input MoveAppToTeamInput {
@@ -7797,6 +7960,21 @@ type ProviderpluginconfigpayloadMutationResult {
   data: Providerpluginconfigpayload
 }
 
+input ProvisionClusterModelInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  name: String!
+  modelRepo: String!
+  revisionSha: String!
+  computeMode: String!
+  cpuRequest: String!
+  memoryRequest: String!
+  gpuCount: Int!
+  allowSubscriptions: Boolean!
+  cpuKvCacheGiB: Int = null
+}
+
 type ProvisionManagedDomainPayload {
   zone: String!
   workflowId: String!
@@ -8069,6 +8247,12 @@ type Query {
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
+  clusterModelPlacementClustersPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelPlacementClusterPage!
+  clusterModelDeploymentsPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25, filter: ClusterModelsFilterInput = null): ClusterModelDeploymentPage!
+  clusterModelDeployment(organizationId: GUID!, id: GUID!): ClusterModelDeployment
+  clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
+  clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
+  clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
   astroliftProjectResourceClusters(projectId: GUID!): [AstroliftTenantCluster!]!
   astroliftProjectManagedServiceCatalog(projectId: GUID!, clusterId: GUID!): [AstroliftManagedServiceCatalogEntry!]!
   astroliftModelEndpoints: [AstroliftManagedService!]!

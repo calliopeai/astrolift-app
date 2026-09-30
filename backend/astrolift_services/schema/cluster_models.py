@@ -1,0 +1,371 @@
+"""Organization-owned model catalogue and destination-authorized subscriptions."""
+
+from uuid import UUID
+
+import strawberry
+from django.db.models import Exists, F, OuterRef, Q
+from strawberry.types import Info
+
+from astrolift_clusters.models import TenantCluster
+from astrolift_graphql import GUID, PageType, numbered_page
+from astrolift_identity.operation_visibility import visible_operation_rows
+from astrolift_lifecycle.models import AppEnvironment
+from astrolift_registry.models import RegisteredApp
+from astrolift_registry.scopes import live_app_owners
+from astrolift_services.cluster_models import (
+    available_model_clusters,
+    cluster_model_org_scope,
+    live_cluster_model_by_guid,
+    live_cluster_models,
+)
+from astrolift_services.model_admission import (
+    current_org_id,
+    in_current_org,
+    shared_cluster_operation,
+    validate_cluster_request,
+)
+from astrolift_services.models import ManagedService, ManagedServiceAttachment
+from astrolift_services.schema.model_types import (
+    ClusterModelDeploymentType,
+    ModelRuntimeAdmissionType,
+    ModelSubscriptionTargetType,
+    ModelSubscriptionType,
+    cluster_model_to_type,
+    model_subscription_to_type,
+)
+from core.decorators import tenant_scoped
+from core.permissions import Permission, check_permission, require_permission
+from core.tenancy import get_current_tenant
+
+
+@strawberry.input
+class ProvisionClusterModelInput:
+    organization_id: GUID
+    cluster_id: GUID
+    expected_provider_id: GUID
+    name: str
+    model_repo: str
+    revision_sha: str
+    compute_mode: str
+    cpu_request: str
+    memory_request: str
+    gpu_count: int
+    allow_subscriptions: bool
+    cpu_kv_cache_gi_b: int | None = None
+
+
+@strawberry.input
+class ClusterModelsFilterInput:
+    cluster_id: GUID | None = None
+    compute_mode: str | None = None
+    status: str | None = None
+    ready: bool | None = None
+    subscriptions_enabled: bool | None = None
+    deployed_by_me: bool | None = None
+
+
+def _guid(value):
+    try:
+        return UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _page(rows, *, page, page_size, projection):
+    result = numbered_page(rows, order_by=["pk"], page=page, page_size=page_size, max_page_size=50)
+    return PageType(
+        items=[projection(row) for row in result.rows],
+        page=result.page,
+        page_size=result.page_size,
+        total_count=result.total_count,
+    )
+
+
+def _search(rows, search, fields):
+    text = (search or "").strip()[:200]
+    predicate = Q()
+    if text:
+        for field in fields:
+            predicate |= Q(**{f"{field}__icontains": text})
+    return rows.filter(predicate)
+
+
+def _environment_rows(permission):
+    owners = live_app_owners(
+        RegisteredApp.objects.filter(
+            organization_id=current_org_id(),
+            organization__deleted_at__isnull=True,
+        )
+    )
+    rows = AppEnvironment.objects.filter(
+        registered_app__in=owners,
+        tenant_cluster__deleted_at__isnull=True,
+    ).select_related("registered_app__organization", "tenant_cluster")
+    return visible_operation_rows(rows, permission, environment_path="self")
+
+
+@strawberry.type(name="ModelPlacementCluster")
+class ModelPlacementClusterType:
+    id: GUID
+    provider_id: GUID
+    name: str
+    slug: str
+    region: str | None
+
+
+@strawberry.type
+class ClusterModelsQuery:
+    @strawberry.field
+    @require_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ))
+    @tenant_scoped()
+    def cluster_model_placement_clusters_page(
+        self,
+        info: Info,
+        organization_id: GUID,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> PageType[ModelPlacementClusterType]:
+        rows = available_model_clusters(TenantCluster.objects.all(), current_org_id()).select_related(
+            "provider_plugin"
+        )
+        if not in_current_org(organization_id):
+            rows = rows.none()
+        return _page(
+            _search(rows, search, ("name", "slug", "region")),
+            page=page,
+            page_size=page_size,
+            projection=lambda cluster: ModelPlacementClusterType(
+                id=GUID(str(cluster.guid)),
+                provider_id=GUID(str(cluster.provider_plugin.guid)),
+                name=cluster.name,
+                slug=cluster.slug,
+                region=cluster.region or None,
+            ),
+        )
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ))
+    @tenant_scoped()
+    def cluster_model_deployments_page(
+        self,
+        info: Info,
+        organization_id: GUID,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+        filter: ClusterModelsFilterInput | None = None,
+    ) -> PageType[ClusterModelDeploymentType]:
+        rows = live_cluster_models(ManagedService.objects.all(), current_org_id()).select_related(
+            "organization",
+            "tenant_cluster__provider_plugin",
+        )
+        if not in_current_org(organization_id):
+            rows = rows.none()
+        if filter is not None:
+            if filter.cluster_id is not None:
+                rows = rows.filter(tenant_cluster__guid=_guid(filter.cluster_id))
+            if filter.compute_mode is not None:
+                rows = rows.filter(config__compute_mode=filter.compute_mode)
+            if filter.status is not None:
+                rows = rows.filter(status=filter.status)
+            if filter.subscriptions_enabled is not None:
+                rows = rows.filter(config__allow_subscriptions=filter.subscriptions_enabled)
+            if filter.deployed_by_me is not None:
+                tenant = get_current_tenant()
+                mine = (
+                    Q(created_by_id=tenant.actor_user_id) if tenant and tenant.actor_user_id else Q(pk__in=[])
+                )
+                rows = rows.filter(mine if filter.deployed_by_me else ~mine)
+            if filter.ready is not None:
+                ready = Q(
+                    status="active",
+                    applied_config__isnull=False,
+                    model_ready_observed_at__isnull=False,
+                    model_ready_generation__isnull=False,
+                    model_ready_auth_revision=F("subscription_revision"),
+                    applied_subscription_revision=F("subscription_revision"),
+                    tenant_cluster__is_active=True,
+                    tenant_cluster__lifecycle="managed",
+                    tenant_cluster__provider_plugin__is_enabled=True,
+                ) & ~Q(backend_ref="")
+                ready &= ~Q(applied_config__has_key="replicas") | Q(applied_config__replicas__gt=0)
+                rows = rows.filter(ready if filter.ready else ~ready)
+        return _page(
+            _search(rows, search, ("name", "config__model")),
+            page=page,
+            page_size=page_size,
+            projection=cluster_model_to_type,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ))
+    @tenant_scoped()
+    def cluster_model_deployment(
+        self, info: Info, organization_id: GUID, id: GUID
+    ) -> ClusterModelDeploymentType | None:
+        if not in_current_org(organization_id):
+            return None
+        row = live_cluster_model_by_guid(id)
+        return cluster_model_to_type(row) if row else None
+
+    @strawberry.field
+    @require_permission(
+        Permission.CLUSTER_UPDATE,
+        scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE),
+        operation=shared_cluster_operation(),
+    )
+    @tenant_scoped()
+    def cluster_model_runtime_admission(
+        self, info: Info, input: ProvisionClusterModelInput
+    ) -> ModelRuntimeAdmissionType:
+        if not in_current_org(input.organization_id):
+            return ModelRuntimeAdmissionType(
+                eligible=False,
+                reason="Model placement is unavailable.",
+                runtime_version=None,
+                architecture=None,
+            )
+        cluster = available_model_clusters(
+            TenantCluster.objects.filter(
+                guid=_guid(input.cluster_id), provider_plugin__guid=_guid(input.expected_provider_id)
+            ),
+            current_org_id(),
+        ).first()
+        if cluster is None:
+            return ModelRuntimeAdmissionType(
+                eligible=False,
+                reason="Model placement is unavailable.",
+                runtime_version=None,
+                architecture=None,
+            )
+        try:
+            _, runtime = validate_cluster_request(input, cluster)
+        except (TypeError, ValueError) as exc:
+            return ModelRuntimeAdmissionType(
+                eligible=False, reason=str(exc), runtime_version=None, architecture=None
+            )
+        return ModelRuntimeAdmissionType(
+            eligible=True,
+            reason=None,
+            runtime_version="0.15.1",
+            architecture=runtime.architecture,
+            hardware_admission="operator_declared",
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_UPDATE, any_scope=True)
+    @tenant_scoped()
+    def cluster_model_subscription_targets_page(
+        self,
+        info: Info,
+        organization_id: GUID,
+        model_deployment_id: GUID,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> PageType[ModelSubscriptionTargetType]:
+        check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
+        service = live_cluster_model_by_guid(model_deployment_id) if in_current_org(organization_id) else None
+        rows = _environment_rows(Permission.APP_UPDATE)
+        if service is None:
+            rows = rows.none()
+        admitted = bool(
+            service
+            and (service.config or {}).get("allow_subscriptions") is True
+            and service.status in ("active", "updating")
+            and service.backend_ref
+            and service.applied_config is not None
+        )
+        if service is not None:
+            admitted = (
+                admitted
+                and available_model_clusters(
+                    TenantCluster.objects.filter(pk=service.tenant_cluster_id), current_org_id()
+                ).exists()
+            )
+            admitted = admitted and cluster_model_to_type(service).runtime_supported is True
+
+        def project(env):
+            from _sdk.k8s_naming import app_namespace
+
+            from core.app_deploy import namespace_for_environment
+
+            canonical_namespace = app_namespace(
+                organization_slug=env.registered_app.organization.slug, app_slug=env.registered_app.slug
+            )
+            supported_namespace = namespace_for_environment(env) == canonical_namespace
+            eligible = admitted and service.tenant_cluster_id == env.tenant_cluster_id and supported_namespace
+            return ModelSubscriptionTargetType(
+                environment_id=GUID(str(env.guid)),
+                environment_version=env.version,
+                app_id=GUID(str(env.registered_app.guid)),
+                app_slug=env.registered_app.slug,
+                app_name=env.registered_app.name,
+                environment_name=env.name,
+                cluster_id=GUID(str(env.tenant_cluster.guid)),
+                eligible=eligible,
+                reason=None
+                if eligible
+                else (
+                    "Custom or preview namespaces are not supported for shared model subscriptions."
+                    if not supported_namespace
+                    else "Environment and model placement or subscription admission is unavailable."
+                ),
+            )
+
+        return _page(
+            _search(rows, search, ("name", "registered_app__slug", "registered_app__name")),
+            page=page,
+            page_size=page_size,
+            projection=project,
+        )
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def cluster_model_subscriptions_page(
+        self,
+        info: Info,
+        organization_id: GUID,
+        model_deployment_id: GUID,
+        app_environment_id: GUID | None = None,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> PageType[ModelSubscriptionType]:
+        check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
+        service = live_cluster_model_by_guid(model_deployment_id) if in_current_org(organization_id) else None
+        envs = _environment_rows(Permission.APP_READ)
+        if app_environment_id is not None:
+            envs = envs.filter(guid=_guid(app_environment_id))
+        rows = ManagedServiceAttachment.objects.filter(
+            model_subscription=True, managed_service=service, app_environment__in=envs
+        ).select_related(
+            "managed_service",
+            "app_environment__registered_app",
+        )
+        if service is None:
+            rows = rows.none()
+        rows = rows.annotate(
+            _can_revoke=Exists(
+                _environment_rows(Permission.APP_UPDATE).filter(pk=OuterRef("app_environment_id"))
+            )
+        )
+        return _page(
+            _search(
+                rows,
+                search,
+                (
+                    "binding_alias",
+                    "app_environment__name",
+                    "app_environment__registered_app__slug",
+                    "app_environment__registered_app__name",
+                ),
+            ),
+            page=page,
+            page_size=page_size,
+            projection=lambda row: model_subscription_to_type(
+                row, can_revoke=row._can_revoke and row.desired_enabled
+            ),
+        )

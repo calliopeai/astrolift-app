@@ -45,6 +45,7 @@ from astrolift_services.models import (
     SecretChangeProposal,
     WorkloadIdentityGrant,
 )
+from astrolift_services.schema.cluster_models import ClusterModelsQuery
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
     AppSecretType,
@@ -669,7 +670,7 @@ def _managed_services_qs(
 
 
 @strawberry.type
-class ServicesQuery:
+class ServicesQuery(ClusterModelsQuery):
     @strawberry.field
     @require_permission(
         Permission.PROJECT_READ,

@@ -6,6 +6,12 @@
   cluster, provider and version identities under owner permissions and current
   region policy. The bounded in-cluster relay derives its private target from
   persisted UUIDs, preserving actual failure and timeout outcomes (#2213).
+- Shared model catalogue, placement review and subscription-target pages use
+  current organization/provider identities and filter before paging. Runtime
+  admission requires cluster management authority; readable subscriptions have
+  independent destination revoke decisions. Readiness stays unconfirmed until
+  a real generation/auth-revision observation is persisted (#2213).
+
 - The v.next shared vLLM driver foundation renders GUID-owned namespaces,
   explicit certified CPU/GPU runtimes, immutable model revisions, independent
   startup credential snapshots and operator-authenticated metrics. Readiness
