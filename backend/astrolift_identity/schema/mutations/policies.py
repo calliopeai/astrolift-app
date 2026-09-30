@@ -32,6 +32,7 @@ from astrolift_identity.schema.types import (
     PolicyType,
     policy_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -45,7 +46,7 @@ class PolicyMutations:
 
     @strawberry.field
     @mutation_audit(action="policy.create")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def create_policy(self, info: Info, input: CreatePolicyInput) -> MutationResultType[PolicyType]:
         tenant = get_current_tenant()
@@ -110,7 +111,7 @@ class PolicyMutations:
 
     @strawberry.field
     @mutation_audit(action="policy.update")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def update_policy(self, info: Info, input: UpdatePolicyInput) -> MutationResultType[PolicyType]:
         tenant = get_current_tenant()
@@ -156,7 +157,7 @@ class PolicyMutations:
 
     @strawberry.field
     @mutation_audit(action="policy.delete")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def soft_delete_policy(
         self, info: Info, input: SoftDeleteByGuidInput

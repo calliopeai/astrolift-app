@@ -15,6 +15,7 @@ from astrolift_identity.schema.mutations.types import (
     SetOrganizationModuleInput,
     _OrganizationModulePayload,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -43,7 +44,7 @@ class OrganizationModuleMutations:
         )
     )
     @mutation_audit(action="org.module.set", target=_module_target)
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def set_organization_module(
         self, info: Info, input: SetOrganizationModuleInput

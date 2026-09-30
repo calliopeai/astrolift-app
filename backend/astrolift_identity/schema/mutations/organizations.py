@@ -33,6 +33,7 @@ from astrolift_identity.schema.types import (
     OrganizationType,
     organization_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from astrolift_operations.observability_profile import (
     RETENTION_LOGS,
     RETENTION_METRICS,
@@ -40,6 +41,7 @@ from astrolift_operations.observability_profile import (
     RETENTION_TRACES,
 )
 from core.appearance import AppearanceError, validate_appearance
+from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.resource_tags import ResourceTagError, validate_resource_tags
@@ -85,7 +87,8 @@ class OrganizationMutations:
 
     @strawberry.field
     @mutation_audit(action="org.update")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
+    @tenant_scoped()
     def update_organization(
         self, info: Info, input: UpdateOrganizationInput
     ) -> MutationResultType[OrganizationType]:
@@ -241,7 +244,8 @@ class OrganizationMutations:
 
     @strawberry.field
     @mutation_audit(action="org.delete")
-    @require_permission(Permission.ORG_DELETE)
+    @require_permission(Permission.ORG_DELETE, scope=identity_organization_scope(Permission.ORG_DELETE))
+    @tenant_scoped()
     def soft_delete_organization(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:

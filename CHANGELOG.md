@@ -24,6 +24,14 @@
   rows without revealing descendant teams, projects or apps (#2164). Deleted
   roles stop granting authority through user, group and group-mapping bindings.
 
+- Identity administration gates resolve explicit organization or live target
+  owners (#2103). Team/project and binding collections filter grants and bearer
+  ceilings before counts; scoped binding managers retain their real target
+  authority and grant ceilings. Selected headers cannot authorize owner misses,
+  and project writes verify coherent live team ancestry. Organization bootstrap
+  and personal operations retain their existing contracts. See
+  [identity access scopes](docs/operators/identity-access-scopes.md).
+
 - Pipeline creation requires `app.update` at the active organization (#2115).
   The existing creation input has no app association, so team/project/app
   grants and team-bound bearer credentials cannot authorize this organization
