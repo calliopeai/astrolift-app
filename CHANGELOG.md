@@ -43,6 +43,12 @@
   logs keep their separate permission. Internal metric catalogs no longer become
   accidental GraphQL root fields; existing data-query contracts are unchanged.
   See [observability access scopes](docs/operators/observability-access-scopes.md).
+- Registry app and workload gates resolve live tenant-owned targets and take
+  explicit organization scope on missing, ambiguous or stale ownership (#2105).
+  Collections filter rows before pagination; team-scoped bearer credentials
+  retain their owner/share ceiling despite an organization-wide user role.
+  Registration and transfer destinations are checked separately, and source
+  manifest scans require organization authority.
 
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep

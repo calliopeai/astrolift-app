@@ -14,7 +14,6 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
-from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_manifest.persist import actor_may_attach_project_services, allow_project_attach
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import RegisteredApp
@@ -43,6 +42,7 @@ from astrolift_registry.schema.types import (
     RegisteredAppType,
     app_to_type,
 )
+from astrolift_registry.scopes import registration_project_scope
 from astrolift_scm.org_repo_policy import rejection_reason
 from core.decorators import tenant_scoped
 from core.friendly_name import friendly_name_from_slug
@@ -55,7 +55,10 @@ from core.tenancy import get_current_tenant
 class RegistrationMutations:
     @strawberry.field
     @mutation_audit(action="app.create")
-    @require_permission(Permission.APP_CREATE, scope=project_scope_by_guid("input.project_id"))
+    @require_permission(
+        Permission.APP_CREATE,
+        scope=registration_project_scope("input.project_id", permission=Permission.APP_CREATE),
+    )
     @tenant_scoped()
     def register_app(self, info: Info, input: RegisterAppInput) -> MutationResultType[RegisteredAppType]:
         # Org-scope the project lookup to the caller's tenant. Everything
@@ -423,7 +426,10 @@ class RegistrationMutations:
         action="app.register_agent_repo",
         target=lambda self, info, input: ("repo", input.source_repo),
     )
-    @require_permission(Permission.AGENT_CREATE, scope=project_scope_by_guid("input.project_id"))
+    @require_permission(
+        Permission.AGENT_CREATE,
+        scope=registration_project_scope("input.project_id", permission=Permission.AGENT_CREATE),
+    )
     @tenant_scoped()
     def register_agent_repo(
         self, info: Info, input: RegisterAgentRepoInput
@@ -549,7 +555,10 @@ class RegistrationMutations:
         action="app.register_app_repo",
         target=lambda self, info, input: ("repo", input.source_repo),
     )
-    @require_permission(Permission.APP_CREATE, scope=project_scope_by_guid("input.project_id"))
+    @require_permission(
+        Permission.APP_CREATE,
+        scope=registration_project_scope("input.project_id", permission=Permission.APP_CREATE),
+    )
     @tenant_scoped()
     def register_app_repo(
         self, info: Info, input: RegisterAppRepoInput

@@ -27,7 +27,7 @@ from astrolift_registry.schema.types import (
     app_team_access_to_type,
     app_to_type,
 )
-from astrolift_registry.scopes import app_scope_by_guid
+from astrolift_registry.scopes import app_scope_by_guid, transfer_destination_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -38,7 +38,9 @@ from core.tenancy import get_current_tenant
 class TeamAccessMutations:
     @strawberry.field
     @mutation_audit(action="app.move_to_team")
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def move_app_to_team(
         self, info: Info, input: MoveAppToTeamInput
@@ -89,11 +91,13 @@ class TeamAccessMutations:
                 field="targetTeamId",
             )
 
+        transfer_destination_scope(permission=Permission.APP_UPDATE)({"input": input})
+
         # The existing project must belong to the new team or the tree
         # breaks. ``transferApp`` allows callers to specify a new
         # project alongside; ``moveAppToTeam`` keeps the API narrow
         # (team-only) and refuses orphaning the project.
-        if app.project.team_id != target.id:
+        if app.project is not None and app.project.team_id != target.id:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
                 "the app's project belongs to a different team — use transferApp to move both",
@@ -117,7 +121,9 @@ class TeamAccessMutations:
 
     @strawberry.field
     @mutation_audit(action="app.grant_team_access")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def grant_team_access_to_app(
         self, info: Info, input: GrantTeamAccessInput
@@ -190,7 +196,9 @@ class TeamAccessMutations:
 
     @strawberry.field
     @mutation_audit(action="app.revoke_team_access")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def revoke_team_access_from_app(
         self, info: Info, input: RevokeTeamAccessInput

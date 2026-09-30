@@ -28,7 +28,6 @@ from astrolift_graphql import (
     search_q,
 )
 from astrolift_identity.schema.types import ProjectType, project_to_type
-from astrolift_identity.scope_visibility import visible_apps
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
@@ -68,8 +67,12 @@ from astrolift_registry.schema.workload_list import (
     WorkloadsListFilterInput,
     cron_last_runs,
 )
-from astrolift_registry.scopes import app_scope_by_slug, app_scope_by_workload_slug
+from astrolift_registry.scopes import (
+    app_scope_by_slug,
+    registry_organization_scope,
+)
 from astrolift_registry.topology import classify_topology
+from astrolift_registry.visibility import visible_registry_apps
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -1131,7 +1134,8 @@ def _workloads_qs(
     org_id = _caller_org_id()
     if org_id is None:
         return Workload.objects.none()
-    qs = Workload.objects.select_related("registered_app").filter(registered_app__organization_id=org_id)
+    apps = visible_registry_apps(RegisteredApp.objects.all(), Permission.APP_READ)
+    qs = Workload.objects.select_related("registered_app").filter(registered_app__in=apps)
     if app_slug:
         qs = qs.filter(registered_app__slug=app_slug)
     if search:
@@ -1209,7 +1213,7 @@ class RegistryQuery:
         org_id = _caller_org_id()
         if org_id is None:
             return []
-        qs = visible_apps(
+        qs = visible_registry_apps(
             RegisteredApp.objects.select_related("organization", "team", "project").filter(
                 organization_id=org_id,
                 deleted_at__isnull=True,
@@ -1333,7 +1337,7 @@ class RegistryQuery:
         )
         # Deny-by-default: no tenant context → no rows (#1042).
         qs = (
-            visible_apps(qs.filter(organization_id=org_id), Permission.APP_READ)
+            visible_registry_apps(qs.filter(organization_id=org_id), Permission.APP_READ)
             if org_id is not None
             else qs.none()
         )
@@ -1522,7 +1526,7 @@ class RegistryQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("slug"))
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("slug", permission=Permission.APP_READ))
     @tenant_scoped()
     def astrolift_app(
         self,
@@ -1579,7 +1583,9 @@ class RegistryQuery:
             "Returns every grant in one unbounded response. Use astroliftAppTeamAccessesPage."
         )
     )
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_team_accesses(self, info: Info, app_slug: str) -> list[AppTeamAccessType]:
         """List every team that holds active access to ``app_slug``.
@@ -1596,7 +1602,9 @@ class RegistryQuery:
         return [app_team_access_to_type(r, home_team_id=r.registered_app.team_id) for r in rows]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_team_accesses_page(
         self,
@@ -1636,7 +1644,7 @@ class RegistryQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage.")
     )
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_workloads(self, info: Info, app_slug: str | None = None) -> list[WorkloadType]:
         # No ``order_by``: this field never had one, and the workload
@@ -1648,7 +1656,7 @@ class RegistryQuery:
         return [workload_to_type(w) for w in _workloads_qs(app_slug=app_slug)[:200]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_workloads_page(
         self,
@@ -1711,7 +1719,9 @@ class RegistryQuery:
         return result.map(lambda w: workload_to_type(w, last_run=last_runs.get(w.pk)))
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_workload(self, info: Info, app_slug: str, slug: str) -> WorkloadType | None:
         """Single workload by (app_slug, slug).
@@ -1743,7 +1753,9 @@ class RegistryQuery:
     # rendering happens client-side off the same single round-trip.
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_workload_scaling_status(
         self,
@@ -1822,7 +1834,7 @@ class RegistryQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_workload_slug("workload_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_containers(self, info: Info, workload_slug: str | None = None) -> list[ContainerType]:
         from astrolift_services.secret_visibility import can_reveal_app_secrets
@@ -1831,7 +1843,10 @@ class RegistryQuery:
         if org_id is None:
             return []
         qs = Container.objects.select_related("workload__registered_app").filter(
-            workload__registered_app__organization_id=org_id
+            workload__registered_app__in=visible_registry_apps(
+                RegisteredApp.objects.all(), Permission.APP_READ
+            ),
+            workload__deleted_at__isnull=True,
         )
         if workload_slug:
             qs = qs.filter(workload__slug=workload_slug)
@@ -1846,7 +1861,9 @@ class RegistryQuery:
         return [container_to_type(c, env_revealed=revealed[c.workload.registered_app_id]) for c in containers]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_rendered_manifest(
         self,
@@ -1998,7 +2015,9 @@ class RegistryQuery:
     # is a follow-up backend ticket.
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_workload_manifest(
         self,
@@ -2242,7 +2261,9 @@ class RegistryQuery:
         return [project_to_type(p) for p in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_doctor(self, info: Info, app_slug: str) -> AppDoctorReportType:
         """Verify every dependency this app needs is actually usable (#1550).
@@ -2279,7 +2300,7 @@ class RegistryQuery:
         return build_app_doctor_report(app)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ)
+    @require_permission(Permission.APP_READ, scope=registry_organization_scope(Permission.APP_READ))
     @tenant_scoped()
     def scan_app_manifests(
         self,

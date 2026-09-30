@@ -33,7 +33,7 @@ from astrolift_registry.schema.types import (
     app_to_type,
     retention_policy_to_type,
 )
-from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_registry.scopes import app_scope_by_slug, registration_project_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -44,7 +44,9 @@ from core.tenancy import get_current_tenant
 class AppSettingMutations:
     @strawberry.field
     @mutation_audit(action="app.manifest.resync_from_repo")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def resync_astrolift_manifest_from_repo(
         self,
@@ -175,7 +177,9 @@ class AppSettingMutations:
 
     @strawberry.field
     @mutation_audit(action="app.assign_project")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def assign_astrolift_app_to_project(
         self,
@@ -247,6 +251,8 @@ class AppSettingMutations:
                 field="projectGuid",
             )
 
+        registration_project_scope("input.project_guid", permission=Permission.APP_UPDATE)({"input": input})
+
         if not _viewer_can_access_project(project=project, viewer=viewer):
             return gql_failure(
                 ErrorCode.PERMISSION_DENIED.value,
@@ -269,7 +275,9 @@ class AppSettingMutations:
 
     @strawberry.field
     @mutation_audit(action="app.security_policy.update")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def update_astrolift_security_policy(
         self,
@@ -326,7 +334,9 @@ class AppSettingMutations:
     @strawberry.field
     @mutation_audit(action="app.webhook_deploys.pause")
     @requires_elevation(action_label="app.webhook_deploys.pause")
-    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY)
+    )
     @tenant_scoped()
     def pause_astrolift_app_webhook_deploys(
         self,
@@ -388,7 +398,9 @@ class AppSettingMutations:
 
     @strawberry.field
     @mutation_audit(action="app.webhook_deploys.resume")
-    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY)
+    )
     @tenant_scoped()
     def resume_astrolift_app_webhook_deploys(
         self,
@@ -437,7 +449,9 @@ class AppSettingMutations:
 
     @strawberry.mutation
     @mutation_audit(action="app.retention_policy.set")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def set_retention_policy(
         self, info: Info, input: SetRetentionPolicyInput

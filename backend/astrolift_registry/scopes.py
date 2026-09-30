@@ -18,9 +18,7 @@ def registry_org_scope(_args=None) -> PermissionScope:
     return PermissionScope(kind=ScopeKind.ORG, id=_org_id() or 0)
 
 
-def _credential_scope(
-    scope: PermissionScope, permission: Permission | None
-) -> PermissionScope:
+def _credential_scope(scope: PermissionScope, permission: Permission | None) -> PermissionScope:
     if permission is None:
         return scope
     from astrolift_identity.api_tokens import get_current_api_token
@@ -32,22 +30,15 @@ def _credential_scope(
         return scope
     org_id = _org_id()
     if token.organization_id != org_id:
-        raise PermissionDenied(
-            permission, scope, "credential belongs to another organization"
-        )
+        raise PermissionDenied(permission, scope, "credential belongs to another organization")
     if token.team_id is None:
         return scope
     if scope.kind == ScopeKind.APP:
         from django.db.models import Q
 
         owned = (
-            live_app_owners(
-                RegisteredApp.objects.filter(pk=scope.id, organization_id=org_id)
-            )
-            .filter(
-                Q(team_id=token.team_id)
-                | Q(team_id__isnull=True, project__team_id=token.team_id)
-            )
+            live_app_owners(RegisteredApp.objects.filter(pk=scope.id, organization_id=org_id))
+            .filter(Q(team_id=token.team_id) | Q(team_id__isnull=True, project__team_id=token.team_id))
             .exists()
         )
         shared = AppTeamAccess.objects.filter(
@@ -69,8 +60,7 @@ def live_app_owners(qs):
 
     org_id = _org_id()
     return qs.filter(
-        Q(team_id__isnull=True)
-        | Q(team__organization_id=org_id, team__deleted_at__isnull=True),
+        Q(team_id__isnull=True) | Q(team__organization_id=org_id, team__deleted_at__isnull=True),
         Q(project_id__isnull=True)
         | Q(
             project__organization_id=org_id,
@@ -78,33 +68,23 @@ def live_app_owners(qs):
             project__team__organization_id=org_id,
             project__team__deleted_at__isnull=True,
         ),
-        Q(team_id__isnull=True)
-        | Q(project_id__isnull=True)
-        | Q(team_id=F("project__team_id")),
+        Q(team_id__isnull=True) | Q(project_id__isnull=True) | Q(team_id=F("project__team_id")),
     )
 
 
-def _app_scope(
-    *, permission: Permission | None = None, **lookup: Any
-) -> PermissionScope:
+def _app_scope(*, permission: Permission | None = None, **lookup: Any) -> PermissionScope:
     from astrolift_registry.models import RegisteredApp
 
     app_id = (
         live_app_owners(
             RegisteredApp.objects.filter(
-                organization_id=_org_id(),
-                organization__deleted_at__isnull=True,
-                **lookup,
+                organization_id=_org_id(), organization__deleted_at__isnull=True, **lookup
             )
         )
         .values_list("pk", flat=True)
         .first()
     )
-    scope = (
-        PermissionScope(kind=ScopeKind.APP, id=app_id)
-        if app_id
-        else registry_org_scope()
-    )
+    scope = PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else registry_org_scope()
     return _credential_scope(scope, permission)
 
 
@@ -134,9 +114,7 @@ def app_scope_by_guid(field: str = "app_id", *, permission: Permission | None = 
 
 
 def _workload_apps(**lookup):
-    from astrolift_registry.models import Workload
-
-    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.models import RegisteredApp, Workload
 
     return Workload.objects.filter(
         registered_app__in=live_app_owners(RegisteredApp.objects.all()),
@@ -147,37 +125,94 @@ def _workload_apps(**lookup):
     ).values_list("registered_app_id", flat=True)
 
 
-def app_scope_by_workload_guid(
-    field: str = "workload_id", *, permission: Permission | None = None
-):
+def app_scope_by_workload_guid(field: str = "workload_id", *, permission: Permission | None = None):
     """Workloads have no separate RBAC scope; their live app owns the gate."""
 
     def _scope(args: dict[str, Any]) -> PermissionScope:
         guid = read_guid(args, field)
         app_id = _workload_apps(guid=guid).first() if guid else None
-        scope = (
-            PermissionScope(kind=ScopeKind.APP, id=app_id)
-            if app_id
-            else registry_org_scope()
-        )
+        scope = PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else registry_org_scope()
         return _credential_scope(scope, permission)
 
     return _scope
 
 
-def app_scope_by_workload_slug(
-    field: str = "workload_slug", *, permission: Permission | None = None
-):
+def app_scope_by_workload_slug(field: str = "workload_slug", *, permission: Permission | None = None):
     """An ambiguous workload slug requires org authority rather than picking an app."""
 
     def _scope(args: dict[str, Any]) -> PermissionScope:
         slug = read_arg(args, field)
         app_ids = list(_workload_apps(slug=slug).distinct()[:2]) if slug else []
         scope = (
-            PermissionScope(kind=ScopeKind.APP, id=app_ids[0])
-            if len(app_ids) == 1
-            else registry_org_scope()
+            PermissionScope(kind=ScopeKind.APP, id=app_ids[0]) if len(app_ids) == 1 else registry_org_scope()
         )
         return _credential_scope(scope, permission)
+
+    return _scope
+
+
+def registry_organization_scope(permission: Permission):
+    def _scope(_args):
+        return _credential_scope(registry_org_scope(), permission)
+
+    return _scope
+
+
+def registration_project_scope(field: str = "project_id", *, permission: Permission):
+    """Creating into a project requires a live destination inside the token's team."""
+
+    def _scope(args):
+        from astrolift_identity.api_tokens import get_current_api_token
+        from astrolift_identity.models import Project
+
+        guid = read_guid(args, field)
+        project = (
+            Project.objects.filter(
+                guid=guid,
+                organization_id=_org_id(),
+                organization__deleted_at__isnull=True,
+                team__organization_id=_org_id(),
+                team__deleted_at__isnull=True,
+            ).first()
+            if guid
+            else None
+        )
+        scope = PermissionScope(ScopeKind.PROJECT, project.pk) if project else registry_org_scope()
+        if guid and project is None and Project.objects.filter(guid=guid, organization_id=_org_id()).exists():
+            raise PermissionDenied(permission, scope, "destination ownership is not live")
+        token = get_current_api_token()
+        if token is not None:
+            if token.organization_id != _org_id() or (
+                token.team_id is not None and (project is None or token.team_id != project.team_id)
+            ):
+                raise PermissionDenied(permission, scope, "destination is outside the credential's team")
+        return scope
+
+    return _scope
+
+
+def transfer_destination_scope(*, permission: Permission = Permission.APP_CREATE):
+    def _scope(args):
+        from astrolift_identity.api_tokens import get_current_api_token
+        from astrolift_identity.models import Team
+
+        if read_arg(args, "input.target_project_id") is not None:
+            return registration_project_scope("input.target_project_id", permission=permission)(args)
+        guid = read_guid(args, "input.target_team_id")
+        team = (
+            Team.objects.filter(
+                guid=guid, organization_id=_org_id(), organization__deleted_at__isnull=True
+            ).first()
+            if guid
+            else None
+        )
+        scope = PermissionScope(ScopeKind.TEAM, team.pk) if team else registry_org_scope()
+        token = get_current_api_token()
+        if token is not None and (
+            token.organization_id != _org_id()
+            or (token.team_id is not None and (team is None or token.team_id != team.pk))
+        ):
+            raise PermissionDenied(permission, scope, "destination is outside the credential's team")
+        return scope
 
     return _scope

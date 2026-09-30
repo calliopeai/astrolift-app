@@ -29,7 +29,9 @@ from core.tenancy import get_current_tenant
 class ArchiveMutations:
     @strawberry.mutation
     @mutation_audit(action="app.archive")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def archive_app(self, info: Info, input: ArchiveAppInput) -> MutationResultType[RegisteredAppType]:
         """Scale all workloads to zero and suppress deploys. Idempotent."""
@@ -62,7 +64,9 @@ class ArchiveMutations:
 
     @strawberry.mutation
     @mutation_audit(action="app.restore")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def restore_app(self, info: Info, input: RestoreAppInput) -> MutationResultType[RegisteredAppType]:
         """Restore archived app: un-archive and return workloads to pre-archive replicas."""

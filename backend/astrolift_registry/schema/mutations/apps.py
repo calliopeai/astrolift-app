@@ -32,7 +32,7 @@ from astrolift_registry.schema.types import (
     RegisteredAppType,
     app_to_type,
 )
-from astrolift_registry.scopes import app_scope_by_guid
+from astrolift_registry.scopes import app_scope_by_guid, transfer_destination_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -44,7 +44,9 @@ from core.tenancy import get_current_tenant
 class AppMutations:
     @strawberry.field
     @mutation_audit(action="app.update")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def update_app(self, info: Info, input: UpdateAppInput) -> MutationResultType[RegisteredAppType]:
         # Org-scope the by-guid lookup to the caller's tenant. Fails closed
@@ -206,7 +208,9 @@ class AppMutations:
 
     @strawberry.field
     @mutation_audit(action="app.set_subdomain")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def set_app_subdomain(
         self, info: Info, input: SetAppSubdomainInput
@@ -311,7 +315,9 @@ class AppMutations:
 
     @strawberry.field
     @mutation_audit(action="app.delete")
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_guid("input.id", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def soft_delete_app(
         self, info: Info, input: SoftDeleteAppInput
@@ -331,7 +337,9 @@ class AppMutations:
 
     @strawberry.field
     @mutation_audit(action="app.tear_down")
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_guid("input.id", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def tear_down_app(self, info: Info, input: TearDownAppInput) -> MutationResultType[_SoftDeletePayload]:
         """Fires ``TearDownAppWorkflow`` (#358) — symmetric inverse
@@ -391,7 +399,10 @@ class AppMutations:
 
     @strawberry.field
     @mutation_audit(action="app.transfer")
-    @require_permission(Permission.APP_TRANSFER, Permission.APP_CREATE)
+    @require_permission(
+        Permission.APP_TRANSFER, scope=app_scope_by_guid("input.app_id", permission=Permission.APP_TRANSFER)
+    )
+    @require_permission(Permission.APP_CREATE, scope=transfer_destination_scope())
     @tenant_scoped()
     def transfer_app(self, info: Info, input: TransferAppInput) -> MutationResultType[RegisteredAppType]:
         """Re-parent an app to a different team / project within the
@@ -402,9 +413,7 @@ class AppMutations:
         - ``app.create`` on the destination team/project (caller is
           claiming a new home)
 
-        Both checks are enforced by the ``@require_permission`` stack
-        at the top — the scope-aware variant would tighten this further
-        but isn't yet wired through the resolver decorator surface.
+        Both scoped checks are enforced by the decorator stack.
         Cross-org transfers are refused; use the federation flow for
         those instead.
         """
@@ -481,7 +490,7 @@ class AppMutations:
         # When only target_team_id was set, the existing project must
         # belong to the new team or the tree breaks. Refuse rather
         # than silently re-anchoring the project to the new team.
-        if next_project.team_id != next_team.id:
+        if next_project is not None and next_project.team_id != next_team.id:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
                 "project does not belong to the target team — specify targetProjectId",
