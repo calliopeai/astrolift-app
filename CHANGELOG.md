@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Cluster unregister and decommission refuse while any live shared model remains,
+  including app-free pending or failed deployments. Worker retirement rechecks
+  under the placement lock before removing cluster transport (#2213).
+
 - Shared-model prompt denials return the complete public mutation error
   envelope, including nullable version details, while preserving status auditing
   and bounded real relay outcomes (#2213).

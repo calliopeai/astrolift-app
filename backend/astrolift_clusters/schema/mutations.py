@@ -1125,31 +1125,37 @@ class ClustersMutation:
         """
 
         tenant = get_current_tenant()
-        cluster = TenantCluster.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            guid=str(input.cluster_id),
-            deleted_at__isnull=True,
-        ).first()
-        _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
-        if cluster is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
-        if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONED.value:
-            # Already terminal — surface the row without re-firing.
-            return gql_success(cluster_to_type(cluster))
-        if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value:
-            # Already in flight — join the existing run.
-            return gql_success(cluster_to_type(cluster))
-        if cluster.lifecycle not in (
-            TenantCluster.Lifecycle.MANAGED.value,
-            TenantCluster.Lifecycle.ERROR.value,
-        ):
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"cluster lifecycle is {cluster.lifecycle!r}; only managed or error clusters can be decommissioned",
-            )
-
-        actor = _actor_from_request(info)
         with transaction.atomic():
+            cluster = (
+                TenantCluster.objects.select_for_update()
+                .filter(
+                    Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                    guid=str(input.cluster_id),
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
+            if cluster is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+            if cluster.lifecycle in (
+                TenantCluster.Lifecycle.DECOMMISSIONED.value,
+                TenantCluster.Lifecycle.DECOMMISSIONING.value,
+            ):
+                return gql_success(cluster_to_type(cluster))
+            if cluster.lifecycle not in (
+                TenantCluster.Lifecycle.MANAGED.value,
+                TenantCluster.Lifecycle.ERROR.value,
+            ):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"cluster lifecycle is {cluster.lifecycle!r}; only managed or error clusters can be decommissioned",
+                )
+            from astrolift_services.cluster_retirement import MODEL_CLEANUP_REQUIRED, has_cluster_owned_models
+
+            if has_cluster_owned_models(cluster.pk):
+                return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)
+            actor = _actor_from_request(info)
             _kick_decommission_cluster(
                 cluster=cluster,
                 actor=actor,
@@ -1374,24 +1380,31 @@ class ClustersMutation:
         self, info: Info, input: UnregisterTenantClusterInput
     ) -> MutationResultType[_SoftDeletePayload]:
         tenant = get_current_tenant()
-        cluster = TenantCluster.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            guid=str(input.id),
-        ).first()
-        _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
-        if cluster is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
-
-        # Refuse if active apps still target this cluster.
-        from astrolift_registry.models import RegisteredApp
-
-        in_use = RegisteredApp.objects.filter(default_tenant_cluster=cluster, is_active=True).count()
-        if in_use:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"{in_use} active app(s) still target this cluster; reassign first",
+        with transaction.atomic():
+            cluster = (
+                TenantCluster.objects.select_for_update()
+                .filter(
+                    Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                    guid=str(input.id),
+                )
+                .first()
             )
-        cluster.soft_delete()
+            _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
+            if cluster is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
+            from astrolift_services.cluster_retirement import MODEL_CLEANUP_REQUIRED, has_cluster_owned_models
+
+            if has_cluster_owned_models(cluster.pk):
+                return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)
+            from astrolift_registry.models import RegisteredApp
+
+            in_use = RegisteredApp.objects.filter(default_tenant_cluster=cluster, is_active=True).count()
+            if in_use:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"{in_use} active app(s) still target this cluster; reassign first",
+                )
+            cluster.soft_delete()
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
 
     # ---- ManagedDomain ----------------------------------------------

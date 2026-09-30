@@ -61,6 +61,12 @@ written; conflicting keys must refuse before side effects. Reads and mutations
 recheck current tenant ownership, destination environment, token ceilings and
 target identities.
 
+Remove shared model deployments before unregistering or decommissioning their
+cluster. App-free pending and failed deployments also block retirement: their
+cluster transport remains necessary for cleanup. Retirement and model admission
+serialize on the cluster row, and the retirement worker rechecks before changing
+the cluster lifecycle. Soft-deleted deployments no longer block retirement.
+
 New subscriptions require a named alias. Existing legacy `MODEL_*` bindings keep
 their behavior. A review captures the exact model, environment and subscription
 versions. A changed target invalidates that review, and late mutation responses

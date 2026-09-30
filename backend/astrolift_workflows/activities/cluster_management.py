@@ -313,9 +313,12 @@ def _ensure_cluster_drained_sync(cluster_id: int) -> int:
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.cluster_retirement import MODEL_CLEANUP_REQUIRED, has_cluster_owned_models
     from core.cluster_management import ClusterManagementError
 
     cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    if has_cluster_owned_models(cluster.pk):
+        raise ClusterManagementError(MODEL_CLEANUP_REQUIRED)
     bound_count = AppEnvironment.objects.filter(
         tenant_cluster=cluster,
         deleted_at__isnull=True,
@@ -338,14 +341,18 @@ async def ensure_cluster_drained(cluster_id: int) -> int:
 
 
 def _mark_decommissioning_sync(cluster_id: int) -> None:
+    from django.db import transaction
+
     from astrolift_clusters.models import TenantCluster
 
-    cluster = TenantCluster.all_objects.get(pk=cluster_id)
-    if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value:
-        return
-    cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONING.value
-    cluster.last_management_error = ""
-    cluster.save(update_fields=["lifecycle", "last_management_error", "updated_at", "version"])
+    with transaction.atomic():
+        cluster = TenantCluster.all_objects.select_for_update().get(pk=cluster_id)
+        _ensure_cluster_drained_sync(cluster_id)
+        if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value:
+            return
+        cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONING.value
+        cluster.last_management_error = ""
+        cluster.save(update_fields=["lifecycle", "last_management_error", "updated_at", "version"])
 
 
 @activity.defn(name="astrolift.cluster.mark_decommissioning")
