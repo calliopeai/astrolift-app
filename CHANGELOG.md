@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Translate the bounded real-model playground's prompts, local-session notices,
+  readiness and failure states in all eight locales; preserve ICU parameters.
+
 - Agent secrets require an explicit visible environment-spec choice, verify its
   current identity before opening editors, and target that recipe instead of
   guessing from the agent slug. Recipe-wide edits are labeled; switching agents
