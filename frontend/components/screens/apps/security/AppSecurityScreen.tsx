@@ -12,6 +12,8 @@ import {
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { useFormatters } from "@/lib/i18n/formatters";
+
 import { Can } from "@/components/Can";
 import type { Column } from "@/components/data-table";
 import { QueryError } from "@/components/QueryError";
@@ -84,9 +86,9 @@ const FINDINGS_SELECT: SelectRowsSpec<ScanFinding> = {
   id: findingKey,
 };
 
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
+function useFormatTime() {
+  const fmt = useFormatters();
+  return (iso: string | null | undefined) => (iso ? fmt.formatDateTime(iso) : "—");
 }
 
 function asObject(payload: unknown): Record<string, unknown> | null {
@@ -131,7 +133,7 @@ export function AppSecurityScreen({
   if (error && !a) {
     return (
       <PageShell title={t("loadingTitle")}>
-        <QueryError title="Could not load app security" error={error} onRetry={onRetry} />
+        <QueryError title={t("loadError")} error={error} onRetry={onRetry} />
       </PageShell>
     );
   }
@@ -162,11 +164,7 @@ export function AppSecurityScreen({
 
       {access}
       {eventsError ? (
-        <QueryError
-          title="Could not load security events"
-          error={eventsError}
-          onRetry={onRetryEvents}
-        />
+        <QueryError title={t("eventsError")} error={eventsError} onRetry={onRetryEvents} />
       ) : (
         <>
           <SigningCard event={latestSigning} loading={eventsLoading} />
@@ -185,6 +183,7 @@ export function AppSecurityScreen({
 
 function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading: boolean }) {
   const t = useTranslations("apps.security.signing");
+  const formatTime = useFormatTime();
   const payload = (event && asObject(event.payload)) as SigningPayload | null;
   const hasEvent = event !== null && payload !== null;
 
@@ -257,6 +256,7 @@ function SigningCard({ event, loading }: { event: AstroliftEvent | null; loading
 
 function SbomCard({ event, loading }: { event: AstroliftEvent | null; loading: boolean }) {
   const t = useTranslations("apps.security.sbom");
+  const formatTime = useFormatTime();
   const tSig = useTranslations("apps.security.signing");
   const payload = (event && asObject(event.payload)) as SbomPayload | null;
   const hasEvent = event !== null && payload !== null;
@@ -319,6 +319,7 @@ function SbomCard({ event, loading }: { event: AstroliftEvent | null; loading: b
 
 function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: boolean }) {
   const t = useTranslations("apps.security.scan");
+  const formatTime = useFormatTime();
   const tSig = useTranslations("apps.security.signing");
   const payload = (event && asObject(event.payload)) as ScanPayload | null;
   const hasEvent = event !== null && payload !== null;
@@ -358,7 +359,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
       id: "severity",
       header: t("columns.severity"),
       sortKey: "severity",
-      cell: (f) => <Badge className={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>,
+      cell: (f) => <Badge className={SEVERITY_TONE[f.severity]}>{t(f.severity)}</Badge>,
     },
     {
       id: "package",
@@ -426,7 +427,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
             <ListPage<ScanFinding>
               embedded
               list={list}
-              label="Findings"
+              label={t("findings")}
               columns={columns}
               rows={page.rows}
               getRowId={findingKey}
@@ -443,7 +444,7 @@ function ScanCard({ event, loading }: { event: AstroliftEvent | null; loading: b
 /** The findings list's declaration; its labels are the scan card's own copy. */
 function useFindingsList(): ListDefinition {
   const t = useTranslations("apps.security.scan");
-  const [def] = React.useState<ListDefinition>(() => ({
+  return {
     id: "apps.security.findings",
     fields: [
       {
@@ -463,15 +464,15 @@ function useFindingsList(): ListDefinition {
         ],
       },
     ],
-    searchPlaceholder: "Search CVEs, packages…",
+    searchPlaceholder: t("searchPlaceholder"),
     defaultSort: [{ key: "severity", dir: "asc" }],
-    views: standardViews({ owner: "me" }, [], {
-      mineNote: "Findings are the image's, not a person's, so Mine is empty.",
-    }),
+    views: standardViews({ owner: "me" }, [], { mineNote: t("mineNote") }).map((view) => ({
+      ...view,
+      label: t(view.key === "mine" ? "mineView" : "allView"),
+    })),
     paging: "numbered",
     pageSizes: [25, 50, 100],
-  }));
-  return def;
+  };
 }
 
 function SeverityCount({
@@ -562,6 +563,7 @@ function PolicyCard({
               <p className="text-muted-foreground text-xs">{t("highThresholdDesc")}</p>
             </div>
             <select
+              aria-label={t("highThreshold")}
               className="border-input bg-background rounded-md border px-2 py-1 text-sm disabled:opacity-50"
               value={policy.blockOnHighCveThreshold ?? ""}
               disabled={saving}
@@ -570,10 +572,10 @@ function PolicyCard({
               }
             >
               <option value="">{t("noThreshold")}</option>
-              <option value="1">≥ 1 high</option>
-              <option value="3">≥ 3 high</option>
-              <option value="5">≥ 5 high</option>
-              <option value="10">≥ 10 high</option>
+              <option value="1">{t("thresholdOption", { count: 1 })}</option>
+              <option value="3">{t("thresholdOption", { count: 3 })}</option>
+              <option value="5">{t("thresholdOption", { count: 5 })}</option>
+              <option value="10">{t("thresholdOption", { count: 10 })}</option>
             </select>
           </div>
         </div>

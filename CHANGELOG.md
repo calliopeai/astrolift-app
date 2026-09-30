@@ -21,6 +21,10 @@
   language in all eight supported locales, including rich environment-variable
   hints. Failed confirmations remain open for retry (#2145; remaining domains
   are still being translated).
+- App supply-chain security copy, vulnerability badges and numeric threshold
+  labels now use all eight locales. Security-event timestamps follow the locale,
+  and findings labels refresh when the language changes (#2145).
+
 - Deploy-token controls, rotation metadata states and exact grace durations now
   use all eight dashboard locales. Expiry and last-use dates follow the selected
   locale; technical token scopes and one-time secret values are unchanged (#2145).

@@ -1291,7 +1291,12 @@
           "fix": "Fix available"
         },
         "upgrade": "upgrade → {version}",
-        "noFix": "no fix yet"
+        "noFix": "no fix yet",
+        "findings": "Findings",
+        "searchPlaceholder": "Search CVEs, packages…",
+        "allView": "All",
+        "mineView": "Mine",
+        "mineNote": "Findings are the image’s, not a person’s, so Mine is empty."
       },
       "policy": {
         "title": "Deploy-gating policy",
@@ -1305,8 +1310,11 @@
         "noThreshold": "No threshold",
         "reset": "Reset",
         "save": "Save policy",
-        "pending": "Backend wiring pending"
-      }
+        "pending": "Backend wiring pending",
+        "thresholdOption": "≥ {count} high"
+      },
+      "loadError": "Could not load app security",
+      "eventsError": "Could not load security events"
     },
     "members": {
       "title": "App members",

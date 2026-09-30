@@ -1,10 +1,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parse, type MessageFormatElement } from "@formatjs/icu-messageformat-parser";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { AppSecurityScreen } from "@/components/screens/apps/security/AppSecurityScreen";
+import {
+  SECURITY,
+  SIGNING_EVENT,
+} from "@/components/screens/apps/security/app-security-previews.fixtures";
 import { DeployTokensScreen } from "@/components/screens/apps/secrets/DeployTokensScreen";
 import {
   TOKENS_SCREEN,
@@ -72,7 +77,6 @@ function argumentsOf(ast: MessageFormatElement[]): unknown[] {
     return [[node.type, node.value]];
   });
 }
-const source = leaves(catalogs.en.apps.tokens);
 
 // Same spelling is meaningful for these cognates and the technical IP label.
 const unchanged = new Set([
@@ -83,6 +87,7 @@ const unchanged = new Set([
 ]);
 describe("deploy-token translations", () => {
   it.each(locales)("%s covers the complete namespace with matching ICU arguments", (locale) => {
+    const source = leaves(catalogs.en.apps.tokens);
     const translated = leaves(catalogs[locale].apps.tokens);
     expect(Object.keys(translated).sort()).toEqual(Object.keys(source).sort());
     for (const [key, text] of Object.entries(source)) {
@@ -147,4 +152,98 @@ describe("deploy-token translations", () => {
       view.unmount();
     }
   );
+});
+
+describe("app supply-chain translations", () => {
+  const same = new Set(["sbom.title", "scan.columns.cve", "fr:sbom.format", "de:sbom.format"]);
+  it.each(locales)(
+    "%s translates the whole security namespace and preserves ICU inputs",
+    (locale) => {
+      const source = leaves(catalogs.en.apps.security);
+      const translated = leaves(catalogs[locale].apps.security);
+      expect(Object.keys(translated).sort()).toEqual(Object.keys(source).sort());
+      for (const [key, text] of Object.entries(source)) {
+        expect(argumentsOf(parse(translated[key])), `${locale}:${key}`).toEqual(
+          argumentsOf(parse(text))
+        );
+        if (locale !== "en" && !same.has(key) && !same.has(`${locale}:${key}`))
+          expect(translated[key], `${locale}:${key}`).not.toBe(text);
+        for (const technical of [
+          "image.signed",
+          "image.scanned",
+          "sbom.generated",
+          "image_signing",
+          "image_scan",
+          "sbom_multiarch",
+          "RegisteredApp.securityPolicy",
+          "Sigstore",
+          "Cosign",
+          "cosign",
+          "Rekor",
+          "promote-deploy",
+        ]) {
+          if (text.includes(technical))
+            expect(translated[key], `${locale}:${key}`).toContain(technical);
+        }
+      }
+    }
+  );
+});
+
+describe("translated supply-chain controls", () => {
+  it.each(locales)(
+    "%s keeps threshold values numeric and shows translated severity and timestamps",
+    async (locale) => {
+      const messages = catalogs[locale];
+      const t = createTranslator({ locale, messages, namespace: "apps.security" });
+      const save = vi.fn(async () => true);
+      const view = render(
+        <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
+          <AppSecurityScreen {...SECURITY} access={null} tabs={null} onSavePolicy={save} />
+        </NextIntlClientProvider>
+      );
+      const threshold = screen.getByRole("combobox", { name: t("policy.highThreshold") });
+      fireEvent.change(threshold, { target: { value: "10" } });
+      expect(
+        within(threshold).getByRole("option", { name: t("policy.thresholdOption", { count: 10 }) })
+      ).toHaveValue("10");
+      fireEvent.click(screen.getByRole("button", { name: t("policy.save") }));
+      await waitFor(() =>
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ blockOnHighCveThreshold: 10 }))
+      );
+      expect(screen.getAllByText(t("scan.critical")).length).toBeGreaterThan(0);
+      expect(screen.queryByText("critical", { exact: true })).not.toBeInTheDocument();
+      const signedAt = new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        timeZoneName: "short",
+        timeZone: "UTC",
+      }).format(new Date(SIGNING_EVENT.occurredAt));
+      expect(screen.getAllByText(signedAt).length).toBeGreaterThan(0);
+      expect(screen.getByPlaceholderText(t("scan.searchPlaceholder"))).toBeInTheDocument();
+      view.unmount();
+    }
+  );
+
+  it("changes existing findings labels when the active locale changes", () => {
+    const view = render(
+      <NextIntlClientProvider locale="en" messages={catalogs.en} timeZone="UTC">
+        <AppSecurityScreen {...SECURITY} access={null} tabs={null} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.getByPlaceholderText("Search CVEs, packages…")).toBeInTheDocument();
+    view.rerender(
+      <NextIntlClientProvider locale="ja" messages={catalogs.ja} timeZone="UTC">
+        <AppSecurityScreen {...SECURITY} access={null} tabs={null} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.queryByPlaceholderText("Search CVEs, packages…")).not.toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(catalogs.ja.apps.security.scan.searchPlaceholder)
+    ).toBeInTheDocument();
+    view.unmount();
+  });
 });
