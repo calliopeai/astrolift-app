@@ -17,6 +17,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
+import { QueryError } from "@/components/QueryError";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,8 +86,8 @@ function ResourceGroup({ group, labelKey }: { group: ResourceGroupSpec; labelKey
  * the same check server-side via the `confirm_name` field on
  * `DeregisterAppInput`.
  *
- * #436 A — blast-radius preview: the modal fetches
- * `previewAstroliftDeregister` on open and renders an expandable
+ * #436 A — blast-radius preview: the hook loads the authorized count
+ * before opening, refreshes on open and renders an expandable
  * grouped list (k8s / managed-services / identity / network / secrets)
  * with the actual object names the workflow will tear down. The
  * trigger button carries a resource-count badge so the operator sees
@@ -102,6 +103,7 @@ export function DangerZoneView({
   loading,
   preview,
   previewLoading,
+  previewError,
   stillLive,
   loadPreview,
   onDeregister,
@@ -112,17 +114,14 @@ export function DangerZoneView({
   const [open, setOpen] = React.useState(false);
   const [confirm, setConfirm] = React.useState("");
 
-  // Lazy-load the preview when the modal opens so closed-modal renders
-  // don't fire a network call.
-  React.useEffect(() => {
-    if (open) {
-      loadPreview();
-    } else {
-      setConfirm("");
-    }
-  }, [open, loadPreview]);
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    setConfirm("");
+    if (next) loadPreview();
+  }
 
-  const armed = confirm.trim() === appName && !loading;
+  const armed =
+    confirm.trim() === appName && !loading && !!preview && !previewLoading && !previewError;
 
   // Group the preview rows by destination so the expander tree maps
   // 1:1 with the workflow's per-step ordering (k8s → managed
@@ -285,11 +284,11 @@ export function DangerZoneView({
 
   async function handleConfirm() {
     if (!armed) return;
-    if (await onDeregister(confirm.trim())) setOpen(false);
+    if (await onDeregister(confirm.trim())) onOpenChange(false);
   }
 
   async function handleRetry() {
-    if (await onRetry()) setOpen(false);
+    if (await onRetry()) onOpenChange(false);
   }
 
   return (
@@ -308,18 +307,21 @@ export function DangerZoneView({
               variant="destructive"
               size="sm"
               className="shrink-0"
-              onClick={() => setOpen(true)}
+              onClick={() => onOpenChange(true)}
             >
               <Trash2Icon className="size-3.5" />
               {t("button")}
-              {preview && preview.totalResourceCount > 0 ? (
+              {preview ? (
                 <Badge variant="secondary" className="text-2xs ml-1.5 font-mono">
                   {preview.totalResourceCount}
                 </Badge>
+              ) : previewLoading ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
               ) : null}
             </Button>
           </Can>
         </div>
+        <QueryError title={tPreview("unavailable")} error={previewError} onRetry={loadPreview} />
         {stillLive.length > 0 ? (
           <div className="border-warning-border bg-warning/5 min-w-0 rounded-md border p-3 text-xs">
             <p className="text-warning-fg">{t("stillLive", { count: stillLive.length })}</p>
@@ -351,7 +353,7 @@ export function DangerZoneView({
         )}
       </div>
 
-      <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialog open={open} onOpenChange={onOpenChange}>
         <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -369,9 +371,9 @@ export function DangerZoneView({
                   <p className="text-xs font-medium">
                     {previewLoading
                       ? tPreview("loading")
-                      : tPreview("header", {
-                          count: preview?.totalResourceCount ?? 0,
-                        })}
+                      : preview
+                        ? tPreview("header", { count: preview.totalResourceCount })
+                        : tPreview("unavailable")}
                   </p>
                   {previewLoading ? (
                     <Skeleton className="h-16 w-full" />
@@ -381,9 +383,9 @@ export function DangerZoneView({
                         <ResourceGroup key={g.key} group={g} labelKey={g.key} />
                       ))}
                     </div>
-                  ) : (
+                  ) : preview ? (
                     <p className="text-muted-foreground text-xs">{tPreview("noResources")}</p>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">

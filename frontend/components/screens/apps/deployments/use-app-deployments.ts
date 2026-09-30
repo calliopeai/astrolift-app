@@ -3,6 +3,7 @@
 import { NetworkStatus } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
@@ -12,7 +13,7 @@ import type {
   AstroliftDeployment,
 } from "@/graphql/lifecycle/lifecycle.types";
 
-import { appDeploymentsList, pageVariables } from "./app-deployments-list";
+import { localizedAppDeploymentsList, pageVariables } from "./app-deployments-list";
 import { APP_DEPLOYMENTS_PAGE } from "./app-deployments-query";
 
 interface PageResp {
@@ -36,11 +37,12 @@ const POLL_MS = 30_000;
  * different pages can still be compared.
  */
 export function useAppDeployments(slug: string, { previews = true }: { previews?: boolean } = {}) {
+  const t = useTranslations("apps.deployments");
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, { variables: { appSlug: slug } });
   const envKey = (envs.data?.astroliftEnvironments ?? []).map((e) => e.name).join("\n");
   const definition = React.useMemo(
-    () => appDeploymentsList(envKey ? envKey.split("\n") : [], { previews }),
-    [envKey, previews]
+    () => localizedAppDeploymentsList(t, envKey ? envKey.split("\n") : [], { previews }),
+    [t, envKey, previews]
   );
   const list = useListState(definition);
   const { state, filters } = list;

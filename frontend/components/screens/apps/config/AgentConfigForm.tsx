@@ -20,6 +20,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -82,6 +83,7 @@ function TextareaField({
   return (
     <FieldRow label={label} help={help} error={error}>
       <Textarea
+        aria-label={label}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
@@ -118,6 +120,7 @@ function CollapsibleEntry({
   removeLabel: string;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("apps.config.builder");
   return (
     <Card className={invalid ? "border-destructive/40" : undefined}>
       <Collapsible open={open} onOpenChange={onOpenChange}>
@@ -127,7 +130,7 @@ function CollapsibleEntry({
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground rounded p-0.5"
-                aria-label={open ? "Collapse" : "Expand"}
+                aria-label={open ? t("collapse") : t("expand")}
               >
                 {open ? (
                   <ChevronDownIcon className="size-4" />
@@ -139,7 +142,7 @@ function CollapsibleEntry({
             <span className="text-muted-foreground shrink-0">{icon}</span>
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <span className="truncate font-mono text-sm font-medium">
-                {title || <span className="text-muted-foreground italic">unnamed</span>}
+                {title || <span className="text-muted-foreground italic">{t("unnamed")}</span>}
               </span>
               {subtitle && (
                 <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
@@ -405,8 +408,10 @@ function ToolEditor({
 
 // ─── Root form ───────────────────────────────────────────────────────────────
 
-export function AgentConfigFormBuilder({ model, errors, onChange }: Props) {
+export function AgentConfigFormBuilder({ model, errors: rawErrors, onChange }: Props) {
   const t = useTranslations("apps.config.builder");
+  const copy = useConfigCopy();
+  const errors = copy.errors(rawErrors);
   const patch = (p: Partial<AgentConfigModel>) => onChange({ ...model, ...p });
   const patchEnv = (p: Partial<AgentConfigModel["environment"]>) =>
     onChange({ ...model, environment: { ...model.environment, ...p } });

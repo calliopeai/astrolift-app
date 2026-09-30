@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -78,6 +80,7 @@ export function FilterBar({
   leading,
   className,
 }: FilterBarProps) {
+  const t = useTranslations("shared.list");
   const { definition: def, state } = list;
   const chips = Object.entries(state.filters);
   const sortable = columns.filter((c) => c.sortKey);
@@ -105,7 +108,7 @@ export function FilterBar({
               variant="ghost"
               size="icon"
               className="size-5 shrink-0"
-              aria-label={`Remove filter ${field?.label ?? key}: ${label}`}
+              aria-label={t("removeFilter", { field: field?.label ?? key, value: label })}
               onClick={() => list.setFilter(key, null)}
             >
               <XIcon className="size-3" />
@@ -115,7 +118,7 @@ export function FilterBar({
       })}
       {list.isFiltered && (
         <Button variant="ghost" size="sm" onClick={list.clearFilters}>
-          Clear
+          {t("clear")}
         </Button>
       )}
 
@@ -126,13 +129,13 @@ export function FilterBar({
         {hideable.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" aria-label="Choose columns">
+              <Button variant="outline" size="sm" aria-label={t("chooseColumns")}>
                 <Columns3Icon className="size-4" />
-                <span className="hidden lg:inline">Columns</span>
+                <span className="hidden lg:inline">{t("columns")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-44">
-              <DropdownMenuLabel>Columns</DropdownMenuLabel>
+              <DropdownMenuLabel>{t("columns")}</DropdownMenuLabel>
               {hideable.map((c) => (
                 <DropdownMenuCheckboxItem
                   key={c.id}
@@ -156,6 +159,7 @@ export function FilterBar({
 // ---------------------------------------------------------------------------
 
 function SearchBox({ list }: { list: ListStateController }) {
+  const t = useTranslations("shared.list");
   const { definition: def, state } = list;
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [text, setText] = React.useState(state.q);
@@ -243,7 +247,7 @@ function SearchBox({ list }: { list: ListStateController }) {
             commit("", true);
           }}
           className="absolute top-1/2 right-1 size-6 -translate-y-1/2"
-          aria-label="Clear search"
+          aria-label={t("clearSearch")}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -268,6 +272,7 @@ function AddFilter({
   fields: ListField[];
   onAdd: (key: string, value: string) => void;
 }) {
+  const t = useTranslations("shared.list");
   const [open, setOpen] = React.useState(false);
   const [field, setField] = React.useState<ListField | null>(null);
 
@@ -288,7 +293,7 @@ function AddFilter({
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
           <PlusIcon className="size-4" />
-          Filter
+          {t("filter")}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-1">
@@ -302,7 +307,7 @@ function AddFilter({
             }}
           />
         ) : (
-          <ul role="listbox" aria-label="Filter by" className="flex flex-col">
+          <ul role="listbox" aria-label={t("filterBy")} className="flex flex-col">
             {fields.map((f) => (
               <li key={f.key}>
                 <button
@@ -333,6 +338,7 @@ function ValuePicker({
   onBack: () => void;
   onPick: (value: string) => void;
 }) {
+  const t = useTranslations("shared.list");
   const [query, setQuery] = React.useState("");
   const debounced = useDebounce(query, SEARCH_DEBOUNCE_MS);
   const [found, setFound] = React.useState<ListFieldOption[] | null>(null);
@@ -361,7 +367,7 @@ function ValuePicker({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1 px-1 pt-1">
-        <Button variant="ghost" size="sm" onClick={onBack} aria-label="Back to fields">
+        <Button variant="ghost" size="sm" onClick={onBack} aria-label={t("backToFields")}>
           ‹
         </Button>
         <span className="text-sm font-medium">{field.label}</span>
@@ -379,18 +385,18 @@ function ValuePicker({
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={field.options ? `Find a ${field.label.toLowerCase()}` : "Type a value"}
-          aria-label={`${field.label} value`}
+          placeholder={field.options ? t("findValue", { field: field.label }) : t("typeValue")}
+          aria-label={t("fieldValue", { field: field.label })}
           className="h-8"
         />
       </form>
-      {failed && <p className="text-danger px-2 py-1 text-sm">Could not load values.</p>}
+      {failed && <p className="text-danger px-2 py-1 text-sm">{t("valuesFailed")}</p>}
       {field.async && found === null && !failed && (
-        <p className="text-muted-foreground px-2 py-1 text-sm">Loading…</p>
+        <p className="text-muted-foreground px-2 py-1 text-sm">{t("loading")}</p>
       )}
       <ul
         role="listbox"
-        aria-label={`${field.label} values`}
+        aria-label={t("fieldValues", { field: field.label })}
         className="flex max-h-64 flex-col overflow-y-auto"
       >
         {options.map((o) => (
@@ -415,7 +421,11 @@ function ValuePicker({
               onClick={() => onPick(query.trim())}
               className="hover:bg-muted w-full min-w-0 truncate rounded-sm px-2 py-1.5 text-left text-sm outline-none"
             >
-              {field.label} is <span className="font-mono">{query.trim()}</span>
+              {t.rich("fieldEquals", {
+                field: field.label,
+                value: query.trim(),
+                valueText: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </button>
           </li>
         )}
@@ -435,6 +445,7 @@ function SortMenu({
   columns: FilterBarColumn[];
   onChange: (sort: SortState[]) => void;
 }) {
+  const t = useTranslations("shared.list");
   const primary = sort[0];
   const current = columns.find((c) => c.sortKey === primary?.key);
   const Arrow = primary?.dir === "asc" ? ArrowUpIcon : ArrowDownIcon;
@@ -442,19 +453,19 @@ function SortMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          <span className="text-muted-foreground">Sort:</span>
-          {current?.label ?? primary?.key ?? "Default"}
+          <span className="text-muted-foreground">{t("sortPrefix")}</span>
+          {current?.label ?? primary?.key ?? t("defaultSort")}
           {primary && (
             <Arrow
               className="size-3.5"
-              aria-label={primary.dir === "asc" ? "ascending" : "descending"}
+              aria-label={t(primary.dir === "asc" ? "ascending" : "descending")}
             />
           )}
           <ChevronDownIcon className="size-3.5 opacity-60" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("sortBy")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={primary?.key}
           onValueChange={(key) => onChange([{ key, dir: primary?.dir ?? "desc" }])}
@@ -473,8 +484,8 @@ function SortMenu({
             onChange([{ key: primary.key, dir: dir as SortState["dir"] }, ...sort.slice(1)])
           }
         >
-          <DropdownMenuRadioItem value="asc">Ascending</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="desc">Descending</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="asc">{t("ascending")}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="desc">{t("descending")}</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>

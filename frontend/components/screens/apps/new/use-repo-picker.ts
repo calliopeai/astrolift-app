@@ -1,7 +1,13 @@
 "use client";
 
+import {
+  KIND_TO_SOURCE_KIND,
+  usableSourceConnections,
+} from "@/components/wizard/source-connection";
+
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 import { useScmConnect } from "@/components/use-scm-connect";
 import { CLUSTER_COUNT } from "@/graphql/clusters/clusters.queries";
@@ -31,22 +37,6 @@ interface ClusterCountResp {
 interface AppsResp {
   astroliftApps: AstroliftRegisteredApp[];
 }
-
-const KIND_TO_SOURCE_KIND: Record<ScmConnectionKind, SourceKind> = {
-  github_pat: "github",
-  github_app_install: "github",
-  github_oauth_app: "github",
-  github_oauth_user: "github",
-  gitlab_pat: "gitlab",
-  gitlab_oauth_app: "gitlab",
-  gitlab_oauth_user: "gitlab",
-  bitbucket_pat: "bitbucket",
-  bitbucket_oauth_app: "bitbucket",
-  bitbucket_oauth_user: "bitbucket",
-  gitea_pat: "gitea",
-  gitea_oauth_app: "gitea",
-  gitea_oauth_user: "gitea",
-};
 
 /** The wizard-state fields step 1 reads and writes. */
 export interface RepoPickerFields {
@@ -86,6 +76,8 @@ export function useRepoPicker<S extends RepoPickerFields>({
   isCiPushableKind,
 }: UseRepoPickerArgs<S>): RepoPickerStepViewProps {
   const scm = useScmConnect();
+  const { org } = useActiveOrg();
+  const orgId = org?.id ?? "";
   // Cluster preflight (#315/#316): registerApp refuses orgs with zero
   // managed clusters. We mirror the gate in the wizard so the operator
   // doesn't walk through five steps to fail at submit. Querying ahead
@@ -94,6 +86,7 @@ export function useRepoPicker<S extends RepoPickerFields>({
   // astroliftClusterCount tightened in #316 to require lifecycle =
   // "managed" — registered-only rows no longer count.
   const clusterCount = useQuery<ClusterCountResp>(CLUSTER_COUNT, {
+    skip: !orgId,
     fetchPolicy: "cache-and-network",
   });
 
@@ -102,6 +95,7 @@ export function useRepoPicker<S extends RepoPickerFields>({
   // Backend currently has no per-repo flag (#409 follow-on); we derive
   // it client-side off the LIST_APPS payload.
   const existingApps = useQuery<AppsResp>(LIST_APPS, {
+    skip: !orgId,
     fetchPolicy: "cache-first",
   });
   const repoToAppCount = React.useMemo(() => {
@@ -118,15 +112,16 @@ export function useRepoPicker<S extends RepoPickerFields>({
 
   const connections = useQuery<ConnectionsResp>(LIST_SOURCE_CONNECTIONS, {
     fetchPolicy: "cache-and-network",
-    skip: !hasCluster,
+    skip: !orgId || !hasCluster,
   });
 
   const usable = React.useMemo(
-    () =>
-      (connections.data?.astroliftSourceConnections ?? []).filter(
-        (c) => c.isActive && !c.isOauthAppConfig
-      ),
-    [connections.data?.astroliftSourceConnections]
+    () => usableSourceConnections(connections.data?.astroliftSourceConnections ?? []),
+    [connections.data]
+  );
+  const selectedConnection = usable.find((connection) => connection.id === state.connectionId);
+  const connectionValid = Boolean(
+    orgId && selectedConnection && !connections.loading && !connections.error
   );
 
   // Auto-pick the first connection when there's exactly one.
@@ -154,7 +149,7 @@ export function useRepoPicker<S extends RepoPickerFields>({
       search: search || null,
       limit: 100,
     },
-    skip: !state.connectionId,
+    skip: !connectionValid,
     fetchPolicy: "cache-and-network",
   });
   const repoList = repos.data?.astroliftAvailableRepos;
@@ -164,12 +159,12 @@ export function useRepoPicker<S extends RepoPickerFields>({
   // backend would refuse on submit anyway; gating Next here keeps the
   // operator from going further until the precondition is met.
   React.useEffect(() => {
-    setValid(Boolean(hasCluster && state.connectionId && state.sourceRepo));
-  }, [hasCluster, state.connectionId, state.sourceRepo, setValid]);
+    setValid(Boolean(hasCluster && connectionValid && state.sourceRepo));
+  }, [hasCluster, connectionValid, state.sourceRepo, setValid]);
 
   function onPickRepo(fullName: string) {
     const repo = repoList?.repos.find((r) => r.fullName === fullName);
-    if (!repo) return;
+    if (!repo || !connectionValid) return;
     const conn = usable.find((c) => c.id === state.connectionId);
     const inferredKind = conn
       ? (KIND_TO_SOURCE_KIND[conn.kind as ScmConnectionKind] ?? "git_url")

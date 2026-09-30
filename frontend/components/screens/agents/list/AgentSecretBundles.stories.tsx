@@ -1,4 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import { ATTACHMENT, BUNDLES, BUNDLES_LIST, LONG_BUNDLE } from "./agents-dispatch-secrets.fixtures";
 import { AgentSecretBundlesView } from "./AgentSecretBundles";
@@ -25,10 +28,7 @@ export const Empty: Story = {
   render: () => <AgentSecretBundlesView {...BUNDLES} bundles={[]} defaultAttachments={[]} />,
 };
 
-/**
- * The card has no error state: failed queries render as Empty and failed
- * writes are toasts. Closest real state: a key being revealed while busy.
- */
+/** Values disclosed by a successful audited provider read. */
 export const Revealed: Story = {
   render: () => (
     <AgentSecretBundlesView
@@ -54,5 +54,44 @@ export const LongStrings: Story = {
         },
       ]}
     />
+  ),
+};
+
+export const PendingWrites: Story = {
+  render: () => (
+    <AgentSecretBundlesView
+      {...BUNDLES}
+      defaultAttachments={[]}
+      pending={new Set(["attach:bundle-1", "key-delete:bundle-1:GITHUB_APP_ID"])}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const attach = canvas.getAllByRole("button", { name: "Attach" });
+    await expect(attach[0]).toBeDisabled();
+    await expect(attach[1]).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "Delete GITHUB_APP_ID" })).toBeDisabled();
+  },
+};
+
+export const ReadFailure: Story = {
+  render: () => (
+    <AgentSecretBundlesView
+      {...BUNDLES}
+      error={{ message: "ATTACHMENT_READ_REFUSED: the selected recipe could not be read" }}
+    />
+  ),
+};
+
+export const GermanReadFailureLongStrings: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" timeZone="Europe/Berlin" messages={de}>
+      <div style={{ width: 768 }}>
+        <AgentSecretBundlesView
+          {...BUNDLES}
+          error={{ message: "PROVIDER_DIAGNOSTIC: " + "request-identifier/".repeat(30) }}
+        />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

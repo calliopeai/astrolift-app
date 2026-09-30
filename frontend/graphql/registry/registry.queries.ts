@@ -298,6 +298,19 @@ export const LIST_WORKLOADS = gql`
   query ListWorkloads($appSlug: String) {
     astroliftWorkloads(appSlug: $appSlug) {
       id
+      version
+      viewerCan {
+        restart {
+          allowed
+          code
+          reason
+        }
+        scale {
+          allowed
+          code
+          reason
+        }
+      }
       slug
       name
       kind
@@ -338,6 +351,19 @@ export const LIST_WORKLOADS = gql`
 const WORKLOAD_FIELDS = gql`
   fragment WorkloadFields on AstroliftWorkload {
     id
+    version
+    viewerCan {
+      restart {
+        allowed
+        code
+        reason
+      }
+      scale {
+        allowed
+        code
+        reason
+      }
+    }
     slug
     name
     kind
@@ -418,6 +444,19 @@ export const GET_WORKLOAD = gql`
   query GetWorkload($appSlug: String!, $slug: String!) {
     astroliftWorkload(appSlug: $appSlug, slug: $slug) {
       id
+      version
+      viewerCan {
+        restart {
+          allowed
+          code
+          reason
+        }
+        scale {
+          allowed
+          code
+          reason
+        }
+      }
       name
       slug
       kind

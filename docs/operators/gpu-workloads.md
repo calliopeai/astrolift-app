@@ -28,12 +28,12 @@ The platform then does four things:
 
 Taint every GPU node pool `NoSchedule`. Pods that don't tolerate the taint, including platform pods, then never land on GPU nodes.
 
-| Cloud | How |
-|---|---|
-| GKE | GKE taints GPU node pools with `nvidia.com/gpu=present:NoSchedule` itself. Nothing to do. |
-| EKS | Add the taint to the GPU managed node group or Karpenter NodePool: `nvidia.com/gpu=present:NoSchedule`. |
-| AKS | `az aks nodepool add ... --node-taints nvidia.com/gpu=present:NoSchedule` |
-| On-prem | `kubectl taint nodes <node> astrolift.io/gpu=true:NoSchedule` |
+| Cloud   | How                                                                                                     |
+| ------- | ------------------------------------------------------------------------------------------------------- |
+| GKE     | GKE taints GPU node pools with `nvidia.com/gpu=present:NoSchedule` itself. Nothing to do.               |
+| EKS     | Add the taint to the GPU managed node group or Karpenter NodePool: `nvidia.com/gpu=present:NoSchedule`. |
+| AKS     | `az aks nodepool add ... --node-taints nvidia.com/gpu=present:NoSchedule`                               |
+| On-prem | `kubectl taint nodes <node> astrolift.io/gpu=true:NoSchedule`                                           |
 
 ### Expose the GPUs to Kubernetes
 
@@ -52,3 +52,10 @@ On GKE Autopilot, or with Karpenter GPU NodePools, a cluster may have no GPU nod
 ## GPU quota per organization
 
 An org-scope quota on the `gpu` resource caps the GPUs an organization's workloads hold at once. A deploy is refused when its GPUs plus the org's running deploys and vLLM models would pass the hard limit. Each workload counts at its ceiling: `gpu` times its HPA `hpa_max` (or Knative `max_scale`), else `replicas`. MIG slices count as one each. Redeploying an environment doesn't count what it replaces. With no `gpu` quota there is no limit.
+
+## Capacity and replica ownership
+
+For always-on GPU availability and the separate CPU workload/node policies, see
+[workload and node autoscaling](workload-and-node-autoscaling.md). CPU HPA settings
+remain an explicit workload choice; GPU pools do not opt into node autoscaling
+merely because their maximum size exceeds their desired size.

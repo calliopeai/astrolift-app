@@ -3,7 +3,7 @@
 import { ChevronDownIcon } from "lucide-react";
 import * as React from "react";
 
-import { useAppChrome } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
+import { useAppChrome } from "@/lib/app-chrome-context";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const STORAGE_PREFIX = "astrolift.pageshell.header.";

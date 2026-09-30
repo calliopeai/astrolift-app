@@ -24,7 +24,7 @@ import {
   LIST_SECRET_CHANGE_PROPOSALS,
 } from "@/graphql/services/services.queries";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
-import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
+import { useVersionMismatch } from "@/lib/apollo/use-version-mismatch";
 
 import {
   APP_SECRET_BUNDLES_LIST,
@@ -37,15 +37,19 @@ import type { AppSecret, AppSecretBundleAttachment, RevealedSecretData } from ".
 
 export const ALL_ENVS = "__all__";
 
-/** #679 — short label for the scope badge on each secret row. */
-export function scopeBadgeLabel(scope: string): string {
-  if (scope === "production") return "prod";
-  if (scope === "preview") return "preview";
-  if (scope.startsWith("preview:")) {
-    const branch = scope.slice("preview:".length);
-    return branch ? `preview:${branch}` : "preview";
-  }
-  return scope;
+/** Translates display labels while preserving the raw scope sent to mutations. */
+export function useSecretScopeLabel() {
+  const t = useTranslations("apps.secrets.scope");
+  return (scope: string): string => {
+    if (scope === "all") return t("all");
+    if (scope === "production") return t("production");
+    if (scope === "preview") return t("preview");
+    if (scope.startsWith("preview:")) {
+      const branch = scope.slice("preview:".length);
+      return branch ? t("previewBranch", { branch }) : t("preview");
+    }
+    return scope;
+  };
 }
 
 interface SecretsResp {
@@ -68,6 +72,8 @@ interface AttachmentsResp {
  */
 export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
   const t = useTranslations("apps.secrets");
+  const scopeLabel = useSecretScopeLabel();
+  const handleVersionMismatch = useVersionMismatch();
   const [envName, setEnvName] = React.useState<string>(ALL_ENVS);
   // revealedValues maps secret.id -> plaintext while revealed.
   const [revealedValues, setRevealedValues] = React.useState<Record<string, string>>({});
@@ -197,9 +203,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
   function onRequestDelete(s: AppSecret): boolean {
     if (s.source !== "literal") {
       toast.error(
-        s.source === "bundle"
-          ? "Detach the bundle to remove this key."
-          : "Managed-service envelope keys aren't editable directly."
+        s.source === "bundle" ? t("toasts.bundleDeleteBlocked") : t("toasts.managedDeleteBlocked")
       );
       return false;
     }
@@ -212,7 +216,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
       variables: { input: { appSlug: slug, key: s.key } },
     });
     if (data?.deleteAppSecret.ok) {
-      toast.success(`Deleted ${s.key}`);
+      toast.success(t("toasts.deleted", { key: s.key }));
       setRevealedValues((prev) => {
         if (!(s.id in prev)) return prev;
         const next = { ...prev };
@@ -220,7 +224,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
         return next;
       });
     } else {
-      throw new Error(data?.deleteAppSecret.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.deleteAppSecret.errors?.[0]?.message ?? t("toasts.deleteFailed"));
     }
   }
 
@@ -307,7 +311,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
       ) {
         return false;
       }
-      toast.error(data?.rotateAppSecret.errors?.[0]?.message ?? "Rotate failed");
+      toast.error(data?.rotateAppSecret.errors?.[0]?.message ?? t("toasts.rotateFailed"));
       return false;
     }
     const { data } = await setSecret({ variables: { input } });
@@ -325,7 +329,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
     ) {
       return false;
     }
-    toast.error(data?.setAppSecret.errors?.[0]?.message ?? "Save failed");
+    toast.error(data?.setAppSecret.errors?.[0]?.message ?? t("toasts.saveFailed"));
     return false;
   }
 
@@ -337,7 +341,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
     if (data?.detachSecretBundle.ok) {
       toast.success(t("attached.toastDetached", { name: a.bundleName }));
     } else {
-      throw new Error(data?.detachSecretBundle.errors?.[0]?.message ?? "Detach failed");
+      throw new Error(data?.detachSecretBundle.errors?.[0]?.message ?? t("toasts.detachFailed"));
     }
   }
 
@@ -355,7 +359,11 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
       },
     });
     if (data?.setAppSecret.ok) {
-      toast.success(`Set ${key}${scope !== "all" ? ` (${scopeBadgeLabel(scope)})` : ""}`);
+      toast.success(
+        scope === "all"
+          ? t("toasts.set", { key })
+          : t("toasts.setScoped", { key, scope: scopeLabel(scope) })
+      );
       return true;
     }
     if (
@@ -366,7 +374,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
     ) {
       return false;
     }
-    toast.error(data?.setAppSecret.errors?.[0]?.message ?? "Save failed");
+    toast.error(data?.setAppSecret.errors?.[0]?.message ?? t("toasts.saveFailed"));
     return false;
   }
 
@@ -377,10 +385,10 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
     });
     if (data?.bulkImportAppSecrets.ok) {
       const keys = data.bulkImportAppSecrets.data?.keysSet ?? [];
-      toast.success(`Imported ${keys.length} key${keys.length === 1 ? "" : "s"}`);
+      toast.success(t("toasts.imported", { count: keys.length }));
       return true;
     }
-    toast.error(data?.bulkImportAppSecrets.errors?.[0]?.message ?? "Import failed");
+    toast.error(data?.bulkImportAppSecrets.errors?.[0]?.message ?? t("toasts.importFailed"));
     return false;
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { InfoIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftPolicyConditionKind } from "@/graphql/__generated__/schema";
@@ -49,6 +50,7 @@ export function PolicyConditionHelp({
   error,
   className,
 }: PolicyConditionHelpProps) {
+  const t = useTranslations("shared.access.conditionHelp");
   const used = [...new Set(kinds)];
   if (used.length === 0) return null;
   if (loading) {
@@ -61,19 +63,14 @@ export function PolicyConditionHelp({
   }
   const byKind = new Map(catalog.map((c) => [c.kind, c]));
   return (
-    <section
-      aria-label="What the conditions need"
-      className={cn("flex min-w-0 flex-col gap-2", className)}
-    >
+    <section aria-label={t("label")} className={cn("flex min-w-0 flex-col gap-2", className)}>
       <p className="text-muted-foreground flex min-w-0 items-start gap-2 text-xs">
         <InfoIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-        <span className="min-w-0">
-          Every check evaluates this policy. A condition the request cannot answer denies.
-        </span>
+        <span className="min-w-0">{t("intro")}</span>
       </p>
       {error && (
         <p role="alert" className="text-warning-fg text-xs [overflow-wrap:anywhere]">
-          Could not load the condition catalog: {error.message}
+          {t("failed", { message: error.message })}
         </p>
       )}
       <dl className="flex min-w-0 flex-col gap-2">
@@ -87,10 +84,10 @@ export function PolicyConditionHelp({
               </dt>
               <dd className="text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]">
                 {entry
-                  ? `${entry.description} ${NEEDS_TEXT[entry.needs] ?? `Needs ${entry.needs}.`}`
+                  ? `${entry.description} ${Object.prototype.hasOwnProperty.call(NEEDS_TEXT, entry.needs) ? t(`needs.${entry.needs}`) : t("unknownNeeds", { needs: entry.needs })}`
                   : error
-                    ? "Unknown until the catalog loads."
-                    : "The server does not know this kind: a check cannot answer it, so it denies."}
+                    ? t("pending")
+                    : t("unknown")}
               </dd>
             </div>
           );

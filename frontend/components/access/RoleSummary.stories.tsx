@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 
 import { DEPLOYER, LONG_ROLE, RELEASE_CAPTAIN, ROLES, TEAM_DEV, VIEWER } from "./fixtures";
 import { RoleSummary } from "./RoleSummary";
@@ -14,6 +16,10 @@ const meta: Meta<typeof RoleSummary> = {
 export default meta;
 
 type Story = StoryObj<typeof RoleSummary>;
+
+export const FutureScope: Story = {
+  args: { role: { ...DEPLOYER, scopeLevel: "CUSTOM_SCOPE" as typeof DEPLOYER.scopeLevel } },
+};
 
 /** The role's own description wins. */
 export const WithDescription: Story = {};
@@ -57,4 +63,15 @@ export const Width768: Story = {
     ),
   ],
   args: { role: RELEASE_CAPTAIN, base: TEAM_DEV, defaultOpen: true },
+};
+
+export const Japanese: Story = {
+  args: { role: VIEWER, defaultOpen: true },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

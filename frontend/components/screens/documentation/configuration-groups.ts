@@ -19,6 +19,21 @@ export interface Group {
 
 export const CONFIGURATION_GROUPS: Group[] = [
   {
+    id: "control-plane-image",
+    title: "Control-plane image",
+    intro: "Python runtime defaults set by the shipped backend/Dockerfile.",
+    vars: [
+      {
+        name: "PYTHONUNBUFFERED",
+        purpose:
+          "Makes the control-plane Python process emit logs without stdout/stderr buffering.",
+        default: "1",
+        required: false,
+        source: "image",
+      },
+    ],
+  },
+  {
     id: "core-platform",
     title: "Core platform",
     intro:

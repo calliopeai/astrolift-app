@@ -5,7 +5,7 @@ import type * as React from "react";
 import { AppFrame } from "@/components/screens/apps/detail/AppFrame";
 import { useAppFrame } from "@/components/screens/apps/detail/use-app-frame";
 
-import { AppChromeProvider } from "./app-chrome-context";
+import { AppChromeProvider } from "@/lib/app-chrome-context";
 
 /**
  * The frame around every `/apps/[slug]/*` route: the header and the one row

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -26,6 +27,7 @@ export function useAppAccess(appSlug: string) {
  * mounted only for an operator holding `app.access`.
  */
 export function useAccessEditor(access: AstroliftAppAccess) {
+  const t = useTranslations("apps.security.access");
   const [groups, setGroups] = React.useState<string[]>(access.groups);
   const [users, setUsers] = React.useState<string[]>(access.users);
   const [preview, previewState] = useLazyQuery<{
@@ -50,9 +52,9 @@ export function useAccessEditor(access: AstroliftAppAccess) {
       variables: { input: { appSlug: access.appSlug, groups, users } },
     });
     if (data?.setAppAccess.ok) {
-      toast.success(groups.length || users.length ? "Access rule saved." : "Access rule removed.");
+      toast.success(groups.length || users.length ? t("saved") : t("removed"));
     } else {
-      toast.error(data?.setAppAccess.errors?.[0]?.message ?? "Save failed.");
+      toast.error(data?.setAppAccess.errors?.[0]?.message ?? t("saveFailed"));
     }
   }
 

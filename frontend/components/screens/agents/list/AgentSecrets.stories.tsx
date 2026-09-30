@@ -1,5 +1,8 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { expect, userEvent, within } from "storybook/test";
 
 import {
   BUNDLES,
@@ -70,5 +73,37 @@ export const LongStrings: Story = {
       rows={[LONG_SECRET_ROW, ...SECRET_ROWS]}
       reveals={{ [LONG_SECRET_ROW.envVar]: `${"x".repeat(240)}` }}
     />
+  ),
+};
+
+/** The pending tag and the actual mutation share a trimmed environment variable. */
+export const SavingReference: Story = {
+  render: () => <AgentSecretsView {...SECRETS} embedded pending={new Set(["ref:API_KEY"])} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByPlaceholderText("ENV_VAR"), " API_KEY ");
+    await userEvent.type(canvas.getByPlaceholderText(/Provider URI/), "agents/org-1/api-key");
+    await expect(canvas.getByRole("button", { name: "Add / update ref" })).toBeDisabled();
+    await expect(canvas.getByPlaceholderText("ENV_VAR")).toHaveValue(" API_KEY ");
+  },
+};
+
+export const ReadFailure: StoryObj = {
+  render: () => (
+    <AgentSecretsView
+      {...SECRETS}
+      embedded
+      error={{ message: "SECRET_STATUS_READ_REFUSED: the selected recipe could not be read" }}
+    />
+  ),
+};
+
+export const FrenchWidth768: StoryObj = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" timeZone="Europe/Paris" messages={fr}>
+      <div style={{ width: 768 }}>
+        <AgentSecretsView {...SECRETS} embedded />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

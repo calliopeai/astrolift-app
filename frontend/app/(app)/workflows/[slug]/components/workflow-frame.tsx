@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import type * as React from "react";
 
-import { AppChromeProvider } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
+import { AppChromeProvider } from "@/lib/app-chrome-context";
 import { useWorkflowFrame } from "@/components/screens/workflows/detail/use-workflow-frame";
 import { WorkflowFrame } from "@/components/screens/workflows/detail/WorkflowFrame";
 

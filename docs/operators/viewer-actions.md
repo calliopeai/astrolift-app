@@ -35,9 +35,30 @@ version and driver availability still apply. A grant or policy can change after
 the read. Mutations lock their targets and recheck authority before side effects;
 clients must handle the mutation result even when an action was enabled.
 
-This is a partial foundation for APP #1867. Other object actions, web navigation
-and action consumption, CLI `whoami --permissions` and early permission
-diagnosis, common denial envelopes across transports, and stock-role web/CLI
-acceptance remain outstanding. Existing union-based capability lists are not
-object authority and should not substitute for `viewerCan`. The pinned CLI
-release does not yet implement the requested `whoami` contract.
+The web workload list and detail scaling controls consume the corresponding
+object decision. Settings render restart and scale once under **Primary
+environment**, separately from each environment's deploy/pause controls. These
+mutations do not accept a selected environment; a named-environment scaling
+control refuses to write even when the primary decision allows it. Denied and
+unavailable decisions disable controls and retain their reason on readable pages.
+The client sends the displayed workload version as the top-level
+`ifMatchVersion` mutation argument.
+
+Mutation envelopes remain authoritative. A structured permission denial shows
+its reason and refreshes active workload authority queries; failed refreshes
+keep a stale allowed snapshot locally blocked. Version conflicts and missing
+targets likewise require a refreshed snapshot. Input validation and transport
+errors retain their normal error handling. This does not promise exactly-once
+execution after transport uncertainty.
+
+CLI main `618d120` adds verified `whoami --permissions` and repairs account
+permission diagnosis. Those informational reports do not establish the current
+credential's target authority or mutation environment and approval requirements.
+They do not preflight another operation; the tagged CLI distribution remains a
+separate release step.
+
+This is a partial foundation for APP #1867. Other object actions, web navigation,
+remaining action consumption, operation-specific early refusal, common denial
+envelopes across transports and complete stock-role web/CLI acceptance remain
+outstanding. Existing union-based capability lists are not object authority and
+should not substitute for `viewerCan`.

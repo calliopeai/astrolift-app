@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import localizedMessages from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { AddDomainSheet } from "./AddDomainSheet";
@@ -48,4 +50,15 @@ export const LongStrings: Story = {
       }))}
     />
   ),
+};
+
+export const Localized: Story = {
+  render: () => <AddDomainSheet {...ADD_SHEET} />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={localizedMessages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

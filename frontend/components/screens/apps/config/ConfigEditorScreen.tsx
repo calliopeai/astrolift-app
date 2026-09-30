@@ -110,6 +110,7 @@ function ConflictResolverModal({
   onClose: () => void;
 }) {
   const t = useTranslations("apps.config.conflict");
+  const fmt = useFormatters();
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6"
@@ -122,7 +123,7 @@ function ConflictResolverModal({
           {t("title")}
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          {t("description", { at: new Date(serverUpdatedAt).toLocaleString() })}
+          {t("description", { at: fmt.formatDateTime(serverUpdatedAt) })}
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
@@ -274,9 +275,7 @@ export function ConfigEditorScreen({
       title={t("title", { name: a.name })}
       description={
         <span className="text-muted-foreground flex flex-wrap items-center gap-2 font-mono text-xs">
-          <span>
-            {a.manifestPath} on {a.deployBranch}
-          </span>
+          <span>{t("repoLocation", { path: a.manifestPath, branch: a.deployBranch })}</span>
           <Badge variant={syncBadge.tone}>{tSync(syncBadge.key)}</Badge>
           <span>{t("updated", { at: fmt.formatRelativeTime(a.updatedAt) })}</span>
         </span>
@@ -316,11 +315,7 @@ export function ConfigEditorScreen({
               variant="outline"
               onClick={handlePush}
               disabled={busy}
-              title={
-                a.manifestSyncState === "in_sync"
-                  ? "In sync with the repo — edit and Save draft first"
-                  : undefined
-              }
+              title={a.manifestSyncState === "in_sync" ? t("pushHint") : undefined}
             >
               <GitPullRequestIcon className="size-4" />
               {t("pushToRepo")}
@@ -333,7 +328,7 @@ export function ConfigEditorScreen({
               variant="outline"
               onClick={() => setConfirmApply(true)}
               disabled={busy || !a.rawManifestStaged || isDirty}
-              title={isDirty ? "Save or discard your local edits first" : undefined}
+              title={isDirty ? t("applyHint") : undefined}
             >
               <CheckIcon className="size-4" />
               {applying ? t("applying") : t("applyStaged")}

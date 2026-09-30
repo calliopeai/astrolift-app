@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
+import de from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { AppTabsView } from "../detail/AppTabs";
@@ -81,4 +84,23 @@ export const Error: Story = {
     latestSbom: null,
     eventsError: "Permission denied",
   },
+};
+
+export const Japanese: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+export const German: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

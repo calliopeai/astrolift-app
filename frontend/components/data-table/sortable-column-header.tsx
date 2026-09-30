@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import * as React from "react";
 import { ArrowDownIcon, ArrowUpIcon, ChevronsUpDownIcon } from "lucide-react";
 
@@ -33,6 +35,7 @@ export function SortableColumnHeader({
   children,
   className,
 }: SortableColumnHeaderProps) {
+  const t = useTranslations("shared.table");
   const keys = Array.isArray(sort) ? sort : sort ? [sort] : [];
   const index = keys.findIndex((s) => s.key === sortKey);
   const active = index !== -1;
@@ -58,8 +61,10 @@ export function SortableColumnHeader({
       )}
       {active && keys.length > 1 && (
         <span className="text-muted-foreground text-2xs font-mono tabular-nums">
-          <span className="sr-only">sort key </span>
-          {index + 1}
+          {t.rich("sortKey", {
+            index: index + 1,
+            order: (chunks) => <span className="sr-only">{chunks}</span>,
+          })}
         </span>
       )}
     </button>

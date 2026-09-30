@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,11 @@ export function PrincipalPicker({
   onChange,
   search,
   quickPicks = [],
-  placeholder = "Search people by name or email",
+  placeholder,
   className,
 }: PrincipalPickerProps) {
+  const t = useTranslations("shared.access.picker");
+  const searchPlaceholder = placeholder ?? t("placeholder");
   const id = React.useId();
   const results = search.results.filter((p) => !value || keyOf(p) !== keyOf(value));
 
@@ -57,9 +60,9 @@ export function PrincipalPicker({
             size="sm"
             variant="ghost"
             onClick={() => onChange(null)}
-            aria-label={`Change ${label.toLowerCase()}`}
+            aria-label={t("changeField", { field: label })}
           >
-            Change
+            {t("change")}
           </Button>
         </div>
       ) : (
@@ -86,15 +89,15 @@ export function PrincipalPicker({
               type="search"
               value={search.query}
               onChange={(e) => search.setQuery(e.target.value)}
-              placeholder={placeholder}
-              aria-label={`${label}: ${placeholder}`}
+              placeholder={searchPlaceholder}
+              aria-label={t("searchField", { field: label, placeholder: searchPlaceholder })}
               className="pl-8"
             />
           </div>
           <div className="max-h-56 min-w-0 overflow-auto rounded-md border">
             {search.error ? (
               <p role="alert" className="text-danger-fg p-3 text-sm [overflow-wrap:anywhere]">
-                Search failed: {search.error.message}
+                {t("searchFailed", { message: search.error.message })}
               </p>
             ) : search.loading ? (
               <div className="flex flex-col gap-2 p-3" aria-busy>
@@ -104,9 +107,7 @@ export function PrincipalPicker({
               </div>
             ) : results.length === 0 ? (
               <p className="text-muted-foreground p-3 text-sm [overflow-wrap:anywhere]">
-                {search.query.trim()
-                  ? `No one matches "${search.query.trim()}".`
-                  : "Type to search."}
+                {search.query.trim() ? t("none", { query: search.query.trim() }) : t("type")}
               </p>
             ) : (
               <ul className="divide-y">
@@ -115,7 +116,7 @@ export function PrincipalPicker({
                     <button
                       type="button"
                       onClick={() => onChange(p)}
-                      aria-label={`Pick ${p.name}`}
+                      aria-label={t("pick", { name: p.name })}
                       className="hover:bg-muted/60 focus-visible:ring-ring flex w-full min-w-0 items-center px-3 py-2 text-left focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
                     >
                       <PrincipalChip principal={{ ...p, href: undefined }} variant="block" />

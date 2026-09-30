@@ -3,7 +3,7 @@
 import { DeployActivityStrip as DeployActivityStripView } from "@/components/screens/apps/detail/DeployActivityStrip";
 import { useDeployActivity } from "@/components/screens/apps/detail/use-deploy-activity";
 
-import { appPath, useAppChrome } from "./app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 interface Props {
   appSlug: string;

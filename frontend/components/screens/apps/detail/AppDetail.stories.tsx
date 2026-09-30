@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { AppChromeProvider } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
+import { AppChromeProvider } from "@/lib/app-chrome-context";
 import { AppDoctorPanelView } from "@/components/screens/apps/homes/AppDoctorPanel";
 import { DOCTOR_REPORT, TASK } from "@/components/screens/apps/homes/app-homes.fixtures";
 import { TaskHomeScreen } from "@/components/screens/apps/homes/TaskHome";

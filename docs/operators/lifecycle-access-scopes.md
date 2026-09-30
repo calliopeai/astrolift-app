@@ -45,3 +45,21 @@ actor and bearer with a fresh permission cache, so membership, role, policy and
 token revocation stop delivery. Denied streams close silently; cancellation and
 cross-task generator closure remove their broker queue. GraphQL SDL and HTTP
 request and response shapes remain unchanged.
+
+Deploy-token rotation confirmation reads
+`astroliftAppDeployTokenRotationMetadata(appSlug)` with `app.update` on the
+coherent live app owner. The read retains actual role/policy and bearer ceilings;
+read-only, deploy-only and viewer-share grants cannot read this metadata. Missing
+or invalid live app ancestry returns null without accessing configuration, even
+for an organization updater. This query exposes only `rotationGraceSeconds`,
+validated by the same Constance helper as rotation (60 seconds through 7 days;
+malformed/unavailable configuration uses the helper's existing server fallback).
+It does not expose raw configuration or any token material.
+
+The web dialog reads without caching on each open/retry and blocks confirmation
+while loading, unavailable or refused. Delayed replies after close or an
+organization/app/token switch cannot enable another target. Durations retain
+whole seconds rather than rounding a configured window. This read is a snapshot:
+configuration may change before confirmation. Rotation retains its existing
+`app.update` and elevation checks, rereads the current setting when issuing the
+secret, and returns the actual applied window in its one-time reveal.

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { EyeIcon, EyeOffIcon, KeyRoundIcon, LinkIcon, Trash2Icon, UnlinkIcon } from "lucide-react";
 import * as React from "react";
 
@@ -24,7 +26,7 @@ import {
 } from "@/components/ui/sheet";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 
-import { SECRET_STATE_LABEL, type SecretState, secretState } from "./agent-secrets-list";
+import { type SecretState, secretState } from "./agent-secrets-list";
 import type { AgentSecretValuesState } from "./use-agent-secrets-tab";
 
 const STATE_DOT: Record<SecretState, "ok" | "warn" | "error"> = {
@@ -59,6 +61,7 @@ export function AgentSecretValues({
   onRemoveRef,
   onReveal,
 }: AgentSecretValuesProps) {
+  const t = useTranslations("agentSecrets.values");
   const [adding, setAdding] = React.useState(false);
   const [envVar, setEnvVar] = React.useState("");
   const [uri, setUri] = React.useState("");
@@ -70,7 +73,7 @@ export function AgentSecretValues({
   const columns: Column<AstroliftAgentSecretStatus>[] = [
     {
       id: "envVar",
-      header: "Variable",
+      header: t("variable"),
       sortKey: "envVar",
       cell: (r) => (
         <span className="flex min-w-0 flex-col gap-0.5">
@@ -87,7 +90,7 @@ export function AgentSecretValues({
     },
     {
       id: "uri",
-      header: "Provider URI",
+      header: t("providerUri"),
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (r) => (
         <span className="block max-w-80 truncate" title={r.uri}>
@@ -97,7 +100,7 @@ export function AgentSecretValues({
     },
     {
       id: "provider",
-      header: "Provider",
+      header: t("provider"),
       sortKey: "provider",
       width: "w-40",
       cell: (r) => (
@@ -113,7 +116,7 @@ export function AgentSecretValues({
     },
     {
       id: "status",
-      header: "Value",
+      header: t("value"),
       sortKey: "exists",
       width: "w-28",
       cell: (r) => {
@@ -121,7 +124,7 @@ export function AgentSecretValues({
         return (
           <span className="inline-flex items-center gap-1.5 text-sm" title={r.error ?? undefined}>
             <StatusDot status={STATE_DOT[s]} />
-            {SECRET_STATE_LABEL[s]}
+            {t(`state.${s}`)}
           </span>
         );
       },
@@ -151,26 +154,23 @@ export function AgentSecretValues({
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <p className="text-muted-foreground min-w-0 flex-1 text-sm">
-          Bind variables to provider values, then set, rotate, reveal or delete them. Reveal needs
-          secret.read and a recent step-up sign-in, and hides the value after 30 seconds.
-        </p>
+        <p className="text-muted-foreground min-w-0 flex-1 text-sm">{t("intro")}</p>
         <Button size="sm" onClick={() => setAdding(true)}>
           <LinkIcon className="size-4" />
-          Add binding
+          {t("addBinding")}
         </Button>
       </div>
 
       {readError && (
         <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]" role="status">
-          The secret store could not be read: {readError}.
+          {t("storeReadError", { message: readError })}
         </p>
       )}
 
       <ListPage<AstroliftAgentSecretStatus>
         embedded
         list={list}
-        label="Secrets"
+        label={t("secrets")}
         columns={columns}
         rows={rows}
         getRowId={(r) => r.envVar}
@@ -181,15 +181,14 @@ export function AgentSecretValues({
         totalCount={totalCount}
         empty={{
           icon: <KeyRoundIcon className="size-5" />,
-          title: "No secret bindings",
-          description:
-            "This agent binds no secrets directly. Add a binding, or attach a reusable bundle under Bundles.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
         rowActions={(r) => (
           <>
             <DropdownMenuItem disabled={busyVar === r.envVar} onSelect={() => setSetting(r)}>
               <KeyRoundIcon className="size-4" />
-              {r.exists ? "Rotate value" : "Set value"}
+              {t(r.exists ? "rotateValue" : "setValue")}
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={!r.exists || !r.canReveal || busyVar === `reveal:${r.envVar}`}
@@ -200,7 +199,7 @@ export function AgentSecretValues({
               ) : (
                 <EyeIcon className="size-4" />
               )}
-              {reveals[r.envVar] ? "Hide value" : "Reveal value"}
+              {t(reveals[r.envVar] ? "hideValue" : "revealValue")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -209,7 +208,7 @@ export function AgentSecretValues({
               onSelect={() => setDeleteTarget(r)}
             >
               <Trash2Icon className="size-4" />
-              Delete value
+              {t("deleteValue")}
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
@@ -217,7 +216,7 @@ export function AgentSecretValues({
               onSelect={() => setUnbindTarget(r)}
             >
               <UnlinkIcon className="size-4" />
-              Remove binding
+              {t("removeBinding")}
             </DropdownMenuItem>
           </>
         )}
@@ -227,15 +226,12 @@ export function AgentSecretValues({
         <SheetContent className="flex flex-col">
           <form onSubmit={submitBinding} className="flex min-h-0 flex-1 flex-col">
             <SheetHeader>
-              <SheetTitle>Add a secret binding</SheetTitle>
-              <SheetDescription>
-                The agent receives the provider value as this environment variable. Binding the same
-                variable again updates it.
-              </SheetDescription>
+              <SheetTitle>{t("addTitle")}</SheetTitle>
+              <SheetDescription>{t("bindingDescription")}</SheetDescription>
             </SheetHeader>
             <div className="flex min-w-0 flex-col gap-4 px-4">
               <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="secret-env-var">Environment variable</Label>
+                <Label htmlFor="secret-env-var">{t("environmentVariable")}</Label>
                 <Input
                   id="secret-env-var"
                   className="font-mono"
@@ -245,7 +241,7 @@ export function AgentSecretValues({
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="secret-uri">Provider URI</Label>
+                <Label htmlFor="secret-uri">{t("providerUri")}</Label>
                 <Input
                   id="secret-uri"
                   className="font-mono"
@@ -254,17 +250,19 @@ export function AgentSecretValues({
                   onChange={(e) => setUri(e.target.value)}
                 />
                 <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
-                  Under <span className="font-mono">{refNamespace}/</span>; the platform refuses a
-                  ref outside it.
+                  {t.rich("namespaceNotice", {
+                    namespace: `${refNamespace}/`,
+                    identifier: (chunks) => <span className="font-mono">{chunks}</span>,
+                  })}
                 </p>
               </div>
             </div>
             <SheetFooter className="mt-auto flex-row justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setAdding(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={!envVar.trim() || !uri.trim()}>
-                Save binding
+                {t("saveBinding")}
               </Button>
             </SheetFooter>
           </form>
@@ -276,16 +274,21 @@ export function AgentSecretValues({
           <form onSubmit={submitValue} className="flex min-h-0 flex-1 flex-col">
             <SheetHeader>
               <SheetTitle className="[overflow-wrap:anywhere]">
-                {setting?.exists ? "Rotate" : "Set"}{" "}
-                <span className="font-mono">{setting?.envVar}</span>
+                {t.rich("valueTitle", {
+                  action: t(setting?.exists ? "rotate" : "set"),
+                  name: setting?.envVar ?? "",
+                  identifier: (chunks) => <span className="font-mono">{chunks}</span>,
+                })}
               </SheetTitle>
               <SheetDescription className="[overflow-wrap:anywhere]">
-                Written to <span className="font-mono">{setting?.uri}</span>. The value is never
-                shown again here; Reveal is the audited way to read it.
+                {t.rich("valueWritten", {
+                  uri: setting?.uri ?? "",
+                  identifier: (chunks) => <span className="font-mono">{chunks}</span>,
+                })}
               </SheetDescription>
             </SheetHeader>
             <div className="flex min-w-0 flex-col gap-2 px-4">
-              <Label htmlFor="secret-value">Value</Label>
+              <Label htmlFor="secret-value">{t("value")}</Label>
               <Input
                 id="secret-value"
                 type="password"
@@ -297,10 +300,10 @@ export function AgentSecretValues({
             </div>
             <SheetFooter className="mt-auto flex-row justify-end gap-2">
               <Button type="button" variant="outline" onClick={closeValue}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={!value || busyVar === setting?.envVar}>
-                {busyVar === setting?.envVar ? "Saving…" : setting?.exists ? "Rotate" : "Set"}
+                {t(busyVar === setting?.envVar ? "saving" : setting?.exists ? "rotate" : "set")}
               </Button>
             </SheetFooter>
           </form>
@@ -310,9 +313,9 @@ export function AgentSecretValues({
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={`Delete the value of ${deleteTarget?.envVar ?? "this secret"}?`}
-        description="This deletes the stored value from the secret store. The binding stays; runs fail their preflight until a new value is set."
-        confirmLabel="Delete value"
+        title={t("deleteTitle", { name: deleteTarget?.envVar ?? "" })}
+        description={t("deleteDescription")}
+        confirmLabel={t("deleteValue")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await onDeleteValue(deleteTarget);
@@ -321,9 +324,9 @@ export function AgentSecretValues({
       <ConfirmDialog
         open={unbindTarget !== null}
         onOpenChange={(open) => !open && setUnbindTarget(null)}
-        title={`Remove the ${unbindTarget?.envVar ?? "secret"} binding?`}
-        description="The agent stops receiving this variable. The provider-side value is kept and can be bound again."
-        confirmLabel="Remove binding"
+        title={t("removeTitle", { name: unbindTarget?.envVar ?? "" })}
+        description={t("removeDescription")}
+        confirmLabel={t("removeBinding")}
         destructive
         onConfirm={async () => {
           if (unbindTarget) await onRemoveRef(unbindTarget);
@@ -347,26 +350,27 @@ export interface AgentSecretsTabProps {
  * one on screen at a time by `?section=`, and only that one mounts. Pure.
  */
 export function AgentSecretsTab({ section, values, bundles }: AgentSecretsTabProps) {
+  const t = useTranslations("agentSecrets.values");
   return (
     <SettingsPage
       single={section}
       sections={[
         {
           id: "values",
-          title: "Values",
+          title: t("valuesTitle"),
           content: (
-            <Section title="Values" divided className="min-w-0">
+            <Section title={t("valuesTitle")} divided className="min-w-0">
               {values}
             </Section>
           ),
         },
         {
           id: "bundles",
-          title: "Bundles",
+          title: t("bundlesTitle"),
           content: (
             <Section
-              title="Bundles"
-              description="Reusable sets of secrets, shared across agents and attached here."
+              title={t("bundlesTitle")}
+              description={t("bundlesDescription")}
               divided
               className="min-w-0"
             >

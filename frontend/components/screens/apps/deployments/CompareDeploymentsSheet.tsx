@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { ExternalLinkIcon, GitCompareIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,7 @@ export function CompareDeploymentsSheetView({
   loading,
   error,
 }: CompareDeploymentsSheetViewProps) {
+  const t = useTranslations("apps.deployments.compare");
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col gap-4 sm:max-w-3xl">
@@ -47,7 +50,7 @@ export function CompareDeploymentsSheetView({
                 rel="noreferrer"
                 className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 text-xs"
               >
-                View on source host
+                {t("source")}
                 <ExternalLinkIcon className="size-3" />
               </a>
             )}
@@ -58,7 +61,7 @@ export function CompareDeploymentsSheetView({
                 {cmp.baseSha.slice(0, 7)}...{cmp.headSha.slice(0, 7)}
               </span>
             ) : loading ? (
-              "Loading comparison..."
+              t("loading")
             ) : error ? (
               <span className="text-destructive">{error}</span>
             ) : (
@@ -76,30 +79,25 @@ export function CompareDeploymentsSheetView({
           ) : cmp ? (
             <>
               <section className="space-y-2">
-                <h4 className="text-sm font-semibold">Image diff</h4>
+                <h4 className="text-sm font-semibold">{t("image")}</h4>
                 {cmp.imageDiffSummary ? (
                   <pre className="bg-muted/40 border-border overflow-x-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
                     {cmp.imageDiffSummary}
                   </pre>
                 ) : (
-                  <p className="text-muted-foreground text-xs">
-                    No image diff available for this pair.
-                  </p>
+                  <p className="text-muted-foreground text-xs">{t("noImage")}</p>
                 )}
               </section>
 
               <section className="space-y-2">
                 <h4 className="text-sm font-semibold">
-                  Manifest diff{" "}
+                  {t("manifest")}{" "}
                   <span className="text-muted-foreground text-xs font-normal">
-                    ({cmp.manifestDiff.length} change
-                    {cmp.manifestDiff.length === 1 ? "" : "s"})
+                    {t("changes", { count: cmp.manifestDiff.length })}
                   </span>
                 </h4>
                 {cmp.manifestDiff.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">
-                    Manifests are identical between these two deploys.
-                  </p>
+                  <p className="text-muted-foreground text-xs">{t("identical")}</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {cmp.manifestDiff.map((entry, i) => (
@@ -121,13 +119,14 @@ function ManifestDiffRow({
 }: {
   entry: { op: string; path: string; before: unknown; after: unknown };
 }) {
+  const t = useTranslations("apps.deployments.compare");
   const badge =
     entry.op === "add" ? (
-      <Badge className="border-success-border bg-success/15 text-success-fg">+ add</Badge>
+      <Badge className="border-success-border bg-success/15 text-success-fg">{t("add")}</Badge>
     ) : entry.op === "remove" ? (
-      <Badge variant="destructive">− remove</Badge>
+      <Badge variant="destructive">{t("remove")}</Badge>
     ) : (
-      <Badge className="border-warning-border bg-warning/15 text-warning-fg">~ replace</Badge>
+      <Badge className="border-warning-border bg-warning/15 text-warning-fg">{t("replace")}</Badge>
     );
 
   return (

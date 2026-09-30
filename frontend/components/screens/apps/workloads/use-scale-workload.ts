@@ -4,6 +4,11 @@ import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
 
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
+import {
+  useWorkloadActionPermission,
+  workloadActionRefetch,
+} from "./use-workload-action-permission";
 import { SCALE_WORKLOAD } from "@/graphql/lifecycle/lifecycle.mutations";
 
 /**
@@ -11,12 +16,14 @@ import { SCALE_WORKLOAD } from "@/graphql/lifecycle/lifecycle.mutations";
  * value, scales, toasts, and resolves true when the popover should close.
  * The data half of ScalePopoverView.
  */
-export function useScaleWorkload(workloadId: string, workloadName: string, currentDesired: number) {
+export function useScaleWorkload(workload: AstroliftWorkload, currentDesired: number) {
+  const feedback = useWorkloadActionPermission(workload.viewerCan?.scale, workload.version);
   const [scale, { loading }] = useMutation<{
     scaleAstroliftWorkload: MutationResult<unknown>;
-  }>(SCALE_WORKLOAD);
+  }>(SCALE_WORKLOAD, workloadActionRefetch);
 
   async function apply(value: string): Promise<boolean> {
+    if (feedback.blocked()) return false;
     const next = Number.parseInt(value, 10);
     if (Number.isNaN(next) || next < 0 || next > 50) {
       toast.error("Replicas must be a number between 0 and 50");
@@ -27,19 +34,27 @@ export function useScaleWorkload(workloadId: string, workloadName: string, curre
     }
     try {
       const { data } = await scale({
-        variables: { input: { workloadId, replicas: next } },
+        variables: {
+          input: { workloadId: workload.id, replicas: next },
+          ifMatchVersion: workload.version,
+        },
       });
       if (data?.scaleAstroliftWorkload.ok) {
-        toast.success(`${workloadName} → ${next} replicas`);
+        toast.success(`${workload.name} → ${next} replicas`);
         return true;
       }
-      toast.error(data?.scaleAstroliftWorkload.errors?.[0]?.message ?? "Scale failed");
-      return false;
+      return feedback.reject(data?.scaleAstroliftWorkload, "Scale failed");
     } catch (err) {
       toast.error((err as Error).message);
       return false;
     }
   }
 
-  return { workloadName, currentDesired, loading, apply };
+  return {
+    workloadName: workload.name,
+    currentDesired,
+    loading,
+    apply,
+    permission: feedback.permission,
+  };
 }

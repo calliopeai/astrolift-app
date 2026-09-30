@@ -11,6 +11,7 @@
 
 import { AlertTriangleIcon, CheckCircle2Icon, CopyIcon, GripVerticalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { copyWithFeedback } from "@/lib/copy-with-feedback";
@@ -35,6 +36,7 @@ export function AgentConfigFormPane({
   onSwitchToCode: () => void;
 }) {
   const t = useTranslations("apps.config.builder");
+  const copy = useConfigCopy();
   const [parsed, setParsed] = React.useState(() => tomlToAgentModel(draft));
   const lastEmitted = React.useRef<string | null>(null);
 
@@ -47,10 +49,11 @@ export function AgentConfigFormPane({
     lastEmitted.current = draft;
   }, [draft]);
 
-  const errors = React.useMemo(
+  const rawErrors = React.useMemo(
     () => (parsed.safe ? validateAgentConfig(parsed.model) : []),
     [parsed]
   );
+  const errors = copy.errors(rawErrors);
   const previewToml = React.useMemo(
     () => (parsed.safe ? agentModelToToml(parsed.model) : ""),
     [parsed]
@@ -77,7 +80,9 @@ export function AgentConfigFormPane({
           <AlertTriangleIcon className="text-warning-fg size-4" />
           <span className="font-medium">{t("unsafeTitle")}</span>
         </div>
-        <p className="text-muted-foreground">{t("unsafeBody", { reason: parsed.reason ?? "" })}</p>
+        <p className="text-muted-foreground">
+          {t("unsafeBody", { reason: copy.reason(parsed.reason) })}
+        </p>
         <Button variant="outline" size="sm" className="self-start" onClick={onSwitchToCode}>
           {t("switchToCode")}
         </Button>
@@ -92,7 +97,7 @@ export function AgentConfigFormPane({
           <div className="h-full overflow-y-auto p-5">
             <AgentConfigFormBuilder
               model={parsed.model}
-              errors={errors}
+              errors={rawErrors}
               onChange={handleModelChange}
             />
           </div>

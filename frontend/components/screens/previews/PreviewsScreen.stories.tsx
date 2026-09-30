@@ -1,10 +1,13 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import spanish from "@/messages/es.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
 import { LONG_PREVIEW, PREVIEWS, previewsProps } from "./previews.fixtures";
-import { PREVIEWS_LIST, previewsVariables } from "./previews-list";
+import { localizedPreviewsList, previewsVariables } from "./previews-list";
 import { PreviewsScreen, type PreviewsScreenProps } from "./PreviewsScreen";
 
 const meta: Meta = {
@@ -26,7 +29,8 @@ type Props = Partial<Omit<PreviewsScreenProps, "list">> & {
  * app, status and opened-by variables the hook sends.
  */
 function Previews({ all = PREVIEWS, initial, ...patch }: Props) {
-  const list = useLocalListState(PREVIEWS_LIST, initial);
+  const t = useTranslations("lists.previews");
+  const list = useLocalListState(localizedPreviewsList(t), initial);
   const v = previewsVariables(list.filters, list.state);
   const rows = all.filter(
     (p) =>
@@ -81,5 +85,15 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <Previews all={[LONG_PREVIEW, ...PREVIEWS]} />
     </div>
+  ),
+};
+
+export const SpanishWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }}>
+        <Previews all={[LONG_PREVIEW, ...PREVIEWS]} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

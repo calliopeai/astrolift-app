@@ -183,7 +183,7 @@ export function WebhookDeploysPauseView({
             />
             <p className="text-muted-foreground text-2xs">{t("reasonHelp")}</p>
           </div>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="sm:flex-wrap">
             <AlertDialogCancel disabled={pausing}>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
@@ -191,7 +191,7 @@ export function WebhookDeploysPauseView({
                 void handlePauseConfirm();
               }}
               disabled={pausing}
-              className="bg-warning hover:bg-warning/90 text-white"
+              className="bg-warning hover:bg-warning/90 h-auto min-h-8 max-w-full [overflow-wrap:anywhere] whitespace-normal text-white"
             >
               {pausing ? <Loader2Icon className="size-4 animate-spin" /> : null}
               {t("confirmButton")}

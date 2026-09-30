@@ -2,6 +2,7 @@
 
 import { GitCompareIcon, RocketIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { Column, RowSelection } from "@/components/data-table";
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
@@ -102,6 +103,7 @@ export function AppDeploymentsScreen({
   renderActionDialog,
   renderCompare,
 }: AppDeploymentsScreenProps) {
+  const t = useTranslations("apps.deployments");
   const fmt = useFormatters();
   const [target, setTarget] = React.useState<ActionTarget | null>(null);
   const [pair, setPair] = React.useState<[AstroliftDeployment, AstroliftDeployment] | null>(null);
@@ -109,7 +111,7 @@ export function AppDeploymentsScreen({
   const columns: Column<AstroliftDeployment>[] = [
     {
       id: "deployment",
-      header: "Deployment",
+      header: t("columns.deployment"),
       cellClassName: "max-w-64",
       cell: (d) => (
         <div className="flex min-w-0 flex-col">
@@ -133,13 +135,13 @@ export function AppDeploymentsScreen({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("columns.status"),
       cellClassName: "max-w-64",
       cell: (d) => <DeploymentStatusCell deployment={d} />,
     },
     {
       id: "env",
-      header: "Environment",
+      header: t("columns.environment"),
       cellClassName: "max-w-48",
       cell: (d) => (
         <span className="block truncate font-mono text-xs" title={d.environmentName}>
@@ -149,7 +151,7 @@ export function AppDeploymentsScreen({
     },
     {
       id: "commit",
-      header: "Commit",
+      header: t("columns.commit"),
       cellClassName: "max-w-72",
       cell: (d) =>
         d.commitSha ? (
@@ -174,11 +176,13 @@ export function AppDeploymentsScreen({
     },
     {
       id: "trigger",
-      header: "Trigger",
+      header: t("columns.trigger"),
       cellClassName: "max-w-48",
       cell: (d) => (
         <div className="flex min-w-0 flex-col font-mono text-xs">
-          <span>{d.triggerKind}</span>
+          <span>
+            {t.has(`triggers.${d.triggerKind}`) ? t(`triggers.${d.triggerKind}`) : d.triggerKind}
+          </span>
           {d.commitAuthor && (
             <span className="text-muted-foreground truncate" title={d.commitAuthor}>
               {d.commitAuthor}
@@ -189,13 +193,13 @@ export function AppDeploymentsScreen({
     },
     {
       id: "started",
-      header: "Started",
+      header: t("columns.started"),
       cellClassName: "font-mono text-xs whitespace-nowrap",
       cell: (d) => fmt.formatDateTime(d.startedAt ?? d.createdAt),
     },
     {
       id: "took",
-      header: "Took",
+      header: t("columns.duration"),
       align: "right",
       cellClassName: "font-mono text-xs tabular-nums",
       cell: (d) => formatDuration(d.durationSeconds),
@@ -209,7 +213,7 @@ export function AppDeploymentsScreen({
       <ListPage<AstroliftDeployment>
         embedded
         list={list}
-        label="Deployments"
+        label={t("label")}
         columns={columns}
         rows={rows}
         getRowId={(d) => d.id}
@@ -228,11 +232,10 @@ export function AppDeploymentsScreen({
         onRetry={onRetry}
         empty={{
           icon: <RocketIcon className="size-5" />,
-          title: "No deployments yet",
-          description:
-            "This app hasn't been deployed yet. Deploy from the header, or start one from an environment.",
+          title: t("emptyCurrentTitle"),
+          description: t("emptyCurrentDescription"),
           actionHref: environmentsHref,
-          actionLabel: "Start a deployment",
+          actionLabel: t("emptyStart"),
           learnMoreHref: "/documentation",
         }}
         totalCount={totalCount}
@@ -265,6 +268,7 @@ function CompareAction({
   lookup: (id: string) => AstroliftDeployment | null;
   onCompare: (pair: [AstroliftDeployment, AstroliftDeployment]) => void;
 }) {
+  const t = useTranslations("apps.deployments");
   const picked = selection.selectedIds
     .map(lookup)
     .filter((d): d is AstroliftDeployment => d !== null);
@@ -282,7 +286,7 @@ function CompareAction({
       }}
     >
       <GitCompareIcon className="size-3.5" />
-      {ready ? "Compare" : "Compare (select exactly 2)"}
+      {ready ? t("compare.action") : t("compare.selectTwo")}
     </Button>
   );
 }

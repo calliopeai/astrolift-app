@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import localizedMessages from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
@@ -56,4 +58,14 @@ export const EnvironmentsFailed: Story = {
     environments: [],
     environmentsError: { name: "Error", message: "Permission denied while loading this section" },
   },
+};
+
+export const Localized: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={localizedMessages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

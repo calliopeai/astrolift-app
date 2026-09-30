@@ -12,6 +12,7 @@ export default meta;
 
 type Story = StoryObj<typeof ChangelogScreen>;
 
+/** Without a verified versioned feed the page links the canonical repository history. */
 export const Full: Story = {};
 
 /** Static content: no entries is the closest thing to an empty state. */

@@ -116,7 +116,7 @@ export function PreviewsScreen({
       header: t("columns.status"),
       cell: (p) => (
         <Badge variant="secondary" className="capitalize">
-          {p.status.replace(/_/g, " ")}
+          {t(`status.${p.status}`)}
         </Badge>
       ),
     },
@@ -138,7 +138,7 @@ export function PreviewsScreen({
           <DropdownMenuItem asChild>
             <a href={`https://${p.hostname}`} target="_blank" rel="noreferrer">
               <ExternalLinkIcon className="size-4" />
-              Open preview
+              {t("openPreview")}
             </a>
           </DropdownMenuItem>
         )}
@@ -146,7 +146,7 @@ export function PreviewsScreen({
           <DropdownMenuItem asChild>
             <a href={p.prUrl} target="_blank" rel="noreferrer">
               <GitPullRequestIcon className="size-4" />
-              Open pull request
+              {t("openPullRequest")}
             </a>
           </DropdownMenuItem>
         )}
@@ -171,7 +171,7 @@ export function PreviewsScreen({
       <ListPage<AstroliftPreviewEnvironment>
         header={{ crumbs: appsListCrumbs("previews"), title: t("title") }}
         list={list}
-        label="Previews"
+        label={t("pluralLabel")}
         columns={columns}
         rows={rows}
         getRowId={(p) => p.id}

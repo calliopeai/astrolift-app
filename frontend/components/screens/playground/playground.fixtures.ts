@@ -13,56 +13,56 @@ export const LONG =
   "Summarise the attached incident review for the platform-team-shared-production-workloads-us-west-2 cluster, including every contributing factor, the timeline of operator actions, and a deliberately long list of follow-ups that keeps going";
 
 export const PLAYGROUND: Omit<PlaygroundScreenProps, "batch"> = {
-  models: ["Genesis", "Explorer", "Quantum"],
+  models: [
+    {
+      id: "019abcde-1111-7000-8000-000000000001",
+      name: "Qwen workspace",
+      variant: "vllm",
+      registeredAppSlug: "support",
+      environmentName: "production",
+    },
+  ],
+  model: "019abcde-1111-7000-8000-000000000001",
+  modelName: "Qwen workspace",
+  setModel: noop,
+  search: "",
+  setSearch: noop,
+  page: 1,
+  totalCount: 1,
+  setPage: noop,
+  catalogLoading: false,
+  catalogError: false,
+  onCatalogRetry: noop,
+  readiness: "READY",
+  onReadinessRetry: noop,
+  maxPromptChars: 4000,
+  maxOutputTokens: 128,
+  maxWaitSeconds: 40,
+  canSend: true,
+  error: null,
   tab: "chat",
   setTab: noop,
-  title: "Zero-shot notes",
+  title: "Arithmetic example",
   setTitle: noop,
   messages: [
-    { role: "user", content: "Explain the concept of zero-shot prompting." },
-    {
-      role: "assistant",
-      content:
-        "Zero-shot prompting means asking a model to perform a task without giving it any examples. The model relies solely on its pre-trained knowledge to generate a response.",
-    },
-    { role: "user", content: "Give me one example." },
-    {
-      role: "assistant",
-      content: '[Genesis] This is a simulated response to: "Give me one example."',
-    },
+    { role: "user", content: "What is 2+2?" },
+    { role: "assistant", content: "4", totalTokens: 12, latencyMs: 850 },
   ],
   prompt: "",
   setPrompt: noop,
-  model: "Genesis",
-  setModel: noop,
   loading: false,
   savedSessions: [
     {
-      id: "s-1",
-      title: "Zero-shot notes",
-      model: "Genesis",
+      id: "019abcde-1111-7000-8000-000000000002",
+      title: "Arithmetic example",
+      model: "019abcde-1111-7000-8000-000000000001",
+      modelName: "Qwen workspace",
       updatedAt: "2026-09-27T14:05:00Z",
       starred: true,
-      messageCount: 4,
-    },
-    {
-      id: "s-2",
-      title: "SQL for top customers",
-      model: "Explorer",
-      updatedAt: "2026-09-26T09:12:00Z",
-      starred: false,
       messageCount: 2,
     },
-    {
-      id: "s-3",
-      title: "Microservices pros and cons",
-      model: "Quantum",
-      updatedAt: "2026-09-25T17:40:00Z",
-      starred: false,
-      messageCount: 6,
-    },
   ],
-  activeSavedId: "s-1",
+  activeSavedId: "019abcde-1111-7000-8000-000000000002",
   onSend: noop,
   onSave: noop,
   onShare: asyncNoop,
@@ -71,25 +71,20 @@ export const PLAYGROUND: Omit<PlaygroundScreenProps, "batch"> = {
   onDelete: noop,
   onStar: noop,
 };
-
 export const BATCH: PlaygroundBatchProps = {
-  input: '{"prompt": "What is 2+2?"}\n{"prompt": "Name three primary colours"}',
+  input: "What is 2+2?\nName three primary colours",
   setInput: noop,
-  inputs: ['{"prompt": "What is 2+2?"}', '{"prompt": "Name three primary colours"}'],
+  inputs: ["What is 2+2?", "Name three primary colours"],
   running: false,
+  cancelled: false,
+  canRun: true,
+  invalid: false,
   results: [
-    {
-      input: '{"prompt": "What is 2+2?"}',
-      output: "[Genesis] simulated response for input length 25",
-      ok: true,
-    },
-    {
-      input: '{"prompt": "Name three primary colours"}',
-      output: "[Genesis] simulated response for input length 39",
-      ok: true,
-    },
+    { input: "What is 2+2?", output: "4", ok: true },
+    { input: "Name three primary colours", output: "Red, green, blue", ok: true },
   ],
   onRun: asyncNoop,
+  onCancel: noop,
   onExportCsv: noop,
   onExportJsonl: noop,
   onCopyJson: asyncNoop,
@@ -97,49 +92,21 @@ export const BATCH: PlaygroundBatchProps = {
 
 export const HISTORY: PlaygroundHistorySession[] = [
   {
-    date: "2026-02-23",
-    prompt: "Explain zero-shot prompting in simple terms",
-    model: "Genesis",
-    tokens: 312,
-    status: "completed",
-  },
-  {
-    date: "2026-02-22",
-    prompt: "Generate SQL to find top 10 customers by revenue",
-    model: "Explorer",
-    tokens: 287,
-    status: "completed",
-  },
-  {
-    date: "2026-02-18",
-    prompt: "Review this code for security vulnerabilities",
-    model: "Quantum",
-    tokens: 932,
-    status: "error",
+    schema: 2,
+    id: "019abcde-1111-7000-8000-000000000002",
+    title: "Arithmetic example",
+    model: "019abcde-1111-7000-8000-000000000001",
+    modelName: "Qwen workspace",
+    messages: [
+      { role: "user", content: "What is 2+2?" },
+      { role: "assistant", content: "4", totalTokens: 12, latencyMs: 850 },
+    ],
+    createdAt: "2026-09-27T14:05:00Z",
+    updatedAt: "2026-09-27T14:05:00Z",
+    starred: true,
   },
 ];
-
-export const STARRED: PlaygroundStarredPrompt[] = [
-  {
-    title: "Unit test generator",
-    prompt:
-      "Write a comprehensive unit test suite for the following TypeScript function. Cover edge cases, null inputs, and boundary conditions.",
-    model: "Explorer",
-    date: "2026-02-20",
-  },
-  {
-    title: "SQL optimiser",
-    prompt: "Analyse this SQL query and suggest optimisations for performance.",
-    model: "Quantum",
-    date: "2026-02-18",
-  },
-  {
-    title: "Email drafter",
-    prompt: "Draft a professional email to announce a new product feature.",
-    model: "Genesis",
-    date: "2026-02-15",
-  },
-];
+export const STARRED: PlaygroundStarredPrompt[] = HISTORY;
 
 export const OBSERVABILITY: PlaygroundObservabilityScreenProps = {
   run: {

@@ -104,8 +104,6 @@ export function ApprovalScreen({
     d.status === "rolled_back" ||
     d.status === "superseded";
   const failed = d.status === "failed";
-  const showApproveCta = needsApproval && canApprovePermission && !isSelfTrigger;
-  const showRejectCta = needsApproval && canApprovePermission && !isSelfTrigger;
 
   return (
     <PageShell title={t("title")} description={`${d.registeredAppSlug} → ${d.environmentName}`}>

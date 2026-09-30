@@ -22,6 +22,7 @@ import { useSkillBuilder } from "./agents/skills/use-skill-builder";
 import { GET_SKILL } from "@/graphql/agents/agents.queries";
 import { AgentConfigFormPane } from "./apps/config/AgentConfigFormPane";
 import { PANE_PROPS } from "./apps/config/app-config-agent.fixtures";
+import { WORKLOAD_WEB } from "./apps/controls/app-controls.fixtures";
 import { useEnvironmentControls, useWorkloadOps } from "./apps/controls/use-controls-section";
 import { useDeployToken } from "./apps/controls/use-deploy-token";
 import { ENVS } from "./apps/managed-services/app-managed-services.fixtures";
@@ -52,10 +53,14 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => "/apps",
 }));
-vi.mock("next-intl", async (original) => ({
-  ...(await original<typeof import("next-intl")>()),
-  useTranslations: () => (key: string) => key,
-}));
+vi.mock("next-intl", async (original) => {
+  const actual = await original<typeof import("next-intl")>();
+  return {
+    ...actual,
+    useTranslations: (namespace?: string) =>
+      namespace?.startsWith("shared.") ? actual.useTranslations(namespace) : (key: string) => key,
+  };
+});
 vi.mock("@/lib/permissions/use-my-permissions", () => ({
   useMyPermissions: () => ({ can: () => true, loading: false }),
 }));
@@ -82,7 +87,7 @@ let queryFails: boolean;
 let client: ApolloClient;
 function wrapper({ children }: PropsWithChildren) {
   return (
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
       <ApolloProvider client={client}>{children}</ApolloProvider>
     </NextIntlClientProvider>
   );
@@ -230,8 +235,8 @@ describe("plain action failures (#2146)", () => {
     expect(state.success).not.toHaveBeenCalled();
   });
   it("reports restart rejection and returns false from scale so its counter can revert", async () => {
-    const workload = { id: "w-1", name: "api" } as Parameters<typeof useWorkloadOps>[1];
-    const { result } = renderHook(() => useWorkloadOps("prod", workload, "api"), { wrapper });
+    const workload = { ...WORKLOAD_WEB, id: "w-1", name: "api" };
+    const { result } = renderHook(() => useWorkloadOps(workload), { wrapper });
     await act(async () => {
       await result.current.onRestart();
       expect(await result.current.onApply(3)).toBe(false);
@@ -450,7 +455,10 @@ describe("real Apollo refetch rejection", () => {
       ).toEqual({});
     });
     expect(state.success).toHaveBeenCalledWith("Skill saved");
-    expect(state.warning).toHaveBeenCalled();
+    // Apollo's onQueryUpdated passes a cache diff as its second argument.
+    expect(state.warning).toHaveBeenCalledWith(
+      "Could not refresh the view. Refresh to see current data."
+    );
     expect(requests.filter((r) => r.operation === "GetSkill")).toHaveLength(2);
     expect(requests.filter((r) => r.operation === "UpdateSkill")).toHaveLength(1);
   });

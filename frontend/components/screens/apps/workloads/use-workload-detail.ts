@@ -16,7 +16,6 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 import { GET_WORKLOAD, LIST_CONTAINERS } from "@/graphql/registry/registry.queries";
 import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/registry.types";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface WorkloadResp {
   astroliftWorkload: AstroliftWorkload | null;
@@ -50,8 +49,6 @@ const POD_POLL_MS = 15_000;
  * their own.
  */
 export function useWorkloadDetail(appSlug: string, workloadSlug: string) {
-  const { can } = useMyPermissions();
-  const canDeploy = can("app.deploy");
   const { data: wlData, loading: wlLoading } = useQuery<WorkloadResp>(GET_WORKLOAD, {
     variables: { appSlug, slug: workloadSlug },
     fetchPolicy: "cache-and-network",
@@ -116,7 +113,6 @@ export function useWorkloadDetail(appSlug: string, workloadSlug: string) {
   return {
     workload: w,
     workloadLoading: wlLoading,
-    canDeploy,
     containers,
     containersLoading: cLoading,
     pods: podRows,

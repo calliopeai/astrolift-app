@@ -8,27 +8,41 @@ This is an audit of current source and focused regressions, not a claim that eve
 
 ## Checks
 
-Final focused verification: **44 React/Apollo checks across 10 files**, **31 Chromium behavior/layout checks**, Storybook production build, TypeScript and ESLint (zero errors; existing effect warnings). No backend/schema changes and no production writes. The parent runs the combined release checks after integration.
+First bounded group verification: **44 React/Apollo checks across 10 files**, **31 Chromium behavior/layout checks**, Storybook production build, TypeScript and ESLint (zero errors; existing effect warnings). No backend/schema changes and no production writes. The parent runs the combined release checks after integration.
 
 Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
+
+The following seven-item slice starts from `66b902d1`: **64 React/Apollo checks across four files** (16 new operational/route checks plus existing query-state/frame regressions), **53 affected portable stories**, **13 Chromium behavior/layout checks**, Storybook production build, TypeScript and ESLint with zero warnings/errors in affected files. It uses existing queries/mutations only. Pipeline metadata refusal remains separate from the authorization of secret/run reads. Item 79 was already implemented and is corrected to Pre-existing, with an actual Apollo route regression. Other owners' later fixes are not changed by this slice.
+
+The separate item-21 rotation metadata slice adds a nullable read-only query with
+`app.update` on the coherent live owner and existing credential/policy ceilings.
+Verification: **169 real PostgreSQL/HTTP and owner/guardrail checks** (31 new),
+**49 React/Apollo checks** (10 new), **15 affected portable stories**, eight
+message-catalog checks, atomic SDL/codegen/contracts, TypeScript, Ruff and format
+checks. ESLint has zero errors and one pre-existing create-sheet reset warning.
+Six Chromium checks cover rotation loading/refusal/configured confirmation and the
+existing token/dialog layout states. The duration is a fresh read-time snapshot;
+the mutation retains authorization/elevation and uses its then-current value.
 
 - Focused cluster/config/operational/navigation React and real Apollo tests; terminal polling and actual concurrent mutations use the real Apollo client over a controlled transport.
 - Chromium behavior checks cover actual menu admission, separate SVG paint servers, draft choice/readiness, pending rows, command target and uppercase-running input.
 - Typecheck, ESLint and affected Storybook builds/layout checks; the parent runs the final combined route/build checks.
 
+Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 affected portable stories**, **19 Chromium layout checks**, Storybook production build, TypeScript and ESLint (zero errors, one existing PageShell storage-effect warning). Shared-context hydration and framed/agent-shell behavior remain covered, image configuration is checked against the shipped Dockerfile, and the regenerated reader/packaged documentation copies agree. Other owners' pending fixes and parked routes are preserved.
+
 ## Item evidence
 
 | Item | Status | Current evidence / remaining work |
 | --- | --- | --- |
-| 1. AstroliftPolicy.conditions typed as object but used as an array | Remaining | JSON scalar still generates object types; policy condition arrays need an accurately typed facade/contract. |
+| 1. AstroliftPolicy.conditions typed as object but used as an array | Fixed | The facade treats condition JSON as unknown input for the existing validated parser, allowing arrays and malformed legacy values without an object cast. Policy fixtures use actual arrays; TypeScript and 62 policy story renders pass. |
 | 2. Cluster card view uses plain anchors and reloads the page | Pre-existing | Cluster cards use shared ListPage rowHref/navigation rather than a plain anchor. |
 | 3. Full preflight refresh branch is unreachable | Fixed | Managed row menu exposes onRefresh(cluster,true); real Apollo input and Chromium menu checks. |
 | 4. Organization settings Save is enabled with no changes | Pre-existing | OrganizationSettings passes generalDirty/retentionDirty/policiesDirty to independent save sections. |
 | 5. Cluster status flashes 'No agent' cards while live state loads | Fixed | cluster-connectivity.test.tsx proves unknown/error states do not report No agent or mount provider query slots. |
 | 6. Activity tab copy reads 'BringClusterInto- Management' | Pre-existing | Earlier display copy fix separates bring-into-management workflow words. |
 | 7. Cluster settings allowlist reason omits the bootstrap history table | Pre-existing | frontend/bootstrap.md points at the exact allowlist; raw-table-allowlist.mjs now has an empty baseline. |
-| 8. IngressAuth spinners are inconsistent between Save & Apply and Apply | Remaining | IngressAuth still spins Save & Apply on busy and Apply only on reconciling. |
-| 9. Agent wizard steps are drifting copies of the apps wizard steps | Remaining | AgentReviewSubmitStep still declares local SideEffectStep/StepStatus; wizard copies remain separate. |
+| 8. IngressAuth spinners are inconsistent between Save & Apply and Apply | Fixed | Both actions spin for every busy phase, including a save before reconciliation. React and Chromium checks cover the pre-reconcile state. |
+| 9. Agent wizard steps are drifting copies of the apps wizard steps | Fixed | SourceRepositoryPicker and ReviewParts share selection/progress markup, status types and host mappings. App cluster/CI behavior and agent scan/ref behavior remain explicit. Project validity uses live active-org rows, and submission refreshes the actual destination before registering. |
 | 10. Manifest preview Retry never shows its success or failure toast | Pre-existing | useManifestPreviewStep.auto now takes no options; retry reports its result in the inline banner, without a toast contract. |
 | 11. ObservabilitySection doc comment names the wrong link target | Pre-existing | Earlier observability documentation-link correction is included in the audited base. |
 | 12. CI reference workflow hard-codes aws-region us-west-2 | External | Parent/forms agent owns canonical CI region and CiSetup work; requires their integration, not edits in this branch. |
@@ -40,66 +54,66 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 | 18. Code view 'services' pill never finds the managed services section | Pre-existing | Earlier managed_services section-link codec correction and story are included in the audited base. |
 | 19. Conflict modal 'Force overwrite' does not save anything | Fixed | ConfigEditorClient regression keeps draft without a mutation; explicit Save submits later, including failed-save draft retention. |
 | 20. Path route form cannot be submitted when no workloads exist | Pre-existing | Old path-route/workload form is absent; AddDomainSheet submits a hostname without an empty workload Select. |
-| 21. Deploy token rotate confirm ignores the configured grace period | Remaining | DeployTokensScreen rotate confirmation still uses ROTATION_GRACE_DEFAULT_SECONDS; no pre-rotation configured grace read is wired. |
+| 21. Deploy token rotate confirm ignores the configured grace period | Fixed | App-update scoped metadata reuses the rotation helper; every confirmation opens with an uncached read and blocks while loading/refused/missing. Real PostgreSQL/HTTP roles, bearer ceilings, live ancestry, policy denies and mutation/clamp parity plus Apollo target/org/app race and retry regressions; exact duration and snapshot semantics are explicit. |
 | 22. Secret expiry badge says 'Expired 1d ago' for keys expiring today | Pre-existing | Earlier future-under-a-day SecretExpiryBadge correction is included in the audited base. |
 | 23. Secret sheets are not blocked while a rotate is in flight | Fixed | Real Apollo rotation request now contributes to useAppSecrets.busy for both shared sheets. |
 | 24. Email detail sheet comment says five panels, it renders twelve | Pre-existing | EmailDetailSheet header documents five health panels and separately scoped embedded lists. |
 | 25. Email sheet allowlist reason misdescribes its tables | Pre-existing | Email tables migrated to embedded ListPage; raw table allowlist is empty and bootstrap references its exact-match gate. |
 | 26. Workload detail links use plain anchors and reload the page | Pre-existing | Earlier WorkloadLink navigation correction is included in the audited base. |
-| 27. Danger zone deregister badge never shows before first open | Remaining | DangerZone still loads deregistration preview only after opening; pre-open magnitude is unavailable. |
-| 28. Clearing an environment override has no busy state | Remaining | EnvironmentSettings clear override button still lacks pending admission/disabled state. |
+| 27. Danger zone deregister badge never shows before first open | Fixed | The existing app-scoped preview loads after delete permission metadata resolves and supplies the count before opening. Confirmation refreshes it; refused/unknown previews do not become zero-resource claims or permit confirmation. Actual Apollo/React regressions cover pre-open counts, missing/unknown admission and refresh refusal. |
+| 28. Clearing an environment override has no busy state | Fixed | Environment/key-scoped pending admission survives the awaited refetch; the clear button disables and spins only its row. pending-operations.test.tsx covers duplicates, denial and refresh completion. |
 | 29. Command runner Run does nothing when no container is selected | Fixed | Operational React and Chromium checks require a nonempty containerName before Run. |
 | 30. Run command page highlights the Deployments tab | Fixed | Command runner fallback uses commands; canonical AppCommandsRedirect already resolves Logs & metrics Commands. |
-| 31. Observability duplicates pod selection and ignores ?container= | Remaining | use-app-observability.ts still has KNOWN_SIDECARS/pickDefaultContainer and does not consume container deep-link state. |
-| 32. Agent list item Pick omits fields the schema now provides | Remaining | Agent list facade omits run-spec baseline fields; AgentControl retains save-to-set fallback notices. Verify current reads before altering DTO. |
+| 31. Observability duplicates pod selection and ignores ?container= | Fixed | Logs and shell use the shared live-target helpers. Observability honors container URLs, resets local picks for new links, and falls back when a linked pod/container is gone; the actual stream variables are checked. |
+| 32. Agent list item Pick omits fields the schema now provides | Fixed | All fleet/workload list documents read the supported replica, loop-cap and scheduled-scaling fields. The editor seeds stored values before saving, preserves zero/null and keeps drafts during polling. Actual SDL validation covers all four documents. |
 | 33. Run status spellings drift between terminal set and tones | Fixed | Terminal aliases are shared and case normalized; actual Apollo polling stops both task/log reads, canceled timeline is skipped. |
-| 34. Agent and apps repo pickers link to different provider routes | Remaining | AgentRepoPickerStep points at settings/source-providers, app RepoPickerStep at providers#source; shared canonical picker route remains to reconcile. |
+| 34. Agent and apps repo pickers link to different provider routes | Fixed | Agent and app repository pickers now link directly to /providers#source. The affected story and Chromium check assert the canonical destination. |
 | 35. Run content comment disagrees with StatusCell badge variants | Pre-existing | AgentRunScreen now uses StatusDot/runDot; the obsolete outline/secondary status-badge comment is absent. |
 | 36. Agent overview matches running status case-sensitively | Fixed | AgentOverview matches RUNNING case insensitively; focused React/Chromium overseer input checks. |
 | 37. Overview run mode tile shows 'Service · Service' | Pre-existing | AgentOverview uses AgentFrame.runModeLabel, which merges repeated family/mode values. |
-| 38. Secret bundle Attach and key Delete can fire twice | Remaining | Attach button and key-delete opener still omit the hook busy value; ConfirmDialog guards its own pending confirmation only. |
-| 39. Add / update ref button stays clickable during save | Remaining | AgentSecrets Add/update ref button still ignores busyVar; hook tracks untrimmed envVar while mutation trims it. |
-| 40. Agent secrets dialog leaks reveal timers on close | Remaining | use-agent-secrets.clearReveals clears values but does not cancel/reset revealTimers until unmount. |
-| 41. Agent secrets page assumes env spec slug equals agent slug | Remaining | Current SecretsContent still passes agent slug directly as envSpecSlug and documents that assumption; an actual association read is needed. |
+| 38. Secret bundle Attach and key Delete can fire twice | Fixed | Bundle actions keep independent pending keys; Attach and key-delete controls disable their operation. Real Apollo regressions prove duplicate calls reach the transport once and failures release admission. |
+| 39. Add / update ref button stays clickable during save | Fixed | Reference mutation variables and pending keys use the trimmed environment variable. The view disables that ref save and keeps drafts changed during an earlier request. |
+| 40. Agent secrets dialog leaks reveal timers on close | Fixed | Closing, changing the environment spec or unmounting cancels timers and invalidates late reveal responses; a cleared older timer cannot hide a later reveal. Real Apollo/timer regressions cover each boundary. |
+| 41. Agent secrets page assumes env spec slug equals agent slug | Fixed | Explicit active-org environment-spec choice uses bounded server search/pages and verifies the returned ID and slug through the owner-filtered singular API. Values/bundles use only that confirmed recipe; agent/org changes and unavailable/error checks close editors and discard revealed values. Edits are spec-wide; no agent default or dispatch association is claimed. |
 | 42. Register tool form has two duplicate close buttons | Pre-existing | AddToolForm dialog was replaced by AddToolScreen/use-add-tool page flow; duplicate dialog cancellation path is absent. |
-| 43. PageShell imports from app/, breaking the components rule | Remaining | PageShell still imports useAppChrome from an app route directory. |
+| 43. PageShell imports from app/, breaking the components rule | Fixed | Shared app chrome context now lives in lib/app-chrome-context.tsx; PageShell and every route/story consumer import the same shared module. Existing navigation/hydration and new framed/agent-shell tests preserve behavior. |
 | 44. Profile identity copy points to the old organization settings path | Pre-existing | Earlier profile organization-link correction is included in the audited base. |
 | 45. AppearanceClient export actually renders language and timezone | Pre-existing | ProfilePreferences now contains language/timezone only; appearance has its own settings page. |
-| 46. 'Cannot delete the active provider' toast is unreachable | Remaining | Active IdP deletion is disabled in the view; unreachable defensive hook toast remains cleanup work. |
+| 46. 'Cannot delete the active provider' toast is unreachable | Fixed | Removed the unreachable active-provider toast callback from the hook, view and fixture. Active-provider Delete remains disabled, with local request admission still refusing active rows. |
 | 47. Identity provider client ID always gets an ellipsis | Pre-existing | Earlier IdP client-id truncation correction is included in the audited base. |
 | 48. 'Active since' falls back to updatedAt for legacy providers | Pre-existing | Earlier IdP observed activation-date correction is included in the audited base. |
 | 49. Agents Active and History tables show raw ISO timestamps | Pre-existing | Current AgentRunScreen Time formats startedAt/finishedAt with formatRelativeAge; old Active/History components are gone. |
 | 50. useAgentBoxes hides includeEnded behind a type cast | Pre-existing | useAgentBoxes uses AgentBoxesVars directly with orgId/includeEnded; hidden variable cast is gone. |
-| 51. 'No other sessions' toast can never fire | Remaining | No-other-session toast remains a defensive hook path behind a disabled sign-out-all view. |
+| 51. 'No other sessions' toast can never fire | Fixed | Removed the unreachable no-other-sessions toast callback. The actual count and pending state still guard the disabled sign-out action and confirmation admission. |
 | 52. Identity providers doc link label does not match its target | Pre-existing | Earlier identity-provider organization-label documentation correction is included in the audited base. |
-| 53. Introduction, Get Started and Changelog describe an unrelated boilerplate | Remaining | Introduction/GetStarted/Changelog still require product-fact review; this branch does not claim their static content is accurate. |
-| 54. Changelog shows unknown entry types as destructive | Remaining | ChangelogScreen.typeVariant still gives unrecognized types destructive styling. |
+| 53. Introduction, Get Started and Changelog describe an unrelated boilerplate | Fixed | Introduction and local setup describe the current Astrolift/Kubernetes control plane, Temporal and actual bootstrap/run.sh/Makefile commands. The Changelog page removes unsupported dashboard versions/dates, explicitly reports unavailable versioned notes and links canonical private repository history. Generated reader/packaged docs are refreshed. |
+| 54. Changelog shows unknown entry types as destructive | Fixed | Unknown changelog categories use a neutral outline badge; a React regression prevents them being interpreted as failures. |
 | 55. Cluster prerequisites renders 'whosespec.ingressClassName' | Pre-existing | Earlier cluster prerequisite spec spacing correction is included in the audited base. |
 | 56. Cluster prerequisites cert-manager text loses a space | Pre-existing | Earlier prerequisite cert-manager spacing correction is included in the audited base. |
-| 57. Configuration docs handle an 'image' source nothing uses | Remaining | ConfigurationScreen still advertises image source; only story fixtures currently supply image-source rows. |
+| 57. Configuration docs handle an 'image' source nothing uses | Fixed | The real Configuration reference now includes PYTHONUNBUFFERED=1 as an image-sourced default from backend/Dockerfile. A source-contract regression and the production ImageDefaults story back the source category with actual runtime configuration. |
 | 58. Help copyDiagnostics timer is never cleared | Fixed | Help copy timers are replaced on repeat and cleared at unmount; clipboard completion after unmount is ignored. |
 | 59. Mute hours above 168 are not rejected in the submit handler | Pre-existing | display-logic.test.tsx verifies integer 1..168-hour boundaries and pending refusal. |
 | 60. Dashboard loading skeleton no longer matches the layout | Pre-existing | DashboardLoading was replaced by components/home/HomeScreen HomeSkeleton over current panel spans. |
 | 61. Dashboard counts recent failures twice | Pre-existing | Old DashboardScreen failure tiles are gone; current HomeScreen/HomeScreen.test.tsx use permission-scoped home panels. |
-| 62. ApprovalScreen computes unused approve and reject CTA flags | Remaining | ApprovalScreen still computes unused showApproveCta/showRejectCta. |
-| 63. Approval history tones use hard-coded rgb() values | Remaining | ApprovalHistory still returns inline rgb colors for tone borders/icons. |
+| 62. ApprovalScreen computes unused approve and reject CTA flags | Fixed | Removed unused showApproveCta/showRejectCta locals; the rendered approval controls retain their existing permission and self-trigger checks. |
+| 63. Approval history tones use hard-coded rgb() values | Fixed | Approval history borders and icons use success/danger/muted semantic Tailwind tokens instead of raw inline RGB styles. The icon registry uses stable module-level component references. |
 | 64. Approvals select-all is wrong when stale ids remain selected | Pre-existing | display-logic.test.tsx verifies visible approval selection after polling, including stale ids. |
 | 65. Form submissions sparkline mixes local and UTC dates | Parked | Forms route flag remains false. Do not enable or claim runtime fulfillment of sparkline time display. |
 | 66. Form detail says 'No published form found' for any missing form | Pre-existing | Earlier missing-form copy fix is included; Forms remains parked independently of this copy correction. |
 | 67. Managed domains table flashes the skeleton on poll | Pre-existing | ManagedDomainsScreen now delegates loading/rows to shared ListPage/DataTable rather than replacing its whole table on poll. |
-| 68. Downloads PackageRow has unused badge and disabled props | Remaining | DownloadsScreen PackageRow still declares unused badge/disabled props. |
+| 68. Downloads PackageRow has unused badge and disabled props | Fixed | Removed PackageRow badge/disabled props and their unused rendering branches; both real install-channel callers retain their command/copy behavior. |
 | 69. Redeploy input shape differs between detail and list screens | Pre-existing | use-deployment-detail.onRedeploy now sends input {id: deployment.id}, matching other actual callers. |
 | 70. Metrics footer links Temporal UI to localhost | Fixed | Metrics receives existing NEXT_PUBLIC_TEMPORAL_UI_URL from its route container; hides link when unconfigured; focused React check. |
 | 71. Ops cluster status comment contradicts the code | Pre-existing | use-ops now reads scoped queries; obsolete disabled-cluster aggregation comment is absent there. |
 | 72. Job run breadcrumbs link to ?tab= values the Jobs page ignores | Pre-existing | Jobs use actual runs/commands routes; old ignored ?tab= links are absent. |
 | 73. Command run page comment says no singular query exists | Pre-existing | Old commands page is a documented redirect to Logs Commands; stale singular-query comment is absent. |
 | 74. Task output storage copy contradicts itself | Pre-existing | Old TasksScreen inline-output placeholder is absent; TaskRunDetail consistently documents pod output/console link. |
-| 75. Playground hook order depends on a route flag | Parked | Playground route flag remains false; no feature activation or hook-order acceptance work in this branch. |
-| 76. Playground runs entirely on simulated responses | Parked | Playground remains parked; no simulated inference is wired or advertised as successful. |
+| 75. Playground hook order depends on a route flag | Fixed | Server route guards precede separately mounted client containers; hook order is independent of route flags. Only actual prompt/local-history/starred routes are enabled; unrelated showcases remain parked. |
+| 76. Playground runs entirely on simulated responses | Fixed | Actual persisted endpoint GUIDs use the existing authorized vLLM prompt relay; readiness is advisory, failures/timeouts/null results never become assistant success, and batch is bounded/sequential/cancellable without retry. Real PG/HTTP authorization, Apollo race/transport tests, portable stories and a controlled production-browser prompt prove the path without invoking tenant models. History/starred are explicitly scoped browser-local records. |
 | 77. Invitation expiry badge shows NaN for unparseable dates | Pre-existing | display-logic.test.tsx verifies invalid/nonfinite invitation expiry remains unavailable. |
 | 78. 'New Pipeline' links to a route that does not exist | Pre-existing | pipelines/new has actual page/new-pipeline-client routes; it no longer falls through to a detail id of new. |
 | 79. Pipeline secrets route opens on the Runs tab | Pre-existing | usePipelineDetail selects secrets when the actual pathname ends with /secrets; this branch already honors the route independently of a tab query. |
-| 80. Pipeline detail title is always 'Pipeline' | Remaining | PipelineDetailClient still reads usePipelineDetail runs; no pipeline-name lookup is wired on this audited branch. |
+| 80. Pipeline detail title is always 'Pipeline' | Fixed | The existing GET_PIPELINE definition read supplies the visible pipeline name on both detail and secrets routes. Loading, refused and missing metadata states stay distinct; run/secret reads retain their separate gates. pipeline-route.test.tsx and Chromium verify the actual title and secrets tab. |
 | 81. Webhook row actions disable the button on every row | Fixed | Real concurrent Apollo request regression verifies synchronous same-row exclusion and independent release on transport/success; row menu uses pendingRows. |
 | 82. Create sheets default slugs the backend rejects | Fixed | Shared default slug generation obeys core/naming.py letter-start/40-char/end-alnum rules; create sheets/hooks refuse invalid submissions. |
 | 83. Create project ignores ?team= | Fixed | useProjects passes team query through dialog props; requested visible team is selected after load/reopen, unavailable request does not silently select another. |
@@ -113,6 +127,35 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 
 ## Dependencies and limits
 
-- Rotation grace (#21) needs a truthful configured value before confirmation; do not replace it with another guessed default. Agent environment-spec association (#41) needs the actual persisted relationship rather than a slug convention.
-- Copies of the wizard, the app Chrome context location, unused props/flags, and presentation-token cleanup remain listed explicitly; this bounded fix does not redesign those surfaces.
+- Rotation grace (#21) reads the configured value before confirmation. Agent secrets (#41) require an explicit verified recipe choice; workloads have no singular persisted default recipe, and per-run/box recipe FKs may differ.
+- Wizard selection/progress copies are now shared. The app Chrome context location, unused props/flags, and presentation-token cleanup retain their own audit rows.
 - The only locale edit changes the existing identical English manifest-conflict description in all eight catalogs to describe an unsaved draft. Full translation work remains #2145.
+
+## Wizard and target follow-up
+
+Items 8, 9, 31 and 32 were validated with 383 affected Vitest checks, 257
+portable Storybook states and four Chromium checks, including both repository
+pickers at 480px. TypeScript and changed-file ESLint pass. The agent list query
+contract tests validate against the committed SDL; no server schema changes are
+required.
+
+The app and agent wizards keep their distinct registration contracts. Both wait
+for an active organization and require a live project returned for that org;
+a fresh destination read precedes registration, and the mutation still enforces
+access. A changed organization remounts the wizard so source, project and scan
+choices start again. An unresolved or no-longer-visible source connection cannot
+advance the repository step. Personal source connections remain eligible when
+the API returns them; OAuth app configuration rows remain excluded.
+
+Pod names and container names in URLs are temporary selections, so a replaced
+pod or missing container resolves to a live fallback. The shared helper does not
+add pod reads to inactive metrics panels. This follow-up does not infer an agent
+or environment-spec association; item 41 retains its separate status.
+
+### Explicit agent secret source (#41)
+
+The page starts without a recipe selection, including when an unrelated spec happens to share the agent slug. The existing `agentEnvironmentSpecsPage` searches and pages at 20 rows, scoped to the active organization. Only a returned choice can be selected; `agentEnvironmentSpec` must then return its exact ID and slug before either editor mounts. Loading, failed verification, deleted/recreated slugs and missing visibility close editors. Agent/organization changes reset search, selection, drafts and revealed values. Known missing/unknown `agent_env_spec.read` skips source queries; missing `secret.list` skips editors, and missing `secret.read` skips bundle attachment queries. These permission hints are not authority: server owner, credential and mutation guards remain authoritative.
+
+The choice is read-time verified, with a manual refresh control. It is a recipe-wide editor, not a durable agent default or a dispatch association. Existing secret mutations remain slug-addressed; this change does not add an atomic spec-ID precondition or a new backend association API. Dispatch must select the recipe independently.
+
+Validation covers real Apollo queries/mutation envelopes, bounded search/pagination, same-slug nonselection, visibility loss, reused slug IDs, verification errors, agent/org reset and revealed-value cleanup; both new documents validate against the committed schema. Existing real PostgreSQL owner/token/HTTP tests pass for environment-spec pages (10) and secret owners/mutations (6). Portable source/value/bundle stories and Chromium unselected/unavailable/480px long-recipe checks pass. No backend schema, migration, fleet association, live cloud operation or secret-provider write was changed.

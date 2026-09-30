@@ -388,7 +388,62 @@
           "NEVER": "Never deployed"
         }
       },
-      "count": "Showing {shown} of {total}"
+      "count": "Showing {shown} of {total}",
+      "newApp": "New app",
+      "getStarted": "Get started",
+      "pin": "Pin",
+      "pinApp": "Pin to top",
+      "unpinApp": "Unpin app",
+      "none": "none",
+      "noneYet": "none yet",
+      "unknown": "unknown",
+      "noWorkloads": "No workloads yet",
+      "columns": {
+        "app": "App",
+        "status": "Status",
+        "kind": "Kind",
+        "cluster": "Cluster",
+        "lastDeploy": "Last deploy",
+        "registered": "Registered",
+        "project": "Project"
+      },
+      "kinds": {
+        "service": "Single service",
+        "service-data": "Service and data",
+        "service-worker": "Web and worker",
+        "microservices": "Microservices",
+        "service-agent": "App and agent",
+        "agent": "Agent",
+        "functions": "Functions",
+        "scheduled": "Scheduled",
+        "task": "Task",
+        "workflow": "Workflow",
+        "mixed": "Mixed"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "failing": "Failing",
+        "archived": "Archived",
+        "mineNote": "Mine means apps you hold a role on, directly or through their project, team or organization, until apps record who owns them."
+      },
+      "bulk": {
+        "restart": "Rolling restart",
+        "pushSecrets": "Push secrets",
+        "resync": "Resync manifest",
+        "succeeded": "{action}: {okCount}/{total} apps succeeded",
+        "failed": "{action} failed for: {failedSlugs}"
+      },
+      "pushSecrets": {
+        "bundle": "Bundle slug",
+        "environment": "Environment (optional)",
+        "cancel": "Cancel",
+        "busy": "Pushing...",
+        "title": "{count, plural, one {Push secrets to # app} other {Push secrets to # apps}}",
+        "submit": "{count, plural, one {Push to # app} other {Push to # apps}}",
+        "description": "Project the named secret bundle onto every selected app. Leave environment blank to fan out to every environment the bundle is bound to."
+      },
+      "previewCount": "{count, plural, one {# preview} other {# previews}}"
     },
     "tabs": {
       "ariaLabel": "App sections",
@@ -671,6 +726,12 @@
         "confirm": "Deploy",
         "started": "Deploy started: {tag} to {env}",
         "failed": "Deploy failed"
+      },
+      "deployActivity": {
+        "title": "Deploy activity",
+        "latest": "Last <mono>{limit, number}</mono>",
+        "inFlight": "· <mono>{count, number}</mono> in flight",
+        "all": "View all"
       }
     },
     "overview": {
@@ -772,6 +833,25 @@
         "emptyTitle": "No source repo",
         "emptyDescription": "Connect a repo so a push can build and deploy this app.",
         "emptyAction": "Open settings"
+      },
+      "activity": {
+        "title": "Activity",
+        "filteredCount": "{count, plural, one {# event} other {# events}} of {total, number}",
+        "count": "{count, plural, one {# event} other {# events}}",
+        "searchPlaceholder": "Search…",
+        "searchLabel": "Search activity",
+        "loadError": "Could not load activity",
+        "emptyTitle": "No recent events for this app",
+        "noMatches": "No events match <badge>{filter}</badge>.",
+        "noMatchesQuery": "No events match <badge>{filter} · \"{query}\"</badge>.",
+        "filters": {
+          "all": "All",
+          "deploy": "Deploys",
+          "config": "Config",
+          "secret": "Secrets",
+          "token": "Tokens",
+          "alert": "Alerts"
+        }
       }
     },
     "wizard": {
@@ -807,7 +887,8 @@
       "filters": {
         "search": "Search commit, tag, branch, workload…",
         "anyEnv": "Any env",
-        "counts": "{filtered} of {total}"
+        "counts": "{filtered} of {total}",
+        "searchCurrent": "Search tags, commits, branches…"
       },
       "table": {
         "when": "When",
@@ -845,6 +926,79 @@
         "scheduled": "scheduled",
         "rollback": "rollback",
         "promotion": "promotion"
+      },
+      "label": "Deployments",
+      "emptyCurrentTitle": "No deployments yet",
+      "emptyCurrentDescription": "This app hasn't been deployed yet. Deploy from the header, or start one from an environment.",
+      "columns": {
+        "deployment": "Deployment",
+        "status": "Status",
+        "environment": "Environment",
+        "commit": "Commit",
+        "trigger": "Trigger",
+        "started": "Started",
+        "duration": "Took"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "waiting": "Waiting approval",
+        "failed": "Failed",
+        "today": "Today",
+        "previews": "Previews",
+        "mineNote": "Deployments you triggered."
+      },
+      "statuses": {
+        "pending_approval": "Pending approval",
+        "pending": "Pending",
+        "deploying": "Deploying",
+        "redeploying": "Redeploying",
+        "running": "Running",
+        "failed": "Failed",
+        "superseded": "Superseded",
+        "rolled_back": "Rolled back"
+      },
+      "compare": {
+        "action": "Compare",
+        "selectTwo": "Compare (select exactly 2)",
+        "source": "View on source host",
+        "loading": "Loading comparison...",
+        "image": "Image diff",
+        "noImage": "No image diff available for this pair.",
+        "manifest": "Manifest diff",
+        "changes": "({count, plural, one {# change} other {# changes}})",
+        "identical": "Manifests are identical between these two deploys.",
+        "add": "+ add",
+        "remove": "− remove",
+        "replace": "~ replace"
+      },
+      "actions": {
+        "noActions": "No actions for this deployment",
+        "approve": "Approve",
+        "redeploy": "Redeploy",
+        "rollbackTo": "Roll back to this",
+        "abort": "Abort",
+        "discardFailed": "Discard failed deploy",
+        "abortReasonLabel": "Reason for abort",
+        "abortReasonPlaceholder": "Why are you aborting this deploy?",
+        "requiredReason": "Reason required",
+        "abortTitle": "Abort deploy to {env}?",
+        "abortDescription": "The in-flight rollout will be marked failed. Tell the team what changed.",
+        "abortConfirm": "Abort deploy",
+        "redeployTitle": "Redeploy {tag} to {app}/{env}?",
+        "redeployDescription": "Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config.",
+        "rollbackTitle": "Rollback {env} to {tag}?",
+        "rollbackDescription": "The platform will redeploy this image as the live version. The current rollout will be marked superseded.",
+        "rollbackConfirm": "Roll back",
+        "discardReasonLabel": "Reason for discard",
+        "discardReasonPlaceholder": "Why are you discarding this deploy?",
+        "discardTitle": "Discard failed deploy {tag}?",
+        "discardDescription": "The row stays in history but the rollout is marked aborted. Tell the team what changed.",
+        "discardConfirm": "Discard",
+        "missingResponse": "{action}: no response received",
+        "failed": "{action} failed",
+        "success": "{action}: {status}",
+        "defaultStatus": "Done"
       }
     },
     "observability": {
@@ -1002,13 +1156,13 @@
         "1d": "+1d",
         "7d": "+7d"
       },
-      "costPerDay": "${cost}/day",
+      "costPerDay": "{cost}/day",
       "costUnavailable": "Cost unavailable",
-      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · {cost}/day from live cloud pricing",
       "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
       "staleBadge": "stale",
       "tearDown": "Tear down",
-      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
+      "footer": "Preview retention is {count, plural, one {# active environment} other {# active environments}} per app · stale threshold {days, number} days.",
       "confirmTitle": "Tear down preview for PR #{pr}?",
       "confirmFallback": "Tear down preview?",
       "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
@@ -1026,11 +1180,57 @@
         "teardownEnqueued": "Teardown enqueued for PR #{pr}",
         "teardownFailed": "Teardown failed",
         "ttlExtended": "PR #{pr} preview extended by {days}d",
-        "extendFailed": "Could not extend TTL"
+        "extendFailed": "Could not extend TTL",
+        "created": "Preview for \"{branch}\" is provisioning",
+        "createFailed": "Failed to create preview"
       },
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
-      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR.",
+      "create": {
+        "title": "Create preview environment",
+        "action": "Create preview",
+        "description": "Provision a preview from any branch without opening a pull request.",
+        "branch": "Branch name",
+        "hint": "The branch must exist in the connected repository. The environment will use the same TTL and resource limits as auto-preview environments.",
+        "cancel": "Cancel",
+        "creating": "Creating…"
+      },
+      "manual": "manual",
+      "tornDownAction": "Torn down: nothing to change",
+      "extendAction": "Extend TTL {duration}",
+      "list": {
+        "label": "Previews",
+        "search": "Search branch, host, commit or status…",
+        "views": {
+          "all": "All",
+          "mine": "Mine",
+          "waiting": "Waiting approval",
+          "failed": "Failed",
+          "today": "Today",
+          "previews": "Previews"
+        }
+      },
+      "status": {
+        "building": "Building",
+        "running": "Running",
+        "failed": "Failed",
+        "torn_down": "Torn down"
+      },
+      "countdown": {
+        "expired": "expired",
+        "daysHours": "{days, number}d {hours, number}h",
+        "hoursMinutes": "{hours, number}h {minutes, number}m",
+        "minutes": "{minutes, number}m"
+      },
+      "spend": {
+        "daily": "Daily spend",
+        "monthly": "This month (projected)",
+        "approximate": "approximate",
+        "priced": "{priced, number} of {total, number} previews priced",
+        "unpriced": "{count, number} not priced by this cluster's driver",
+        "overcount": "{count, number} priced by summing every SKU in the service, so the total is an over-count"
+      }
     },
     "domains": {
       "title": "Custom domains",
@@ -1063,11 +1263,21 @@
           "byo_cert": "Bring your own certificate"
         },
         "methodHints": {
-          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.<hostname>.",
+          "dns_txt": "Default. Operator adds a TXT record at _astrolift-challenge.'<hostname>'.",
           "http_01": "ACME HTTP-01 challenge served from the cluster's ingress controller. Pick this when DNS edits are slow.",
           "dns_01": "ACME DNS-01 challenge. Required for wildcards and zones where ACM / cloud cert manager handles the records.",
           "byo_cert": "Skip ACME entirely. Validate via DNS-TXT, then paste your own PEM chain + private key."
-        }
+        },
+        "coverage": "Cert will cover <host>{hostname}</host>",
+        "wildcardTitle": "Wildcard domain",
+        "wildcardHelp": "Cover every subdomain under <code>*.hostname</code>. Requires DNS-01 validation.",
+        "sniLabel": "SNI cert ref (optional)",
+        "loadingCertificates": "Loading certificates…",
+        "searchCertificates": "Search {count, plural, one {# certificate} other {# certificates}}…",
+        "noCertificates": "No matching certificates — type an ARN to use it directly.",
+        "providerCertificateHelp": "Pick an issued certificate from the {provider} cluster, or paste a ref. Leave blank for platform-managed.",
+        "certificateRefHelp": "ACM ARN, GCP cert name, Azure cert ID, or k8s Secret ref. Leave blank for platform-managed.",
+        "wildcardMethodHelp": "DNS-01 is required for wildcard certificates."
       },
       "remove": {
         "title": "Remove {hostname}?",
@@ -1115,7 +1325,13 @@
           "name": "Name",
           "value": "Value",
           "ttl": "TTL"
-        }
+        },
+        "sniLabel": "SNI cert ref:",
+        "renewalFailed": "Renewal failed",
+        "expired": "Expired {days, plural, one {# day} other {# days}} ago",
+        "expires": "Expires in {days, plural, one {# day} other {# days}}",
+        "recordLabel": "{kind} {label}",
+        "ttlSeconds": "{seconds, number}s"
       },
       "upload": {
         "title": "Upload certificate for {hostname}",
@@ -1140,6 +1356,78 @@
         "noneBound": "No hostnames bound yet.",
         "maintenance": "Maintenance mode active.",
         "maintenanceDesc": "Every bound hostname is returning 503. Health probes that hit ingress will fail; in-cluster probes are unaffected."
+      },
+      "orgZones": "Org DNS zones",
+      "wildcard": "wildcard",
+      "copy": {
+        "action": "Copy {label}",
+        "copied": "{label} copied"
+      },
+      "routing": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "addToList": "Add to list",
+        "kind": "Kind",
+        "redirects": "Redirects",
+        "addRedirect": "Add redirect",
+        "queryPreserve": "Query string preserved",
+        "queryDrop": "Query string dropped",
+        "preserveQuery": "Preserve query string",
+        "sourcePattern": "Source pattern",
+        "destination": "Destination",
+        "destinationUrl": "Destination URL",
+        "removeRule": "Remove rule",
+        "noRedirects": "No redirects configured. Add one to send HTTP traffic to HTTPS or fold an apex into www.",
+        "statusCode": "Status code",
+        "permanent": "301 (permanent)",
+        "temporary": "302 (temporary)",
+        "rulesHint": "New rules apply after you click Save above.",
+        "pathTitle": "Path routing",
+        "addRoute": "Add route",
+        "workload": "Workload",
+        "port": "Port",
+        "stripYes": "Strip prefix: yes",
+        "stripNo": "Strip prefix: no",
+        "priority": "Priority",
+        "removeRoute": "Remove route",
+        "defaultRoute": "All traffic falls through to the default workload. Add a path prefix to send /api or /static elsewhere.",
+        "pathPrefix": "Path prefix",
+        "selectWorkload": "Select workload",
+        "noWorkloads": "No workloads registered",
+        "targetPort": "Target port",
+        "stripPrefix": "Strip prefix before forwarding to workload",
+        "routesHint": "New routes apply after you click Save above.",
+        "kinds": {
+          "http_to_https": "HTTP → HTTPS",
+          "apex_to_www": "Apex → www",
+          "custom": "Custom"
+        }
+      },
+      "list": {
+        "search": "Search hostnames…",
+        "status": "Status",
+        "kind": "Kind",
+        "exact": "Exact host",
+        "all": "All",
+        "clientNote": "All rows loaded; search, filters, sort and pagination run in the browser."
+      },
+      "toasts": {
+        "addedWildcard": "Added wildcard *.{hostname}",
+        "added": "Added {hostname}",
+        "addFailed": "Add failed",
+        "uploaded": "Certificate uploaded for {hostname}",
+        "uploadFailed": "Upload failed",
+        "removed": "Removed {hostname}",
+        "removeFailed": "Remove failed",
+        "recheckQueued": "Recheck queued for {hostname}",
+        "recheckFailed": "Recheck failed",
+        "redirectsSaved": "Redirects updated for {hostname}",
+        "routesSaved": "Path routes updated for {hostname}",
+        "saveFailed": "Save failed",
+        "ingressResumed": "Ingress resumed for {environment}.",
+        "resumeFailed": "Resume failed.",
+        "ingressPaused": "Ingress paused for {environment}.",
+        "pauseFailed": "Pause failed."
       }
     },
     "secrets": {
@@ -1161,7 +1449,19 @@
         "actions": "Actions"
       },
       "history": {
-        "title": "Audit history"
+        "title": "Audit history",
+        "action": "History",
+        "actionHint": "Audit history for this key",
+        "loadError": "Could not load history",
+        "empty": "No audit entries yet",
+        "system": "System",
+        "actions": {
+          "set": "Set",
+          "rotate": "Rotate",
+          "delete": "Delete",
+          "metadata": "Update metadata",
+          "import": "Bulk import"
+        }
       },
       "delete": {
         "title": "Delete {key}?",
@@ -1176,7 +1476,17 @@
         "valueLabel": "Value",
         "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
         "submit": "Save secret",
-        "submitting": "Saving…"
+        "submitting": "Saving…",
+        "scope": "Scope",
+        "allScope": "All environments (default)",
+        "productionScope": "Production only",
+        "previewScope": "All previews",
+        "branchScope": "Specific preview branch…",
+        "branchLabel": "Preview branch",
+        "allHint": "Visible to every deploy of this app.",
+        "productionHint": "Only production deploys can read this value.",
+        "previewHint": "Only preview deploys can read this value.",
+        "branchHint": "Only the named preview branch can read this value."
       },
       "bulkSheet": {
         "title": "Bulk import from .env",
@@ -1242,6 +1552,53 @@
         "title": "{count, plural, one {# key will revert on the next deploy} other {# keys will revert on the next deploy}}",
         "description": "These literal values are staged but have no matching approval. Without one, the next deploy reverts them to their last-approved value.",
         "seeAll": "+{count} more"
+      },
+      "source": {
+        "literal": "Literal",
+        "bundle": "Bundle",
+        "managed": "Managed service"
+      },
+      "setVia": {
+        "web": "Web",
+        "cli": "CLI",
+        "envPaste": ".env paste",
+        "bundle": "Bundle sync",
+        "managed": "Managed service",
+        "description": "Set via {source}"
+      },
+      "scope": {
+        "title": "Scope",
+        "all": "All deploys",
+        "production": "Production",
+        "preview": "Previews",
+        "previewBranch": "Preview: {branch}"
+      },
+      "expiry": {
+        "expired": "Expired {days, plural, one {# day ago} other {# days ago}}",
+        "rotateSoon": "Rotate — expires in {days, plural, one {# day} other {# days}}",
+        "expires": "Expires in {days, plural, one {# day} other {# days}}"
+      },
+      "rotate": "Rotate",
+      "rotateHint": "Rotate (distinct from edit in the audit log)",
+      "list": {
+        "searchKeys": "Search keys…",
+        "searchBundles": "Search bundles, teams, prefixes…",
+        "all": "All",
+        "localNote": "Filtered, sorted and paged in the browser: this list’s backend field returns every row at once."
+      },
+      "pushToRepo": "Push to repo",
+      "toasts": {
+        "bundleDeleteBlocked": "Detach the bundle to remove this key.",
+        "managedDeleteBlocked": "Managed-service envelope keys aren’t editable directly.",
+        "deleted": "Deleted {key}",
+        "deleteFailed": "Delete failed",
+        "rotateFailed": "Rotate failed",
+        "saveFailed": "Save failed",
+        "detachFailed": "Detach failed",
+        "set": "Set {key}",
+        "setScoped": "Set {key} ({scope})",
+        "imported": "Imported {count, plural, one {# key} other {# keys}}",
+        "importFailed": "Import failed"
       }
     },
     "security": {
@@ -1291,7 +1648,12 @@
           "fix": "Fix available"
         },
         "upgrade": "upgrade → {version}",
-        "noFix": "no fix yet"
+        "noFix": "no fix yet",
+        "findings": "Findings",
+        "searchPlaceholder": "Search CVEs, packages…",
+        "allView": "All",
+        "mineView": "Mine",
+        "mineNote": "Findings are the image’s, not a person’s, so Mine is empty."
       },
       "policy": {
         "title": "Deploy-gating policy",
@@ -1305,7 +1667,33 @@
         "noThreshold": "No threshold",
         "reset": "Reset",
         "save": "Save policy",
-        "pending": "Backend wiring pending"
+        "pending": "Backend wiring pending",
+        "thresholdOption": "≥ {count} high"
+      },
+      "loadError": "Could not load app security",
+      "eventsError": "Could not load security events",
+      "access": {
+        "title": "Access",
+        "managedByManifest": "set in astrolift.toml",
+        "restrictedDescription": "Only the groups and users below can enter. Everyone else who signs in is shown a no-access page.",
+        "openDescription": "Every user who can sign in to this cluster’s central auth can enter.",
+        "notEnforced": "Enforced on the Envoy edge; none of this app’s clusters is on it yet, so it is gated by login only.",
+        "noRule": "No access rule.",
+        "groups": "Groups",
+        "users": "Users",
+        "usersEmail": "Users (email)",
+        "remove": "Remove {value}",
+        "add": "Add",
+        "invalidEmail": "Enter an email address.",
+        "preview": "{allowed, number} of {total, plural, one {# user} other {# users}} could enter.",
+        "losingAccess": "{count, number} would lose access: {users}",
+        "saving": "Saving…",
+        "save": "Save access",
+        "saved": "Access rule saved.",
+        "removed": "Access rule removed.",
+        "saveFailed": "Save failed.",
+        "membersDescription": "Who may see and change this app: their roles here, and teams it is shared with.",
+        "edgeDescription": "Who may reach the app’s URL. The edge decides who gets through to the app; roles decide who may change it."
       }
     },
     "members": {
@@ -1321,7 +1709,9 @@
         "user": "User",
         "role": "Role",
         "granted": "Granted",
-        "expires": "Expires"
+        "expires": "Expires",
+        "who": "Who",
+        "source": "Source"
       },
       "groupPrefix": "group:",
       "never": "never",
@@ -1332,7 +1722,47 @@
         "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
         "confirm": "Revoke role"
       },
-      "searchPlaceholder": "Search members…"
+      "searchPlaceholder": "Search members…",
+      "peopleTitle": "People with access",
+      "teamShare": "team share",
+      "homeTeam": "Home team",
+      "summary": "Who can get into <app></app>, with what, and why.",
+      "grantAccess": "Grant access",
+      "checkAccess": "Check their access",
+      "openPrincipal": {
+        "user": "Open user",
+        "group": "Open group",
+        "team": "Open team",
+        "token": "Open token"
+      },
+      "removeRole": "Remove role",
+      "endTeamShare": "End team share",
+      "endShare": "End share",
+      "removeConfirm": {
+        "bindingTitle": "Remove {role} from {target}?",
+        "shareTitle": "End {target}'s share of {app}?",
+        "fallbackTitle": "Remove access?",
+        "bindingDescription": "Revokes this role on this app. They keep any access granted on the project, team or organization, and any other role that carries the same permissions.",
+        "shareDescription": "The team loses its access level on this app. Its members keep any role they hold here, or on the project, team or organization."
+      },
+      "emptyCurrentTitle": "No one holds a role on this app",
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "roles": "Roles",
+        "teams": "Team shares"
+      },
+      "notes": {
+        "mine": "Your own grants on this app.",
+        "all": "Grants on this app and team shares. Grants on its project, team or the org reach it too and are not listed here yet: check a person to see them."
+      },
+      "accessSearchPlaceholder": "Search people, groups, teams and roles",
+      "toasts": {
+        "revokeFailed": "Revoke failed",
+        "roleRevoked": "Role revoked",
+        "shareEnded": "Ended {team}'s access"
+      },
+      "emptyCurrentDescription": "Grants on its project, team or the organization still reach it. Grant access to give someone a role here."
     },
     "config": {
       "title": "{name} · config",
@@ -1506,7 +1936,121 @@
         "outputSchema": "Output schema (JSON)",
         "implementationConfig": "Implementation config (JSON)",
         "jsonHelp": "A JSON object. Leave blank for none.",
-        "validAgentSummary": "Valid — {skills, plural, one {# skill} other {# skills}}, {tools, plural, one {# tool} other {# tools}}"
+        "validAgentSummary": "Valid — {skills, plural, one {# skill} other {# skills}}, {tools, plural, one {# tool} other {# tools}}",
+        "collapse": "Collapse",
+        "expand": "Expand",
+        "unnamed": "unnamed",
+        "select": "Select {label}",
+        "valuePlaceholder": "value",
+        "advanced": "advanced",
+        "editInCode": "edit in Code view",
+        "removeEntry": "Remove entry"
+      },
+      "repoLocation": "{path} on {branch}",
+      "pushHint": "In sync with the repo — edit and Save draft first",
+      "applyHint": "Save or discard your local edits first",
+      "preview": {
+        "title": "Manifest preview",
+        "description": "Renders the stored TOML for {slug} into the Kubernetes resources the deploy activity would apply. The view is purely a preview — no cluster traffic happens here.",
+        "environment": "Environment",
+        "defaultEnvironment": "preview (no env required)",
+        "imageTag": "Image tag (optional)",
+        "imagePlaceholder": "defaults to preview",
+        "environmentsError": "Could not load environments",
+        "loadingEnvironments": "Loading environments…",
+        "queryError": "Could not load manifest preview",
+        "notFound": "App not found.",
+        "renderError": "Manifest could not be rendered",
+        "offendingKey": "offending key:",
+        "line": "line {line, number}",
+        "column": "column {column, number}",
+        "fixHint": "Fix the TOML in your repo and push; the next sync will re-parse.",
+        "namespace": "namespace",
+        "imageBadge": "image tag",
+        "resourceCount": "{count, plural, one {# resource} other {# resources}}",
+        "noResources": "No resources rendered. Either the manifest is empty or every workload is of an unsupported kind."
+      },
+      "toasts": {
+        "saved": "Draft saved",
+        "saveFailed": "Save failed",
+        "synced": "Pulled from repo",
+        "syncFailed": "Couldn't pull from the repo",
+        "applied": "Applied",
+        "applyFailed": "Apply failed",
+        "nothingToPush": "No staged changes to push.",
+        "prOpened": "PR opened: {branch}",
+        "pushed": "Push complete",
+        "pushFailed": "Push failed",
+        "loadedServer": "Loaded the server's copy."
+      },
+      "fields": {
+        "cpu_request": "CPU request",
+        "cpu_limit": "CPU limit",
+        "memory_request": "Memory request",
+        "memory_limit": "Memory limit",
+        "hpa_min": "HPA min replicas",
+        "hpa_max": "HPA max replicas",
+        "hpa_target_cpu_pct": "HPA target CPU %",
+        "storage_class": "Storage class",
+        "storage_size": "Storage size",
+        "image_ref": "Image",
+        "port": "Port",
+        "dockerfile_path": "Dockerfile path",
+        "build_context": "Build context",
+        "run_family": "Run family",
+        "max_retries": "Max retries",
+        "tool_timeout_seconds": "Tool timeout (s)",
+        "result_ttl_hours": "Result TTL (h)",
+        "workflow_type": "Workflow type",
+        "task_queue": "Task queue",
+        "temporal_namespace": "Temporal namespace",
+        "max_concurrent_activities": "Max concurrent activities",
+        "max_concurrent_workflows": "Max concurrent workflows",
+        "min_scale": "Min scale",
+        "max_scale": "Max scale",
+        "concurrency": "Concurrency",
+        "timeout_seconds": "Timeout (s)",
+        "static_build_command": "Build command",
+        "static_output_dir": "Output dir",
+        "static_spa": "SPA rewrite",
+        "static_index": "Index document",
+        "faas_package_type": "Package type",
+        "faas_runtime": "Runtime",
+        "faas_handler": "Handler",
+        "faas_memory_mb": "Memory (MB)",
+        "faas_architecture": "Architecture",
+        "faas_public": "Public URL",
+        "workflowRequired": "Required for workflow workers.",
+        "faas_timeout_seconds": "Timeout (s)",
+        "faas_build_command": "Build command",
+        "faas_output_dir": "Output dir"
+      },
+      "validation": {
+        "appName": "Top-level app name is required.",
+        "workloadName": "Workload name is required.",
+        "duplicateWorkload": "Duplicate workload name \"{name}\".",
+        "kind": "Kind must be one of {options}.",
+        "schedule": "Cronjob workloads require a schedule.",
+        "concurrencyPolicy": "Concurrency policy must be one of {options}.",
+        "workflowType": "Workflow workloads require a workflow type.",
+        "taskQueue": "Workflow workloads require a task queue.",
+        "outputDir": "A build command requires an output dir.",
+        "zipRequired": "zip-package FaaS requires {key}.",
+        "imageHandler": "image-package FaaS must not set handler/runtime.",
+        "noContainers": "{kind} workloads must declare no containers.",
+        "containerName": "Container name is required.",
+        "healthcheck": "Healthcheck kind must be one of {options}.",
+        "serviceKind": "Managed service kind is required.",
+        "agentVersion": "astrolift_version is required for an agent config.",
+        "skillSlug": "Skill slug is required.",
+        "duplicateSkill": "Duplicate skill slug \"{slug}\".",
+        "toolSlug": "Tool slug is required.",
+        "duplicateTool": "Duplicate tool slug \"{slug}\".",
+        "reserved": "\"{key}\" is a reserved key — set it in the field above.",
+        "jsonObject": "{field}: must be a JSON object",
+        "jsonDiagnostic": "{field}: {reason}",
+        "notRepresentable": "{field}: value is not representable in TOML (e.g. null)",
+        "unsafeRoundTrip": "The manifest uses TOML this editor cannot safely round-trip"
       }
     },
     "settingsTab": {
@@ -1529,7 +2073,8 @@
         "defaultBranch": "Default branch",
         "slug": "Slug",
         "toastSaved": "App details saved",
-        "toastFailed": "Could not save the app details"
+        "toastFailed": "Could not save the app details",
+        "save": "Save"
       },
       "empty": "Nothing here for this app."
     },
@@ -1658,7 +2203,8 @@
         "observability": {
           "title": "Observability",
           "description": "Logs, metrics, traces, and SLO posture for this app. Prometheus + Loki + Tempo wired by default."
-        }
+        },
+        "modified": "Modified {when}"
       },
       "forceRedeploy": {
         "title": "Force redeploy",
@@ -1708,7 +2254,8 @@
             "deployTokens": "Deploy tokens",
             "identity": "Workload identity roles",
             "network": "Network / integrations"
-          }
+          },
+          "unavailable": "Resource preview unavailable."
         }
       },
       "runJob": {
@@ -1756,11 +2303,11 @@
         },
         "revealDialog": {
           "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
+          "description": "Envelope keys the workload sees at runtime. Secret values live in the platform secrets backend and are never returned in plaintext.",
           "secretRefLabel": "Secrets backend reference",
           "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
           "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
+          "plaintextWarning": "Plaintext secret values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
           "copy": "Copy",
           "copied": "Copied to clipboard.",
           "copyFailed": "Couldn't copy — select the text and copy manually.",
@@ -1805,7 +2352,8 @@
           "loading": "Loading…",
           "refresh": "Refresh",
           "close": "Close"
-        }
+        },
+        "loadFailed": "Could not load managed services"
       }
     },
     "workloadDetail": {
@@ -1843,7 +2391,8 @@
         "applyingButton": "Applying…",
         "successToast": "Scale applied — {replicas} replicas requested",
         "errorToast": "Couldn't apply scale: {message}",
-        "permissionDenied": "You need app.deploy to scale this workload."
+        "permissionDenied": "You need app.deploy to scale this workload.",
+        "unknownError": "Unknown error"
       },
       "manifest": {
         "title": "Manifest",
@@ -1954,7 +2503,7 @@
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "User agent"
       },
       "createSheet": {
         "title": "Create deploy token",
@@ -1978,16 +2527,29 @@
       "rotateDialog": {
         "title": "Rotate {name}?",
         "fallbackTitle": "Rotate token?",
-        "graceLine": "Old token remains valid for {window} — in-flight CI runs will not fail.",
-        "newLine": "New token issued now.",
+        "graceLine": "Configured grace window: {window}. The previous token remains valid for this window after rotation.",
+        "newLine": "Confirmation issues a new token.",
         "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token"
+        "confirm": "Rotate token",
+        "loading": "Reading the configured rotation window…",
+        "unavailable": "The rotation window could not be read. Rotation is blocked until it is available.",
+        "retry": "Retry",
+        "snapshotHint": "This is the current configuration. Rotation rechecks access and reads the window again when issuing the new token."
       },
       "revokeDialog": {
         "title": "Revoke {name}?",
         "fallbackTitle": "Revoke token?",
         "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
         "confirm": "Revoke token"
+      },
+      "rotateFailed": "Rotate failed",
+      "searchPlaceholder": "Search tokens by name, last 4, IP or user agent…",
+      "allView": "All",
+      "graceDuration": {
+        "days": "{count}d",
+        "hours": "{count}h",
+        "minutes": "{count}m",
+        "seconds": "{count}s"
       }
     },
     "logs": {
@@ -2056,6 +2618,13 @@
         "failed": "Upload failed: {error}",
         "noUrl": "no pre-signed URL returned"
       }
+    },
+    "workloadActions": {
+      "primary": "Primary environment",
+      "advisory": "Permissions are checked at read time. Actions recheck before applying.",
+      "unavailable": "Current workload permissions or version are unavailable. Refresh the page.",
+      "selectedEnvironmentUnsupported": "This action targets the primary environment. It cannot target a selected environment.",
+      "permissionDenied": "Permission denied"
     }
   },
   "lists": {
@@ -2255,7 +2824,8 @@
         "cluster": "Cluster",
         "approvals": "Approvals",
         "status": "Status",
-        "actions": "Actions"
+        "actions": "Actions",
+        "app": "App"
       },
       "emptyTitle": "No environments yet",
       "emptyDescription": "Register an app and bind it to a cluster to create your first environment.",
@@ -2270,11 +2840,45 @@
         "fallbackTitle": "Pause environment?",
         "description": "CI pushes and source-driven triggers are rejected with a 423 until you explicitly resume. In-flight deployments continue to completion. Operator-initiated deployments from the UI are still allowed.",
         "confirm": "Pause environment"
+      },
+      "openUrl": "Open URL",
+      "openApp": "Open app",
+      "searchPlaceholder": "Search environments, apps, clusters, regions…",
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "production": "Production",
+        "previews": "Previews"
+      },
+      "operationFailed": "{action} failed",
+      "operationResult": "{action}: {status}",
+      "detail": {
+        "environmentLabel": "environment {id}",
+        "title": "Environment",
+        "notFound": "Environment not found",
+        "notFoundDescription": "No environment has this id, or you do not have permission to see it.",
+        "openEnvironments": "Open environments",
+        "settings": "Settings",
+        "deploysPaused": "Deploys paused",
+        "deploysActive": "Deploys active",
+        "open": "Open",
+        "moreActions": "More actions",
+        "environmentSettings": "Environment settings",
+        "deploymentsHere": "Deployments here",
+        "overview": "Overview",
+        "provider": "Provider",
+        "domainZone": "Domain zone",
+        "requiredApprovals": "Required approvals",
+        "deploys": "Deploys",
+        "ingress": "Ingress",
+        "created": "Created",
+        "noSettings": "No environment settings",
+        "noSettingsDescription": "This environment has no per-environment settings configured."
       }
     },
     "previews": {
       "title": "Preview environments",
-      "description": "Per-PR ephemeral deploys. Hostnames follow pr-<n>-<app>.pr.<org>.<base-zone>; tear-down on PR close.",
+      "description": "Per-PR ephemeral deploys. Hostnames follow pr-'<n>'-'<app>'.pr.'<org>'.'<base-zone>'; tear-down on PR close.",
       "columns": {
         "app": "App",
         "pr": "PR",
@@ -2291,7 +2895,54 @@
       "confirmTitle": "Tear down preview for PR #{pr}?",
       "confirmFallback": "Tear down preview?",
       "confirmDescription": "Namespace {namespace} is deleted and the hostname {hostname} is released. The preview re-spins automatically on the next push to {branch}.",
-      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released."
+      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "pluralLabel": "Previews",
+      "openPreview": "Open preview",
+      "openPullRequest": "Open pull request",
+      "openRepository": "Open repository",
+      "openApp": "Open app",
+      "searchPlaceholder": "Search apps, branches, hosts, commits…",
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "status": {
+        "building": "Building",
+        "running": "Running",
+        "failed": "Failed",
+        "torn_down": "Torn down"
+      },
+      "toastEnqueued": "Teardown enqueued",
+      "toastFailed": "Teardown failed",
+      "detail": {
+        "previewLabel": "preview {id}",
+        "title": "Preview",
+        "notFound": "Preview not found",
+        "notFoundDescription": "No preview environment has this id in the recent window, or you do not have permission to see it.",
+        "openPreviews": "Open previews",
+        "resources": "Resources",
+        "moreActions": "More actions",
+        "overview": "Overview",
+        "failed": "Preview failed",
+        "failureReason": "The preview did not build or deploy. Its app's logs hold the reason.",
+        "openLogs": "Open logs",
+        "namespace": "Namespace",
+        "commit": "Commit",
+        "trigger": "Trigger",
+        "manual": "Manual",
+        "automatic": "Automatic",
+        "pinned": "Pinned",
+        "yes": "yes",
+        "no": "No",
+        "ttlUntil": "TTL until",
+        "lastDeployed": "Last deployed",
+        "tornDown": "Torn down",
+        "cpu": "vCPU (aggregate)",
+        "memory": "Memory (aggregate)",
+        "pods": "Pods",
+        "dailyCost": "Est. daily cost",
+        "approximate": "approximate"
+      }
     },
     "approval": {
       "title": "Approve deployment",
@@ -2692,7 +3343,38 @@
         "saving": "Saving…",
         "toastSuccess": "Retention updated to {days} days",
         "toastFailure": "Couldn't update audit retention"
-      }
+      },
+      "searchPlaceholder": "Search actions, actors, targets, request ids…",
+      "listFields": {
+        "actor": "Actor",
+        "action": "Action",
+        "target": "Target kind",
+        "decision": "Decision",
+        "since": "Since"
+      },
+      "decisions": {
+        "ALLOW": "Allowed",
+        "DENY": "Denied",
+        "UNKNOWN": "Unknown"
+      },
+      "since": {
+        "1h": "Last hour",
+        "24h": "Last 24 hours",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "90d": "Last 90 days"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "denied": "Denied"
+      },
+      "eventsCount": "{count, plural, one {# event} other {# events}}",
+      "retainedDays": "retained {days, plural, one {# day} other {# days}}",
+      "viewsLabel": "Views",
+      "feedLabel": "Audit events",
+      "filteredTitle": "No audit events match",
+      "filteredDescription": "Remove a filter or change the search to see more."
     },
     "membersBulk": {
       "selectAllLabel": "Select all role bindings",
@@ -3118,6 +3800,731 @@
         "empty": "No approvals recorded yet.",
         "unknownApprover": "unknown"
       }
+    }
+  },
+  "projectResources": {
+    "operation": {
+      "label": "Last operation:",
+      "completed": "Completed {at}",
+      "running": "Running"
+    }
+  },
+  "administration": {
+    "features": {
+      "title": "Features",
+      "description": "Toggle runtime feature flags for this install, and review the install-time features that require a redeploy to change.",
+      "loadError": "Could not load features",
+      "retry": "Retry",
+      "on": "On",
+      "off": "Off",
+      "runtimeTitle": "Runtime flags",
+      "runtimeDescription": "Flip these live — the change takes effect immediately across the install. Backed by Constance; platform-admin only.",
+      "runtimeEmpty": "No runtime feature flags are published on this install.",
+      "toggle": "Toggle {key}",
+      "installTitle": "Install-time features",
+      "installDescription": "These gate app loading at boot and cannot be flipped at runtime — change the environment variable and redeploy. Shown for visibility.",
+      "installEmpty": "No install-time features are reported by this install.",
+      "requiresRedeployLabel": "{key} (requires redeploy)",
+      "requiresRedeploy": "Requires a redeploy — set <code>{env}</code> and restart.",
+      "disableTitle": "Disable {key}?",
+      "enableTitle": "Enable {key}?",
+      "changeTitle": "Change feature flag?",
+      "disableDescription": "This takes effect immediately for everyone on this install. Turning the flag off can hide whole surfaces and remove entries from the sidebar. You can turn it back on here.",
+      "enableDescription": "This takes effect immediately for everyone on this install. Turning the flag on can expose new surfaces and add entries to the sidebar. You can turn it back off here.",
+      "disable": "Disable flag",
+      "enable": "Enable flag",
+      "updateError": "Could not update the feature flag.",
+      "enabled": "{key} enabled",
+      "disabled": "{key} disabled"
+    },
+    "metrics": {
+      "title": "Platform metrics",
+      "description": "Fleet health, in-cluster Prometheus saturation, and cloud-provider system metrics across your organization's clusters.",
+      "loadError": "Could not load clusters",
+      "retry": "Retry",
+      "emptyTitle": "No clusters registered",
+      "emptyDescription": "Register a tenant cluster to start collecting platform metrics. Cluster saturation and system metrics populate once a cluster is managed and reachable.",
+      "openClusters": "Open clusters",
+      "fleet": "Fleet",
+      "clusters": "Clusters",
+      "connected": "Connected",
+      "degraded": "Degraded",
+      "offline": "Offline",
+      "noAgent": "No agent",
+      "openClusterStatus": "Open cluster status →",
+      "noAgentDescription": "No keep-alive agent has reported from this cluster yet. Install the agent from cluster settings to see live state.",
+      "offlineAge": "Cluster offline — last seen {seconds, plural, one {# second ago} other {# seconds ago}}.",
+      "offlineUnknown": "Cluster offline — last contact unknown.",
+      "windowHours": "{hours, number}h",
+      "saturationTitle": "Cluster saturation",
+      "saturationDescription": "In-cluster Prometheus golden signals — current snapshot and trend over the selected window.",
+      "cpu": "CPU utilization",
+      "memory": "Memory utilization",
+      "nodes": "Nodes",
+      "pods": "Pod health",
+      "systemTitle": "System metrics",
+      "scope": "{source} · namespace {namespace}",
+      "systemDescription": "Cloud-provider metrics — no in-app instrumentation required.",
+      "emptyWindow": "No data in window",
+      "collecting": "Collecting data…",
+      "promNoEndpointTitle": "No Prometheus endpoint",
+      "promNoEndpointBody": "The control plane hasn't discovered a Prometheus endpoint for this cluster yet.",
+      "promNoEndpointHint": "Run Refresh cluster management from Settings to auto-discover the endpoint, or set prometheus_endpoint in provider_config.",
+      "promUnreachableTitle": "Prometheus unreachable",
+      "promUnreachableBody": "The control plane can't reach the Prometheus endpoint stored for this cluster.",
+      "promUnreachableHint": "Verify the endpoint is reachable from the control plane on port 9090.",
+      "clusterSettings": "Go to cluster settings →",
+      "cloudUnsupportedTitle": "Cloud metrics not available for this provider",
+      "cloudUnsupportedBody": "The {provider} driver has no cloud-metrics integration wired yet. System metrics are sourced from CloudWatch on AWS clusters today.",
+      "cloudUnreachableTitle": "Cloud metrics unreachable",
+      "cloudUnreachableBody": "The cloud provider's metrics API couldn't be reached (missing credentials or throttled). In-cluster Prometheus metrics above are unaffected.",
+      "series": {
+        "cpu_utilization": "CPU",
+        "memory_utilization": "Memory",
+        "pod_running_ratio": "Pods running",
+        "restart_rate": "Restarts",
+        "deployment_ready_ratio": "Deployments ready",
+        "network_rx": "Network in",
+        "request_rate": "Requests",
+        "error_rate": "Error rate",
+        "latency_p99": "Latency p99",
+        "latency_p95": "Latency p95"
+      }
+    }
+  },
+  "playground": {
+    "title": "Model playground",
+    "savedNavigation": "Saved prompt navigation",
+    "history": "History",
+    "starred": "Starred",
+    "models": "Models",
+    "singlePrompt": "Each submission sends one user prompt to the selected endpoint. Previous displayed turns are not sent.",
+    "savedSessions": "Saved sessions",
+    "localOnly": "Saved only in this browser for this organization and user. Up to 30 sessions; no server history.",
+    "new": "New session",
+    "nothingSaved": "No sessions saved.",
+    "unstar": "Unstar",
+    "star": "Star",
+    "delete": "Delete",
+    "endpoint": "Model endpoint",
+    "searchEndpoints": "Search visible endpoints",
+    "loadingEndpoints": "Loading endpoints…",
+    "catalogFailed": "Could not load endpoints.",
+    "retry": "Retry",
+    "noEndpoints": "No visible endpoints match this search.",
+    "projectOwned": "Project-owned",
+    "unknown": "Unknown",
+    "previous": "Previous",
+    "page": "Page {page} · {total} visible matches",
+    "next": "Next",
+    "selected": "Selected: {name}",
+    "none": "None",
+    "checkReadiness": "Check readiness",
+    "relayAdvisory": "Up to {chars} prompt characters and {tokens} output tokens; waits up to {seconds} seconds. Heartbeats do not advertise relay capability. The actual request can still fail or time out; access and configuration are checked again when sent.",
+    "chat": "Single prompt",
+    "batch": "Batch",
+    "sessionTitle": "Session title",
+    "save": "Save locally",
+    "copySession": "Copy session JSON",
+    "emptyChat": "Select an endpoint and submit a concrete prompt to see its actual reply.",
+    "you": "Your prompt",
+    "modelReply": "Endpoint reply",
+    "observed": "Reported tokens: {tokens} · latency: {latency} ms",
+    "sending": "Waiting for the endpoint relay…",
+    "prompt": "Prompt",
+    "send": "Send prompt",
+    "batchLimits": "At most six nonempty prompt lines, each up to 4,000 characters. Runs sequentially; six prompts per minute per user and one job per cluster. No automatic retries. Cancel stops future prompts; a submitted server job can still finish.",
+    "batchInput": "Prompts (one plain-text prompt per line)",
+    "batchInvalid": "Use one to six prompt lines, each within the character limit.",
+    "running": "Running…",
+    "runAll": "Run batch",
+    "cancel": "Cancel remaining",
+    "copyResults": "Copy results",
+    "cancelled": "Remaining prompts cancelled.",
+    "batchCount": "{ok} successful of {total} submitted prompts",
+    "emptyResults": "Actual replies and failures appear here after submission.",
+    "saved": "Session saved locally.",
+    "saveFailed": "Could not save the session in this browser.",
+    "copied": "Copied.",
+    "copyFailed": "Could not copy.",
+    "loadFailed": "Could not load this local session.",
+    "readiness": {
+      "READY": "Ready to attempt a prompt; relay support is unverified.",
+      "INACTIVE": "The endpoint is not active.",
+      "UNSUPPORTED": "Prompt invocation is supported only for app-owned vLLM endpoints. This provider is unavailable in the playground.",
+      "UNAVAILABLE": "The provisioning cluster is unavailable.",
+      "UNKNOWN_HEARTBEAT": "The cluster has no recorded agent heartbeat.",
+      "STALE_HEARTBEAT": "The agent heartbeat is stale; the relay is disconnected.",
+      "UNCONFIGURED_RELAY": "The cluster has not configured its opt-in model relay.",
+      "UNCONFIGURED_MODEL": "The endpoint has no model configured.",
+      "loading": "Checking the selected endpoint…",
+      "refused": "Prompt access was refused. APP_UPDATE permission and the endpoint's environment policy are required.",
+      "transport": "Could not check readiness.",
+      "missing": "The endpoint is no longer visible or available.",
+      "unselected": "Choose a visible endpoint to check prompt readiness."
+    },
+    "errors": {
+      "refused": "Prompt access was refused.",
+      "unavailable": "The endpoint is unavailable for this prompt.",
+      "timedOut": "The agent did not return a reply within the bounded wait.",
+      "failed": "The endpoint or relay reported a failed prompt.",
+      "rateLimited": "The prompt rate limit was reached. Wait before submitting again.",
+      "conflict": "Another prompt job is already running on this cluster. Try later.",
+      "invalid": "The prompt is empty or exceeds its character limit.",
+      "transport": "Could not obtain a prompt result. The server job may still finish; it was not retried."
+    }
+  },
+  "shared": {
+    "versionMismatch": {
+      "changed": "This item was modified by another session. Refresh and retry.",
+      "refresh": "Refresh"
+    },
+    "pagination": {
+      "rowsPerPage": "Rows per page",
+      "perPage": "/ page",
+      "pages": "Pages",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "page": "Page {page, number}",
+      "range": "{start, number}–{end, number} of {total, number}",
+      "emptyRange": "0 of 0",
+      "showing": "Showing <shownCount>{shown, number}</shownCount>",
+      "showingOf": "Showing <shownCount>{shown, number}</shownCount> of <totalCount>{total}</totalCount>",
+      "approximately": "about {count}",
+      "newer": "Newer",
+      "older": "Older"
+    },
+    "confirmation": {
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "working": "Working…",
+      "reasonRequired": "Reason required",
+      "failed": "Action failed"
+    },
+    "list": {
+      "actions": "Actions",
+      "emptyView": "No {label} in {view}",
+      "thisView": "this view",
+      "emptyViewDescription": "Nothing here matches the {view} view right now.",
+      "sortedBy": "by {field} {direction}",
+      "views": "Views",
+      "emptyFiltered": "No {label} match",
+      "emptyFilteredDescription": "Remove a filter or change the search to see more.",
+      "view": "View",
+      "viewPrefix": "View:",
+      "rowActions": "{label}: row actions",
+      "loadFailed": "Could not load {label}",
+      "requestFailed": "The request failed.",
+      "retry": "Retry",
+      "clearFilters": "Clear filters",
+      "loading": "Loading…",
+      "removeFilter": "Remove filter {field}: {value}",
+      "clear": "Clear",
+      "chooseColumns": "Choose columns",
+      "columns": "Columns",
+      "clearSearch": "Clear search",
+      "filter": "Filter",
+      "filterBy": "Filter by",
+      "backToFields": "Back to fields",
+      "findValue": "Find a value for {field}",
+      "typeValue": "Type a value",
+      "fieldValue": "{field} value",
+      "valuesFailed": "Could not load values.",
+      "fieldValues": "{field} values",
+      "fieldEquals": "{field} is <valueText>{value}</valueText>",
+      "sortPrefix": "Sort:",
+      "defaultSort": "Default",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "sortBy": "Sort by",
+      "cardView": "Card view",
+      "listView": "List view",
+      "newRows": "{count, plural, one {<countText>{shown}</countText> new} other {<countText>{shown}</countText> new}}",
+      "nothingYet": "Nothing here yet.",
+      "viewAll": "View all",
+      "viewAllCount": "View all <countText>{count, number}</countText>",
+      "learnMore": "Learn more"
+    },
+    "table": {
+      "loadFailed": "Could not load {label}",
+      "requestFailed": "The request failed.",
+      "retry": "Retry",
+      "clearSearch": "Clear search",
+      "clear": "Clear",
+      "loading": "Loading…",
+      "noMatches": "No matches",
+      "noMatchesDescription": "No {label} match the current filters.",
+      "selectRow": "Select row {id}",
+      "selected": "{count, number} selected",
+      "selectPage": "Select all {label} on this page",
+      "filteredResults": "Filtered results shown.",
+      "search": "Search…",
+      "results": "{count, plural, one {# result} other {# results}}",
+      "sortKey": "<order>sort key </order>{index, number}"
+    },
+    "access": {
+      "direct": "direct",
+      "via": "via {kind} {name}",
+      "inherited": "inherited from {kind} {name}",
+      "combined": "{via}, {inherited}",
+      "principal": {
+        "user": "user",
+        "group": "group",
+        "team": "team",
+        "token": "token"
+      },
+      "scope": {
+        "ORG": "org",
+        "TEAM": "team",
+        "PROJECT": "project",
+        "APP": "app"
+      },
+      "remove": "Remove {kind} {name}",
+      "viaRich": "via {kind} <identifier>{name}</identifier>",
+      "inheritedRich": "inherited from {kind} <identifier>{name}</identifier>",
+      "picker": {
+        "placeholder": "Search people by name or email",
+        "change": "Change",
+        "changeField": "Change {field}",
+        "searchField": "{field}: {placeholder}",
+        "searchFailed": "Search failed: {message}",
+        "none": "No one matches \"{query}\".",
+        "type": "Type to search.",
+        "pick": "Pick {name}"
+      },
+      "role": {
+        "builtIn": "built-in",
+        "custom": "custom",
+        "count": "{count, plural, one {# permission} other {# permissions}}",
+        "show": "Show permissions",
+        "hide": "Hide permissions"
+      },
+      "matrix": {
+        "filter": "Filter permissions",
+        "placeholder": "Filter permissions, e.g. deploy",
+        "count": "{held, number} of {total, number}",
+        "vs": "vs {name}",
+        "noMatch": "No permission matches \"{query}\".",
+        "notLoaded": "The permission catalog has not loaded.",
+        "none": "No permissions.",
+        "label": "Permissions",
+        "resource": "Resource",
+        "also": "Also",
+        "all": "All {name} permissions",
+        "notApplicable": "not applicable",
+        "state": {
+          "on": "granted",
+          "off": "not granted",
+          "added": "added",
+          "removed": "removed"
+        },
+        "stateTitle": "{slug} ({state})",
+        "stateLabel": "{slug}: {state}"
+      },
+      "permissionPicker": {
+        "label": "Can do",
+        "placeholder": "Filter permissions (app.deploy)",
+        "empty": "The catalog is empty."
+      },
+      "scopePicker": {
+        "label": "Scope",
+        "placeholder": "Search teams, projects, apps…",
+        "search": "Search {label}",
+        "selected": "Selected: {kind} <identifier>{name}</identifier>",
+        "noMatch": "Nothing loaded matches \"{query}\".",
+        "empty": "No scopes to choose from.",
+        "failed": "Could not load scopes: {message}",
+        "loadFailed": "Could not load",
+        "retry": "Retry",
+        "loading": "Loading",
+        "expand": "Expand {name}",
+        "collapse": "Collapse {name}"
+      },
+      "presentation": {
+        "none": "No permissions",
+        "everything": "Everything in the catalog",
+        "readOnly": "Read only: {resources}",
+        "resourceVerbs": "{resource}: {verbs}",
+        "bindReason": "{name} is a {kind} role: pick a {kind} or something inside one.",
+        "area": {
+          "agents": "Agents",
+          "apps": "Apps",
+          "workflows": "Workflows",
+          "admin": "Admin",
+          "other": "Other"
+        },
+        "column": {
+          "read": "Read",
+          "create": "Create",
+          "update": "Update",
+          "delete": "Delete"
+        },
+        "resource": {
+          "app": "apps",
+          "agent": "agents",
+          "agent_task": "agent runs",
+          "agent_box": "agent boxes",
+          "agent_env_spec": "agent environments",
+          "skill": "skills",
+          "secret": "secrets",
+          "managed_service": "managed services",
+          "deploy_token": "deploy tokens",
+          "form": "forms",
+          "workflow": "workflows",
+          "pipeline": "pipelines",
+          "org": "the organization",
+          "team": "teams",
+          "project": "projects",
+          "api_token": "API tokens",
+          "webhook": "webhooks",
+          "cluster": "clusters",
+          "provider_plugin": "providers",
+          "scm": "source control",
+          "audit_log": "the audit log",
+          "billing": "billing",
+          "zentinelle": "Zentinelle",
+          "admin": "administration"
+        }
+      },
+      "diagnostics": {
+        "failed": "Could not check access: {message}",
+        "retry": "Retry",
+        "prompt": "Pick a person and a permission to see whether they have it, and why.",
+        "answer": {
+          "granted": "Yes.",
+          "denied": "No."
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> can <action>{permission}</action> on {kind} <target>{name}</target>.",
+          "deniedScope": "<who>{username}</who> cannot <action>{permission}</action> on {kind} <target>{name}</target>.",
+          "grantedOrg": "<who>{username}</who> can <action>{permission}</action> in this organization.",
+          "deniedOrg": "<who>{username}</who> cannot <action>{permission}</action> in this organization."
+        },
+        "superuser": "As a superuser.",
+        "reasoning": "Reasoning",
+        "tone": {
+          "pass": "yes",
+          "fail": "no",
+          "info": "no, not needed"
+        },
+        "step": {
+          "is_active": "The account is active",
+          "is_superuser": "Superuser",
+          "permission_is_declared": "The permission exists",
+          "has_active_organization": "The request is in an organization",
+          "role_bindings_in_this_org": "They hold roles in this organization",
+          "bindings_carrying_this_permission": "A role they hold carries it",
+          "target_scope": "The object is in this organization",
+          "idp_groups": "Their IdP groups",
+          "team_shares": "A team share on the app carries it",
+          "rbac": "Their roles grant it here",
+          "abac_policies": "No policy denies it",
+          "resolver_verdict": "The resolver's answer"
+        },
+        "compare": {
+          "failed": "Could not compare: {message}",
+          "prompt": "Pick two people to compare what they can do.",
+          "only": "Only <who>{username}</who>",
+          "both": "Both",
+          "none": "None."
+        }
+      },
+      "conditionHelp": {
+        "label": "What the conditions need",
+        "intro": "Every check evaluates this policy. A condition the request cannot answer denies.",
+        "failed": "Could not load the condition catalog: {message}",
+        "pending": "Unknown until the catalog loads.",
+        "unknown": "The server does not know this kind: a check cannot answer it, so it denies.",
+        "unknownNeeds": "Needs {needs}.",
+        "needs": {
+          "clock": "Read from the server's clock: every check can answer it.",
+          "client_ip": "Needs the caller's address. A check made without one (a background job, an internal call) cannot answer it, so it denies.",
+          "session": "Needs the caller's own sign-in session. A token or a check made on someone else's behalf has none, so it denies.",
+          "operation": "Needs the operation to say it (an approval, the target environment). A check that does not carry it cannot answer, so it denies."
+        }
+      },
+      "simulation": {
+        "label": "Simulation",
+        "failed": "Could not simulate: {message}",
+        "fallback": "The simulation failed.",
+        "retry": "Retry",
+        "none": "Nobody holds what this policy covers today.",
+        "holders": "{denied, number} of {count, plural, one {# holder} other {# holders}} would be denied.",
+        "unknown": "{count, plural, one {# more depends on something a check cannot always answer, and is denied when it cannot.} other {# more depend on something a check cannot always answer, and are denied when it cannot.}}",
+        "covers": "Covers {actions}",
+        "affected": "Holders it would deny",
+        "outcome": {
+          "DENIED": "denied",
+          "UNKNOWN": "denied, cannot tell",
+          "NOT_DENIED": "not denied"
+        },
+        "at": "at {scope}",
+        "recorded": "Over the last {days, plural, one {# day} other {# days}}, {count, plural, one {# recorded decision} other {# recorded decisions}} would have been checked: {denied, number} denied, {unknown, number} denied for want of an attribute.",
+        "noRecorded": "This organization has no recorded decisions in the last {days, plural, one {# day} other {# days}}, so only today's holders are simulated.",
+        "flipped": "Recorded decisions it would have denied"
+      },
+      "policy": {
+        "rule": "Rule",
+        "effect": "Effect",
+        "deny": "Deny",
+        "allow": "Allow",
+        "action": "Action",
+        "actionPlaceholder": "app.deploy, secret.* or *",
+        "on": "On",
+        "anything": "anything",
+        "removeMatch": "Remove the {kind} match",
+        "slugPlaceholder": "slug or glob",
+        "narrow": "Narrow to",
+        "for": "For",
+        "inGroups": "in groups",
+        "groupsPlaceholder": "everyone, or IdP groups",
+        "holdingRole": "holding role",
+        "anyRole": "any role",
+        "unless": "Unless",
+        "onlyWhen": "Only when",
+        "noConditions": "no conditions: it applies to every request",
+        "addCondition": "Add condition",
+        "removeCondition": "Remove condition {index, number}",
+        "days": "Days",
+        "timeZone": "Time zone",
+        "approvers": "Approvers",
+        "factors": "Factors",
+        "minutes": "Minutes since sign-in",
+        "jsonEdit": "Edit as JSON",
+        "jsonLabel": "Conditions as JSON",
+        "jsonArray": "Conditions are a JSON array.",
+        "jsonInvalid": "Invalid JSON",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "resource": {
+          "app_slug": "app",
+          "project_slug": "project",
+          "env": "environment",
+          "region": "region"
+        },
+        "kind": {
+          "time_window": "a time window",
+          "ip_allowlist": "an IP allowlist",
+          "approval_required": "approvers",
+          "env_match": "an environment",
+          "device_assertion": "a sign-in factor",
+          "freshness": "a fresh session",
+          "custom": "custom"
+        },
+        "error": {
+          "days": "Pick at least one day.",
+          "ranges": "Add at least one range, like 09:00-18:00.",
+          "hours": "Hours are HH:MM-HH:MM, like 09:00-18:00.",
+          "zone": "Name a time zone, like America/Los_Angeles.",
+          "cidrs": "Add at least one CIDR, like 10.0.0.0/8.",
+          "cidrFormat": "Each entry is a CIDR, like 10.0.0.0/8.",
+          "approver": "At least one approver.",
+          "environment": "Name at least one environment.",
+          "factor": "Pick at least one factor.",
+          "minute": "At least one minute."
+        },
+        "summary": {
+          "rule": "<effect></effect> <action></action> on <resource></resource> for <actor></actor><conditions></conditions>.",
+          "everyAction": "every action",
+          "none": "none",
+          "match": "{kind}: <values></values>",
+          "everyone": "everyone",
+          "groups": "members of <groups></groups>",
+          "role": "holders of <role></role>",
+          "groupsRole": "members of <groups></groups> holding <role></role>",
+          "unless": " unless <tests></tests>",
+          "onlyWhen": " only when <tests></tests>",
+          "timeWindow": "it is <days></days> <hours></hours> in <zone>{tz}</zone>",
+          "ip": "request comes from <ranges></ranges>",
+          "approval": "{count, plural, one {# approver approves} other {# approvers approve}}",
+          "environment": "environment is <values></values>",
+          "device": "session used <factors></factors>",
+          "freshness": "person signed in within {minutes, plural, one {# minute} other {# minutes}}",
+          "custom": "custom condition <kind>{name}</kind>"
+        }
+      }
+    },
+    "settings": {
+      "sections": "Settings sections",
+      "section": "Settings section",
+      "dangerZone": "Danger zone",
+      "dangerDescription": "These cannot be undone. Each one asks before it runs.",
+      "readOnly": "You can view these settings. Changing them needs the <code>{permission}</code> permission.",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "restricted": {
+      "changing": "Changing these",
+      "needsPermission": "{verb} needs the <code>{permission}</code> permission."
+    },
+    "feed": {
+      "loading": "Loading…",
+      "loadFailed": "Could not load {label}",
+      "empty": "No {label} yet",
+      "loadOlder": "Load older",
+      "retry": "Retry",
+      "noOlderItems": "No older items",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "unknownDate": "Unknown date"
+    }
+  },
+  "agentSecrets": {
+    "source": {
+      "accessLoading": "Checking access to environment specs…",
+      "accessDenied": "Reading environment specs requires agent_env_spec.read.",
+      "accessError": "Access to environment specs could not be checked. Reload this page to try again.",
+      "title": "Environment spec secrets",
+      "description": "Choose a visible environment spec to manage its secrets. Edits affect every run or box using this recipe. Select the recipe separately when dispatching an agent.",
+      "search": "Search environment specs",
+      "searchPlaceholder": "Search names, slugs, runtimes, repos…",
+      "spec": "Environment spec",
+      "loadingSpecs": "Loading specs…",
+      "chooseSpecs": "Choose an environment spec",
+      "listError": "Environment specs could not be loaded.",
+      "retryChoices": "Retry choices",
+      "loadingChoices": "Loading choices…",
+      "count": "{count, plural, one {# visible spec} other {# visible specs}} · Page {page, number}",
+      "previous": "Previous specs",
+      "next": "Next specs",
+      "empty": "No visible environment specs match this search.",
+      "clear": "Clear source",
+      "verify": "Verify source again",
+      "unselected": "Select an environment spec to view its values and bundles.",
+      "checking": "Checking the selected spec…",
+      "unavailable": "The selected spec is no longer available. Choose a visible spec.",
+      "verifyError": "The selected spec could not be verified. Try verifying the source again.",
+      "listDenied": "Listing this spec’s secret values and bundles requires secret.list.",
+      "bundlesDenied": "Reading this spec’s bundle attachments requires secret.read and secret.list."
+    },
+    "values": {
+      "valuesTitle": "Values",
+      "bundlesTitle": "Bundles",
+      "bundlesDescription": "Reusable secret sets attached to the selected recipe’s default environment. Bundles can also be reused by other recipes.",
+      "variable": "Variable",
+      "providerUri": "Provider URI",
+      "provider": "Provider",
+      "status": "Status",
+      "value": "Value",
+      "state": {
+        "set": "Set",
+        "missing": "Missing",
+        "error": "Error"
+      },
+      "search": "Search variables, URIs…",
+      "all": "All",
+      "intro": "Manage provider bindings and values for the selected environment recipe. Reveal needs secret.read and a recent step-up sign-in, and hides the value after 30 seconds.",
+      "addBinding": "Add binding",
+      "storeReadError": "The secret store could not be read: {message}.",
+      "secrets": "Secrets",
+      "emptyTitle": "No secret bindings",
+      "emptyDescription": "This environment recipe binds no secrets directly. Add a binding, or attach a reusable bundle under Bundles.",
+      "rotateValue": "Rotate value",
+      "setValue": "Set value",
+      "hideValue": "Hide value",
+      "revealValue": "Reveal value",
+      "deleteValue": "Delete value",
+      "removeBinding": "Remove binding",
+      "addTitle": "Add a secret binding",
+      "bindingDescription": "Runs and boxes using this recipe receive the provider value as this environment variable. Binding the same variable again updates it.",
+      "environmentVariable": "Environment variable",
+      "namespaceNotice": "Under <identifier>{namespace}</identifier>; the platform refuses a ref outside it.",
+      "cancel": "Cancel",
+      "saveBinding": "Save binding",
+      "rotate": "Rotate",
+      "set": "Set",
+      "valueTitle": "{action} <identifier>{name}</identifier>",
+      "valueWritten": "Written to <identifier>{uri}</identifier>. Reveal is the separate audited way to read the value.",
+      "saving": "Saving…",
+      "deleteTitle": "Delete the value of {name}?",
+      "deleteDescription": "This deletes the stored value from the secret store. The binding stays; runs fail their preflight until a new value is set.",
+      "removeTitle": "Remove the {name} binding?",
+      "removeDescription": "Runs and boxes using this recipe stop receiving this variable. The provider-side value is kept and can be bound again.",
+      "rotatePlaceholder": "Enter a new value to rotate",
+      "setPlaceholder": "Enter value to set",
+      "dialogTitle": "Secrets — {name}",
+      "dialogDescription": "Manage bindings, provider values and reusable bundles for this environment recipe. Values are disclosed only through audited Reveal.",
+      "valuesHeader": "Environment recipe secret values",
+      "noDirectRefs": "This recipe has no direct secret refs. Add one above or attach a reusable bundle below.",
+      "upsertRef": "Add / update ref",
+      "checkingStatus": "Checking secret status…",
+      "hide": "Hide",
+      "reveal": "Reveal",
+      "hideNamed": "Hide {name}",
+      "revealNamed": "Reveal {name}",
+      "deleteNamed": "Delete {name}",
+      "removeNamed": "Remove binding {name}",
+      "refPlaceholder": "Provider URI (for example {uri})",
+      "deleteValueTitle": "Delete secret value?",
+      "deleteNamedDescription": "This deletes the stored value for <identifier>{name}</identifier>. The binding stays on the recipe; runs fail their preflight until a new value is set.",
+      "delete": "Delete"
+    },
+    "bundles": {
+      "title": "Reusable secret bundles",
+      "description": "Share provider-backed keys across recipes. Bundles merge in the selected recipe’s default-environment attachment order; direct bindings override matching variables.",
+      "name": "Bundle name",
+      "providerRef": "Provider ref (optional)",
+      "create": "Create",
+      "loading": "Loading bundles…",
+      "empty": "No reusable bundles yet.",
+      "attachedAt": "Attached #{position, number}",
+      "save": "Save",
+      "edit": "Edit",
+      "prefixFor": "Prefix for {name}",
+      "prefixPlaceholder": "ENV_ prefix",
+      "positionFor": "Merge position for {name}",
+      "saveAttachment": "Save attachment",
+      "detach": "Detach",
+      "attach": "Attach",
+      "deleteNamed": "Delete {name}",
+      "hideNamed": "Hide {name}",
+      "revealNamed": "Reveal {name}",
+      "value": "Value",
+      "setKey": "Set key",
+      "deleteBundleTitle": "Delete “{name}”?",
+      "detachTitle": "Detach “{name}”?",
+      "deleteKeyTitle": "Delete {key}?",
+      "confirmTitle": "Confirm secret change",
+      "deleteBundleDescription": "This deletes both the bundle definition and its provider-side secret. The provider’s recovery policy may allow restoration for a limited time.",
+      "detachDescription": "The selected recipe’s default environment will stop receiving this bundle. The bundle and its provider-side values are retained.",
+      "deleteKeyDescription": "This permanently deletes {key} from “{name}” in the configured secret provider.",
+      "detachBundle": "Detach bundle",
+      "delete": "Delete"
+    },
+    "feedback": {
+      "unknownError": "Unknown error",
+      "failure": "{operation}: {message}",
+      "enterValue": "Enter a value first",
+      "refRequired": "Environment variable and provider URI are required",
+      "bundleRequired": "Bundle name and slug are required",
+      "keyValueRequired": "Key and value are required",
+      "valueSaved": "Saved {name}",
+      "valueDeleted": "Deleted {name}",
+      "bindingSaved": "Saved binding {name}",
+      "bindingRemoved": "Removed binding {name}",
+      "created": "Secret bundle created",
+      "updated": "Bundle updated",
+      "bundleDeleted": "Bundle deleted",
+      "attachmentUpdated": "Attachment updated",
+      "attached": "Bundle attached",
+      "detached": "Bundle detached",
+      "keySaved": "Saved {key}",
+      "keyDeleted": "Deleted {key}",
+      "setValueFailed": "Set {name} failed",
+      "deleteValueFailed": "Delete {name} failed",
+      "saveRefFailed": "Save ref failed",
+      "removeRefFailed": "Remove ref failed",
+      "revealFailed": "Reveal failed",
+      "createFailed": "Create bundle failed",
+      "updateFailed": "Update failed",
+      "deleteBundleFailed": "Delete bundle failed",
+      "attachFailed": "Attach failed",
+      "detachFailed": "Detach failed",
+      "saveKeyFailed": "Save key failed",
+      "deleteKeyFailed": "Delete key failed",
+      "readFailed": "Read failed",
+      "refreshFailed": "The change was saved, but the view could not refresh. Refresh to see current data; do not repeat the write."
     }
   }
 }

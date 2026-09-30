@@ -24,7 +24,7 @@ import type {
 } from "@/graphql/operations/operations.types";
 
 import type { AuditLogScreenProps } from "./AuditLogScreen";
-import { AUDIT_LIST, auditVariables } from "./audit-list";
+import { localizedAuditList, auditVariables } from "./audit-list";
 
 interface PageResp {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
@@ -53,7 +53,8 @@ interface ExportResp {
 export function useAuditLog(): AuditLogScreenProps {
   const t = useTranslations("lists.audit");
   const { org } = useActiveOrg();
-  const list = useListState(AUDIT_LIST);
+  const definition = React.useMemo(() => localizedAuditList(t), [t]);
+  const list = useListState(definition);
   const [exporting, setExporting] = React.useState(false);
   // `since:24h` is anchored when the page opens, so the variables stay
   // stable across renders; the 5s poll still brings in newer events.

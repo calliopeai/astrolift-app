@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import * as React from "react";
 import { SearchIcon, XIcon } from "lucide-react";
 
@@ -19,10 +21,12 @@ type DataTableToolbarProps<TRow> = {
 
 export function DataTableToolbar<TRow>({
   controller,
-  searchPlaceholder = "Search…",
+  searchPlaceholder,
   children,
   className,
 }: DataTableToolbarProps<TRow>) {
+  const t = useTranslations("shared.table");
+  const placeholder = searchPlaceholder ?? t("search");
   const { search, setSearch, searchEnabled, totalCount } = controller;
 
   if (!searchEnabled && !children && totalCount === null) return null;
@@ -35,9 +39,9 @@ export function DataTableToolbar<TRow>({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={searchPlaceholder}
+            placeholder={placeholder}
             className="pl-8"
-            aria-label={searchPlaceholder}
+            aria-label={placeholder}
           />
           {search && (
             <Button
@@ -45,7 +49,7 @@ export function DataTableToolbar<TRow>({
               size="icon"
               onClick={() => setSearch("")}
               className="absolute top-1/2 right-1 size-6 -translate-y-1/2"
-              aria-label="Clear search"
+              aria-label={t("clearSearch")}
             >
               <XIcon className="size-3.5" />
             </Button>
@@ -55,7 +59,7 @@ export function DataTableToolbar<TRow>({
       {children}
       {totalCount !== null && (
         <span className="text-muted-foreground ml-auto text-sm tabular-nums">
-          {totalCount === 1 ? "1 result" : `${totalCount.toLocaleString()} results`}
+          {t("results", { count: totalCount })}
         </span>
       )}
     </div>

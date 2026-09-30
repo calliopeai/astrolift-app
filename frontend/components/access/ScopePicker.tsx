@@ -11,19 +11,14 @@ import {
   UsersIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import {
-  SCOPE_NOUN,
-  type ScopeKind,
-  type ScopeNode,
-  type ScopeRef,
-  scopePath,
-} from "./access-model";
+import { type ScopeKind, type ScopeNode, type ScopeRef, scopePath } from "./access-model";
 
 const ICON: Record<ScopeKind, typeof BuildingIcon> = {
   ORG: BuildingIcon,
@@ -31,6 +26,8 @@ const ICON: Record<ScopeKind, typeof BuildingIcon> = {
   PROJECT: FolderIcon,
   APP: AppWindowIcon,
 };
+
+import { localizedScopeLabel } from "./access-copy";
 
 export interface ScopePickerProps {
   /** Usually one node: the organization, with its teams below. */
@@ -75,13 +72,15 @@ export function ScopePicker({
   loading = false,
   error,
   onRetry,
-  label = "Scope",
+  label,
   className,
 }: ScopePickerProps) {
+  const t = useTranslations("shared.access");
+  const treeLabel = label ?? t("scopePicker.label");
   const [query, setQuery] = React.useState("");
   const [loaded, setLoaded] = React.useState<Record<string, ScopeNode[]>>({});
   const [pending, setPending] = React.useState<Record<string, boolean>>({});
-  const [failed, setFailed] = React.useState<Record<string, string>>({});
+  const [failed, setFailed] = React.useState<Record<string, string | null>>({});
   // Open by default: the roots and the path to the selection, derived so a
   // tree that arrives after the first render still opens on its selection.
   // A person's own toggles override the default.
@@ -150,7 +149,10 @@ export function ScopePicker({
         const kids = await loadChildren(node);
         setLoaded((l) => ({ ...l, [key]: kids }));
       } catch (err) {
-        setFailed((f) => ({ ...f, [key]: err instanceof Error ? err.message : "Could not load" }));
+        setFailed((f) => ({
+          ...f,
+          [key]: err instanceof Error ? err.message : null,
+        }));
       } finally {
         setPending(({ [key]: _done, ...rest }) => rest);
       }
@@ -229,11 +231,11 @@ export function ScopePicker({
       >
         <AlertTriangleIcon className="size-4 shrink-0" />
         <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-          Could not load scopes: {error.message}
+          {t("scopePicker.failed", { message: error.message })}
         </span>
         {onRetry && (
           <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
+            {t("scopePicker.retry")}
           </Button>
         )}
       </div>
@@ -252,23 +254,33 @@ export function ScopePicker({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search teams, projects, apps…"
-          aria-label={`Search ${label.toLowerCase()}`}
+          placeholder={t("scopePicker.placeholder")}
+          aria-label={t("scopePicker.search", { label: treeLabel })}
           className="pl-8"
         />
       </div>
       {value && (
         <p className="text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]">
-          Selected: {SCOPE_NOUN[value.kind]} <span className="font-mono">{value.name}</span>
+          {t.rich("scopePicker.selected", {
+            kind: localizedScopeLabel(value.kind, t),
+            name: value.name,
+            identifier: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </p>
       )}
       <div className="max-h-80 min-w-0 overflow-auto rounded-md border">
         {rows.length === 0 ? (
           <p className="text-muted-foreground p-3 text-sm">
-            {needle ? `Nothing loaded matches "${query.trim()}".` : "No scopes to choose from."}
+            {needle ? t("scopePicker.noMatch", { query: query.trim() }) : t("scopePicker.empty")}
           </p>
         ) : (
-          <ul role="tree" aria-label={label} ref={treeRef} onKeyDown={onKeyDown} className="py-1">
+          <ul
+            role="tree"
+            aria-label={treeLabel}
+            ref={treeRef}
+            onKeyDown={onKeyDown}
+            className="py-1"
+          >
             {rows.map((row, idx) => {
               const { node } = row;
               const key = keyOf(node);
@@ -298,12 +310,18 @@ export function ScopePicker({
                   <span className="flex size-5 shrink-0 items-center justify-center">
                     {row.expandable &&
                       (isPending ? (
-                        <Loader2Icon aria-label="Loading" className="size-3.5 animate-spin" />
+                        <Loader2Icon
+                          aria-label={t("scopePicker.loading")}
+                          className="size-3.5 animate-spin"
+                        />
                       ) : (
                         <button
                           type="button"
                           tabIndex={-1}
-                          aria-label={`${row.expanded ? "Collapse" : "Expand"} ${node.name}`}
+                          aria-label={t(
+                            row.expanded ? "scopePicker.collapse" : "scopePicker.expand",
+                            { name: node.name }
+                          )}
                           onClick={(e) => {
                             e.stopPropagation();
                             void toggle(node);
@@ -329,12 +347,12 @@ export function ScopePicker({
                     </span>
                   )}
                   <span className="text-muted-foreground text-2xs ml-auto shrink-0 font-mono uppercase">
-                    {SCOPE_NOUN[node.kind]}
+                    {localizedScopeLabel(node.kind, t)}
                   </span>
                   {allowed !== true && <span className="sr-only">, {allowed}</span>}
-                  {failed[key] && (
+                  {(failed[key] === null || failed[key]) && (
                     <span className="text-danger-fg text-2xs shrink-0" role="status">
-                      {failed[key]}
+                      {failed[key] ?? t("scopePicker.loadFailed")}
                     </span>
                   )}
                 </li>

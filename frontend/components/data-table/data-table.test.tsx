@@ -1,4 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
+import { render as rtlRender, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DataTable } from "./data-table";
@@ -366,3 +368,13 @@ describe("DataTable", () => {
     });
   });
 });
+
+function render(ui: React.ReactNode) {
+  return rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+  });
+}

@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
+import { fireEvent, render as rtlRender, screen } from "@testing-library/react";
 import * as React from "react";
 import { describe, expect, it } from "vitest";
 
@@ -48,3 +50,13 @@ describe("ListPage", () => {
     expect(items.find((i) => i.textContent === "Failed")).toHaveAttribute("aria-current", "page");
   });
 });
+
+function render(ui: React.ReactNode) {
+  return rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+  });
+}

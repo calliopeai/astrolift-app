@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type * as React from "react";
 import { expect, within } from "storybook/test";
 
-import { AppChromeProvider } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
+import { AppChromeProvider } from "@/lib/app-chrome-context";
 import { useLocalListState } from "@/components/list/use-list-state";
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
 

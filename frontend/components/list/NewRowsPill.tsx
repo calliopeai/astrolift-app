@@ -1,5 +1,7 @@
 "use client";
 
+import { useFormatter, useTranslations } from "next-intl";
+
 import { ArrowUpIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,8 @@ export function NewRowsPill({
   onReveal: () => void;
   className?: string;
 }) {
+  const t = useTranslations("shared.list");
+  const format = useFormatter();
   return (
     <div aria-live="polite" className={cn("flex justify-center", count === 0 && "sr-only")}>
       {count > 0 && (
@@ -28,7 +32,11 @@ export function NewRowsPill({
           onClick={onReveal}
           className={cn("rounded-full shadow-sm", className)}
         >
-          <span className="font-mono tabular-nums">{count > 99 ? "99+" : count}</span> new
+          {t.rich("newRows", {
+            count,
+            shown: count > 99 ? "99+" : format.number(count),
+            countText: (chunks) => <span className="font-mono tabular-nums">{chunks}</span>,
+          })}
           <ArrowUpIcon className="size-3.5" aria-hidden />
         </Button>
       )}

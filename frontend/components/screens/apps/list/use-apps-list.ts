@@ -2,6 +2,7 @@
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import type { DocumentNode } from "graphql";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -18,7 +19,7 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import type { TopologyKind } from "@/lib/topology";
 
-import { APPS_LIST, type AppRow, appsPageVariables, pinFirst } from "./apps-list";
+import { type AppRow, appsPageVariables, localizedAppsList, pinFirst } from "./apps-list";
 
 /** The walk's page size: the backend's page cap, so up to 200 apps is one request. */
 const WALK_LIMIT = 200;
@@ -107,7 +108,10 @@ interface AppsPageResp {
  * AppsListScreen.
  */
 export function useAppsList() {
-  const list = useListState(APPS_LIST);
+  const t = useTranslations("apps.list");
+  const status = useTranslations("apps.frame");
+  const definition = React.useMemo(() => localizedAppsList(t, status), [t, status]);
+  const list = useListState(definition);
   const { state } = list;
   const { can } = useMyPermissions();
   const mine = state.view === "mine";
@@ -158,13 +162,13 @@ export function useAppsList() {
   function report(label: string, result: BulkOperationResult | undefined): boolean {
     if (!result) return false;
     const total = result.okCount + result.failedCount;
-    toast.success(`${label}: ${result.okCount}/${total} apps succeeded`);
+    toast.success(t("bulk.succeeded", { action: label, okCount: result.okCount, total }));
     if (result.failedCount > 0) {
       const failed = result.perApp
         .filter((p) => !p.ok)
         .map((p) => p.appSlug)
         .join(", ");
-      toast.error(`${label} failed for: ${failed}`);
+      toast.error(t("bulk.failed", { action: label, failedSlugs: failed }));
     }
     return true;
   }
@@ -187,7 +191,7 @@ export function useAppsList() {
       const { data } = await bulkRollingRestart({
         variables: { input: { appSlugs, environmentName: null } },
       });
-      return report("Rolling restart", data?.bulkRollingRestart);
+      return report(t("bulk.restart"), data?.bulkRollingRestart);
     },
     onPushSecrets: async (
       appSlugs: string[],
@@ -197,11 +201,11 @@ export function useAppsList() {
       const { data } = await bulkPushSecrets({
         variables: { input: { appSlugs, bundleSlug, environmentName } },
       });
-      return report("Push secrets", data?.bulkPushSecrets);
+      return report(t("bulk.pushSecrets"), data?.bulkPushSecrets);
     },
     onResyncManifest: async (appSlugs: string[]) => {
       const { data } = await bulkResyncManifest({ variables: { input: { appSlugs } } });
-      return report("Resync manifest", data?.bulkResyncManifest);
+      return report(t("bulk.resync"), data?.bulkResyncManifest);
     },
   };
 }

@@ -24,7 +24,7 @@ vi.mock("next-intl", () => ({
   // Render the raw i18n key so assertions read as tab identity, not copy.
   useTranslations: () => (key: string) => key,
 }));
-vi.mock("./app-chrome-context", () => ({ useAppChrome: () => chrome.value }));
+vi.mock("@/lib/app-chrome-context", () => ({ useAppChrome: () => chrome.value }));
 vi.mock("next/link", () => ({
   default: ({
     href,

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type {
@@ -20,6 +21,7 @@ export type BuildTimeFeature =
 
 /** The install's runtime flags and install-time features, and the flag toggle. */
 export function useFeatureFlags() {
+  const t = useTranslations("administration.features");
   const { data, loading, error, refetch } = useQuery<AdminFeatureInventoryQuery>(
     ADMIN_FEATURE_INVENTORY,
     {
@@ -47,9 +49,9 @@ export function useFeatureFlags() {
       });
       const result = res.data?.setFeatureFlag;
       if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Could not update the feature flag.");
+        throw new Error(result?.errors?.[0]?.message ?? t("updateError"));
       }
-      toast.success(`${humanizeKey(flag.key)} ${next ? "enabled" : "disabled"}`);
+      toast.success(t(next ? "enabled" : "disabled", { key: humanizeKey(flag.key) }));
     } finally {
       setPendingKey(null);
     }

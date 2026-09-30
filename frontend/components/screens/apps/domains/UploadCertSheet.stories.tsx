@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import localizedMessages from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { DOMAIN_LONG, UPLOAD_SHEET } from "./app-domains.fixtures";
@@ -23,4 +25,15 @@ export const Uploading: Story = { render: () => <UploadCertSheet {...UPLOAD_SHEE
 
 export const LongStrings: Story = {
   render: () => <UploadCertSheet {...UPLOAD_SHEET} domain={DOMAIN_LONG} />,
+};
+
+export const Localized: Story = {
+  render: () => <UploadCertSheet {...UPLOAD_SHEET} />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={localizedMessages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

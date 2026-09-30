@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useMemo } from "react";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
@@ -11,7 +13,7 @@ import { LIST_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { ENVIRONMENTS_LIST, environmentsVariables } from "./environments-list";
+import { localizedEnvironmentsList, environmentsVariables } from "./environments-list";
 
 interface MutationResultLite<T> {
   ok: boolean;
@@ -23,18 +25,6 @@ interface Resp {
   astroliftEnvironmentsPage: { items: AstroliftAppEnvironment[]; totalCount: number | null };
 }
 
-function reportResult(
-  label: string,
-  result: MutationResultLite<AstroliftAppEnvironment> | null | undefined
-) {
-  if (!result) throw new Error(`${label} failed`);
-  if (result.ok) {
-    toast.success(`${label}: ${result.data?.deploysPaused ? "paused" : "active"}`);
-  } else {
-    throw new Error(result.errors[0]?.message ?? `${label} failed`);
-  }
-}
-
 /**
  * Environments across the org (URL list state), or one app's when appSlug
  * is set (in-memory list state: the host tab's own query must survive a
@@ -43,8 +33,10 @@ function reportResult(
  * Polls every 30s. The data half of EnvironmentsScreen.
  */
 export function useEnvironments(appSlug?: string) {
-  const routed = useListState(ENVIRONMENTS_LIST);
-  const local = useLocalListState(ENVIRONMENTS_LIST);
+  const t = useTranslations("lists.environments");
+  const definition = useMemo(() => localizedEnvironmentsList(t), [t]);
+  const routed = useListState(definition);
+  const local = useLocalListState(definition);
   const list = appSlug ? local : routed;
   const { state } = list;
   const { can } = useMyPermissions();
@@ -73,19 +65,38 @@ export function useEnvironments(appSlug?: string) {
     resumeEnvironment: MutationResultLite<AstroliftAppEnvironment>;
   }>(RESUME_ENVIRONMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: refetch });
 
+  function reportResult(
+    action: string,
+    result: MutationResultLite<AstroliftAppEnvironment> | null | undefined
+  ) {
+    if (!result) throw new Error(t("operationFailed", { action }));
+    if (result.ok) {
+      toast.success(
+        t("operationResult", {
+          action,
+          status: t(result.data?.deploysPaused ? "paused" : "active"),
+        })
+      );
+    } else {
+      throw new Error(result.errors[0]?.message ?? t("operationFailed", { action }));
+    }
+  }
+
   /** Throws on failure so the confirm dialog shows the error and stays open. */
   async function onPause(e: AstroliftAppEnvironment) {
     const { data } = await pause({ variables: { input: { id: e.id } } });
-    reportResult("pauseEnvironment", data?.pauseEnvironment);
+    reportResult(t("pause"), data?.pauseEnvironment);
   }
 
   /** No confirm stands in front of resume, so a failure is a toast. */
   async function onResume(e: AstroliftAppEnvironment) {
     try {
       const { data } = await resume({ variables: { input: { id: e.id } } });
-      reportResult("resumeEnvironment", data?.resumeEnvironment);
+      reportResult(t("resume"), data?.resumeEnvironment);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "resumeEnvironment failed");
+      toast.error(
+        err instanceof Error ? err.message : t("operationFailed", { action: t("resume") })
+      );
     }
   }
 

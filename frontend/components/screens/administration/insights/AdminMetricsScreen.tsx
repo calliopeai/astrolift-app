@@ -8,6 +8,7 @@ import {
   WifiOffIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -17,11 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  clusterOfflineMessage,
-  heartbeatPresentation,
-  isClusterLive,
-} from "@/lib/cluster-heartbeat";
+import { heartbeatPresentation, isClusterLive } from "@/lib/cluster-heartbeat";
 
 import {
   TONE_COLORS,
@@ -54,21 +51,22 @@ export function AdminMetricsScreen({
   onRetry,
   renderLivePanels,
 }: AdminMetricsScreenProps) {
+  const t = useTranslations("administration.metrics");
   return (
     <AdministrationShell
       fnKey="metrics"
-      title="Platform metrics"
-      description="Fleet health, in-cluster Prometheus saturation, and cloud-provider system metrics across your organization's clusters."
+      title={t("title")}
+      description={t("description")}
       primaryAction={<WindowSelector value={windowLabel} onChange={onWindowChange} />}
     >
       {error && clusters.length === 0 ? (
         <EmptyState
           icon={<AlertTriangleIcon className="text-danger size-5" />}
-          title="Could not load clusters"
+          title={t("loadError")}
           description={error.message}
           secondary={
             <Button size="sm" variant="outline" onClick={onRetry}>
-              Retry
+              {t("retry")}
             </Button>
           }
         />
@@ -80,17 +78,17 @@ export function AdminMetricsScreen({
       ) : clusters.length === 0 ? (
         <EmptyState
           icon={<ServerIcon className="size-5" />}
-          title="No clusters registered"
-          description="Register a tenant cluster to start collecting platform metrics. Cluster saturation and system metrics populate once a cluster is managed and reachable."
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
           actionHref="/clusters"
-          actionLabel="Open clusters"
+          actionLabel={t("openClusters")}
         />
       ) : (
         <div className="flex min-w-0 flex-col gap-8">
-          <Section title="Fleet">
+          <Section title={t("fleet")}>
             <FleetSummary clusters={clusters} />
           </Section>
-          <Section title="Clusters">
+          <Section title={t("clusters")}>
             {clusters.map((c) => (
               <ClusterSection
                 key={c.id}
@@ -108,6 +106,7 @@ export function AdminMetricsScreen({
 
 // ─── Fleet summary strip ──────────────────────────────────────────────
 function FleetSummary({ clusters }: { clusters: MetricsCluster[] }) {
+  const t = useTranslations("administration.metrics");
   const total = clusters.length;
   const connected = clusters.filter((c) => c.heartbeatStatus === "connected").length;
   const degraded = clusters.filter((c) => c.heartbeatStatus === "degraded").length;
@@ -116,10 +115,10 @@ function FleetSummary({ clusters }: { clusters: MetricsCluster[] }) {
   ).length;
 
   const tiles: { label: string; value: number; tone: Tone }[] = [
-    { label: "Clusters", value: total, tone: "neutral" },
-    { label: "Connected", value: connected, tone: connected > 0 ? "ok" : "neutral" },
-    { label: "Degraded", value: degraded, tone: degraded > 0 ? "warn" : "neutral" },
-    { label: "Offline", value: offline, tone: offline > 0 ? "bad" : "neutral" },
+    { label: t("clusters"), value: total, tone: "neutral" },
+    { label: t("connected"), value: connected, tone: connected > 0 ? "ok" : "neutral" },
+    { label: t("degraded"), value: degraded, tone: degraded > 0 ? "warn" : "neutral" },
+    { label: t("offline"), value: offline, tone: offline > 0 ? "bad" : "neutral" },
   ];
 
   return (
@@ -158,6 +157,7 @@ function ClusterSection({
   win: MetricsWindow;
   renderLivePanels: AdminMetricsScreenProps["renderLivePanels"];
 }) {
+  const t = useTranslations("administration.metrics");
   const live = isClusterLive(cluster.heartbeatStatus);
   const p = heartbeatPresentation(cluster.heartbeatStatus);
 
@@ -188,7 +188,7 @@ function ClusterSection({
             ) : (
               <WifiOffIcon className="size-3" />
             )}
-            {p.label}
+            {t(cluster.heartbeatStatus === "never_seen" ? "noAgent" : cluster.heartbeatStatus)}
           </span>
         </div>
       </CardHeader>
@@ -200,13 +200,19 @@ function ClusterSection({
             <WifiOffIcon className="text-muted-foreground/70 mt-0.5 size-4 shrink-0" />
             <div className="min-w-0 space-y-1">
               <p className="[overflow-wrap:anywhere]">
-                {clusterOfflineMessage(cluster.heartbeatStatus, cluster.heartbeatAgeSeconds)}
+                {cluster.heartbeatStatus === "never_seen"
+                  ? t("noAgentDescription")
+                  : cluster.heartbeatAgeSeconds === null
+                    ? t("offlineUnknown")
+                    : t("offlineAge", {
+                        seconds: Math.max(0, Math.floor(cluster.heartbeatAgeSeconds)),
+                      })}
               </p>
               <Link
                 href={`/clusters/${cluster.slug}/status`}
                 className="text-primary inline-block text-xs underline-offset-4 hover:underline"
               >
-                Open cluster status →
+                {t("openClusterStatus")}
               </Link>
             </div>
           </div>
@@ -224,6 +230,7 @@ function WindowSelector({
   value: WindowLabel;
   onChange: (w: WindowLabel) => void;
 }) {
+  const t = useTranslations("administration.metrics");
   return (
     <div className="bg-muted/40 inline-flex rounded-md border p-0.5">
       {WINDOWS.map((w) => (
@@ -234,7 +241,7 @@ function WindowSelector({
           className="h-7 px-3 font-mono text-xs"
           onClick={() => onChange(w.label)}
         >
-          {w.label}
+          {t("windowHours", { hours: w.rangeSeconds / 3600 })}
         </Button>
       ))}
     </div>

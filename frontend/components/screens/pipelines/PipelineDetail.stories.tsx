@@ -29,7 +29,9 @@ export const Full: Story = {
 };
 
 export const SecretsRoute: Story = {
-  render: () => <PipelineDetailScreen {...DETAIL} pipelineId="pipeline-guid" secrets={secrets} />,
+  render: () => (
+    <PipelineDetailScreen {...DETAIL} pipelineId="pipeline-guid" tab="secrets" secrets={secrets} />
+  ),
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole("link", { name: "Secrets" })).toHaveAttribute(
       "href",
@@ -50,6 +52,10 @@ export const ErrorState: Story = {
   render: () => (
     <PipelineDetailScreen
       {...DETAIL}
+      pipeline={{
+        ...DETAIL.pipeline!,
+        name: "A very long pipeline name for the release and integration tests against the staging payment gateway sandbox",
+      }}
       runs={[]}
       runsError={{ name: "Error", message: "Permission denied while loading this section" }}
       secrets={secrets}
@@ -83,6 +89,10 @@ export const LongStrings: Story = {
   render: () => (
     <PipelineDetailScreen
       {...DETAIL}
+      pipeline={{
+        ...DETAIL.pipeline!,
+        name: "A very long pipeline name for the release and integration tests against the staging payment gateway sandbox",
+      }}
       runs={[
         {
           id: LONG_RUN.id,
@@ -130,4 +140,23 @@ export const RunnersTab: Story = {
 
 export const SecretsTab: Story = {
   render: () => <PipelineDetailScreen {...DETAIL} tab="secrets" secrets={secrets} />,
+};
+
+export const DefinitionLoading: Story = {
+  render: () => (
+    <PipelineDetailScreen {...DETAIL} pipeline={null} pipelineLoading secrets={secrets} />
+  ),
+};
+export const DefinitionError: Story = {
+  render: () => (
+    <PipelineDetailScreen
+      {...DETAIL}
+      pipeline={null}
+      pipelineError={new Error("Permission denied")}
+      secrets={secrets}
+    />
+  ),
+};
+export const DefinitionUnavailable: Story = {
+  render: () => <PipelineDetailScreen {...DETAIL} pipeline={null} secrets={secrets} />,
 };

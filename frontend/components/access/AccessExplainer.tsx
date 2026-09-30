@@ -9,12 +9,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { SCOPE_NOUN, type ScopeRef } from "./access-model";
+import { type ScopeRef } from "./access-model";
 
 /** One step of `permissionDiagnose` (core/schema/types/permission_analysis.py). */
 export interface DiagnosisStep {
@@ -50,20 +51,20 @@ export interface AccessExplainerProps {
   className?: string;
 }
 
-const STEP_LABEL: Record<string, string> = {
-  is_active: "The account is active",
-  is_superuser: "Superuser",
-  permission_is_declared: "The permission exists",
-  has_active_organization: "The request is in an organization",
-  role_bindings_in_this_org: "They hold roles in this organization",
-  bindings_carrying_this_permission: "A role they hold carries it",
-  target_scope: "The object is in this organization",
-  idp_groups: "Their IdP groups",
-  team_shares: "A team share on the app carries it",
-  rbac: "Their roles grant it here",
-  abac_policies: "No policy denies it",
-  resolver_verdict: "The resolver's answer",
-};
+const STEP_CHECKS = new Set([
+  "is_active",
+  "is_superuser",
+  "permission_is_declared",
+  "has_active_organization",
+  "role_bindings_in_this_org",
+  "bindings_carrying_this_permission",
+  "target_scope",
+  "idp_groups",
+  "team_shares",
+  "rbac",
+  "abac_policies",
+  "resolver_verdict",
+]);
 
 /** Steps whose false is information, not the reason for a No. */
 const NEUTRAL_WHEN_FALSE = new Set(["is_superuser", "idp_groups", "team_shares"]);
@@ -99,6 +100,8 @@ export function AccessExplainer({
   bindingHref,
   className,
 }: AccessExplainerProps) {
+  const t = useTranslations("shared.access.diagnostics");
+  const scopeT = useTranslations("shared.access.scope");
   if (loading) {
     return (
       <div className={cn("flex min-w-0 flex-col gap-2", className)} aria-busy>
@@ -120,22 +123,18 @@ export function AccessExplainer({
       >
         <AlertTriangleIcon className="size-4 shrink-0" />
         <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-          Could not check access: {error.message}
+          {t("failed", { message: error.message })}
         </span>
         {onRetry && (
           <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
+            {t("retry")}
           </Button>
         )}
       </div>
     );
   }
   if (!diagnosis) {
-    return (
-      <p className={cn("text-muted-foreground text-sm", className)}>
-        Pick a person and a permission to see whether they have it, and why.
-      </p>
-    );
+    return <p className={cn("text-muted-foreground text-sm", className)}>{t("prompt")}</p>;
   }
 
   const d = diagnosis;
@@ -156,22 +155,29 @@ export function AccessExplainer({
           <XCircleIcon className="mt-0.5 size-5 shrink-0" />
         )}
         <p className="min-w-0 text-sm [overflow-wrap:anywhere]">
-          <span className="font-semibold">{d.granted ? "Yes. " : "No. "}</span>
-          <span className="font-mono">{d.username}</span> {d.granted ? "can" : "cannot"}{" "}
-          <span className="font-mono">{d.permission}</span>
-          {target ? (
-            <>
-              {" "}
-              on {SCOPE_NOUN[target.kind]} <span className="font-mono">{target.name}</span>
-            </>
-          ) : (
-            " in this organization"
+          <span className="font-semibold">{t(d.granted ? "answer.granted" : "answer.denied")}</span>{" "}
+          {t.rich(
+            target
+              ? d.granted
+                ? "body.grantedScope"
+                : "body.deniedScope"
+              : d.granted
+                ? "body.grantedOrg"
+                : "body.deniedOrg",
+            {
+              username: d.username,
+              permission: d.permission,
+              ...(target ? { kind: scopeT(target.kind), name: target.name } : {}),
+              who: (chunks) => <span className="font-mono">{chunks}</span>,
+              action: (chunks) => <span className="font-mono">{chunks}</span>,
+              target: (chunks) => <span className="font-mono">{chunks}</span>,
+            }
           )}
-          {d.isSuperuser && ", as a superuser"}.
+          {d.isSuperuser && <> {t("superuser")}</>}
         </p>
       </div>
 
-      <ol aria-label="Reasoning" className="max-h-96 min-w-0 overflow-auto rounded-md border">
+      <ol aria-label={t("reasoning")} className="max-h-96 min-w-0 overflow-auto rounded-md border">
         {d.steps.map((s, i) => {
           const tone = s.result ? "pass" : NEUTRAL_WHEN_FALSE.has(s.check) ? "info" : "fail";
           const bindings = parseBindingLabels(s.detail);
@@ -180,10 +186,8 @@ export function AccessExplainer({
               <StepIcon tone={tone} />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="text-sm font-medium">
-                  {STEP_LABEL[s.check] ?? s.check}
-                  <span className="sr-only">
-                    : {tone === "pass" ? "yes" : tone === "fail" ? "no" : "no, not needed"}
-                  </span>
+                  {STEP_CHECKS.has(s.check) ? t(`step.${s.check}`) : s.check}
+                  <span className="sr-only">: {t(`tone.${tone}`)}</span>
                 </p>
                 {bindings ? (
                   <ul className="flex min-w-0 flex-wrap gap-1">
@@ -234,7 +238,7 @@ function BindingChip({ binding: b, href }: { binding: BindingLabel; href?: strin
     <>
       <span className="min-w-0 truncate">{b.role}</span>
       <span className="text-muted-foreground shrink-0">
-        @{SCOPE_NOUN[b.scopeKind]}:{b.scopeId}
+        @{b.scopeKind}:{b.scopeId}
       </span>
     </>
   );
@@ -284,6 +288,8 @@ export function AccessCompare({
   onRetry,
   className,
 }: AccessCompareProps) {
+  const t = useTranslations("shared.access.diagnostics");
+  const format = useFormatter();
   if (loading) {
     return (
       <div className={cn("grid min-w-0 gap-3 md:grid-cols-3", className)} aria-busy>
@@ -304,43 +310,37 @@ export function AccessCompare({
       >
         <AlertTriangleIcon className="size-4 shrink-0" />
         <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-          Could not compare: {error.message}
+          {t("compare.failed", { message: error.message })}
         </span>
         {onRetry && (
           <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
+            {t("retry")}
           </Button>
         )}
       </div>
     );
   }
   if (!c) {
-    return (
-      <p className={cn("text-muted-foreground text-sm", className)}>
-        Pick two people to compare what they can do.
-      </p>
-    );
+    return <p className={cn("text-muted-foreground text-sm", className)}>{t("compare.prompt")}</p>;
   }
   const cols: { title: React.ReactNode; slugs: string[]; tone?: string }[] = [
     {
-      title: (
-        <>
-          Only <span className="font-mono">{c.userAUsername}</span>
-        </>
-      ),
+      title: t.rich("compare.only", {
+        username: c.userAUsername,
+        who: (chunks) => <span className="font-mono">{chunks}</span>,
+      }),
       slugs: c.onlyA,
       tone: "text-info-fg",
     },
     {
-      title: (
-        <>
-          Only <span className="font-mono">{c.userBUsername}</span>
-        </>
-      ),
+      title: t.rich("compare.only", {
+        username: c.userBUsername,
+        who: (chunks) => <span className="font-mono">{chunks}</span>,
+      }),
       slugs: c.onlyB,
       tone: "text-info-fg",
     },
-    { title: "Both", slugs: c.shared },
+    { title: t("compare.both"), slugs: c.shared },
   ];
   return (
     <div className={cn("grid min-w-0 gap-3 md:grid-cols-3", className)}>
@@ -349,11 +349,11 @@ export function AccessCompare({
           <h3 className="flex min-w-0 items-baseline gap-2 border-b px-3 py-2 text-sm font-medium">
             <span className="min-w-0 truncate">{col.title}</span>
             <span className="text-muted-foreground ml-auto font-mono text-xs tabular-nums">
-              {col.slugs.length}
+              {format.number(col.slugs.length)}
             </span>
           </h3>
           {col.slugs.length === 0 ? (
-            <p className="text-muted-foreground p-3 text-xs">None.</p>
+            <p className="text-muted-foreground p-3 text-xs">{t("compare.none")}</p>
           ) : (
             <ul className="max-h-72 min-w-0 overflow-auto p-2">
               {col.slugs.map((s) => (

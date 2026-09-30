@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import german from "@/messages/de.json";
 import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { AUDIT_LIST } from "./audit-list";
+import { localizedAuditList } from "./audit-list";
 import { type AuditEventsFeed, AuditLogScreen, type AuditLogScreenProps } from "./AuditLogScreen";
 import { AUDIT, AUDIT_EVENTS, AUDIT_EVENTS_LONG, AUDIT_FEED } from "./fixtures";
 
@@ -22,7 +24,8 @@ type Props = Partial<Omit<AuditLogScreenProps, "list" | "events">> & {
 
 /** The screen over in-memory list state, so tabs and chips all click. */
 function Audit({ initial, feed, ...props }: Props) {
-  const list = useLocalListState(AUDIT_LIST, initial);
+  const t = useTranslations("lists.audit");
+  const list = useLocalListState(localizedAuditList(t), initial);
   return <AuditLogScreen {...AUDIT} list={list} events={{ ...AUDIT_FEED, ...feed }} {...props} />;
 }
 
@@ -150,4 +153,14 @@ export const ExportMenu: Story = {
       await within(document.body).findByRole("menuitem", { name: /Export as CSV/ })
     ).toBeInTheDocument();
   },
+};
+
+export const GermanWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={german}>
+      <div style={{ width: 768 }} className="overflow-hidden border">
+        <Audit feed={{ items: [...AUDIT_EVENTS, ...AUDIT_EVENTS_LONG] }} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

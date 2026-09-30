@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
 
 import { Input } from "@/components/ui/input";
+import es from "@/messages/es.json";
+import ja from "@/messages/ja.json";
 
 import { Restricted } from "./Restricted";
 
@@ -27,6 +30,26 @@ type Story = StoryObj<typeof Restricted>;
 export const Allowed: Story = { args: { allowed: true } };
 /** Shown read-only: the same fields, disabled, and the permission named. */
 export const ShowReadOnly: Story = { args: { allowed: false, mode: "show" } };
+export const SpanishReadOnly: Story = {
+  args: { allowed: false, mode: "show" },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="es" messages={es}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+export const JapaneseReadOnly: Story = {
+  args: { allowed: false, mode: "show" },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
 /** Hidden: nothing renders for a viewer who chose to hide what they can't change. */
 export const Hidden: Story = {
   args: { allowed: false, mode: "hide" },

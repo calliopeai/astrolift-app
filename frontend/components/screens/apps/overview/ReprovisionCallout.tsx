@@ -63,14 +63,16 @@ export function ReprovisionCalloutView({
       ? Math.max(0, Math.floor(reprovision.elapsedSeconds / 60))
       : null;
 
-  const headline = t(`headline.${reprovision.state}`, {
-    defaultValue: t("headline.unknown"),
-  });
+  const headline = t(
+    t.has(`headline.${reprovision.state}`) ? `headline.${reprovision.state}` : "headline.unknown"
+  );
   const description =
     reprovision.reason ||
-    t(`description.${reprovision.state}`, {
-      defaultValue: t("description.unknown"),
-    });
+    t(
+      t.has(`description.${reprovision.state}`)
+        ? `description.${reprovision.state}`
+        : "description.unknown"
+    );
   const elapsedLabel = elapsedMinutes != null ? t("elapsed", { minutes: elapsedMinutes }) : "";
 
   async function handleConfirm() {

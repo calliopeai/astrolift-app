@@ -4,7 +4,7 @@ import { useLogExport } from "@/components/observability/use-log-export";
 import { AppLogsScreen } from "@/components/screens/apps/deployments/AppLogsScreen";
 import { useAppLogs } from "@/components/screens/apps/deployments/use-app-logs";
 
-import { appPath, useAppChrome } from "../components/app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 import { usePodTarget } from "../components/use-pod-target";
 

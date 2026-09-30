@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 import { ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -38,13 +42,12 @@ export function EmptyState({
   learnMoreLabel,
   secondary,
 }: EmptyStateProps) {
-  const learnMoreText = learnMoreLabel ?? "Learn more";
-  const isExternal =
-    learnMoreHref?.startsWith("http://") ||
-    learnMoreHref?.startsWith("https://");
+  const t = useTranslations("shared.list");
+  const learnMoreText = learnMoreLabel ?? t("learnMore");
+  const isExternal = learnMoreHref?.startsWith("http://") || learnMoreHref?.startsWith("https://");
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed py-12 px-6 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-6 py-12 text-center">
       <div className="bg-muted text-muted-foreground rounded-md p-2">{icon}</div>
       <div>
         <p className="font-medium">{title}</p>

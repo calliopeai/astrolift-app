@@ -2,6 +2,7 @@
 
 import { RocketIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
@@ -22,17 +23,6 @@ const TILE_TONE: Record<DeploymentStatus, string> = {
   pending: "bg-warning/70 hover:bg-warning border-warning-border animate-pulse",
   pending_approval: "bg-info/85 hover:bg-info border-info-border animate-pulse",
   redeploying: "bg-warning/85 hover:bg-warning border-warning-border animate-pulse",
-};
-
-const STATUS_LABEL: Record<DeploymentStatus, string> = {
-  running: "running",
-  failed: "failed",
-  rolled_back: "rolled back",
-  superseded: "superseded",
-  deploying: "deploying",
-  pending: "pending",
-  pending_approval: "awaiting approval",
-  redeploying: "redeploying",
 };
 
 const IN_FLIGHT = new Set<DeploymentStatus>([
@@ -61,6 +51,7 @@ export function DeployActivityStrip({
   limit,
 }: DeployActivityStripProps) {
   const fmt = useFormatters();
+  const t = useTranslations("apps.detail");
   const deploymentsHref = `${appHref}/deployments`;
   const inFlight = deployments.filter((d) => IN_FLIGHT.has(d.status));
 
@@ -73,19 +64,25 @@ export function DeployActivityStrip({
       <div className="mb-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-2">
           <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-            Deploy activity
+            {t("deployActivity.title")}
           </p>
           <p className="text-muted-foreground text-2xs">
-            Last <span className="font-mono">{limit}</span>
+            {t.rich("deployActivity.latest", {
+              limit,
+              mono: (chunks) => <span className="font-mono">{chunks}</span>,
+            })}
             {inFlight.length > 0 && (
               <span className="text-warning-fg ml-2">
-                · <span className="font-mono">{inFlight.length}</span> in flight
+                {t.rich("deployActivity.inFlight", {
+                  count: inFlight.length,
+                  mono: (chunks) => <span className="font-mono">{chunks}</span>,
+                })}
               </span>
             )}
           </p>
         </div>
         <Link href={deploymentsHref} className="text-primary text-xs hover:underline">
-          View all
+          {t("deployActivity.all")}
         </Link>
       </div>
 
@@ -94,7 +91,7 @@ export function DeployActivityStrip({
       ) : deployments.length === 0 ? (
         <div className="text-muted-foreground flex items-center gap-2 py-1 text-xs">
           <RocketIcon className="size-3.5" />
-          No deploys yet. Trigger one from the CLI or push to the deploy branch.
+          {t("latestDeploy.empty")}
         </div>
       ) : (
         <div className="flex min-w-0 flex-wrap items-center gap-1">
@@ -122,7 +119,8 @@ function DeployTile({
   relativeTime: string;
 }) {
   const tone = TILE_TONE[dep.status] ?? TILE_TONE.superseded;
-  const label = STATUS_LABEL[dep.status] ?? dep.status;
+  const t = useTranslations("apps.overview.latestDeploy.status");
+  const label = t.has(dep.status) ? t(dep.status) : dep.status;
   const tag = dep.imageTag ? dep.imageTag.slice(0, 10) : dep.id.slice(0, 8);
   const tooltip = `${tag} · ${label} · ${relativeTime}${
     dep.environmentName ? ` · ${dep.environmentName}` : ""

@@ -1,13 +1,16 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useQuery } from "@apollo/client/react";
+import * as React from "react";
 
 import { useListState } from "@/components/list/use-list-state";
 import { useAgentSecrets } from "@/components/screens/agents/list/use-agent-secrets";
 import { AGENT_SECRET_STATUS_PAGE } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentSecretStatus } from "@/graphql/agents/agents.types";
 
-import { AGENT_SECRETS_LIST, agentSecretsPageVariables } from "./agent-secrets-list";
+import { localizedAgentSecretsList, agentSecretsPageVariables } from "./agent-secrets-list";
 
 interface SecretStatusPageResp {
   agentEnvironmentSpecSecretStatusPage: {
@@ -18,15 +21,17 @@ interface SecretStatusPageResp {
 }
 
 /**
- * Secrets › Values: one numbered page of the env spec's secret refs (the
- * spec slug is the agent slug) from `agentEnvironmentSpecSecretStatusPage`
+ * Secrets › Values: one numbered page of the explicitly selected env spec's
+ * secret refs from `agentEnvironmentSpecSecretStatusPage`
  * (#2155), on URL list state, plus the mutations the dispatch dialog uses.
  * The server probes the store, filters, sorts and counts. The data half of
  * AgentSecretValues.
  */
 export function useAgentSecretValues(slug: string) {
   const secrets = useAgentSecrets(slug, false);
-  const list = useListState(AGENT_SECRETS_LIST);
+  const t = useTranslations("agentSecrets.values");
+  const definition = React.useMemo(() => localizedAgentSecretsList(t), [t]);
+  const list = useListState(definition);
   const { state } = list;
   const query = useQuery<SecretStatusPageResp>(AGENT_SECRET_STATUS_PAGE, {
     variables: {

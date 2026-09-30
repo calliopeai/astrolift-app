@@ -2,6 +2,7 @@
 
 import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import {
   ABORT_DEPLOYMENT,
@@ -27,18 +28,6 @@ interface MutationResultLite<T> {
  */
 const REFETCH = [APP_DEPLOYMENTS_OPERATION, "ListDeployments"];
 
-function reportResult(
-  label: string,
-  result: MutationResultLite<AstroliftDeployment> | null | undefined
-) {
-  if (!result) return;
-  if (result.ok) {
-    toast.success(`${label}: ${result.data?.status ?? "ok"}`);
-  } else {
-    throw new Error(result.errors[0]?.message ?? `${label} failed`);
-  }
-}
-
 /**
  * The lifecycle actions on the Deployments tab's rows: one set of
  * mutations for the whole list, each taking the deployment it acts on.
@@ -48,6 +37,28 @@ function reportResult(
  */
 export function useDeploymentActions() {
   const { can } = useMyPermissions();
+  const t = useTranslations("apps.deployments.actions");
+  const statusLabel = useTranslations("apps.deployments.statuses");
+
+  function reportResult(
+    action: "approve" | "abort" | "redeploy" | "rollbackConfirm",
+    result: MutationResultLite<AstroliftDeployment> | null | undefined
+  ) {
+    const label = t(action);
+    if (!result) throw new Error(t("missingResponse", { action: label }));
+    if (!result.ok) throw new Error(result.errors[0]?.message || t("failed", { action: label }));
+    const status = result.data?.status;
+    toast.success(
+      t("success", {
+        action: label,
+        status: status
+          ? statusLabel.has(status)
+            ? statusLabel(status)
+            : status
+          : t("defaultStatus"),
+      })
+    );
+  }
 
   const [approve, approveState] = useMutation<{
     approveDeployment: MutationResultLite<AstroliftDeployment>;
@@ -68,25 +79,25 @@ export function useDeploymentActions() {
   async function onApprove(d: AstroliftDeployment) {
     try {
       const { data } = await approve({ variables: { input: { id: d.id } } });
-      reportResult("approveDeployment", data?.approveDeployment);
+      reportResult("approve", data?.approveDeployment);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Approve failed");
+      toast.error(err instanceof Error ? err.message : t("failed", { action: t("approve") }));
     }
   }
 
   async function onAbort(d: AstroliftDeployment, reason: string) {
     const { data } = await abort({ variables: { input: { id: d.id, reason } } });
-    reportResult("abortDeployment", data?.abortDeployment);
+    reportResult("abort", data?.abortDeployment);
   }
 
   async function onRedeploy(d: AstroliftDeployment) {
     const { data } = await redeploy({ variables: { input: { id: d.id } } });
-    reportResult("redeployApp", data?.redeployApp);
+    reportResult("redeploy", data?.redeployApp);
   }
 
   async function onRollback(d: AstroliftDeployment) {
     const { data } = await rollback({ variables: { input: { id: d.id } } });
-    reportResult("rollbackDeployment", data?.rollbackDeployment);
+    reportResult("rollbackConfirm", data?.rollbackDeployment);
   }
 
   return {

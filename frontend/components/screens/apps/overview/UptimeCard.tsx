@@ -1,7 +1,7 @@
 "use client";
 
 import { ActivityIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
@@ -27,6 +27,7 @@ export function UptimeCardView({
   span = 6,
 }: UptimeCardViewProps) {
   const t = useTranslations("apps.overview.health");
+  const format = useFormatter();
   const up = u?.isUp === true;
   const hasData = !!u && u.totalChecks > 0;
   const latencies = u?.recent.map((p) => p.latencyMs) ?? [];
@@ -68,7 +69,13 @@ export function UptimeCardView({
             {lastChecked && (
               <span className="text-muted-foreground text-2xs" title={lastChecked}>
                 {t("checked")}{" "}
-                <span className="font-mono">{new Date(lastChecked).toLocaleTimeString()}</span>
+                <time className="font-mono" dateTime={lastChecked}>
+                  {format.dateTime(new Date(lastChecked), {
+                    hour: "numeric",
+                    minute: "numeric",
+                    second: "numeric",
+                  })}
+                </time>
               </span>
             )}
             {latencies.length > 1 && (

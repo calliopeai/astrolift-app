@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+
 /**
  * DataTable — the house standard for every list surface (#1231).
  *
@@ -133,6 +135,9 @@ export function DataTable<TRow>({
   onSortToggle,
   className,
 }: DataTableProps<TRow>) {
+  const t = useTranslations("shared.table");
+  const locale = useLocale();
+  const noun = locale.startsWith("en") ? label.toLocaleLowerCase(locale) : label;
   const { rows, state, error, retry, pageSize, isFiltered, clearFilters } = controller;
 
   const pageIds = React.useMemo(() => rows.map(getRowId), [rows, getRowId]);
@@ -166,13 +171,13 @@ export function DataTable<TRow>({
               <div className="flex flex-col items-center gap-3 text-center">
                 <AlertTriangleIcon className="text-danger size-5" />
                 <div>
-                  <p className="font-medium">Could not load {label.toLowerCase()}</p>
+                  <p className="font-medium">{t("loadFailed", { label: noun })}</p>
                   <p className="text-muted-foreground mt-1 max-w-md text-sm">
-                    {error?.message ?? "The request failed."}
+                    {error?.message ?? t("requestFailed")}
                   </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={retry}>
-                  Retry
+                  {t("retry")}
                 </Button>
               </div>
             </TableCell>
@@ -186,14 +191,13 @@ export function DataTable<TRow>({
               <div className="flex flex-col items-center gap-3 text-center">
                 <SearchXIcon className="text-muted-foreground size-5" />
                 <div>
-                  <p className="font-medium">{emptyFiltered?.title ?? "No matches"}</p>
+                  <p className="font-medium">{emptyFiltered?.title ?? t("noMatches")}</p>
                   <p className="text-muted-foreground mt-1 max-w-md text-sm">
-                    {emptyFiltered?.description ??
-                      `No ${label.toLowerCase()} match the current filters.`}
+                    {emptyFiltered?.description ?? t("noMatchesDescription", { label: noun })}
                   </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={clearFilters}>
-                  Clear search
+                  {t("clearSearch")}
                 </Button>
               </div>
             </TableCell>
@@ -235,7 +239,7 @@ export function DataTable<TRow>({
                   <Checkbox
                     checked={selected}
                     onCheckedChange={() => selection.toggle(id)}
-                    aria-label={`Select row ${id}`}
+                    aria-label={t("selectRow", { id })}
                   />
                 </TableCell>
               )}
@@ -291,10 +295,10 @@ export function DataTable<TRow>({
       {selection && selection.selectedCount > 0 && bulkActions && (
         <div className="bg-muted/50 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2">
           <span className="text-sm font-medium tabular-nums">
-            {selection.selectedCount} selected
+            {t("selected", { count: selection.selectedCount })}
           </span>
           <Button variant="ghost" size="sm" onClick={selection.clear}>
-            Clear
+            {t("clear")}
           </Button>
           <div className="ml-auto flex flex-wrap items-center gap-2">{bulkActions(selection)}</div>
         </div>
@@ -304,7 +308,7 @@ export function DataTable<TRow>({
           while they are answering the previous question. */}
       <div
         className={cn("rounded-md border transition-opacity", controller.isStale && "opacity-60")}
-        aria-busy={controller.isStale || undefined}
+        aria-busy={state === "loading" || controller.isStale || undefined}
       >
         <Table>
           <caption className="sr-only">{label}</caption>
@@ -315,7 +319,7 @@ export function DataTable<TRow>({
                   <Checkbox
                     checked={selection.pageSelectionState(pageIds)}
                     onCheckedChange={() => selection.togglePage(pageIds)}
-                    aria-label={`Select all ${label.toLowerCase()} on this page`}
+                    aria-label={t("selectPage", { label: noun })}
                     disabled={pageIds.length === 0}
                   />
                 </TableHead>
@@ -353,9 +357,15 @@ export function DataTable<TRow>({
 
       {chrome === "full" && <DataTablePagination controller={controller} />}
 
+      {state === "loading" && (
+        <p className="sr-only" role="status">
+          {t("loading")}
+        </p>
+      )}
+
       {isFiltered && state === "ready" && (
         <p className="text-muted-foreground sr-only" aria-live="polite">
-          Filtered results shown.
+          {t("filteredResults")}
         </p>
       )}
     </div>

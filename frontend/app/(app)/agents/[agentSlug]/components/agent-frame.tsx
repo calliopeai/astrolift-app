@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { AppChromeProvider } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
+import { AppChromeProvider } from "@/lib/app-chrome-context";
 import { AgentFrame } from "@/components/screens/agents/detail/AgentFrame";
 import { useAgentFrame } from "@/components/screens/agents/detail/use-agent-frame";
 

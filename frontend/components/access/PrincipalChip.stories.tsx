@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
 
 import {
   CI_TOKEN,
@@ -76,4 +78,15 @@ export const Width768: Story = {
       ))}
     </div>
   ),
+};
+
+export const GermanRemovable: Story = {
+  ...Removable,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

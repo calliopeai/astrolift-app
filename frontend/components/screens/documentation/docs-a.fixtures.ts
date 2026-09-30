@@ -59,6 +59,6 @@ export const LONG_CHANGELOG: ChangelogEntry[] = [
     version: "10.120.2",
     date: "2026-09-20",
     type: "breaking",
-    changes: ["An entry of an unknown type falls back to the destructive badge."],
+    changes: ["An unrecognized release-note category uses a neutral outline badge."],
   },
 ];

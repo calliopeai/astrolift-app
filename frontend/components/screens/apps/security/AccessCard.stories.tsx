@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { AccessCardView, AccessEditorView } from "./AccessCard";
@@ -44,3 +47,22 @@ export const Saving: Story = {
 };
 
 export const LongStrings: Story = { args: { ...ACCESS_LONG } };
+
+export const French: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+export const Japanese: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};

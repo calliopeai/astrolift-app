@@ -29,3 +29,22 @@ export const Rejected: Story = {
 };
 
 export const LongStrings: Story = { args: { defaultOpen: true, workloadName: LONG } };
+
+export const Restricted: Story = {
+  args: {
+    permission: {
+      allowed: false,
+      code: "PERMISSION_DENIED",
+      reason: "No role binding grants this permission",
+    },
+  },
+};
+export const Unknown: Story = {
+  args: {
+    permission: {
+      allowed: false,
+      code: "",
+      reason: "Current permissions are unavailable. Refresh the page.",
+    },
+  },
+};

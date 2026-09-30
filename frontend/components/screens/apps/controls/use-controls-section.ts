@@ -4,6 +4,10 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import {
+  useWorkloadActionPermission,
+  workloadActionRefetch,
+} from "../workloads/use-workload-action-permission";
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import {
@@ -72,10 +76,7 @@ interface ResumeResp {
  * Environments + the app's workloads for the live operational controls
  * (#402). The data half of ControlsSectionView.
  *
- * Workloads aren't env-scoped in the schema today (LIST_WORKLOADS is
- * app-scoped; the same Deployment definition fans out across envs), so
- * each env card renders the same set of workload rows. The actions
- * themselves are scoped per-env in the confirmation copy.
+ * Restart and scale target the primary environment, independently of env controls.
  */
 export function useControlsSection(appSlug: string) {
   const { data, loading } = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
@@ -84,10 +85,6 @@ export function useControlsSection(appSlug: string) {
   });
   const envs = data?.astroliftEnvironments ?? [];
 
-  // The workload list is shared across env rows (one query, one source
-  // of truth). Each env card reads from this collection so we don't
-  // multiply the network call by env count. Refetches after a per-env
-  // workload op converge every row at once.
   const workloadsQuery = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
@@ -246,41 +243,55 @@ export function useEnvironmentControls(
 }
 
 /**
- * One workload's rolling restart + replica scale within an env row. The
+ * One workload's rolling restart + replica scale in the primary environment. The
  * data half of WorkloadOpsRowView.
  */
-export function useWorkloadOps(envName: string, workload: AstroliftWorkload, appSlug: string) {
+export function useWorkloadOps(workload: AstroliftWorkload) {
   const t = useTranslations("apps.settings.controls");
-  const [restart, { loading: restarting }] = useMutation<RestartWorkloadResp>(RESTART_WORKLOAD, {
-    refetchQueries: [{ query: LIST_WORKLOADS, variables: { appSlug } }],
-    onQueryUpdated: refetchAfterMutation,
-    awaitRefetchQueries: true,
-  });
-  const [scale, { loading: scaling }] = useMutation<ScaleWorkloadResp>(SCALE_WORKLOAD, {
-    refetchQueries: [{ query: LIST_WORKLOADS, variables: { appSlug } }],
-    onQueryUpdated: refetchAfterMutation,
-    awaitRefetchQueries: true,
-  });
+  const actions = useTranslations("apps.workloadActions");
+  const envName = actions("primary");
+  const restartFeedback = useWorkloadActionPermission(
+    workload.viewerCan?.restart,
+    workload.version
+  );
+  const scaleFeedback = useWorkloadActionPermission(workload.viewerCan?.scale, workload.version);
+  const [restart, { loading: restarting }] = useMutation<RestartWorkloadResp>(
+    RESTART_WORKLOAD,
+    workloadActionRefetch
+  );
+  const [scale, { loading: scaling }] = useMutation<ScaleWorkloadResp>(
+    SCALE_WORKLOAD,
+    workloadActionRefetch
+  );
 
   async function onRestart() {
+    if (restartFeedback.blocked()) return false;
     try {
-      const { data } = await restart({ variables: { input: { workloadId: workload.id } } });
+      const { data } = await restart({
+        variables: { input: { workloadId: workload.id }, ifMatchVersion: workload.version },
+      });
       const payload = data?.restartAstroliftWorkload;
       if (payload?.ok) {
         toast.success(t("toastRestartIssued", { workload: workload.name, env: envName }));
+        return true;
       } else {
-        toast.error(payload?.errors?.[0]?.message ?? t("toastRestartFailed"));
+        return restartFeedback.reject(payload, t("toastRestartFailed"));
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("toastRestartFailed"));
+      return false;
     }
   }
 
   /** Resolves false on a rejected scale so the view can revert its staged counter. */
   async function onApply(replicas: number): Promise<boolean> {
+    if (scaleFeedback.blocked()) return false;
     try {
       const { data } = await scale({
-        variables: { input: { workloadId: workload.id, replicas } },
+        variables: {
+          input: { workloadId: workload.id, replicas },
+          ifMatchVersion: workload.version,
+        },
       });
       const payload = data?.scaleAstroliftWorkload;
       if (payload?.ok) {
@@ -288,13 +299,21 @@ export function useWorkloadOps(envName: string, workload: AstroliftWorkload, app
         toast.success(t("toastScaled", { workload: workload.name, env: envName, count: desired }));
         return true;
       }
-      toast.error(payload?.errors?.[0]?.message ?? t("toastScaleFailed"));
-      return false;
+      return scaleFeedback.reject(payload, t("toastScaleFailed"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("toastScaleFailed"));
       return false;
     }
   }
 
-  return { envName, workload, restarting, scaling, onRestart, onApply };
+  return {
+    envName,
+    workload,
+    restarting,
+    scaling,
+    onRestart,
+    onApply,
+    restartPermission: restartFeedback.permission,
+    scalePermission: scaleFeedback.permission,
+  };
 }

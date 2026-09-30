@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 
 import { GrantSource } from "./GrantSource";
 import { LONG } from "./fixtures";
@@ -95,4 +97,15 @@ export const Width768: Story = {
       ))}
     </div>
   ),
+};
+
+export const JapaneseInherited: Story = {
+  ...ViaGroupAndInherited,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

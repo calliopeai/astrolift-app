@@ -2,6 +2,7 @@
 
 import { BarChart3Icon, CloudIcon, RefreshCwIcon, WifiOffIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useId } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
@@ -32,16 +33,14 @@ export function PrometheusPanel({
   range,
   rangeLoading,
 }: PrometheusPanelProps) {
+  const t = useTranslations("administration.metrics");
   return (
     <section className="space-y-4">
       <div>
         <h3 className="flex items-center gap-2 text-sm font-medium">
-          <BarChart3Icon className="size-4" /> Cluster saturation
+          <BarChart3Icon className="size-4" /> {t("saturationTitle")}
         </h3>
-        <p className="text-muted-foreground text-xs">
-          In-cluster Prometheus golden signals — current snapshot and trend over the selected
-          window.
-        </p>
+        <p className="text-muted-foreground text-xs">{t("saturationDescription")}</p>
       </div>
 
       {/* KPI tiles from the instant query */}
@@ -59,20 +58,20 @@ export function PrometheusPanel({
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <KpiTile
-            label="CPU utilization"
+            label={t("cpu")}
             value={instant.cpuUtilization}
             unit="ratio"
             tone={utilizationTone(instant.cpuUtilization)}
           />
           <KpiTile
-            label="Memory utilization"
+            label={t("memory")}
             value={instant.memoryUtilization}
             unit="ratio"
             tone={utilizationTone(instant.memoryUtilization)}
           />
-          <KpiTile label="Nodes" value={instant.nodeCount} unit="count" tone="neutral" />
+          <KpiTile label={t("nodes")} value={instant.nodeCount} unit="count" tone="neutral" />
           <KpiTile
-            label="Pod health"
+            label={t("pods")}
             value={instant.podRunningRatio}
             unit="ratio"
             tone={healthTone(instant.podRunningRatio)}
@@ -111,16 +110,20 @@ export function PrometheusPanel({
 
 // ─── System metrics panel (cloud provider · CloudWatch ALB) ───────────
 export function SystemMetricsPanel({ providerSlug, metrics, loading }: SystemMetricsPanelProps) {
+  const t = useTranslations("administration.metrics");
   const scopeNote =
     metrics?.available && metrics.appNamespace
-      ? `${metrics.source === "cloudwatch" ? "CloudWatch ALB" : metrics.source} · namespace ${metrics.appNamespace}`
-      : "Cloud-provider metrics — no in-app instrumentation required.";
+      ? t("scope", {
+          source: metrics.source === "cloudwatch" ? "CloudWatch ALB" : metrics.source,
+          namespace: metrics.appNamespace,
+        })
+      : t("systemDescription");
 
   return (
     <section className="space-y-4">
       <div>
         <h3 className="flex items-center gap-2 text-sm font-medium">
-          <CloudIcon className="size-4" /> System metrics
+          <CloudIcon className="size-4" /> {t("systemTitle")}
         </h3>
         <p className="text-muted-foreground text-xs">{scopeNote}</p>
       </div>
@@ -171,6 +174,7 @@ function KpiTile({
 
 // ─── Single metric area card (shared: Prometheus + system series) ─────
 function MetricAreaCard({ series }: { series: RangeSeries }) {
+  const t = useTranslations("administration.metrics");
   const gradientId = `sysgrad-${useId()}`;
   const tone = seriesTone(series);
   const colors = TONE_COLORS[tone];
@@ -180,7 +184,7 @@ function MetricAreaCard({ series }: { series: RangeSeries }) {
     <Card className="overflow-hidden !rounded-none shadow-md">
       <CardHeader className="px-4 pt-4 pb-2">
         <span className="text-muted-foreground text-xs tracking-wide uppercase">
-          {series.label}
+          {t.has(`series.${series.metric}`) ? t(`series.${series.metric}`) : series.label}
         </span>
         <CardTitle className={`text-2xl font-semibold tabular-nums ${colors.text}`}>
           {fmtValue(series.current, series.unit)}
@@ -225,7 +229,7 @@ function MetricAreaCard({ series }: { series: RangeSeries }) {
         ) : (
           <div className="flex h-[80px] items-center justify-center">
             <span className="text-muted-foreground text-xs">
-              {series.points.length === 0 ? "No data in window" : "Collecting data…"}
+              {series.points.length === 0 ? t("emptyWindow") : t("collecting")}
             </span>
           </div>
         )}
@@ -242,15 +246,12 @@ function MetricsUnavailableCard({
   reason: string | null;
   settingsHref: string;
 }) {
+  const t = useTranslations("administration.metrics");
   const isNoEndpoint = reason === "no_endpoint";
   const Icon = isNoEndpoint ? RefreshCwIcon : WifiOffIcon;
-  const title = isNoEndpoint ? "No Prometheus endpoint" : "Prometheus unreachable";
-  const body = isNoEndpoint
-    ? "The control plane hasn't discovered a Prometheus endpoint for this cluster yet."
-    : "The control plane can't reach the Prometheus endpoint stored for this cluster.";
-  const hint = isNoEndpoint
-    ? "Run Refresh cluster management from Settings to auto-discover the endpoint, or set prometheus_endpoint in provider_config."
-    : "Verify the endpoint is reachable from the control plane on port 9090.";
+  const title = t(isNoEndpoint ? "promNoEndpointTitle" : "promUnreachableTitle");
+  const body = t(isNoEndpoint ? "promNoEndpointBody" : "promUnreachableBody");
+  const hint = t(isNoEndpoint ? "promNoEndpointHint" : "promUnreachableHint");
 
   return (
     <div className="border-warning-border bg-warning/5 flex items-start gap-3 rounded-md border p-3">
@@ -264,7 +265,7 @@ function MetricsUnavailableCard({
             href={settingsHref}
             className="text-primary mt-2 inline-block text-xs underline-offset-4 hover:underline"
           >
-            Go to cluster settings →
+            {t("clusterSettings")}
           </Link>
         )}
       </div>
@@ -280,14 +281,13 @@ function SystemMetricsUnavailableCard({
   reason: string | null;
   providerSlug: string;
 }) {
+  const t = useTranslations("administration.metrics");
   const notSupported = reason === "not_supported";
   const Icon = notSupported ? CloudIcon : WifiOffIcon;
-  const title = notSupported
-    ? "Cloud metrics not available for this provider"
-    : "Cloud metrics unreachable";
+  const title = t(notSupported ? "cloudUnsupportedTitle" : "cloudUnreachableTitle");
   const body = notSupported
-    ? `The ${providerSlug} driver has no cloud-metrics integration wired yet. System metrics are sourced from CloudWatch on AWS clusters today.`
-    : "The cloud provider's metrics API couldn't be reached (missing credentials or throttled). In-cluster Prometheus metrics above are unaffected.";
+    ? t("cloudUnsupportedBody", { provider: providerSlug })
+    : t("cloudUnreachableBody");
 
   return (
     <div className="border-border/70 text-muted-foreground flex items-start gap-3 rounded-md border border-dashed p-3 text-sm">

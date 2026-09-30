@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 
 import {
   DangerAction,
@@ -144,6 +147,28 @@ export const Default: StoryObj = { render: () => <Page /> };
 /** No permission: the same fields, disabled, and the permission named. */
 export const ReadOnly: StoryObj = {
   render: () => <Page readOnly={{ permission: "cluster.manage" }} />,
+};
+
+export const French: StoryObj = {
+  render: () => <Page />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={fr}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+
+export const JapaneseReadOnly: StoryObj = {
+  render: () => <Page readOnly={{ permission: "cluster.manage" }} restrictedMode="show" />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };
 
 export const SaveError: StoryObj = {

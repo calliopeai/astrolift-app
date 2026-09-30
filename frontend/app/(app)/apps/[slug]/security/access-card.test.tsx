@@ -1,7 +1,17 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
+import { fireEvent, render as renderView, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccessCard } from "./access-card";
+
+function render(view: React.ReactNode) {
+  return renderView(
+    <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+      {view}
+    </NextIntlClientProvider>
+  );
+}
 
 // Who may enter an app behind central auth (#2132).
 

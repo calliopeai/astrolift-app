@@ -215,6 +215,7 @@ export const RETENTION: RetentionPolicyViewProps = {
 // ─── environment overrides ────────────────────────────────────────────────────
 
 export const ENV_SETTINGS: EnvironmentSettingsViewProps = {
+  clearing: new Set(),
   envs: ENVIRONMENTS,
   adding: false,
   onAdd: yes,
@@ -322,6 +323,7 @@ export const DANGER_ZONE: DangerZoneViewProps = {
   loading: false,
   preview: null,
   previewLoading: false,
+  previewError: undefined,
   stillLive: [],
   loadPreview: () => {},
   onDeregister: yes,

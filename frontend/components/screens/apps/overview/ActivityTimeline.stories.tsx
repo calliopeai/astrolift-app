@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import spanish from "@/messages/es.json";
 import { expect, userEvent, within } from "storybook/test";
 
 import { DeployActivityStrip } from "../detail/DeployActivityStrip";
@@ -66,4 +68,21 @@ export const At768: Story = {
       <ActivityTimelineView {...args} />
     </div>
   ),
+};
+
+export const SpanishWidth768: Story = {
+  args: ACTIVITY,
+  render: (args) => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }}>
+        <ActivityTimelineView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Despliegues" }));
+    await userEvent.type(c.getByRole("textbox", { name: "Buscar actividad" }), "no-such-image");
+    await expect(c.getByText(/Ningún evento coincide/)).toBeVisible();
+  },
 };

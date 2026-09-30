@@ -1,3 +1,6 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import french from "@/messages/fr.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
@@ -12,7 +15,7 @@ import {
   ENV_STAGING_PAUSED,
   environmentsProps,
 } from "./environments.fixtures";
-import { ENVIRONMENTS_LIST } from "./environments-list";
+import { localizedEnvironmentsList } from "./environments-list";
 import { EnvironmentsScreen, type EnvironmentsScreenProps } from "./EnvironmentsScreen";
 
 const meta: Meta = {
@@ -33,7 +36,8 @@ type Props = Partial<Omit<EnvironmentsScreenProps, "list">> & {
  * so a story passes the rows its page would return; this only slices them.
  */
 function Environments({ all = ALL_ENVIRONMENTS, initial, ...patch }: Props) {
-  const list = useLocalListState(ENVIRONMENTS_LIST, initial);
+  const t = useTranslations("lists.environments");
+  const list = useLocalListState(localizedEnvironmentsList(t), initial);
   const { page, pageSize } = list.state;
   const rows = all.slice((page - 1) * pageSize, page * pageSize);
   return (
@@ -108,5 +112,15 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <Environments all={[ENV_LONG, ...ALL_ENVIRONMENTS]} />
     </div>
+  ),
+};
+
+export const FrenchWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <div style={{ width: 768 }}>
+        <Environments />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

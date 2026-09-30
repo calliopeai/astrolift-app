@@ -8,6 +8,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { selectContainerName, selectPodName } from "@/lib/pod-target";
+
 import { useLocalListState } from "@/components/list/use-list-state";
 import type { ObservabilityPanelReason } from "@/components/observability/panel-reason";
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
@@ -98,39 +100,6 @@ export const POD_POLL_MS = 5000;
 export const LOG_BUFFER_LIMIT = 500;
 const DEFAULT_TAIL_LINES = 200;
 
-// Heuristic for the "default container" — pick the one whose name
-// matches the pod's workload (typical for app workloads named after
-// the deployment). Falls back to the first non-sidecar candidate so
-// we don't auto-select istio-proxy / linkerd-proxy / otel-collector
-// when they're present alongside the main app container.
-const KNOWN_SIDECARS = new Set([
-  "istio-proxy",
-  "envoy",
-  "linkerd-proxy",
-  "datadog-agent",
-  "otel-collector",
-  "otc-container",
-  "newrelic-infrastructure",
-  "fluent-bit",
-  "fluentd",
-  "filebeat",
-  "vault-agent",
-  "vault-agent-init",
-]);
-
-function pickDefaultContainer(
-  containers: string[],
-  workload: string | null | undefined
-): string | null {
-  if (containers.length === 0) return null;
-  if (workload) {
-    const match = containers.find((c) => c === workload);
-    if (match) return match;
-  }
-  const nonSidecar = containers.find((c) => !KNOWN_SIDECARS.has(c));
-  return nonSidecar ?? containers[0];
-}
-
 /**
  * Logs & metrics › Metrics data: the app, its pods (polled) as a list, this
  * app's platform events, the env/workload scope (URL-backed), the pod pick
@@ -194,7 +163,8 @@ export function useAppObservability(slug: string, panel: MetricsPanel = "signals
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const podParam = searchParams?.get("pod") ?? null;
+  const podParam = searchParams?.get("pod") || null;
+  const containerParam = searchParams?.get("container") || null;
   const envParam = searchParams?.get("env") ?? null;
   const workloadParam = searchParams?.get("workload") ?? null;
   // The pick is the URL's: a pod row links to `?pod=<name>`.
@@ -245,9 +215,7 @@ export function useAppObservability(slug: string, panel: MetricsPanel = "signals
   const panelHref = (p: MetricsPanel) => `${pathname ?? ""}?${metricsPanelQuery(qs, p)}`;
 
   const selectedPod: string | null = React.useMemo(() => {
-    if (pickedPod && podRows.some((p) => p.name === pickedPod)) return pickedPod;
-    const running = podRows.find((p) => p.status === "Running");
-    return running?.name ?? podRows[0]?.name ?? null;
+    return selectPodName(podRows, pickedPod);
   }, [pickedPod, podRows]);
 
   const [streaming, setStreaming] = React.useState(false);
@@ -265,12 +233,18 @@ export function useAppObservability(slug: string, panel: MetricsPanel = "signals
   // Operator-overridden container; null means "use the default" which
   // we recompute from the pod's containers below.
   const [pickedContainer, setPickedContainer] = React.useState<string | null>(null);
-  const selectedContainer: string | null = React.useMemo(() => {
-    if (pickedContainer && podContainers.includes(pickedContainer)) {
-      return pickedContainer;
-    }
-    return pickDefaultContainer(podContainers, selectedPodWorkload);
-  }, [pickedContainer, podContainers, selectedPodWorkload]);
+  // A new deep link replaces a local pick; polling the same link preserves it.
+  const linkKey = JSON.stringify([slug, podParam, containerParam]);
+  const [previousLinkKey, setPreviousLinkKey] = React.useState(linkKey);
+  if (previousLinkKey !== linkKey) {
+    setPreviousLinkKey(linkKey);
+    setPickedContainer(null);
+  }
+  const selectedContainer = selectContainerName(
+    podContainers,
+    selectedPodWorkload,
+    pickedContainer ?? containerParam
+  );
   const podUsage = usePodResourceUsage(slug, selectedPod, scopedEnv);
 
   // Clearing the buffer when the operator switches pods or containers

@@ -525,8 +525,8 @@ const WORKLOAD_OP_FIELDS = `
 `;
 
 export const RESTART_WORKLOAD = gql`
-  mutation RestartAstroliftWorkload($input: RestartWorkloadInput!) {
-    restartAstroliftWorkload(input: $input) {
+  mutation RestartAstroliftWorkload($input: RestartWorkloadInput!, $ifMatchVersion: Int) {
+    restartAstroliftWorkload(input: $input, ifMatchVersion: $ifMatchVersion) {
       ok
       errors {
         code
@@ -541,8 +541,8 @@ export const RESTART_WORKLOAD = gql`
 `;
 
 export const SCALE_WORKLOAD = gql`
-  mutation ScaleAstroliftWorkload($input: ScaleWorkloadInput!) {
-    scaleAstroliftWorkload(input: $input) {
+  mutation ScaleAstroliftWorkload($input: ScaleWorkloadInput!, $ifMatchVersion: Int) {
+    scaleAstroliftWorkload(input: $input, ifMatchVersion: $ifMatchVersion) {
       ok
       errors {
         code

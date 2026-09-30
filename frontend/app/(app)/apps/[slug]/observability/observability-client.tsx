@@ -28,7 +28,7 @@ import {
 import { useAlertEvents, useAlertRules } from "@/components/screens/apps/tools/use-alert-rules";
 import { useAppObservability } from "@/components/screens/apps/tools/use-app-observability";
 
-import { appPath, useAppChrome } from "../components/app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 import { AppTabs } from "../components/app-tabs";
 import { ManagedServiceMetrics } from "../components/managed-service-metrics";
 import { ObservabilitySection } from "../components/observability-section";

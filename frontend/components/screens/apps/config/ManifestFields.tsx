@@ -12,6 +12,8 @@
  */
 
 import { PlusIcon, TrashIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +76,7 @@ export function TextField({
   return (
     <FieldRow label={label} help={help} error={error}>
       <Input
+        aria-label={label}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
@@ -102,6 +105,7 @@ export function NumberField({
   return (
     <FieldRow label={label} help={help} error={error}>
       <Input
+        aria-label={label}
         type="number"
         value={value ?? ""}
         placeholder={placeholder}
@@ -158,11 +162,12 @@ export function SelectField({
   error?: string;
   help?: string;
 }) {
+  const t = useTranslations("apps.config.builder");
   return (
     <FieldRow label={label} help={help} error={error}>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-8 text-xs" aria-invalid={!!error}>
-          <SelectValue placeholder={`Select ${label}`} />
+        <SelectTrigger className="h-8 text-xs" aria-label={label} aria-invalid={!!error}>
+          <SelectValue placeholder={t("select", { label })} />
         </SelectTrigger>
         <SelectContent>
           {options.map((opt) => (
@@ -212,15 +217,16 @@ export function SpecField({
   onPatch: (key: string, value: TomlValue | undefined) => void;
   error?: string;
 }) {
+  const copy = useConfigCopy();
   const raw = bag[spec.key];
   switch (spec.widget) {
     case "number":
       return (
         <NumberField
-          label={spec.label}
+          label={copy.fieldLabel(spec)}
           value={typeof raw === "number" ? raw : null}
           placeholder={spec.placeholder}
-          help={spec.help}
+          help={copy.fieldHelp(spec)}
           error={error}
           onChange={(v) => onPatch(spec.key, v === null ? undefined : v)}
         />
@@ -228,30 +234,30 @@ export function SpecField({
     case "toggle":
       return (
         <ToggleField
-          label={spec.label}
+          label={copy.fieldLabel(spec)}
           value={raw === true}
-          help={spec.help}
+          help={copy.fieldHelp(spec)}
           onChange={(v) => onPatch(spec.key, v ? true : undefined)}
         />
       );
     case "select":
       return (
         <SelectField
-          label={spec.label}
+          label={copy.fieldLabel(spec)}
           value={typeof raw === "string" ? raw : ""}
           options={spec.options ?? []}
           error={error}
-          help={spec.help}
+          help={copy.fieldHelp(spec)}
           onChange={(v) => onPatch(spec.key, v || undefined)}
         />
       );
     default:
       return (
         <TextField
-          label={spec.label}
+          label={copy.fieldLabel(spec)}
           value={typeof raw === "string" ? raw : ""}
           placeholder={spec.placeholder}
-          help={spec.help}
+          help={copy.fieldHelp(spec)}
           error={error}
           onChange={(v) => onPatch(spec.key, v.trim() === "" ? undefined : v)}
         />
@@ -270,7 +276,7 @@ export function KeyValueEditor({
   onChange,
   addLabel,
   keyPlaceholder = "KEY",
-  valuePlaceholder = "value",
+  valuePlaceholder,
 }: {
   entries: EnvEntry[];
   onChange: (next: EnvEntry[]) => void;
@@ -278,6 +284,7 @@ export function KeyValueEditor({
   keyPlaceholder?: string;
   valuePlaceholder?: string;
 }) {
+  const t = useTranslations("apps.config.builder");
   const patch = (i: number, next: Partial<EnvEntry>) =>
     onChange(entries.map((e, j) => (j === i ? { ...e, ...next } : e)));
   const remove = (i: number) => onChange(entries.filter((_, j) => j !== i));
@@ -299,17 +306,17 @@ export function KeyValueEditor({
             {isString ? (
               <Input
                 value={entry.value as string}
-                placeholder={valuePlaceholder}
+                placeholder={valuePlaceholder ?? t("valuePlaceholder")}
                 onChange={(e) => patch(i, { value: e.target.value })}
                 className="h-8 flex-1 font-mono text-xs"
               />
             ) : (
               <div className="flex flex-1 items-center gap-2">
                 <Badge variant="outline" className="text-2xs">
-                  advanced
+                  {t("advanced")}
                 </Badge>
                 <span className="text-muted-foreground text-2xs truncate font-mono">
-                  {JSON.stringify(entry.value)} — edit in Code view
+                  {JSON.stringify(entry.value)} — {t("editInCode")}
                 </span>
               </div>
             )}
@@ -317,7 +324,7 @@ export function KeyValueEditor({
               type="button"
               onClick={() => remove(i)}
               className="text-muted-foreground hover:text-destructive shrink-0"
-              aria-label="Remove entry"
+              aria-label={t("removeEntry")}
             >
               <TrashIcon className="size-3.5" />
             </button>

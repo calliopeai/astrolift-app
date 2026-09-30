@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -13,8 +13,8 @@ import type {
   AstroliftRegisteredAgent,
 } from "@/graphql/agents/agents.types";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
-import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
-import type { AstroliftProject, MutationResult } from "@/graphql/identity/identity.types";
+import { useWizardProjects } from "@/components/wizard/use-wizard-projects";
+import type { MutationResult } from "@/graphql/identity/identity.types";
 import type { SourceKind } from "@/graphql/registry/registry.types";
 import type { ScmConnectionKind } from "@/graphql/scm/scm.types";
 
@@ -101,10 +101,6 @@ export function stepValid(
   return true;
 }
 
-interface ProjectsResp {
-  astroliftProjects: AstroliftProject[];
-}
-
 /**
  * The New agent flow's state machine: one `WizardState`, per-part validity
  * reported by each step's hook, errors shown in place once Continue was
@@ -114,6 +110,13 @@ interface ProjectsResp {
  */
 export function useNewAgent() {
   const router = useRouter();
+  const mounted = React.useRef(true);
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
   const [state, setState] = React.useState<WizardState>(initialWizardState);
@@ -135,8 +138,8 @@ export function useNewAgent() {
 
   // The destination project's slug (the success redirect's filter and the
   // scoped refetch) and its `team/project` label for Review.
-  const projectsQuery = useQuery<ProjectsResp>(LIST_PROJECTS, { fetchPolicy: "cache-first" });
-  const picked = projectsQuery.data?.astroliftProjects.find((p) => p.id === state.projectId);
+  const projects = useWizardProjects();
+  const picked = projects.allProjects.find((p) => p.id === state.projectId);
   const projectSlug = picked?.slug ?? "";
   const projectLabel = picked ? `${picked.team.slug}/${picked.slug}` : "";
 
@@ -163,7 +166,7 @@ export function useNewAgent() {
   const hasRepo = state.sourceRepo !== "";
 
   async function submit() {
-    if (!state.projectId) {
+    if (!picked || !orgId) {
       setAttempted((a) => ({ ...a, 2: true }));
       goTo(2);
       return;
@@ -175,6 +178,8 @@ export function useNewAgent() {
       setSideEffects((prev) => prev.map((s) => (s.key === "register" ? { ...s, ...patch } : s)));
 
     try {
+      await projects.confirmDestination(state.projectId);
+      if (!mounted.current) return;
       const { data } = await registerAgentRepo({
         variables: {
           input: {
@@ -188,6 +193,7 @@ export function useNewAgent() {
           },
         },
       });
+      if (!mounted.current) return;
       const result = data?.registerAgentRepo;
       if (!result?.ok || !result.data) {
         const msg = result?.errors?.[0]?.message ?? "Registration failed";
@@ -207,6 +213,7 @@ export function useNewAgent() {
       );
       router.push(projectSlug ? `/agents?project=${encodeURIComponent(projectSlug)}` : "/agents");
     } catch (err) {
+      if (!mounted.current) return;
       const msg = err instanceof Error ? err.message : "Registration failed";
       update({ status: "failed", error: msg });
       setSubmitError(msg);

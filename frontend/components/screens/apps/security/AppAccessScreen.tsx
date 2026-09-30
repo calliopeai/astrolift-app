@@ -37,19 +37,22 @@ export interface AppAccessScreenProps {
   restrictedMode?: RestrictedSettings;
 }
 
-const SECTIONS: { id: keyof AppAccessSlots; permission: string; description?: string }[] = [
+const SECTIONS: {
+  id: keyof AppAccessSlots;
+  permission: string;
+  descriptionKey?: "membersDescription" | "edgeDescription";
+}[] = [
   {
     id: "members",
     permission: "org.manage_members",
-    description: "Who may see and change this app: their roles here, and teams it is shared with.",
+    descriptionKey: "membersDescription",
   },
   { id: "tokens", permission: "app.deploy" },
   { id: "security", permission: "app.update" },
   {
     id: "edge",
     permission: "app.access",
-    description:
-      "Who may reach the app's URL. The edge decides who gets through to the app; roles decide who may change it.",
+    descriptionKey: "edgeDescription",
   },
 ];
 
@@ -65,6 +68,7 @@ const SECTIONS: { id: keyof AppAccessSlots; permission: string; description?: st
  */
 export function AppAccessScreen({ section, access, slots, restrictedMode }: AppAccessScreenProps) {
   const t = useTranslations("apps.frame.sections");
+  const tAccess = useTranslations("apps.security.access");
   const tTab = useTranslations("apps.settingsTab");
   const hide = useRestrictedMode(restrictedMode) === "hide";
 
@@ -74,7 +78,12 @@ export function AppAccessScreen({ section, access, slots, restrictedMode }: AppA
     id: s.id,
     title: t(s.id),
     content: (
-      <Section title={t(s.id)} description={s.description} divided className="min-w-0">
+      <Section
+        title={t(s.id)}
+        description={s.descriptionKey ? tAccess(s.descriptionKey) : undefined}
+        divided
+        className="min-w-0"
+      >
         <Restricted mode={restrictedMode} allowed={access[s.id]} permission={s.permission}>
           {slots[s.id]}
         </Restricted>

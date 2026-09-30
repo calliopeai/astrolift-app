@@ -29,14 +29,11 @@ export function ControlsSection({ appSlug, deployBranch }: Props) {
     <ControlsSectionView
       envs={envs}
       loading={loading}
+      workloads={workloads}
+      workloadsLoading={workloadsLoading}
+      renderWorkload={(w) => <WorkloadRow workload={w} />}
       renderEnvironment={(env) => (
-        <EnvironmentRow
-          env={env}
-          appSlug={appSlug}
-          deployBranch={deployBranch}
-          workloads={workloads}
-          workloadsLoading={workloadsLoading}
-        />
+        <EnvironmentRow env={env} appSlug={appSlug} deployBranch={deployBranch} />
       )}
     />
   );
@@ -46,33 +43,14 @@ function EnvironmentRow({
   env,
   appSlug,
   deployBranch,
-  workloads,
-  workloadsLoading,
 }: {
   env: AstroliftAppEnvironment;
   appSlug: string;
   deployBranch: string;
-  workloads: AstroliftWorkload[];
-  workloadsLoading: boolean;
 }) {
-  return (
-    <EnvironmentControlsView
-      {...useEnvironmentControls(env, appSlug, deployBranch)}
-      workloads={workloads}
-      workloadsLoading={workloadsLoading}
-      renderWorkload={(w) => <WorkloadRow envName={env.name} workload={w} appSlug={appSlug} />}
-    />
-  );
+  return <EnvironmentControlsView {...useEnvironmentControls(env, appSlug, deployBranch)} />;
 }
 
-function WorkloadRow({
-  envName,
-  workload,
-  appSlug,
-}: {
-  envName: string;
-  workload: AstroliftWorkload;
-  appSlug: string;
-}) {
-  return <WorkloadOpsRowView {...useWorkloadOps(envName, workload, appSlug)} />;
+function WorkloadRow({ workload }: { workload: AstroliftWorkload }) {
+  return <WorkloadOpsRowView {...useWorkloadOps(workload)} />;
 }

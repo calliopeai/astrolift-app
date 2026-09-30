@@ -2,11 +2,14 @@
 
 import { ArrowUpRightIcon, CornerLeftUpIcon, UserCheckIcon, UsersRoundIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-import { describeSource, type GrantSourceInfo, SCOPE_NOUN, viaName } from "./access-model";
+import { describeSource, type GrantSourceInfo, viaName } from "./access-model";
+
+import { localizedScopeLabel } from "./access-copy";
 
 export interface GrantSourceProps {
   source: GrantSourceInfo;
@@ -21,25 +24,35 @@ export interface GrantSourceProps {
  * Each part reads as its own phrase, so a screen reader hears the same words.
  */
 export function GrantSource({ source, className }: GrantSourceProps) {
+  const t = useTranslations("shared.access");
   const { via, inheritedFrom } = source;
   const direct = !via && !inheritedFrom;
 
   return (
     <span
       className={cn("inline-flex max-w-full min-w-0 flex-wrap items-center gap-1", className)}
-      title={describeSource(source)}
+      title={describeSource(source, {
+        direct: t("direct"),
+        via: (kind, name) => t("via", { kind: t(`principal.${kind}`), name }),
+        inherited: (kind, name) => t("inherited", { kind: localizedScopeLabel(kind, t), name }),
+        combined: (via, inherited) => t("combined", { via, inherited }),
+      })}
       data-source={
         direct ? "direct" : [via?.kind, inheritedFrom && "inherited"].filter(Boolean).join(" ")
       }
     >
       {direct && (
         <Part icon={<UserCheckIcon className="size-3" />} tone="direct">
-          direct
+          {t("direct")}
         </Part>
       )}
       {via && (
         <Part icon={<UsersRoundIcon className="size-3" />} href={via.href} tone="via">
-          via {via.kind} <span className="font-mono">{viaName(via)}</span>
+          {t.rich("viaRich", {
+            kind: t(`principal.${via.kind}`),
+            identifier: (chunks) => <span className="font-mono">{chunks}</span>,
+            name: viaName(via),
+          })}
         </Part>
       )}
       {inheritedFrom && (
@@ -48,8 +61,11 @@ export function GrantSource({ source, className }: GrantSourceProps) {
           href={inheritedFrom.href}
           tone="inherited"
         >
-          inherited from {SCOPE_NOUN[inheritedFrom.kind]}{" "}
-          <span className="font-mono">{inheritedFrom.name}</span>
+          {t.rich("inheritedRich", {
+            kind: localizedScopeLabel(inheritedFrom.kind, t),
+            name: inheritedFrom.name,
+            identifier: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </Part>
       )}
     </span>

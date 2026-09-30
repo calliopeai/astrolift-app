@@ -13,7 +13,7 @@ import { useDeploymentActions } from "@/components/screens/apps/deployments/use-
 import { useDeploymentComparison } from "@/components/screens/apps/deployments/use-deployment-comparison";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
-import { appPath, useAppChrome } from "../components/app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 /**
  * The app's Deployments tab. The screen owns the markup; the approval

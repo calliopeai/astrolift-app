@@ -2,17 +2,19 @@
 
 import { CheckIcon, ChevronRightIcon, MinusIcon, PlusIcon } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { cn } from "@/lib/utils";
 
+import { localizedResourceLabel } from "./access-copy";
+
 import {
   buildMatrix,
   diffPermissions,
   type MatrixRow,
-  resourceLabel,
   splitSlug,
   VERB_COLUMNS,
 } from "./access-model";
@@ -56,6 +58,8 @@ export function PermissionMatrix({
   defaultOpen,
   className,
 }: PermissionMatrixProps) {
+  const t = useTranslations("shared.access");
+  const format = useFormatter();
   const editable = Boolean(onChange);
   const held = React.useMemo(() => new Set(permissions), [permissions]);
   const was = React.useMemo(() => (base ? new Set(base) : null), [base]);
@@ -114,20 +118,20 @@ export function PermissionMatrix({
           type="search"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter permissions, e.g. deploy"
-          aria-label="Filter permissions"
+          placeholder={t("matrix.placeholder")}
+          aria-label={t("matrix.filter")}
           className="h-8 max-w-64 min-w-0 flex-1 font-mono text-xs"
         />
         <span className="text-muted-foreground font-mono text-xs tabular-nums">
-          {held.size} of {catalog.length}
+          {t("matrix.count", { held: held.size, total: catalog.length })}
         </span>
         {diff && (
           <span className="flex min-w-0 items-center gap-2 font-mono text-xs tabular-nums">
-            <span className="text-success-fg">+{diff.added.length}</span>
-            <span className="text-danger-fg">−{diff.removed.length}</span>
+            <span className="text-success-fg">+{format.number(diff.added.length)}</span>
+            <span className="text-danger-fg">−{format.number(diff.removed.length)}</span>
             {baseLabel && (
               <span className="text-muted-foreground min-w-0 truncate font-sans">
-                vs {baseLabel}
+                {t("matrix.vs", { name: baseLabel })}
               </span>
             )}
           </span>
@@ -138,17 +142,17 @@ export function PermissionMatrix({
         {shownAreas.length === 0 ? (
           <p className="text-muted-foreground p-3 text-sm">
             {needle
-              ? `No permission matches "${filter.trim()}".`
+              ? t("matrix.noMatch", { query: filter.trim() })
               : catalog.length === 0
-                ? "The permission catalog has not loaded."
-                : "No permissions."}
+                ? t("matrix.notLoaded")
+                : t("matrix.none")}
           </p>
         ) : (
-          <div role="table" aria-label="Permissions" className="min-w-[30rem] text-sm">
+          <div role="table" aria-label={t("matrix.label")} className="min-w-[30rem] text-sm">
             <div role="rowgroup" className="bg-surface-1 sticky top-0 z-10 border-b">
               <div role="row" className={cn(grid, "text-muted-foreground text-2xs uppercase")}>
                 <span role="columnheader" className="px-3 py-2 font-medium tracking-wide">
-                  Resource
+                  {t("matrix.resource")}
                 </span>
                 {VERB_COLUMNS.map((c) => (
                   <span
@@ -156,11 +160,11 @@ export function PermissionMatrix({
                     role="columnheader"
                     className="px-1 py-2 text-center font-medium tracking-wide"
                   >
-                    {c.label}
+                    {t(`presentation.column.${c.key}`)}
                   </span>
                 ))}
                 <span role="columnheader" className="px-3 py-2 font-medium tracking-wide">
-                  Also
+                  {t("matrix.also")}
                 </span>
               </div>
             </div>
@@ -192,15 +196,15 @@ export function PermissionMatrix({
                             isOpen && "rotate-90"
                           )}
                         />
-                        {area.label}
+                        {t(`presentation.area.${area.key}`)}
                       </button>
                       <span className="text-muted-foreground text-2xs font-mono tabular-nums">
-                        {areaHeld}/{areaSlugs.length}
+                        {format.number(areaHeld)}/{format.number(areaSlugs.length)}
                       </span>
                     </span>
                     {editable && (
                       <Checkbox
-                        aria-label={`All ${area.label} permissions`}
+                        aria-label={t("matrix.all", { name: t(`presentation.area.${area.key}`) })}
                         checked={
                           areaHeld === areaSlugs.length
                             ? true
@@ -249,6 +253,7 @@ function MatrixRowView({
   onToggle: (slug: string, on: boolean) => void;
   onRow: (on: boolean) => void;
 }) {
+  const t = useTranslations("shared.access");
   const heldCount = row.all.filter((s) => {
     const st = stateOf(s);
     return st === "on" || st === "added";
@@ -258,7 +263,7 @@ function MatrixRowView({
       <span role="rowheader" className="flex min-w-0 items-center gap-2 px-3 py-1.5">
         {editable && (
           <Checkbox
-            aria-label={`All ${resourceLabel(row.resource)} permissions`}
+            aria-label={t("matrix.all", { name: localizedResourceLabel(row.resource, t) })}
             checked={heldCount === row.all.length ? true : heldCount > 0 ? "indeterminate" : false}
             onCheckedChange={(v) => onRow(v === true)}
           />
@@ -274,7 +279,10 @@ function MatrixRowView({
             {slug ? (
               <Cell slug={slug} state={stateOf(slug)} editable={editable} onToggle={onToggle} />
             ) : (
-              <span aria-label="not applicable" className="text-muted-foreground/50 text-xs">
+              <span
+                aria-label={t("matrix.notApplicable")}
+                className="text-muted-foreground/50 text-xs"
+              >
                 ·
               </span>
             )}
@@ -296,13 +304,6 @@ function MatrixRowView({
   );
 }
 
-const STATE_LABEL: Record<CellState, string> = {
-  on: "granted",
-  off: "not granted",
-  added: "added",
-  removed: "removed",
-};
-
 function Cell({
   slug,
   state,
@@ -314,6 +315,8 @@ function Cell({
   editable: boolean;
   onToggle: (slug: string, on: boolean) => void;
 }) {
+  const t = useTranslations("shared.access.matrix");
+  const stateLabel = t(`state.${state}`);
   const on = state === "on" || state === "added";
   if (editable) {
     return (
@@ -323,7 +326,7 @@ function Cell({
           state === "added" && "bg-success-bg ring-success-border ring-1",
           state === "removed" && "bg-danger-bg ring-danger-border ring-1"
         )}
-        title={`${slug} (${STATE_LABEL[state]})`}
+        title={t("stateTitle", { slug, state: stateLabel })}
       >
         <Checkbox
           aria-label={slug}
@@ -335,8 +338,8 @@ function Cell({
   }
   return (
     <span
-      title={`${slug} (${STATE_LABEL[state]})`}
-      aria-label={`${slug}: ${STATE_LABEL[state]}`}
+      title={t("stateTitle", { slug, state: stateLabel })}
+      aria-label={t("stateLabel", { slug, state: stateLabel })}
       role="img"
       className={cn(
         "inline-flex size-5 items-center justify-center rounded-sm",
@@ -370,6 +373,8 @@ function VerbChip({
   editable: boolean;
   onToggle: (slug: string, on: boolean) => void;
 }) {
+  const t = useTranslations("shared.access.matrix");
+  const stateLabel = t(`state.${state}`);
   const on = state === "on" || state === "added";
   const verb = splitSlug(slug).verb;
   const cls = cn(
@@ -389,9 +394,9 @@ function VerbChip({
   if (!editable) {
     if (state === "off") return null;
     return (
-      <span className={cls} title={`${slug} (${STATE_LABEL[state]})`}>
+      <span className={cls} title={t("stateTitle", { slug, state: stateLabel })}>
         {inner}
-        <span className="sr-only">: {STATE_LABEL[state]}</span>
+        <span className="sr-only">: {stateLabel}</span>
       </span>
     );
   }

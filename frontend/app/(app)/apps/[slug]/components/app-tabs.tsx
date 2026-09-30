@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 
 import { AppTabsView } from "@/components/screens/apps/detail/AppTabs";
 
-import { useAppChrome } from "./app-chrome-context";
+import { useAppChrome } from "@/lib/app-chrome-context";
 
 interface AppTabsProps {
   slug: string;

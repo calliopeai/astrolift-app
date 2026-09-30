@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import german from "@/messages/de.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { DEPLOY_STRATEGY, LONG, STRATEGY_APP } from "./app-overview-cards-b.fixtures";
@@ -49,4 +52,19 @@ export const CronSheet: Story = {
 
 export const LongStrings: Story = {
   args: { app: { ...STRATEGY_APP, deployBranch: `release/${LONG}`, defaultBranch: LONG } },
+};
+
+/** Expanded German editor copy keeps branch and cron identifiers intact. */
+export const GermanWidth768: Story = {
+  args: {
+    defaultOpen: true,
+    app: { ...STRATEGY_APP, triggerMode: "cron", cronExpression: "0 6 * * *" },
+  },
+  render: (args) => (
+    <NextIntlClientProvider locale="de" messages={german}>
+      <div style={{ width: 768 }}>
+        <DeployStrategyCardView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

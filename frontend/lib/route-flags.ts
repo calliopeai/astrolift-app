@@ -12,16 +12,19 @@
 //                 direct GraphQL submitForm calls; the FE never exposed
 //                 a public submit page, so /forms/[slug]/submit parks
 //                 with the rest of the tree).
-//   /playground — prompt playground demo surface (static demo data).
+//   /playground/topology and /playground/observability — unrelated demo showcases.
+// Real prompt/history/starred routes use persisted endpoints and scoped local records.
 export const ROUTE_FLAGS: Record<string, boolean> = {
   "/forms": false,
-  "/playground": false,
+  "/playground": true,
+  "/playground/topology": false,
+  "/playground/observability": false,
 };
 
 /** True unless `path` (or a prefix of it) is flagged off in ROUTE_FLAGS. */
 export function isRouteEnabled(path: string): boolean {
   for (const [prefix, enabled] of Object.entries(ROUTE_FLAGS)) {
-    if (path === prefix || path.startsWith(prefix + "/")) return enabled;
+    if (!enabled && (path === prefix || path.startsWith(prefix + "/"))) return false;
   }
   return true;
 }

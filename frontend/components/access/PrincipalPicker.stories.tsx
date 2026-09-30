@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 import * as React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -102,4 +104,21 @@ export const Width768: Story = {
       <Picker initial={{ ...LONG_PRINCIPAL, kind: "user" }} />
     </div>
   ),
+};
+
+export const FrenchEmpty: Story = {
+  render: (args) => <PrincipalPicker {...(args as PrincipalPickerProps)} />,
+  args: {
+    label: "Personne",
+    value: null,
+    search: { query: "", setQuery: () => {}, results: [], loading: false, error: null },
+    onChange: () => {},
+  },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={fr}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

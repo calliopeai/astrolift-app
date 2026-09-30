@@ -266,6 +266,7 @@ def test_rate_limited_after_budget(permission_resolver, monkeypatch):
             # test here -- the conflict guard has its own test below.
             job_id = agent_test_jobs.current_job_id(str(cluster.guid))
             assert job_id is not None
+            assert agent_test_jobs.dispatch_pending(str(cluster.guid))["job_id"] == job_id
             agent_test_jobs.record_result(cluster_guid=str(cluster.guid), job_id=job_id, ok=True)
         limited = ServicesMutation().test_model_endpoint(_info(), _input(svc))
     assert not limited.ok

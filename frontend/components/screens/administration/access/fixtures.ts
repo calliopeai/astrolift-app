@@ -105,11 +105,6 @@ export const LONG_MEMBER: AstroliftMember = {
   scopeId: `project-${LONG}`,
 };
 
-// The JSON scalar is typed as an object, but the server sends conditions as an
-// array; the screen counts them with Array.isArray.
-const conditions = (rows: Record<string, unknown>[]) =>
-  rows as unknown as AstroliftPolicy["conditions"];
-
 export const POLICIES: AstroliftPolicy[] = [
   {
     id: "pol-1",
@@ -122,7 +117,7 @@ export const POLICIES: AstroliftPolicy[] = [
     actionPattern: "app.deploy",
     actorPattern: {},
     resourcePattern: {},
-    conditions: conditions([{ kind: "time_window", days: ["mon", "tue"], hours: ["09:00-18:00"] }]),
+    conditions: [{ kind: "time_window", days: ["mon", "tue"], hours: ["09:00-18:00"] }],
     createdByUsername: "ada.lovelace",
     updatedByUsername: null,
     createdAt: "2026-08-14T10:00:00Z",
@@ -141,10 +136,10 @@ export const POLICIES: AstroliftPolicy[] = [
     actionPattern: "*",
     actorPattern: {},
     resourcePattern: {},
-    conditions: conditions([
+    conditions: [
       { kind: "ip_allowlist", cidrs: ["10.0.0.0/8"] },
       { kind: "freshness", maxAgeSeconds: 900 },
-    ]),
+    ],
     createdByUsername: null,
     updatedByUsername: null,
     createdAt: "2026-09-02T12:30:00Z",
@@ -163,7 +158,7 @@ export const POLICIES: AstroliftPolicy[] = [
     actionPattern: "app.restart",
     actorPattern: {},
     resourcePattern: {},
-    conditions: conditions([]),
+    conditions: [],
     createdByUsername: "grace.hopper",
     updatedByUsername: null,
     createdAt: "2026-09-20T08:15:00Z",

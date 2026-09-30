@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -58,6 +59,7 @@ export interface ManifestConflict {
  * save / sync / push / apply mutations. The data half of ConfigEditorScreen.
  */
 export function useConfigEditor(slug: string) {
+  const t = useTranslations("apps.config.toasts");
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const a = app.data?.astroliftApp ?? null;
 
@@ -178,9 +180,9 @@ export function useConfigEditor(slug: string) {
           : (saved?.rawManifest ?? submitted);
         baselineRef.current = echoed;
         setDraft((current) => (current === submitted ? echoed : current));
-        toast.success("Draft saved");
+        toast.success(t("saved"));
       } else {
-        toast.error(data?.updateManifest.errors?.[0]?.message ?? "Save failed");
+        toast.error(data?.updateManifest.errors?.[0]?.message ?? t("saveFailed"));
       }
     } finally {
       savingRef.current = false;
@@ -196,11 +198,9 @@ export function useConfigEditor(slug: string) {
       const text = next?.rawManifestStaged || next?.rawManifest || "";
       setDraft(text);
       baselineRef.current = text;
-      toast.success("Pulled from repo");
+      toast.success(t("synced"));
     } else {
-      throw new Error(
-        data?.syncManifestFromRepo.errors?.[0]?.message ?? "Couldn't pull from the repo"
-      );
+      throw new Error(data?.syncManifestFromRepo.errors?.[0]?.message ?? t("syncFailed"));
     }
   }
 
@@ -216,9 +216,9 @@ export function useConfigEditor(slug: string) {
       const text = next?.rawManifest || "";
       setDraft(text);
       baselineRef.current = text;
-      toast.success("Applied");
+      toast.success(t("applied"));
     } else {
-      throw new Error(data?.applyStagedManifest.errors?.[0]?.message ?? "Apply failed");
+      throw new Error(data?.applyStagedManifest.errors?.[0]?.message ?? t("applyFailed"));
     }
   }
 
@@ -229,14 +229,14 @@ export function useConfigEditor(slug: string) {
     if (result?.ok) {
       const note = result.data?.note;
       if (note === "nothing_to_push") {
-        toast.message("No staged changes to push.");
+        toast.message(t("nothingToPush"));
       } else if (result.data?.prUrl) {
-        toast.success(`PR opened: ${result.data.branchName}`);
+        toast.success(t("prOpened", { branch: result.data.branchName }));
       } else {
-        toast.success("Push complete");
+        toast.success(t("pushed"));
       }
     } else {
-      toast.error(result?.errors?.[0]?.message ?? "Push failed");
+      toast.error(result?.errors?.[0]?.message ?? t("pushFailed"));
     }
   }
 
@@ -253,7 +253,7 @@ export function useConfigEditor(slug: string) {
     setDraft(conflict.theirs);
     baselineRef.current = conflict.theirs;
     setConflict(null);
-    toast.message("Loaded the server's copy.");
+    toast.message(t("loadedServer"));
   }
 
   function closeConflict() {

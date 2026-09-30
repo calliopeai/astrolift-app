@@ -2148,6 +2148,10 @@ export type AstroliftDeployTokenPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftDeployTokenRotationMetadata = {
+  rotationGraceSeconds: Scalars['Int']['output'];
+};
+
 export type AstroliftDeployment = {
   abortedReason: Scalars['String']['output'];
   approvalsReceived: Scalars['Int']['output'];
@@ -3337,6 +3341,25 @@ export type AstroliftModelEndpointsFilter = {
   /** Engines and providers: vllm, kserve, bedrock, azure_openai... */
   variant: InputMaybe<Array<Scalars['String']['input']>>;
 };
+
+export type AstroliftModelPromptReadiness = {
+  eligible: Scalars['Boolean']['output'];
+  maxOutputTokens: Scalars['Int']['output'];
+  maxPromptChars: Scalars['Int']['output'];
+  maxWaitSeconds: Scalars['Int']['output'];
+  promptsPerMinute: Scalars['Int']['output'];
+  state: AstroliftModelPromptReadinessState;
+};
+
+export type AstroliftModelPromptReadinessState =
+  | 'INACTIVE'
+  | 'READY'
+  | 'STALE_HEARTBEAT'
+  | 'UNAVAILABLE'
+  | 'UNCONFIGURED_MODEL'
+  | 'UNCONFIGURED_RELAY'
+  | 'UNKNOWN_HEARTBEAT'
+  | 'UNSUPPORTED';
 
 export type AstroliftModuleEntitlement = {
   canCreate: Scalars['Boolean']['output'];
@@ -9181,6 +9204,7 @@ export type Query = {
   astroliftAppAccessPreview?: Maybe<AstroliftAppAccessPreview>;
   astroliftAppCertificates: AstroliftAppCertificatesResult;
   astroliftAppCountForCluster: Scalars['Int']['output'];
+  astroliftAppDeployTokenRotationMetadata?: Maybe<AstroliftDeployTokenRotationMetadata>;
   /** @deprecated Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage. */
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
   astroliftAppDeployTokensPage: AstroliftDeployTokenPage;
@@ -9291,6 +9315,7 @@ export type Query = {
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
+  astroliftModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -9815,6 +9840,11 @@ export type QueryAstroliftAppCertificatesArgs = {
 
 export type QueryAstroliftAppCountForClusterArgs = {
   clusterId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftAppDeployTokenRotationMetadataArgs = {
+  appSlug: Scalars['String']['input'];
 };
 
 
@@ -10457,6 +10487,11 @@ export type QueryAstroliftModelEndpointsPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftModelPromptReadinessArgs = {
+  id: Scalars['GUID']['input'];
 };
 
 

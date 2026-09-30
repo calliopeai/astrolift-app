@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 
@@ -52,6 +53,11 @@ export const OnlyThisSession: Story = {
   render: () => (
     <SecuritySettingsView {...securityProps({ sessions: SESSIONS.filter((s) => s.isCurrent) })} />
   ),
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole("button", { name: "Sign out everywhere" })
+    ).toBeDisabled();
+  },
 };
 
 export const SigningOut: Story = {

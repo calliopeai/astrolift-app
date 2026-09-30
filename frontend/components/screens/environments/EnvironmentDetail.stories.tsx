@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import korean from "@/messages/ko.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { ENV_LONG, ENV_STAGING_PAUSED, ENV_UNPLACED, ENVIRONMENT } from "./environments.fixtures";
@@ -51,5 +54,15 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <EnvironmentDetail {...ENVIRONMENT} environment={ENV_LONG} />
     </div>
+  ),
+};
+
+export const KoreanWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ko" messages={korean}>
+      <div style={{ width: 768 }}>
+        <EnvironmentDetail {...ENVIRONMENT} environment={ENV_LONG} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

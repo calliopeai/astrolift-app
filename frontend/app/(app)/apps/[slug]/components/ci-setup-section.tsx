@@ -8,7 +8,7 @@ import {
 import { useCiSetup, usePushAndRotate } from "@/components/screens/apps/overview/use-ci-setup";
 import type { AstroliftCiWorkflowSyncStatus } from "@/graphql/__generated__/schema";
 
-import { appPath, useAppChrome } from "./app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 interface Props {
   /** Public app GUID used by managed-workflow drift mutations. */

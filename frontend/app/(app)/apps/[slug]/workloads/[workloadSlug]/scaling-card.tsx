@@ -1,5 +1,6 @@
 "use client";
 
+import type { AstroliftActionPermission } from "@/graphql/__generated__/schema";
 import { ScalingCardView } from "@/components/screens/apps/workloads/ScalingCard";
 import { useWorkloadScaling } from "@/components/screens/apps/workloads/use-workload-scaling";
 
@@ -9,7 +10,8 @@ export function ScalingCard(props: {
   appSlug: string;
   workloadSlug: string;
   environmentName: string | null;
-  canDeploy: boolean;
+  permission: AstroliftActionPermission | undefined;
+  version: number | undefined;
 }) {
   return <ScalingCardView {...useWorkloadScaling(props)} />;
 }

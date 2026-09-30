@@ -102,6 +102,35 @@ export const APPS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+/** Translate presentation while preserving URL keys, API values and view filters. */
+export function localizedAppsList(
+  t: (key: string) => string,
+  status: (key: string) => string
+): ListDefinition {
+  return {
+    ...APPS_LIST,
+    searchPlaceholder: t("search.placeholder"),
+    fields: APPS_LIST.fields.map((field) => ({
+      ...field,
+      label: t(`columns.${field.key === "deploy" ? "lastDeploy" : field.key}`),
+      options: field.options?.map((option) => ({
+        ...option,
+        label:
+          field.key === "status"
+            ? status(`status.${option.value}`)
+            : field.key === "deploy"
+              ? t(`freshness.status.${option.value.toUpperCase()}`)
+              : t(`kinds.${option.value}`),
+      })),
+    })),
+    views: APPS_LIST.views.map((view) => ({
+      ...view,
+      label: t(`views.${view.key}`),
+      ...(view.key === "mine" ? { note: t("views.mineNote") } : {}),
+    })),
+  };
+}
+
 /** `Apps ▾` [› tail]: the first crumb switches between the Apps area's functions. */
 export function appsCrumbs(tail?: Crumb): Crumb[] {
   const area = NAV.find((a) => a.key === "apps");

@@ -110,9 +110,7 @@ export const WORKLOADS: AstroliftWorkload[] = [WORKLOAD_WEB, WORKLOAD_WORKER];
 
 // ---------------------------------------------------------------- controls section
 
-export function envControls(
-  env: AstroliftAppEnvironment
-): Omit<EnvironmentControlsViewProps, "workloads" | "workloadsLoading" | "renderWorkload"> {
+export function envControls(env: AstroliftAppEnvironment): EnvironmentControlsViewProps {
   return {
     env,
     lastTag: "sha-4f2a9c1",
@@ -126,13 +124,15 @@ export function envControls(
   };
 }
 
-export function workloadOps(envName: string, workload: AstroliftWorkload): WorkloadOpsRowViewProps {
+export function workloadOps(workload: AstroliftWorkload): WorkloadOpsRowViewProps {
   return {
-    envName,
+    envName: "Primary environment",
     workload,
+    restartPermission: workload.viewerCan.restart,
+    scalePermission: workload.viewerCan.scale,
     restarting: false,
     scaling: false,
-    onRestart: noop,
+    onRestart: yes,
     onApply: yes,
   };
 }

@@ -2,11 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
-import {
-  AppTopologyMap,
-  type TopologyEdge,
-  type TopologyNode,
-} from "@/components/topology";
+import { AppTopologyMap, type TopologyEdge, type TopologyNode } from "@/components/topology";
 
 import { isRouteEnabled } from "@/lib/route-flags";
 
@@ -105,7 +101,7 @@ const DEMO_EDGES: TopologyEdge[] = [
 ];
 
 export default function TopologyPlaygroundPage() {
-  if (!isRouteEnabled("/playground")) notFound();
+  if (!isRouteEnabled("/playground/topology")) notFound();
 
   return (
     <PageShell

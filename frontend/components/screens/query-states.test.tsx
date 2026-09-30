@@ -1,6 +1,7 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import { ApolloClient, ApolloLink, InMemoryCache } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Observable } from "rxjs";
 import { describe, expect, it, vi } from "vitest";
@@ -53,7 +54,14 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/test",
   useSearchParams: () => new URLSearchParams(),
 }));
-vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
+vi.mock("next-intl", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next-intl")>();
+  return {
+    ...actual,
+    useTranslations: (namespace?: string) =>
+      namespace?.startsWith("shared.") ? actual.useTranslations(namespace) : (key: string) => key,
+  };
+});
 vi.mock("@/lib/permissions/use-my-permissions", () => ({
   useMyPermissions: () => ({ can: () => true, loading: false }),
 }));

@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import localizedMessages from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
@@ -36,4 +38,14 @@ export const Unsafe: Story = {
 
 export const LongStrings: Story = {
   args: { draft: `name = "${LONG}"\n\n[[workloads]]\nname = "${LONG}"\nkind = "deployment"\n` },
+};
+
+export const Localized: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={localizedMessages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

@@ -4,89 +4,84 @@ export function GetStartedScreen() {
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Get Started</h1>
-        <p className="text-muted-foreground mt-2 text-sm">Up and running in five minutes.</p>
+        <h1 className="text-2xl font-semibold">Local development setup</h1>
+        <p className="text-muted-foreground mt-2 text-sm">
+          Run the Astrolift control plane from an astrolift-app checkout.
+        </p>
       </div>
 
       <div className="bg-muted/40 text-muted-foreground rounded-md border p-4 text-sm leading-relaxed">
-        <strong className="text-foreground">Configuration.</strong> The steps below assume the
-        bundled docker-compose env file. For a non-local deployment, the{" "}
-        <Link
-          href="/documentation/configuration"
-          className="text-foreground underline-offset-2 hover:underline"
-        >
+        For your first application deployment, follow the{" "}
+        <Link href="/documentation/quickstart" className="text-foreground underline">
+          Quickstart
+        </Link>
+        . The steps here are for contributors running the local control plane. They require Docker
+        Desktop or Docker Engine with Compose v2. Review the{" "}
+        <Link href="/documentation/configuration" className="text-foreground underline">
           configuration reference
         </Link>{" "}
-        lists every environment variable Astrolift reads, with defaults and which ones the operator
-        must set.
+        and your local environment files before starting the stack.
       </div>
 
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Step 1 — Start the stack</h2>
+          <h2 className="text-lg font-medium">Prepare and start the stack</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            The entire platform runs in Docker Compose. A single command brings up Postgres, Redis,
-            OpenSearch, MinIO, Celery workers, the Django API, and the Next.js frontend.
+            Run these commands from the repository root. Bootstrap checks Docker and creates missing
+            local environment files from the examples. Fill in required configuration values before
+            starting the Compose services. The stack includes the API and UI, PostgreSQL, Redis,
+            Temporal, and local storage and email services.
           </p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
-            <code>{`make up        # start all containers
-make build     # rebuild and start (after Dockerfile changes)
-make ps        # check container status`}</code>
+            <code>{`./bootstrap.sh
+./run.sh up
+./run.sh ps`}</code>
           </pre>
         </div>
 
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Step 2 — Run migrations</h2>
+          <h2 className="text-lg font-medium">Migrate and seed the local identity</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Apply database migrations to set up the schema. If this is a fresh clone, you will also
-            want to create a superuser for the admin panel.
+            Once the API container is running, apply the database migrations and run the development
+            identity seed. This creates the local organization, team, project and development
+            account used by the local sign-in flow.
           </p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
-            <code>{`make migrate
-make superuser`}</code>
+            <code>{`./run.sh migrate
+./run.sh seed`}</code>
           </pre>
         </div>
 
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Step 3 — Seed development data</h2>
+          <h2 className="text-lg font-medium">Explore and inspect</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Load numbered fixtures to populate the database with sample organizations, users,
-            profiles, and permissions. Use the --flush flag to reset first.
+            The default UI is at http://localhost:3000, the GraphQL API at
+            http://localhost:8000/app/gql/config/, and the Temporal UI at http://localhost:8233.
+            Check your Compose configuration if you override host ports. Use the command wrapper to
+            inspect running containers and logs.
           </p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
-            <code>{`make seed`}</code>
+            <code>{`./run.sh urls
+./run.sh logs
+./run.sh shell`}</code>
           </pre>
         </div>
 
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Step 4 — Explore the services</h2>
+          <h2 className="text-lg font-medium">Run the checks</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            With the stack running, all services are accessible on localhost. The Django admin
-            includes a custom dark theme with import/export on every model.
+            Backend tests run against real PostgreSQL and Temporal through the local stack. Ruff
+            checks backend formatting and lint; the frontend has TypeScript, ESLint and React tests.
+            When changing the GraphQL contract, regenerate its schema and frontend types together.
           </p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
-            <code>{`Django API        http://localhost:8000
-Next.js UI        http://localhost:3000
-Django Admin      http://localhost:8000/app/admin/
-GraphQL           http://localhost:8000/app/gql/config/
-Mailpit           http://localhost:8025
-MinIO Console     http://localhost:9001  (minioadmin/minioadmin)
-Flower (Celery)   http://localhost:5555
-OpenSearch        http://localhost:9200`}</code>
-          </pre>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Step 5 — Run the checks</h2>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            Before committing any code, run the linter and test suite. The linter enforces PEP 8
-            with a 140-character line limit via flake8 and isort. Tests run against a real Postgres
-            and Redis.
-          </p>
-          <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
-            <code>{`make lint      # flake8 + isort checks
-make test      # run Django test suite
-make schema    # export GraphQL SDL`}</code>
+            <code>{`./run.sh test
+make lint
+make schema
+cd frontend
+npm run codegen
+npm run typecheck
+npm test`}</code>
           </pre>
         </div>
       </section>

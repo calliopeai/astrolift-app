@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { ActivityIcon } from "lucide-react";
 import * as React from "react";
@@ -250,4 +253,30 @@ export const Width768: Story = {
     }
     return <Demo />;
   },
+};
+
+export const FrenchWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" timeZone="Europe/Paris" messages={fr}>
+      <div style={{ width: 768 }}>
+        <Feed
+          {...BASE}
+          label="Activité"
+          items={makeEvents(20)}
+          groupBy={BY_DAY}
+          hasMore
+          onLoadMore={() => {}}
+        />
+      </div>
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseLongStrings: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" timeZone="Asia/Tokyo" messages={ja}>
+      <div style={{ width: 768 }}>
+        <Feed {...BASE} label="アクティビティ" items={LONG_EVENTS} groupBy={BY_DAY} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

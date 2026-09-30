@@ -2,6 +2,7 @@
 
 import { PlusIcon, XIcon } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,19 +24,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { cn } from "@/lib/utils";
 
+import { localizedConditionError } from "./policy-copy";
+
 import {
   CONDITION_KINDS,
-  conditionError,
   type ConditionKind,
   newCondition,
   parseCondition,
   type PolicyCondition,
   type PolicyShape,
-  policySegments,
-  RESOURCE_KEY_LABEL,
   RESOURCE_KEYS,
   type ResourceKey,
-  type Segment,
   serializeCondition,
   WEEKDAYS,
 } from "./policy-model";
@@ -62,46 +61,118 @@ export interface PolicySentenceProps {
  */
 export function PolicySentence({ policy, onChange, actions, className }: PolicySentenceProps) {
   if (!onChange) {
-    return (
-      <SentenceText
-        segments={policySegments(policy)}
-        effect={policy.effect}
-        className={className}
-      />
-    );
+    return <SentenceText policy={policy} className={className} />;
   }
   return (
     <PolicyEditor policy={policy} onChange={onChange} actions={actions} className={className} />
   );
 }
 
-function SentenceText({
-  segments,
-  effect,
-  className,
-}: {
-  segments: Segment[];
-  effect: PolicyShape["effect"];
-  className?: string;
-}) {
+function Literal({ children }: { children: React.ReactNode }) {
+  return <span className="bg-muted rounded-sm px-1 font-mono text-xs">{children}</span>;
+}
+
+function SentenceText({ policy, className }: { policy: PolicyShape; className?: string }) {
+  const t = useTranslations("shared.access.policy");
+  const format = useFormatter();
+  const list = (values: string[], type: "conjunction" | "disjunction" = "disjunction") =>
+    values.length ? (
+      <>
+        {format.list(
+          values.map((value, i) => <Literal key={i}>{value}</Literal>),
+          { type }
+        )}
+      </>
+    ) : (
+      t("summary.none")
+    );
+  const joined = (items: React.ReactNode[]) => (
+    <>
+      {format.list(
+        items.map((item, i) => <React.Fragment key={i}>{item}</React.Fragment>),
+        { type: "conjunction" }
+      )}
+    </>
+  );
+  const resources = RESOURCE_KEYS.filter((key) => policy.resource[key]?.length).map((key) =>
+    t.rich("summary.match", {
+      kind: t(`resource.${key}`),
+      values: () => list(policy.resource[key] ?? []),
+    })
+  );
+  const groups = () => list(policy.actor.groups);
+  const role = () => <Literal>{policy.actor.role}</Literal>;
+  const actors = policy.actor.groups.length
+    ? t.rich(policy.actor.role ? "summary.groupsRole" : "summary.groups", { groups, role })
+    : policy.actor.role
+      ? t.rich("summary.role", { role })
+      : t("summary.everyone");
+  const conditions = policy.conditions.map((condition) => {
+    switch (condition.kind) {
+      case "time_window":
+        return t.rich("summary.timeWindow", {
+          days: () =>
+            list(
+              condition.days.map((day) => {
+                const index = WEEKDAYS.indexOf(day as (typeof WEEKDAYS)[number]);
+                return index < 0
+                  ? day
+                  : format.dateTime(new Date(Date.UTC(2026, 8, 28 + index)), {
+                      weekday: "short",
+                      timeZone: "UTC",
+                    });
+              })
+            ),
+          hours: () => list(condition.hours),
+          tz: condition.tz,
+          zone: (chunks) => <Literal>{chunks}</Literal>,
+        });
+      case "ip_allowlist":
+        return t.rich("summary.ip", { ranges: () => list(condition.cidrs) });
+      case "approval_required":
+        return t("summary.approval", { count: condition.min_approvers });
+      case "env_match":
+        return t.rich("summary.environment", { values: () => list(condition.env_in) });
+      case "device_assertion":
+        return t.rich("summary.device", {
+          factors: () => list(condition.required_factors, "conjunction"),
+        });
+      case "freshness":
+        return t("summary.freshness", { minutes: condition.max_session_age_minutes });
+      case "custom": {
+        const raw = condition.raw;
+        const name =
+          raw && typeof raw === "object" && "kind" in raw && typeof raw.kind === "string"
+            ? raw.kind
+            : (JSON.stringify(raw) ?? "undefined");
+        return t.rich("summary.custom", { name, kind: (chunks) => <Literal>{chunks}</Literal> });
+      }
+    }
+  });
+  const action = policy.actionPattern.trim() || "*";
   return (
     <p className={cn("min-w-0 text-sm leading-relaxed [overflow-wrap:anywhere]", className)}>
-      {segments.map((s, i) =>
-        i === 0 ? (
+      {t.rich("summary.rule", {
+        effect: () => (
           <span
-            key={i}
-            className={cn("font-medium", effect === "DENY" ? "text-danger-fg" : "text-success-fg")}
+            className={cn(
+              "font-medium",
+              policy.effect === "DENY" ? "text-danger-fg" : "text-success-fg"
+            )}
           >
-            {s.text}
+            {t(policy.effect === "DENY" ? "deny" : "allow")}
           </span>
-        ) : s.value ? (
-          <span key={i} className="bg-muted rounded-sm px-1 font-mono text-xs">
-            {s.text}
-          </span>
-        ) : (
-          <span key={i}>{s.text}</span>
-        )
-      )}
+        ),
+        action: () => (action === "*" ? t("summary.everyAction") : <Literal>{action}</Literal>),
+        resource: () => (resources.length ? joined(resources) : t("anything")),
+        actor: () => actors,
+        conditions: () =>
+          conditions.length
+            ? t.rich(policy.effect === "DENY" ? "summary.unless" : "summary.onlyWhen", {
+                tests: () => joined(conditions),
+              })
+            : null,
+      })}
     </p>
   );
 }
@@ -122,6 +193,7 @@ function PolicyEditor({
   actions?: readonly string[];
   className?: string;
 }) {
+  const t = useTranslations("shared.access.policy");
   const listId = React.useId();
   const suggestions = React.useMemo(() => actions ?? defaultActions(), [actions]);
   const patch = (next: Partial<PolicyShape>) => onChange({ ...policy, ...next });
@@ -133,28 +205,28 @@ function PolicyEditor({
   return (
     <div className={cn("flex min-w-0 flex-col gap-4", className)}>
       <div className="bg-muted/30 rounded-md border p-3">
-        <SentenceText segments={policySegments(policy)} effect={policy.effect} />
+        <SentenceText policy={policy} />
       </div>
 
-      <Clause label="Rule">
+      <Clause label={t("rule")}>
         <Select
           value={policy.effect}
           onValueChange={(v) => patch({ effect: v as PolicyShape["effect"] })}
         >
-          <SelectTrigger aria-label="Effect" className="w-28">
+          <SelectTrigger aria-label={t("effect")} className="w-28">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="DENY">Deny</SelectItem>
-            <SelectItem value="ALLOW">Allow</SelectItem>
+            <SelectItem value="DENY">{t("deny")}</SelectItem>
+            <SelectItem value="ALLOW">{t("allow")}</SelectItem>
           </SelectContent>
         </Select>
         <Input
-          aria-label="Action"
+          aria-label={t("action")}
           list={listId}
           value={policy.actionPattern}
           onChange={(e) => patch({ actionPattern: e.target.value })}
-          placeholder="app.deploy, secret.* or *"
+          placeholder={t("actionPlaceholder")}
           className="max-w-72 min-w-0 flex-1 font-mono text-xs"
         />
         <datalist id={listId}>
@@ -164,21 +236,25 @@ function PolicyEditor({
         </datalist>
       </Clause>
 
-      <Clause label="On">
+      <Clause label={t("on")}>
         {Object.keys(policy.resource).length === 0 && (
-          <span className="text-muted-foreground text-sm">anything</span>
+          <span className="text-muted-foreground text-sm">{t("anything")}</span>
         )}
         <div className="flex w-full min-w-0 flex-col gap-2">
           {RESOURCE_KEYS.filter((k) => k in policy.resource).map((key) => (
             <div key={key} className="flex min-w-0 items-start gap-2">
               <span className="text-muted-foreground w-24 shrink-0 pt-2 text-sm">
-                {RESOURCE_KEY_LABEL[key]}
+                {t(`resource.${key}`)}
               </span>
               <TagInput
                 value={policy.resource[key] ?? []}
                 onChange={(values) => patch({ resource: { ...policy.resource, [key]: values } })}
                 placeholder={
-                  key === "env" ? "production" : key === "region" ? "us-west-2" : "slug or glob"
+                  key === "env"
+                    ? "production"
+                    : key === "region"
+                      ? "us-west-2"
+                      : t("slugPlaceholder")
                 }
                 className="min-w-0 flex-1 font-mono text-xs"
               />
@@ -186,7 +262,7 @@ function PolicyEditor({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Remove the ${RESOURCE_KEY_LABEL[key]} match`}
+                aria-label={t("removeMatch", { kind: t(`resource.${key}`) })}
                 onClick={() => {
                   const { [key]: _gone, ...rest } = policy.resource;
                   patch({ resource: rest });
@@ -199,43 +275,43 @@ function PolicyEditor({
         </div>
         {unused.length > 0 && (
           <AddMenu
-            label="Narrow to"
-            items={unused.map((k) => ({ key: k, label: RESOURCE_KEY_LABEL[k] }))}
+            label={t("narrow")}
+            items={unused.map((k) => ({ key: k, label: t(`resource.${k}`) }))}
             onPick={(k) => patch({ resource: { ...policy.resource, [k as ResourceKey]: [] } })}
           />
         )}
       </Clause>
 
-      <Clause label="For">
+      <Clause label={t("for")}>
         <div className="flex w-full min-w-0 flex-col gap-2">
           <div className="flex min-w-0 items-start gap-2">
-            <span className="text-muted-foreground w-24 shrink-0 pt-2 text-sm">in groups</span>
+            <span className="text-muted-foreground w-24 shrink-0 pt-2 text-sm">
+              {t("inGroups")}
+            </span>
             <TagInput
               value={policy.actor.groups}
               onChange={(groups) => patch({ actor: { ...policy.actor, groups } })}
-              placeholder="everyone, or IdP groups"
+              placeholder={t("groupsPlaceholder")}
               className="min-w-0 flex-1 font-mono text-xs"
             />
           </div>
           <div className="flex min-w-0 items-center gap-2">
-            <span className="text-muted-foreground w-24 shrink-0 text-sm">holding role</span>
+            <span className="text-muted-foreground w-24 shrink-0 text-sm">{t("holdingRole")}</span>
             <Input
-              aria-label="Holding role"
+              aria-label={t("holdingRole")}
               value={policy.actor.role}
               onChange={(e) => patch({ actor: { ...policy.actor, role: e.target.value } })}
-              placeholder="any role"
+              placeholder={t("anyRole")}
               className="max-w-64 min-w-0 flex-1 font-mono text-xs"
             />
           </div>
         </div>
       </Clause>
 
-      <Clause label={policy.effect === "DENY" ? "Unless" : "Only when"}>
+      <Clause label={t(policy.effect === "DENY" ? "unless" : "onlyWhen")}>
         <div className="flex w-full min-w-0 flex-col gap-3">
           {policy.conditions.length === 0 && (
-            <span className="text-muted-foreground text-sm">
-              no conditions: it applies to every request
-            </span>
+            <span className="text-muted-foreground text-sm">{t("noConditions")}</span>
           )}
           {policy.conditions.map((c, i) => (
             <ConditionRow
@@ -248,8 +324,8 @@ function PolicyEditor({
           ))}
           <div className="flex flex-wrap gap-2">
             <AddMenu
-              label="Add condition"
-              items={CONDITION_KINDS.map((k) => ({ key: k.kind, label: k.label }))}
+              label={t("addCondition")}
+              items={CONDITION_KINDS.map((k) => ({ key: k.kind, label: t(`kind.${k.kind}`) }))}
               onPick={(k) =>
                 patch({ conditions: [...policy.conditions, newCondition(k as ConditionKind)] })
               }
@@ -305,11 +381,13 @@ function AddMenu({
 function Toggles({
   label,
   options,
+  labelFor,
   value,
   onChange,
 }: {
   label: string;
   options: readonly string[];
+  labelFor?: (value: string) => string;
   value: string[];
   onChange: (next: string[]) => void;
 }) {
@@ -328,7 +406,7 @@ function Toggles({
               on ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground"
             )}
           >
-            {o}
+            {labelFor?.(o) ?? o}
           </button>
         );
       })}
@@ -347,9 +425,10 @@ function ConditionRow({
   onChange: (next: PolicyCondition) => void;
   onRemove: () => void;
 }) {
-  const error = conditionError(c);
-  const kindLabel =
-    c.kind === "custom" ? "custom" : CONDITION_KINDS.find((k) => k.kind === c.kind)?.label;
+  const t = useTranslations("shared.access.policy");
+  const format = useFormatter();
+  const error = localizedConditionError(c, t);
+  const kindLabel = t(`kind.${c.kind}`);
   const errorId = `condition-${index}-error`;
   return (
     <div
@@ -365,7 +444,7 @@ function ConditionRow({
           type="button"
           variant="ghost"
           size="icon-sm"
-          aria-label={`Remove condition ${index + 1}`}
+          aria-label={t("removeCondition", { index: index + 1 })}
           onClick={onRemove}
         >
           <XIcon />
@@ -374,8 +453,16 @@ function ConditionRow({
       {c.kind === "time_window" && (
         <>
           <Toggles
-            label="Days"
+            label={t("days")}
             options={WEEKDAYS}
+            labelFor={(day) =>
+              format.dateTime(
+                new Date(
+                  Date.UTC(2026, 8, 28 + WEEKDAYS.indexOf(day as (typeof WEEKDAYS)[number]))
+                ),
+                { weekday: "short", timeZone: "UTC" }
+              )
+            }
             value={c.days}
             onChange={(days) => onChange({ ...c, days })}
           />
@@ -387,7 +474,7 @@ function ConditionRow({
               className="max-w-64 min-w-0 flex-1 font-mono text-xs"
             />
             <Input
-              aria-label="Time zone"
+              aria-label={t("timeZone")}
               value={c.tz}
               onChange={(e) => onChange({ ...c, tz: e.target.value })}
               placeholder="America/Los_Angeles"
@@ -406,7 +493,7 @@ function ConditionRow({
       )}
       {c.kind === "approval_required" && (
         <NumberField
-          label="Approvers"
+          label={t("approvers")}
           value={c.min_approvers}
           onChange={(n) => onChange({ ...c, min_approvers: n })}
         />
@@ -421,7 +508,7 @@ function ConditionRow({
       )}
       {c.kind === "device_assertion" && (
         <Toggles
-          label="Factors"
+          label={t("factors")}
           options={FACTORS}
           value={c.required_factors}
           onChange={(required_factors) => onChange({ ...c, required_factors })}
@@ -429,7 +516,7 @@ function ConditionRow({
       )}
       {c.kind === "freshness" && (
         <NumberField
-          label="Minutes since sign-in"
+          label={t("minutes")}
           value={c.max_session_age_minutes}
           onChange={(n) => onChange({ ...c, max_session_age_minutes: n })}
         />
@@ -478,9 +565,12 @@ function JsonEditor({
   conditions: PolicyCondition[];
   onApply: (next: PolicyCondition[]) => void;
 }) {
+  const t = useTranslations("shared.access.policy");
   const [open, setOpen] = React.useState(false);
   const [text, setText] = React.useState("");
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<{ kind: "array" | "parser"; message?: string } | null>(
+    null
+  );
 
   if (!open) {
     return (
@@ -494,21 +584,25 @@ function JsonEditor({
           setOpen(true);
         }}
       >
-        Edit as JSON
+        {t("jsonEdit")}
       </Button>
     );
   }
   return (
     <div className="flex w-full min-w-0 flex-col gap-2">
       <Textarea
-        aria-label="Conditions as JSON"
+        aria-label={t("jsonLabel")}
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={8}
         className="font-mono text-xs"
         aria-invalid={Boolean(error)}
       />
-      {error && <p className="text-danger-fg text-xs [overflow-wrap:anywhere]">{error}</p>}
+      {error && (
+        <p className="text-danger-fg text-xs [overflow-wrap:anywhere]">
+          {error.kind === "array" ? t("jsonArray") : (error.message ?? t("jsonInvalid"))}
+        </p>
+      )}
       <div className="flex gap-2">
         <Button
           type="button"
@@ -516,18 +610,21 @@ function JsonEditor({
           onClick={() => {
             try {
               const parsed: unknown = JSON.parse(text.trim() || "[]");
-              if (!Array.isArray(parsed)) throw new Error("Conditions are a JSON array.");
+              if (!Array.isArray(parsed)) {
+                setError({ kind: "array" });
+                return;
+              }
               onApply(parsed.map(parseCondition));
               setOpen(false);
             } catch (err) {
-              setError(err instanceof Error ? err.message : "Invalid JSON");
+              setError({ kind: "parser", message: err instanceof Error ? err.message : undefined });
             }
           }}
         >
-          Apply
+          {t("apply")}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
+          {t("cancel")}
         </Button>
       </div>
     </div>

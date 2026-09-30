@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
 
 import { CRON_JOBS, LONG, RUN_JOB } from "./app-settings-members.fixtures";
 import { RunScheduledJobView } from "./RunScheduledJob";
@@ -27,4 +29,14 @@ export const Running: Story = { args: { running: true } };
 
 export const LongStrings: Story = {
   args: { cronJobs: [{ ...CRON_JOBS[0], slug: LONG, schedule: "0 2 * * *" }] },
+};
+
+export const JapaneseWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <div style={{ width: 768 }}>
+        <RunScheduledJobView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

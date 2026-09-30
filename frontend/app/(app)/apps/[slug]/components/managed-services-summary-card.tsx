@@ -17,7 +17,7 @@ import {
   useSendTestEmail,
 } from "@/components/screens/apps/overview/use-managed-services-summary";
 
-import { appPath, useAppChrome } from "./app-chrome-context";
+import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 /**
  * Managed-services summary card for the app Settings landing (#401). Each

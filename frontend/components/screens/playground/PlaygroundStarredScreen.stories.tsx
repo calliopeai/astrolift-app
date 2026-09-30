@@ -15,13 +15,20 @@ export const Full: Story = {
   render: () => <PlaygroundStarredScreen items={STARRED} />,
 };
 
-/** Static list: no loading or error state exists; an empty list is the closest to both. */
+/** No browser-local starred sessions. */
 export const Empty: Story = {
   render: () => <PlaygroundStarredScreen items={[]} />,
 };
 
 export const LongStrings: Story = {
   render: () => (
-    <PlaygroundStarredScreen items={[{ ...STARRED[0], title: LONG, prompt: `${LONG} ${LONG}` }]} />
+    <PlaygroundStarredScreen
+      items={[
+        { ...STARRED[0], title: LONG, messages: [{ role: "user", content: `${LONG} ${LONG}` }] },
+      ]}
+    />
   ),
 };
+
+export const Loading: Story = { render: () => <PlaygroundStarredScreen items={[]} loading /> };
+export const Failed: Story = { render: () => <PlaygroundStarredScreen items={[]} error /> };

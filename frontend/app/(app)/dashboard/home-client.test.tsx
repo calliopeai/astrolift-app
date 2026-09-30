@@ -1,6 +1,7 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HOME_QUESTION } from "@/components/home/HomeScreen";
@@ -56,15 +57,20 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
-  useFormatter: () => ({
-    dateTime: (d: Date) => d.toISOString(),
-    relativeTime: (d: Date) => d.toISOString(),
-    number: (n: number) => String(n),
-  }),
-  useLocale: () => "en",
-}));
+vi.mock("next-intl", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next-intl")>();
+  return {
+    ...actual,
+    useTranslations: (namespace?: string) =>
+      namespace?.startsWith("shared.") ? actual.useTranslations(namespace) : (key: string) => key,
+    useFormatter: () => ({
+      dateTime: (d: Date) => d.toISOString(),
+      relativeTime: (d: Date) => d.toISOString(),
+      number: (n: number) => String(n),
+    }),
+    useLocale: () => "en",
+  };
+});
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }),

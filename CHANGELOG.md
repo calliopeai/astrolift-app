@@ -2,6 +2,254 @@
 
 ## Unreleased
 
+- Webhook pause confirmation actions wrap inside the dialog for longer localized
+  labels, including the French layout found by browser CI.
+- Preserve custom or future access scope labels literally instead of requesting
+  missing translation keys.
+- Model prompt relay admission, dispatch and result transitions atomically retain
+  the matching cluster slot. Concurrent heartbeats dispatch at most once and
+  replayed results preserve the first outcome without releasing a newer job.
+  Cache failures return generic mutation/result failures while authenticated
+  heartbeats remain healthy; admitted jobs may still finish after polling fails.
+
+- Confirmation dialogs retain handled false outcomes and entered reasons for
+  retry without duplicating action diagnostics. Workload restart confirmations
+  propagate the actual outcome; existing void-success callbacks still close.
+- Object and queue snapshot refreshes keep their dialogs open, disable duplicate
+  refreshes while pending and retain the selected service’s last snapshot with
+  visible read diagnostics on failure. Initial read errors no longer look empty.
+- First enabling workload HPA preserves an existing Deployment's observed
+  replica count through a conditional, non-forcing ownership handover. Shared
+  cloud apply drivers refuse stale/replaced targets or unconfirmed handovers;
+  dry runs remain non-mutating.
+
+- The browser workload-controls regression checks the actual three-replica web
+  and zero-replica worker fixtures independently, keeping unobserved readiness
+  unknown rather than inventing healthy pod counts (#2145).
+- Shared policy sentences and editors use all eight locales with grammar-aware
+  clauses, condition validation and JSON-shape feedback. DENY/ALLOW semantics,
+  technical values, raw custom conditions and serialized payloads are preserved
+  (#2145).
+
+- Shared policy condition guidance and simulation summaries use all eight
+  locales, preserving unknown-condition denials, recorded-history limits,
+  server catalog metadata, diagnostics, notes and actual holder targets (#2145).
+
+- Shared access diagnostics and comparisons use all eight locales for verdicts,
+  reasoning labels and states. Actual resolver diagnostics, technical binding
+  targets, permission IDs and comparison partitions remain intact (#2145).
+
+- Shared role summaries and permission/scope pickers translate presentation
+  defaults in all eight locales, retaining literal role metadata, permission
+  slugs, target IDs, server diagnostics and disabled selection checks (#2145).
+
+- Translate shared principal search, empty/error states and selection controls in all eight locales, preserving provider diagnostics and selected identities (#2145).
+
+- Translate grant-source phrases, principal removal labels and Home’s app ownership note in all eight locales while preserving identifiers, edit links and callbacks (#2145).
+- Shared settings navigation, danger-zone notices, default save/cancel actions
+  and read-only permission sentences use all eight locales. Actual permission
+  IDs, caller labels, server diagnostics and draft/retry behavior are preserved
+- Successful agent secret value/reference and bundle/key writes remain
+  committed when their list refresh fails. All eight locales explain that the
+  view needs refreshing and the write should not be repeated (#2145).
+
+- Agent secret value and bundle editors translate presentation and feedback in
+  all eight locales, identify the explicitly selected environment recipe and
+  retain provider identifiers and server diagnostics. Failed status/catalog
+  reads show retryable errors; attachment reads finish before empty states or
+  attach controls appear (#2145).
+
+- Shared feeds translate defaults and calendar-day headings in all eight
+  locales. Grouping follows the configured timezone across daylight-saving
+  transitions; paging callbacks, caller overrides and server errors stay intact
+  (#2145).
+
+- The explicit agent environment-spec picker translates access boundaries,
+  shared-recipe notices, search and pagination in all eight locales (#2145).
+- Shared list and table controls, empty/error/loading states, selection and live
+  row notices use all eight locales. Counts honor the selected locale; caller
+  labels, server diagnostics and actual paging/filter/sort values are preserved
+  (#2145).
+
+- Shared numbered and cursor pagination translates controls and count sentences
+  in all eight locales, retaining page/cursor callbacks and unknown totals.
+- Shared confirmation dialogs use all eight locales for default actions,
+  pending labels and validation feedback, preserving server errors and retry
+  behavior (#2145).
+- Connect the model playground to actual authorized vLLM prompt relays with
+  server-paged endpoint selection, advisory readiness, truthful failures and
+  bounded sequential batch cancellation. Replace demo history/starred data with
+  validated browser-local records scoped to the active organization and user;
+  keep unrelated topology/observability showcases and forms parked (#2148).
+- Managed-service summary, connection metadata and test-email/object/queue dialogs
+  use all eight locales, including byte quantities, cache age and queue counts.
+  Actual service identifiers, metadata, reference shims and rejected-email drafts
+  remain intact; read failures retain their server diagnostics (#2145).
+
+- Deployment controls and settings destination cards use all eight locales.
+  Section modification captions localize both the sentence and relative time;
+  image-tag retries, replica staging and actual destination routes remain intact (#2145).
+
+- Source resync, ingress, webhook pause and one-shot job controls use all eight
+  locales, including audit attribution and operational help. Actual job and
+  environment selections and rejected-pause reasons remain intact (#2145).
+
+- Recovery, deregistration resource previews and grace-period cancellation
+  warnings use all eight locales. Exact app-name/slug confirmation guards,
+  resource identifiers, workflow IDs and rejected-action retry remain intact (#2145).
+
+- Deployment action menus, reasons, target warnings and outcomes use all eight
+  locales. Missing mutation responses now reject confirmations; pending requests
+  block resubmission and failures retain the entered reason for retry (#2145).
+
+- App deployment history, views, filters and comparison sheets use all eight
+  locales. Compare still requires two actual deployments in chronological order;
+  source links, manifest paths and values remain intact (#2145).
+
+- App access views, grant/source removal copy, home-team labels and outcomes
+  use all eight locales. Removal confirmations retain the actual grant or team
+  share across failure and retry; home-team shares remain protected (#2145).
+
+- Complete missing app settings group and identity messages in every locale,
+  including the editor’s save action. Blank names remain refused, failed saves
+  retain user edits and version conflicts use the localized shared notice (#2145).
+
+- Global preview lists, detail panels, states and teardown warnings use all
+  eight locales. Resource numbers and USD costs respect the locale; actual PR
+  targets, hostname patterns and driver cost caveats remain intact (#2145).
+
+- Environment list views, filters, pause confirmations, outcomes and detail
+  panels use all eight locales. Ownership/kind filter values, target links and
+  actual settings remain unchanged; failed pauses require a confirmed retry (#2145).
+
+- Deploy strategy editor copy and notices are translated in all eight locales.
+  Branch help retains its actual identifier, rejected saves keep edits for retry,
+  and missing-message version conflicts use the localized shared fallback (#2145).
+
+- Shared version-conflict fallback notices and their Refresh action use the
+  selected locale; actual server-provided messages remain unchanged (#2145).
+
+- Translate actual model-playground readiness, prompt limits, cancellation, and
+  browser-local history notices across all eight UI locales (#2148, #2145).
+
+- Shared version-conflict feedback can supply translated fallback text and
+  refresh actions without replacing server diagnostics or replaying mutations.
+
+- Translate the bounded real-model playground's prompts, local-session notices,
+  readiness and failure states in all eight locales; preserve ICU parameters.
+
+- Agent secrets require an explicit visible environment-spec choice, verify its
+  current identity before opening editors, and target that recipe instead of
+  guessing from the agent slug. Recipe-wide edits are labeled; switching agents
+  or organizations clears selection and revealed values (#2148).
+- Scaling feedback passes actual ICU values, and API key/project operation dates
+  honor the selected locale and timezone. Project operation states and fallback
+  scale errors have translations in all supported locales (#2145).
+- App registry columns, kinds, views, filters, pins, bulk outcomes and secret-push
+  dialogs use all eight locales. Translated labels preserve real query values,
+  and an unsuccessful secret push retains selection and form values (#2145).
+
+- The app deploy-activity strip localizes labels, numeric hints, empty copy and
+  deployment status tooltips while retaining real deployment links (#2145).
+
+- App detail deploy/delete confirmations, config-drift notices and URL health
+  hints use all eight locales. Translated confirmations preserve actual image,
+  environment and app identifiers and require acceptance before writes (#2145).
+
+- App frame, section/tab labels and shared app loading/not-found messages are
+  translated in all eight locales. Locale changes preserve actual route targets,
+  active tabs and retry callbacks (#2145).
+
+- Complete the 73 missing app overview translations in each non-English locale,
+  including deployment states, health, ownership, CI and service summaries. The
+  probe clock respects the selected locale and configured time zone (#2145).
+
+- App activity filters, search and count/empty states use all eight locales.
+  Reprovision notices use real translated fallback keys for unknown states;
+  confirmations retain failure-and-retry behavior (#2145).
+
+- Audit feed labels, filters, decision badges, retention and export copy use all
+  eight locales. Translated filter labels preserve the original server values;
+  counts use locale-aware ICU plurals (#2145).
+
+- Platform metrics translate fleet states, range controls, metric labels and
+  unavailable-provider guidance in all eight locales while preserving actual
+  cluster/provider identifiers and links (#2145).
+
+- Feature controls, confirmation dialogs and mutation notices use the selected
+  language in all eight supported locales, including rich environment-variable
+  hints. Failed confirmations remain open for retry (#2145; remaining domains
+  are still being translated).
+- Custom-domain DNS, certificate, routing and ingress controls use all eight
+  locales. Certificate dates follow the locale; DNS records, PEM values and
+  the existing external-domain cookie limitation are preserved (#2145).
+
+- App and agent configuration forms, manifest previews, local validation and
+  save feedback use all eight locales. Generated TOML and technical diagnostic
+  paths retain their original identifiers (#2145).
+
+- App preview dialogs, countdowns, statuses and spend warnings use all eight
+  locales. Currency follows the selected locale; unpriced and approximate
+  estimates retain their qualifications (#2145).
+
+- App secret controls, scopes, history and mutation feedback use all eight
+  locales. Dates and expiry counts follow the locale; secret values, scope
+  identifiers and server-provided errors stay unchanged (#2145).
+
+- Edge-access rule descriptions, editor controls, validation and save feedback
+  use all eight locales. Preview counts use locale number/plural formatting;
+  group names, email identities and access policy stay unchanged (#2145).
+
+- App supply-chain security copy, vulnerability badges and numeric threshold
+  labels now use all eight locales. Security-event timestamps follow the locale,
+  and findings labels refresh when the language changes (#2145).
+
+- Deploy-token controls, rotation metadata states and exact grace durations now
+  use all eight dashboard locales. Expiry and last-use dates follow the selected
+  locale; technical token scopes and one-time secret values are unchanged (#2145).
+- HPA-managed Deployments release replica ownership so an image redeploy does not
+  overwrite a live autoscaler count. Fixed-size deployments and preview clamps
+  keep explicit replicas; document separate workload, CPU-node and GPU policies.
+- Add selected-endpoint model prompt readiness and harden the existing real vLLM
+  prompt relay against retired/incoherent owners and inactive clusters before
+  heartbeat, configuration, rate, or job reads. Readiness is advisory and exposes
+  only invocation limits; reported agent versions do not establish relay support
+  (#2148).
+
+- Deregistration loads its authorized resource preview before displaying the
+  count badge, refreshes on confirmation and treats unavailable/refused reads
+  as unknown. Confirmation waits for a usable preview (#2148).
+- Deploy-token rotation confirmation reads the actual validated configuration
+  through an app-update scoped metadata query. Loading, refused and missing
+  metadata block confirmation; each opening rereads, ignores stale replies and
+  shows the exact duration and read-time snapshot semantics (#2148).
+
+- Policy condition JSON passes through the existing validating parser without an
+  object-only type or double assertion; Storybook fixtures use actual arrays (#2148).
+
+- Pipeline detail and secrets pages show the existing definition's actual name
+  with explicit loading/error/unavailable states. Agent repository pickers link
+  directly to the canonical Source providers section (#2148).
+
+- Environment override clears, secret bundle attachments/deletions and secret
+  reference saves prevent pending repeats and show the affected action as busy.
+  Reference saves use trimmed variable identities; closing or changing a secret
+  dialog cancels reveal timers and ignores late reveal responses (#2148).
+
+- Introduction and local setup describe the current Astrolift control plane and
+  actual development commands. The dashboard links canonical project history
+  when versioned release notes are unavailable, treats unknown note categories
+  neutrally, and documents the image's real unbuffered-logging default (#2148).
+
+- Shared page chrome uses a common context outside app routes. Remove unreachable
+  active-provider/session toast callbacks and unused approval/download props;
+  approval history uses semantic theme tokens (#2148).
+- Agent run controls read stored replicas, loop concurrency and scaling schedules
+  before saving. Logs and shell share live pod/container targeting, including
+  container deep links; ingress Apply reflects every busy phase. App and agent
+  wizards share repository/progress UI and refresh their active-org project
+  destination before registering (#2148).
+
 - Audit managed runtime reservation and revocation, and redact provider failures
   during managed Stop without losing retry or retained-storage recovery (#1971).
 
@@ -51,6 +299,12 @@
 - Managed clusters offer an explicit full-preflight refresh. Cluster status waits
   for observed connectivity before reporting an absent agent, and metrics charts
   use distinct SVG gradients when multiple clusters render together (#2148).
+
+- Web workload restart and scale controls use object `viewerCan` decisions,
+  retain denial reasons and refresh authority after structured failures. Settings
+  name the actual primary-environment target once; workload version preconditions
+  protect stale actions (#1867). Other objects, navigation and CLI acceptance
+  remain pending.
 
 - Workloads expose advisory `viewerCan.restart` and `viewerCan.scale` decisions
   using actual owner, bearer, grant/share and primary-environment policy checks,
@@ -577,7 +831,7 @@
   `astrolift_io_managed_service_id`, reserved against tenant labels, with
   the create-time description (`resource=<managed-service id>`) read back
   as evidence; Cloud Operations bundle ids end in `--<digest of the
-  managed-service id>`. New Spanner and PSC derived names get the same
+managed-service id>`. New Spanner and PSC derived names get the same
   digest. Existing resources keep their recorded names. One made before this
   change, and so without the marker, is accepted (and, on provision or
   update, stamped) only when the platform's record of its handle is
@@ -634,7 +888,7 @@
   `softDeleteApp`. A data migration backfills the ledger from every
   existing app, keeping the first claimant (oldest app) on any
   pre-existing collision and logging the rest. `manage.py
-  report_shared_zone_hostname_collisions` is a new read-only command that
+report_shared_zone_hostname_collisions` is a new read-only command that
   renders every live app's public hostnames in shared zones independently
   of the ledger and lists every hostname two or more organizations render
   : the way to find what the migration left unclaimed, and to audit the
@@ -1050,7 +1304,7 @@
   None of the eleven is a credential, so reveal shows them unmasked.
 
 - Make the binding-envelope guardrail read conditional bindings, and separate
-  a value's *encoding* from its *provenance*. `binding()` bodies branch, and
+  a value's _encoding_ from its _provenance_. `binding()` bodies branch, and
   reading only the last branch mis-reported three ledgers at once: the Aurora
   postgres drivers read as emitting the MySQL envelope and none of
   `POSTGRES_*`, and every AWS/GCP Redis driver's `REDIS_URL` was recorded as

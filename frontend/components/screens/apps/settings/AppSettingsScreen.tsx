@@ -13,14 +13,13 @@ import {
   WebhookIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatRelativeAge } from "@/lib/format";
 
 import type { useAppSettings } from "./use-app-settings";
 
@@ -340,10 +339,13 @@ function SettingsLinkCard({
   compact?: boolean;
 }) {
   const t = useTranslations("apps.settings.links");
+  const fmt = useFormatter();
   const Icon = section.icon;
   const title = t(`${section.i18nKey}.title`);
   const description = t(`${section.i18nKey}.description`);
-  const modified = lastModifiedAt ? `Modified ${formatRelativeAge(lastModifiedAt)}` : null;
+  const modified = lastModifiedAt
+    ? t("modified", { when: fmt.relativeTime(new Date(lastModifiedAt)) })
+    : null;
 
   // These are destinations, not peer objects to compare, so the compact
   // default is a row: name and description on the left, freshness right-

@@ -4,6 +4,8 @@ import { useQuery } from "@apollo/client/react";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 
+import { selectContainerName, selectPodName } from "@/lib/pod-target";
+
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 
@@ -14,39 +16,6 @@ interface PodsResp {
 // Same defaults the observability tab uses — keep them in sync so an operator
 // switching tabs gets identical pod-freshness behaviour.
 const POD_POLL_MS = 5000;
-
-const KNOWN_SIDECARS = new Set([
-  "istio-proxy",
-  "envoy",
-  "linkerd-proxy",
-  "datadog-agent",
-  "otel-collector",
-  "otc-container",
-  "newrelic-infrastructure",
-  "fluent-bit",
-  "fluentd",
-  "filebeat",
-  "vault-agent",
-  "vault-agent-init",
-]);
-
-/**
- * The app container an operator almost certainly meant. Prefer the container
- * named after the workload, then the first non-sidecar; a mesh proxy is never
- * what someone opening a shell or tailing logs is after.
- */
-function pickDefaultContainer(
-  containers: string[],
-  workload: string | null | undefined
-): string | null {
-  if (containers.length === 0) return null;
-  if (workload) {
-    const match = containers.find((c) => c === workload);
-    if (match) return match;
-  }
-  const nonSidecar = containers.find((c) => !KNOWN_SIDECARS.has(c));
-  return nonSidecar ?? containers[0];
-}
 
 export interface PodTarget {
   podRows: AstroliftAppPod[];
@@ -98,13 +67,7 @@ export function usePodTarget(slug: string): PodTarget {
 
   const [pickedPod, setPickedPod] = React.useState<string | null>(null);
   const selectedPod: string | null = React.useMemo(() => {
-    // The URL is a *default*, not a pin: once the operator touches the
-    // picker their choice wins, and the link's pod is dropped as soon as it
-    // stops existing rather than leaving the surface stuck on a dead name.
-    const desired = pickedPod ?? urlPod;
-    if (desired && podRows.some((p) => p.name === desired)) return desired;
-    const running = podRows.find((p) => p.status === "Running");
-    return running?.name ?? podRows[0]?.name ?? null;
+    return selectPodName(podRows, pickedPod ?? urlPod);
   }, [pickedPod, urlPod, podRows]);
 
   const podContainers: string[] = React.useMemo(() => {
@@ -119,9 +82,7 @@ export function usePodTarget(slug: string): PodTarget {
 
   const [pickedContainer, setPickedContainer] = React.useState<string | null>(null);
   const selectedContainer: string | null = React.useMemo(() => {
-    const desired = pickedContainer ?? urlContainer;
-    if (desired && podContainers.includes(desired)) return desired;
-    return pickDefaultContainer(podContainers, selectedPodWorkload);
+    return selectContainerName(podContainers, selectedPodWorkload, pickedContainer ?? urlContainer);
   }, [pickedContainer, urlContainer, podContainers, selectedPodWorkload]);
 
   const podsLoading = pods.loading && podRows.length === 0;

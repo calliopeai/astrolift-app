@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import type * as React from "react";
 
-import { Can } from "@/components/Can";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +28,7 @@ export type WorkloadsListScreenProps = ReturnType<typeof useWorkloadsList> & {
   basePath: string;
   /**
    * The inline scale control for one row, rendered only for workloads the
-   * HPA does not own and only with app.deploy.
+   * HPA does not own and with a per-object primary-environment permission decision.
    */
   renderScale?: (workload: AstroliftWorkload, currentDesired: number) => React.ReactNode;
   /** A row's `⋯` items (`DropdownMenuItem`s): Run now for a CronJob. */
@@ -137,9 +136,7 @@ export function WorkloadsListScreen({
                   replicas during an incident without navigating to the
                   detail page. HPA-bound workloads skip the affordance
                   (HPA owns the replica count). */}
-              {!w.hpaMinReplicas && !w.hpaMaxReplicas ? (
-                <Can permission="app.deploy">{renderScale?.(w, live.desired)}</Can>
-              ) : null}
+              {!w.hpaMinReplicas && !w.hpaMaxReplicas ? renderScale?.(w, live.desired) : null}
             </div>
             {w.hpaMinReplicas && w.hpaMaxReplicas ? (
               <div className="text-muted-foreground mt-1">

@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import localizedMessages from "@/messages/es.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { useLocalListState } from "@/components/list/use-list-state";
@@ -116,4 +118,15 @@ export const ManyDomains: Story = {
       pickedId="dom-many-7"
     />
   ),
+};
+
+export const Localized: Story = {
+  render: () => <Domains />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="es" messages={localizedMessages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import * as React from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
@@ -33,6 +35,7 @@ export function DataTablePagination<TRow>({
   controller,
   className,
 }: DataTablePaginationProps<TRow>) {
+  const t = useTranslations("shared.pagination");
   const { pageIndex, hasNext, hasPrev, next, prev, pageSize, setPageSize } = controller;
 
   if (!hasNext && !hasPrev) return null;
@@ -40,9 +43,9 @@ export function DataTablePagination<TRow>({
   return (
     <div className={cn("flex flex-wrap items-center justify-end gap-4", className)}>
       <div className="flex items-center gap-2">
-        <span className="text-muted-foreground text-sm">Rows per page</span>
+        <span className="text-muted-foreground text-sm">{t("rowsPerPage")}</span>
         <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
-          <SelectTrigger size="sm" className="w-18" aria-label="Rows per page">
+          <SelectTrigger size="sm" className="w-18" aria-label={t("rowsPerPage")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -55,13 +58,15 @@ export function DataTablePagination<TRow>({
         </Select>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-muted-foreground text-sm tabular-nums">Page {pageIndex + 1}</span>
+        <span className="text-muted-foreground text-sm tabular-nums">
+          {t("page", { page: pageIndex + 1 })}
+        </span>
         <Button
           variant="outline"
           size="icon"
           onClick={prev}
           disabled={!hasPrev}
-          aria-label="Previous page"
+          aria-label={t("previousPage")}
         >
           <ChevronLeftIcon className="size-4" />
         </Button>
@@ -70,7 +75,7 @@ export function DataTablePagination<TRow>({
           size="icon"
           onClick={next}
           disabled={!hasNext}
-          aria-label="Next page"
+          aria-label={t("nextPage")}
         >
           <ChevronRightIcon className="size-4" />
         </Button>

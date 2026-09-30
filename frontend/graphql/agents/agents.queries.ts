@@ -367,6 +367,11 @@ const AGENT_LIST_ITEM_FIELDS = `
   runMode
   runPaused
   runCronExpression
+  replicas
+  runMaxParallel
+  scheduledScaleTo
+  scaleUpCron
+  scaleDownCron
   lastRunStatus
   lastRunAt
   runningCount
@@ -403,6 +408,11 @@ export const LIST_AGENT_FLEET_PAGE = gql`
         runMode
         runPaused
         runCronExpression
+        replicas
+        runMaxParallel
+        scheduledScaleTo
+        scaleUpCron
+        scaleDownCron
         lastRunStatus
         lastRunAt
         runningCount
@@ -663,6 +673,11 @@ export const AGENT_FLEET_LIST_PAGE = gql`
         runMode
         runPaused
         runCronExpression
+        replicas
+        runMaxParallel
+        scheduledScaleTo
+        scaleUpCron
+        scaleDownCron
         lastRunStatus
         lastRunAt
         runningCount

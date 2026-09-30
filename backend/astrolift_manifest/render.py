@@ -285,9 +285,15 @@ def _render_deployment(
             "name": w.name,
             "namespace": namespace,
             "labels": labels,
+            **(
+                {"annotations": {"astrolift.dev/replica-owner": "hpa"}}
+                if w.hpa_min is not None and w.hpa_max is not None
+                else {}
+            ),
         },
         "spec": {
-            "replicas": int(w.replicas),
+            # The HPA owns /scale; reapplying replicas would reset its live count.
+            **({"replicas": int(w.replicas)} if w.hpa_min is None or w.hpa_max is None else {}),
             "selector": {"matchLabels": selector},
             "template": {
                 "metadata": {

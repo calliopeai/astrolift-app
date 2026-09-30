@@ -2,6 +2,7 @@
 
 import { BrainCircuitIcon, RocketIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -117,6 +118,7 @@ export function ModelsScreen({
   error,
   onRetry,
 }: ModelsScreenProps) {
+  const t = useTranslations("playground");
   return (
     <ListPage<ModelEndpoint>
       header={{
@@ -125,12 +127,17 @@ export function ModelsScreen({
         context:
           "Hosted on your own GPUs or served by your cloud; every one binds through the same MODEL_* variables.",
         primaryAction: (
-          <Button size="sm" asChild>
-            <Link href="/models/deploy">
-              <RocketIcon className="size-4" />
-              Deploy model
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/playground">{t("title")}</Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href="/models/deploy">
+                <RocketIcon className="size-4" />
+                Deploy model
+              </Link>
+            </Button>
+          </div>
         ),
       }}
       list={list}

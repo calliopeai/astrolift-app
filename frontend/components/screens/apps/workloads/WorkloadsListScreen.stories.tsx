@@ -39,7 +39,12 @@ function Workloads({
       {...LIST}
       list={list}
       renderScale={(w, currentDesired) => (
-        <ScalePopoverView {...SCALE} workloadName={w.name} currentDesired={currentDesired} />
+        <ScalePopoverView
+          {...SCALE}
+          permission={w.viewerCan.scale}
+          workloadName={w.name}
+          currentDesired={currentDesired}
+        />
       )}
       renderRowActions={(w) => (
         <WorkloadRowActions
@@ -95,5 +100,27 @@ export const Width768: Story = {
     <div style={{ width: 768 }} className="overflow-hidden border">
       <Workloads {...LIST_LONG} />
     </div>
+  ),
+};
+
+export const RestrictedRow: Story = {
+  render: () => (
+    <Workloads
+      rows={[
+        {
+          ...WORKLOADS[0],
+          viewerCan: {
+            restart: { allowed: false, code: "PERMISSION_DENIED", reason: "No app grant" },
+            scale: {
+              allowed: false,
+              code: "PERMISSION_DENIED",
+              reason: "Sibling app is outside the grant",
+            },
+          },
+        },
+        WORKLOADS[2],
+      ]}
+      totalCount={2}
+    />
   ),
 };

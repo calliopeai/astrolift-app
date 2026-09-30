@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { CheckIcon, RotateCcwIcon, StopCircleIcon, Trash2Icon, UndoIcon } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -64,43 +66,44 @@ export function DeploymentRowMenuItems({
   actions,
   onRequest,
 }: DeploymentRowMenuItemsProps) {
+  const t = useTranslations("apps.deployments.actions");
   const show = availableActions(d, actions);
   const { busy } = actions;
   const ask = (kind: ConfirmedAction) => () => onRequest({ kind, deployment: d });
 
   if (!Object.values(show).some(Boolean)) {
-    return <DropdownMenuItem disabled>No actions for this deployment</DropdownMenuItem>;
+    return <DropdownMenuItem disabled>{t("noActions")}</DropdownMenuItem>;
   }
   return (
     <>
       {show.approve && (
         <DropdownMenuItem disabled={busy} onSelect={() => void actions.onApprove(d)}>
           <CheckIcon className="size-4" />
-          Approve
+          {t("approve")}
         </DropdownMenuItem>
       )}
       {show.redeploy && (
         <DropdownMenuItem disabled={busy} onSelect={ask("redeploy")}>
           <RotateCcwIcon className="size-4" />
-          Redeploy
+          {t("redeploy")}
         </DropdownMenuItem>
       )}
       {show.rollback && (
         <DropdownMenuItem disabled={busy} onSelect={ask("rollback")}>
           <UndoIcon className="size-4" />
-          Roll back to this
+          {t("rollbackTo")}
         </DropdownMenuItem>
       )}
       {show.abort && (
         <DropdownMenuItem variant="destructive" disabled={busy} onSelect={ask("abort")}>
           <StopCircleIcon className="size-4" />
-          Abort
+          {t("abort")}
         </DropdownMenuItem>
       )}
       {show.discard && (
         <DropdownMenuItem variant="destructive" disabled={busy} onSelect={ask("discard")}>
           <Trash2Icon className="size-4" />
-          Discard failed deploy
+          {t("discardFailed")}
         </DropdownMenuItem>
       )}
     </>
@@ -121,6 +124,8 @@ export function DeploymentActionDialog({
   onClose,
   actions,
 }: DeploymentActionDialogProps) {
+  const t = useTranslations("apps.deployments.actions");
+  const common = useTranslations("apps.common");
   const d = target?.deployment;
   const tag = d ? d.imageTag || d.id.slice(0, 8) : "";
   const onOpenChange = (open: boolean) => {
@@ -130,12 +135,17 @@ export function DeploymentActionDialog({
   return (
     <>
       <ConfirmDialog
-        reason={{ label: "Reason for abort", placeholder: "Why are you aborting this deploy?" }}
+        reason={{
+          label: t("abortReasonLabel"),
+          placeholder: t("abortReasonPlaceholder"),
+          requiredError: t("requiredReason"),
+        }}
         open={target?.kind === "abort"}
         onOpenChange={onOpenChange}
-        title={`Abort deploy to ${d?.environmentName ?? ""}?`}
-        description="The in-flight rollout will be marked failed. Tell the team what changed."
-        confirmLabel="Abort deploy"
+        cancelLabel={common("cancel")}
+        title={t("abortTitle", { env: d?.environmentName ?? "" })}
+        description={t("abortDescription")}
+        confirmLabel={t("abortConfirm")}
         destructive
         onConfirm={(reason) => (d ? actions.onAbort(d, reason) : undefined)}
       />
@@ -143,26 +153,33 @@ export function DeploymentActionDialog({
       <ConfirmDialog
         open={target?.kind === "redeploy"}
         onOpenChange={onOpenChange}
-        title={`Redeploy ${tag} to ${appSlug}/${d?.environmentName ?? ""}?`}
-        description="Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config."
-        confirmLabel="Redeploy"
+        cancelLabel={common("cancel")}
+        title={t("redeployTitle", { tag, app: appSlug, env: d?.environmentName ?? "" })}
+        description={t("redeployDescription")}
+        confirmLabel={t("redeploy")}
         onConfirm={() => (d ? actions.onRedeploy(d) : undefined)}
       />
       <ConfirmDialog
         open={target?.kind === "rollback"}
         onOpenChange={onOpenChange}
-        title={`Rollback ${d?.environmentName ?? ""} to ${tag}?`}
-        description="The platform will redeploy this image as the live version. The current rollout will be marked superseded."
-        confirmLabel="Roll back"
+        cancelLabel={common("cancel")}
+        title={t("rollbackTitle", { env: d?.environmentName ?? "", tag })}
+        description={t("rollbackDescription")}
+        confirmLabel={t("rollbackConfirm")}
         onConfirm={() => (d ? actions.onRollback(d) : undefined)}
       />
       <ConfirmDialog
-        reason={{ label: "Reason for discard", placeholder: "Why are you discarding this deploy?" }}
+        reason={{
+          label: t("discardReasonLabel"),
+          placeholder: t("discardReasonPlaceholder"),
+          requiredError: t("requiredReason"),
+        }}
         open={target?.kind === "discard"}
         onOpenChange={onOpenChange}
-        title={`Discard failed deploy ${(d?.imageTag || d?.id || "").slice(0, 8)}?`}
-        description="The row stays in history but the rollout is marked aborted. Tell the team what changed."
-        confirmLabel="Discard"
+        cancelLabel={common("cancel")}
+        title={t("discardTitle", { tag: (d?.imageTag || d?.id || "").slice(0, 8) })}
+        description={t("discardDescription")}
+        confirmLabel={t("discardConfirm")}
         destructive
         onConfirm={(reason) => (d ? actions.onAbort(d, reason) : undefined)}
       />

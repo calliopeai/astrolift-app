@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import es from "@/messages/es.json";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
 import { PendingDeploymentsView } from "../controls/PendingDeployments";
 import { PENDING } from "../controls/app-controls.fixtures";
-import { appDeploymentsList } from "./app-deployments-list";
+import { localizedAppDeploymentsList } from "./app-deployments-list";
 import {
   ACTIONS,
   COMPARE,
@@ -26,12 +28,11 @@ export default meta;
 
 type Story = StoryObj;
 
-const DEF = appDeploymentsList(["prod", "stg"]);
-
 type Props = Partial<Omit<AppDeploymentsScreenProps, "list">> & { initial?: Partial<ListState> };
 
 function Deployments({ initial, ...props }: Props) {
-  const list = useLocalListState(DEF, initial);
+  const t = useTranslations("apps.deployments");
+  const list = useLocalListState(localizedAppDeploymentsList(t, ["prod", "stg"]), initial);
   return (
     <AppDeploymentsScreen
       {...SCREEN}
@@ -146,5 +147,15 @@ export const Width768: Story = {
     <div style={{ width: 768 }} className="overflow-hidden border">
       <Deployments rows={[DEPLOY_LONG, ...DEPLOYMENTS]} />
     </div>
+  ),
+};
+
+export const SpanishWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={es} timeZone="UTC">
+      <div style={{ width: 768 }} className="overflow-hidden border">
+        <Deployments rows={[DEPLOY_LONG, ...DEPLOYMENTS]} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

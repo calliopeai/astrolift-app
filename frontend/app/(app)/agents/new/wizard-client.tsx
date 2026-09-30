@@ -1,5 +1,7 @@
 "use client";
 
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { NewAgentPage, NewAgentSection } from "@/components/screens/agents/new/NewAgentPage";
 import { useNewAgent } from "@/components/screens/agents/new/use-new-agent";
@@ -15,6 +17,11 @@ import { ReviewSubmitStep } from "./steps/ReviewSubmitStep";
  * a container that reports its own validity.
  */
 export function WizardClient() {
+  const { org } = useActiveOrg();
+  return <ScopedWizardClient key={org?.id ?? "unresolved"} />;
+}
+
+function ScopedWizardClient() {
   const flow = useNewAgent();
   const { state, setState, setValid, errors } = flow;
 

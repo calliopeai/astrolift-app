@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useMemo } from "react";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
@@ -24,7 +26,7 @@ import type {
 import { GET_ME } from "@/graphql/user/user.queries";
 import type { CurrentUser } from "@/graphql/user/user.types";
 
-import { type AccessRow, accessRows, APP_ACCESS_LIST, viewSources } from "./app-access-rows";
+import { type AccessRow, accessRows, localizedAppAccessList, viewSources } from "./app-access-rows";
 
 interface AppResp {
   astroliftApp: AstroliftRegisteredApp | null;
@@ -54,7 +56,9 @@ export function useAppMembers(slug: string) {
   const pathname = usePathname() ?? `/apps/${slug}/access`;
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
   const me = useQuery<MeResp>(GET_ME);
-  const list = useListState(APP_ACCESS_LIST);
+  const t = useTranslations("apps.members");
+  const definition = useMemo(() => localizedAppAccessList(t), [t]);
+  const list = useListState(definition);
   const { state } = list;
   const view = state.view;
   const sources = viewSources(view);
@@ -123,18 +127,20 @@ export function useAppMembers(slug: string) {
     if (row.kind === "binding") {
       const { data } = await revokeBinding({ variables: { input: { id: row.binding.id } } });
       if (!data?.revokeRoleBinding.ok) {
-        throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
+        throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? t("toasts.revokeFailed"));
       }
-      toast.success("Role revoked");
+      toast.success(t("toasts.roleRevoked"));
       return;
     }
     const { data } = await revokeShare({
       variables: { input: { appId: row.share.appId, teamId: row.share.teamId } },
     });
     if (!data?.revokeTeamAccessFromApp.ok) {
-      throw new Error(data?.revokeTeamAccessFromApp.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(
+        data?.revokeTeamAccessFromApp.errors?.[0]?.message ?? t("toasts.revokeFailed")
+      );
     }
-    toast.success(`Ended ${row.share.teamSlug}'s access`);
+    toast.success(t("toasts.shareEnded", { team: row.share.teamSlug }));
   }
 
   const scope = a ? { kind: "APP" as const, id: a.id, name: a.name || a.slug } : null;

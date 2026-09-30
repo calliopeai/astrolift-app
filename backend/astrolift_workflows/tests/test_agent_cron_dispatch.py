@@ -18,12 +18,12 @@ The four acceptance cases (spec §PR-4):
      deploy);
   2. ``run_paused`` is honored — a paused agent does not dispatch;
   3. a service agent (family=service, replicas=N) deploys a
-     Deployment+Service+HPA with N replicas via the existing renderer;
+     Deployment+Service+HPA with HPA-owned replicas via the existing renderer;
   4. manual ``scale_workload`` still works on a service agent.
 
 Cases 3 & 4 verify the Service-mode reuse: the render path keys on the
 manifest workload ``kind == "agent"`` (which already emits the trio and
-honours ``replicas``) and ``scale_workload`` patches the Deployment by
+defers replica count to the HPA) and ``scale_workload`` patches the Deployment by
 name regardless of run-spec family.
 """
 
@@ -427,13 +427,13 @@ def test_agent_cron_tick_is_registered_at_60_seconds():
 
 def test_service_agent_renders_deployment_service_hpa_with_replicas():
     """Acceptance (3): a Service-family agent deploys a
-    Deployment+Service+HPA with N replicas.
+    Deployment+Service+HPA with HPA-owned replicas.
 
     The render path keys on the manifest workload ``kind == "agent"``,
-    which already emits the trio and honours ``replicas`` (via the shared
+    which emits the trio and defers replicas to the HPA (via the shared
     deployment renderer). A ``family=service`` agent flows through this
     exact path when its app deploys — so this asserts the rendered output
-    a Service agent produces, with replicas honoured."""
+    a Service agent produces, with HPA bounds honoured."""
     from astrolift_manifest.normalize import NormalizationDefaults, normalize
     from astrolift_manifest.render import render_manifests
     from astrolift_manifest.types import (
@@ -465,8 +465,7 @@ def test_service_agent_renders_deployment_service_hpa_with_replicas():
     assert kinds == ["Deployment", "HorizontalPodAutoscaler", "Service"]
 
     dep = next(r for r in out if r["kind"] == "Deployment")
-    # N replicas honoured.
-    assert dep["spec"]["replicas"] == 3
+    assert "replicas" not in dep["spec"]
     # Still the agent pod annotation (it IS an agent, just always-on).
     assert dep["spec"]["template"]["metadata"]["annotations"]["astrolift.dev/workload-kind"] == "agent"
 

@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import es from "@/messages/es.json";
 import { expect, within } from "storybook/test";
 
 import { CONDITION_CATALOG, LONG } from "./fixtures";
@@ -41,4 +43,15 @@ export const LongStrings: Story = {
     catalog: [{ ...CONDITION_CATALOG[0], label: LONG, description: LONG }],
     kinds: ["time_window"],
   },
+};
+
+export const Spanish: Story = {
+  args: { catalog: CONDITION_CATALOG, kinds: ["time_window", "ip_allowlist", "geo_fence"] },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="es" messages={es}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

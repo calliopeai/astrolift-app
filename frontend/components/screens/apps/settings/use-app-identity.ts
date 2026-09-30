@@ -8,7 +8,7 @@ import type { MutationResult } from "@/graphql/identity/identity.types";
 import { UPDATE_APP } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
-import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
+import { useVersionMismatch } from "@/lib/apollo/use-version-mismatch";
 
 interface UpdateResp {
   updateApp: MutationResult<Partial<AstroliftRegisteredApp>>;
@@ -27,6 +27,7 @@ export interface AppIdentityValues {
  */
 export function useAppIdentity(app: AstroliftRegisteredApp) {
   const t = useTranslations("apps.settingsTab.identity");
+  const handleVersionMismatch = useVersionMismatch();
   const [save, { loading: saving }] = useMutation<UpdateResp>(UPDATE_APP, {
     refetchQueries: [{ query: GET_APP, variables: { slug: app.slug } }],
     awaitRefetchQueries: true,

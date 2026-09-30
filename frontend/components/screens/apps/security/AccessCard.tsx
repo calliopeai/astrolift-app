@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { DoorOpenIcon, XIcon } from "lucide-react";
 import * as React from "react";
 
@@ -26,11 +27,12 @@ export type AccessCardViewProps = ReturnType<typeof useAppAccess> & {
  * [ingress.access] is managed there, and this card only shows it.
  */
 export function AccessCardView({ access, loading, editor }: AccessCardViewProps) {
+  const t = useTranslations("apps.security.access");
   if (loading && !access) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Access</CardTitle>
+          <CardTitle className="text-sm">{t("title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Skeleton className="h-20 w-full" />
@@ -45,19 +47,16 @@ export function AccessCardView({ access, loading, editor }: AccessCardViewProps)
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-sm">
           <DoorOpenIcon className="size-4" />
-          Access
+          {t("title")}
           {access.managedByManifest && (
             <Badge variant="outline" className="text-2xs font-normal">
-              set in astrolift.toml
+              {t("managedByManifest")}
             </Badge>
           )}
         </CardTitle>
         <CardDescription>
-          {access.restricted
-            ? "Only the groups and users below can enter. Everyone else who signs in is shown a no-access page."
-            : "Every user who can sign in to this cluster's central auth can enter."}{" "}
-          {access.enforcedOn.length === 0 &&
-            "Enforced on the Envoy edge; none of this app's clusters is on it yet, so it is gated by login only."}
+          {access.restricted ? t("restrictedDescription") : t("openDescription")}{" "}
+          {access.enforcedOn.length === 0 && t("notEnforced")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -74,17 +73,18 @@ export function AccessCardView({ access, loading, editor }: AccessCardViewProps)
 }
 
 function AccessSummary({ access }: { access: AstroliftAppAccess }) {
-  if (!access.restricted) return <p className="text-muted-foreground text-sm">No access rule.</p>;
+  const t = useTranslations("apps.security.access");
+  if (!access.restricted) return <p className="text-muted-foreground text-sm">{t("noRule")}</p>;
   return (
     <dl className="grid gap-2 text-sm">
       <div>
-        <dt className="text-muted-foreground text-xs">Groups</dt>
+        <dt className="text-muted-foreground text-xs">{t("groups")}</dt>
         <dd className="flex flex-wrap gap-1">
           {access.groups.length ? access.groups.map((g) => <Badge key={g}>{g}</Badge>) : "—"}
         </dd>
       </div>
       <div>
-        <dt className="text-muted-foreground text-xs">Users</dt>
+        <dt className="text-muted-foreground text-xs">{t("users")}</dt>
         <dd className="flex flex-wrap gap-1">
           {access.users.length
             ? access.users.map((u) => (
@@ -114,6 +114,7 @@ function ListInput({
   placeholder: string;
   validate?: (v: string) => string | null;
 }) {
+  const t = useTranslations("apps.security.access");
   const [draft, setDraft] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   function add() {
@@ -137,7 +138,7 @@ function ListInput({
             {v}
             <button
               type="button"
-              aria-label={`Remove ${v}`}
+              aria-label={t("remove", { value: v })}
               onClick={() => onChange(values.filter((x) => x !== v))}
             >
               <XIcon className="size-3" />
@@ -159,7 +160,7 @@ function ListInput({
           }}
         />
         <Button type="button" variant="outline" size="sm" onClick={add}>
-          Add
+          {t("add")}
         </Button>
       </div>
       {error && <p className="text-destructive text-xs">{error}</p>}
@@ -179,6 +180,7 @@ export function AccessEditorView({
   saving,
   onSave,
 }: AccessEditorViewProps) {
+  const t = useTranslations("apps.security.access");
   return (
     <form
       className="space-y-4"
@@ -189,26 +191,29 @@ export function AccessEditorView({
     >
       <ListInput
         id="access-groups"
-        label="Groups"
+        label={t("groups")}
         values={groups}
         onChange={setGroups}
         placeholder="veruus"
       />
       <ListInput
         id="access-users"
-        label="Users (email)"
+        label={t("usersEmail")}
         values={users}
         onChange={setUsers}
         placeholder="someone@example.com"
-        validate={(v) => (v.includes("@") ? null : "Enter an email address.")}
+        validate={(v) => (v.includes("@") ? null : t("invalidEmail"))}
       />
-      {changed && p && p.total !== null && (
+      {changed && p && p.total != null && p.allowed != null && (
         <p role="status" className="text-muted-foreground text-xs">
-          {p.allowed} of {p.total} users could enter.
+          {t("preview", { allowed: p.allowed, total: p.total })}
           {p.losing.length > 0 && (
             <span className="text-warning-fg">
               {" "}
-              {p.losing.length} would lose access: {p.losing.slice(0, 5).join(", ")}
+              {t("losingAccess", {
+                count: p.losing.length,
+                users: p.losing.slice(0, 5).join(", "),
+              })}
               {p.losing.length > 5 ? "…" : ""}
             </span>
           )}
@@ -216,7 +221,7 @@ export function AccessEditorView({
       )}
       <div className="flex justify-end">
         <Button type="submit" size="sm" disabled={!changed || saving}>
-          {saving ? "Saving…" : "Save access"}
+          {saving ? t("saving") : t("save")}
         </Button>
       </div>
     </form>

@@ -1,6 +1,7 @@
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import type { ReactNode } from "react";
 
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TeamsCard } from "./teams-card";
@@ -49,7 +50,9 @@ vi.mock("@apollo/client/react", () => ({
     state.calls.push({ op, variables: options?.variables ?? {} });
     let data: unknown = {};
     if (op === "ListAppTeamAccessesPage") {
-      data = { astroliftAppTeamAccessesPage: { items: [PLATFORM], nextCursor: "c1", totalCount: 2 } };
+      data = {
+        astroliftAppTeamAccessesPage: { items: [PLATFORM], nextCursor: "c1", totalCount: 2 },
+      };
     } else if (op === "ListAppTeamAccesses") {
       data = { astroliftAppTeamAccesses: [PLATFORM, PAYMENTS] };
     } else if (op === "ListTeams") {

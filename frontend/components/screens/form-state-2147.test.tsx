@@ -179,6 +179,7 @@ describe("dialog edit sessions", () => {
   it("preserves a staged scale across live replicas updates and resets only on reopening", () => {
     const props = {
       workloadName: "api",
+      permission: { allowed: true, code: "", reason: "" },
       currentDesired: 2,
       loading: false,
       apply: async () => false,

@@ -18,7 +18,7 @@ export const Full: Story = {
   render: () => <PlaygroundScreen {...PLAYGROUND} batch={batch} />,
 };
 
-/** A prompt was sent and the simulated reply is pending. */
+/** A prompt was sent and the actual relay reply is pending. */
 export const Loading: Story = {
   render: () => <PlaygroundScreen {...PLAYGROUND} loading batch={batch} />,
 };
@@ -37,7 +37,7 @@ export const Empty: Story = {
   ),
 };
 
-/** The chat tab has no error state; the batch tab's failed result is the closest. */
+/** A failed real prompt row appears in the batch tab. */
 export const BatchTab: Story = {
   render: () => (
     <PlaygroundScreen
@@ -46,7 +46,7 @@ export const BatchTab: Story = {
       batch={
         <PlaygroundBatch
           {...BATCH}
-          results={[{ input: BATCH.inputs[0], output: "", ok: false, error: "Model unavailable" }]}
+          results={[{ input: BATCH.inputs[0], output: "", ok: false, error: "unavailable" }]}
         />
       }
     />
@@ -61,10 +61,51 @@ export const LongStrings: Story = {
       prompt={LONG}
       messages={[
         { role: "user", content: LONG },
-        { role: "assistant", content: `[Genesis] This is a simulated response to: "${LONG}"` },
+        { role: "assistant", content: LONG },
       ]}
       savedSessions={[{ ...PLAYGROUND.savedSessions[0], title: LONG }]}
       batch={batch}
     />
   ),
+};
+
+export const CheckingEndpoint: Story = {
+  render: () => (
+    <PlaygroundScreen {...PLAYGROUND} readiness="loading" canSend={false} batch={batch} />
+  ),
+};
+export const Disconnected: Story = {
+  render: () => (
+    <PlaygroundScreen {...PLAYGROUND} readiness="STALE_HEARTBEAT" canSend={false} batch={batch} />
+  ),
+};
+export const Refused: Story = {
+  render: () => (
+    <PlaygroundScreen {...PLAYGROUND} readiness="refused" canSend={false} batch={batch} />
+  ),
+};
+export const Unsupported: Story = {
+  render: () => (
+    <PlaygroundScreen {...PLAYGROUND} readiness="UNSUPPORTED" canSend={false} batch={batch} />
+  ),
+};
+export const TimedOut: Story = {
+  render: () => <PlaygroundScreen {...PLAYGROUND} error="timedOut" batch={batch} />,
+};
+export const NoVisibleEndpoints: Story = {
+  render: () => (
+    <PlaygroundScreen
+      {...PLAYGROUND}
+      models={[]}
+      totalCount={0}
+      model=""
+      modelName=""
+      readiness="unselected"
+      canSend={false}
+      batch={batch}
+    />
+  ),
+};
+export const CatalogError: Story = {
+  render: () => <PlaygroundScreen {...PLAYGROUND} catalogError canSend={false} batch={batch} />,
 };

@@ -41,3 +41,14 @@ export const OneGroup: Story = {
     await expect(c.queryByText("DJANGO_SECRET_KEY")).toBeNull();
   },
 };
+
+/** The image badge is backed by an actual shipped Dockerfile default. */
+export const ImageDefaults: Story = {
+  args: { groups: CONFIGURATION_GROUPS },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Control-plane image" }));
+    await expect(canvas.getByText("PYTHONUNBUFFERED")).toBeInTheDocument();
+    await expect(canvas.queryByText("DJANGO_SECRET_KEY")).toBeNull();
+  },
+};

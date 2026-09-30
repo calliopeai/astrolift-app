@@ -2,6 +2,7 @@
 
 import { SearchCheckIcon, ShieldIcon, UserPlusIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { GrantSource } from "@/components/access/GrantSource";
@@ -69,6 +70,8 @@ export function AppMembersScreen({
   slug,
 }: AppMembersScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("apps.members");
+  const common = useTranslations("apps.common");
   const [target, setTarget] = React.useState<AccessRow | null>(null);
 
   if (loading) {
@@ -84,10 +87,10 @@ export function AppMembersScreen({
     return (
       <EmptyState
         icon={<UsersIcon className="size-5" />}
-        title={`No app called ${slug}`}
-        description="It does not exist, or you do not have permission to see it."
+        title={common("notFoundSlug", { slug })}
+        description={common("notFoundDescription")}
         actionHref="/apps"
-        actionLabel="Back to apps"
+        actionLabel={common("backToApps")}
       />
     );
   }
@@ -95,12 +98,21 @@ export function AppMembersScreen({
   const columns: Column<AccessRow>[] = [
     {
       id: "principal",
-      header: "Who",
-      cell: (r) => <PrincipalChip principal={r.principal} variant="block" />,
+      header: t("columns.who"),
+      cell: (r) => (
+        <PrincipalChip
+          principal={
+            r.kind === "team_share" && r.share.isHome
+              ? { ...r.principal, detail: t("homeTeam") }
+              : r.principal
+          }
+          variant="block"
+        />
+      ),
     },
     {
       id: "role",
-      header: "Role",
+      header: t("columns.role"),
       cell: (r) => (
         <span className="flex min-w-0 flex-col">
           <span className="min-w-0 truncate text-sm" title={r.role.name}>
@@ -116,11 +128,11 @@ export function AppMembersScreen({
     },
     {
       id: "source",
-      header: "Source",
+      header: t("columns.source"),
       cell: (r) =>
         r.kind === "team_share" ? (
           <Badge variant="outline" className="text-2xs">
-            team share
+            {t("teamShare")}
           </Badge>
         ) : (
           <GrantSource source={r.source} />
@@ -128,13 +140,13 @@ export function AppMembersScreen({
     },
     {
       id: "expires",
-      header: "Expires",
+      header: t("columns.expires"),
       cellClassName: "text-muted-foreground font-mono text-xs whitespace-nowrap",
-      cell: (r) => (r.expiresAt ? fmt.formatDateTime(r.expiresAt) : "never"),
+      cell: (r) => (r.expiresAt ? fmt.formatDateTime(r.expiresAt) : t("never")),
     },
     {
       id: "granted",
-      header: "Granted",
+      header: t("columns.granted"),
       cellClassName: "text-muted-foreground font-mono text-xs whitespace-nowrap",
       cell: (r) => fmt.formatDateTime(r.grantedAt),
     },
@@ -144,12 +156,12 @@ export function AppMembersScreen({
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <p className="text-muted-foreground max-w-2xl min-w-0 text-sm">
-          Who can get into <span className="font-mono">{a.slug}</span>, with what, and why.
+          {t.rich("summary", { app: () => <span className="font-mono">{a.slug}</span> })}
         </p>
         <Can permission="org.manage_members">
           <Button asChild size="sm">
             <Link href={grantHref}>
-              <UserPlusIcon className="size-4" /> Grant access
+              <UserPlusIcon className="size-4" /> {t("grantAccess")}
             </Link>
           </Button>
         </Can>
@@ -158,7 +170,7 @@ export function AppMembersScreen({
       <ListPage<AccessRow>
         embedded
         list={list}
-        label="People with access"
+        label={t("peopleTitle")}
         columns={columns}
         rows={rows}
         getRowId={(r) => r.id}
@@ -167,14 +179,14 @@ export function AppMembersScreen({
             {r.principal.kind === "user" && (
               <DropdownMenuItem asChild>
                 <Link href={checkHref(r)}>
-                  <SearchCheckIcon className="size-4" /> Check their access
+                  <SearchCheckIcon className="size-4" /> {t("checkAccess")}
                 </Link>
               </DropdownMenuItem>
             )}
             {r.principal.href && (
               <DropdownMenuItem asChild>
                 <Link href={r.principal.href}>
-                  <UsersIcon className="size-4" /> Open {r.principal.kind}
+                  <UsersIcon className="size-4" /> {t(`openPrincipal.${r.principal.kind}`)}
                 </Link>
               </DropdownMenuItem>
             )}
@@ -184,7 +196,7 @@ export function AppMembersScreen({
                 disabled={removing || (r.kind === "team_share" && r.share.isHome)}
                 onSelect={() => setTarget(r)}
               >
-                {r.kind === "binding" ? "Remove role" : "End team share"}
+                {r.kind === "binding" ? t("removeRole") : t("endTeamShare")}
               </DropdownMenuItem>
             </Can>
           </>
@@ -195,11 +207,10 @@ export function AppMembersScreen({
         onRetry={onRetry}
         empty={{
           icon: <ShieldIcon className="size-5" />,
-          title: "No one holds a role on this app",
-          description:
-            "Grants on its project, team or the organization still reach it. Grant access to give someone a role here.",
+          title: t("emptyCurrentTitle"),
+          description: t("emptyCurrentDescription"),
           actionHref: grantHref,
-          actionLabel: "Grant access",
+          actionLabel: t("grantAccess"),
         }}
         totalCount={totalCount}
         nextCursor={nextCursor}
@@ -213,16 +224,19 @@ export function AppMembersScreen({
         title={
           target
             ? target.kind === "binding"
-              ? `Remove ${target.role.slug} from ${target.principal.name}?`
-              : `End ${target.principal.name}'s share of ${a.slug}?`
-            : "Remove access?"
+              ? t("removeConfirm.bindingTitle", {
+                  role: target.role.slug,
+                  target: target.principal.name,
+                })
+              : t("removeConfirm.shareTitle", { target: target.principal.name, app: a.slug })
+            : t("removeConfirm.fallbackTitle")
         }
         description={
           target?.kind === "team_share"
-            ? "The team loses its access level on this app. Its members keep any role they hold here, or on the project, team or organization."
-            : "Revokes this role on this app. They keep any access granted on the project, team or organization, and any other role that carries the same permissions."
+            ? t("removeConfirm.shareDescription")
+            : t("removeConfirm.bindingDescription")
         }
-        confirmLabel={target?.kind === "team_share" ? "End share" : "Remove role"}
+        confirmLabel={target?.kind === "team_share" ? t("endShare") : t("removeRole")}
         destructive
         onConfirm={async () => {
           if (target) await onRemove(target);

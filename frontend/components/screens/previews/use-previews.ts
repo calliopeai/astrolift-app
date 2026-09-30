@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useMemo } from "react";
 
 import type { CursorPage } from "@/components/data-table";
 import { useListState } from "@/components/list/use-list-state";
@@ -10,7 +12,7 @@ import { LIST_PREVIEW_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.qu
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { PREVIEWS_LIST, previewsVariables } from "./previews-list";
+import { localizedPreviewsList, previewsVariables } from "./previews-list";
 
 interface MutationResultLite {
   ok: boolean;
@@ -28,7 +30,9 @@ interface PreviewsPageResp {
  */
 export function usePreviews() {
   const { can } = useMyPermissions();
-  const list = useListState(PREVIEWS_LIST);
+  const t = useTranslations("lists.previews");
+  const definition = useMemo(() => localizedPreviewsList(t), [t]);
+  const list = useListState(definition);
   const { state } = list;
   const query = useQuery<PreviewsPageResp>(LIST_PREVIEW_ENVIRONMENTS_PAGE, {
     variables: previewsVariables(list.filters, state),
@@ -42,16 +46,16 @@ export function usePreviews() {
     tearDownPreview: MutationResultLite;
   }>(TEAR_DOWN_PREVIEW, { refetchQueries: ["ListPreviewEnvironmentsPage"] });
 
-  /** Throws on failure so the confirm dialog shows the error inline. */
+  /** Throws on failure so the confirm dialog toasts the error and stays open. */
   async function tearDown(preview: AstroliftPreviewEnvironment) {
     const { data: result } = await tearDownMutation({
       variables: { input: { id: preview.id } },
     });
     const r = result?.tearDownPreview;
     if (r?.ok) {
-      toast.success(`Teardown enqueued`);
+      toast.success(t("toastEnqueued"));
     } else {
-      throw new Error(r?.errors[0]?.message ?? "Teardown failed");
+      throw new Error(r?.errors[0]?.message ?? t("toastFailed"));
     }
   }
 

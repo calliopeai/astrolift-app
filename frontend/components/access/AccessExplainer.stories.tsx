@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 
 import { AccessCompare, AccessExplainer } from "./AccessExplainer";
 import {
@@ -109,4 +112,25 @@ export const Width768: Story = {
       <AccessCompare comparison={COMPARISON} />
     </div>
   ),
+};
+
+export const FrenchPolicyDenied: Story = {
+  args: { diagnosis: DIAGNOSIS_POLICY_DENIED, target: CHECKOUT },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={fr}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+export const JapaneseComparison: Story = {
+  render: () => <AccessCompare comparison={COMPARISON} />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

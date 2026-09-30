@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { SecretHistoryPanelView } from "./SecretHistoryPanel";
@@ -59,4 +61,14 @@ export const LongHistory: Story = {
       timestamp: new Date(Date.UTC(2026, 8, 28, 12) - i * 6 * 3_600_000).toISOString(),
     })),
   },
+};
+
+export const German: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

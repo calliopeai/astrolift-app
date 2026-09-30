@@ -60,6 +60,24 @@ export const AUDIT_LIST: ListDefinition = {
   defaultPageSize: AUDIT_PAGE_SIZE,
 };
 
+/** Translate presentation only; URL keys, filter values and query semantics stay stable. */
+export function localizedAuditList(t: (key: string) => string): ListDefinition {
+  return {
+    ...AUDIT_LIST,
+    searchPlaceholder: t("searchPlaceholder"),
+    fields: AUDIT_LIST.fields.map((field) => ({
+      ...field,
+      label: t(`listFields.${field.key}`),
+      options: field.options?.map((option) => ({
+        ...option,
+        label:
+          field.key === "decision" ? t(`decisions.${option.value}`) : t(`since.${option.value}`),
+      })),
+    })),
+    views: AUDIT_LIST.views.map((view) => ({ ...view, label: t(`views.${view.key}`) })),
+  };
+}
+
 const RELATIVE = /^(\d+)([hd])$/;
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 

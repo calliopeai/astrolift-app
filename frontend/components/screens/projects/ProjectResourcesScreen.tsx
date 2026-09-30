@@ -14,6 +14,7 @@ import {
   UnplugIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -36,6 +37,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Textarea } from "@/components/ui/textarea";
+
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useProjectResources } from "./use-project-resources";
 
@@ -105,6 +108,8 @@ export function ProjectResourcesScreen({
   onDetachBundleConsumer,
   section,
 }: ProjectResourcesScreenProps) {
+  const fmt = useFormatters();
+  const tOperation = useTranslations("projectResources.operation");
   const [resourceOpen, setResourceOpen] = React.useState(false);
   const [bundleOpen, setBundleOpen] = React.useState(false);
   const [resourceCatalogId, setResourceCatalogId] = React.useState("");
@@ -281,11 +286,11 @@ export function ProjectResourcesScreen({
                         {service.operationKind && (
                           <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
                             <p>
-                              Last operation:{" "}
+                              {tOperation("label")}{" "}
                               <span className="font-medium">{service.operationKind}</span>
                               {service.operationCompletedAt
-                                ? ` · completed ${new Date(service.operationCompletedAt).toLocaleString()}`
-                                : " · running"}
+                                ? ` · ${tOperation("completed", { at: fmt.formatDateTime(service.operationCompletedAt) })}`
+                                : ` · ${tOperation("running")}`}
                             </p>
                             {service.operationWorkflowId && (
                               <p className="truncate font-mono" title={service.operationWorkflowId}>

@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import localizedMessages from "@/messages/es.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -114,4 +116,14 @@ export const Busy: Story = {
 export const LongStrings: Story = {
   args: { app: LONG_APP, slug: LONG, isDirty: true },
   play: async ({ canvasElement }) => openCodeView(canvasElement),
+};
+
+export const Localized: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="es" messages={localizedMessages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

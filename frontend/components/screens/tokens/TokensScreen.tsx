@@ -31,6 +31,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useFormatters } from "@/lib/i18n/formatters";
 import type { AstroliftApiToken } from "@/graphql/identity/identity.types";
 
 import type { useTokens } from "./use-tokens";
@@ -80,6 +81,7 @@ export function TokensScreen({
   onCopyMcpEndpoint,
   renderScopePicker,
 }: TokensScreenProps) {
+  const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [expiresInDays, setExpiresInDays] = React.useState("90");
@@ -180,14 +182,14 @@ export function TokensScreen({
       header: "Created",
       width: "w-28",
       cellClassName: "text-muted-foreground text-sm",
-      cell: (t) => new Date(t.createdAt).toLocaleDateString(),
+      cell: (t) => fmt.formatDate(t.createdAt),
     },
     {
       id: "expires",
       header: "Expires",
       width: "w-28",
       cellClassName: "text-muted-foreground text-sm",
-      cell: (t) => (t.expiresAt ? new Date(t.expiresAt).toLocaleDateString() : "never"),
+      cell: (t) => (t.expiresAt ? fmt.formatDate(t.expiresAt) : "never"),
     },
     {
       id: "status",
@@ -407,10 +409,11 @@ export function TokensScreen({
 }
 
 function LastUsedCell({ token }: { token: AstroliftApiToken }) {
+  const fmt = useFormatters();
   if (!token.lastUsedAt) {
     return <span className="text-muted-foreground">—</span>;
   }
-  const ts = new Date(token.lastUsedAt).toLocaleString();
+  const ts = fmt.formatDateTime(token.lastUsedAt);
   const hasMeta = Boolean(token.lastUsedIp || token.lastUsedAgent);
   if (!hasMeta) {
     return <span>{ts}</span>;

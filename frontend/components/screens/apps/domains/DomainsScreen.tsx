@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { useFormatters } from "@/lib/i18n/formatters";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -101,6 +102,40 @@ export function DomainsScreen({
 }: DomainsScreenProps) {
   const t = useTranslations("apps.domains");
   const tCert = useTranslations("apps.domains.cert");
+  const fmt = useFormatters();
+  const optionLabels: Record<string, string> = {
+    pending: tCert("awaiting"),
+    validating: tCert("validating"),
+    validated: tCert("validated"),
+    failed: tCert("failed"),
+    exact: t("list.exact"),
+    wildcard: t("wildcard"),
+  };
+  const localizedList = {
+    ...list,
+    definition: {
+      ...list.definition,
+      searchPlaceholder: t("list.search"),
+      fields: list.definition.fields.map((field) => ({
+        ...field,
+        label:
+          field.key === "status"
+            ? t("list.status")
+            : field.key === "kind"
+              ? t("list.kind")
+              : field.label,
+        options: field.options?.map((option) => ({
+          ...option,
+          label: optionLabels[option.value] ?? option.label,
+        })),
+      })),
+      views: list.definition.views?.map((view) => ({
+        ...view,
+        label: view.key === "all" ? t("list.all") : view.label,
+        note: t("list.clientNote"),
+      })),
+    },
+  };
   const [removeTarget, setRemoveTarget] = React.useState<AppDomain | null>(null);
   const [byoTarget, setByoTarget] = React.useState<AppDomain | null>(null);
   const shown = pickShownDomain(all, pickedId);
@@ -118,7 +153,7 @@ export function DomainsScreen({
           </code>
           {d.isWildcard && (
             <Badge variant="outline" className="text-2xs">
-              wildcard
+              {t("wildcard")}
             </Badge>
           )}
         </span>
@@ -159,8 +194,7 @@ export function DomainsScreen({
       sortKey: "checked",
       width: "w-44",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (d) =>
-        d.lastCheckedAt ? new Date(d.lastCheckedAt).toLocaleString() : tCert("notChecked"),
+      cell: (d) => (d.lastCheckedAt ? fmt.formatDateTime(d.lastCheckedAt) : tCert("notChecked")),
     },
     {
       id: "actions",
@@ -211,7 +245,7 @@ export function DomainsScreen({
         <>
           {/* Cross-link to the org-level DNS zones surface (#918). */}
           <Button asChild size="sm" variant="outline">
-            <Link href="/domains">Org DNS zones</Link>
+            <Link href="/domains">{t("orgZones")}</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link href={DOC_LINKS.customDomains}>
@@ -234,7 +268,7 @@ export function DomainsScreen({
         <div className="col-span-12 min-w-0">
           <ListPage<AppDomain>
             embedded
-            list={list}
+            list={localizedList}
             label={t("listTitle")}
             columns={columns}
             rows={rows}

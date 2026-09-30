@@ -20,6 +20,7 @@ import {
   TrashIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +101,7 @@ function CollapsibleEntry({
   removeLabel: string;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("apps.config.builder");
   return (
     <Card className={invalid ? "border-destructive/40" : undefined}>
       <Collapsible open={open} onOpenChange={onOpenChange}>
@@ -109,7 +111,7 @@ function CollapsibleEntry({
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground rounded p-0.5"
-                aria-label={open ? "Collapse" : "Expand"}
+                aria-label={open ? t("collapse") : t("expand")}
               >
                 {open ? (
                   <ChevronDownIcon className="size-4" />
@@ -121,7 +123,7 @@ function CollapsibleEntry({
             <span className="text-muted-foreground shrink-0">{icon}</span>
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <span className="truncate font-mono text-sm font-medium">
-                {title || <span className="text-muted-foreground italic">unnamed</span>}
+                {title || <span className="text-muted-foreground italic">{t("unnamed")}</span>}
               </span>
               {subtitle && (
                 <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
@@ -166,6 +168,7 @@ function ContainerEditor({
   onRemove: () => void;
 }) {
   const t = useTranslations("apps.config.builder");
+  const copy = useConfigCopy();
   const [open, setOpen] = React.useState(true);
   const patch = (p: Partial<ContainerModel>) => onChange({ ...container, ...p });
   const hc = container.healthcheck;
@@ -205,7 +208,7 @@ function ContainerEditor({
           spec.widget === "number" ? (
             <NumberField
               key={spec.key}
-              label={spec.label}
+              label={copy.fieldLabel(spec)}
               placeholder={spec.placeholder}
               value={(container[spec.key as keyof ContainerModel] as number | null) ?? null}
               onChange={(v) => patch({ [spec.key]: v } as Partial<ContainerModel>)}
@@ -213,7 +216,7 @@ function ContainerEditor({
           ) : (
             <TextField
               key={spec.key}
-              label={spec.label}
+              label={copy.fieldLabel(spec)}
               mono
               placeholder={spec.placeholder}
               value={(container[spec.key as keyof ContainerModel] as string) ?? ""}
@@ -295,6 +298,7 @@ function WorkloadEditor({
   onRemove: () => void;
 }) {
   const t = useTranslations("apps.config.builder");
+  const copy = useConfigCopy();
   const [open, setOpen] = React.useState(true);
   const path = `workloads[${index}]`;
   const patch = (p: Partial<WorkloadModel>) => onChange({ ...workload, ...p });
@@ -385,7 +389,7 @@ function WorkloadEditor({
               spec.widget === "number" ? (
                 <NumberField
                   key={spec.key}
-                  label={spec.label}
+                  label={copy.fieldLabel(spec)}
                   placeholder={spec.placeholder}
                   value={(workload[spec.key as keyof WorkloadModel] as number | null) ?? null}
                   onChange={(v) => patch({ [spec.key]: v } as Partial<WorkloadModel>)}
@@ -393,7 +397,7 @@ function WorkloadEditor({
               ) : (
                 <TextField
                   key={spec.key}
-                  label={spec.label}
+                  label={copy.fieldLabel(spec)}
                   mono
                   placeholder={spec.placeholder}
                   value={(workload[spec.key as keyof WorkloadModel] as string) ?? ""}
@@ -536,8 +540,10 @@ function ServiceEditor({
 
 // ─── Root form ───────────────────────────────────────────────────────────────
 
-export function ManifestFormBuilder({ model, errors, onChange }: Props) {
+export function ManifestFormBuilder({ model, errors: rawErrors, onChange }: Props) {
   const t = useTranslations("apps.config.builder");
+  const copy = useConfigCopy();
+  const errors = copy.errors(rawErrors);
   const patch = (p: Partial<ManifestModel>) => onChange({ ...model, ...p });
   const preservedKeys = Object.keys(model.extra);
 

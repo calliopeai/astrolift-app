@@ -1,5 +1,7 @@
 "use client";
 
+import { useFormatter, useTranslations } from "next-intl";
+
 /**
  * ListSummary: the one exception to "one list per screen" (Leo's list rule
  * 3). On an overview, a second list is a count and its top rows, never a
@@ -76,6 +78,8 @@ export function ListSummary<T>({
   span,
   className,
 }: ListSummaryProps<T>) {
+  const t = useTranslations("shared.list");
+  const format = useFormatter();
   const shown = rows.slice(0, Math.min(Math.max(1, limit), LIST_SUMMARY_MAX));
   const isEmpty = !loading && !error && rows.length === 0;
   const total = count ?? null;
@@ -95,13 +99,13 @@ export function ListSummary<T>({
       actions={
         total !== null && (
           <span className="text-muted-foreground font-mono text-xs tabular-nums">
-            {total.toLocaleString()}
+            {format.number(total)}
           </span>
         )
       }
     >
       {isEmpty ? (
-        <p className="text-muted-foreground px-4 py-3 text-sm">Nothing here yet.</p>
+        <p className="text-muted-foreground px-4 py-3 text-sm">{t("nothingYet")}</p>
       ) : (
         <>
           <ul className="min-w-0 divide-y">
@@ -129,10 +133,12 @@ export function ListSummary<T>({
               href={viewAllHref}
               className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
             >
-              View all
-              {total !== null && (
-                <span className="font-mono tabular-nums">{total.toLocaleString()}</span>
-              )}
+              {total === null
+                ? t("viewAll")
+                : t.rich("viewAllCount", {
+                    count: total,
+                    countText: (chunks) => <span className="font-mono tabular-nums">{chunks}</span>,
+                  })}
               <ArrowRightIcon className="size-3.5" aria-hidden />
             </Link>
           </div>

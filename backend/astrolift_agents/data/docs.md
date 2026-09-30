@@ -16,7 +16,9 @@ How Astrolift works, how to install it, and the operator runbooks for the surfac
 ## /documentation/changelog
 
 # Changelog
-New features and fixes, most recent first.
+Release notes and project change history.
+Versioned release notes are not available in this dashboard.
+Project changes are maintained in the repository changelog . Repository access requires an authorized GitHub account.
 
 ## /documentation/cluster-prerequisites
 
@@ -118,18 +120,16 @@ Matrix reflects manifest declarations · last probed varies by cluster · See li
 
 ## /documentation/get-started
 
-# Get Started
-Up and running in five minutes.
-## Step 1 — Start the stack
-The entire platform runs in Docker Compose. A single command brings up Postgres, Redis, OpenSearch, MinIO, Celery workers, the Django API, and the Next.js frontend.
-## Step 2 — Run migrations
-Apply database migrations to set up the schema. If this is a fresh clone, you will also want to create a superuser for the admin panel.
-## Step 3 — Seed development data
-Load numbered fixtures to populate the database with sample organizations, users, profiles, and permissions. Use the --flush flag to reset first.
-## Step 4 — Explore the services
-With the stack running, all services are accessible on localhost. The Django admin includes a custom dark theme with import/export on every model.
-## Step 5 — Run the checks
-Before committing any code, run the linter and test suite. The linter enforces PEP 8 with a 140-character line limit via flake8 and isort. Tests run against a real Postgres and Redis.
+# Local development setup
+Run the Astrolift control plane from an astrolift-app checkout.
+## Prepare and start the stack
+Run these commands from the repository root. Bootstrap checks Docker and creates missing local environment files from the examples. Fill in required configuration values before starting the Compose services. The stack includes the API and UI, PostgreSQL, Redis, Temporal, and local storage and email services.
+## Migrate and seed the local identity
+Once the API container is running, apply the database migrations and run the development identity seed. This creates the local organization, team, project and development account used by the local sign-in flow.
+## Explore and inspect
+The default UI is at http://localhost:3000, the GraphQL API at http://localhost:8000/app/gql/config/, and the Temporal UI at http://localhost:8233. Check your Compose configuration if you override host ports. Use the command wrapper to inspect running containers and logs.
+## Run the checks
+Backend tests run against real PostgreSQL and Temporal through the local stack. Ruff checks backend formatting and lint; the frontend has TypeScript, ESLint and React tests. When changing the GraphQL contract, regenerate its schema and frontend types together.
 
 ## /documentation/help
 
@@ -162,25 +162,22 @@ By default, an SSO sign-in succeeds only if Astrolift already has an account for
 ## /documentation/introduction
 
 # Introduction
-Welcome to the platform documentation.
-## What is this platform?
-This platform is a full-stack production boilerplate built on Django, Strawberry GraphQL, and Next.js. It ships with session-based auth, role permissions, Celery task processing, OpenSearch, file uploads via MinIO/S3, email via SES, feature flags, and a dark-themed admin — all wired together with Docker Compose and ready to extend.
-The platform handles authentication, rate limiting, permissions, audit trails, and background processing so you can focus on building domain features rather than infrastructure. A single Docker Compose command brings up the entire stack locally.
+Build, deploy and operate with Astrolift.
+## What is Astrolift?
+Astrolift is a control plane for applications and agents running on Kubernetes. Connect your clusters and source repositories, register an Astrolift manifest, and manage deployments, environment configuration and managed services from one dashboard or the CLI.
+The control plane records desired configuration and deployment history. Cluster agents report observed runtime state; unavailable observations remain distinct from healthy or failed workloads.
 ## Key concepts
-- Tracking models — every business model inherits from Tracking, giving you created/updated/deleted timestamps, user attribution, version numbers, and full audit history via django-simple-history.
-- GUIDs over PKs — integer primary keys are never exposed in the API. All external references use UUID guid fields or Relay global IDs.
-- Soft deletes — business objects are never hard-deleted. Set deleted_at and deleted_by instead of calling .delete().
-- Permission checks — every GraphQL resolver and mutation begins with an auth check. Permissions are defined per-model and per-field, assigned to groups, never directly to users.
-- Strawberry GraphQL — the API layer uses Strawberry with django integration, async dataloaders, and a custom context providing user, organization, and cached permission state.
-## Architecture overview
-Requests flow from the Next.js frontend through Apollo Client to the Django API. GraphQL queries hit Strawberry resolvers backed by the Django ORM, while background work is dispatched to Celery workers via Redis. All services run in Docker containers orchestrated by Compose.
-## App structure
-- auth1 — session-based authentication, login views, rate limiting
-- core — User, Profile, Address, Notification, ResourceFile, OpenSearch, telemetry, signals
-- organization — Organization and OrganizationMember models, member status management
-- core_rule_engine — rule definitions, conditions, actions, model signal triggers
-- scheduled_task — DFA state machine, cron-scheduled transitions via Celery beat
-- testdata — dev fixtures and the seed management command
+- Organizations, teams and projects organize ownership and access to apps, clusters and shared resources.
+- Applications and manifests describe workloads, configuration and service bindings. A registered app connects that definition to its source repository.
+- Environments select runtime placement and environment-specific configuration for an app.
+- Deployments track image versions, approval requirements, execution and history for an environment.
+- Roles, policies and credentials control permitted operations and resource scope. A token cannot expand its holder's access.
+## Control plane and runtime
+The dashboard and CLI call the Django and Strawberry GraphQL control plane. PostgreSQL stores platform records, Redis supports caching, and Temporal coordinates long-running lifecycle work. Applications run on connected Kubernetes clusters rather than inside the dashboard process.
+## Where to start
+- Quickstart walks through connecting a cluster and source, registering an app and deploying it.
+- Cluster prerequisites describes the runtime services your cluster needs.
+- Local development setup explains how contributors run the control plane locally.
 
 ## /documentation/policies
 

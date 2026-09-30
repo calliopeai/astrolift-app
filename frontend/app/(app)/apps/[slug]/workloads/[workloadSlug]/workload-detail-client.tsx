@@ -3,7 +3,7 @@
 import { useWorkloadDetail } from "@/components/screens/apps/workloads/use-workload-detail";
 import { WorkloadDetailScreen } from "@/components/screens/apps/workloads/WorkloadDetailScreen";
 
-import { useAppChrome } from "../../components/app-chrome-context";
+import { useAppChrome } from "@/lib/app-chrome-context";
 import { ManifestCard } from "./manifest-card";
 import { ResourceUsageGauges } from "./resource-usage-gauges";
 import { ScalingCard } from "./scaling-card";
@@ -39,7 +39,8 @@ export function WorkloadDetailClient({
             appSlug={appSlug}
             workloadSlug={workloadSlug}
             environmentName={null}
-            canDeploy={detail.canDeploy}
+            permission={w.viewerCan?.scale}
+            version={w.version}
           />
         ) : null
       }

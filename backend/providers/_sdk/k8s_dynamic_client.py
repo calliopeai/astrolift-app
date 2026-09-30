@@ -366,6 +366,80 @@ class KubernetesDynamicClient:
             raise AlreadyExistsError(f"{kind}/{name} already exists; create-only refused adoption") from exc
         return "created"
 
+    def _prepare_hpa_replica_handover(
+        self,
+        *,
+        resource: Any,
+        namespace: str | None,
+        manifest: dict[str, Any],
+        current: Any,
+        dry_run: bool,
+    ) -> dict[str, Any]:
+        observed = self._to_dict(current)
+        metadata = observed.get("metadata") or {}
+        uid, version = metadata.get("uid"), metadata.get("resourceVersion")
+        replicas = (observed.get("spec") or {}).get("replicas")
+        if (
+            not isinstance(uid, str)
+            or not uid
+            or not isinstance(version, str)
+            or not version
+            or isinstance(replicas, bool)
+            or not isinstance(replicas, int)
+            or replicas < 0
+        ):
+            raise ValueError("cannot safely transfer HPA replicas without observed UID, resourceVersion and count")
+        fields = metadata.get("managedFields")
+        if not isinstance(fields, list):
+            raise ValueError("cannot safely transfer HPA replicas without managed field ownership")
+        owners = {
+            entry.get("manager")
+            for entry in fields
+            if "f:replicas" in ((entry.get("fieldsV1") or {}).get("f:spec") or {})
+        }
+        if not owners or any(not isinstance(owner, str) or not owner for owner in owners):
+            raise ValueError("cannot safely transfer HPA replicas with unknown field ownership")
+
+        if owners == {"astrolift"}:
+            # A second owner prevents omission from defaulting replicas to one before HPA ever writes /scale.
+            handover = {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "metadata": {"name": manifest["metadata"]["name"], "uid": uid, "resourceVersion": version},
+                "spec": {"replicas": replicas},
+            }
+            kwargs: dict[str, Any] = {
+                "body": handover,
+                "namespace": namespace,
+                "field_manager": "astrolift-hpa-handover",
+                "force_conflicts": False,
+            }
+            if dry_run:
+                kwargs["dry_run"] = "All"
+            transferred = self._to_dict(resource.server_side_apply(**kwargs))
+            transferred_meta = transferred.get("metadata") or {}
+            transferred_replicas = (transferred.get("spec") or {}).get("replicas")
+            transferred_version = transferred_meta.get("resourceVersion")
+            transferred_owners = {
+                entry.get("manager")
+                for entry in transferred_meta.get("managedFields") or []
+                if "f:replicas" in ((entry.get("fieldsV1") or {}).get("f:spec") or {})
+            }
+            if (
+                transferred_meta.get("uid") != uid
+                or isinstance(transferred_replicas, bool)
+                or not isinstance(transferred_replicas, int)
+                or transferred_replicas != replicas
+                or not isinstance(transferred_version, str)
+                or not transferred_version
+                or "astrolift-hpa-handover" not in transferred_owners
+            ):
+                raise ValueError("HPA replica ownership handover was not confirmed; deployment apply refused")
+            version = transferred_meta["resourceVersion"]
+
+        # The second apply must not target a replacement or race a later /scale write.
+        return {**manifest, "metadata": {**manifest["metadata"], "uid": uid, "resourceVersion": version}}
+
     def server_side_apply(
         self,
         *,
@@ -403,6 +477,11 @@ class KubernetesDynamicClient:
         that genuinely want to defer to an existing owner can pass
         ``force_conflicts=False``.
 
+        HPA-marked Deployments that omit replicas conditionally share a
+        solely Astrolift-owned count before relinquishing it. That handover
+        never forces ownership, and both writes require the observed UID
+        and resourceVersion so newer scale/replacement state wins.
+
         ``dry_run`` is the bool the SDK callers pass; the kubernetes
         wire takes the literal string ``"All"`` for dry-run.
         """
@@ -431,6 +510,21 @@ class KubernetesDynamicClient:
             pre_generation = self._to_dict(current).get("metadata", {}).get("generation")
         except DynNotFound:
             pre_existed = False
+
+        if (
+            pre_existed
+            and api_version == "apps/v1"
+            and kind == "Deployment"
+            and (meta.get("annotations") or {}).get("astrolift.dev/replica-owner") == "hpa"
+            and "replicas" not in (manifest.get("spec") or {})
+        ):
+            manifest = self._prepare_hpa_replica_handover(
+                resource=resource,
+                namespace=request_namespace,
+                manifest=manifest,
+                current=current,
+                dry_run=dry_run,
+            )
 
         apply_kwargs: dict[str, Any] = {
             "body": manifest,

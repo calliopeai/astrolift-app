@@ -1,6 +1,6 @@
 "use client";
 
-import { useLazyQuery, useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -11,6 +11,7 @@ import type { MutationResult } from "@/graphql/identity/identity.types";
 import { DEREGISTER_APP } from "@/graphql/lifecycle/lifecycle.mutations";
 import { PREVIEW_DEREGISTER_APP } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeregisterPreview } from "@/graphql/lifecycle/lifecycle.types";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface DeregisterResp {
   deregisterAstroliftApp: MutationResult<{
@@ -28,8 +29,8 @@ interface PreviewResp {
  * `DeregisterAppWorkflow` with a deterministic workflow id, so re-firing
  * joins the existing run (partial-failure resume is a one-click retry).
  *
- * - A: `loadPreview` fetches the blast-radius preview; the view calls it
- *   when the confirm dialog opens.
+ * - A: the authorized preview loads before the trigger badge renders;
+ *   `loadPreview` refreshes it when the confirm dialog opens.
  * - B: a clean kickoff records the grace-period entry the
  *   DeregisterPendingBanner consumes, then navigates to /apps.
  * - C: a partial failure returns the still-live resources, kept here so
@@ -41,23 +42,27 @@ export function useDangerZone(appSlug: string, appName: string) {
   const [stillLive, setStillLive] = React.useState<string[]>([]);
   const [deregister, { loading }] = useMutation<DeregisterResp>(DEREGISTER_APP);
 
-  // ``cache-and-network`` keeps the count badge fresh whenever the modal
-  // reopens — the resource list can change between attempts (operator
-  // created/deleted services in a sibling tab) and a stale badge would
-  // mislead.
-  const [runPreview, previewQuery] = useLazyQuery<PreviewResp>(PREVIEW_DEREGISTER_APP, {
+  const permissions = useMyPermissions();
+  const previewEnabled = !!appSlug && !permissions.loading && permissions.can("app.delete");
+  // This is a scoped database read; the server still checks the actual app.
+  // Load the badge before confirmation, then refresh on each modal open.
+  const previewQuery = useQuery<PreviewResp>(PREVIEW_DEREGISTER_APP, {
+    variables: { appSlug },
+    skip: !previewEnabled,
     fetchPolicy: "cache-and-network",
   });
+  const refetchPreview = previewQuery.refetch;
   const loadPreview = React.useCallback(() => {
-    void runPreview({ variables: { appSlug } });
-  }, [runPreview, appSlug]);
+    if (!previewEnabled) return;
+    void refetchPreview().catch((err: unknown) => {
+      toast.error(err instanceof Error ? err.message : t("toastFailed"));
+    });
+  }, [previewEnabled, refetchPreview, t]);
 
-  // useLazyQuery returns a DeepPartial<TData> on `data` to model the
-  // "haven't fired yet" state; coerce to the full type once we've
-  // checked the top-level field is present.
   const preview =
-    (previewQuery.data?.previewAstroliftDeregister as AstroliftDeregisterPreview | undefined) ??
-    null;
+    previewEnabled && !previewQuery.error
+      ? (previewQuery.data?.previewAstroliftDeregister ?? null)
+      : null;
   const previewLoading = previewQuery.loading && !preview;
 
   /** Resolves true on a clean kickoff (close the dialog; already navigating). */
@@ -115,6 +120,7 @@ export function useDangerZone(appSlug: string, appName: string) {
     loading,
     preview,
     previewLoading,
+    previewError: previewQuery.error,
     stillLive,
     loadPreview,
     onDeregister,

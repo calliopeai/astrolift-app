@@ -1,5 +1,7 @@
 "use client";
 
+import { useFormatter, useLocale, useNow, useTimeZone, useTranslations } from "next-intl";
+
 /**
  * Feed: the one primitive for things that grow (Leo's list rule 5, spec 44
  * §5.1 "feeds that are read rather than acted on"): activity, events,
@@ -98,10 +100,16 @@ export function Feed<T>({
   maxHeight = "max-h-96",
   dense = false,
   errorTitle,
-  loadOlderLabel = "Load older",
-  loadingOlderLabel = "Loading…",
+  loadOlderLabel,
+  loadingOlderLabel,
   className,
 }: FeedProps<T>) {
+  const t = useTranslations("shared.feed");
+  const locale = useLocale();
+  const timeZone = useTimeZone() ?? "UTC";
+  const now = useNow({ updateInterval: 60_000 });
+  const fmt = useFormatter();
+  const noun = locale.startsWith("en") ? label.toLocaleLowerCase(locale) : label;
   const frame = React.useRef<HTMLDivElement | null>(null);
   const sentinel = React.useRef<HTMLDivElement | null>(null);
   const errorMessage = typeof error === "string" ? error : (error?.message ?? null);
@@ -113,7 +121,15 @@ export function Feed<T>({
     if (frame.current) hold(frame.current);
   });
 
-  const groups = React.useMemo(() => groupItems(items, groupBy), [items, groupBy]);
+  const groups = groupItems(items, groupBy, {
+    timeZone,
+    now,
+    today: t("today"),
+    yesterday: t("yesterday"),
+    unknownDate: t("unknownDate"),
+    formatDate: (date) =>
+      fmt.dateTime(date, { year: "numeric", month: "short", day: "numeric", timeZone }),
+  });
 
   const showNew = () => {
     onShowNew?.();
@@ -124,10 +140,15 @@ export function Feed<T>({
     return (
       <div className={cn("min-w-0", className)} aria-busy={loading || undefined}>
         {loading ? (
-          <SkeletonRows />
+          <>
+            <p className="sr-only" role="status">
+              {t("loading")}
+            </p>
+            <SkeletonRows />
+          </>
         ) : errorMessage ? (
           <FeedError
-            title={errorTitle ?? `Could not load ${label.toLowerCase()}`}
+            title={errorTitle ?? t("loadFailed", { label: noun })}
             message={errorMessage}
             onRetry={onRetry}
           />
@@ -135,7 +156,7 @@ export function Feed<T>({
           <EmptyState
             {...(empty ?? {
               icon: <InboxIcon className="size-5" />,
-              title: `No ${label.toLowerCase()} yet`,
+              title: t("empty", { label: noun }),
             })}
           />
         )}
@@ -197,14 +218,16 @@ export function Feed<T>({
               onClick={loader.manual}
               disabled={loadingMore}
             >
-              {loadingMore ? loadingOlderLabel : loadOlderLabel}
+              {loadingMore
+                ? (loadingOlderLabel ?? t("loading"))
+                : (loadOlderLabel ?? t("loadOlder"))}
             </Button>
           ) : errorMessage && onRetry ? (
             <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
-              Retry
+              {t("retry")}
             </Button>
           ) : (
-            <p className="text-muted-foreground text-xs">No older items</p>
+            <p className="text-muted-foreground text-xs">{t("noOlderItems")}</p>
           )}
         </div>
       </div>
@@ -221,6 +244,7 @@ function FeedError({
   message: string;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("shared.feed");
   return (
     <div role="alert" className="flex flex-col items-center gap-3 py-6 text-center">
       <AlertTriangleIcon className="text-danger size-5" aria-hidden />
@@ -232,7 +256,7 @@ function FeedError({
       </div>
       {onRetry && (
         <Button size="sm" variant="outline" onClick={onRetry}>
-          Retry
+          {t("retry")}
         </Button>
       )}
     </div>

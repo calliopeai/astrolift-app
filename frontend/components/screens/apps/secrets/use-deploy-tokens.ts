@@ -1,19 +1,27 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
+import { useApolloClient, useMutation } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
+import type {
+  GetAppDeployTokenRotationMetadataQuery,
+  GetAppDeployTokenRotationMetadataQueryVariables,
+} from "@/graphql/__generated__/operations";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   CREATE_DEPLOY_TOKEN,
   REVOKE_DEPLOY_TOKEN,
   ROTATE_DEPLOY_TOKEN,
 } from "@/graphql/lifecycle/lifecycle.mutations";
-import { LIST_APP_DEPLOY_TOKENS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
+import {
+  GET_APP_DEPLOY_TOKEN_ROTATION_METADATA,
+  LIST_APP_DEPLOY_TOKENS_PAGE,
+} from "@/graphql/lifecycle/lifecycle.queries";
 
 import { useCursorList } from "../use-cursor-list";
 import { APP_DEPLOY_TOKENS_LIST } from "./deploy-tokens-list";
@@ -31,6 +39,9 @@ interface Resp {
  * `?section=tokens`, which a URL list state would drop on its first search.
  */
 export function useDeployTokens(slug: string) {
+  const client = useApolloClient();
+  const { org } = useActiveOrg();
+  const rotationScopeKey = `${org?.id ?? ""}:${slug}`;
   const tr = useTranslations("apps.tokens");
   const [reveal, setReveal] = React.useState<DeployTokenSecretReveal | null>(null);
 
@@ -55,6 +66,22 @@ export function useDeployTokens(slug: string) {
   const [revokeToken, revokeState] = useMutation<{
     revokeDeployToken: MutationResult<{ id: string; revoked: boolean }>;
   }>(REVOKE_DEPLOY_TOKEN, { refetchQueries: refetch, awaitRefetchQueries: true });
+
+  // A fresh read on every dialog open/retry. Prior cached metadata must not
+  // bypass a revoked permission or reuse another app's configuration snapshot.
+  const onLoadRotationGrace = React.useCallback(async (): Promise<number | null> => {
+    const { data } = await client.query<
+      GetAppDeployTokenRotationMetadataQuery,
+      GetAppDeployTokenRotationMetadataQueryVariables
+    >({
+      query: GET_APP_DEPLOY_TOKEN_ROTATION_METADATA,
+      variables: { appSlug: slug },
+      fetchPolicy: "no-cache",
+      context: { queryDeduplication: false },
+    });
+    const value = data?.astroliftAppDeployTokenRotationMetadata?.rotationGraceSeconds;
+    return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+  }, [client, slug]);
 
   const busy = createState.loading || rotateState.loading || revokeState.loading;
 
@@ -82,7 +109,7 @@ export function useDeployTokens(slug: string) {
       const next = data.rotateDeployToken.data;
       if (next) setReveal(next);
     } else {
-      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? "Rotate failed");
+      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? tr("rotateFailed"));
     }
   }
 
@@ -98,12 +125,14 @@ export function useDeployTokens(slug: string) {
 
   return {
     slug,
+    rotationScopeKey,
     ...tokens,
     busy,
     reveal,
     onDismissReveal: () => setReveal(null),
     onCreate,
     onRotate,
+    onLoadRotationGrace,
     onRevoke,
   };
 }

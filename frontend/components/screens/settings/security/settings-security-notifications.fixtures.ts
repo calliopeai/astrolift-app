@@ -13,7 +13,6 @@ import type { SecuritySettingsViewProps } from "./SecuritySettings";
 
 const noop = () => {};
 const resolved = async () => {};
-const yes = () => true;
 const resolvedTrue = async () => true;
 
 export const LONG =
@@ -94,7 +93,6 @@ export function securityProps(
     errorMessage: null,
     signingOut: false,
     revoking: false,
-    onRequestSignOutAll: yes,
     onSignOutAll: resolved,
     onRevoke: resolvedTrue,
     ...over,

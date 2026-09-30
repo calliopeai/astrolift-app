@@ -2230,6 +2230,10 @@ type AstroliftDeployTokenPage {
   pageSize: Int
 }
 
+type AstroliftDeployTokenRotationMetadata {
+  rotationGraceSeconds: Int!
+}
+
 type AstroliftDeployment {
   id: GUID!
 
@@ -3489,6 +3493,26 @@ input AstroliftModelEndpointsFilter {
 
   """User ids, or "me"."""
   deployedBy: [String!] = null
+}
+
+type AstroliftModelPromptReadiness {
+  state: AstroliftModelPromptReadinessState!
+  eligible: Boolean!
+  maxPromptChars: Int!
+  maxOutputTokens: Int!
+  promptsPerMinute: Int!
+  maxWaitSeconds: Int!
+}
+
+enum AstroliftModelPromptReadinessState {
+  READY
+  UNSUPPORTED
+  INACTIVE
+  UNAVAILABLE
+  UNKNOWN_HEARTBEAT
+  STALE_HEARTBEAT
+  UNCONFIGURED_RELAY
+  UNCONFIGURED_MODEL
 }
 
 type AstroliftModuleEntitlement {
@@ -7867,6 +7891,7 @@ type Query {
   astroliftWorkloadPodStatusBreakdown(appSlug: String!, workloadSlug: String!, environmentName: String = null): [AstroliftWorkloadPodStatusBucket!]!
   astroliftAppDeployTokens(appSlug: String!): [AstroliftDeployToken!]! @deprecated(reason: "Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage.")
   astroliftAppDeployTokensPage(appSlug: String!, search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null): AstroliftDeployTokenPage!
+  astroliftAppDeployTokenRotationMetadata(appSlug: String!): AstroliftDeployTokenRotationMetadata
   astroliftAppDnsRecords(appSlug: String!, environmentName: String = null): AstroliftAppDnsRecordsResult!
   astroliftAppCertificates(appSlug: String!, environmentName: String = null): AstroliftAppCertificatesResult!
   astroliftAppIdentityBinding(appSlug: String!, environmentName: String = null): AstroliftAppIdentityBindingResult!
@@ -7917,6 +7942,7 @@ type Query {
   astroliftProjectManagedServiceCatalog(projectId: GUID!, clusterId: GUID!): [AstroliftManagedServiceCatalogEntry!]!
   astroliftModelEndpoints: [AstroliftManagedService!]!
   astroliftModelEndpointsPage(search: String = null, filter: AstroliftModelEndpointsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftManagedServicePage!
+  astroliftModelPromptReadiness(id: GUID!): AstroliftModelPromptReadiness
   astroliftModelEndpoint(id: GUID!): AstroliftManagedService
   astroliftProjectManagedServices(projectId: GUID!): [AstroliftManagedService!]!
   astroliftProjectSecretBundles(projectId: GUID!): [AstroliftSecretBundle!]!
