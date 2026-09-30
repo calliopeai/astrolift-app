@@ -20,6 +20,10 @@
   team ceilings remain enforced. Replacement rechecks the destination under
   definition/stage locks before writing; all three guardrail gaps are removed.
 
+- Non-inheriting organization bindings authorize organization-owned collection
+  rows without revealing descendant teams, projects or apps (#2164). Deleted
+  roles stop granting authority through user, group and group-mapping bindings.
+
 - Pipeline creation requires `app.update` at the active organization (#2115).
   The existing creation input has no app association, so team/project/app
   grants and team-bound bearer credentials cannot authorize this organization

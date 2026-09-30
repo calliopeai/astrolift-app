@@ -12,6 +12,11 @@ and counts. App shares remain usable at their delegated level. A viewer share
 allows app reads; deployer and owner shares carry the caller's granted actions.
 Shares never grant a permission the caller lacks.
 
+A non-inheriting organization binding grants at the organization itself. It can
+authorize organization-owned records in mixed collections, but never descendant
+teams, projects or apps. Deleted roles supply no authority through either direct
+bindings or identity-provider group mappings.
+
 Bearer credentials retain their permission scopes and optional team ceiling,
 even when their user has an organization-wide role. An app must belong to the
 credential's live team or have a live share that delegates the actual action.

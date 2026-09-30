@@ -182,7 +182,7 @@ def _live_grants(tenant: TenantContext, scopes: Iterable[tuple[str, int]] | None
     principal = Q(user_id=tenant.actor_user_id)
     if groups:
         principal |= Q(user__isnull=True, group_external_id__in=sorted(groups))
-    qs = RoleBinding.objects.select_related("role").filter(principal)
+    qs = RoleBinding.objects.select_related("role").filter(principal, role__deleted_at__isnull=True)
     if scope_list is not None:
         qs = qs.filter(_scope_filter(scope_list))
     out: list[Grant] = []
@@ -208,6 +208,7 @@ def _live_grants(tenant: TenantContext, scopes: Iterable[tuple[str, int]] | None
             Q(role__organization_id=tenant.organization_id) | Q(role__organization__isnull=True),
             organization_id=tenant.organization_id,
             group_external_id__in=sorted(groups),
+            role__deleted_at__isnull=True,
         )
         if scope_list is not None:
             mappings = mappings.filter(_scope_filter(scope_list))
@@ -697,8 +698,8 @@ def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScop
     Every scope in the active org where ``tenant``'s actor holds
     ``permission``. A non-inheriting TEAM or PROJECT grant lands in the
     ``exact_*`` sets (that scope and nothing below it); a non-inheriting
-    ORG grant covers the org row itself and no row beneath it, so it adds
-    nothing here. A policy that denies the permission everywhere empties
+    ORG grant sets ``org_only``: organization-owned rows and no descendants.
+    A policy that denies the permission everywhere empties
     the answer.
     """
 
@@ -723,7 +724,7 @@ def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScop
         )
 
     by_kind: dict[str, set[int]] = {"ORG": set(), "TEAM": set(), "PROJECT": set(), "APP": set()}
-    exact: dict[str, set[int]] = {"TEAM": set(), "PROJECT": set()}
+    exact: dict[str, set[int]] = {"ORG": set(), "TEAM": set(), "PROJECT": set()}
     for grant in _org_confined_bindings(tenant):
         if not grant.carries(permission.value):
             continue
@@ -741,6 +742,7 @@ def granted_scopes(tenant: TenantContext, permission: Permission) -> GrantedScop
         app_ids=frozenset(by_kind["APP"]),
         exact_team_ids=frozenset(exact["TEAM"] - by_kind["TEAM"]),
         exact_project_ids=frozenset(exact["PROJECT"] - by_kind["PROJECT"]),
+        org_only=bool(exact["ORG"]),
     )
 
 

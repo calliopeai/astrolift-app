@@ -32,9 +32,9 @@ from astrolift_identity.permission_resolver import (
     resolve_effective_permissions_anywhere,
     resolve_effective_permissions_for_apps,
 )
-from astrolift_identity.scope_visibility import visible_projects, visible_teams
-from astrolift_registry.models import AppTeamAccess
-from core.permissions import NO_SCOPES, Permission, PermissionScope, ScopeKind
+from astrolift_identity.scope_visibility import visible_apps, visible_projects, visible_teams
+from astrolift_registry.models import AppTeamAccess, RegisteredApp
+from core.permissions import NO_SCOPES, Permission, PermissionScope, ScopeKind, check_permission_any_scope
 from core.tenancy import TenantContext, tenant_context
 from core.tests.utils.scope_world import ScopeWorld, make_user
 
@@ -575,7 +575,9 @@ def test_policies_still_deny_a_shared_grant(world):
 
 def test_a_non_inheriting_org_binding_grants_at_the_org_only(world):
     user = _member(world, _user("o"))
-    _bind(user, _role(Permission.TEAM_READ, READ), "ORG", world.org.pk, inherits=False)
+    _bind(
+        user, _role(Permission.TEAM_READ, Permission.PROJECT_READ, READ), "ORG", world.org.pk, inherits=False
+    )
     tenant = _tenant(world, user)
 
     assert resolve(tenant, READ, None)[0] is True
@@ -587,7 +589,70 @@ def test_a_non_inheriting_org_binding_grants_at_the_org_only(world):
     assert resolve(_tenant(world, user, team_id=world.medops.pk), READ, None)[0] is False
     # Lists get no rows below the org from it.
     scopes = granted_scopes(tenant, Permission.TEAM_READ)
-    assert scopes.org is False and not scopes
+    assert not scopes.org and scopes.org_only and scopes
+    assert not scopes.team_ids and not scopes.exact_team_ids
+    assert not scopes.project_ids and not scopes.exact_project_ids and not scopes.app_ids
+    with tenant_context(tenant):
+        check_permission_any_scope(READ)
+        assert not visible_teams(Team.objects.filter(organization=world.org), Permission.TEAM_READ).exists()
+        assert not visible_projects(
+            Project.objects.filter(organization=world.org), Permission.PROJECT_READ
+        ).exists()
+        assert not visible_apps(RegisteredApp.objects.filter(organization=world.org), READ).exists()
+
+
+def test_exact_org_and_inherited_team_grants_keep_their_separate_boundaries(world):
+    user = _member(world, _user("org-and-team"))
+    role = _role(READ)
+    _bind(user, role, "ORG", world.org.pk, inherits=False)
+    _bind(user, role, "TEAM", world.medops.pk)
+    tenant = _tenant(world, user)
+    scopes = granted_scopes(tenant, READ)
+    assert scopes.org_only and not scopes.org and scopes.team_ids == {world.medops.pk}
+    with tenant_context(tenant):
+        check_permission_any_scope(READ)
+        assert set(
+            visible_apps(RegisteredApp.objects.filter(organization=world.org), READ).values_list(
+                "pk", flat=True
+            )
+        ) == {world.medops_app.pk}
+    assert not resolve(tenant, READ, _app_scope(world.platform_app))[0]
+
+
+@pytest.mark.parametrize("invalid", ["foreign", "expired", "deleted-role"])
+def test_invalid_exact_org_binding_cannot_admit_an_organization_collection(world, other, invalid):
+    user = _member(world, _user("invalid-exact-org"))
+    role = _role(READ)
+    target = other.org if invalid == "foreign" else world.org
+    extra = {"expires_at": timezone.now() - timedelta(seconds=1)} if invalid == "expired" else {}
+    _bind(user, role, "ORG", target.pk, inherits=False, **extra)
+    if invalid == "deleted-role":
+        role.soft_delete()
+    assert not granted_scopes(_tenant(world, user), READ)
+
+
+@pytest.mark.parametrize("source", ["user", "group", "mapping"])
+def test_deleted_roles_cannot_authorize_direct_or_collection_reads(world, source):
+    user = _member(world, _user("deleted-role"), groups=["eng"])
+    role = _role(READ)
+    if source == "user":
+        _bind(user, role, "ORG", world.org.pk)
+    elif source == "group":
+        _bind_group("eng", role, "ORG", world.org.pk)
+    else:
+        GroupRoleMapping.objects.create(
+            organization=world.org,
+            group_external_id="eng",
+            role=role,
+            scope_kind="ORG",
+            scope_id=world.org.pk,
+        )
+    tenant = _tenant(world, user)
+    assert resolve(tenant, READ, _app_scope(world.medops_app))[0]
+    role.soft_delete()
+    assert not resolve(tenant, READ, _app_scope(world.medops_app))[0]
+    assert not granted_scopes(tenant, READ)
+    assert READ.value not in resolve_effective_permissions_anywhere(tenant)
 
 
 def test_a_non_inheriting_team_binding_covers_the_team_row_only(world):
