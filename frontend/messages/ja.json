@@ -1107,34 +1107,34 @@
       "eyebrow": "デプロイ戦略",
       "edit": "編集",
       "previewEnvironments": "プレビュー環境",
-      "previewEnvironmentsHelp": "プルリクエストごとに一時的な環境を立ち上げます。",
+      "previewEnvironmentsHelp": "プルリクエストごとに一時的な環境を作成します。",
       "sheetTitle": "デプロイ戦略を編集",
-      "sheetDescription": "変更は次のデプロイから適用されます。実行中のロールアウトは以前の戦略で完了します。",
+      "sheetDescription": "変更は次回のデプロイから適用されます。進行中のロールアウトは以前の戦略で完了します。",
       "triggerModeLabel": "トリガーモード",
-      "cronExpressionLabel": "Cron 式",
-      "cronExpressionHelp": "5 つのフィールド (分 時 日 月 曜日)。バックエンドは不正な式を拒否します。",
+      "cronExpressionLabel": "cron 式",
+      "cronExpressionHelp": "5 つのフィールド（分 時 日 月 曜日）です。不正な式はサーバーが拒否します。",
       "deployBranchLabel": "デプロイブランチ",
-      "deployBranchHelp": "リポジトリのデフォルトブランチは <branch></branch> です。",
+      "deployBranchHelp": "リポジトリの既定のブランチは <branch></branch> です。",
       "cancel": "キャンセル",
       "save": "戦略を保存",
       "toastSaved": "デプロイ戦略を更新しました。",
       "toastFailed": "更新に失敗しました。",
       "modes": {
         "auto_on_push": {
-          "label": "プッシュで自動",
-          "hint": "デプロイブランチへのプッシュごとにデプロイを実行します。"
+          "label": "プッシュ時に自動実行",
+          "hint": "デプロイブランチへのプッシュごとにデプロイを開始します。"
         },
         "manual": {
           "label": "手動のみ",
-          "hint": "UI または CLI からのみデプロイをトリガーします。"
+          "hint": "UI または CLI から実行した場合のみデプロイします。"
         },
         "external_ci": {
           "label": "外部 CI",
-          "hint": "CI がデプロイトークンで Astrolift を呼び出します。Webhook なし。"
+          "hint": "CI がデプロイトークンで Astrolift を呼び出します。Webhook は使用しません。"
         },
         "cron": {
-          "label": "Cron スケジュール",
-          "hint": "Cron 式で定義された定期スケジュールでデプロイが実行されます。"
+          "label": "cron スケジュール",
+          "hint": "cron 式で定義した定期的なスケジュールでデプロイを実行します。"
         }
       }
     },

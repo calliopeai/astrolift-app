@@ -1107,34 +1107,34 @@
       "eyebrow": "Estratégia de implantação",
       "edit": "Editar",
       "previewEnvironments": "Ambientes de prévia",
-      "previewEnvironmentsHelp": "Cria um ambiente efêmero por pull request.",
+      "previewEnvironmentsHelp": "Crie um ambiente temporário para cada solicitação de pull.",
       "sheetTitle": "Editar estratégia de implantação",
-      "sheetDescription": "Mudanças se aplicam à próxima implantação. Rollouts em andamento terminam com a estratégia anterior.",
-      "triggerModeLabel": "Modo de gatilho",
+      "sheetDescription": "As alterações se aplicam à próxima implantação. As implantações em andamento terminam com a estratégia anterior.",
+      "triggerModeLabel": "Modo de acionamento",
       "cronExpressionLabel": "Expressão cron",
-      "cronExpressionHelp": "Cinco campos (minuto hora dia mês dia-semana). O backend rejeita expressões mal formadas.",
+      "cronExpressionHelp": "Cinco campos (minuto hora dia mês dia da semana). O servidor rejeita expressões inválidas.",
       "deployBranchLabel": "Branch de implantação",
-      "deployBranchHelp": "O branch padrão do repositório é <branch></branch>.",
+      "deployBranchHelp": "A branch padrão do repositório é <branch></branch>.",
       "cancel": "Cancelar",
       "save": "Salvar estratégia",
       "toastSaved": "Estratégia de implantação atualizada.",
-      "toastFailed": "Falha na atualização.",
+      "toastFailed": "A atualização falhou.",
       "modes": {
         "auto_on_push": {
-          "label": "Automático no push",
-          "hint": "Qualquer push para o branch de implantação dispara uma implantação."
+          "label": "Automático a cada push",
+          "hint": "Cada push para a branch de implantação inicia uma implantação."
         },
         "manual": {
           "label": "Somente manual",
-          "hint": "Implanta somente quando acionado pela UI ou CLI."
+          "hint": "Implanta somente quando acionado pela interface ou CLI."
         },
         "external_ci": {
-          "label": "CI externo",
+          "label": "CI externa",
           "hint": "Sua CI chama o Astrolift com um token de implantação. Sem webhook."
         },
         "cron": {
           "label": "Agendamento cron",
-          "hint": "Implantações rodam em uma agenda recorrente definida pela expressão cron."
+          "hint": "As implantações seguem o agendamento recorrente definido pela expressão cron."
         }
       }
     },

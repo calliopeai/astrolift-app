@@ -1106,35 +1106,35 @@
     "deployStrategy": {
       "eyebrow": "배포 전략",
       "edit": "편집",
-      "previewEnvironments": "미리보기 환경",
-      "previewEnvironmentsHelp": "풀 리퀘스트마다 임시 환경을 띄웁니다.",
+      "previewEnvironments": "미리 보기 환경",
+      "previewEnvironmentsHelp": "풀 리퀘스트마다 임시 환경을 생성합니다.",
       "sheetTitle": "배포 전략 편집",
-      "sheetDescription": "변경 사항은 다음 배포부터 적용됩니다. 진행 중인 롤아웃은 이전 전략으로 완료됩니다.",
+      "sheetDescription": "변경 사항은 다음 배포에 적용됩니다. 진행 중인 롤아웃은 이전 전략으로 완료됩니다.",
       "triggerModeLabel": "트리거 모드",
-      "cronExpressionLabel": "Cron 표현식",
-      "cronExpressionHelp": "다섯 개 필드 (분 시 일 월 요일). 백엔드는 잘못된 표현식을 거부합니다.",
+      "cronExpressionLabel": "cron 표현식",
+      "cronExpressionHelp": "필드는 다섯 개입니다(분 시 일 월 요일). 서버는 잘못된 표현식을 거부합니다.",
       "deployBranchLabel": "배포 브랜치",
-      "deployBranchHelp": "저장소의 기본 브랜치는 <branch></branch> 입니다.",
+      "deployBranchHelp": "저장소의 기본 브랜치는 <branch></branch>입니다.",
       "cancel": "취소",
       "save": "전략 저장",
       "toastSaved": "배포 전략이 업데이트되었습니다.",
-      "toastFailed": "업데이트 실패.",
+      "toastFailed": "업데이트하지 못했습니다.",
       "modes": {
         "auto_on_push": {
-          "label": "푸시 시 자동",
-          "hint": "배포 브랜치로 푸시할 때마다 배포를 실행합니다."
+          "label": "푸시 시 자동 실행",
+          "hint": "배포 브랜치에 푸시할 때마다 배포를 시작합니다."
         },
         "manual": {
-          "label": "수동만",
-          "hint": "UI 또는 CLI에서 트리거할 때만 배포합니다."
+          "label": "수동으로만 실행",
+          "hint": "UI 또는 CLI에서 실행할 때만 배포합니다."
         },
         "external_ci": {
           "label": "외부 CI",
-          "hint": "CI가 배포 토큰으로 Astrolift를 호출합니다. Webhook 없음."
+          "hint": "CI가 배포 토큰으로 Astrolift를 호출합니다. 웹훅은 사용하지 않습니다."
         },
         "cron": {
-          "label": "Cron 일정",
-          "hint": "Cron 표현식으로 정의된 반복 일정에 따라 배포가 실행됩니다."
+          "label": "cron 일정",
+          "hint": "cron 표현식으로 정의한 반복 일정에 따라 배포합니다."
         }
       }
     },

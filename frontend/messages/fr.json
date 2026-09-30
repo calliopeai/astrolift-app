@@ -1106,35 +1106,35 @@
     "deployStrategy": {
       "eyebrow": "Stratégie de déploiement",
       "edit": "Modifier",
-      "previewEnvironments": "Environnements d'aperçu",
-      "previewEnvironmentsHelp": "Créer un environnement éphémère par pull request.",
+      "previewEnvironments": "Environnements d’aperçu",
+      "previewEnvironmentsHelp": "Créez un environnement temporaire pour chaque demande de fusion.",
       "sheetTitle": "Modifier la stratégie de déploiement",
-      "sheetDescription": "Les changements s'appliquent au prochain déploiement. Les déploiements en cours terminent avec la stratégie précédente.",
+      "sheetDescription": "Les modifications s’appliquent au prochain déploiement. Les déploiements en cours se terminent avec la stratégie précédente.",
       "triggerModeLabel": "Mode de déclenchement",
       "cronExpressionLabel": "Expression cron",
-      "cronExpressionHelp": "Cinq champs (minute heure jour mois jour-semaine). Le backend rejette les expressions mal formées.",
+      "cronExpressionHelp": "Cinq champs (minute heure jour mois jour de la semaine). Le serveur refuse les expressions mal formées.",
       "deployBranchLabel": "Branche de déploiement",
       "deployBranchHelp": "La branche par défaut du dépôt est <branch></branch>.",
       "cancel": "Annuler",
       "save": "Enregistrer la stratégie",
       "toastSaved": "Stratégie de déploiement mise à jour.",
-      "toastFailed": "Échec de la mise à jour.",
+      "toastFailed": "La mise à jour a échoué.",
       "modes": {
         "auto_on_push": {
-          "label": "Auto à chaque push",
-          "hint": "Tout push sur la branche de déploiement déclenche un déploiement."
+          "label": "Automatique à chaque push",
+          "hint": "Chaque push vers la branche de déploiement lance un déploiement."
         },
         "manual": {
           "label": "Manuel uniquement",
-          "hint": "Déploie uniquement lorsqu'il est déclenché depuis l'UI ou la CLI."
+          "hint": "Déploie uniquement sur déclenchement depuis l’interface ou la CLI."
         },
         "external_ci": {
           "label": "CI externe",
-          "hint": "Votre CI appelle Astrolift avec un token de déploiement. Pas de webhook."
+          "hint": "Votre CI appelle Astrolift avec un jeton de déploiement. Aucun webhook."
         },
         "cron": {
           "label": "Planification cron",
-          "hint": "Les déploiements s'exécutent selon un horaire récurrent défini par l'expression cron."
+          "hint": "Les déploiements suivent la planification récurrente définie par l’expression cron."
         }
       }
     },

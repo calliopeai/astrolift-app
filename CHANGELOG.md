@@ -12,6 +12,12 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Deploy strategy editor copy and notices are translated in all eight locales.
+  Branch help retains its actual identifier, rejected saves keep edits for retry,
+  and missing-message version conflicts use the localized shared fallback (#2145).
+
+- Shared version-conflict fallback notices and their Refresh action use the
+  selected locale; actual server-provided messages remain unchanged (#2145).
 
 - Translate actual model-playground readiness, prompt limits, cancellation, and
   browser-local history notices across all eight UI locales (#2148, #2145).
