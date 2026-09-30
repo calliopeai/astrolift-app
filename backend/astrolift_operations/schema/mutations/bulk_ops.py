@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import functools
+import inspect
+
 import strawberry
 from strawberry.types import Info
 
+from astrolift_identity.operation_context import environment_operation, named_environment, workload_operation
 from astrolift_manifest.persist import actor_may_attach_project_services, allow_project_attach
 from astrolift_operations.schema.mutations.helpers import (
     _BULK_APP_CAP,
@@ -16,10 +20,110 @@ from astrolift_operations.schema.mutations.types import (
     BulkResyncManifestInput,
     BulkRollingRestartInput,
 )
+from astrolift_operations.scopes import org_id
+from astrolift_registry.scopes import app_scope_by_guid, app_scope_by_workload_guid, live_app_owners
+from astrolift_services.scopes import (
+    assert_provider_cluster,
+    live_secret_bundles,
+    secret_bundle_project_scope,
+)
 from core.decorators import tenant_scoped
-from core.mutations import mutation_audit
-from core.permissions import Permission, require_permission
+from core.mutations import ErrorCode, MutationError, mutation_audit
+from core.permissions import Permission, PermissionDenied, require_permission
 from core.tenancy import get_current_tenant
+
+
+class _BulkPermissionRefusal(BulkOperationResult):
+    @property
+    def ok(self):
+        return False
+
+    @property
+    def errors(self):
+        message = self.per_app[0].errors[0] if self.per_app else "permission denied"
+        return [MutationError(code=ErrorCode.PERMISSION_DENIED, message=message)]
+
+
+def _bulk_permission_result(fn):
+    signature = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def wrapped(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except PermissionDenied as exc:
+            bound = signature.bind(*args, **kwargs)
+            slugs = list(dict.fromkeys(bound.arguments["input"].app_slugs or []))[:_BULK_APP_CAP]
+            return _BulkPermissionRefusal(
+                ok_count=0,
+                failed_count=len(slugs),
+                per_app=[BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)]) for slug in slugs],
+            )
+
+    return wrapped
+
+
+@require_permission(
+    Permission.APP_DEPLOY,
+    scope=app_scope_by_workload_guid("workload_id", permission=Permission.APP_DEPLOY),
+    operation=workload_operation("workload_id"),
+)
+def _restart_workload(workload_id):
+    from astrolift_lifecycle.services.k8s_ops import (
+        _primary_environment_for_workload,
+        rollout_restart_workload,
+    )
+    from astrolift_registry.models import Workload
+
+    workload = Workload.objects.select_related("registered_app").get(
+        guid=workload_id, registered_app__organization_id=org_id()
+    )
+    env = _primary_environment_for_workload(workload)
+    if env is not None:
+        assert_provider_cluster(env.tenant_cluster, permission=Permission.APP_DEPLOY)
+    return rollout_restart_workload(workload)
+
+
+@require_permission(
+    Permission.APP_UPDATE, scope=secret_bundle_project_scope(permissions=(Permission.APP_UPDATE,))
+)
+def _authorize_bundle(bundle_id):
+    return None
+
+
+@require_permission(
+    Permission.APP_UPDATE,
+    scope=app_scope_by_guid(permission=Permission.APP_UPDATE),
+    operation=environment_operation("environment_id"),
+)
+def _attach_bundle(app_id, environment_id, bundle):
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.models.secret_bundle import AppSecretBundleRef
+
+    _authorize_bundle(bundle.guid)
+    env = AppEnvironment.objects.get(
+        guid=environment_id, registered_app__guid=app_id, registered_app__organization_id=org_id()
+    )
+    AppSecretBundleRef.objects.get_or_create(
+        registered_app=env.registered_app,
+        app_environment=env,
+        secret_bundle=bundle,
+        deleted_at__isnull=True,
+    )
+
+
+@require_permission(
+    Permission.APP_UPDATE,
+    scope=app_scope_by_guid(permission=Permission.APP_UPDATE),
+    operation=named_environment("app_slug", "_absent", all_if_absent=True),
+)
+def _resync_manifest(app_id, app_slug):
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.services.manifest_sync import resync_app_manifest_from_repo
+
+    app = RegisteredApp.objects.get(guid=app_id, slug=app_slug, organization_id=org_id())
+    with allow_project_attach(actor_may_attach_project_services(app)):
+        return resync_app_manifest_from_repo(app)
 
 
 @strawberry.type
@@ -28,7 +132,8 @@ class BulkOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.bulk.rolling_restart")
-    @require_permission(Permission.APP_DEPLOY)
+    @_bulk_permission_result
+    @require_permission(Permission.APP_DEPLOY, any_scope=True)
     @tenant_scoped()
     def bulk_rolling_restart(
         self,
@@ -43,7 +148,6 @@ class BulkOpsMutations:
         success+failure summary in one toast."""
         from astrolift_lifecycle.services.k8s_ops import (
             K8sOpError,
-            rollout_restart_workload,
         )
         from astrolift_registry.models import RegisteredApp, Workload
 
@@ -64,10 +168,12 @@ class BulkOpsMutations:
 
         per_app: list[BulkAppResultItem] = []
         for slug in slugs:
-            app = RegisteredApp.objects.filter(
-                slug=slug,
-                organization_id=org_id,
-                deleted_at__isnull=True,
+            app = live_app_owners(
+                RegisteredApp.objects.filter(
+                    slug=slug,
+                    organization_id=org_id,
+                    deleted_at__isnull=True,
+                )
             ).first()
             if app is None:
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["app not found"]))
@@ -88,9 +194,11 @@ class BulkOpsMutations:
             errors: list[str] = []
             for wl in workloads:
                 try:
-                    rollout_restart_workload(wl)
+                    _restart_workload(wl.guid)
                 except K8sOpError as exc:
                     errors.append(f"{wl.slug}: {exc.message}")
+                except PermissionDenied as exc:
+                    errors.append(f"{wl.slug}: {exc}")
 
             per_app.append(BulkAppResultItem(app_slug=slug, ok=not errors, errors=errors))
 
@@ -103,7 +211,8 @@ class BulkOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.bulk.push_secrets")
-    @require_permission(Permission.APP_UPDATE)
+    @_bulk_permission_result
+    @require_permission(Permission.APP_UPDATE, any_scope=True)
     @tenant_scoped()
     def bulk_push_secrets(
         self,
@@ -119,7 +228,7 @@ class BulkOpsMutations:
         pairs are injected on the next deploy or manifest reconcile."""
         from astrolift_lifecycle.models import AppEnvironment
         from astrolift_registry.models import RegisteredApp
-        from astrolift_services.models.secret_bundle import AppSecretBundleRef, SecretBundle
+        from astrolift_services.models.secret_bundle import SecretBundle
 
         slugs = list(dict.fromkeys(input.app_slugs or []))[:_BULK_APP_CAP]
         tenant = get_current_tenant()
@@ -140,10 +249,12 @@ class BulkOpsMutations:
         # an organization FK. An unscoped slug lookup let a caller attach
         # ANOTHER tenant's secret bundle to their own apps — cross-org
         # secret injection on the next deploy / manifest reconcile.
-        bundle = SecretBundle.objects.filter(
-            slug=input.bundle_slug,
-            organization_id=org_id,
-            deleted_at__isnull=True,
+        bundle = live_secret_bundles(
+            SecretBundle.objects.filter(
+                slug=input.bundle_slug,
+                organization_id=org_id,
+                deleted_at__isnull=True,
+            )
         ).first()
         if bundle is None:
             return BulkOperationResult(
@@ -161,10 +272,12 @@ class BulkOpsMutations:
 
         per_app: list[BulkAppResultItem] = []
         for slug in slugs:
-            app = RegisteredApp.objects.filter(
-                slug=slug,
-                organization_id=org_id,
-                deleted_at__isnull=True,
+            app = live_app_owners(
+                RegisteredApp.objects.filter(
+                    slug=slug,
+                    organization_id=org_id,
+                    deleted_at__isnull=True,
+                )
             ).first()
             if app is None:
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["app not found"]))
@@ -181,22 +294,11 @@ class BulkOpsMutations:
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["no matching environment"]))
                 continue
 
-            exists = AppSecretBundleRef.objects.filter(
-                registered_app=app,
-                app_environment=env,
-                secret_bundle=bundle,
-                deleted_at__isnull=True,
-            ).exists()
-            if not exists:
-                try:
-                    AppSecretBundleRef.objects.create(
-                        registered_app=app,
-                        app_environment=env,
-                        secret_bundle=bundle,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]]))
-                    continue
+            try:
+                _attach_bundle(app.guid, env.guid, bundle)
+            except Exception as exc:  # noqa: BLE001
+                per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]]))
+                continue
 
             per_app.append(BulkAppResultItem(app_slug=slug, ok=True, errors=[]))
 
@@ -209,7 +311,8 @@ class BulkOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.bulk.resync_manifest")
-    @require_permission(Permission.APP_UPDATE)
+    @_bulk_permission_result
+    @require_permission(Permission.APP_UPDATE, any_scope=True)
     @tenant_scoped()
     def bulk_resync_manifest(
         self,
@@ -221,7 +324,6 @@ class BulkOpsMutations:
         ``resync_app_manifest_from_repo`` per app. Per-app failures are
         collected so the FE can render a summary."""
         from astrolift_registry.models import RegisteredApp
-        from astrolift_registry.services.manifest_sync import resync_app_manifest_from_repo
 
         slugs = list(dict.fromkeys(input.app_slugs or []))[:_BULK_APP_CAP]
         tenant = get_current_tenant()
@@ -240,18 +342,19 @@ class BulkOpsMutations:
 
         per_app: list[BulkAppResultItem] = []
         for slug in slugs:
-            app = RegisteredApp.objects.filter(
-                slug=slug,
-                organization_id=org_id,
-                deleted_at__isnull=True,
+            app = live_app_owners(
+                RegisteredApp.objects.filter(
+                    slug=slug,
+                    organization_id=org_id,
+                    deleted_at__isnull=True,
+                )
             ).first()
             if app is None:
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=["app not found"]))
                 continue
 
             try:
-                with allow_project_attach(actor_may_attach_project_services(app)):
-                    result = resync_app_manifest_from_repo(app)
+                result = _resync_manifest(app.guid, app.slug)
             except Exception as exc:  # noqa: BLE001
                 per_app.append(BulkAppResultItem(app_slug=slug, ok=False, errors=[str(exc)[:256]]))
                 continue

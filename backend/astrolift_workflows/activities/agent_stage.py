@@ -423,7 +423,9 @@ def _expire_agent_task(task_pk):
         reason = task_timeout_reason(task)
         if reason is None:
             return None
-        task.failure = {"message": reason}
+        from astrolift_agents.services.startup_diagnostic import startup_failure_suffix
+
+        task.failure = {"message": reason + startup_failure_suffix(task)}
         task.save(update_fields=["failure", "updated_at", "version"])
         if task.external_id:
             try:
@@ -467,6 +469,14 @@ def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
         result = _cancel_agent_task_locked(str(task.guid))
         return {"status": result["status"], "terminal": result["status"] in _TERMINAL_STATUSES}
 
+    startup_pods = None
+    if task.external_id:
+        backend, cluster, namespace = _placement_for_task(task)
+        if backend == "k8s_job":
+            from astrolift_agents.services.startup_diagnostic import observe_startup
+
+            startup_pods = observe_startup(task, cluster=cluster, namespace=namespace, task_id=str(task.guid))
+
     expired = _expire_agent_task(task.pk)
     if expired is not None:
         return expired
@@ -496,9 +506,11 @@ def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
         return {"status": task.status, "terminal": True}
 
     if status.failed:
+        from astrolift_agents.services.startup_diagnostic import startup_failure_suffix
+
         if task.failure is None:
             task.failure = {
-                "message": status.error_message or "container failed",
+                "message": (status.error_message or "container failed") + startup_failure_suffix(task),
                 "exit_code": status.exit_code,
             }
             task.save(update_fields=["failure", "updated_at", "version"])
@@ -515,7 +527,11 @@ def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
     # instead of failing. Only the reasons that never self-heal are fatal;
     # transient startup states (ContainerCreating, a first-attempt
     # ErrImagePull) fall through and get another poll.
-    fatal = _fatal_pod_wait_reason(cluster, namespace, str(task.guid)) if backend == "k8s_job" else None
+    fatal = (
+        _fatal_pod_wait_reason(cluster, namespace, str(task.guid), startup_pods)
+        if backend == "k8s_job"
+        else None
+    )
     if fatal:
         if task.failure is None:
             task.failure = {"message": f"container never started: {fatal}"}
@@ -559,7 +575,7 @@ def _cleanup_terminal_task_secret(task: Any, *, spawner: Any | None = None) -> N
 _FATAL_POD_WAIT_REASONS = frozenset({"ImagePullBackOff", "InvalidImageName", "CreateContainerConfigError"})
 
 
-def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str) -> str:
+def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str, pods=None) -> str:
     """Return the task pod's fatal container-waiting reason, or ``""``.
 
     Discovers the pod by its ``astrolift.dev/task-id`` label (the same lookup
@@ -571,12 +587,13 @@ def _fatal_pod_wait_reason(cluster: Any, namespace: str, task_guid: str) -> str:
     from core.cluster_observability import ClusterObservabilityError, list_app_pods
 
     try:
-        pods = list_app_pods(
-            cluster=cluster,
-            namespace=namespace,
-            app_slug=task_guid,
-            task_id=task_guid,
-        )
+        if pods is None:
+            pods = list_app_pods(
+                cluster=cluster,
+                namespace=namespace,
+                app_slug=task_guid,
+                task_id=task_guid,
+            )
     except ClusterObservabilityError:
         return ""
     except Exception:  # noqa: BLE001 — a probe hiccup must not fail the task

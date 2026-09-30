@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import logging
 from typing import Optional
 
+import logging
+
 import strawberry
-from django.core.exceptions import ValidationError
 from graphql import GraphQLError
 from strawberry.types import Info
 
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Input types
 # ---------------------------------------------------------------------------
+
 
 @strawberry.input
 class OrganizationInput:
@@ -40,6 +41,7 @@ class OrganizationMemberStatusInput:
 # Result types
 # ---------------------------------------------------------------------------
 
+
 @strawberry.type
 class OrganizationMutationResult(MutationResult):
     id: Optional[strawberry.ID] = None
@@ -48,6 +50,7 @@ class OrganizationMutationResult(MutationResult):
 # ---------------------------------------------------------------------------
 # Mutations
 # ---------------------------------------------------------------------------
+
 
 def _require_caller_in_org(info: Info, org_pk) -> None:
     """Reject the mutation unless the caller is an active member of org_pk.
@@ -61,9 +64,12 @@ def _require_caller_in_org(info: Info, org_pk) -> None:
     from organization.models import OrganizationMember
 
     user = info.context.user
-    if not getattr(user, 'is_authenticated', False):
-        raise GraphQLError('Authentication required')
-    if getattr(user, 'is_superuser', False):
+    if not getattr(user, "is_authenticated", False):
+        raise GraphQLError("Authentication required")
+    from core.schema.legacy_access import is_operator_with_credential, require_account_access
+
+    require_account_access(info)
+    if is_operator_with_credential(user):
         return
     is_member = OrganizationMember.objects.filter(
         member=user,
@@ -72,90 +78,28 @@ def _require_caller_in_org(info: Info, org_pk) -> None:
         deleted_at__isnull=True,
     ).exists()
     if not is_member:
-        raise GraphQLError('Caller is not a member of the target organization')
+        raise GraphQLError("Caller is not a member of the target organization")
 
 
 @strawberry.type
 class Mutation:
-
     @strawberry.mutation
     def organization(self, info: Info, input: OrganizationInput) -> OrganizationMutationResult:
-        """Create or update an Organization via form."""
-        from organization.models import Organization
-        from organization.schema.mutations.organization import OrganizationForm
+        from core.permissions import require_platform_operator
 
-        user = info.context.user
-        if not getattr(user, 'is_authenticated', False):
-            raise GraphQLError('Authentication required')
-
-        instance = None
-        form_data = {}
-
-        if input.id:
-            pk = GlobalIDUtils.get_pk_flexible(input.id)
-            instance = Organization.objects.filter(pk=pk).first()
-            if not instance:
-                raise GraphQLError(f'Organization {input.id} not found')
-            # #537: editing an existing org requires membership in it.
-            _require_caller_in_org(info, instance.pk)
-            form_data['created_by'] = instance.created_by_id
-        else:
-            form_data['created_by'] = user.pk
-
-        if input.website is not None:
-            form_data['website'] = input.website
-
-        form_data['last_modified_by'] = user.pk
-
-        form = OrganizationForm(data=form_data, instance=instance)
-        setattr(form, 'info', info)
-
-        if form.is_valid():
-            obj = form.save()
-            obj = form.post_save(form_data)
-            global_id = GlobalIDUtils.to_global_id('OrganizationType', obj.pk)
-            return OrganizationMutationResult(ok=True, errors=[], id=global_id)
-
-        return OrganizationMutationResult.from_form_errors(form.errors)
+        require_platform_operator(info.context.user)
+        raise GraphQLError(
+            "Legacy organization writes are unavailable; use the Astrolift identity mutations."
+        )
 
     @strawberry.mutation
     def upsert_organization(self, info: Info, input: UpsertOrganizationInput) -> OrganizationMutationResult:
-        """Upsert an Organization using UtilityForm.apply_forms."""
-        from core.schema.mutations.common import UtilityForm
+        from core.permissions import require_platform_operator
 
-        user = info.context.user
-        if not getattr(user, 'is_authenticated', False):
-            raise GraphQLError('Authentication required')
-        # #537: editing an existing org requires membership in it. Creates
-        # (no id supplied) are still allowed for any authed user, matching
-        # the pre-existing create flow.
-        if input.id is not None:
-            target_pk = GlobalIDUtils.get_pk_flexible(input.id)
-            if target_pk is not None:
-                _require_caller_in_org(info, target_pk)
-
-        # Build a dict matching the Graphene InputObjectType shape
-        input_data = {}
-        if input.id is not None:
-            input_data['id'] = input.id
-        if input.website is not None:
-            input_data['website'] = input.website
-
-        try:
-            organization = UtilityForm.apply_forms(None, info, input_data)
-        except ValidationError as exc:
-            flat_errors = []
-            if hasattr(exc, 'message_dict'):
-                for field, msgs in exc.message_dict.items():
-                    from core.schema.common import ValidationError as VE
-                    flat_errors.append(VE(field=field, messages=[str(m) for m in msgs]))
-            else:
-                from core.schema.common import ValidationError as VE
-                flat_errors.append(VE(field='__all__', messages=[str(exc)]))
-            return OrganizationMutationResult(ok=False, errors=flat_errors)
-
-        global_id = GlobalIDUtils.to_global_id('OrganizationType', organization.pk)
-        return OrganizationMutationResult(ok=True, errors=[], id=global_id)
+        require_platform_operator(info.context.user)
+        raise GraphQLError(
+            "Legacy organization writes are unavailable; use the Astrolift identity mutations."
+        )
 
     @strawberry.mutation
     def organization_member_status(

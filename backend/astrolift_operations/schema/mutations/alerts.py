@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import strawberry
 from strawberry.types import Info
 
@@ -9,6 +11,7 @@ from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
+from astrolift_identity.operation_context import managed_service_operation
 from astrolift_operations.models import (
     AlertEvent,
     AlertMute,
@@ -32,10 +35,35 @@ from astrolift_operations.schema.types import (
     alert_event_to_type,
     alert_rule_to_type,
 )
+from astrolift_operations.scopes import (
+    alert_creation_scope,
+    alert_operation,
+    alert_scope,
+    target_exists,
+)
+from astrolift_services.scopes import managed_service_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+@require_permission(
+    Permission.WEBHOOK_CREATE,
+    scope=alert_creation_scope(Permission.WEBHOOK_CREATE),
+    operation=alert_operation(creation=True),
+)
+def _authorize_new_target(input):
+    return None
+
+
+@require_permission(
+    Permission.WEBHOOK_UPDATE,
+    scope=managed_service_scope_by_guid("service_id", permissions=(Permission.WEBHOOK_UPDATE,)),
+    operation=managed_service_operation("service_id"),
+)
+def _authorize_new_service(service_id):
+    return None
 
 
 @strawberry.type
@@ -44,7 +72,11 @@ class AlertMutations:
 
     @strawberry.field
     @mutation_audit(action="alert_rule.create")
-    @require_permission(Permission.WEBHOOK_CREATE)
+    @require_permission(
+        Permission.WEBHOOK_CREATE,
+        scope=alert_creation_scope(Permission.WEBHOOK_CREATE),
+        operation=alert_operation(creation=True),
+    )
     @tenant_scoped()
     def create_alert_rule(
         self,
@@ -110,6 +142,11 @@ class AlertMutations:
                     "managed service not found",
                     field="managedServiceId",
                 )
+        if not target_exists(input.target, input.target_id):
+            return gql_failure(ErrorCode.NOT_FOUND.value, "alert target not found", field="targetId")
+        _authorize_new_target(
+            SimpleNamespace(target=input.target, target_id=input.target_id, managed_service_id=None)
+        )
         rule = AlertRule.objects.create(
             organization=org,
             name=input.name.strip(),
@@ -125,7 +162,9 @@ class AlertMutations:
 
     @strawberry.field
     @mutation_audit(action="alert_rule.update")
-    @require_permission(Permission.WEBHOOK_UPDATE)
+    @require_permission(
+        Permission.WEBHOOK_UPDATE, scope=alert_scope(Permission.WEBHOOK_UPDATE), operation=alert_operation()
+    )
     @tenant_scoped()
     def update_alert_rule(
         self,
@@ -176,13 +215,16 @@ class AlertMutations:
                     "managed service not found",
                     field="managedServiceId",
                 )
+            _authorize_new_service(service.guid)
             rule.managed_service = service
         rule.save()
         return gql_success(alert_rule_to_type(rule))
 
     @strawberry.field
     @mutation_audit(action="alert_rule.delete")
-    @require_permission(Permission.WEBHOOK_DELETE)
+    @require_permission(
+        Permission.WEBHOOK_DELETE, scope=alert_scope(Permission.WEBHOOK_DELETE), operation=alert_operation()
+    )
     @tenant_scoped()
     def delete_alert_rule(
         self,
@@ -210,7 +252,11 @@ class AlertMutations:
 
     @strawberry.field
     @mutation_audit(action="alert_event.acknowledge")
-    @require_permission(Permission.WEBHOOK_UPDATE)
+    @require_permission(
+        Permission.WEBHOOK_UPDATE,
+        scope=alert_scope(Permission.WEBHOOK_UPDATE, event=True),
+        operation=alert_operation(event=True),
+    )
     @tenant_scoped()
     def acknowledge_alert_event(
         self,
@@ -252,7 +298,11 @@ class AlertMutations:
 
     @strawberry.field
     @mutation_audit(action="alert_rule.mute")
-    @require_permission(Permission.WEBHOOK_UPDATE)
+    @require_permission(
+        Permission.WEBHOOK_UPDATE,
+        scope=alert_scope(Permission.WEBHOOK_UPDATE, field="input.rule_id"),
+        operation=alert_operation("input.rule_id"),
+    )
     @tenant_scoped()
     def mute_alert_rule(
         self,
@@ -326,7 +376,11 @@ class AlertMutations:
 
     @strawberry.field
     @mutation_audit(action="alert_rule.unmute")
-    @require_permission(Permission.WEBHOOK_UPDATE)
+    @require_permission(
+        Permission.WEBHOOK_UPDATE,
+        scope=alert_scope(Permission.WEBHOOK_UPDATE, field="input.rule_id"),
+        operation=alert_operation("input.rule_id"),
+    )
     @tenant_scoped()
     def unmute_alert_rule(
         self,

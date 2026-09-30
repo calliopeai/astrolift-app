@@ -22,7 +22,7 @@ interface GetAgentTaskData {
  * flips to a clear "session ended" state instead of leaving a dead canvas.
  */
 export function useAgentVncPopout(taskId: string) {
-  const { data, loading, error } = useQuery<GetAgentTaskData>(GET_AGENT_TASK, {
+  const { data, loading, error, refetch } = useQuery<GetAgentTaskData>(GET_AGENT_TASK, {
     variables: { id: taskId },
     fetchPolicy: "cache-and-network",
     pollInterval: 5000,
@@ -32,7 +32,10 @@ export function useAgentVncPopout(taskId: string) {
     taskId,
     task: data?.agentTask ?? null,
     loading,
-    error: error ? error.message : null,
+    error: data ? null : (error?.message ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
   };
 }
 

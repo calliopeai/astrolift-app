@@ -269,7 +269,7 @@ class NotificationReadMutationTest(TestCase):
         )
 
         self.assertIsNotNone(result.errors)
-        self.assertIn('does not belong to user', str(result.errors[0]))
+        self.assertIn('Notification not found', str(result.errors[0]))
 
         # Database should be unchanged
         other_notif.refresh_from_db()
@@ -456,5 +456,4 @@ class LibraryRmdirMutationTest(TestCase):
             )
 
         self.assertTrue(SharedDirectory.objects.filter(pk=other.pk).exists())
-
 

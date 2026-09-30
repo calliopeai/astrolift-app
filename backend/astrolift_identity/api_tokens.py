@@ -213,11 +213,15 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         return True
     if SCOPE_SECRET_READ in scopes and permission == "secret.read":
         return True
-    if SCOPE_SECRET_WRITE in scopes and permission == "secret.write":
+    if SCOPE_SECRET_WRITE in scopes and permission in {"secret.write", "pipeline.secret_manage"}:
         return True
     if SCOPE_MCP_READ in scopes and permission == "agent.read":
         return True
-    if SCOPE_MCP_DISPATCH in scopes and permission in {"agent.dispatch", "agent_task.send_input"}:
+    if SCOPE_MCP_DISPATCH in scopes and permission in {
+        "agent.dispatch",
+        "agent_task.send_input",
+        "agent_box.attach",
+    }:
         return True
     if SCOPE_MCP_WRITE in scopes and permission in {"agent.create", "agent.update"}:
         return True
@@ -301,7 +305,12 @@ SCOPE_CATALOG: tuple[ScopeInfo, ...] = (
     ScopeInfo(
         SCOPE_MCP_READ, "MCP read", "agents", "List agent packages and inspect runs through remote MCP."
     ),
-    ScopeInfo(SCOPE_MCP_DISPATCH, "MCP dispatch", "agents", "Run and hard-stop agents through remote MCP."),
+    ScopeInfo(
+        SCOPE_MCP_DISPATCH,
+        "MCP dispatch",
+        "agents",
+        "Run, steer and hard-stop agents; attach to agent boxes, subject to account permissions.",
+    ),
     ScopeInfo(SCOPE_MCP_WRITE, "MCP write", "agents", "Sync agent repositories and package definitions."),
     ScopeInfo(
         SCOPE_AGENT_ENV_SPEC_WRITE,

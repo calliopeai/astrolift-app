@@ -18,12 +18,13 @@ interface LifecycleResp {
  */
 export function useClusterLifecycleAudit(
   clusterId: string,
-  { limit, pollInterval }: { limit: number; pollInterval?: number }
+  { limit, pollInterval = 30000 }: { limit: number; pollInterval?: number }
 ) {
   const grow = useGrowingLimit(limit);
   const { data, loading, error, refetch } = useQuery<LifecycleResp>(CLUSTER_LIFECYCLE_AUDIT, {
     variables: { clusterId, limit: grow.limit },
     pollInterval,
+    fetchPolicy: "cache-and-network",
   });
   const entries = data?.astroliftClusterLifecycleAudit ?? [];
   return {

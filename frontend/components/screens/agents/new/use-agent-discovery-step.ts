@@ -57,9 +57,36 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
     fetchPolicy: "network-only",
   });
 
+  const requestVersion = React.useRef(0);
+  const scanKey = JSON.stringify([
+    orgId,
+    state.sourceRepo,
+    state.sourceKind,
+    state.ref || state.defaultBranch || "main",
+  ]);
+  React.useEffect(
+    () => () => {
+      requestVersion.current += 1;
+    },
+    [scanKey]
+  );
+
   const run = React.useCallback(
     async (opts?: { manual?: boolean }) => {
       if (!orgId || !state.sourceRepo) return;
+      const version = ++requestVersion.current;
+      const update = (apply: (current: S) => S) =>
+        setState((current) => {
+          const currentKey = JSON.stringify([
+            orgId,
+            current.sourceRepo,
+            current.sourceKind,
+            current.ref || current.defaultBranch || "main",
+          ]);
+          return version === requestVersion.current && currentKey === scanKey
+            ? apply(current)
+            : current;
+        });
       const manual = opts?.manual ?? false;
       setFetchState("scanning");
       setFetchError("");
@@ -70,11 +97,15 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
           sourceKind: state.sourceKind,
           ref: state.ref || state.defaultBranch || "main",
         },
-      });
+      }).catch((error: unknown) => ({
+        data: undefined,
+        error: error instanceof Error ? error : new Error(String(error)),
+      }));
+      if (version !== requestVersion.current) return;
       if (error) {
         setFetchState("error");
         setFetchError(error.message);
-        setState((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: error.message }));
+        update((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: error.message }));
         if (manual) toast.error(`Scan failed: ${error.message}`);
         return;
       }
@@ -82,7 +113,7 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
       if (!result) {
         setFetchState("error");
         setFetchError("no response from server");
-        setState((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: "no response" }));
+        update((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: "no response" }));
         if (manual) toast.error("Scan failed: no response from server.");
         return;
       }
@@ -90,7 +121,7 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
         const msg = result.error ?? "scan failed";
         setFetchState("error");
         setFetchError(msg);
-        setState((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: msg }));
+        update((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: msg }));
         if (manual) toast.error(`Scan failed: ${msg}`);
         return;
       }
@@ -99,7 +130,7 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
       // agents are pre-checked + disabled (they'll be matched, not
       // duplicated). The selection is a client-side preview — see the
       // hook docstring.
-      setState((s) => ({
+      update((s) => ({
         ...s,
         scanned: true,
         scanError: null,
@@ -121,19 +152,28 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
         );
       }
     },
-    [orgId, state.sourceRepo, state.sourceKind, state.ref, state.defaultBranch, scan, setState]
+    [
+      orgId,
+      state.sourceRepo,
+      state.sourceKind,
+      state.ref,
+      state.defaultBranch,
+      scanKey,
+      scan,
+      setState,
+    ]
   );
 
   // Auto-scan on first entry (or whenever the repo / ref changed upstream).
   const lastScanKey = React.useRef<string>("");
   React.useEffect(() => {
-    const key = `${orgId}|${state.sourceRepo}|${state.sourceKind}|${state.ref}`;
+    const key = scanKey;
     if (!orgId || !state.sourceRepo) return;
     if (state.scanned && lastScanKey.current === key) return;
     if (lastScanKey.current === key && fetchState !== "idle") return;
     lastScanKey.current = key;
     void run();
-  }, [orgId, state.sourceRepo, state.sourceKind, state.ref, state.scanned, fetchState, run]);
+  }, [orgId, state.sourceRepo, scanKey, state.scanned, fetchState, run]);
 
   // Valid once we've discovered at least one not-yet-registered agent. (If
   // every discovered agent is already registered there's nothing to do — the

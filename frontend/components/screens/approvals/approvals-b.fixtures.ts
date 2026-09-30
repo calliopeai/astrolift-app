@@ -89,11 +89,15 @@ export const LONG_PROPOSAL: AstroliftSecretChangeProposal = {
 };
 
 export const QUEUE: SecretProposalsQueueProps = {
+  error: null,
+  onRetry: () => {},
   proposals: PROPOSALS,
   loading: false,
 };
 
 export const DETAIL: SecretProposalDetailScreenProps = {
+  error: null,
+  onRetry: () => {},
   proposal: PROPOSAL,
   loading: false,
   canApprove: true,

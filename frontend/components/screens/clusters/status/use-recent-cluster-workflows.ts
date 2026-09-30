@@ -18,12 +18,13 @@ interface WorkflowsResp {
  */
 export function useRecentClusterWorkflows(
   clusterId: string,
-  { limit, pollInterval }: { limit: number; pollInterval?: number }
+  { limit, pollInterval = 15000 }: { limit: number; pollInterval?: number }
 ) {
   const grow = useGrowingLimit(limit);
   const { data, loading, error, refetch } = useQuery<WorkflowsResp>(RECENT_CLUSTER_WORKFLOWS, {
     variables: { clusterId, limit: grow.limit },
     pollInterval,
+    fetchPolicy: "cache-and-network",
   });
   const runs = data?.astroliftRecentClusterWorkflows ?? [];
   return {

@@ -1,21 +1,16 @@
 import { gql } from "@apollo/client";
 
-/** Fetch a single pipeline by ID, including its declared secrets list. */
+/** Fetch the existing pipeline definition; secret metadata has a separate gate. */
 export const GET_PIPELINE = gql`
-  query GetPipeline($id: UUID!) {
+  query GetPipeline($id: String!) {
     astroliftPipeline(id: $id) {
       id
       name
-      slug
-      description
+      repoUrl
+      defaultBranch
+      tomlPath
       createdAt
       updatedAt
-      secrets {
-        id
-        name
-        createdAt
-        updatedAt
-      }
     }
   }
 `;
@@ -25,7 +20,7 @@ export const GET_PIPELINE = gql`
  * secrets list after set/delete mutations.
  */
 export const LIST_PIPELINE_SECRETS = gql`
-  query ListPipelineSecrets($pipelineId: UUID!) {
+  query ListPipelineSecrets($pipelineId: GUID!) {
     astroliftPipelineSecrets(pipelineId: $pipelineId) {
       id
       name

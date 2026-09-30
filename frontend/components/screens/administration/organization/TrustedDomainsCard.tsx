@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 
@@ -42,6 +44,9 @@ export function TrustedDomainsCard({
   error,
   onRetry,
   roleOptions,
+  rolesLoading,
+  rolesError,
+  onRetryRoles,
   adding,
   removing,
   onAdd,
@@ -134,7 +139,11 @@ export function TrustedDomainsCard({
           </div>
           <div className="min-w-0 space-y-2">
             <Label htmlFor="allowlist-role">Default role</Label>
-            <Select value={roleSlug} onValueChange={setRoleSlug}>
+            <Select
+              value={roleSlug}
+              onValueChange={setRoleSlug}
+              disabled={rolesLoading || Boolean(rolesError)}
+            >
               <SelectTrigger id="allowlist-role">
                 <SelectValue placeholder="None" />
               </SelectTrigger>
@@ -147,6 +156,16 @@ export function TrustedDomainsCard({
                 ))}
               </SelectContent>
             </Select>
+            {rolesLoading && (
+              <p role="status" className="text-muted-foreground text-xs">
+                Loading roles…
+              </p>
+            )}
+            <QueryError
+              title="Could not load default roles"
+              error={rolesError}
+              onRetry={onRetryRoles}
+            />
           </div>
           <div className="min-w-0 space-y-2">
             <Label htmlFor="allowlist-review">On sign-in</Label>

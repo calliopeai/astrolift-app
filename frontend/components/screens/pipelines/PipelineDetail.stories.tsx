@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 
@@ -27,6 +28,16 @@ export const Full: Story = {
   render: () => <PipelineDetailScreen {...DETAIL} runGraph={graph} secrets={secrets} />,
 };
 
+export const SecretsRoute: Story = {
+  render: () => <PipelineDetailScreen {...DETAIL} pipelineId="pipeline-guid" secrets={secrets} />,
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByRole("link", { name: "Secrets" })).toHaveAttribute(
+      "href",
+      "/pipelines/pipeline-guid/secrets"
+    );
+  },
+};
+
 export const Loading: Story = {
   render: () => <PipelineDetailScreen {...DETAIL} runs={[]} runsLoading secrets={secrets} />,
 };
@@ -35,12 +46,15 @@ export const Empty: Story = {
   render: () => <PipelineDetailScreen {...DETAIL} runs={[]} secrets={secrets} />,
 };
 
-/**
- * The runs query surfaces no error state in this screen: a failed fetch
- * renders as the empty Runs tab. This is the closest real state.
- */
 export const ErrorState: Story = {
-  render: () => <PipelineDetailScreen {...DETAIL} runs={[]} secrets={secrets} />,
+  render: () => (
+    <PipelineDetailScreen
+      {...DETAIL}
+      runs={[]}
+      runsError={{ name: "Error", message: "Permission denied while loading this section" }}
+      secrets={secrets}
+    />
+  ),
 };
 
 /** The latest run's graph is still loading. */

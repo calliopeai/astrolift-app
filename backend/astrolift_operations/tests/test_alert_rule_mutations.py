@@ -28,7 +28,10 @@ def _info():
 
 def _scaffold():
     org = Organization.objects.create(name="Acme", slug="acme")
-    Team.objects.create(organization=org, name="Eng", slug="eng")
+    team = Team.objects.create(organization=org, name="Eng", slug="eng")
+    from astrolift_registry.models import RegisteredApp
+
+    RegisteredApp.objects.create(organization=org, team=team, name="Hello", slug="hello-app")
     return org
 
 

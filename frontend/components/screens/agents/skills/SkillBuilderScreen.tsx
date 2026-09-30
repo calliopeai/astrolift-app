@@ -10,7 +10,7 @@ import {
   TrashIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ListSummary } from "@/components/list/ListSummary";
@@ -63,28 +63,33 @@ export function SkillBuilderScreen({
   aiAssist,
   initialErrors = {},
 }: SkillBuilderScreenProps) {
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [description, setDescription] = useState("");
-  const [content, setContent] = useState("");
+  const [name, setName] = useState(skill?.name ?? "");
+  const [slug, setSlug] = useState(skill?.slug ?? "");
+  const [description, setDescription] = useState(skill?.description ?? "");
+  const [content, setContent] = useState(skill?.content ?? "");
   const [dirty, setDirty] = useState(false);
+  const editVersion = useRef(0);
   const [errors, setErrors] = useState<SkillErrors>(initialErrors);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Seed the form when the skill loads, and again after a save.
-  useEffect(() => {
-    if (skill && !dirty) {
-      /* eslint-disable react-hooks/set-state-in-effect -- the fields copy the loaded skill until the person edits them */
+  const [sourceRecord, setSourceRecord] = useState(skill);
+  if (
+    JSON.stringify(skill) !== JSON.stringify(sourceRecord) &&
+    (!dirty || skill?.id !== sourceRecord?.id)
+  ) {
+    setSourceRecord(skill);
+    if (skill && (!dirty || skill.id !== sourceRecord?.id)) {
       setName(skill.name);
       setSlug(skill.slug);
       setDescription(skill.description);
       setContent(skill.content);
-      /* eslint-enable react-hooks/set-state-in-effect */
+      if (skill.id !== sourceRecord?.id) setDirty(false);
     }
-  }, [skill, dirty]);
+  }
 
   function edit<T>(set: (v: T) => void, field: keyof SkillErrors) {
     return (v: T) => {
+      editVersion.current += 1;
       set(v);
       setDirty(true);
       setErrors((e) => ({ ...e, [field]: undefined, form: undefined }));
@@ -93,14 +98,16 @@ export function SkillBuilderScreen({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    const version = editVersion.current;
     const found = await saveSkill({ name, slug, description, content });
     setErrors(found);
-    if (Object.values(found).every((v) => !v)) setDirty(false);
+    if (editVersion.current === version && Object.values(found).every((v) => !v)) setDirty(false);
   }
 
   async function handleAiAssist() {
     const generated = await aiAssist({ name, description, content });
     if (generated) {
+      editVersion.current += 1;
       setContent(generated);
       setDirty(true);
     }

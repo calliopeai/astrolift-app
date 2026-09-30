@@ -171,7 +171,9 @@ def test_publish_sync_from_sync_context():
 
 
 @pytest.mark.django_db
-def test_transition_publishes_lifecycle_event(org, app, env, actor, monkeypatch):
+def test_transition_publishes_lifecycle_event(
+    org, app, env, actor, monkeypatch, django_capture_on_commit_callbacks
+):
     """Every Deployment status transition publishes to the broker.
 
     We don't run an async loop here — just monkeypatch the publish
@@ -201,7 +203,9 @@ def test_transition_publishes_lifecycle_event(org, app, env, actor, monkeypatch)
     )
 
     captured.clear()  # ignore any publishes from .create()
-    deploy.transition_to(Deployment.Status.DEPLOYING)
+    with django_capture_on_commit_callbacks(execute=True):
+        deploy.transition_to(Deployment.Status.DEPLOYING)
+        assert captured == []
 
     # Two publishes per transition: org-scoped + app-scoped.
     topics = [t for t, _ in captured]

@@ -420,6 +420,7 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert token_scope_allows_permission(token, Permission.APP_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_DISPATCH)
     assert token_scope_allows_permission(token, Permission.AGENT_TASK_SEND_INPUT)
+    assert token_scope_allows_permission(token, Permission.AGENT_BOX_ATTACH)
     assert token_scope_allows_permission(token, Permission.AGENT_CREATE)
     assert token_scope_allows_permission(token, Permission.AGENT_UPDATE)
     assert token_scope_allows_permission(token, Permission.AGENT_ENV_SPEC_CREATE)
@@ -448,6 +449,18 @@ def test_cli_device_scopes_allow_agent_and_workflow_ops_without_admin():
     assert not token_scope_allows_permission(token, Permission.SECRET_READ)
     assert not token_scope_allows_permission(token, Permission.ADMIN_ELEVATE)
     assert not token_scope_allows_permission(token, Permission.API_TOKEN_CREATE)
+
+
+@pytest.mark.parametrize("scope", sorted(ALLOWED_SCOPES - {SCOPE_ADMIN}))
+def test_only_dispatch_scope_allows_box_attachment(scope):
+    token = SimpleNamespace(scopes=[scope])
+    assert token_scope_allows_permission(token, Permission.AGENT_BOX_ATTACH) == (scope == SCOPE_MCP_DISPATCH)
+
+
+def test_dispatch_scope_does_not_grant_unrelated_controls():
+    token = SimpleNamespace(scopes=[SCOPE_MCP_DISPATCH])
+    for permission in (Permission.APP_EXEC_POD, Permission.SECRET_READ, Permission.API_TOKEN_CREATE):
+        assert not token_scope_allows_permission(token, permission)
 
 
 def test_app_onboard_scope_maps_only_to_register_and_update():

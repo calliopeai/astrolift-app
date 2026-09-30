@@ -53,3 +53,12 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const RolesFailed: Story = {
+  render: () => (
+    <Card
+      {...trustedDomains}
+      rolesError={{ name: "Error", message: "Permission denied while loading this section" }}
+    />
+  ),
+};

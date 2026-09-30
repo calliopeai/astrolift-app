@@ -462,7 +462,7 @@ class K8sJobSpawner(ContainerSpawner):
             )
 
             return TaskStatus(
-                running=not succeeded and not failed,
+                running=not succeeded and not failed and getattr(ws, "ready_replicas", 0) > 0,
                 succeeded=succeeded,
                 failed=failed,
             )

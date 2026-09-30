@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import type { CursorPage } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -62,12 +64,14 @@ export function useAlertSubscriptions() {
     setAlertSubscription: MutationResult<AstroliftUserAlertSubscription>;
   }>(SET_ALERT_SUBSCRIPTION, {
     refetchQueries: [{ query: LIST_MY_ALERT_SUBSCRIPTIONS, variables: { appSlug: null } }],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
   const [clearSubscription, clearState] = useMutation<{
     clearAlertSubscription: MutationResult<AstroliftUserAlertSubscription>;
   }>(CLEAR_ALERT_SUBSCRIPTION, {
     refetchQueries: [{ query: LIST_MY_ALERT_SUBSCRIPTIONS, variables: { appSlug: null } }],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
@@ -92,28 +96,39 @@ export function useAlertSubscriptions() {
       },
     });
     if (!data?.setAlertSubscription.ok) {
-      toast.error(data?.setAlertSubscription.errors?.[0]?.message ?? "Save failed");
+      throw new Error(data?.setAlertSubscription.errors?.[0]?.message ?? "Save failed");
     }
   }
 
   /** One matrix cell: unchecking an existing subscription clears it. */
   async function onToggle(appSlug: string, alertKind: string, enabled: boolean) {
-    const sub = subMap.get(subKey(appSlug, alertKind)) ?? null;
-    if (!enabled && sub) {
-      await clearSubscription({ variables: { input: { id: sub.id } } });
-    } else {
-      await setEnabled(appSlug, alertKind, enabled);
+    try {
+      const sub = subMap.get(subKey(appSlug, alertKind)) ?? null;
+      if (!enabled && sub) {
+        const { data } = await clearSubscription({ variables: { input: { id: sub.id } } });
+        if (!data?.clearAlertSubscription.ok) {
+          throw new Error(data?.clearAlertSubscription.errors?.[0]?.message ?? "Save failed");
+        }
+      } else {
+        await setEnabled(appSlug, alertKind, enabled);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
     }
   }
 
   async function onSubscribeAll(appSlug: string) {
-    for (const kind of ALERT_KINDS) {
-      const existing = subMap.get(subKey(appSlug, kind.value));
-      if (!existing || !existing.enabled) {
-        await setEnabled(appSlug, kind.value, true);
+    try {
+      for (const kind of ALERT_KINDS) {
+        const existing = subMap.get(subKey(appSlug, kind.value));
+        if (!existing || !existing.enabled) {
+          await setEnabled(appSlug, kind.value, true);
+        }
       }
+      toast.success(`Subscribed to all on ${appSlug}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Subscribe failed");
     }
-    toast.success(`Subscribed to all on ${appSlug}`);
   }
 
   // Throws on the first failure so ConfirmDialog keeps the dialog open and

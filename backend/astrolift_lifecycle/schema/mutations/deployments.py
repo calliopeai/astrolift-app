@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import strawberry
 from django.db import transaction
 from django.utils import timezone
@@ -14,6 +16,7 @@ from astrolift_identity.operation_context import (
     deployment_operation,
     named_environment,
 )
+from astrolift_lifecycle.action_preconditions import locked_deployment, recheck_action
 from astrolift_lifecycle.approval import mint_magic_link
 from astrolift_lifecycle.models import (
     AppEnvironment,
@@ -66,6 +69,7 @@ from astrolift_lifecycle.schema.types import (
     deployment_to_type,
 )
 from astrolift_lifecycle.scopes import deployment_app_scope
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.capability_projection import check_promotion
@@ -80,6 +84,7 @@ from astrolift_workflows.inputs import (
 )
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
+from core.optimistic import check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -92,7 +97,9 @@ class DeploymentMutations:
         extras=lambda result: _start_extras(result),
     )
     @require_permission(
-        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
+        operation=named_environment(),
     )
     @tenant_scoped()
     def start_deployment(self, info: Info, input: StartDeploymentInput) -> MutationResultType[DeploymentType]:
@@ -286,7 +293,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_APPROVE_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_APPROVE_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -300,7 +307,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment", "workload")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment", "workload")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -349,7 +357,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_APPROVE_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_APPROVE_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -381,7 +389,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment", "workload")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment", "workload")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -613,7 +622,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -639,7 +648,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -696,7 +706,7 @@ class DeploymentMutations:
     )
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
@@ -719,7 +729,8 @@ class DeploymentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment")
+            live_lifecycle_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -762,12 +773,12 @@ class DeploymentMutations:
     @mutation_audit(action="deployment.rollback")
     @require_permission(
         Permission.APP_ROLLBACK,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_ROLLBACK),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
     def rollback_deployment(
-        self, info: Info, input: DeploymentByIdInput
+        self, info: Info, input: DeploymentByIdInput, if_match_version: int | None = None
     ) -> MutationResultType[DeploymentType]:
         if _deploy_pipeline_disabled():
             return gql_failure(ErrorCode.PRECONDITION.value, _DEPLOY_PIPELINE_DISABLED_MSG)
@@ -775,159 +786,181 @@ class DeploymentMutations:
         # rollback side effect (which creates a new deploy + fires a
         # workflow). Fails closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        deployment = (
-            Deployment.objects.select_related("registered_app", "app_environment")
-            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
-            .first()
-        )
-        if deployment is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "deployment not found")
-        if deployment.status != Deployment.Status.RUNNING.value:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"only running deployments are rollback targets (status={deployment.status})",
-            )
+        with locked_deployment(str(input.id)) as deployment:
+            if deployment is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "deployment not found")
+            mismatch = check_version_match(deployment, if_match_version=if_match_version, kind="Deployment")
+            if mismatch is not None:
+                return mismatch
+            recheck_action(Permission.APP_ROLLBACK, deployment, deployment.app_environment, deployment=True)
 
-        prior = (
-            Deployment.objects.filter(
-                registered_app_id=deployment.registered_app_id,
-                app_environment_id=deployment.app_environment_id,
-                status=Deployment.Status.SUPERSEDED.value,
-                deleted_at__isnull=True,
-            )
-            .order_by("-created_at")
-            .first()
-        )
-        if prior is None:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "no prior superseded deployment to roll back to",
-            )
+            if deployment.status != Deployment.Status.RUNNING.value:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"only running deployments are rollback targets (status={deployment.status})",
+                )
 
-        actor = _actor_from_request(info)
-
-        with transaction.atomic():
-            deployment.transition_to(Deployment.Status.ROLLED_BACK)
-            new_deploy = Deployment.objects.create(
-                registered_app_id=deployment.registered_app_id,
-                app_environment_id=deployment.app_environment_id,
-                workload_id=deployment.workload_id,
-                triggered_by_user_id=actor.user_id,
-                trigger_kind=Deployment.TriggerKind.ROLLBACK.value,
-                # #736 — rollback inherits the prior known-good
-                # deploy's strategy so the operator gets the same kind
-                # of rollout they last had working.
-                strategy=(prior.strategy or "rolling"),
-                status=Deployment.Status.PENDING.value,
-                image_tag=prior.image_tag,
-                image_digest=prior.image_digest,
-                config_snapshot=prior.config_snapshot,
-                approvals_required=0,
-                approvals_received=0,
-                promoted_from=prior,
+            current = (
+                live_lifecycle_rows(Deployment.objects.all())
+                .filter(
+                    app_environment_id=deployment.app_environment_id, status=str(Deployment.Status.RUNNING)
+                )
+                .order_by("-created_at", "-guid")
+                .values_list("pk", flat=True)
+                .first()
             )
-            _start_deploy_workflow_on_commit(
-                deployment=new_deploy,
-                workflow_kind="RollbackDeploymentWorkflow",
-                workflow_id=_rollback_workflow_id(str(new_deploy.guid)),
-                args=[
-                    RollbackInput(
-                        deployment_id=new_deploy.pk,
-                        actor=actor,
-                    )
-                ],
-                organization_id=tenant.organization_id if tenant else None,
-                registered_app_id=new_deploy.registered_app_id,
-                app_environment_id=new_deploy.app_environment_id,
-                actor=actor,
-            )
+            if current != deployment.pk:
+                return cast(
+                    MutationResultType[DeploymentType],
+                    gql_failure(
+                        ErrorCode.PRECONDITION.value,
+                        "only the current running deployment is a rollback target",
+                    ),
+                )
 
-        return gql_success(deployment_to_type(new_deploy))
+            prior = (
+                live_lifecycle_rows(Deployment.objects.all())
+                .select_for_update(of=("self",))
+                .filter(
+                    registered_app_id=deployment.registered_app_id,
+                    app_environment_id=deployment.app_environment_id,
+                    status=Deployment.Status.SUPERSEDED.value,
+                    created_at__lt=deployment.created_at,
+                    deleted_at__isnull=True,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            if prior is None:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "no prior superseded deployment to roll back to",
+                )
+
+            actor = _actor_from_request(info)
+
+            with transaction.atomic():
+                deployment.transition_to(Deployment.Status.ROLLED_BACK)
+                new_deploy = Deployment.objects.create(
+                    registered_app_id=deployment.registered_app_id,
+                    app_environment_id=deployment.app_environment_id,
+                    workload_id=deployment.workload_id,
+                    triggered_by_user_id=actor.user_id,
+                    trigger_kind=Deployment.TriggerKind.ROLLBACK.value,
+                    # #736 — rollback inherits the prior known-good
+                    # deploy's strategy so the operator gets the same kind
+                    # of rollout they last had working.
+                    strategy=(prior.strategy or "rolling"),
+                    status=Deployment.Status.PENDING.value,
+                    image_tag=prior.image_tag,
+                    image_digest=prior.image_digest,
+                    config_snapshot=prior.config_snapshot,
+                    approvals_required=0,
+                    approvals_received=0,
+                    promoted_from=prior,
+                )
+                _start_deploy_workflow_on_commit(
+                    deployment=new_deploy,
+                    workflow_kind="RollbackDeploymentWorkflow",
+                    workflow_id=_rollback_workflow_id(str(new_deploy.guid)),
+                    args=[
+                        RollbackInput(
+                            deployment_id=new_deploy.pk,
+                            actor=actor,
+                        )
+                    ],
+                    organization_id=tenant.organization_id if tenant else None,
+                    registered_app_id=new_deploy.registered_app_id,
+                    app_environment_id=new_deploy.app_environment_id,
+                    actor=actor,
+                )
+
+            return gql_success(deployment_to_type(new_deploy))
 
     @strawberry.field
     @mutation_audit(action="deployment.redeploy")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=deployment_app_scope("input.id"),
+        scope=deployment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=deployment_operation("input.id"),
     )
     @tenant_scoped()
-    def redeploy_app(self, info: Info, input: DeploymentByIdInput) -> MutationResultType[DeploymentType]:
+    def redeploy_app(
+        self, info: Info, input: DeploymentByIdInput, if_match_version: int | None = None
+    ) -> MutationResultType[DeploymentType]:
         # Org-scope the by-guid lookup to the caller's tenant before the
         # redeploy side effect (creates a new deploy + fires a workflow).
         # Fails closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        source = (
-            Deployment.objects.select_related("registered_app", "app_environment")
-            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
-            .first()
-        )
-        if source is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "deployment not found")
+        with locked_deployment(str(input.id)) as source:
+            if source is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "deployment not found")
+            mismatch = check_version_match(source, if_match_version=if_match_version, kind="Deployment")
+            if mismatch is not None:
+                return mismatch
+            recheck_action(Permission.APP_DEPLOY, source, source.app_environment, deployment=True)
 
-        actor = _actor_from_request(info)
-        env = source.app_environment
+            actor = _actor_from_request(info)
+            env = source.app_environment
 
-        if env.deploys_paused:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"environment {env.name!r} has deploys paused",
-            )
-
-        approvals_required = _required_approvals_for(source.registered_app, env)
-        initial_status = (
-            Deployment.Status.PENDING_APPROVAL if approvals_required > 0 else Deployment.Status.PENDING
-        )
-
-        with transaction.atomic():
-            new_deploy = Deployment.objects.create(
-                registered_app_id=source.registered_app_id,
-                app_environment_id=source.app_environment_id,
-                workload_id=source.workload_id,
-                triggered_by_user_id=actor.user_id,
-                trigger_kind=Deployment.TriggerKind.MANUAL.value,
-                # #736 — redeploy keeps the source deploy's strategy.
-                strategy=(source.strategy or "rolling"),
-                status=initial_status.value,
-                image_tag=source.image_tag,
-                image_digest=source.image_digest,
-                config_snapshot=source.config_snapshot,
-                approvals_required=approvals_required,
-                approvals_received=0,
-                promoted_from=source,
-            )
-
-            if initial_status is Deployment.Status.PENDING:
-                wf_id = _deploy_workflow_id(str(source.registered_app.guid), str(env.guid))
-                _start_deploy_workflow_on_commit(
-                    deployment=new_deploy,
-                    workflow_kind="DeployAppWorkflow",
-                    workflow_id=wf_id,
-                    args=[
-                        DeployAppInput(
-                            registered_app_id=source.registered_app_id,
-                            app_environment_id=source.app_environment_id,
-                            deployment_id=new_deploy.pk,
-                            image_tags={"app": source.image_tag},
-                            trigger_kind=Deployment.TriggerKind.MANUAL.value,
-                            actor=actor,
-                        )
-                    ],
-                    organization_id=tenant.organization_id if tenant else None,
-                    registered_app_id=source.registered_app_id,
-                    app_environment_id=source.app_environment_id,
-                    actor=actor,
+            if env.deploys_paused:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"environment {env.name!r} has deploys paused",
                 )
 
-        return gql_success(deployment_to_type(new_deploy))
+            approvals_required = _required_approvals_for(source.registered_app, env)
+            initial_status = (
+                Deployment.Status.PENDING_APPROVAL if approvals_required > 0 else Deployment.Status.PENDING
+            )
+
+            with transaction.atomic():
+                new_deploy = Deployment.objects.create(
+                    registered_app_id=source.registered_app_id,
+                    app_environment_id=source.app_environment_id,
+                    workload_id=source.workload_id,
+                    triggered_by_user_id=actor.user_id,
+                    trigger_kind=Deployment.TriggerKind.MANUAL.value,
+                    # #736 — redeploy keeps the source deploy's strategy.
+                    strategy=(source.strategy or "rolling"),
+                    status=initial_status.value,
+                    image_tag=source.image_tag,
+                    image_digest=source.image_digest,
+                    config_snapshot=source.config_snapshot,
+                    approvals_required=approvals_required,
+                    approvals_received=0,
+                    promoted_from=source,
+                )
+
+                if initial_status is Deployment.Status.PENDING:
+                    wf_id = _deploy_workflow_id(str(source.registered_app.guid), str(env.guid))
+                    _start_deploy_workflow_on_commit(
+                        deployment=new_deploy,
+                        workflow_kind="DeployAppWorkflow",
+                        workflow_id=wf_id,
+                        args=[
+                            DeployAppInput(
+                                registered_app_id=source.registered_app_id,
+                                app_environment_id=source.app_environment_id,
+                                deployment_id=new_deploy.pk,
+                                image_tags={"app": source.image_tag},
+                                trigger_kind=Deployment.TriggerKind.MANUAL.value,
+                                actor=actor,
+                            )
+                        ],
+                        organization_id=tenant.organization_id if tenant else None,
+                        registered_app_id=source.registered_app_id,
+                        app_environment_id=source.app_environment_id,
+                        actor=actor,
+                    )
+
+            return gql_success(deployment_to_type(new_deploy))
 
     @strawberry.field
     @mutation_audit(action="deployment.promote")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=app_scope_by_slug("input.app_slug"),
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_DEPLOY),
         operation=named_environment(environment_field="input.target_environment_name"),
     )
     @tenant_scoped()
@@ -955,7 +988,8 @@ class DeploymentMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, f"app {input.app_slug!r} not found")
 
         app = (
-            RegisteredApp.objects.filter(
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(
                 slug=input.app_slug,
                 organization_id=org_id,
                 deleted_at__isnull=True,
@@ -968,7 +1002,8 @@ class DeploymentMutations:
 
         def _env(name: str) -> AppEnvironment | None:
             return (
-                AppEnvironment.objects.filter(
+                live_lifecycle_rows(AppEnvironment.objects.all())
+                .filter(
                     registered_app=app,
                     name=name,
                     deleted_at__isnull=True,
@@ -1004,7 +1039,8 @@ class DeploymentMutations:
             )
 
         source = (
-            Deployment.objects.filter(
+            live_lifecycle_rows(Deployment.objects.all())
+            .filter(
                 registered_app=app,
                 app_environment=source_env,
                 status=Deployment.Status.RUNNING.value,

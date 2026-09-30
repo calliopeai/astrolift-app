@@ -433,3 +433,27 @@ export const LIST_WORKFLOW_RUNS = gql`
     }
   }
 `;
+
+export const GET_EVENT = gql`
+  ${EVENT_FIELDS}
+  query GetEvent($id: GUID!) {
+    astroliftEvent(id: $id) {
+      ...EventFields
+    }
+  }
+`;
+
+export const GET_APP_SECURITY_EVENTS = gql`
+  ${EVENT_FIELDS}
+  query GetAppSecurityEvents($appSlug: String!) {
+    signing: astroliftEvents(appSlug: $appSlug, eventType: "image.signed", limit: 1) {
+      ...EventFields
+    }
+    scan: astroliftEvents(appSlug: $appSlug, eventType: "image.scanned", limit: 1) {
+      ...EventFields
+    }
+    sbom: astroliftEvents(appSlug: $appSlug, eventType: "sbom.generated", limit: 1) {
+      ...EventFields
+    }
+  }
+`;

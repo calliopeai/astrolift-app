@@ -16,6 +16,7 @@ export function PipelineDetailClient({ pipelineId }: { pipelineId: string }) {
   return (
     <PipelineDetailScreen
       {...detail}
+      pipelineId={pipelineId}
       // key on the run id so the graph re-flows when the newest run changes
       runGraph={latest ? <RunGraph key={latest.id} runId={latest.id} /> : null}
       secrets={<PipelineSecretsTab pipelineId={pipelineId} />}

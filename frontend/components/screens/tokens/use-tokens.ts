@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { useListState } from "@/components/list/use-list-state";
 import { CREATE_API_TOKEN, REVOKE_API_TOKEN } from "@/graphql/identity/identity.mutations";
 import { LIST_API_TOKENS_PAGE } from "@/graphql/identity/identity.queries";
@@ -65,6 +67,7 @@ export function useTokens() {
     createApiToken: MutationResult<AstroliftApiTokenPlaintext>;
   }>(CREATE_API_TOKEN, {
     refetchQueries: refetchPage,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
@@ -72,30 +75,36 @@ export function useTokens() {
     revokeApiToken: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_API_TOKEN, {
     refetchQueries: refetchPage,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
   /** Resolves true once the token is minted, so the sheet resets and closes. */
   async function onCreate(input: CreateApiTokenInput): Promise<boolean> {
-    if (input.scopes.length === 0) {
-      toast.error("Pick at least one scope");
+    try {
+      if (input.scopes.length === 0) {
+        toast.error("Pick at least one scope");
+        return false;
+      }
+      const { data } = await createToken({
+        variables: {
+          input: {
+            name: input.name.trim(),
+            expiresInDays: Number(input.expiresInDays) || null,
+            scopes: input.scopes,
+          },
+        },
+      });
+      if (data?.createApiToken.ok && data.createApiToken.data) {
+        setCreatedToken(data.createApiToken.data);
+        return true;
+      }
+      toast.error(data?.createApiToken.errors?.[0]?.message ?? "Create failed");
+      return false;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Create failed");
       return false;
     }
-    const { data } = await createToken({
-      variables: {
-        input: {
-          name: input.name.trim(),
-          expiresInDays: Number(input.expiresInDays) || null,
-          scopes: input.scopes,
-        },
-      },
-    });
-    if (data?.createApiToken.ok && data.createApiToken.data) {
-      setCreatedToken(data.createApiToken.data);
-      return true;
-    }
-    toast.error(data?.createApiToken.errors?.[0]?.message ?? "Create failed");
-    return false;
   }
 
   /** Throws on failure so the confirm dialog stays open and shows the error. */

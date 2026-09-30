@@ -213,6 +213,10 @@ const GPU_CAPS = json({
 });
 
 export const DEPLOY: DeployModelScreenProps = {
+  onRetryTargets: () => {},
+  clustersLoading: false,
+  clustersError: null,
+  onRetryClusters: () => {},
   envsLoading: false,
   envsError: null,
   envs: [
@@ -291,6 +295,8 @@ export const PLUGINS: AstroliftProviderPlugin[] = [
 ];
 
 export const CLOUD_PROVIDERS: CloudProvidersPanelViewProps = {
+  error: null,
+  onRetry: () => {},
   loading: false,
   pluginCount: PLUGINS.length,
   configured: [

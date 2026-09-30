@@ -20,7 +20,10 @@ export const Loading: Story = { args: modulesLoading };
 export const Empty: Story = { args: modulesAllOff };
 
 /** A viewer without org.update: every switch is read-only. */
-export const Error: Story = { args: modulesReadOnly };
+export const ReadOnly: Story = { args: modulesReadOnly };
+export const Error: Story = {
+  args: { error: { name: "Error", message: "Permission denied while loading this section" } },
+};
 
 export const Pending: Story = { args: { ...modules, pendingKey: "chat_studio_integration" } };
 

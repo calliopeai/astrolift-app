@@ -35,6 +35,7 @@ from astrolift_lifecycle.schema.types import (
     app_domain_to_type,
 )
 from astrolift_lifecycle.scopes import custom_domain_app_scope
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
@@ -49,7 +50,9 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.add")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def add_app_domain(
         self,
@@ -62,7 +65,11 @@ class DomainMutations:
         # None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id)
+            .first()
+        )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         host = (input.hostname or "").strip().lower()
@@ -82,7 +89,11 @@ class DomainMutations:
             )
         # Idempotent re-add: an active row with the same hostname is
         # treated as success rather than a 409.
-        existing = CustomDomain.objects.filter(hostname=host, deleted_at__isnull=True).first()
+        existing = (
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(hostname=host, deleted_at__isnull=True)
+            .first()
+        )
         if existing is not None:
             if existing.registered_app_id != app.id:
                 return gql_failure(
@@ -155,7 +166,9 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.add_wildcard")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def add_wildcard_domain(
         self,
@@ -181,7 +194,11 @@ class DomainMutations:
         # None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id)
+            .first()
+        )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
 
@@ -213,7 +230,11 @@ class DomainMutations:
 
         sni_cert_ref = (input.sni_cert_ref or "").strip()
 
-        existing = CustomDomain.objects.filter(hostname=host, deleted_at__isnull=True).first()
+        existing = (
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(hostname=host, deleted_at__isnull=True)
+            .first()
+        )
         if existing is not None:
             if existing.registered_app_id != app.id:
                 return gql_failure(
@@ -294,7 +315,9 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.remove")
-    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def remove_app_domain(
         self,
@@ -306,9 +329,11 @@ class DomainMutations:
         # (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        domain = CustomDomain.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id
-        ).first()
+        domain = (
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
+            .first()
+        )
         if domain is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -324,7 +349,9 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.recheck")
-    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def recheck_domain_validation(
         self,
@@ -344,11 +371,15 @@ class DomainMutations:
         # closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        domain = CustomDomain.objects.filter(
-            guid=str(input.id),
-            deleted_at__isnull=True,
-            registered_app__organization_id=org_id,
-        ).first()
+        domain = (
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(
+                guid=str(input.id),
+                deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
+            )
+            .first()
+        )
         if domain is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -359,7 +390,9 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.upload_certificate")
-    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def upload_custom_domain_certificate(
         self,
@@ -385,11 +418,15 @@ class DomainMutations:
         # (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        domain = CustomDomain.objects.filter(
-            guid=str(input.id),
-            deleted_at__isnull=True,
-            registered_app__organization_id=org_id,
-        ).first()
+        domain = (
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(
+                guid=str(input.id),
+                deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
+            )
+            .first()
+        )
         if domain is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -433,7 +470,10 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.redirects_updated")
-    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.domain_id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=custom_domain_app_scope("input.domain_id", permission=Permission.APP_UPDATE),
+    )
     @tenant_scoped()
     def set_domain_redirects(
         self,
@@ -496,7 +536,8 @@ class DomainMutations:
         if org_id is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         domain = (
-            CustomDomain.objects.filter(
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(
                 guid=str(input.domain_id),
                 registered_app__organization_id=org_id,
                 deleted_at__isnull=True,
@@ -537,7 +578,10 @@ class DomainMutations:
 
     @strawberry.field
     @mutation_audit(action="app.domain.path_routes_updated")
-    @require_permission(Permission.APP_UPDATE, scope=custom_domain_app_scope("input.domain_id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=custom_domain_app_scope("input.domain_id", permission=Permission.APP_UPDATE),
+    )
     @tenant_scoped()
     def set_domain_path_routes(
         self,
@@ -584,7 +628,8 @@ class DomainMutations:
         if org_id is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
         domain = (
-            CustomDomain.objects.filter(
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(
                 guid=str(input.domain_id),
                 registered_app__organization_id=org_id,
                 deleted_at__isnull=True,

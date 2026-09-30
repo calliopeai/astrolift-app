@@ -32,6 +32,8 @@ export type FormDetailScreenProps = {
   error?: { message: string } | null;
   submissions: FormSubmission[];
   submissionsLoading: boolean;
+  submissionsError?: { message: string } | null;
+  onRetrySubmissions?: () => void;
   onPublish: () => Promise<boolean>;
   onArchive: () => Promise<boolean>;
 };
@@ -44,6 +46,8 @@ export function FormDetailScreen({
   error,
   submissions,
   submissionsLoading,
+  submissionsError,
+  onRetrySubmissions,
   onPublish,
   onArchive,
 }: FormDetailScreenProps) {
@@ -139,7 +143,12 @@ export function FormDetailScreen({
         <FormPreviewTab schema={(form.schema as Record<string, unknown>) ?? {}} />
       )}
       {tab === "submissions" && (
-        <FormSubmissionsTab submissions={submissions} loading={submissionsLoading} />
+        <FormSubmissionsTab
+          submissions={submissions}
+          loading={submissionsLoading}
+          error={submissionsError}
+          onRetry={onRetrySubmissions}
+        />
       )}
     </div>
   );

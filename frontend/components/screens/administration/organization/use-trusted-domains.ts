@@ -43,8 +43,10 @@ export interface TrustedDomainInput {
  */
 export function useTrustedDomains() {
   const listState = useLocalListState(TRUSTED_DOMAINS_LIST);
-  const list = useQuery<ListResp>(LIST_ORGANIZATION_ALLOWLIST_DOMAINS);
-  const rolesQ = useQuery<RolesResp>(LIST_ROLES);
+  const list = useQuery<ListResp>(LIST_ORGANIZATION_ALLOWLIST_DOMAINS, {
+    fetchPolicy: "cache-and-network",
+  });
+  const rolesQ = useQuery<RolesResp>(LIST_ROLES, { fetchPolicy: "cache-and-network" });
 
   const [addDomain, { loading: adding }] = useMutation<{
     addOrganizationAllowlistDomain: MutationResult<AstroliftOrganizationAllowlistedDomain>;
@@ -124,12 +126,17 @@ export function useTrustedDomains() {
     list: listState,
     rows: page.rows,
     totalCount: page.totalCount,
-    loading: list.loading && all.length === 0,
-    error: list.error && all.length === 0 ? { message: list.error.message } : null,
+    loading: list.loading && !list.data,
+    error: list.data ? null : list.error ? { message: list.error.message } : null,
     onRetry: () => {
       void list.refetch();
     },
     roleOptions,
+    rolesLoading: rolesQ.loading && !rolesQ.data,
+    rolesError: rolesQ.data ? null : (rolesQ.error ?? null),
+    onRetryRoles: () => {
+      void rolesQ.refetch().catch(() => {});
+    },
     adding,
     removing,
     onAdd,

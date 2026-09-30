@@ -40,3 +40,9 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const Error: Story = {
+  render: () => (
+    <NotificationsInbox {...inboxProps({ notifications: [], error: "Permission denied" })} />
+  ),
+};

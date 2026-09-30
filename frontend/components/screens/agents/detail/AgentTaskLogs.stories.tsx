@@ -22,6 +22,13 @@ const meta: Meta<typeof AgentTaskLogsView> = {
     error: null,
     onRetry: fn(),
     onDownload: fn(),
+    onLoadEarlier: fn(),
+    onRefresh: fn(),
+    hasMore: false,
+    loadingEarlier: false,
+    pageError: null,
+    liveOnly: true,
+    windowLimited: false,
   },
 };
 export default meta;
@@ -29,6 +36,12 @@ export default meta;
 type Story = StoryObj<typeof AgentTaskLogsView>;
 
 export const Full: Story = {};
+
+export const EarlierPages: Story = { args: { hasMore: true, windowLimited: true } };
+export const LoadingEarlier: Story = { args: { hasMore: true, loadingEarlier: true } };
+export const ExpiredPage: Story = {
+  args: { hasMore: true, pageError: "Task log page expired; refresh the log." },
+};
 
 export const Loading: Story = { args: { lines: [], loading: true } };
 

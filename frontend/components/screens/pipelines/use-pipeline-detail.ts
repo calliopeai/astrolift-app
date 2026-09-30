@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { PipelineDagStage } from "@/components/viz";
 
 const GET_PIPELINE_RUNS = gql`
-  query GetPipelineRuns($pipelineId: ID, $limit: Int) {
+  query GetPipelineRuns($pipelineId: String!, $limit: Int) {
     astroliftPipelineRuns(pipelineId: $pipelineId, limit: $limit) {
       id
       runNumber
@@ -89,16 +89,26 @@ export function usePipelineDetail(pipelineId: string) {
   const searchParams = useSearchParams();
 
   const rawTab = searchParams.get("tab") as PipelineDetailTab | null;
-  const tab: PipelineDetailTab = rawTab && PIPELINE_DETAIL_TABS.includes(rawTab) ? rawTab : "runs";
+  const tab: PipelineDetailTab =
+    rawTab && PIPELINE_DETAIL_TABS.includes(rawTab)
+      ? rawTab
+      : pathname.endsWith("/secrets")
+        ? "secrets"
+        : "runs";
 
   function onTabChange(next: PipelineDetailTab) {
     const params = new URLSearchParams(searchParams.toString());
     if (next === "runs") params.delete("tab");
     else params.set("tab", next);
-    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
+    router.replace(`/pipelines/${pipelineId}${params.size ? `?${params}` : ""}`, { scroll: false });
   }
 
-  const { data: runsData, loading: runsLoading } = useQuery<{
+  const {
+    data: runsData,
+    loading: runsLoading,
+    error: runsError,
+    refetch: refetchRuns,
+  } = useQuery<{
     astroliftPipelineRuns: PipelineDetailRun[];
   }>(GET_PIPELINE_RUNS, {
     variables: { pipelineId, limit: 50 },
@@ -109,7 +119,16 @@ export function usePipelineDetail(pipelineId: string) {
 
   const runs = runsData?.astroliftPipelineRuns ?? [];
 
-  return { tab, onTabChange, runs, runsLoading };
+  return {
+    tab,
+    onTabChange,
+    runs,
+    runsLoading: runsLoading && !runsData,
+    runsError: runsData ? null : (runsError ?? null),
+    onRetryRuns: () => {
+      void refetchRuns().catch(() => {});
+    },
+  };
 }
 
 /**

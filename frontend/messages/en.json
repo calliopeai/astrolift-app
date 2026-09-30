@@ -297,6 +297,7 @@
         "verificationUriHelp": "If the QR doesn't scan, type this URL on your device.",
         "toastGenerateFailed": "Couldn't generate QR — try again.",
         "toastUriCopied": "Verification URL copied",
+        "toastCopyFailed": "Could not copy. Select the text and copy manually.",
         "toastPayloadCopied": "Payload copied"
       }
     }
@@ -1451,6 +1452,7 @@
         "serviceConfig": "Config",
         "addConfig": "Add key",
         "copied": "TOML copied",
+        "copyFailed": "Could not copy. Select the text and copy manually.",
         "unsafeTitle": "Can't open this manifest in the visual editor",
         "unsafeBody": "{reason}. Edit it in the Code view — your manifest is untouched.",
         "switchToCode": "Switch to Code view",
@@ -2177,6 +2179,9 @@
       }
     },
     "deploymentDetail": {
+      "olderLog": "Load older run log",
+      "olderLogFailed": "Could not load older run log",
+      "downloadFailed": "Run log download failed",
       "title": "{app} → {env}",
       "subtitle": "Deployment {id}",
       "loadingTitle": "Deployment",

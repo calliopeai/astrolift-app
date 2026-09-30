@@ -7,9 +7,10 @@ and ProfileImageFieldUploadMutation.
 
 from __future__ import annotations
 
+from typing import List, Optional
+
 import logging
 from datetime import date
-from typing import List, Optional
 from uuid import UUID, uuid4
 
 import strawberry
@@ -26,7 +27,6 @@ from core.schema.common import GlobalIDUtils
 from core.schema.types.upload import FileUploadType as StrawberryFileUploadType
 from core.schema.types.upload import UploadType as StrawberryUploadType
 from core.systems import AwsProcessSystem
-from strawberry.relay import from_base64
 
 # Optional import - Domain-specific functionality
 try:
@@ -97,11 +97,11 @@ def _resolve_upload(info: Info, global_id: strawberry.ID) -> Upload:
     leak `core/tests/test_tenancy_guardrail_byid.py` exists to stop, and it
     flagged exactly that on the first draft of this fix.
     """
-    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='UploadType')
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type="UploadType")
     if pk is None:
         raise GraphQLError("Not an upload id.")
     scoped = StrawberryUploadType.get_queryset(Upload.objects.all(), info)
-    upload = scoped.filter(pk=pk).first()
+    upload = scoped.filter(pk=pk, organization=_upload_organization(info), deleted_at__isnull=True).first()
     if upload is None:
         # Indistinguishable from "not visible to you", deliberately: telling
         # a caller a row exists in another tenant is the same leak in words.
@@ -111,11 +111,17 @@ def _resolve_upload(info: Info, global_id: strawberry.ID) -> Upload:
 
 def _resolve_file_upload(info: Info, global_id: strawberry.ID) -> FileUpload:
     """Resolve a FileUpload global id through its own scoped queryset."""
-    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='FileUploadType')
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type="FileUploadType")
     if pk is None:
         raise GraphQLError("Not a file upload id.")
     scoped = StrawberryFileUploadType.get_queryset(FileUpload.objects.all(), info)
-    file_upload = scoped.filter(pk=pk).first()
+    file_upload = scoped.filter(
+        pk=pk,
+        created_by=info.context.user,
+        upload__organization=_upload_organization(info),
+        deleted_at__isnull=True,
+        upload__deleted_at__isnull=True,
+    ).first()
     if file_upload is None:
         raise GraphQLError("File upload not found.")
     return file_upload
@@ -129,10 +135,12 @@ def _resolve_process(info: Info, global_id: strawberry.ID) -> DataProcess:
     `created_by` keeps a caller-supplied id from addressing someone else's
     process, which is the same protection an org clause would give here.
     """
-    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type='DataProcessType')
+    pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type="DataProcessType")
     if pk is None:
         raise GraphQLError("Not a process id.")
-    mine = DataProcess.objects.filter(created_by=info.context.user)
+    mine = DataProcess.objects.filter(
+        created_by=info.context.user, organization=_upload_organization(info), deleted_at__isnull=True
+    )
     process = mine.filter(pk=pk).first()
     if process is None:
         raise GraphQLError("Process not found.")
@@ -273,21 +281,28 @@ def _assert_caller_owns_target(info, instance) -> None:
     write an FK/M2M on that row. With no ownership check any authenticated
     user could mint an upload against, and mutate, a row in another tenant.
 
-    The ownership boundary mirrors ``UploadQuerySet.with_view_permission`` /
-    ``scope_to_caller_org``: the target must resolve to the caller's active
-    organization, or be a row the caller owns / created. A target that
-    exposes no organization / owner signal is denied (fail-closed) rather
-    than left open. Superusers bypass, matching those queryset helpers.
+    Organization IDs belong to distinct model tables, so tenant targets
+    must match the legacy organization's GUID. Modern targets additionally
+    require the operator; global personal targets retain their owner check.
     """
-    user = getattr(info.context, "user", None)
-    if user is None or not getattr(user, "is_authenticated", False):
-        raise GraphQLError("Not authorized to upload to the requested target.")
-    if getattr(user, "is_superuser", False):
-        return
+    from core.permissions import is_platform_operator, require_platform_operator
+    from organization.models import Organization as LegacyOrganization
 
-    profile = getattr(user, "profile", None)
-    organization = profile.organization() if profile is not None else None
-    if organization is not None and getattr(instance, "organization_id", None) == organization.pk:
+    user = info.context.user
+    organization = _upload_organization(info)
+    target_org = instance if isinstance(instance, LegacyOrganization) else (
+        getattr(instance, "organization", None) if hasattr(instance, "organization_id") else None
+    )
+    if target_org is not None:
+        if target_org.deleted_at is not None or target_org.guid != organization.guid:
+            raise GraphQLError("Not authorized to upload to the requested target.")
+        if not isinstance(target_org, LegacyOrganization):
+            require_platform_operator(user)
+        return
+    if hasattr(instance, "organization_id"):
+        raise GraphQLError("Not authorized to upload to the requested target.")
+    if is_platform_operator(user):
+        require_platform_operator(user)
         return
 
     for owner_attr in ("user_id", "created_by_id"):
@@ -314,13 +329,14 @@ class UploadMutations:
         info: Info,
         global_id: strawberry.ID,
         mimetype: str,
-        uuid: Optional[UUID] = None,
-        metadata: Optional[strawberry.scalars.JSON] = None,
-        location: Optional[UploadLocationEnum] = None,
-        description: Optional[str] = None,
-        name: Optional[str] = None,
-        owner_container_property: Optional[str] = None,
+        uuid: UUID | None = None,
+        metadata: strawberry.scalars.JSON | None = None,
+        location: UploadLocationEnum | None = None,
+        description: str | None = None,
+        name: str | None = None,
+        owner_container_property: str | None = None,
     ) -> PreSignedUrlUploadResult:
+        _upload_organization(info)
         # Ownership gate (#1193): the target (model, pk) is resolved from a
         # caller-supplied global id and — via owner_container_property — can be
         # mutated below. Verify the caller owns the target BEFORE minting a
@@ -416,13 +432,13 @@ class UploadMutations:
         self,
         info: Info,
         mimetype: str,
-        metadata: Optional[strawberry.scalars.JSON] = None,
+        metadata: strawberry.scalars.JSON | None = None,
     ) -> DataImportUploadResult:
-        if mimetype not in FileType.labels:
-            raise GraphQLError("Invalid mimetype, must be one of {}".format(", ".join(FileType.labels)))
-
+        _upload_organization(info)
         if not HAS_DOMAIN_APP:
             raise GraphQLError("Data import feature requires domain app")
+        if mimetype not in FileType.labels:
+            raise GraphQLError("Invalid mimetype, must be one of {}".format(", ".join(FileType.labels)))
 
         employee: Employee = Employee.objects.filter(
             membership__member_id=info.context.user.id,
@@ -454,8 +470,9 @@ class UploadMutations:
         info: Info,
         entity_type: EntityTypeEnum,
         uploaded_file_id: strawberry.ID,
-        process_id: Optional[strawberry.ID] = None,
+        process_id: strawberry.ID | None = None,
     ) -> ProcessFileResult:
+        _upload_organization(info)
         # Two broken imports on these two lines, not one: the package root
         # exports no `UploadType`, and `core.schema.process` does not exist
         # as a module at all. This mutation could never run.
@@ -493,12 +510,13 @@ class UploadMutations:
         self,
         info: Info,
         mimetype: str,
-        file_upload_gid: Optional[strawberry.ID] = None,
-        metadata: Optional[strawberry.scalars.JSON] = None,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        is_public: Optional[bool] = False,
+        file_upload_gid: strawberry.ID | None = None,
+        metadata: strawberry.scalars.JSON | None = None,
+        name: str | None = None,
+        description: str | None = None,
+        is_public: bool | None = False,
     ) -> FileUploadResult:
+        _upload_organization(info)
         # `core.schema.upload` does not exist; the module is
         # `core.schema.types.upload`, whose types carry no `get_object`.
         if file_upload_gid:
@@ -536,20 +554,25 @@ class UploadMutations:
         info: Info,
         global_id: strawberry.ID,
         mimetype: str,
-        field: Optional[ProfileImageFieldEnum] = None,
-        metadata: Optional[strawberry.scalars.JSON] = None,
+        field: ProfileImageFieldEnum | None = None,
+        metadata: strawberry.scalars.JSON | None = None,
     ) -> ProfileImageFieldUploadResult:
-        model_name, pk = GlobalIDUtils.from_global_id(global_id)
-        assert model_name != Profile._meta.model_name
-        profile_original: Profile = Profile.objects.get(pk=pk)
+        from core.schema.legacy_access import require_account_access
+
+        require_account_access(info, write=True)
+        pk = GlobalIDUtils.get_pk_flexible(global_id, expected_type="ProfileType")
+        profile_original = Profile.objects.filter(
+            pk=pk, user=info.context.user, deleted_at__isnull=True
+        ).first()
         # Ownership check (#1193): a profile-image upload is a self-service edit
         # of the caller's OWN profile (avatar / signature). Without this gate any
         # authenticated user could upload to — and, for whitelisted fields,
         # overwrite the avatar/signature of — another user's profile by supplying
         # its global id. Mirrors notification_read's owner check.
-        if profile_original.user_id != info.context.user.id:
+        if profile_original is None:
             raise GraphQLError("Profile does not belong to user")
-        whitelist: List[str] = Profile.whitelist_fields()
+        _upload_organization(info)
+        whitelist: list[str] = Profile.whitelist_fields()
 
         if field.value in whitelist:
             # Skip approval request flow

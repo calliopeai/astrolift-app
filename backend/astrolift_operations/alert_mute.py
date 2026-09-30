@@ -35,6 +35,8 @@ def active_mute_for_rule(rule: AlertRule) -> AlertMute | None:
     when more than one exists so the UI shows the latest commitment
     rather than an about-to-expire holdover.
     """
+    if hasattr(rule, "_active_mutes"):
+        return next(iter(rule._active_mutes), None)
     now = timezone.now()
     return (
         AlertMute.objects.filter(

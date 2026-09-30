@@ -3,6 +3,8 @@
 import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import type { CursorPage } from "@/components/data-table";
 import { useListState } from "@/components/list/use-list-state";
 import { REVOKE_ROLE_BINDING } from "@/graphql/identity/identity.mutations";
@@ -42,7 +44,11 @@ export function useRoleHolders(role: Pick<AstroliftRole, "id">) {
 
   const [revokeBinding, { loading: revoking }] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
-  }>(REVOKE_ROLE_BINDING, { refetchQueries: REVOKE_REFETCH, awaitRefetchQueries: true });
+  }>(REVOKE_ROLE_BINDING, {
+    refetchQueries: REVOKE_REFETCH,
+    onQueryUpdated: refetchAfterMutation,
+    awaitRefetchQueries: true,
+  });
 
   /** Throws on failure, so the confirm dialog stays open and shows why. */
   async function onRevoke(b: AstroliftRoleBinding): Promise<void> {

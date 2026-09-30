@@ -11,6 +11,7 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import type * as React from "react";
+import Link from "next/link";
 
 import type { AstroliftAgentListItem, AstroliftAgentTask } from "@/graphql/agents/agents.types";
 
@@ -84,9 +85,14 @@ export function FleetOverviewScreen({
       title="Fleet overview"
       description="A live command center for agents, runtimes, dispatch, and task health."
       actions={
-        <Button variant="outline" size="sm" onClick={refresh}>
-          <RefreshCwIcon className="mr-2 size-4" /> Refresh
-        </Button>
+        <>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/fleet/map">Open fleet map</Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={refresh}>
+            <RefreshCwIcon className="mr-2 size-4" /> Refresh
+          </Button>
+        </>
       }
     >
       <Section title="At a glance" description="Current state reported by the Dispatch service.">

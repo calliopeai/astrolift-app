@@ -3,11 +3,11 @@
 Provides utilities that replace Graphene's SerializerMutation,
 RestrictedSerializerMutation, DeleteMutation, and ActivateMutation patterns.
 """
+
 from __future__ import annotations
 
 from typing import Optional
 
-import strawberry
 from graphql import GraphQLError
 from strawberry.types import Info
 
@@ -75,6 +75,9 @@ def delete_mutation(info: Info, gid: str) -> bool:
     Finds the object by global ID and calls its delete_check() method.
     Replaces Graphene's DeleteMutation base class.
     """
+    from core.permissions import require_platform_operator
+
+    require_platform_operator(info.context.user)
     type_name, pk = GlobalIDUtils.from_global_id(gid)
     instance = GlobalIDUtils.find_object_by_global_id(gid)
     instance.delete_check(info)
@@ -87,7 +90,7 @@ def activate_mutation(info: Info, gid: str, active: bool = True) -> bool:
     Finds the object by global ID and calls its activate() method.
     Replaces Graphene's ActivateMutation base class.
     """
-    type_name, pk = GlobalIDUtils.from_global_id(gid)
-    instance = GlobalIDUtils.find_object_by_global_id(gid)
-    instance.activate(info, active)
-    return True
+    from core.permissions import require_platform_operator
+
+    require_platform_operator(info.context.user)
+    raise GraphQLError("Generic activation is unavailable; use the resource's typed mutation.")

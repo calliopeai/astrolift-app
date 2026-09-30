@@ -45,9 +45,11 @@ export function useManifestPreview(slug: string) {
 
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: slug },
+    fetchPolicy: "cache-and-network",
   });
 
-  const { data, loading } = useQuery<ManifestResp>(GET_RENDERED_MANIFEST, {
+  const { data, loading, error, refetch } = useQuery<ManifestResp>(GET_RENDERED_MANIFEST, {
+    fetchPolicy: "cache-and-network",
     variables: {
       appSlug: slug,
       environmentName: envName === PREVIEW_SENTINEL ? null : envName,
@@ -61,7 +63,16 @@ export function useManifestPreview(slug: string) {
     imageTag,
     setImageTag,
     environments: (envs.data?.astroliftEnvironments ?? []).map((e) => ({ id: e.id, name: e.name })),
-    loading,
+    loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
+    environmentsLoading: envs.loading && !envs.data,
+    environmentsError: envs.data ? null : (envs.error ?? null),
+    onRetryEnvironments: () => {
+      void envs.refetch().catch(() => {});
+    },
     result: data?.astroliftRenderedManifest ?? null,
   };
 }

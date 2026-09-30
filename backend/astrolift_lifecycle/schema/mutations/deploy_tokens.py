@@ -25,6 +25,7 @@ from astrolift_lifecycle.schema.types import (
     deploy_token_to_type,
 )
 from astrolift_lifecycle.scopes import deploy_token_app_scope
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
@@ -39,7 +40,9 @@ class DeployTokenMutations:
 
     @strawberry.field
     @mutation_audit(action="app.deploy_token.create")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def create_deploy_token(
         self,
@@ -58,7 +61,11 @@ class DeployTokenMutations:
         # within an org. Fails closed (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=org_id).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=input.app_slug, organization_id=org_id)
+            .first()
+        )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
         # #449: mint with the canonical ``alft_dt_`` prefix so
@@ -99,7 +106,9 @@ class DeployTokenMutations:
     @strawberry.field
     @mutation_audit(action="app.deploy_token.rotate")
     @requires_elevation(action_label="app.deploy_token.rotate")
-    @require_permission(Permission.APP_UPDATE, scope=deploy_token_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=deploy_token_app_scope("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def rotate_deploy_token(
         self,
@@ -120,9 +129,11 @@ class DeployTokenMutations:
         # (NOT_FOUND) when org_id is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        token = DeployToken.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id
-        ).first()
+        token = (
+            live_lifecycle_rows(DeployToken.objects.all())
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
+            .first()
+        )
         if token is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
@@ -169,7 +180,9 @@ class DeployTokenMutations:
     @strawberry.field
     @mutation_audit(action="app.deploy_token.revoke")
     @requires_elevation(action_label="app.deploy_token.revoke")
-    @require_permission(Permission.APP_UPDATE, scope=deploy_token_app_scope("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=deploy_token_app_scope("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def revoke_deploy_token(
         self,
@@ -181,9 +194,11 @@ class DeployTokenMutations:
         # is None (#1183).
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        token = DeployToken.objects.filter(
-            guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id
-        ).first()
+        token = (
+            live_lifecycle_rows(DeployToken.objects.all())
+            .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
+            .first()
+        )
         if token is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,

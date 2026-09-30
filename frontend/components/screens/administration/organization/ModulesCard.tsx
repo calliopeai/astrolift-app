@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -92,6 +94,8 @@ function ModuleRow({
 export function ModulesCard({
   items,
   loading,
+  error,
+  onRetry,
   canManage,
   permsLoading,
   pendingKey,
@@ -104,7 +108,9 @@ export function ModulesCard({
       divided
     >
       <div className="flex min-w-0 flex-col">
-        {loading ? (
+        {error ? (
+          <QueryError title="Could not load modules" error={error} onRetry={onRetry} />
+        ) : loading ? (
           <div className="flex flex-col gap-3 py-2">
             {items.map((m) => (
               <div key={m.key} className="flex min-w-0 items-center gap-4">

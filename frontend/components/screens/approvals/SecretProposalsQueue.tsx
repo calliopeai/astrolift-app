@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { KeyIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -23,7 +25,12 @@ export type SecretProposalsQueueProps = ReturnType<typeof useSecretProposalsQueu
  * separate. Clicking a row routes to the proposal-detail page where
  * the operator approves / rejects / inspects the diff.
  */
-export function SecretProposalsQueue({ proposals, loading }: SecretProposalsQueueProps) {
+export function SecretProposalsQueue({
+  proposals,
+  loading,
+  error,
+  onRetry,
+}: SecretProposalsQueueProps) {
   const t = useTranslations("lists.secretProposalsQueue");
   const fmt = useFormatters();
 
@@ -35,6 +42,13 @@ export function SecretProposalsQueue({ proposals, loading }: SecretProposalsQueu
     );
   }
 
+  if (error) {
+    return (
+      <Section title={t("title")} className="mt-8">
+        <QueryError title="Could not load secret proposals" error={error} onRetry={onRetry} />
+      </Section>
+    );
+  }
   if (proposals.length === 0) {
     return (
       <Section title={t("title")} className="mt-8">

@@ -61,10 +61,6 @@ export const Full: Story = {};
 
 export const Loading: Story = { args: { loading: true, services: [] } };
 
-/**
- * No bound services: the card hides entirely, so this renders nothing. The
- * card has no error state either; a failed load renders this same nothing.
- */
 export const Empty: Story = { args: { services: [] } };
 
 export const LongStrings: Story = { args: { services: SERVICES_LONG } };
@@ -177,4 +173,8 @@ export const QueueDepthNoResult: StoryObj = {
       onRefresh={REFRESH}
     />
   ),
+};
+
+export const QueryFailed: Story = {
+  args: { services: [], error: "Permission denied while loading services", onRetry: () => {} },
 };

@@ -147,8 +147,9 @@ def test_a_superuser_short_circuits_the_way_the_resolver_does(world):
 
 def test_an_inactive_user_is_denied_before_anything_else(world):
     ghost = _user("ghost-1730", is_active=False, is_superuser=True)
+    operator = _user("ghost-inspector-1730", is_superuser=True)
 
-    result = _diagnose(ghost, ghost, "app.deploy", world.org.id)
+    result = _diagnose(operator, ghost, "app.deploy", world.org.id)
 
     assert result.granted is False
     assert _checks(result)["is_active"].result is False

@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from config.features import Feature, is_enabled
+from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
 from core.services.client_cove_support import ClientCoveSupportClient
 from core.tenancy import get_current_tenant
 
@@ -16,9 +17,29 @@ from core.tenancy import get_current_tenant
 def support_tickets(request):
     if not is_enabled(Feature.SUPPORT) or not getattr(request.user, "is_authenticated", False):
         return JsonResponse({"error": "support unavailable"}, status=404)
-    organization = get_current_tenant()
-    if organization is None:
+    from astrolift_identity.api_tokens import SCOPE_ADMIN, get_current_api_token, has_scope
+    from astrolift_identity.models import Organization
+
+    tenant = get_current_tenant()
+    organization = Organization.objects.filter(pk=tenant.organization_id).first() if tenant else None
+    token = get_current_api_token()
+    if (
+        not request.user.is_active
+        or organization is None
+        or (
+            token is not None
+            and (
+                token.organization_id != organization.pk
+                or token.team_id is not None
+                or (request.method == "POST" and not has_scope(token, SCOPE_ADMIN))
+            )
+        )
+    ):
         return JsonResponse({"error": "organization unavailable"}, status=403)
+    try:
+        check_permission(Permission.ORG_READ, scope=PermissionScope(kind=ScopeKind.ORG, id=organization.pk))
+    except PermissionDenied:
+        return JsonResponse({"error": "support access denied"}, status=403)
     try:
         client = ClientCoveSupportClient(user=request.user, organization=organization)
         if request.method == "GET":

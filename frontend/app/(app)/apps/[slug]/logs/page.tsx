@@ -1,7 +1,7 @@
 import { activeSection, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 import { AppTabSections } from "@/components/screens/apps/detail/AppTabSections";
 import { metricsPanel } from "@/components/screens/apps/tools/metrics-panels";
-import { podEventsVariables } from "@/components/screens/apps/tools/use-app-observability";
+import { podEventsVariables } from "@/components/screens/apps/tools/observability-query-variables";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";

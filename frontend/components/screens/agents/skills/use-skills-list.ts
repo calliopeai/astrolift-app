@@ -73,7 +73,7 @@ export function useSkillsList() {
     loading: (loading || orgLoading || !orgId) && !shown && !error,
     // Rows on screen answer the previous list state while the next loads.
     stale: loading && !data && Boolean(shown),
-    error: error ? { message: error.message } : null,
+    error: shown ? null : error ? { message: error.message } : null,
     onRetry: () => {
       void refetch();
     },

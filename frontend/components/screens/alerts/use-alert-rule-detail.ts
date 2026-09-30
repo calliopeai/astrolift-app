@@ -1,33 +1,33 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import * as React from "react";
 
-import { LIST_ALERT_RULES } from "@/graphql/operations/alerts.queries";
+import { GET_ALERT_RULE } from "@/graphql/operations/alerts.queries";
 
 import type { AlertRule } from "./use-alerts";
 
 export type AlertRuleDetailRow = AlertRule & { managedServiceId?: string | null };
 
 interface Resp {
-  astroliftAlertRules: AlertRuleDetailRow[];
+  astroliftAlertRule: AlertRuleDetailRow | null;
 }
 
-/**
- * The data half of AlertRuleDetail (#1106). Reuses the global
- * LIST_ALERT_RULES window (no singular query exists) — a cache hit when
- * navigated from /alerts.
- */
+/** Direct owner-filtered detail read, independent of the list window. */
 export function useAlertRuleDetail(id: string) {
-  const { data, loading } = useQuery<Resp>(LIST_ALERT_RULES, {
-    variables: { activeOnly: false },
+  const { data, loading, error, refetch } = useQuery<Resp>(GET_ALERT_RULE, {
+    variables: { id },
     fetchPolicy: "cache-and-network",
   });
 
-  const rule = React.useMemo(
-    () => (data?.astroliftAlertRules ?? []).find((row) => row.id === id) ?? null,
-    [data, id]
-  );
+  const rule = data?.astroliftAlertRule ?? null;
 
-  return { id, rule, loading };
+  return {
+    id,
+    rule,
+    loading: loading && !data,
+    error: data ? null : error?.message,
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
+  };
 }

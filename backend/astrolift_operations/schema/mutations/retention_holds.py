@@ -32,6 +32,7 @@ from astrolift_operations.schema.types import (
     ObservabilityRetentionHoldType,
     observability_retention_hold_to_type,
 )
+from astrolift_operations.scopes import org_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -42,7 +43,7 @@ from core.tenancy import get_current_tenant
 class RetentionHoldMutations:
     @strawberry.field
     @mutation_audit(action="observability.retention_hold.place")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=org_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def place_observability_retention_hold(
         self,
@@ -136,7 +137,7 @@ class RetentionHoldMutations:
 
     @strawberry.field
     @mutation_audit(action="observability.retention_hold.release")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=org_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def release_observability_retention_hold(
         self,

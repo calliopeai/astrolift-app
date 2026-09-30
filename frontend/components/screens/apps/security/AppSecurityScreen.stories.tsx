@@ -73,3 +73,12 @@ export const NotFound: Story = {
 };
 
 export const LongStrings: Story = { args: { ...SECURITY_LONG } };
+
+export const Error: Story = {
+  args: {
+    latestSigning: null,
+    latestScan: null,
+    latestSbom: null,
+    eventsError: "Permission denied",
+  },
+};

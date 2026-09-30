@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useRef } from "react";
 import { toast } from "sonner";
 
 import { useLocalListState } from "@/components/list/use-list-state";
@@ -30,53 +31,87 @@ interface MutationResult<T> {
  */
 export function usePipelineSecrets(pipelineId: string) {
   const list = useLocalListState(PIPELINE_SECRETS_LIST);
-  const { data, loading } = useQuery<SecretsResp>(LIST_PIPELINE_SECRETS, {
+  const {
+    data,
+    loading,
+    error,
+    refetch: refetchSecrets,
+  } = useQuery<SecretsResp>(LIST_PIPELINE_SECRETS, {
     variables: { pipelineId },
     fetchPolicy: "cache-and-network",
   });
 
-  const refetch = [{ query: LIST_PIPELINE_SECRETS, variables: { pipelineId } }];
-
   const [setSecret] = useMutation<{
     setPipelineSecret: MutationResult<{ pipelineId: string; name: string }>;
-  }>(SET_PIPELINE_SECRET, { refetchQueries: refetch, awaitRefetchQueries: true });
+  }>(SET_PIPELINE_SECRET);
 
   const [deleteSecretMutation, deleteState] = useMutation<{
     deletePipelineSecret: MutationResult<{ pipelineId: string; name: string }>;
-  }>(DELETE_PIPELINE_SECRET, { refetchQueries: refetch, awaitRefetchQueries: true });
+  }>(DELETE_PIPELINE_SECRET);
+  const saving = useRef(false);
+  const deleting = useRef(false);
 
   const secrets = data?.astroliftPipelineSecrets ?? [];
 
+  async function refreshAfterCommit() {
+    try {
+      await refetchSecrets();
+    } catch {
+      toast.warning("Secret changed, but the list could not refresh. Retry loading the list.");
+    }
+  }
+
   /** True when the secret was saved, so the add form can close. */
   async function saveSecret(name: string, value: string): Promise<boolean> {
-    const { data: resp } = await setSecret({
-      variables: { input: { pipelineId, name, value } },
-    });
-    if (resp?.setPipelineSecret.ok) {
-      toast.success(`Secret "${name}" saved`);
-      return true;
+    if (saving.current) return false;
+    saving.current = true;
+    try {
+      const { data: resp } = await setSecret({
+        variables: { input: { pipelineId, name, value } },
+      });
+      if (resp?.setPipelineSecret.ok) {
+        toast.success(`Secret "${name}" saved`);
+        await refreshAfterCommit();
+        return true;
+      }
+      const err = resp?.setPipelineSecret.errors[0];
+      toast.error(err?.message ?? "Failed to save secret");
+      return false;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save secret");
+      return false;
+    } finally {
+      saving.current = false;
     }
-    const err = resp?.setPipelineSecret.errors[0];
-    toast.error(err?.message ?? "Failed to save secret");
-    return false;
   }
 
   /** Throws on failure so the confirm dialog shows the error inline. */
   async function deleteSecret(secret: PipelineSecret) {
-    const { data: resp } = await deleteSecretMutation({
-      variables: { input: { pipelineId, name: secret.name } },
-    });
-    if (resp?.deletePipelineSecret.ok) {
-      toast.success(`Deleted "${secret.name}"`);
-    } else {
-      throw new Error(resp?.deletePipelineSecret.errors[0]?.message ?? "Delete failed");
+    if (deleting.current) throw new Error("A secret deletion is already in progress");
+    deleting.current = true;
+    try {
+      const { data: resp } = await deleteSecretMutation({
+        variables: { input: { pipelineId, name: secret.name } },
+      });
+      if (resp?.deletePipelineSecret.ok) {
+        toast.success(`Deleted "${secret.name}"`);
+        await refreshAfterCommit();
+      } else {
+        throw new Error(resp?.deletePipelineSecret.errors[0]?.message ?? "Delete failed");
+      }
+    } finally {
+      deleting.current = false;
     }
   }
 
   return {
     list,
     secrets,
-    loading,
+    loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetchSecrets().catch(() => {});
+    },
     deleting: deleteState.loading,
     saveSecret,
     deleteSecret,

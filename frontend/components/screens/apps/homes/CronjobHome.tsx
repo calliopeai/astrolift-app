@@ -4,6 +4,8 @@ import cronstrue from "cronstrue";
 import { HistoryIcon, RepeatIcon, TimerIcon } from "lucide-react";
 import * as React from "react";
 
+import { useBrowserReady } from "@/hooks/use-browser-ready";
+
 import { Feed } from "@/components/feed/Feed";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
@@ -93,16 +95,16 @@ export function CronjobHomeScreen({
   onLoadMore,
 }: CronjobHomeScreenProps) {
   const schedule = workload.schedule || "";
-  const [now, setNow] = React.useState<number | null>(null);
+  const browserReady = useBrowserReady();
+  const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
-    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
   const next = React.useMemo(
-    () => (schedule && now != null ? nextCronRun(schedule, new Date(now)) : null),
-    [schedule, now]
+    () => (schedule && browserReady ? nextCronRun(schedule, new Date(now)) : null),
+    [schedule, now, browserReady]
   );
   const latest = runs[0];
 

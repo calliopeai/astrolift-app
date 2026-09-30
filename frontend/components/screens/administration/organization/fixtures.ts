@@ -146,6 +146,9 @@ const domain = (
 export type TrustedDomainsFixture = Omit<TrustedDomainsCardProps, "list">;
 
 export const trustedDomains: TrustedDomainsFixture = {
+  rolesLoading: false,
+  rolesError: null,
+  onRetryRoles: () => {},
   rows: [
     domain("d1", "acme.example", "team_viewer", false),
     domain("d2", "contractors.acme.example", null, true),
@@ -219,6 +222,8 @@ const MODULE_ITEMS: ModuleItem[] = [
 ];
 
 export const modules: ModulesCardProps = {
+  error: null,
+  onRetry: () => {},
   items: MODULE_ITEMS,
   loading: false,
   canManage: true,

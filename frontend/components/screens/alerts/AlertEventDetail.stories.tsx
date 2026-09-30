@@ -27,14 +27,17 @@ export const Loading: Story = {
   render: () => <AlertEventDetail {...EVENT_DETAIL} event={null} loading />,
 };
 
-/**
- * No such event. This is also the closest real state to "error": the screen
- * has no error view, a failed LIST_ALERT_EVENTS lands here.
- */
+/** A successful direct read returned no visible record. */
 export const NotFound: Story = {
   render: () => <AlertEventDetail {...EVENT_DETAIL} event={null} />,
 };
 
 export const LongStrings: Story = {
   render: () => <AlertEventDetail id={LONG_EVENT.id} event={LONG_EVENT} loading={false} />,
+};
+
+export const Error: Story = {
+  render: () => (
+    <AlertEventDetail {...EVENT_DETAIL} event={null} error="Permission denied" onRetry={() => {}} />
+  ),
 };

@@ -182,10 +182,7 @@ function Planet({ planet, uid }: { planet: OrbitPlanet; uid: string }) {
         fontSize={12}
         fontWeight={600}
       >
-        <title>
-          {cluster.name}
-          {cluster.region ? ` (${cluster.region})` : ""}
-        </title>
+        <title>{`${cluster.name}${cluster.region ? ` (${cluster.region})` : ""}`}</title>
         {truncate(cluster.name, 26)}
       </text>
       <text

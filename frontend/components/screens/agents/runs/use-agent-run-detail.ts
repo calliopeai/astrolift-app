@@ -100,7 +100,7 @@ export function useAgentRunDetail(taskId: string) {
     taskId,
     task,
     loading,
-    error: error ? error.message : null,
+    error: task ? null : (error?.message ?? null),
     onRetry: () => {
       void refetchTask();
     },

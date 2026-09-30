@@ -27,6 +27,8 @@ export type NotificationsInboxProps = Omit<ReturnType<typeof useNotifications>, 
 export function NotificationsInbox({
   notifications,
   loading,
+  error,
+  onRetry,
   marking,
   markingAll,
   onMarkRead,
@@ -58,6 +60,8 @@ export function NotificationsInbox({
         label="Notifications"
         items={notifications}
         loading={loading && notifications.length === 0}
+        error={error}
+        onRetry={onRetry}
         {...more}
         keyOf={(n) => n.id}
         groupBy={{ day: (n) => n.createdAt }}

@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 
 import type { AstroliftRegisteredAppMutationResult } from "@/graphql/__generated__/operations";
-import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
+import { GET_APP_SECURITY_EVENTS } from "@/graphql/operations/operations.queries";
 import { UPDATE_SECURITY_POLICY } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
@@ -22,7 +22,9 @@ interface AppResp {
 }
 
 interface EventsResp {
-  astroliftEvents: AstroliftEvent[];
+  signing: AstroliftEvent[];
+  scan: AstroliftEvent[];
+  sbom: AstroliftEvent[];
 }
 
 export interface AstroliftEvent {
@@ -75,16 +77,22 @@ export interface ScanPayload {
  */
 export function useAppSecurity(slug: string) {
   const app = useQuery<AppResp>(GET_APP, { variables: { slug } });
-  // Org-wide events query — we filter client-side by registeredAppId
-  // until astroliftEvents grows an appSlug arg per #313.
-  const events = useQuery<EventsResp>(LIST_EVENTS, {
-    variables: { limit: 100 },
+  const events = useQuery<EventsResp>(GET_APP_SECURITY_EVENTS, {
+    variables: { appSlug: slug },
     fetchPolicy: "cache-and-network",
     pollInterval: 60000,
+    skip: !app.data?.astroliftApp,
   });
 
   const a = app.data?.astroliftApp ?? null;
-  const allEvents = events.data?.astroliftEvents ?? [];
+  const allEvents = React.useMemo(
+    () => [
+      ...(events.data?.signing ?? []),
+      ...(events.data?.scan ?? []),
+      ...(events.data?.sbom ?? []),
+    ],
+    [events.data]
+  );
 
   const appEvents = React.useMemo(() => {
     if (!a) return [];
@@ -126,7 +134,15 @@ export function useAppSecurity(slug: string) {
   return {
     slug,
     app: a,
-    loading: app.loading,
+    loading: app.loading && !app.data,
+    error: app.data ? null : (app.error?.message ?? null),
+    onRetry: () => {
+      void app.refetch().catch(() => {});
+    },
+    eventsError: events.data ? null : (events.error?.message ?? null),
+    onRetryEvents: () => {
+      void events.refetch().catch(() => {});
+    },
     eventsLoading: events.loading && !events.data,
     latestSigning,
     latestSbom,

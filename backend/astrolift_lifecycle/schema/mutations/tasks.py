@@ -20,6 +20,7 @@ from astrolift_lifecycle.schema.types import (
     TaskRunPayloadType,
     task_run_to_payload,
 )
+from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
 from core.decorators import tenant_scoped
@@ -38,7 +39,9 @@ class TaskMutations:
     @strawberry.field
     @mutation_audit(action="task.run")
     @require_permission(
-        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_UPDATE),
+        operation=named_environment(),
     )
     @tenant_scoped()
     def run_task(
@@ -75,7 +78,8 @@ class TaskMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -101,11 +105,15 @@ class TaskMutations:
 
         env = None
         if (input.environment_name or "").strip():
-            env = AppEnvironment.objects.filter(
-                registered_app=app,
-                name=input.environment_name,
-                deleted_at__isnull=True,
-            ).first()
+            env = (
+                live_lifecycle_rows(AppEnvironment.objects.all())
+                .filter(
+                    registered_app=app,
+                    name=input.environment_name,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
             if env is None:
                 return gql_failure(
                     ErrorCode.NOT_FOUND.value,

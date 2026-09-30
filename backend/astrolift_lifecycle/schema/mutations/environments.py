@@ -20,6 +20,7 @@ from astrolift_lifecycle.schema.types import (
     app_env_to_type,
 )
 from astrolift_lifecycle.scopes import environment_app_scope
+from astrolift_lifecycle.visibility import live_lifecycle_rows
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -32,7 +33,7 @@ class EnvironmentMutations:
     @mutation_audit(action="environment.pause")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=environment_app_scope("input.id"),
+        scope=environment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=environment_operation("input.id"),
     )
     @tenant_scoped()
@@ -52,7 +53,8 @@ class EnvironmentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         env = (
-            AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related("registered_app", "tenant_cluster", "managed_domain")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -67,7 +69,7 @@ class EnvironmentMutations:
     @mutation_audit(action="environment.resume")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=environment_app_scope("input.id"),
+        scope=environment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=environment_operation("input.id"),
     )
     @tenant_scoped()
@@ -82,7 +84,8 @@ class EnvironmentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         env = (
-            AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related("registered_app", "tenant_cluster", "managed_domain")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -97,7 +100,7 @@ class EnvironmentMutations:
     @mutation_audit(action="environment.pause_ingress")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=environment_app_scope("input.id"),
+        scope=environment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=environment_operation("input.id"),
     )
     @tenant_scoped()
@@ -121,7 +124,8 @@ class EnvironmentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         env = (
-            AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related("registered_app", "tenant_cluster", "managed_domain")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )
@@ -136,7 +140,7 @@ class EnvironmentMutations:
     @mutation_audit(action="environment.resume_ingress")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=environment_app_scope("input.id"),
+        scope=environment_app_scope("input.id", permission=Permission.APP_DEPLOY),
         operation=environment_operation("input.id"),
     )
     @tenant_scoped()
@@ -151,7 +155,8 @@ class EnvironmentMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         env = (
-            AppEnvironment.objects.select_related("registered_app", "tenant_cluster", "managed_domain")
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related("registered_app", "tenant_cluster", "managed_domain")
             .filter(guid=str(input.id), deleted_at__isnull=True, registered_app__organization_id=org_id)
             .first()
         )

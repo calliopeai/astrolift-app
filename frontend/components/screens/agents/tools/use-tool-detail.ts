@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { hasErrors, splitErrors } from "@/components/screens/agents/skills/catalog";
 import {
   TOOL_FIELDS,
@@ -73,10 +75,12 @@ export function useToolDetail(id: string) {
   const tool = data?.toolDef ?? null;
 
   const [updateToolDef, { loading: saving }] = useMutation<UpdateToolDefData>(UPDATE_TOOL_DEF, {
+    onQueryUpdated: refetchAfterMutation,
     refetchQueries: ["ListOrgToolDefs", "ListToolDefs", "ToolDefsListPage", "GetToolDef"],
   });
 
   const [deleteToolDef, { loading: deleting }] = useMutation<DeleteToolDefData>(DELETE_TOOL_DEF, {
+    onQueryUpdated: refetchAfterMutation,
     refetchQueries: ["ListOrgToolDefs", "ListToolDefs", "ToolDefsListPage"],
   });
 

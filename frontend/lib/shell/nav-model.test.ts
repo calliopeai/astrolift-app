@@ -25,11 +25,14 @@ describe("visibleNav", () => {
     const agents = NAV.find((a) => a.key === "agents");
     expect(agents?.groups.flatMap((g) => g.functions.map((f) => f.label))).toEqual([
       "Agents",
+      "Fleet",
+      "Approvals",
       "Workflows",
       "Runs",
       "Functions",
       "Skills",
       "Tools",
+      "Environment specs",
       "Models",
       "Workloads",
     ]);

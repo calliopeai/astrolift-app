@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import os
 import re
 import time
@@ -183,7 +184,9 @@ def _sign_request_sigv4(req: urllib.request.Request, *, host: str) -> None:
 # --- HTTP -------------------------------------------------------------
 
 
-def _request_json(url: str, *, timeout: float, auth: str | None = None) -> Mapping:
+def _request_json(
+    url: str, *, timeout: float, auth: str | None = None, max_response_bytes: int | None = None
+) -> Mapping:
     """Issue a GET, parse the body as JSON, return the decoded payload.
 
     HTTP error codes map to PrometheusQueryError (4xx) or
@@ -206,11 +209,13 @@ def _request_json(url: str, *, timeout: float, auth: str | None = None) -> Mappi
         _sign_request_sigv4(req, host=host)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read()
+            raw = resp.read(max_response_bytes + 1) if max_response_bytes is not None else resp.read()
+            if max_response_bytes is not None and len(raw) > max_response_bytes:
+                raise PrometheusQueryError("prometheus response exceeds the byte limit")
     except urllib.error.HTTPError as exc:
         body = ""
         try:
-            body = exc.read().decode("utf-8", "replace")[:200]
+            body = exc.read(200).decode("utf-8", "replace")[:200]
         except Exception:
             pass
         if 500 <= exc.code < 600:
@@ -218,6 +223,8 @@ def _request_json(url: str, *, timeout: float, auth: str | None = None) -> Mappi
         raise PrometheusQueryError(f"prometheus returned {exc.code}: {body}") from exc
     except urllib.error.URLError as exc:
         raise PrometheusUnavailable(f"couldn't reach prometheus: {exc.reason}") from exc
+    except OSError as exc:
+        raise PrometheusUnavailable("prometheus transport failed") from exc
 
     try:
         payload = json.loads(raw)
@@ -361,6 +368,10 @@ def query_range(
     step_seconds: int,
     timeout: float = 5.0,
     auth: str | None = None,
+    strict: bool = False,
+    max_series: int | None = None,
+    max_samples: int | None = None,
+    max_response_bytes: int | None = None,
 ) -> tuple[RangeQueryResult, ...]:
     """``GET /api/v1/query_range`` over (start, end, step).
 
@@ -381,34 +392,70 @@ def query_range(
         }
     )
     url = f"{base}/api/v1/query_range?{qs}"
-    cache_key = ("range", base, query, start_unix, end_unix, step_seconds)
+    cache_key = (
+        "range",
+        base,
+        query,
+        start_unix,
+        end_unix,
+        step_seconds,
+        strict,
+        max_series,
+        max_samples,
+        max_response_bytes,
+        auth,
+    )
     cached = _cache.get(cache_key)
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    payload = _request_json(url, timeout=timeout, auth=auth)
+    payload = _request_json(url, timeout=timeout, auth=auth, max_response_bytes=max_response_bytes)
     data = payload.get("data") or {}
+    if not isinstance(data, Mapping):
+        raise PrometheusQueryError("matrix data is not an object")
     result_type = data.get("resultType")
     if result_type != "matrix":
         raise PrometheusQueryError(f"expected matrix resultType, got {result_type!r}")
-    result = data.get("result") or []
+    result = data.get("result") if strict else data.get("result") or []
     if not isinstance(result, list):
         raise PrometheusQueryError("matrix result is not a list")
 
+    if max_series is not None and len(result) > max_series:
+        raise PrometheusQueryError("matrix exceeds the series limit")
     out: list[RangeQueryResult] = []
     for row in result:
-        labels = row.get("metric") or {}
-        values = row.get("values") or []
+        if not isinstance(row, Mapping):
+            raise PrometheusQueryError("matrix row is not an object")
+        labels = row.get("metric") if strict else row.get("metric") or {}
+        values = row.get("values") if strict else row.get("values") or []
         if not isinstance(values, list):
             raise PrometheusQueryError("matrix values is not a list")
+        if not isinstance(labels, Mapping) or any(
+            not isinstance(k, str) or not isinstance(v, str) for k, v in labels.items()
+        ):
+            raise PrometheusQueryError("matrix labels are malformed")
+        if max_samples is not None and len(values) > max_samples:
+            raise PrometheusQueryError("matrix exceeds the sample limit")
         parsed: list[tuple[float, float]] = []
         for entry in values:
             if not isinstance(entry, list) or len(entry) != 2:
                 raise PrometheusQueryError("matrix value entry malformed")
             ts, v = entry
             try:
-                parsed.append((float(ts), float(v)))
+                timestamp, value = float(ts), float(v)
+                if strict and (
+                    not math.isfinite(timestamp)
+                    or not math.isfinite(value)
+                    or value < 0
+                    or not start_unix <= timestamp <= end_unix
+                ):
+                    raise PrometheusQueryError("matrix contains invalid rate readings")
+                if strict and parsed and timestamp <= parsed[-1][0]:
+                    raise PrometheusQueryError("matrix timestamps are not increasing")
+                parsed.append((timestamp, value))
             except (TypeError, ValueError) as exc:
+                if strict:
+                    raise PrometheusQueryError("matrix value parse failed") from exc
                 # Prometheus emits "NaN" as a string sometimes; treat
                 # as 0 rather than failing the whole query.
                 try:

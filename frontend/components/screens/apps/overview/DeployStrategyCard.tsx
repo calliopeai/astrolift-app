@@ -103,13 +103,15 @@ export function DeployStrategyCardView({
         </Can>
       </CardContent>
 
-      <EditStrategySheet
-        app={app}
-        open={open}
-        onOpenChange={setOpen}
-        saving={saving}
-        onSave={onSave}
-      />
+      {open && (
+        <EditStrategySheet
+          app={app}
+          open={open}
+          onOpenChange={setOpen}
+          saving={saving}
+          onSave={onSave}
+        />
+      )}
     </Card>
   );
 }

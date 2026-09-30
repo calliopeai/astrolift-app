@@ -33,7 +33,11 @@ export function useDispatchAgent(
       if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
       toast.success(`Dispatched ${agent.name}`);
       const id = result.data?.id ?? "";
-      await onDispatched?.(id);
+      try {
+        await onDispatched?.(id);
+      } catch {
+        toast.warning("Run started, but the view could not refresh. Refresh to see the run.");
+      }
       return id;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

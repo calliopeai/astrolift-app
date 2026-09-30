@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { GET_ROLE } from "@/graphql/access/access.queries";
 import { UPDATE_ROLE } from "@/graphql/identity/identity.mutations";
 import { LIST_ROLES } from "@/graphql/identity/identity.queries";
@@ -46,7 +48,11 @@ export function useRoleDetail(id: string) {
 
   const [update, { loading: saving }] = useMutation<{
     updateRole: MutationResult<AstroliftRole>;
-  }>(UPDATE_ROLE, { refetchQueries: ROLE_REFETCH, awaitRefetchQueries: true });
+  }>(UPDATE_ROLE, {
+    refetchQueries: ROLE_REFETCH,
+    onQueryUpdated: refetchAfterMutation,
+    awaitRefetchQueries: true,
+  });
 
   /** Null when saved, or the server's reason, which the tab shows in place. */
   async function save(input: {
@@ -54,22 +60,26 @@ export function useRoleDetail(id: string) {
     name?: string;
     description?: string;
   }): Promise<string | null> {
-    if (!role) return "This role is no longer there.";
-    const { data: res } = await update({
-      variables: {
-        input: {
-          id: role.id,
-          ...input,
-          name: input.name?.trim(),
-          description: input.description?.trim(),
+    try {
+      if (!role) return "This role is no longer there.";
+      const { data: res } = await update({
+        variables: {
+          input: {
+            id: role.id,
+            ...input,
+            name: input.name?.trim(),
+            description: input.description?.trim(),
+          },
         },
-      },
-    });
-    if (res?.updateRole.ok) {
-      toast.success(`Role “${input.name?.trim() || role.name}” saved`);
-      return null;
+      });
+      if (res?.updateRole.ok) {
+        toast.success(`Role “${input.name?.trim() || role.name}” saved`);
+        return null;
+      }
+      return res?.updateRole.errors?.[0]?.message ?? "Save failed";
+    } catch (err) {
+      return err instanceof Error ? err.message : "Save failed";
     }
-    return res?.updateRole.errors?.[0]?.message ?? "Save failed";
   }
 
   return {

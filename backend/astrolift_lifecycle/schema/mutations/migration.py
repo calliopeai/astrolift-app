@@ -29,6 +29,7 @@ from astrolift_lifecycle.schema.types import (
     app_env_to_type,
 )
 from astrolift_lifecycle.scopes import environment_app_scope
+from astrolift_lifecycle.visibility import live_lifecycle_rows
 from astrolift_workflows.client import (
     start_workflow,
 )
@@ -50,7 +51,7 @@ class MigrationMutations:
     @mutation_audit(action="app.migrate_to_cluster")
     @require_permission(
         Permission.APP_DEPLOY,
-        scope=environment_app_scope("input.app_environment_id"),
+        scope=environment_app_scope("input.app_environment_id", permission=Permission.APP_DEPLOY),
         operation=migration_operation,
     )
     @tenant_scoped()
@@ -79,7 +80,8 @@ class MigrationMutations:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         env = (
-            AppEnvironment.objects.select_related("registered_app", "tenant_cluster")
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related("registered_app", "tenant_cluster")
             .filter(
                 guid=str(input.app_environment_id),
                 deleted_at__isnull=True,
@@ -98,6 +100,7 @@ class MigrationMutations:
             Q(organization_id=org_id) | Q(organization_id__isnull=True),
             guid=str(input.target_cluster_id),
             deleted_at__isnull=True,
+            is_active=True,
         ).first()
         if target is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "target cluster not found")
@@ -115,7 +118,8 @@ class MigrationMutations:
         # of truth for the migration apply — that's the image + config
         # the source cluster is currently running.
         latest = (
-            Deployment.objects.filter(
+            live_lifecycle_rows(Deployment.objects.all())
+            .filter(
                 registered_app=env.registered_app,
                 app_environment=env,
                 deleted_at__isnull=True,

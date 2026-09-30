@@ -41,7 +41,11 @@ export type ConnectGitLabDialogViewProps = ReturnType<typeof useConnectGitLab> &
  * on the connections table runs the user-side OAuth dance against the
  * row, same as today.
  */
-export function ConnectGitLabDialogView({
+export function ConnectGitLabDialogView(props: ConnectGitLabDialogViewProps) {
+  return props.open ? <ConnectGitLabDialogViewForm {...props} /> : null;
+}
+
+function ConnectGitLabDialogViewForm({
   open,
   onOpenChange,
   loading,
@@ -54,16 +58,6 @@ export function ConnectGitLabDialogView({
   const [clientId, setClientId] = React.useState("");
   const [clientSecret, setClientSecret] = React.useState("");
   const [copied, setCopied] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!open) {
-      setGroupOrInstance("");
-      setInstanceUrl("");
-      setClientId("");
-      setClientSecret("");
-      setCopied(false);
-    }
-  }, [open]);
 
   const trimmedInstance = instanceUrl.trim().replace(/\/+$/, "");
   const instanceBase = trimmedInstance || "https://gitlab.com";

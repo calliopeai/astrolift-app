@@ -267,6 +267,7 @@ type AstroliftAgentBox {
   podName: String!
   ownerEmail: String!
   lastError: String!
+  startupDiagnostic: AstroliftAgentStartupDiagnostic
   createdAt: DateTime!
   startedAt: DateTime
   endedAt: DateTime
@@ -331,6 +332,21 @@ type AstroliftAgentEnvironmentSpecMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAgentEnvironmentSpec
+}
+
+type AstroliftAgentEnvironmentSpecPage {
+  items: [AstroliftAgentEnvironmentSpec!]!
+  totalCount: Int!
+  page: Int!
+  pageSize: Int!
+}
+
+input AstroliftAgentEnvironmentSpecsFilter {
+  agentType: [String!] = null
+  runtime: [String!] = null
+
+  """User ids, or "me"."""
+  createdBy: [String!] = null
 }
 
 input AstroliftAgentFleetFilter {
@@ -588,6 +604,14 @@ type AstroliftAgentSkill {
   toolDefs: [AstroliftToolDef!]!
 }
 
+type AstroliftAgentStartupDiagnostic {
+  phase: String!
+  reason: String!
+  message: String!
+  podName: String!
+  observedAt: DateTime!
+}
+
 type AstroliftAgentTask {
   id: GUID!
   agentSlug: String!
@@ -598,6 +622,7 @@ type AstroliftAgentTask {
   result: JSON
   failureMessage: String
   eventSequence: Int!
+  startupDiagnostic: AstroliftAgentStartupDiagnostic
   createdAt: DateTime!
   updatedAt: DateTime!
   queuedAt: DateTime
@@ -663,6 +688,26 @@ type AstroliftAgentTaskInputReplyMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftAgentTaskInputReply
+}
+
+type AstroliftAgentTaskLogLine {
+  id: String!
+  timestamp: DateTime
+  level: String
+  stream: String!
+  message: String!
+  podName: String!
+  container: String!
+}
+
+type AstroliftAgentTaskLogPage {
+  items: [AstroliftAgentTaskLogLine!]!
+  nextCursor: String
+  hasMore: Boolean!
+  pageSize: Int!
+  liveOnly: Boolean!
+  windowLimited: Boolean!
+  expiresAt: DateTime
 }
 
 type AstroliftAgentTaskMutationResult {
@@ -811,6 +856,11 @@ type AstroliftAlertEventPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type AstroliftAlertEventSummary {
+  unresolvedCount: Int!
+  criticalCount: Int!
 }
 
 type AstroliftAlertMute {
@@ -2160,6 +2210,11 @@ type AstroliftDeployTokenPage {
 
 type AstroliftDeployment {
   id: GUID!
+
+  """
+  Version of this deployment snapshot for rollback and redeploy preconditions.
+  """
+  version: Int!
   registeredAppSlug: String!
   environmentName: String!
   workloadSlug: String
@@ -2198,6 +2253,7 @@ type AstroliftDeployment {
   triggeredByUserId: String
   triggeredByMe: Boolean!
   statusReason: String!
+  phases: [AstroliftDeploymentPhase!]!
 }
 
 type AstroliftDeploymentApprovalHistoryEntry {
@@ -2244,6 +2300,8 @@ type AstroliftDeploymentLogEntry {
   message: String!
   detail: JSON!
   occurredAt: DateTime!
+  phase: String!
+  event: String!
 }
 
 type AstroliftDeploymentMetrics {
@@ -2282,6 +2340,27 @@ type AstroliftDeploymentPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type AstroliftDeploymentPhase {
+  name: String!
+  startedAt: DateTime
+  completedAt: DateTime
+  failedAt: DateTime
+  healthyAt: DateTime
+}
+
+type AstroliftDeploymentRunLogDownload {
+  filename: String!
+  content: String!
+  contentType: String!
+}
+
+type AstroliftDeploymentRunLogPage {
+  items: [AstroliftDeploymentLogEntry!]!
+  nextCursor: String
+  hasMore: Boolean!
+  pageSize: Int!
 }
 
 """
@@ -3647,6 +3726,24 @@ type AstroliftPipelineRunPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type AstroliftPipelineSecret {
+  id: GUID!
+  name: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftPipelineSecretChange {
+  pipelineId: GUID!
+  name: String!
+}
+
+type AstroliftPipelineSecretChangeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftPipelineSecretChange
 }
 
 type AstroliftPodResourceUsage {
@@ -5497,6 +5594,8 @@ type AstroliftWorkflowRun {
 }
 
 type AstroliftWorkload {
+  """Version of this workload for restart and scale preconditions."""
+  version: Int!
   id: GUID!
   slug: String!
   name: String!
@@ -6261,6 +6360,11 @@ input DeleteGroupRoleMappingInput {
   id: GUID!
 }
 
+input DeletePipelineSecretInput {
+  pipelineId: GUID!
+  name: String!
+}
+
 input DeleteRoleInput {
   id: GUID!
 }
@@ -6990,8 +7094,8 @@ type Mutation {
   rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
   abortDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
   deleteDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
-  rollbackDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
-  redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  rollbackDeployment(input: DeploymentByIdInput!, ifMatchVersion: Int = null): AstroliftDeploymentMutationResult!
+  redeployApp(input: DeploymentByIdInput!, ifMatchVersion: Int = null): AstroliftDeploymentMutationResult!
   promoteDeployment(input: PromoteDeploymentInput!): AstroliftDeploymentMutationResult!
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   resumeEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
@@ -7018,8 +7122,8 @@ type Mutation {
   archiveAppRegistryRepo(input: ArchiveAppRegistryRepoInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
   deleteAppIngress(input: DeleteAppIngressInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
   triggerAstroliftDeployWorkflow(input: TriggerDeployWorkflowInput!): AstroliftTriggerDeployWorkflowPayloadMutationResult!
-  restartAstroliftWorkload(input: RestartWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
-  scaleAstroliftWorkload(input: ScaleWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
+  restartAstroliftWorkload(input: RestartWorkloadInput!, ifMatchVersion: Int = null): AstroliftWorkloadOpPayloadMutationResult!
+  scaleAstroliftWorkload(input: ScaleWorkloadInput!, ifMatchVersion: Int = null): AstroliftWorkloadOpPayloadMutationResult!
   installAstroliftSourceWebhook(input: InstallSourceWebhookInput!): AstroliftInstallSourceWebhookPayloadMutationResult!
   pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
   validateAstroliftCiSecrets(input: ValidateAstroliftCiSecretsInput!): AstroliftValidateCiSecretsPayloadMutationResult!
@@ -7098,6 +7202,8 @@ type Mutation {
   deleteFormDefinition(input: DeleteFormDefinitionInput!): AstroliftFormDefinitionMutationResult!
   submitForm(slug: String!, payload: JSON!): AstroliftFormSubmissionMutationResult!
   updateSubmissionStatus(submissionId: GUID!, status: String!): AstroliftFormSubmissionMutationResult!
+  setPipelineSecret(input: SetPipelineSecretInput!): AstroliftPipelineSecretChangeMutationResult!
+  deletePipelineSecret(input: DeletePipelineSecretInput!): AstroliftPipelineSecretChangeMutationResult!
   createPipeline(input: CreatePipelineInput!): AstroliftPipelineMutationResult!
   updatePipeline(id: GUID!, input: UpdatePipelineInput!): AstroliftPipelineMutationResult!
   deletePipeline(id: GUID!): AstroliftPipelineMutationResult!
@@ -7630,6 +7736,11 @@ type Query {
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
+  astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
+  astroliftEvent(id: GUID!): AstroliftEvent
+  astroliftAlertRule(id: GUID!): AstroliftAlertRule
+  astroliftAlertEvent(id: GUID!): AstroliftAlertEvent
+  astroliftAlertEventSummary(appSlug: String!): AstroliftAlertEventSummary!
   astroliftAppUptime(appSlug: String!, windowHours: Int! = 24): AstroliftAppUptime
   astroliftEvents(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null): [AstroliftEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage.")
   astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]! @deprecated(reason: "Caps at 500 buckets folded from a bounded 10k-row scan, so activity older than the scan window is unreachable. Use astroliftEventsAggregatedPage.")
@@ -7656,11 +7767,11 @@ type Query {
   astroliftMyNotificationPreferences(channel: String = null): [AstroliftNotificationPreference!]!
   astroliftMyDevices: [AstroliftDeviceRegistration!]!
   astroliftMyAlertSubscriptions(appSlug: String = null): [AstroliftUserAlertSubscription!]!
-  astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true): [AstroliftAlertRule!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
-  astroliftAlertRulesPage(target: String = null, targetId: String = null, activeOnly: Boolean! = true, search: String = null, limit: Int! = 50, after: String = null): AstroliftAlertRulePage!
+  astroliftAlertRules(target: String = null, targetId: String = null, activeOnly: Boolean! = true, appSlug: String = null): [AstroliftAlertRule!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage.")
+  astroliftAlertRulesPage(target: String = null, targetId: String = null, activeOnly: Boolean! = true, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertRulePage!
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
-  astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
-  astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null): AstroliftAlertEventPage!
+  astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100, appSlug: String = null): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
+  astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertEventPage!
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
   astroliftAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, sortBy: AppsListSortKey! = CREATED_DESC, cursor: String = null, limit: Int! = 50, includeArchived: Boolean! = false, filter: AstroliftAppsListFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftRegisteredAppPage!
@@ -7691,6 +7802,8 @@ type Query {
   astroliftDeploymentReleaseNotes(deploymentId: String!): AstroliftReleaseNotes
   astroliftCompareDeployments(idA: String!, idB: String!): AstroliftDeploymentComparison
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
+  astroliftDeploymentRunLogPage(deploymentId: String!, cursor: String = null, limit: Int! = 100): AstroliftDeploymentRunLogPage!
+  astroliftDeploymentRunLogDownload(deploymentId: String!): AstroliftDeploymentRunLogDownload
   astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftScheduledJobRunsPage.")
   astroliftScheduledJobRunsPage(appSlug: String = null, environmentName: String = null, workloadSlug: String = null, search: String = null, limit: Int! = 50, after: String = null, filter: AstroliftScheduledJobRunsFilter = null): AstroliftScheduledJobRunPage!
   astroliftScheduledJobRun(id: String!): AstroliftScheduledJobRun
@@ -7799,6 +7912,7 @@ type Query {
   formDefinition(slug: String!): AstroliftFormDefinition
   formSubmissions(slug: String!, status: String = null): [AstroliftFormSubmission!]!
   formFieldTypes: [String!]!
+  astroliftPipelineSecrets(pipelineId: GUID!): [AstroliftPipelineSecret!]!
   astroliftPipelines(limit: Int! = 100): [AstroliftPipeline!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage.")
   astroliftPipelinesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftPipelinePage!
   astroliftPipeline(id: String!): AstroliftPipeline
@@ -7823,11 +7937,13 @@ type Query {
   agentTaskByClientRequestId(orgId: ID!, clientRequestId: String!): AstroliftAgentTask
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
+  agentTaskLogsPage(id: ID!, cursor: String = null, limit: Int! = 100): AstroliftAgentTaskLogPage!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
+  agentEnvironmentSpecsPage(orgId: ID!, search: String = null, filter: AstroliftAgentEnvironmentSpecsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftAgentEnvironmentSpecPage!
   agentBoxes(orgId: ID!, includeEnded: Boolean! = false): [AstroliftAgentBox!]!
   agentBox(slug: String!): AstroliftAgentBox
-  agentEnvironmentSpec(slug: String!): AstroliftAgentEnvironmentSpec
+  agentEnvironmentSpec(slug: String!, orgId: ID = null): AstroliftAgentEnvironmentSpec
   agentEnvironmentSpecSecretStatus(slug: String!): [AstroliftAgentSecretStatus!]!
   agentEnvironmentSpecSecretStatusPage(slug: String!, search: String = null, filter: AstroliftAgentSecretStatusFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftAgentSecretStatusPage!
   agentSecretBundles(envSpecSlug: String!): [AstroliftAgentSecretBundle!]!
@@ -8389,6 +8505,12 @@ input SetOrganizationModuleInput {
   enabled: Boolean!
 }
 
+input SetPipelineSecretInput {
+  pipelineId: GUID!
+  name: String!
+  value: String!
+}
+
 input SetPreviewPinnedInput {
   id: GUID!
   pinned: Boolean!
@@ -8517,6 +8639,55 @@ input ToolDefInput {
   outputSchema: JSON!
   handlerRef: String!
   implementationConfig: JSON = null
+}
+
+type TopologyEnvironmentTraffic {
+  environmentId: ID!
+  environmentName: String!
+  namespace: String!
+  status: TopologyTrafficStatus!
+  reason: String
+  edges: [TopologyTrafficEdge!]!
+  truncated: Boolean!
+}
+
+type TopologyTraffic {
+  appSlug: String!
+  start: DateTime!
+  end: DateTime!
+  stepSeconds: Int!
+  status: TopologyTrafficStatus!
+  environments: [TopologyEnvironmentTraffic!]!
+  edgeLimit: Int!
+  sampleLimit: Int!
+  environmentLimit: Int!
+  source: String!
+  truncated: Boolean!
+}
+
+type TopologyTrafficEdge {
+  sourceWorkloadId: ID!
+  sourceWorkloadName: String!
+  destinationWorkloadId: ID!
+  destinationWorkloadName: String!
+  requestRate: Float!
+  errorRate: Float!
+  errorRatio: Float!
+  samples: [TopologyTrafficSample!]!
+}
+
+type TopologyTrafficSample {
+  timestamp: DateTime!
+  requestRate: Float!
+  errorRate: Float!
+}
+
+enum TopologyTrafficStatus {
+  AVAILABLE
+  NO_DATA
+  UNCONFIGURED
+  UNAVAILABLE
+  PARTIAL
 }
 
 input TransferAppInput {

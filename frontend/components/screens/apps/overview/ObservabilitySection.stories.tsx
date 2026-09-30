@@ -28,8 +28,7 @@ export const Empty: Story = {
 };
 
 /**
- * No error state of its own (a failed query renders as empty). The
- * closest: failing rollouts and critical alerts.
+ * Failing rollouts and critical alerts.
  */
 export const FailuresAndCritical: Story = {
   render: () => <ObservabilitySectionView {...OBSERVABILITY_FAILING} />,
@@ -46,4 +45,8 @@ export const At768: Story = {
       <ObservabilitySectionView {...OBSERVABILITY_LONG} />
     </div>
   ),
+};
+
+export const Error: Story = {
+  render: () => <ObservabilitySectionView {...OBSERVABILITY_EMPTY} error="Permission denied" />,
 };

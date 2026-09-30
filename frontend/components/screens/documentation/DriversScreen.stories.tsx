@@ -25,11 +25,14 @@ export const Full: Story = { args: DOCS_E_DRIVERS };
 /** No plugins registered: the static known-provider list with the fallback notice. */
 export const Empty: Story = { args: DOCS_E_DRIVERS_FALLBACK };
 
-/**
- * The screen has no error branch: a failed plugins query falls through to
- * the same static fallback as an empty install, so this mirrors Empty.
- */
-export const QueryFailed: Story = { args: DOCS_E_DRIVERS_FALLBACK };
+export const QueryFailed: Story = {
+  args: {
+    ...DOCS_E_DRIVERS_FALLBACK,
+    rows: [],
+    usingFallback: false,
+    error: { name: "Error", message: "Permission denied while loading this section" },
+  },
+};
 
 export const LongStrings: Story = { args: DOCS_E_DRIVERS_LONG };
 

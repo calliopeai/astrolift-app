@@ -553,3 +553,34 @@ def test_pr_closed_unmerged_starts_teardown(stack):
     assert resp.status_code == 200
     assert resp.json()["workflow_id"] == "teardown-preview-acme-org-hello-56"
     assert "closed" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize("pr_first", [True, False])
+def test_manual_pr_branch_collision_keeps_signed_webhook_acknowledged(stack, permission_resolver, pr_first):
+    from types import SimpleNamespace
+
+    from astrolift_lifecycle.tests.test_preview_name_collisions_2095 import manual
+    from core.permissions import Permission
+
+    permission_resolver.grant(Permission.APP_DEPLOY)
+    app = stack["app"]
+    body = _pr_payload(pr_number=3)
+    client = Client()
+
+    def deliver():
+        response = _post(client, str(app.guid), body=body, secret=stack["secret"])
+        assert response.status_code == 200, response.content
+
+    if pr_first:
+        deliver()
+    info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=None, META={})))
+    result = manual(app, info)
+    assert result.ok, result.errors
+    if not pr_first:
+        deliver()
+    rows = list(PreviewEnvironment.objects.filter(registered_app=app).select_related("app_environment"))
+    assert len(rows) == 2
+    assert len({row.app_environment.name for row in rows}) == 2
+    assert len({row.namespace for row in rows}) == 2
+    deliver()
+    assert PreviewEnvironment.objects.filter(registered_app=app).count() == 2

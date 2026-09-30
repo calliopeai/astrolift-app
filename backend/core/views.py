@@ -1,13 +1,16 @@
 from functools import wraps
 
-from core.utils.file_processor.file_export_util import Echo, FileExport
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+
+from core.permissions import require_platform_operator, route_auth
+from core.utils.file_processor.file_export_util import Echo, FileExport
 
 
 def admin_tooling(*perms):
@@ -99,23 +102,29 @@ def user_permissions_tree(request):
 
 
 @login_required
+@route_auth(
+    credential="active platform operator session or admin bearer", scope="install-wide exporter registry"
+)
 def download_file(request):
-    if request.method != 'GET':
+    try:
+        require_platform_operator(request.user)
+    except PermissionDenied:
+        return HttpResponseForbidden()
+    if request.method != "GET":
         return HttpResponse(status=405)
 
-    if request.GET.get('file', None) is None:
-        return HttpResponse('The \"file\" query parameter is required', status=400)
+    if request.GET.get("file", None) is None:
+        return HttpResponse('The "file" query parameter is required', status=400)
 
     # Look up file exporter from registry (allows domain apps to register exporters)
     from core.utils.file_export_registry import get_file_exporter
 
-    file_name = request.GET.get('file').lower()
+    file_name = request.GET.get("file").lower()
     exporter_class = get_file_exporter(file_name)
 
     if exporter_class is None:
         return HttpResponse(
-            f'Provided query parameter "file" value "{file_name}" is not a valid choice.',
-            status=400
+            f'Provided query parameter "file" value "{file_name}" is not a valid choice.', status=400
         )
 
     export_config: FileExport = exporter_class()

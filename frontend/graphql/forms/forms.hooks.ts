@@ -52,7 +52,12 @@ export const useFormSubmissions = (slug: string, status?: string) => {
     fetchPolicy: "cache-and-network",
     skip: !slug,
   });
-  return { submissions: data?.formSubmissions ?? [], loading, error, refetch };
+  return {
+    submissions: data?.formSubmissions ?? [],
+    loading: loading && !data,
+    error: data ? null : error,
+    refetch,
+  };
 };
 
 export const useFormFieldTypes = () => {

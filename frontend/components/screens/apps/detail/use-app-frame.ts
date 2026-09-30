@@ -50,7 +50,7 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
   const workloadsQ = useQuery<WorkloadsResp>(LIST_WORKLOADS, { variables: { appSlug: slug } });
   const envsQ = useQuery<EnvsResp>(LIST_ENVIRONMENTS, { variables: { appSlug: slug } });
   // The Overview's panels read the same deploys (one query, see use-app-deploys).
-  const latest = useAppDeploys(slug).deployments[0] ?? null;
+  const latest = useAppDeploys(slug, { live: true }).deployments[0] ?? null;
 
   const [startDeploy, { loading: deploying }] = useMutation<{
     startDeployment: MutationResult<AstroliftDeployment>;

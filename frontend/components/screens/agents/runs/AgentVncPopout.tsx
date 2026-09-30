@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeftIcon, BotIcon, Loader2Icon, MonitorPlayIcon } from "lucide-react";
@@ -23,7 +25,13 @@ function isWatchable(t: VncPopoutTask): boolean {
  * stops running the viewer flips to a clear "session ended" state instead of
  * leaving a dead canvas mounted.
  */
-export function AgentVncPopoutScreen({ taskId, task, loading, error }: AgentVncPopoutProps) {
+export function AgentVncPopoutScreen({
+  taskId,
+  task,
+  loading,
+  error,
+  onRetry,
+}: AgentVncPopoutProps) {
   let body: React.ReactNode;
   if (loading && !task) {
     body = (
@@ -31,14 +39,10 @@ export function AgentVncPopoutScreen({ taskId, task, loading, error }: AgentVncP
         <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
       </div>
     );
-  } else if (error) {
+  } else if (error && !task) {
     body = (
       <div className="flex flex-1 items-center justify-center">
-        <EmptyState
-          icon={<BotIcon className="size-5" />}
-          title="Couldn't load session"
-          description={error}
-        />
+        <QueryError title="Could not load session" error={error} onRetry={onRetry} />
       </div>
     );
   } else if (!task) {

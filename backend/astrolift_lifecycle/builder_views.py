@@ -53,7 +53,14 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from astrolift_identity.api_tokens import SCOPE_WRITE_APPS, enforce_scopes
-from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
+from core.permissions import (
+    Permission,
+    PermissionDenied,
+    PermissionScope,
+    ScopeKind,
+    check_permission,
+    route_auth,
+)
 from core.tenancy import TenantContext, tenant_context
 
 log = logging.getLogger("astrolift_lifecycle.builder_views")
@@ -142,12 +149,9 @@ def _authorize(token, org, permissions: tuple[Permission, ...], *, team=None, or
     ``write:apps`` is refused whatever its user may do. The check reads the
     token and the named target only, never the tenant middleware's
     context, so request headers cannot widen it. ``team`` is the team an
-    app lands in. Without one, a token issued for a team is checked on that
-    team, which the resolver confirms is live and in ``org``: the bindings
-    of a team deleted after the token was issued stop counting. ``org_only``
-    skips that token-team fallback and checks the organization alone: a dev
-    environment with no resolvable team (#1919) is org-admin-only, not
-    whatever team the caller's own token happens to name.
+    app lands in. A missing destination requires explicit organization
+    authority and an organization credential. A resolved destination must
+    be live, belong to this organization and lie within the token's team.
     """
     missing = enforce_scopes(token, (SCOPE_WRITE_APPS,))
     if missing:
@@ -160,14 +164,32 @@ def _authorize(token, org, permissions: tuple[Permission, ...], *, team=None, or
             status=403,
         )
 
-    if org_only:
-        scope, where = None, "in this organization"
+    if org_only or team is None:
+        if token.team_id is not None:
+            return JsonResponse(
+                {
+                    "detail": "the api token does not cover this organization owner",
+                    "reason": "outside_token_team",
+                },
+                status=403,
+            )
+        scope, where = PermissionScope(kind=ScopeKind.ORG, id=org.pk), "in this organization"
     elif team is not None:
+        if (
+            team.organization_id != org.pk
+            or team.deleted_at is not None
+            or (token.team_id is not None and token.team_id != team.pk)
+        ):
+            return JsonResponse(
+                {
+                    "detail": "the api token does not cover this live team owner",
+                    "reason": "outside_token_team",
+                },
+                status=403,
+            )
         scope, where = PermissionScope(kind=ScopeKind.TEAM, id=team.pk), f"on team {team.slug!r}"
-    elif token.team_id is not None:
-        scope, where = PermissionScope(kind=ScopeKind.TEAM, id=token.team_id), "on the api token's team"
     else:
-        scope, where = None, "in this organization"
+        scope, where = PermissionScope(kind=ScopeKind.ORG, id=org.pk), "in this organization"
 
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=token.user_id)):
         for permission in permissions:
@@ -392,6 +414,11 @@ def _cluster_q_for_org(org):
 
 
 @require_http_methods(["POST"])
+@route_auth(
+    credential="api-token",
+    permissions=(Permission.APP_CREATE,),
+    scope="live destination TEAM or explicit ORG; bearer write:apps and team ceiling",
+)
 def create_dev_environment(request: HttpRequest) -> JsonResponse:
     """Create + start a Calliope App Builder dev environment (#767)."""
     token = getattr(request, "_api_token", None)
@@ -529,6 +556,11 @@ def create_dev_environment(request: HttpRequest) -> JsonResponse:
 
 
 @require_http_methods(["PUT"])
+@route_auth(
+    credential="api-token",
+    permissions=(Permission.APP_CREATE,),
+    scope="dev environment live TEAM or explicit ORG; bearer write:apps; creator or team admin",
+)
 def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
     """Sync a new file tree into a running dev environment (#767).
 
@@ -583,6 +615,11 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
             {"detail": "dev environment is bound to a cluster outside this organization"},
             status=409,
         )
+
+    from astrolift_lifecycle.visibility import cluster_owned_and_live
+
+    if dev.tenant_cluster is not None and not cluster_owned_and_live(dev.tenant_cluster, org.pk):
+        return JsonResponse({"detail": "dev environment cluster is no longer active"}, status=409)
 
     if dev.status != DevEnvironment.Status.RUNNING:
         return JsonResponse({"detail": "environment is not running"}, status=409)
@@ -692,6 +729,11 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
 
 
 @require_http_methods(["POST"])
+@route_auth(
+    credential="api-token",
+    permissions=(Permission.APP_CREATE, Permission.APP_DEPLOY),
+    scope="dev environment live TEAM or explicit ORG plus destination TEAM; bearer write:apps; creator or team admin",
+)
 def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     """Promote a dev environment to a registered production app (#768).
 
@@ -838,6 +880,13 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
             {"detail": "dev environment is bound to a cluster outside this organization"},
             status=409,
         )
+
+    from astrolift_lifecycle.visibility import cluster_owned_and_live, live_app_rows
+
+    if not cluster_owned_and_live(cluster, org.pk):
+        return JsonResponse({"detail": "dev environment cluster is no longer active"}, status=409)
+    if is_update and not live_app_rows(RegisteredApp.objects.all()).filter(pk=existing_app.pk).exists():
+        return JsonResponse({"detail": "promoted app owner is no longer live or coherent"}, status=409)
 
     # ManagedDomain binding is optional — when the caller passes a
     # ``domain``, look it up by zone and bind it to the env; otherwise

@@ -28,7 +28,9 @@ from astrolift_operations.schema.types import (
     app_log_export_to_type,
     audit_export_to_type,
 )
-from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_operations.scopes import org_scope, provider_read_operation
+from astrolift_registry.scopes import app_scope_by_slug, live_app_owners
+from astrolift_services.scopes import assert_provider_cluster
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -49,7 +51,7 @@ def _filter_snapshot(filter_input) -> dict:
 class ExportMutations:
     @strawberry.field
     @mutation_audit(action="audit_log.export")
-    @require_permission(Permission.AUDIT_LOG_EXPORT)
+    @require_permission(Permission.AUDIT_LOG_EXPORT, scope=org_scope(Permission.AUDIT_LOG_EXPORT))
     @tenant_scoped()
     def export_audit_events(
         self, info: Info, input: ExportAuditEventsInput
@@ -187,7 +189,11 @@ class ExportMutations:
 
     @strawberry.field
     @mutation_audit(action="app.log_export")
-    @require_permission(Permission.APP_LOG_EXPORT, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_LOG_EXPORT,
+        scope=app_scope_by_slug("input.app_slug", permission=Permission.APP_LOG_EXPORT),
+        operation=provider_read_operation(Permission.APP_LOG_EXPORT),
+    )
     @tenant_scoped()
     def export_astrolift_app_logs(
         self, info: Info, input: ExportAppLogsInput
@@ -254,7 +260,7 @@ class ExportMutations:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
 
         app = (
-            RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+            live_app_owners(RegisteredApp.objects.select_related("organization", "default_tenant_cluster"))
             .filter(
                 slug=input.app_slug,
                 organization_id=org_id,
@@ -303,6 +309,7 @@ class ExportMutations:
                 f"app {app.slug!r} has no active cluster wired",
             )
 
+        assert_provider_cluster(cluster, permission=Permission.APP_LOG_EXPORT)
         max_lines = max(
             1,
             int(getattr(constance_config, "APP_LOG_EXPORT_MAX_LINES", 100000)),

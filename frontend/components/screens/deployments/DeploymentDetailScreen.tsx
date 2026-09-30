@@ -93,6 +93,8 @@ export function DeploymentDetailScreen({
   logError,
   onRetryLog,
   onDownload,
+  hasOlderLog,
+  onLoadOlderLog,
   manifest,
   manifestLoading,
   events,
@@ -260,8 +262,7 @@ export function DeploymentDetailScreen({
   );
 
   const nonMerge = releaseNotes?.commits.filter((c) => !c.isMerge) ?? [];
-  // Kept as it was: platform events that name an app.
-  const appEvents = events.filter((e) => e.registeredAppId && e.registeredAppId.length > 0);
+  const appEvents = events;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
@@ -296,6 +297,18 @@ export function DeploymentDetailScreen({
           emptyHint: t("noLog"),
         }}
       />
+
+      {hasOlderLog && (
+        <Button
+          variant="outline"
+          disabled={logLoading}
+          onClick={() => {
+            void onLoadOlderLog();
+          }}
+        >
+          {t("olderLog")}
+        </Button>
+      )}
 
       {/* #1553: this rollout rendered the stored manifest, not the repo's.
           It changes what a green deploy means, so it leads the details. */}

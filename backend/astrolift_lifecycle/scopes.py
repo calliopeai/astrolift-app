@@ -6,16 +6,17 @@ environment, a custom domain, a deploy token, a run. Bindings stop at
 APP, so all of those check against the app that owns the row.
 
 One factory covers them because the shape is always the same -- resolve
-a GUID to its owning app, confined to the caller's org, and return
-``None`` for anything that does not resolve so the stricter org-scope
-check stays in place.
+a GUID to its live owning app, confined to the caller's org. Unresolved
+owners take explicit organization scope, independent of selected headers.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from core.permissions import PermissionScope, ScopeKind
+from astrolift_lifecycle.visibility import live_lifecycle_rows
+from astrolift_registry.scopes import _app_scope, _credential_scope, app_scope_by_slug, registry_org_scope
+from core.permissions import Permission
 from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
@@ -31,6 +32,7 @@ def app_scope_via(
     *,
     app_path: str = "registered_app",
     guid_field: str = "guid",
+    permission: Permission | None = None,
 ):
     """Scope on the app owning the row ``field`` names.
 
@@ -42,69 +44,76 @@ def app_scope_via(
     ``"input.id"``.
     """
 
-    def _scope(args: dict[str, Any]) -> PermissionScope | None:
+    def _scope(args: dict[str, Any]):
         key = read_guid(args, field)
         if not key:
-            return None
+            return _credential_scope(registry_org_scope(), permission)
         org_id = _org_id()
         if org_id is None:
-            return None
+            return _credential_scope(registry_org_scope(), permission)
         from django.apps import apps
 
         model = apps.get_model(model_label)
         app_id = (
-            model.objects.filter(
+            live_lifecycle_rows(model.objects.all(), app_path=app_path)
+            .filter(
                 **{guid_field: str(key), f"{app_path}__organization_id": org_id},
             )
             .values_list(f"{app_path}__id", flat=True)
             .first()
         )
-        return PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else None
+        return (
+            _app_scope(pk=app_id, permission=permission)
+            if app_id
+            else _credential_scope(registry_org_scope(), permission)
+        )
 
     return _scope
 
 
-def deployment_app_scope(field: str = "input.id"):
-    return app_scope_via("astrolift_lifecycle.Deployment", field)
+def deployment_app_scope(field: str = "input.id", *, permission=None):
+    return app_scope_via("astrolift_lifecycle.Deployment", field, permission=permission)
 
 
-def environment_app_scope(field: str = "input.id"):
-    return app_scope_via("astrolift_lifecycle.AppEnvironment", field)
+def environment_app_scope(field: str = "input.id", *, permission=None):
+    return app_scope_via("astrolift_lifecycle.AppEnvironment", field, permission=permission)
 
 
-def custom_domain_app_scope(field: str = "input.id"):
-    return app_scope_via("astrolift_lifecycle.CustomDomain", field)
+def custom_domain_app_scope(field: str = "input.id", *, permission=None):
+    return app_scope_via("astrolift_lifecycle.CustomDomain", field, permission=permission)
 
 
-def deploy_token_app_scope(field: str = "input.id"):
-    return app_scope_via("astrolift_lifecycle.DeployToken", field)
+def deploy_token_app_scope(field: str = "input.id", *, permission=None):
+    return app_scope_via("astrolift_lifecycle.DeployToken", field, permission=permission)
 
 
-def preview_environment_app_scope(field: str = "input.id"):
-    return app_scope_via("astrolift_lifecycle.PreviewEnvironment", field)
+def preview_environment_app_scope(field: str = "input.id", *, permission=None):
+    return app_scope_via("astrolift_lifecycle.PreviewEnvironment", field, permission=permission)
 
 
-def scheduled_job_run_app_scope(field: str = "id"):
+def scheduled_job_run_app_scope(field: str = "id", *, permission=None):
     return app_scope_via(
         "astrolift_lifecycle.ScheduledJobRun",
         field,
         app_path="app_environment__registered_app",
+        permission=permission,
     )
 
 
-def command_run_app_scope(field: str = "id"):
-    return app_scope_via("astrolift_lifecycle.CommandRun", field)
+def command_run_app_scope(field: str = "id", *, permission=None):
+    return app_scope_via("astrolift_lifecycle.CommandRun", field, permission=permission)
 
 
-def task_run_app_scope(field: str = "id"):
+def task_run_app_scope(field: str = "id", *, permission=None):
     return app_scope_via(
         "astrolift_lifecycle.TaskRun",
         field,
-        app_path="app_environment__registered_app",
+        app_path="workload__registered_app",
+        permission=permission,
     )
 
 
-def live_app_scope(field: str = "app_slug"):
+def live_app_scope(field: str = "app_slug", *, permission=None):
     """Scope on the live app named by slug, for the WebSocket surfaces
     that stream from or shell into one: the log subscriptions and the exec
     relay (#1866).
@@ -116,19 +125,18 @@ def live_app_scope(field: str = "app_slug"):
     authorized by a team the app does not belong to.
     """
 
-    def _scope(args: dict[str, Any]) -> PermissionScope:
-        org_id = _org_id()
-        slug = read_arg(args, field)
-        if org_id is not None and slug:
-            from astrolift_registry.models import RegisteredApp
+    return app_scope_by_slug(field, permission=permission)
 
-            app_id = (
-                RegisteredApp.objects.filter(organization_id=org_id, slug=str(slug), deleted_at__isnull=True)
-                .values_list("pk", flat=True)
-                .first()
-            )
-            if app_id is not None:
-                return PermissionScope(kind=ScopeKind.APP, id=app_id)
-        return PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
 
-    return _scope
+def deregister_workflow_scope(args):
+    from uuid import UUID
+
+    key = read_arg(args, "input.workflow_id") or ""
+    prefix = "DeregisterAppWorkflow-"
+    try:
+        guid = UUID(key[len(prefix) :]) if key.startswith(prefix) else None
+    except (ValueError, TypeError, AttributeError):
+        guid = None
+    if guid is None:
+        return _credential_scope(registry_org_scope(), Permission.APP_DELETE)
+    return _app_scope(guid=guid, permission=Permission.APP_DELETE)

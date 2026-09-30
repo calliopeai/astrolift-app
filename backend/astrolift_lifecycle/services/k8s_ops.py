@@ -144,6 +144,16 @@ def _resolve_driver_and_namespace(workload: Workload) -> tuple[Any, str, str]:
             "PRECONDITION",
             f"workload {workload.slug!r} has no active environment bound to a cluster",
         )
+    from astrolift_lifecycle.visibility import live_lifecycle_rows
+
+    if (
+        not live_lifecycle_rows(type(env).objects.all(), org_id=workload.registered_app.organization_id)
+        .filter(pk=env.pk)
+        .exists()
+    ):
+        raise K8sOpError(
+            "PRECONDITION", "workload environment does not have a live organization-owned target"
+        )
     cluster = env.tenant_cluster
     namespace = namespace_for_environment(env)
     driver = _driver_for_cluster(cluster)

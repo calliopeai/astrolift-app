@@ -534,6 +534,8 @@ export const RESOURCES: ProjectResourcesScreenProps = {
   effectiveClusterId: "cluster-1",
   effectiveClusterSlug: "production",
   onClusterChange: noop,
+  effectiveBundleClusterId: "cluster-1",
+  onBundleClusterChange: noop,
   catalogEntries: CATALOG,
   catalogLoading: false,
   catalogError: false,

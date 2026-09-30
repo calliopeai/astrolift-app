@@ -65,7 +65,7 @@ export function useWorkflowFrame(slug: string): {
   const entitlement = useWorkflowsEntitlement();
 
   const configuredQ = useTieredWorkflow(slug);
-  const workflow = configuredQ.error ? null : configuredQ.workflow;
+  const workflow = configuredQ.workflow;
   const configuredSettled = !(configuredQ.loading && !configuredQ.workflow);
   const definitionSlug = workflow?.definitionSlug ?? (configuredSettled ? slug : null);
   const definitionQ = useWorkflowDefinition(definitionSlug, orgId);
@@ -170,7 +170,10 @@ export function useWorkflowFrame(slug: string): {
       pathname,
       workflow: subject,
       loading,
-      error: !workflow && !definition && definitionQ.error ? definitionQ.error.message : null,
+      error:
+        !workflow && !definition
+          ? ((configuredQ.error ?? definitionQ.error)?.message ?? null)
+          : null,
       onRetry: () => {
         void configuredQ.refetch();
         void definitionQ.refetch();

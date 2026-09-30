@@ -1,0 +1,78 @@
+# Exact mobile operation documents at 3dc2222aa759d16040be80f642637d69decdd0d8.
+# src/api/hooks/opsOperations.ts, captured for offline contract validation.
+
+mutation AstroliftRollbackDeployment(
+    $input: DeploymentByIdInput!
+    $ifMatchVersion: Int
+  ) {
+    rollbackDeployment(input: $input, ifMatchVersion: $ifMatchVersion) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        status
+      }
+    }
+  }
+
+mutation AstroliftRedeployAppVersioned(
+    $input: DeploymentByIdInput!
+    $ifMatchVersion: Int
+  ) {
+    redeployApp(input: $input, ifMatchVersion: $ifMatchVersion) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        status
+      }
+    }
+  }
+
+mutation AstroliftRestartWorkload(
+    $input: RestartWorkloadInput!
+    $ifMatchVersion: Int
+  ) {
+    restartAstroliftWorkload(input: $input, ifMatchVersion: $ifMatchVersion) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        workloadId
+        newRevision
+        desiredReplicas
+        readyReplicas
+      }
+    }
+  }
+
+mutation AstroliftScaleWorkload(
+    $input: ScaleWorkloadInput!
+    $ifMatchVersion: Int
+  ) {
+    scaleAstroliftWorkload(input: $input, ifMatchVersion: $ifMatchVersion) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        workloadId
+        newRevision
+        desiredReplicas
+        readyReplicas
+      }
+    }
+  }

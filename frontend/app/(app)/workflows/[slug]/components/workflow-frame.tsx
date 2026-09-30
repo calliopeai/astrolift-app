@@ -31,6 +31,8 @@ export function WorkflowFrameContainer({
   // A run's own page is the run archetype (spec 44 §5.5): its own header and
   // no tabs, so it gets the workflow but not the frame around it.
   const pathname = usePathname() ?? "";
-  if (/\/runs\/[^/]+$/.test(pathname)) return body;
+  // Cold run links still need the frame's loading/error boundary until its
+  // workflow exists; the run body reads that context during its first render.
+  if (/\/runs\/[^/]+$/.test(pathname) && framed) return body;
   return <WorkflowFrame {...frame}>{body}</WorkflowFrame>;
 }

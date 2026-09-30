@@ -231,6 +231,7 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
         return next;
       });
       if (editingId === s.id) setEditingId(null);
+      if (rotatingId === s.id) setRotatingId(null);
       return;
     }
     setRevealingId(s.id);

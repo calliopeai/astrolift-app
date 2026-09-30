@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import type { CursorPage } from "@/components/data-table";
 import { useCursorFeed } from "@/components/feed/use-cursor-feed";
 import { useListState, useLocalListState } from "@/components/list/use-list-state";
@@ -84,6 +86,7 @@ export function useWebhooks(appSlug?: string) {
     createWebhookSubscription: MutationResult<AstroliftWebhookSecretReveal>;
   }>(CREATE_WEBHOOK, {
     refetchQueries: refetchVars,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
@@ -91,6 +94,7 @@ export function useWebhooks(appSlug?: string) {
     updateWebhookSubscription: MutationResult<AstroliftWebhookSubscription>;
   }>(UPDATE_WEBHOOK, {
     refetchQueries: refetchVars,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
@@ -98,6 +102,7 @@ export function useWebhooks(appSlug?: string) {
     rotateOutboundWebhookSecret: MutationResult<AstroliftWebhookSecretReveal>;
   }>(ROTATE_OUTBOUND_WEBHOOK_SECRET, {
     refetchQueries: refetchVars,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
@@ -105,6 +110,7 @@ export function useWebhooks(appSlug?: string) {
     testWebhookSubscription: MutationResult<AstroliftWebhookTestResult>;
   }>(TEST_FIRE_WEBHOOK, {
     refetchQueries: refetchVars,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
@@ -112,26 +118,32 @@ export function useWebhooks(appSlug?: string) {
     deleteWebhookSubscription: MutationResult<{ id: string; deleted: boolean }>;
   }>(DELETE_WEBHOOK, {
     refetchQueries: refetchVars,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
   /** Resolves true when the subscription was created (close and reset the sheet). */
   async function onCreate({ url, eventsRaw, format }: CreateWebhookInput): Promise<boolean> {
-    const events = eventsRaw
-      .split(/\s|,/g)
-      .map((e) => e.trim())
-      .filter(Boolean);
-    const { data } = await createWebhook({
-      variables: {
-        input: { url: url.trim(), events, appSlug: appSlug ?? null, format },
-      },
-    });
-    if (data?.createWebhookSubscription.ok && data.createWebhookSubscription.data) {
-      setReveal(data.createWebhookSubscription.data);
-      return true;
+    try {
+      const events = eventsRaw
+        .split(/\s|,/g)
+        .map((e) => e.trim())
+        .filter(Boolean);
+      const { data } = await createWebhook({
+        variables: {
+          input: { url: url.trim(), events, appSlug: appSlug ?? null, format },
+        },
+      });
+      if (data?.createWebhookSubscription.ok && data.createWebhookSubscription.data) {
+        setReveal(data.createWebhookSubscription.data);
+        return true;
+      }
+      toast.error(data?.createWebhookSubscription.errors?.[0]?.message ?? "Create failed");
+      return false;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Create failed");
+      return false;
     }
-    toast.error(data?.createWebhookSubscription.errors?.[0]?.message ?? "Create failed");
-    return false;
   }
 
   async function onDelete(s: AstroliftWebhookSubscription) {
