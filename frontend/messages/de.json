@@ -1804,29 +1804,72 @@
       }
     },
     "members": {
-      "title": "App members",
-      "description": "Role bindings scoped to {slug}. Org and team-level grants apply automatically and aren't shown here — manage them on /members.",
-      "loadingTitle": "Members",
-      "availableRoles": "App-scoped roles available",
-      "noRolesDefined": "No app-scoped roles defined.",
-      "emptyTitle": "No app-scoped role bindings",
-      "emptyDescription": "Grant a user an app-level role from the org-wide /members page (Grant role → APP scope → this app).",
-      "openMembers": "Open members",
+      "title": "App-Mitglieder",
+      "description": "Rollenzuweisungen für {slug}. Berechtigungen auf Organisations- und Teamebene gelten automatisch und werden hier nicht angezeigt; verwalten Sie sie unter /members.",
+      "loadingTitle": "Mitglieder",
+      "availableRoles": "Verfügbare App-Rollen",
+      "noRolesDefined": "Keine App-Rollen definiert.",
+      "emptyTitle": "Keine App-Rollenzuweisungen",
+      "emptyDescription": "Einem Benutzer über die organisationsweite Seite /members eine App-Rolle gewähren (Rolle gewähren → APP-Bereich → diese App).",
+      "openMembers": "Mitglieder öffnen",
       "columns": {
-        "user": "User",
-        "role": "Role",
-        "granted": "Granted",
-        "expires": "Expires"
+        "user": "Benutzer",
+        "role": "Rolle",
+        "granted": "Gewährt",
+        "expires": "Läuft ab",
+        "who": "Wer",
+        "source": "Quelle"
       },
-      "groupPrefix": "group:",
-      "never": "never",
-      "revoke": "Revoke",
+      "groupPrefix": "Gruppe:",
+      "never": "nie",
+      "revoke": "Widerrufen",
       "revokeConfirm": {
-        "title": "Revoke {role} from {target}?",
-        "fallbackTitle": "Revoke role?",
-        "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
-        "confirm": "Revoke role"
-      }
+        "title": "{role} für {target} widerrufen?",
+        "fallbackTitle": "Rolle widerrufen?",
+        "description": "Löscht die App-Rollenzuweisung logisch. Berechtigungen auf Organisations- und Teamebene bleiben bestehen. Der Benutzer behält Zugriff über andere Zuweisungen mit denselben Berechtigungen.",
+        "confirm": "Rolle widerrufen"
+      },
+      "searchPlaceholder": "Mitglieder suchen…",
+      "peopleTitle": "Personen mit Zugriff",
+      "teamShare": "Teamfreigabe",
+      "homeTeam": "Zugehöriges Team",
+      "summary": "Wer auf <app></app> zugreifen kann, mit welchen Rechten und warum.",
+      "grantAccess": "Zugriff gewähren",
+      "checkAccess": "Zugriff prüfen",
+      "openPrincipal": {
+        "user": "Benutzer öffnen",
+        "group": "Gruppe öffnen",
+        "team": "Team öffnen",
+        "token": "Token öffnen"
+      },
+      "removeRole": "Rolle entfernen",
+      "endTeamShare": "Teamfreigabe beenden",
+      "endShare": "Freigabe beenden",
+      "removeConfirm": {
+        "bindingTitle": "{role} für {target} entfernen?",
+        "shareTitle": "Freigabe von {app} für {target} beenden?",
+        "fallbackTitle": "Zugriff entfernen?",
+        "bindingDescription": "Widerruft diese Rolle für diese App. Zugriff auf Projekt-, Team- oder Organisationsebene sowie andere Rollen mit denselben Berechtigungen bleiben erhalten.",
+        "shareDescription": "Das Team verliert seine Zugriffsstufe für diese App. Seine Mitglieder behalten ihre Rollen hier sowie auf Projekt-, Team- oder Organisationsebene."
+      },
+      "emptyCurrentTitle": "Niemand hat eine Rolle für diese App",
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "roles": "Rollen",
+        "teams": "Teamfreigaben"
+      },
+      "notes": {
+        "mine": "Ihre eigenen Berechtigungen für diese App.",
+        "all": "Berechtigungen für diese App und Teamfreigaben. Berechtigungen für Projekt, Team oder Organisation gelten ebenfalls und werden hier noch nicht aufgelistet; prüfen Sie eine Person, um sie anzusehen."
+      },
+      "accessSearchPlaceholder": "Personen, Gruppen, Teams und Rollen suchen",
+      "toasts": {
+        "revokeFailed": "Widerruf fehlgeschlagen",
+        "roleRevoked": "Rolle widerrufen",
+        "shareEnded": "Zugriff für {team} beendet"
+      },
+      "emptyCurrentDescription": "Berechtigungen für Projekt, Team oder Organisation gelten weiterhin. Zugriff gewähren, um hier eine Rolle zuzuweisen."
     },
     "config": {
       "title": "{name} · Konfiguration",

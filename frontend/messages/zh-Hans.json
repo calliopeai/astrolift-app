@@ -1804,29 +1804,72 @@
       }
     },
     "members": {
-      "title": "App members",
-      "description": "Role bindings scoped to {slug}. Org and team-level grants apply automatically and aren't shown here — manage them on /members.",
-      "loadingTitle": "Members",
-      "availableRoles": "App-scoped roles available",
-      "noRolesDefined": "No app-scoped roles defined.",
-      "emptyTitle": "No app-scoped role bindings",
-      "emptyDescription": "Grant a user an app-level role from the org-wide /members page (Grant role → APP scope → this app).",
-      "openMembers": "Open members",
+      "title": "应用成员",
+      "description": "{slug} 范围内的角色绑定。组织和团队级授权会自动生效，但不会在此显示，请在 /members 管理。",
+      "loadingTitle": "成员",
+      "availableRoles": "可用的应用范围角色",
+      "noRolesDefined": "未定义应用范围的角色。",
+      "emptyTitle": "无应用范围的角色绑定",
+      "emptyDescription": "在组织的 /members 页面为用户授予应用级角色（授予角色 → APP 范围 → 此应用）。",
+      "openMembers": "打开成员列表",
       "columns": {
-        "user": "User",
-        "role": "Role",
-        "granted": "Granted",
-        "expires": "Expires"
+        "user": "用户",
+        "role": "角色",
+        "granted": "授予时间",
+        "expires": "到期时间",
+        "who": "主体",
+        "source": "来源"
       },
-      "groupPrefix": "group:",
-      "never": "never",
-      "revoke": "Revoke",
+      "groupPrefix": "组：",
+      "never": "永不过期",
+      "revoke": "撤销",
       "revokeConfirm": {
-        "title": "Revoke {role} from {target}?",
-        "fallbackTitle": "Revoke role?",
-        "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
-        "confirm": "Revoke role"
-      }
+        "title": "撤销 {target} 的 {role}？",
+        "fallbackTitle": "撤销角色？",
+        "description": "软删除应用范围的角色绑定。组织和团队级授权保持不变。用户仍可通过其他授予相同权限的绑定访问。",
+        "confirm": "撤销角色"
+      },
+      "searchPlaceholder": "搜索成员…",
+      "peopleTitle": "有访问权限的人员",
+      "teamShare": "团队共享",
+      "homeTeam": "所属团队",
+      "summary": "谁可以访问 <app></app>、拥有哪些权限及其原因。",
+      "grantAccess": "授予访问权限",
+      "checkAccess": "检查其访问权限",
+      "openPrincipal": {
+        "user": "打开用户",
+        "group": "打开组",
+        "team": "打开团队",
+        "token": "打开令牌"
+      },
+      "removeRole": "移除角色",
+      "endTeamShare": "结束团队共享",
+      "endShare": "结束共享",
+      "removeConfirm": {
+        "bindingTitle": "移除 {target} 的 {role}？",
+        "shareTitle": "结束向 {target} 共享 {app}？",
+        "fallbackTitle": "移除访问权限？",
+        "bindingDescription": "撤销此应用上的角色。项目、团队或组织授予的访问权限，以及其他提供相同权限的角色均会保留。",
+        "shareDescription": "团队将失去对此应用的访问权限。成员在此应用、项目、团队或组织中拥有的角色会保留。"
+      },
+      "emptyCurrentTitle": "无人拥有此应用的角色",
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "roles": "角色",
+        "teams": "团队共享"
+      },
+      "notes": {
+        "mine": "您在此应用上的授权。",
+        "all": "此应用的授权和团队共享。项目、团队或组织的授权也会生效，但尚未在此列出；请检查具体人员的访问权限。"
+      },
+      "accessSearchPlaceholder": "搜索人员、组、团队和角色",
+      "toasts": {
+        "revokeFailed": "撤销失败",
+        "roleRevoked": "角色已撤销",
+        "shareEnded": "已结束 {team} 的访问权限"
+      },
+      "emptyCurrentDescription": "其项目、团队或组织的授权仍然适用。授予访问权限，即可在此为某人分配角色。"
     },
     "config": {
       "title": "{name} · 配置",

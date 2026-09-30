@@ -19,6 +19,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- App access views, grant/source removal copy, home-team labels and outcomes
+  use all eight locales. Removal confirmations retain the actual grant or team
+  share across failure and retry; home-team shares remain protected (#2145).
+
 - Complete missing app settings group and identity messages in every locale,
   including the editor’s save action. Blank names remain refused, failed saves
   retain user edits and version conflicts use the localized shared notice (#2145).

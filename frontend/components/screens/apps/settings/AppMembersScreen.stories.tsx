@@ -1,10 +1,13 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import spanish from "@/messages/es.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 
 import { ACCESS_ROWS_LONG, membersProps } from "./app-access-members.fixtures";
-import { APP_ACCESS_LIST } from "./app-access-rows";
+import { localizedAppAccessList } from "./app-access-rows";
 import { AppMembersScreen, type AppMembersScreenProps } from "./AppMembersScreen";
 import { APP, LONG } from "./app-settings-members.fixtures";
 
@@ -22,7 +25,8 @@ export default meta;
 type Story = StoryObj;
 
 function Members({ view, ...overrides }: Partial<AppMembersScreenProps> & { view?: string }) {
-  const list = useLocalListState(APP_ACCESS_LIST, view ? { view } : {});
+  const t = useTranslations("apps.members");
+  const list = useLocalListState(localizedAppAccessList(t), view ? { view } : {});
   return <AppMembersScreen {...membersProps(list, overrides)} />;
 }
 
@@ -73,5 +77,15 @@ export const Width768: Story = {
     <div style={{ width: 768 }} className="overflow-hidden border p-4">
       <Members app={{ ...APP, slug: LONG }} slug={LONG} rows={ACCESS_ROWS_LONG} />
     </div>
+  ),
+};
+
+export const SpanishWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }} className="overflow-hidden border p-4">
+        <Members />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

@@ -1804,29 +1804,72 @@
       }
     },
     "members": {
-      "title": "App members",
-      "description": "Role bindings scoped to {slug}. Org and team-level grants apply automatically and aren't shown here — manage them on /members.",
-      "loadingTitle": "Members",
-      "availableRoles": "App-scoped roles available",
-      "noRolesDefined": "No app-scoped roles defined.",
-      "emptyTitle": "No app-scoped role bindings",
-      "emptyDescription": "Grant a user an app-level role from the org-wide /members page (Grant role → APP scope → this app).",
-      "openMembers": "Open members",
+      "title": "アプリのメンバー",
+      "description": "{slug} に限定したロールの割り当てです。組織やチームの権限は自動的に適用され、ここには表示されません。/members で管理してください。",
+      "loadingTitle": "メンバー",
+      "availableRoles": "利用可能なアプリのロール",
+      "noRolesDefined": "アプリに限定したロールは定義されていません。",
+      "emptyTitle": "アプリのロール割り当てはありません",
+      "emptyDescription": "組織全体の /members ページでユーザーにアプリのロールを付与してください（ロールを付与 → APP スコープ → このアプリ）。",
+      "openMembers": "メンバーを開く",
       "columns": {
-        "user": "User",
-        "role": "Role",
-        "granted": "Granted",
-        "expires": "Expires"
+        "user": "ユーザー",
+        "role": "ロール",
+        "granted": "付与日時",
+        "expires": "有効期限",
+        "who": "対象",
+        "source": "付与元"
       },
-      "groupPrefix": "group:",
-      "never": "never",
-      "revoke": "Revoke",
+      "groupPrefix": "グループ：",
+      "never": "期限なし",
+      "revoke": "取り消し",
       "revokeConfirm": {
-        "title": "Revoke {role} from {target}?",
-        "fallbackTitle": "Revoke role?",
-        "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
-        "confirm": "Revoke role"
-      }
+        "title": "{target} の {role} を取り消しますか？",
+        "fallbackTitle": "ロールを取り消しますか？",
+        "description": "アプリのロール割り当てを論理削除します。組織やチームの権限は維持されます。同じ権限を付与する他の割り当てがある場合、ユーザーは引き続きアクセスできます。",
+        "confirm": "ロールを取り消し"
+      },
+      "searchPlaceholder": "メンバーを検索…",
+      "peopleTitle": "アクセス権を持つ人",
+      "teamShare": "チームへの共有",
+      "homeTeam": "所属チーム",
+      "summary": "<app></app> にアクセスできる人、その権限、付与された理由です。",
+      "grantAccess": "アクセス権を付与",
+      "checkAccess": "アクセス権を確認",
+      "openPrincipal": {
+        "user": "ユーザーを開く",
+        "group": "グループを開く",
+        "team": "チームを開く",
+        "token": "トークンを開く"
+      },
+      "removeRole": "ロールを削除",
+      "endTeamShare": "チームへの共有を終了",
+      "endShare": "共有を終了",
+      "removeConfirm": {
+        "bindingTitle": "{target} の {role} を削除しますか？",
+        "shareTitle": "{target} への {app} の共有を終了しますか？",
+        "fallbackTitle": "アクセス権を削除しますか？",
+        "bindingDescription": "このアプリのロールを取り消します。プロジェクト、チーム、組織から付与されたアクセス権と、同じ権限を持つ他のロールは維持されます。",
+        "shareDescription": "チームはこのアプリへのアクセス権を失います。メンバーがこのアプリ、プロジェクト、チーム、組織で持つロールは維持されます。"
+      },
+      "emptyCurrentTitle": "このアプリのロールを持つ人はいません",
+      "views": {
+        "all": "すべて",
+        "mine": "自分の権限",
+        "roles": "ロール",
+        "teams": "チームへの共有"
+      },
+      "notes": {
+        "mine": "このアプリで自分に付与された権限です。",
+        "all": "このアプリの権限とチームへの共有です。プロジェクト、チーム、組織の権限も適用されますが、ここにはまだ表示されません。個別のアクセス権を確認してください。"
+      },
+      "accessSearchPlaceholder": "人、グループ、チーム、ロールを検索",
+      "toasts": {
+        "revokeFailed": "取り消しに失敗しました",
+        "roleRevoked": "ロールを取り消しました",
+        "shareEnded": "{team} のアクセス権を終了しました"
+      },
+      "emptyCurrentDescription": "プロジェクト、チーム、組織の権限は引き続き適用されます。ここでロールを割り当てるにはアクセス権を付与してください。"
     },
     "config": {
       "title": "{name} · 設定",

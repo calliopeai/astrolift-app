@@ -56,6 +56,19 @@ export const APP_ACCESS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+/** Translate presentation only; source selection and server paging keep the same view keys. */
+export function localizedAppAccessList(t: (key: string) => string): ListDefinition {
+  return {
+    ...APP_ACCESS_LIST,
+    searchPlaceholder: t("accessSearchPlaceholder"),
+    views: APP_ACCESS_LIST.views.map((view) => ({
+      ...view,
+      label: t(`views.${view.key}`),
+      ...(view.note ? { note: t(`notes.${view.key}`) } : {}),
+    })),
+  };
+}
+
 /** Which sources a view reads: role bindings, team shares, or both. */
 export function viewSources(view: string): { bindings: boolean; shares: boolean } {
   if (view === "teams") return { bindings: false, shares: true };

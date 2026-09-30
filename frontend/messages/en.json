@@ -1547,7 +1547,9 @@
         "user": "User",
         "role": "Role",
         "granted": "Granted",
-        "expires": "Expires"
+        "expires": "Expires",
+        "who": "Who",
+        "source": "Source"
       },
       "groupPrefix": "group:",
       "never": "never",
@@ -1558,7 +1560,47 @@
         "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
         "confirm": "Revoke role"
       },
-      "searchPlaceholder": "Search members…"
+      "searchPlaceholder": "Search members…",
+      "peopleTitle": "People with access",
+      "teamShare": "team share",
+      "homeTeam": "Home team",
+      "summary": "Who can get into <app></app>, with what, and why.",
+      "grantAccess": "Grant access",
+      "checkAccess": "Check their access",
+      "openPrincipal": {
+        "user": "Open user",
+        "group": "Open group",
+        "team": "Open team",
+        "token": "Open token"
+      },
+      "removeRole": "Remove role",
+      "endTeamShare": "End team share",
+      "endShare": "End share",
+      "removeConfirm": {
+        "bindingTitle": "Remove {role} from {target}?",
+        "shareTitle": "End {target}'s share of {app}?",
+        "fallbackTitle": "Remove access?",
+        "bindingDescription": "Revokes this role on this app. They keep any access granted on the project, team or organization, and any other role that carries the same permissions.",
+        "shareDescription": "The team loses its access level on this app. Its members keep any role they hold here, or on the project, team or organization."
+      },
+      "emptyCurrentTitle": "No one holds a role on this app",
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "roles": "Roles",
+        "teams": "Team shares"
+      },
+      "notes": {
+        "mine": "Your own grants on this app.",
+        "all": "Grants on this app and team shares. Grants on its project, team or the org reach it too and are not listed here yet: check a person to see them."
+      },
+      "accessSearchPlaceholder": "Search people, groups, teams and roles",
+      "toasts": {
+        "revokeFailed": "Revoke failed",
+        "roleRevoked": "Role revoked",
+        "shareEnded": "Ended {team}'s access"
+      },
+      "emptyCurrentDescription": "Grants on its project, team or the organization still reach it. Grant access to give someone a role here."
     },
     "config": {
       "title": "{name} · config",

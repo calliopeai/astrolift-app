@@ -1804,29 +1804,72 @@
       }
     },
     "members": {
-      "title": "App members",
-      "description": "Role bindings scoped to {slug}. Org and team-level grants apply automatically and aren't shown here — manage them on /members.",
-      "loadingTitle": "Members",
-      "availableRoles": "App-scoped roles available",
-      "noRolesDefined": "No app-scoped roles defined.",
-      "emptyTitle": "No app-scoped role bindings",
-      "emptyDescription": "Grant a user an app-level role from the org-wide /members page (Grant role → APP scope → this app).",
-      "openMembers": "Open members",
+      "title": "앱 구성원",
+      "description": "{slug} 범위의 역할 바인딩입니다. 조직 및 팀 수준의 권한은 자동으로 적용되며 여기에 표시되지 않습니다. /members에서 관리하세요.",
+      "loadingTitle": "구성원",
+      "availableRoles": "사용 가능한 앱 범위 역할",
+      "noRolesDefined": "앱 범위 역할이 정의되어 있지 않습니다.",
+      "emptyTitle": "앱 범위 역할 바인딩 없음",
+      "emptyDescription": "조직 전체 /members 페이지에서 사용자에게 앱 수준 역할을 부여하세요(역할 부여 → APP 범위 → 이 앱).",
+      "openMembers": "구성원 열기",
       "columns": {
-        "user": "User",
-        "role": "Role",
-        "granted": "Granted",
-        "expires": "Expires"
+        "user": "사용자",
+        "role": "역할",
+        "granted": "부여 일시",
+        "expires": "만료 일시",
+        "who": "대상",
+        "source": "부여 출처"
       },
-      "groupPrefix": "group:",
-      "never": "never",
-      "revoke": "Revoke",
+      "groupPrefix": "그룹:",
+      "never": "만료 없음",
+      "revoke": "취소",
       "revokeConfirm": {
-        "title": "Revoke {role} from {target}?",
-        "fallbackTitle": "Revoke role?",
-        "description": "Soft-deletes the app-scoped role binding. Org-level and team-level grants remain in place. The user keeps access via any other binding that still grants the same permissions.",
-        "confirm": "Revoke role"
-      }
+        "title": "{target}의 {role}을(를) 취소할까요?",
+        "fallbackTitle": "역할을 취소할까요?",
+        "description": "앱 범위 역할 바인딩을 논리적으로 삭제합니다. 조직 및 팀 수준의 권한은 유지됩니다. 같은 권한을 부여하는 다른 바인딩이 있으면 사용자는 계속 접근할 수 있습니다.",
+        "confirm": "역할 취소"
+      },
+      "searchPlaceholder": "구성원 검색…",
+      "peopleTitle": "접근 권한이 있는 사람",
+      "teamShare": "팀 공유",
+      "homeTeam": "소속 팀",
+      "summary": "<app></app>에 접근할 수 있는 사람, 권한 및 부여된 이유입니다.",
+      "grantAccess": "접근 권한 부여",
+      "checkAccess": "접근 권한 확인",
+      "openPrincipal": {
+        "user": "사용자 열기",
+        "group": "그룹 열기",
+        "team": "팀 열기",
+        "token": "토큰 열기"
+      },
+      "removeRole": "역할 제거",
+      "endTeamShare": "팀 공유 종료",
+      "endShare": "공유 종료",
+      "removeConfirm": {
+        "bindingTitle": "{target}의 {role}을(를) 제거할까요?",
+        "shareTitle": "{target}에 대한 {app} 공유를 종료할까요?",
+        "fallbackTitle": "접근 권한을 제거할까요?",
+        "bindingDescription": "이 앱의 역할을 취소합니다. 프로젝트, 팀 또는 조직에서 부여된 접근 권한과 같은 권한을 가진 다른 역할은 유지됩니다.",
+        "shareDescription": "팀은 이 앱의 접근 수준을 잃습니다. 구성원은 이 앱 또는 프로젝트, 팀, 조직에서 가진 역할을 유지합니다."
+      },
+      "emptyCurrentTitle": "이 앱에 역할을 가진 사람이 없습니다",
+      "views": {
+        "all": "전체",
+        "mine": "내 권한",
+        "roles": "역할",
+        "teams": "팀 공유"
+      },
+      "notes": {
+        "mine": "이 앱에서 나에게 부여된 권한입니다.",
+        "all": "이 앱의 권한과 팀 공유입니다. 프로젝트, 팀 또는 조직의 권한도 적용되지만 아직 여기에 나열되지 않습니다. 개인의 접근 권한을 확인하세요."
+      },
+      "accessSearchPlaceholder": "사람, 그룹, 팀 및 역할 검색",
+      "toasts": {
+        "revokeFailed": "취소하지 못했습니다",
+        "roleRevoked": "역할이 취소되었습니다",
+        "shareEnded": "{team}의 접근 권한이 종료되었습니다"
+      },
+      "emptyCurrentDescription": "프로젝트, 팀 또는 조직의 권한은 계속 적용됩니다. 여기에 역할을 부여하려면 접근 권한을 부여하세요."
     },
     "config": {
       "title": "{name} · 구성",
