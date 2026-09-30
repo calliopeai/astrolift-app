@@ -56,6 +56,8 @@ export interface ListDefinition {
   id: string;
   fields: ListField[];
   searchPlaceholder: string;
+  /** Hide free-text search when the server snapshot has no search contract. */
+  searchable?: boolean;
   /** Usually newest first: `[{ key: "started", dir: "desc" }]`. */
   defaultSort: SortState[];
   /** First is the default. Build with `standardViews` so All and Mine lead. */
@@ -151,7 +153,7 @@ export function parseListState(def: ListDefinition, params: URLSearchParams | st
 
   return {
     view: view && def.views.some((v) => v.key === view) ? view : base.view,
-    q: p.get("q") ?? "",
+    q: def.searchable === false ? "" : (p.get("q") ?? ""),
     filters,
     sort: sort.length > 0 ? sort : base.sort,
     page: def.paging === "numbered" && Number.isInteger(page) && page > 1 ? page : 1,
@@ -165,7 +167,7 @@ export function serializeListState(def: ListDefinition, state: ListState): strin
   const base = defaultListState(def);
   const p = new URLSearchParams();
   if (state.view !== base.view) p.set("view", state.view);
-  if (state.q) p.set("q", state.q);
+  if (def.searchable !== false && state.q) p.set("q", state.q);
   for (const field of def.fields) {
     const value = state.filters[field.key];
     if (value) p.set(field.key, value);

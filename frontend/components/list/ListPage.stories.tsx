@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { BotIcon, DownloadIcon, MoreHorizontalIcon, UsersIcon } from "lucide-react";
 import * as React from "react";
+import { expect, within } from "storybook/test";
 
 import type { Column } from "@/components/data-table";
 import { Identifier } from "@/components/Identifier";
@@ -136,10 +137,10 @@ const RUNS_EMPTY = {
 /** A routed list's props: the stories below own the page header. */
 type Routed<TRow> = Partial<Extract<ListPageProps<TRow>, { header: unknown }>>;
 
-type RunsProps = Routed<RunRow> & { initial?: Partial<ListState> };
+type RunsProps = Routed<RunRow> & { initial?: Partial<ListState>; searchable?: boolean };
 
-function Runs({ initial, rows = RUNS, ...props }: RunsProps) {
-  const list = useLocalListState(RUNS_LIST, initial);
+function Runs({ initial, rows = RUNS, searchable, ...props }: RunsProps) {
+  const list = useLocalListState({ ...RUNS_LIST, searchable }, initial);
   return (
     <ListPage<RunRow>
       header={{
@@ -181,6 +182,17 @@ function Runs({ initial, rows = RUNS, ...props }: RunsProps) {
 
 /** Agents › Runs: cursor paged, bulk Retry and Cancel, six views. */
 export const RunsFull: StoryObj = { render: () => <Runs /> };
+export const BoundedSnapshotWithoutSearch: StoryObj = {
+  render: () => (
+    <Runs searchable={false} nextCursor={null} totalCount={RUNS.length} approximateCount={false} />
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).queryByRole("searchbox")).not.toBeInTheDocument();
+    await expect(
+      within(canvasElement).getByRole("link", { name: RUNS[0].id.split("-")[0] })
+    ).toHaveAttribute("href", `#run-${RUNS[0].id}`);
+  },
+};
 
 /** Filters from `+ Filter` or typed tokens, as chips; the Failed view. */
 export const RunsFiltered: StoryObj = {

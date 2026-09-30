@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- List snapshots can explicitly hide free-text search when the server exposes no
+  search contract, while existing searchable lists retain their behavior (#2215).
+
 - Make shared cluster deployments the primary Models catalogue, with actual
   organization-bound server search, filters, Mine and pagination. Preserve a
   visible app/project/cloud endpoint view and its existing deployment flow;

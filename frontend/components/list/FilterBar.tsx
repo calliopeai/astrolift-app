@@ -89,7 +89,7 @@ export function FilterBar({
   return (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
       {leading}
-      <SearchBox list={list} />
+      {def.searchable !== false && <SearchBox list={list} />}
       <AddFilter fields={def.fields} onAdd={list.setFilter} />
 
       {chips.map(([key, value]) => {
