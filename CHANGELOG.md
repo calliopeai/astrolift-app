@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Agent task backlog snapshots survive pod termination and are readable through
+  `agentTaskBacklog(orgId, taskId)` with the same scoped authority as task events
+  (#1972). Negotiated runner callbacks persist ordered, bounded snapshots outside
+  the event feed; an explicit empty list clears prior progress without changing
+  event types or cursors.
+
 - Managed-resource gates resolve live app, project, team or organization owners
   and preserve bearer ceilings across GraphQL and all ten project-resource MCP
   tools (#2106). Collections filter before limits and counts; attachments check

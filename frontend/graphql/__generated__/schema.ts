@@ -603,6 +603,22 @@ export type AstroliftAgentTask = {
   vncUrl: Scalars['String']['output'];
 };
 
+export type AstroliftAgentTaskBacklog = {
+  harness: Scalars['String']['output'];
+  items: Array<AstroliftAgentTaskBacklogItem>;
+  revision: Scalars['Int']['output'];
+  sessionId: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftAgentTaskBacklogItem = {
+  activeForm?: Maybe<Scalars['String']['output']>;
+  details?: Maybe<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  text: Scalars['String']['output'];
+};
+
 export type AstroliftAgentTaskDispatcher = {
   cloud: Scalars['String']['output'];
   clusterId?: Maybe<Scalars['GUID']['output']>;
@@ -8967,6 +8983,7 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  agentTaskBacklog?: Maybe<AstroliftAgentTaskBacklog>;
   agentTaskByClientRequestId?: Maybe<AstroliftAgentTask>;
   agentTaskEvents: Array<AstroliftAgentTaskEvent>;
   agentTaskInputMessage?: Maybe<AstroliftAgentTaskInputMessage>;
@@ -9392,6 +9409,12 @@ export type QueryAgentSecretBundlesArgs = {
 
 export type QueryAgentTaskArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentTaskBacklogArgs = {
+  orgId: Scalars['ID']['input'];
+  taskId: Scalars['ID']['input'];
 };
 
 

@@ -6,6 +6,39 @@ A chat-based overseer can use the same API as another authenticated client.
 
 ## Discover and run work
 
+### Saved task backlog
+
+`agentTaskBacklog(orgId: ID!, taskId: ID!)` returns null until a compatible runner
+has observed successful native planning/task results. Otherwise it returns
+`{ harness, sessionId, revision, updatedAt, items { id text status activeForm details } }`.
+Harness values are `claude-code-cli` and `codex-cli`; item status is `pending`,
+`in_progress`, or `completed`. `updatedAt` is the server's acceptance timestamp,
+not evidence that the pod is still running. An empty `items` list is an explicit
+cleared backlog, including after the pod ends. Reads use precisely the task event
+permission, token ceiling, owner-operation policy and organization/team visibility.
+
+Runners negotiate `task_backlog_protocol_version: 1` in the authenticated callback
+response. The independent `backlog` request field contains `revision`, `harness`,
+`session_id`, and `items`; item optional fields use `active_form` and `details`.
+It never becomes a task event. The callback's `backlog_revision` acknowledges the
+persisted revision. A retry must preserve the identical revision and snapshot;
+older/conflicting revisions and changed native session identity are refused.
+The runner must preserve state across follow-up turns, and must not restart a
+producer against an existing backlog without a corresponding checkpoint.
+
+Snapshots contain at most 256 unique items and 128 KiB of compact UTF-8 JSON.
+Session identities are 1–128 ASCII letters/digits/underscore/hyphen; item IDs are
+1–128 characters, text and active form at most 8,192 characters, and details at
+most 16,384. Text is nonempty; NUL and invalid UTF-8 are refused. Revisions are
+positive signed 32-bit integers. Invalid snapshots reject the entire callback,
+including accompanying events and terminal result. No state is silently truncated.
+
+Deploy the additive `astrolift_agents.0040_agent_task_backlog` migration before
+the backend. Roll back code while retaining the nullable column. Older runners
+continue to work and report no backlog; newer runners must not publish this
+field until support is advertised. Clients against an older schema should
+report backlog unavailable rather than infer a plan from prose or task events.
+
 The CLI supports the operator path:
 
 ```sh

@@ -119,6 +119,7 @@ class AgentTask(BaseCoreModel):
     failure = models.JSONField(null=True, blank=True)
     event_sequence = models.PositiveIntegerField(default=0)
     event_bytes = models.PositiveIntegerField(default=0)
+    backlog_snapshot = models.JSONField(null=True, blank=True)
     # Per-dispatch ad-hoc input frozen at task creation (#930). Carries the
     # ``runAstroliftAgent`` ad-hoc ``trigger_payload`` and the trigger-bound
     # dispatch's ``input_mapping``-shaped webhook payload. Surfaced to the

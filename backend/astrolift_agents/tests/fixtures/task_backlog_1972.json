@@ -1,0 +1,14 @@
+{
+  "revision": 1,
+  "harness": "claude-code-cli",
+  "session_id": "fixture-native-session",
+  "items": [
+    {
+      "id": "7",
+      "text": "Implement durable backlog",
+      "status": "pending",
+      "active_form": "Implementing",
+      "details": "Persist the successful native task list"
+    }
+  ]
+}
