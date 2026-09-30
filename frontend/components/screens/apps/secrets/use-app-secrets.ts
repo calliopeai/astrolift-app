@@ -176,7 +176,12 @@ export function useAppSecrets(slug: string, section: SecretsSection = "keys") {
     revealAppSecret: MutationResult<RevealedSecretData>;
   }>(REVEAL_APP_SECRET);
 
-  const busy = setState.loading || deleteState.loading || bulkState.loading || detachState.loading;
+  const busy =
+    setState.loading ||
+    rotateState.loading ||
+    deleteState.loading ||
+    bulkState.loading ||
+    detachState.loading;
   const list = secrets.data?.astroliftAppSecrets ?? [];
   const envList = envs.data?.astroliftEnvironments ?? [];
   const attachmentList = attachments.data?.astroliftAppSecretBundleAttachments ?? [];

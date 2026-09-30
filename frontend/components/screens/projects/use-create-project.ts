@@ -7,7 +7,7 @@ import { CREATE_PROJECT } from "@/graphql/identity/identity.mutations";
 import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
 import type { AstroliftProject, MutationResult } from "@/graphql/identity/identity.types";
 
-import { slugify } from "./project-team-slug";
+import { slugify, isValidSlug } from "./project-team-slug";
 
 export interface CreateProjectValues {
   teamId: string;
@@ -28,7 +28,8 @@ export function useCreateProject() {
   /** Resolves true when the project was created, so the sheet can close. */
   async function createProject(values: CreateProjectValues): Promise<boolean> {
     if (!values.teamId) return false;
-    const finalSlug = values.slug || slugify(values.name);
+    const finalSlug = values.slug.trim() || slugify(values.name);
+    if (!values.name.trim() || !isValidSlug(finalSlug)) return false;
     const { data } = await createProjectMutation({
       variables: {
         input: {

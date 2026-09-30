@@ -236,6 +236,8 @@ export function assignmentsProps(
     bulkRevoking: false,
     onRevoke: resolved(undefined),
     onBulkRevoke: resolved(true),
+    exportingCsv: false,
+    onExportCsv: resolved(undefined),
     ...overrides,
   };
 }

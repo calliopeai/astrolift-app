@@ -804,6 +804,19 @@ def cron_last_run_to_type(run) -> CronJobLastRunType:
     )
 
 
+@strawberry.type(name="AstroliftActionPermission")
+class ActionPermissionType:
+    allowed: bool
+    code: str
+    reason: str
+
+
+@strawberry.type(name="AstroliftWorkloadViewerCan")
+class WorkloadViewerCanType:
+    restart: ActionPermissionType
+    scale: ActionPermissionType
+
+
 @strawberry.type(name="AstroliftWorkload")
 class WorkloadType:
     version: int = strawberry.field(
@@ -832,6 +845,9 @@ class WorkloadType:
     storage_class: str
     storage_size: str
     registered_app_slug: str
+    viewer_can: WorkloadViewerCanType = strawberry.field(
+        description="Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply."
+    )
     # The DNS name in-cluster callers use to reach this workload's
     # ClusterIP Service — ``<workloadSlug>.<namespace>.svc.cluster.local``
     # (#429). Same shape kubernetes' default DNS surfaces; the
@@ -1733,7 +1749,7 @@ class WorkloadScalingStatus:
     sourced_at: dt.datetime
 
 
-def workload_to_type(workload, *, last_run=None) -> WorkloadType:
+def workload_to_type(workload, *, last_run=None, viewer_permission=None) -> WorkloadType:
     """``last_run`` is the job's latest ``ScheduledJobRun``, loaded in bulk by the caller."""
     from core.tenancy import get_current_tenant
 
@@ -1741,6 +1757,13 @@ def workload_to_type(workload, *, last_run=None) -> WorkloadType:
         workload.registered_app, "created_by_id", None
     )
     tenant = get_current_tenant()
+    if viewer_permission is None:
+        from astrolift_registry.viewer_actions import workload_viewer_permissions
+
+        viewer_permission = workload_viewer_permissions([workload])[workload.pk]
+    action = ActionPermissionType(
+        allowed=viewer_permission.allowed, code=viewer_permission.code, reason=viewer_permission.reason
+    )
     return WorkloadType(
         id=GUID(str(workload.guid)),
         version=int(workload.version or 0),
@@ -1761,6 +1784,7 @@ def workload_to_type(workload, *, last_run=None) -> WorkloadType:
         storage_class=workload.storage_class or "",
         storage_size=workload.storage_size or "",
         registered_app_slug=workload.registered_app.slug,
+        viewer_can=WorkloadViewerCanType(restart=action, scale=action),
         in_cluster_service_fqdn=_in_cluster_service_fqdn(workload),
         volumes=list(workload.volumes or []),
         owner_user_id=str(owner_id) if owner_id else None,

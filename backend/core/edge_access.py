@@ -61,6 +61,8 @@ def _hosts_from_rendered(rendered: list[dict[str, Any]], namespace: str) -> list
         labels = (manifest.get("metadata") or {}).get("labels") or {}
         if labels.get(ROUTE_NAMESPACE_LABEL) != namespace:
             continue
+        if labels.get("astrolift.dev/custom-domain"):
+            continue  # Independent first-party policies never enter the shared central policy.
         hosts.update(str(h) for h in (manifest.get("spec") or {}).get("hostnames") or [])
     return sorted(hosts)
 
@@ -86,8 +88,26 @@ def record_environment(cluster: Any, app: Any, namespace: str, rendered: list[di
         key = _key(app, namespace)
         access = app_access(app)
         hosts = _hosts_from_rendered(rendered, namespace)
-        if hosts and is_restricted(access):
-            rules[key] = {"name": f"{app.slug}-{namespace}", "hosts": hosts, **access}
+        from providers.k8s_native.edge_gateway import custom_domain_hostname
+
+        custom_routes = [
+            {
+                "name": item["metadata"]["name"],
+                "hostname": custom_domain_hostname(item),
+                "labels": item["metadata"]["labels"],
+            }
+            for item in rendered
+            if item.get("kind") == "SecurityPolicy"
+            and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/namespace") == namespace
+            and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/custom-domain")
+        ]
+        if (hosts and is_restricted(access)) or custom_routes:
+            rules[key] = {
+                "name": f"{app.slug}-{namespace}",
+                "hosts": hosts,
+                **access,
+                **({"custom_routes": custom_routes} if custom_routes else {}),
+            }
         else:
             rules.pop(key, None)
         return _save_rules(cluster, rules)
@@ -124,7 +144,7 @@ def set_app_access(app: Any, *, groups: Any, users: Any, source: str) -> dict[st
         if not ours:
             continue
         for key, entry in ours.items():
-            if is_restricted(access):
+            if is_restricted(access) or entry.get("custom_routes"):
                 rules[key] = {**entry, **access}
             else:
                 rules.pop(key)

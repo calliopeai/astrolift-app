@@ -97,8 +97,8 @@ def _register(monkeypatch, env):
 
 def _cluster(**fields):
     org = Organization.objects.create(name="Edge", slug=f"edge-{uuid.uuid4().hex[:8]}")
-    plugin = ProviderPlugin.objects.create(
-        name="aws", slug=f"aws-{uuid.uuid4().hex[:6]}", capabilities_manifest={}, config_schema={}
+    plugin, _ = ProviderPlugin.objects.get_or_create(
+        slug="aws", defaults={"name": "aws", "capabilities_manifest": {}, "config_schema": {}}
     )
     return TenantCluster.objects.create(
         organization=org,

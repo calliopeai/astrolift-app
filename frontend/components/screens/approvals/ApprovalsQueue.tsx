@@ -91,7 +91,7 @@ export function ApprovalsQueueScreen({
 
   function toggleAllVisible() {
     setSelected((prev) => {
-      if (prev.size === pending.length && pending.length > 0) {
+      if (pending.length > 0 && pending.every((deployment) => prev.has(deployment.id))) {
         return new Set();
       }
       return new Set(pending.map((d) => d.id));
@@ -145,12 +145,12 @@ export function ApprovalsQueueScreen({
           <input
             type="checkbox"
             aria-label={t("selectAllLabel")}
-            checked={selected.size === pending.length && pending.length > 0}
+            checked={selectedDeploys.length === pending.length && pending.length > 0}
             onChange={toggleAllVisible}
             className="size-4"
           />
           <span className="text-muted-foreground">
-            {t("selectionStatus", { selected: selected.size, total: pending.length })}
+            {t("selectionStatus", { selected: selectedDeploys.length, total: pending.length })}
           </span>
         </div>
         {!canApprove && (

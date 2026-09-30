@@ -1,12 +1,12 @@
 "use client";
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
-import type { DocumentNode } from "graphql";
 import * as React from "react";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
-import { exportCsv } from "@/components/list/exportCsv";
+import { buildCsv } from "@/components/list/exportCsv";
+import { useCsvExport } from "@/components/list/use-csv-export";
 import { useListState } from "@/components/list/use-list-state";
 import { PRINCIPAL_SEARCH } from "@/graphql/access/access.queries";
 import {
@@ -16,6 +16,8 @@ import {
   REVOKE_INVITATION,
 } from "@/graphql/identity/identity.mutations";
 import {
+  EXPORT_MEMBERS_CSV,
+  EXPORT_INVITATIONS_CSV,
   LIST_INVITATIONS_PAGE,
   LIST_MEMBERS_PAGE,
   LIST_ROLE_BINDINGS_PAGE,
@@ -60,9 +62,8 @@ interface BindingsResp {
   astroliftRoleBindingsPage: Page<AstroliftRoleBinding>;
 }
 
-/** The export walks the view this many rows at a time, and stops at the cap. */
+/** IdP group search has a separate numbered contract. */
 const EXPORT_PAGE = 200;
-const EXPORT_CAP = 5_000;
 
 /**
  * The data half of the People list (access UX design 3.1): the list state
@@ -148,45 +149,44 @@ export function useMembers() {
         ? (data as GroupsResp | undefined)?.astroliftPrincipalSearch.totalCount
         : (data as InvitationsResp | undefined)?.astroliftInvitationsPage.totalCount;
 
-  /** Every row the view and chips match, walked page by page, as CSV. */
-  async function onExportCsv() {
-    type Walk = [DocumentNode, object, (d: unknown) => PeopleRow[]];
-    const [doc, vars, pick]: Walk =
-      source === "members"
-        ? [
-            LIST_MEMBERS_PAGE,
-            membersVariables(question),
-            (d) => userRows((d as MembersResp).astroliftMembersPage.items, [], roleList),
-          ]
-        : source === "groups"
-          ? [
-              PRINCIPAL_SEARCH,
-              groupsVariables(question),
-              (d) => (d as GroupsResp).astroliftPrincipalSearch.items.map(groupRow),
-            ]
-          : [
-              LIST_INVITATIONS_PAGE,
-              invitationsVariables(question),
-              (d) => (d as InvitationsResp).astroliftInvitationsPage.items.map(invitationRow),
-            ];
-    const out: PeopleRow[] = [];
-    try {
-      for (let page = 1; out.length < EXPORT_CAP; page++) {
-        const res = await client.query({
-          query: doc,
-          variables: { ...vars, page, pageSize: EXPORT_PAGE },
-          fetchPolicy: "network-only",
-        });
-        const chunk = res.data ? pick(res.data) : [];
-        out.push(...chunk);
-        if (chunk.length < EXPORT_PAGE) break;
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "The export failed");
-      return;
+  const { exportingCsv, onExportCsv } = useCsvExport(async () => {
+    if (source !== "groups") {
+      const query = source === "members" ? EXPORT_MEMBERS_CSV : EXPORT_INVITATIONS_CSV;
+      const {
+        page: _page,
+        pageSize: _pageSize,
+        ...variables
+      } = source === "members" ? membersVariables(question) : invitationsVariables(question);
+      const result = await client.query({ query, variables, fetchPolicy: "network-only" });
+      const data = result.data as
+        | {
+            astroliftMembersCsv?: { filename: string; content: string };
+            astroliftInvitationsCsv?: { filename: string; content: string };
+          }
+        | undefined;
+      const csv = source === "members" ? data?.astroliftMembersCsv : data?.astroliftInvitationsCsv;
+      if (!csv) throw new Error("The export returned no file");
+      return csv;
     }
-    exportCsv("people", out, PEOPLE_CSV);
-  }
+    const out: PeopleRow[] = [];
+    for (let page = 1; ; page++) {
+      const result = await client.query<GroupsResp>({
+        query: PRINCIPAL_SEARCH,
+        variables: { ...groupsVariables(question), page, pageSize: EXPORT_PAGE },
+        fetchPolicy: "network-only",
+      });
+      const batch = result.data?.astroliftPrincipalSearch;
+      if (!batch) throw new Error("The export returned no groups");
+      out.push(...batch.items.map(groupRow));
+      if (
+        batch.totalCount != null ? out.length >= batch.totalCount : batch.items.length < EXPORT_PAGE
+      )
+        break;
+      if (!batch.items.length)
+        throw new Error("The group list changed during export; retry the export");
+    }
+    return { filename: "people.csv", content: buildCsv(out, PEOPLE_CSV) };
+  });
 
   const [revokeInvite, { loading: revokingInvite }] = useMutation<{
     revokeInvitation: MutationResult<AstroliftInvitation>;
@@ -270,9 +270,8 @@ export function useMembers() {
     onRetry: () => {
       void active.refetch();
     },
-    onExportCsv: () => {
-      void onExportCsv();
-    },
+    exportingCsv,
+    onExportCsv,
     revokingInvite,
     deletingInvite,
     resendingInvite,

@@ -49,7 +49,7 @@ export function MuteAlertRuleSheet({
           onSubmit={async (e) => {
             e.preventDefault();
             const h = Number(hours);
-            if (!Number.isFinite(h) || h <= 0) return;
+            if (busy || !Number.isInteger(h) || h < 1 || h > 168) return;
             if (!reason.trim()) return;
             await onSubmit(Math.round(h * 3600), reason.trim());
           }}

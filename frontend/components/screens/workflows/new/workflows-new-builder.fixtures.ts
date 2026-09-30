@@ -95,6 +95,7 @@ export const MANIFEST_PREVIEW: WorkflowManifestPreview = {
 
 export const BUILDER: WorkflowBuilderScreenProps = {
   canCreate: true,
+  entitlementLoading: false,
   creating: false,
   previewing: false,
   onCreate: async () => ({}),

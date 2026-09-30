@@ -647,6 +647,20 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_API_ORIGIN: "http://127.0.0.1:6172"
+          API_INTERNAL_ROOT: "http://127.0.0.1:6172"
+          TZ: "UTC"
+      - name: Walk production routes through rendered navigation
+        run: npm run test:routes
+        env:
+          TZ: "UTC"
+      - name: Save route navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-route-navigation
+          path: frontend/test-results/routes
+          if-no-files-found: ignore
       - name: Verify generated GraphQL client types
         run: |
           npm run codegen

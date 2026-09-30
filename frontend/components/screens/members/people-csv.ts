@@ -29,7 +29,15 @@ export const PEOPLE_CSV: CsvColumn<PeopleRow>[] = [
     value: (r) =>
       r.kind === "user" ? r.lifecycle : r.kind === "invitation" ? r.invitation.status : "idp group",
   },
-  { header: "Last active", value: (r) => (r.kind === "user" ? r.lastActiveAt : null) },
+  {
+    header: "Last active",
+    value: (r) =>
+      r.kind === "user"
+        ? r.lastActiveAt
+        : r.kind === "invitation"
+          ? r.invitation.lastActiveAt
+          : null,
+  },
   {
     header: "Joined",
     value: (r) =>

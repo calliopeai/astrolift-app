@@ -1,6 +1,12 @@
 "use client";
 
-import { ShieldIcon, Trash2Icon, UserPlusIcon } from "lucide-react";
+import {
+  DownloadIcon,
+  MoreHorizontalIcon,
+  ShieldIcon,
+  Trash2Icon,
+  UserPlusIcon,
+} from "lucide-react";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -8,7 +14,12 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { RowSelection } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -49,6 +60,8 @@ export function AssignmentsView({
   bulkRevoking,
   onRevoke,
   onBulkRevoke,
+  exportingCsv,
+  onExportCsv,
   renderGrantDialog,
 }: AssignmentsViewProps) {
   const fmt = useFormatters();
@@ -81,6 +94,26 @@ export function AssignmentsView({
             </Can>
           ),
         }}
+        menu={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" aria-label="More list actions">
+                <MoreHorizontalIcon className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={exportingCsv || page.totalCount === 0}
+                onSelect={() => {
+                  void onExportCsv();
+                }}
+              >
+                <DownloadIcon className="size-4" />
+                {exportingCsv ? "Exporting CSV…" : "Export matching assignments as CSV"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
         list={list}
         label="Role bindings"
         columns={columns}

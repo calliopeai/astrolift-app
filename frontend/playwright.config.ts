@@ -13,6 +13,7 @@ const STORYBOOK_DIR = process.env.STORYBOOK_DIR ?? "storybook-static";
 
 export default defineConfig({
   testDir: "e2e",
+  outputDir: "test-results/layout",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,

@@ -386,37 +386,63 @@ def _apply_post_install_manifests(
             component.post_install_manifests,
             key=lambda m: 0 if m.get("kind") in _POST_INSTALL_FOUNDATIONAL_KINDS else 1,
         )
-        namespace = _post_install_namespace(manifests, default=target_namespace)
-        result = driver.apply_manifests(ctx_slug, namespace, manifests)
+        custom = [
+            item
+            for item in manifests
+            if item.get("kind") in {"SecurityPolicy", "BackendTrafficPolicy"}
+            and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/custom-domain")
+        ]
+        batches = [[item for item in manifests if item not in custom], custom] if custom else [manifests]
+        # A custom host's first-party gate cannot hold up the shared auth edge.
+        # Keep both its policy ownership and its apply/retry boundary separate.
+        for batch in batches:
+            if not batch:
+                continue
+            namespace = _post_install_namespace(batch, default=target_namespace)
+            result = driver.apply_manifests(ctx_slug, namespace, batch)
 
-        if result.ok:
-            log.info(
-                "install_cluster_prereqs: post-install %s applied "
-                "created=%d updated=%d unchanged=%d (ns=%s)",
-                component.key,
-                len(result.created),
-                len(result.updated),
-                len(result.unchanged),
-                namespace,
-            )
-            continue
+            if any(
+                getattr(error, "exception_type", "")
+                in {
+                    "CustomDomainAuthPending",
+                    "CustomDomainAuthApplyFailed",
+                }
+                for error in result.errors
+            ):
+                from temporalio.exceptions import ApplicationError
 
-        if _operator_not_serving(result.errors):
-            crd_not_ready = True
-            log.info(
-                "install_cluster_prereqs: post-install %s deferred; its "
-                "operator isn't serving yet (CRD or webhook); Temporal will retry",
-                component.key,
-            )
-        for err in result.errors:
-            errors.append(str(err))
-            if not _operator_not_serving([err]):
-                log.warning(
-                    "install_cluster_prereqs: post-install %s manifest error " "(non-fatal): %s",
-                    component.key,
-                    err,
+                raise ApplicationError(
+                    "custom-domain authentication is not ready; its backend remains guarded and the edge install must retry",
+                    non_retryable=False,
                 )
 
+            if result.ok:
+                log.info(
+                    "install_cluster_prereqs: post-install %s applied "
+                    "created=%d updated=%d unchanged=%d (ns=%s)",
+                    component.key,
+                    len(result.created),
+                    len(result.updated),
+                    len(result.unchanged),
+                    namespace,
+                )
+                continue
+
+            if _operator_not_serving(result.errors):
+                crd_not_ready = True
+                log.info(
+                    "install_cluster_prereqs: post-install %s deferred; its "
+                    "operator isn't serving yet (CRD or webhook); Temporal will retry",
+                    component.key,
+                )
+            for err in result.errors:
+                errors.append(str(err))
+                if not _operator_not_serving([err]):
+                    log.warning(
+                        "install_cluster_prereqs: post-install %s manifest error " "(non-fatal): %s",
+                        component.key,
+                        err,
+                    )
     return crd_not_ready, errors
 
 
@@ -690,6 +716,11 @@ def _install_cluster_prereqs_sync(
     cluster = TenantCluster.objects.select_related(
         "provider_plugin",
     ).get(pk=cluster_id)
+    if "envoy-gateway" in selected_keys:
+        from astrolift_clusters.edge_install import edge_support_refusal
+
+        if refusal := edge_support_refusal(cluster):
+            raise AppDeployError(refusal)
     driver = _driver_for_cluster(cluster)
     ctx = _context_for_cluster(cluster)
 

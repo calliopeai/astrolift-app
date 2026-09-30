@@ -1653,7 +1653,11 @@ class RegistryQuery:
         # Imposing one now would visibly reshuffle every one of them, so
         # the deprecated field keeps its exact behaviour; the page field
         # below defines its own (newest-first).
-        return [workload_to_type(w) for w in _workloads_qs(app_slug=app_slug)[:200]]
+        from astrolift_registry.viewer_actions import workload_viewer_permissions
+
+        rows = list(_workloads_qs(app_slug=app_slug)[:200])
+        permissions = workload_viewer_permissions(rows)
+        return [workload_to_type(w, viewer_permission=permissions[w.pk]) for w in rows]
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)
@@ -1716,7 +1720,12 @@ class RegistryQuery:
         else:
             result = keyset_page(qs, cursor=after, limit=limit)
         last_runs = cron_last_runs(result.rows)
-        return result.map(lambda w: workload_to_type(w, last_run=last_runs.get(w.pk)))
+        from astrolift_registry.viewer_actions import workload_viewer_permissions
+
+        permissions = workload_viewer_permissions(result.rows)
+        return result.map(
+            lambda w: workload_to_type(w, last_run=last_runs.get(w.pk), viewer_permission=permissions[w.pk])
+        )
 
     @strawberry.field
     @require_permission(

@@ -4,10 +4,13 @@ import { expect, userEvent, within } from "storybook/test";
 import {
   CI_SETUP,
   CI_SETUP_AGENT,
+  CI_SETUP_APAC,
   CI_SETUP_EMPTY,
+  CI_SETUP_EU,
   CI_SETUP_LOADING,
   CI_SETUP_LONG,
   CI_SETUP_PROBLEMS,
+  CI_SETUP_UNAVAILABLE,
 } from "./app-ci-observability-section.fixtures";
 import { CiSetupSectionView, PushAndRotateButtonView } from "./CiSetupSection";
 
@@ -26,9 +29,27 @@ export const Loading: Story = {
   render: () => <CiSetupSectionView {...CI_SETUP_LOADING} />,
 };
 
-/** Nothing provisioned yet (unbound provider falls back to AWS names). */
+/** Nothing provisioned yet; no runnable AWS workflow is invented. */
 export const Empty: Story = {
   render: () => <CiSetupSectionView {...CI_SETUP_EMPTY} />,
+};
+
+export const EuropeanRegion: Story = {
+  render: () => <CiSetupSectionView {...CI_SETUP_EU} />,
+};
+
+export const AsiaPacificRegion: Story = {
+  render: () => <CiSetupSectionView {...CI_SETUP_APAC} />,
+};
+
+export const WorkflowUnavailable: Story = {
+  render: () => <CiSetupSectionView {...CI_SETUP_UNAVAILABLE} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText("Managed CI workflow"));
+    await expect(canvas.getByRole("button", { name: "Copy workflow YAML" })).toBeDisabled();
+    await expect(canvas.getByText(/Workflow unavailable/)).toBeInTheDocument();
+  },
 };
 
 /**

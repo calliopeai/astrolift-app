@@ -9,7 +9,7 @@ import { CANCEL_TASK } from "@/graphql/agents/agents.mutations";
 import { AGENT_TASK_LOGS, GET_AGENT_TASK } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentTask } from "@/graphql/agents/agents.types";
 
-import { agentLogLines, TERMINAL_STATUSES } from "./agent-run-steps";
+import { agentLogLines, isTerminalAgentTask } from "./agent-run-steps";
 
 interface TaskResp {
   agentTask: AstroliftAgentTask | null;
@@ -59,7 +59,7 @@ export function useAgentRunDetail(taskId: string) {
   });
 
   const task = taskData?.agentTask ?? null;
-  const terminal = task ? TERMINAL_STATUSES.has(task.status) : false;
+  const terminal = task ? isTerminalAgentTask(task.status) : false;
   const now = useNow(Boolean(task) && !terminal);
   const [cancelTask] = useMutation<CancelResp>(CANCEL_TASK);
 

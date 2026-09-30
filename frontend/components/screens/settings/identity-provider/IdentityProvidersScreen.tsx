@@ -108,7 +108,7 @@ export function IdentityProvidersScreen({
           </span>
           {idp.clientId && (
             <span className="text-muted-foreground block truncate font-mono text-xs">
-              client {idp.clientId.slice(0, 12)}…
+              client {idp.clientId.length > 12 ? `${idp.clientId.slice(0, 12)}…` : idp.clientId}
             </span>
           )}
         </span>
@@ -146,12 +146,9 @@ export function IdentityProvidersScreen({
           ) : (
             <Badge variant="secondary">configured</Badge>
           )}
-          {idp.isActive && (idp.activatedAt || idp.updatedAt) && (
-            // Prefer the dedicated `activatedAt` stamp (set only when the
-            // IdP is flipped to active); fall back to `updatedAt` for
-            // legacy rows from before #467.
+          {idp.isActive && idp.activatedAt && (
             <span className="text-muted-foreground text-2xs">
-              Active since {fmt.formatDate((idp.activatedAt ?? idp.updatedAt) as string)}
+              Active since {fmt.formatDate(idp.activatedAt)}
             </span>
           )}
           {idp.isActive && idp.lastSwitchedByUsername && (

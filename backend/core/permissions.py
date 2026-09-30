@@ -609,6 +609,11 @@ def check_permission(
     scope: PermissionScope | None = None,
 ) -> None:
     tenant = get_current_tenant() or TenantContext()
+    _check_permission_decision(permission, scope, lambda: _resolver(tenant, permission, scope))
+
+
+def _check_permission_decision(permission, scope, decision) -> None:
+    """Share bearer-ceiling and denial translation with batched advisory decisions."""
     # API bearer scopes are a ceiling over the user's normal RBAC grants.
     # Session-authenticated callers have no current API token and are
     # unaffected. Imported lazily to keep this core module identity-agnostic
@@ -621,7 +626,7 @@ def check_permission(
     api_token = get_current_api_token()
     if api_token is not None and not token_scope_allows_permission(api_token, permission.value):
         raise PermissionDenied(permission, scope, "api token scope does not allow this permission")
-    granted, reason = _resolver(tenant, permission, scope)
+    granted, reason = decision()
     if not granted:
         raise PermissionDenied(permission, scope, reason)
 

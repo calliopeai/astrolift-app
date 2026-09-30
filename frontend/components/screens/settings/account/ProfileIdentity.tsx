@@ -91,7 +91,7 @@ export function ProfileIdentity({
           ) : (
             <>
               Profile editing is disabled by your organization administrator. Ask your admin to flip{" "}
-              <code>allowUserProfileEdit</code> on <code>/settings/organization</code>.
+              <code>allowUserProfileEdit</code> on <code>/administration/organization</code>.
             </>
           )}
         </CardDescription>

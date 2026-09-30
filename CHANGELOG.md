@@ -24,6 +24,66 @@
   (#1972). Negotiated runner callbacks persist ordered, bounded snapshots outside
   the event feed; an explicit empty list clears prior progress without changing
   event types or cursors.
+- Team and project create sheets generate backend-compatible slugs and preserve
+  a requested visible team. Workflow configuration waits for and scopes reads
+  to the active organization, create access stays unknown while loading, and
+  agent-only attention links target actual agent pages. Metrics links Temporal
+  only when `NEXT_PUBLIC_TEMPORAL_UI_URL` is configured (#2148).
+
+- Operational forms stay blocked during secret rotation and require a command
+  container. Terminal agent-run aliases stop polling, uppercase running tasks
+  accept overseer input, help copy timers are cleaned up, and webhook writes
+  block only their own subscription while preventing duplicate actions (#2148).
+
+- Public install discovery has a dedicated, rate-limited GraphQL transport with
+  only the curated server handshake. Mobile clients can inspect an install before
+  login while the main API retains its authentication requirement (#2185).
+
+- Manifest conflict resolution labels the unsaved local-draft choice as “Keep
+  mine”; saving remains a separate action. Workload controls show pod readiness
+  as unknown instead of treating desired replicas as healthy pods (#2148).
+
+- Managed AWS CI previews use the backend workflow and the private ECR registry
+  region. Unconfigured deploy-only workflows omit AWS authentication; invalid
+  owner/registry coordinates refuse before driver or repository writes. Reference
+  workflows retain the actual deployment branch (#2148).
+
+- Managed clusters offer an explicit full-preflight refresh. Cluster status waits
+  for observed connectivity before reporting an absent agent, and metrics charts
+  use distinct SVG gradients when multiple clusters render together (#2148).
+
+- Workloads expose advisory `viewerCan.restart` and `viewerCan.scale` decisions
+  using actual owner, bearer, grant/share and primary-environment policy checks,
+  batched across a page (#1867). Mutations still recheck; web/CLI consumption
+  and the remaining allowed-action acceptance are pending. See
+  [workload action permissions](docs/operators/viewer-actions.md).
+
+- Token creation accepts the documented zero-day value for no expiry (#2148).
+
+- Config editor section links recognize the manifest codec's managed-service
+  headers. Workload links navigate within the app; identity-provider labels show
+  ellipses only for truncated identifiers and report activation dates only when
+  observed. Correct organization paths, missing-form copy and prerequisite
+  documentation spacing (#2148).
+
+- Approval queue counts and select-all follow currently visible rows after
+  polling. Invalid invitation expiries remain unavailable, alert mute submissions
+  enforce whole hours from 1 through 168 and block pending repeats, manifest
+  diagnostics retain zero coordinates, and blank image tags show the deployment
+  identifier (#2148).
+
+- Production route checks follow rendered navigation for every active route in
+  the generated dictionary (#2171), with separate alias, parked-route and role
+  checks. Cold workflow-run pages wait for workflow context before rendering.
+  See [route navigation checks](docs/testing/route-navigation.md).
+
+- Identity lists export every authorized matching member, invitation and role
+  binding as CSV, preserving filters and stable sorting without the old 5,000-row
+  cutoff or blank member roles. Invitation activity uses only unambiguous live
+  current-org membership and audit evidence; subject aliases and role/policy
+  sort declarations complete the existing paging contract (#2153). See
+  [identity list exports](docs/operators/identity-list-exports.md).
+
 - Persisted deployment logs retain actual owner deny policies and current bearer
   ceilings after app/environment teardown or cluster retirement. Failed history
   diagnostics preserve the original provider failure; completion writes still

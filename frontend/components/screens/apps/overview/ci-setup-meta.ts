@@ -38,22 +38,7 @@ const providerCiMeta: Record<string, ProviderCiMeta> = {
     registryEnv: "ASTROLIFT_ECR_URI",
     registryHint:
       "Amazon ECR repository URI this app pushes to. Tag with the commit SHA per build.",
-    renderWorkflowSteps: () => `      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: \${{ secrets.ASTROLIFT_PUSH_ROLE_ARN }}
-          aws-region: us-west-2
-          role-session-name: astrolift-\${{ github.run_id }}
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push image
-        env:
-          IMAGE: \${{ secrets.ASTROLIFT_ECR_URI }}:\${{ github.sha }}
-        run: |
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"`,
+    renderWorkflowSteps: () => "",
   },
   gcp: {
     pushCredentialEnv: "ASTROLIFT_WORKLOAD_IDENTITY_PROVIDER",
@@ -130,8 +115,7 @@ const providerCiMeta: Record<string, ProviderCiMeta> = {
   },
 };
 
-/** Default to the AWS shape for an unbound / unknown provider so the card
- *  still renders a working reference rather than blanking out. */
+/** Unbound providers retain familiar secret labels; no AWS workflow is invented. */
 export function resolveProviderCiMeta(slug: string): ProviderCiMeta {
   return providerCiMeta[slug] ?? providerCiMeta.aws;
 }
@@ -173,12 +157,22 @@ export const DRIFT_HINT: Record<string, string> = {
  * POST tells the platform which image to roll out. Matches the contract
  * documented in spec 09 §6.
  */
-export function renderWorkflowYaml(meta: ProviderCiMeta): string {
+export function renderWorkflowYaml(
+  meta: ProviderCiMeta,
+  {
+    providerSlug,
+    renderedText,
+    deployBranch,
+  }: { providerSlug: string; renderedText?: string | null; deployBranch?: string | null }
+): string | null {
+  if (providerSlug === "aws" || !(providerSlug in providerCiMeta)) {
+    return renderedText?.trim() ? renderedText : null;
+  }
   return `name: astrolift deploy
 
 on:
   push:
-    branches: [main]
+    branches: [${JSON.stringify(deployBranch?.trim() || "main")}]
   workflow_dispatch: {}
 
 permissions:

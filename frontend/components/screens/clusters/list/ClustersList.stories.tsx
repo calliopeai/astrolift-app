@@ -1,5 +1,5 @@
 import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
@@ -49,6 +49,22 @@ function Clusters({ fleet = CLUSTERS, initial, ...patch }: Props) {
 }
 
 export const Full: Story = { render: () => <Clusters /> };
+
+const refreshWithPreflight = fn(async () => {});
+export const FullPreflight: Story = {
+  render: () => <Clusters fleet={[CLUSTERS[0]]} onRefresh={refreshWithPreflight} />,
+  play: async ({ canvasElement }) => {
+    refreshWithPreflight.mockClear();
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /row actions/ }));
+    await userEvent.click(
+      await within(document.body).findByRole("menuitem", {
+        name: "Refresh setup with full preflight",
+      })
+    );
+    await expect(refreshWithPreflight).toHaveBeenCalledTimes(1);
+    await expect(refreshWithPreflight).toHaveBeenCalledWith(CLUSTERS[0], true);
+  },
+};
 
 export const Loading: Story = { render: () => <Clusters fleet={[]} loading /> };
 

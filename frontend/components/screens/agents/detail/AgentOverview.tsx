@@ -62,7 +62,7 @@ export function AgentOverviewView({
   onSendInput,
 }: AgentOverviewProps) {
   const latest = runs.rows[0] ?? null;
-  const running = runs.rows.find((t) => t.status === "running") ?? null;
+  const running = runs.rows.find((t) => t.status.toLowerCase() === "running") ?? null;
   const skills = detail?.skills ?? [];
   const tools = new Set(skills.flatMap((b) => b.toolDefs.map((t) => t.id))).size;
   const slug = agent.slug;
@@ -115,7 +115,7 @@ export function AgentOverviewView({
               </Fact>
               <Fact label="Took" mono>
                 {runDuration(latest.startedAt, latest.finishedAt) ??
-                  (latest.status === "running" ? "Running" : "Not finished")}
+                  (latest.status.toLowerCase() === "running" ? "Running" : "Not finished")}
               </Fact>
             </dl>
             {running && (

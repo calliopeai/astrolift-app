@@ -43,6 +43,13 @@ export const Full: Story = {
   },
 };
 
+export const UppercaseRunning: Story = {
+  args: {
+    fleet: null,
+    runs: { ...OVERVIEW.runs, rows: [{ ...RUNNING_TASKS[0], status: "RUNNING" }] },
+  },
+};
+
 export const Loading: Story = {
   args: {
     detail: null,

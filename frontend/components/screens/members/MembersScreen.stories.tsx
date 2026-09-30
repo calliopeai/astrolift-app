@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
@@ -179,4 +179,14 @@ export const Width768: Story = {
       />
     </div>
   ),
+};
+
+export const ExportingCsv: Story = {
+  render: () => <People exportingCsv />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "More list actions" }));
+    await expect(
+      within(canvasElement.ownerDocument.body).getByRole("menuitem", { name: "Exporting CSV…" })
+    ).toHaveAttribute("aria-disabled", "true");
+  },
 };

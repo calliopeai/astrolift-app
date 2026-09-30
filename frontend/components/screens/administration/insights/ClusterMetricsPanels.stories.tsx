@@ -68,3 +68,13 @@ export const RangeUnavailable: Story = {
 export const SparseSeries: Story = { render: () => <PrometheusPanel {...PROMETHEUS_SPARSE} /> };
 
 export const LongStrings: Story = { render: () => <PrometheusPanel {...PROMETHEUS_LONG} /> };
+
+/** Identical metric keys from distinct clusters must have separate paint servers. */
+export const MultipleClusters: Story = {
+  render: () => (
+    <div className="space-y-6">
+      <PrometheusPanel {...PROMETHEUS} />
+      <PrometheusPanel {...PROMETHEUS} slug="second-cluster" />
+    </div>
+  ),
+};

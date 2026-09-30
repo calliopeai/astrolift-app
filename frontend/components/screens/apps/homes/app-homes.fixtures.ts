@@ -25,6 +25,10 @@ export const LONG =
 
 export function workload(overrides: Partial<AstroliftWorkload> = {}): AstroliftWorkload {
   return {
+    viewerCan: {
+      restart: { allowed: true, code: "", reason: "" },
+      scale: { allowed: true, code: "", reason: "" },
+    },
     version: 1,
     id: "wl-1",
     slug: "api",

@@ -1605,7 +1605,7 @@
       },
       "conflict": {
         "title": "The manifest changed under your edit",
-        "description": "The server's copy was updated at {at}. Keep your edit (force-overwrite their changes) or discard your draft and load theirs.",
+        "description": "The server's copy was updated at {at}. Keep your edit as an unsaved draft for the next Save, or discard your draft and load theirs.",
         "yourDraft": "Your draft",
         "serverCopy": "Server copy",
         "cancel": "Cancel",

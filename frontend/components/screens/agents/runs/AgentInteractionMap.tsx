@@ -148,7 +148,7 @@ function latestMs(items: AstroliftAgentInteraction[]): number {
 
 // AgentTask.status → the origin (agent) node's tone + whether it pulses.
 function taskTone(status: string): { tone: Tone; pulse: boolean } {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case "running":
       return { tone: "running", pulse: true };
     case "provisioning":

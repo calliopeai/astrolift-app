@@ -40,10 +40,15 @@ from core.utils.logger_helper import gql_logger
 from core.views_well_known import apple_app_site_association, assetlinks_json
 
 from .schema import schema, schema_auth
+from .schema_public import schema_public
 from .views import app_root_view, metrics_view, root_view
 
 strawberry_view = CoreStrawberryView.as_view(schema=schema)
 strawberry_auth_view = CoreStrawberryView.as_view(schema=schema_auth)
+strawberry_public_view = route_auth(
+    credential="anonymous",
+    scope="curated install metadata; discovery schema has no tenant fields or mutations",
+)(CoreStrawberryView.as_view(schema=schema_public))
 
 
 @route_auth(
@@ -72,6 +77,17 @@ urls = [
     path("nested_admin/", include("nested_admin.urls")),
     path("export/", views.download_file),
     # GraphQL endpoints (Strawberry) — rate limited
+    path(
+        "gql/config/public/",
+        csrf_exempt(
+            ratelimit(
+                group="public_install_discovery",
+                key="ip",
+                rate=settings.RATELIMIT_GRAPHQL_AUTH_RATE,
+                block=True,
+            )(strawberry_public_view)
+        ),
+    ),
     path(
         "gql/config/",
         csrf_exempt(

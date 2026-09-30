@@ -49,7 +49,7 @@ export function deployFailureReason(d: AstroliftDeployment): string {
 }
 
 function shortTag(d: Pick<AstroliftDeployment, "imageTag" | "id">): string {
-  return (d.imageTag ?? d.id).slice(0, 12);
+  return (d.imageTag || d.id).slice(0, 12);
 }
 
 export function LatestDeployPanel({
@@ -147,7 +147,7 @@ export function LatestDeployPanel({
             </span>
             <span
               className="min-w-0 font-mono text-sm [overflow-wrap:anywhere]"
-              title={current.imageTag ?? current.id}
+              title={current.imageTag || current.id}
             >
               {shortTag(current)}
             </span>

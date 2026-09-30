@@ -17,6 +17,7 @@ interface LiveStateResp {
 export function useClusterLiveState(clusterId: string) {
   const { data, loading, error, refetch } = useQuery<LiveStateResp>(CLUSTER_LIVE_STATE, {
     variables: { clusterId },
+    fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
   return {

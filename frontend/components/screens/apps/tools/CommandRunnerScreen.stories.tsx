@@ -52,6 +52,10 @@ export const Empty: Story = {
   render: () => <CommandRunnerScreen {...COMMAND_RUNNER} />,
 };
 
+export const MissingContainer: Story = {
+  render: () => <CommandRunnerScreen {...COMMAND_RUNNER} command="ls" containerName="" />,
+};
+
 export const Running: Story = {
   render: () => (
     <CommandRunnerScreen

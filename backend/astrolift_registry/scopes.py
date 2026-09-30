@@ -18,12 +18,12 @@ def registry_org_scope(_args=None) -> PermissionScope:
     return PermissionScope(kind=ScopeKind.ORG, id=_org_id() or 0)
 
 
-def _credential_scope(scope: PermissionScope, permission: Permission | None) -> PermissionScope:
+def _credential_scope(
+    scope: PermissionScope, permission: Permission | None, *, allowed_app_ids=None
+) -> PermissionScope:
     if permission is None:
         return scope
     from astrolift_identity.api_tokens import get_current_api_token
-    from astrolift_identity.permission_resolver import share_levels
-    from astrolift_registry.models import AppTeamAccess, RegisteredApp
 
     token = get_current_api_token()
     if token is None:
@@ -34,32 +34,47 @@ def _credential_scope(scope: PermissionScope, permission: Permission | None) -> 
     if token.team_id is None:
         return scope
     if scope.kind == ScopeKind.APP:
-        from django.db.models import Q
+        from astrolift_identity.historical_scopes import HistoricalAppScope
 
-        from astrolift_identity.historical_scopes import HistoricalAppScope, historical_app_owners
-
-        owners = live_app_owners(RegisteredApp.objects.filter(pk=scope.id, organization_id=org_id))
-        if isinstance(scope, HistoricalAppScope):
-            owners = historical_app_owners(RegisteredApp.all_objects.filter(pk=scope.id), org_id)
-        owned = owners.filter(
-            Q(team_id=token.team_id, team__deleted_at__isnull=True)
-            | Q(
-                team_id__isnull=True,
-                project__team_id=token.team_id,
-                project__team__deleted_at__isnull=True,
-            )
-        ).exists()
-        shared = AppTeamAccess.objects.filter(
-            registered_app_id=scope.id,
-            registered_app__organization_id=org_id,
-            team_id=token.team_id,
-            team__organization_id=org_id,
-            team__deleted_at__isnull=True,
-            access_level__in=share_levels(permission),
-        ).exists()
-        if owned or shared:
+        ids = (
+            allowed_app_ids
+            if allowed_app_ids is not None
+            else _credential_app_ids([scope.id], permission, historical=isinstance(scope, HistoricalAppScope))
+        )
+        if scope.id in ids:
             return scope
     raise PermissionDenied(permission, scope, "app is outside the credential's team")
+
+
+def _credential_app_ids(app_ids, permission, *, historical=False):
+    """Batch the same ownership/share ceiling used by the scalar scope factory."""
+    from django.db.models import Q
+
+    from astrolift_identity.api_tokens import get_current_api_token
+    from astrolift_identity.historical_scopes import historical_app_owners
+    from astrolift_identity.permission_resolver import share_levels
+    from astrolift_registry.models import AppTeamAccess, RegisteredApp
+
+    token = get_current_api_token()
+    if token is None or token.team_id is None:
+        return set(app_ids)
+    org_id = _org_id()
+    owners = live_app_owners(RegisteredApp.objects.filter(pk__in=app_ids, organization_id=org_id))
+    if historical:
+        owners = historical_app_owners(RegisteredApp.all_objects.filter(pk__in=app_ids), org_id)
+    owned = owners.filter(
+        Q(team_id=token.team_id, team__deleted_at__isnull=True)
+        | Q(team_id__isnull=True, project__team_id=token.team_id, project__team__deleted_at__isnull=True)
+    ).values_list("pk", flat=True)
+    shared = AppTeamAccess.objects.filter(
+        registered_app_id__in=app_ids,
+        registered_app__organization_id=org_id,
+        team_id=token.team_id,
+        team__organization_id=org_id,
+        team__deleted_at__isnull=True,
+        access_level__in=share_levels(permission),
+    ).values_list("registered_app_id", flat=True)
+    return set(owned) | set(shared)
 
 
 def live_app_owners(qs):

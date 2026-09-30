@@ -55,13 +55,10 @@ const SYNC_BADGE: Record<
 
 // Section keys map to the leading [section] header in astrolift.toml.
 // The pill toggle scrolls + selects the first occurrence inside the
-// textarea — for the workloads/services/env/volumes tables which are
-// always written as [[workloads.web]] / [services.postgres] / etc.,
-// scanning for "[<key>" catches both the bare section and the inline
-// array-of-tables forms.
+// textarea, including array-of-tables headers written by the manifest codec.
 const PILL_SECTIONS: Array<{ key: string; headers: string[] }> = [
   { key: "workloads", headers: ["[workloads", "[[workloads"] },
-  { key: "services", headers: ["[services", "[[services"] },
+  { key: "services", headers: ["[managed_services", "[[managed_services"] },
   { key: "env", headers: ["[env", "[[env"] },
   { key: "volumes", headers: ["[volumes", "[[volumes"] },
 ];
@@ -101,14 +98,14 @@ function ConflictResolverModal({
   ours,
   theirs,
   serverUpdatedAt,
-  onForceOverwrite,
+  onKeepMine,
   onAcceptTheirs,
   onClose,
 }: {
   ours: string;
   theirs: string;
   serverUpdatedAt: string;
-  onForceOverwrite: () => void;
+  onKeepMine: () => void;
   onAcceptTheirs: () => void;
   onClose: () => void;
 }) {
@@ -152,9 +149,7 @@ function ConflictResolverModal({
           <Button variant="outline" onClick={onAcceptTheirs}>
             {t("loadTheirs")}
           </Button>
-          <Button variant="destructive" onClick={onForceOverwrite}>
-            {t("forceOverwrite")}
-          </Button>
+          <Button onClick={onKeepMine}>{t("keepMine")}</Button>
         </div>
       </div>
     </div>
@@ -468,7 +463,7 @@ export function ConfigEditorScreen({
           ours={draft}
           theirs={conflict.theirs}
           serverUpdatedAt={conflict.serverUpdatedAt}
-          onForceOverwrite={dismissConflictKeepMine}
+          onKeepMine={dismissConflictKeepMine}
           onAcceptTheirs={adoptTheirs}
           onClose={closeConflict}
         />

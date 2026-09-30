@@ -17,6 +17,7 @@ interface Props {
   registryUri: string;
   pushCredentialRef: string;
   providerPluginSlug: string;
+  deployBranch?: string | null;
   sourceWebhookInstalledAt: string | null;
   ciWorkflowSyncStatus: AstroliftCiWorkflowSyncStatus | null;
   agentMode?: boolean;
