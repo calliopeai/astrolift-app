@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import type { CursorPage } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -93,26 +95,33 @@ export function useManagedServices(slug: string) {
     provisionManagedService: MutationResult<ManagedService>;
   }>(PROVISION_MANAGED_SERVICE, {
     refetchQueries: refetch,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
   const [deprovision, deprovisionState] = useMutation<{
     deprovisionManagedService: MutationResult<{ id: string; deleted: boolean }>;
   }>(DEPROVISION_MANAGED_SERVICE, {
     refetchQueries: refetch,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
   /** Resolves true when the provision was accepted (close the sheet). */
   async function onProvision(input: ProvisionInput): Promise<boolean> {
-    const { data } = await provision({
-      variables: { input: { appSlug: slug, ...input } },
-    });
-    if (data?.provisionManagedService.ok) {
-      toast.success(`Provisioning ${input.kind}`);
-      return true;
+    try {
+      const { data } = await provision({
+        variables: { input: { appSlug: slug, ...input } },
+      });
+      if (data?.provisionManagedService.ok) {
+        toast.success(`Provisioning ${input.kind}`);
+        return true;
+      }
+      toast.error(data?.provisionManagedService.errors?.[0]?.message ?? "Provision failed");
+      return false;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Provision failed");
+      return false;
     }
-    toast.error(data?.provisionManagedService.errors?.[0]?.message ?? "Provision failed");
-    return false;
   }
 
   /** Resolves true when the deprovision was accepted (close the dialog). */

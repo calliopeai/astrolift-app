@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
 import {
@@ -113,16 +115,16 @@ export function useDeployments() {
 
   const [approve, approveState] = useMutation<{
     approveDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(APPROVE_DEPLOYMENT, { refetchQueries: REFETCH_LIST });
+  }>(APPROVE_DEPLOYMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: REFETCH_LIST });
   const [abort, abortState] = useMutation<{
     abortDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ABORT_DEPLOYMENT, { refetchQueries: REFETCH_LIST });
+  }>(ABORT_DEPLOYMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: REFETCH_LIST });
   const [rollback, rollbackState] = useMutation<{
     rollbackDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: REFETCH_LIST });
+  }>(ROLLBACK_DEPLOYMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: REFETCH_LIST });
   const [redeploy, redeployState] = useMutation<{
     redeployApp: MutationResultLite<AstroliftDeployment>;
-  }>(REDEPLOY_APP, { refetchQueries: REFETCH_LIST });
+  }>(REDEPLOY_APP, { onQueryUpdated: refetchAfterMutation, refetchQueries: REFETCH_LIST });
 
   const busy =
     approveState.loading || abortState.loading || rollbackState.loading || redeployState.loading;
@@ -185,8 +187,8 @@ export function useDeployments() {
       } else {
         toast.warning(t("bulk.toasts.partial", { label: t(labelKey), succeeded, failed }));
       }
-      refetch().catch(() => {});
     } finally {
+      await refetchAfterMutation({ refetch });
       setBulkRunning(false);
     }
   }

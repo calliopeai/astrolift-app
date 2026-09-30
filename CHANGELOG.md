@@ -105,6 +105,12 @@
   account permissions allow it. The existing `mcp:dispatch` scope now includes
   `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
   enforced (#2188).
+- Frontend action failures show a toast or an inline form reason, while rejected
+  confirmation actions keep their dialog and selection (#2146). Successful
+  dispatches and token creation retain their result when a follow-up refresh
+  fails; bulk deployment actions refresh the list even after total failure.
+  Agent config and device pairing report copy success only after the clipboard
+  write completes, and offer manual-copy guidance when it fails.
 
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep

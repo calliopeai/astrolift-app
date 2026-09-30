@@ -295,6 +295,7 @@
         "verificationUriHelp": "Se o QR não escanear, digite esta URL no seu dispositivo.",
         "toastGenerateFailed": "Não foi possível gerar o QR — tente novamente.",
         "toastUriCopied": "URL de verificação copiada",
+        "toastCopyFailed": "Não foi possível copiar. Selecione o texto e copie manualmente.",
         "toastPayloadCopied": "Payload copiado"
       }
     }
@@ -1703,6 +1704,7 @@
         "serviceConfig": "Config",
         "addConfig": "Add key",
         "copied": "TOML copied",
+        "copyFailed": "Não foi possível copiar. Selecione o texto e copie manualmente.",
         "unsafeTitle": "Can't open this manifest in the visual editor",
         "unsafeBody": "{reason}. Edit it in the Code view — your manifest is untouched.",
         "switchToCode": "Switch to Code view",

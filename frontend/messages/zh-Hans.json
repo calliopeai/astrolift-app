@@ -295,6 +295,7 @@
         "verificationUriHelp": "如果二维码无法扫描，请在设备上输入此 URL。",
         "toastGenerateFailed": "无法生成二维码 — 请重试。",
         "toastUriCopied": "验证 URL 已复制",
+        "toastCopyFailed": "无法复制。请选择文本并手动复制。",
         "toastPayloadCopied": "载荷已复制"
       }
     }
@@ -1703,6 +1704,7 @@
         "serviceConfig": "Config",
         "addConfig": "Add key",
         "copied": "TOML copied",
+        "copyFailed": "无法复制。请选择文本并手动复制。",
         "unsafeTitle": "Can't open this manifest in the visual editor",
         "unsafeBody": "{reason}. Edit it in the Code view — your manifest is untouched.",
         "switchToCode": "Switch to Code view",

@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import {
   PAUSE_ENVIRONMENT,
   RESTART_WORKLOAD,
@@ -112,10 +114,12 @@ export function useEnvironmentControls(
   const t = useTranslations("apps.settings.controls");
   const [pause, { loading: pausing }] = useMutation<PauseResp>(PAUSE_ENVIRONMENT, {
     refetchQueries: [{ query: LIST_ENVIRONMENTS, variables: { appSlug } }],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
   const [resume, { loading: resuming }] = useMutation<ResumeResp>(RESUME_ENVIRONMENT, {
     refetchQueries: [{ query: LIST_ENVIRONMENTS, variables: { appSlug } }],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
   const [deploy, { loading: deploying }] = useMutation<StartResp>(START_DEPLOYMENT, {
@@ -137,21 +141,25 @@ export function useEnvironmentControls(
   const lastTag = deploymentsData?.astroliftDeployments?.[0]?.imageTag ?? "";
 
   async function onTogglePause() {
-    const fn = env.deploysPaused ? resume : pause;
-    const res = await fn({ variables: { input: { id: env.id } } });
-    // The mutation result envelope differs by mutation name; both share
-    // `ok` and `errors[]` so we don't need to discriminate further.
-    const result = env.deploysPaused
-      ? (res.data as ResumeResp | null | undefined)?.resumeEnvironment
-      : (res.data as PauseResp | null | undefined)?.pauseEnvironment;
-    if (result?.ok) {
-      toast.success(
-        env.deploysPaused
-          ? t("toastDeploysResumed", { env: env.name })
-          : t("toastDeploysPaused", { env: env.name })
-      );
-    } else {
-      toast.error(result?.errors?.[0]?.message ?? t("toastActionFailed"));
+    try {
+      const fn = env.deploysPaused ? resume : pause;
+      const res = await fn({ variables: { input: { id: env.id } } });
+      // The mutation result envelope differs by mutation name; both share
+      // `ok` and `errors[]` so we don't need to discriminate further.
+      const result = env.deploysPaused
+        ? (res.data as ResumeResp | null | undefined)?.resumeEnvironment
+        : (res.data as PauseResp | null | undefined)?.pauseEnvironment;
+      if (result?.ok) {
+        toast.success(
+          env.deploysPaused
+            ? t("toastDeploysResumed", { env: env.name })
+            : t("toastDeploysPaused", { env: env.name })
+        );
+      } else {
+        toast.error(result?.errors?.[0]?.message ?? t("toastActionFailed"));
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toastActionFailed"));
     }
   }
 
@@ -243,36 +251,47 @@ export function useWorkloadOps(envName: string, workload: AstroliftWorkload, app
   const t = useTranslations("apps.settings.controls");
   const [restart, { loading: restarting }] = useMutation<RestartWorkloadResp>(RESTART_WORKLOAD, {
     refetchQueries: [{ query: LIST_WORKLOADS, variables: { appSlug } }],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
   const [scale, { loading: scaling }] = useMutation<ScaleWorkloadResp>(SCALE_WORKLOAD, {
     refetchQueries: [{ query: LIST_WORKLOADS, variables: { appSlug } }],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
   async function onRestart() {
-    const { data } = await restart({ variables: { input: { workloadId: workload.id } } });
-    const payload = data?.restartAstroliftWorkload;
-    if (payload?.ok) {
-      toast.success(t("toastRestartIssued", { workload: workload.name, env: envName }));
-    } else {
-      toast.error(payload?.errors?.[0]?.message ?? t("toastRestartFailed"));
+    try {
+      const { data } = await restart({ variables: { input: { workloadId: workload.id } } });
+      const payload = data?.restartAstroliftWorkload;
+      if (payload?.ok) {
+        toast.success(t("toastRestartIssued", { workload: workload.name, env: envName }));
+      } else {
+        toast.error(payload?.errors?.[0]?.message ?? t("toastRestartFailed"));
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toastRestartFailed"));
     }
   }
 
   /** Resolves false on a rejected scale so the view can revert its staged counter. */
   async function onApply(replicas: number): Promise<boolean> {
-    const { data } = await scale({
-      variables: { input: { workloadId: workload.id, replicas } },
-    });
-    const payload = data?.scaleAstroliftWorkload;
-    if (payload?.ok) {
-      const desired = payload.data?.desiredReplicas ?? replicas;
-      toast.success(t("toastScaled", { workload: workload.name, env: envName, count: desired }));
-      return true;
+    try {
+      const { data } = await scale({
+        variables: { input: { workloadId: workload.id, replicas } },
+      });
+      const payload = data?.scaleAstroliftWorkload;
+      if (payload?.ok) {
+        const desired = payload.data?.desiredReplicas ?? replicas;
+        toast.success(t("toastScaled", { workload: workload.name, env: envName, count: desired }));
+        return true;
+      }
+      toast.error(payload?.errors?.[0]?.message ?? t("toastScaleFailed"));
+      return false;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("toastScaleFailed"));
+      return false;
     }
-    toast.error(payload?.errors?.[0]?.message ?? t("toastScaleFailed"));
-    return false;
   }
 
   return { envName, workload, restarting, scaling, onRestart, onApply };

@@ -126,8 +126,8 @@ export function pairProps(over: Partial<PairDeviceViewProps> = {}): PairDeviceVi
     payload: null,
     loading: false,
     onMint: resolved,
-    onCopyVerificationUri: noop,
-    onCopyPayload: noop,
+    onCopyVerificationUri: resolved,
+    onCopyPayload: resolved,
     onClear: noop,
     ...over,
   };

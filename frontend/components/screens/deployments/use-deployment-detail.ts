@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import type { DeploymentByIdInput } from "@/graphql/__generated__/schema";
 import {
   ABORT_DEPLOYMENT,
@@ -91,7 +93,7 @@ function reportResult(
   label: string,
   result: MutationResultLite<AstroliftDeployment> | null | undefined
 ) {
-  if (!result) return;
+  if (!result) throw new Error(`${label} failed`);
   if (result.ok) {
     toast.success(`${label}: ${result.data?.status ?? "ok"}`);
   } else {
@@ -187,17 +189,17 @@ export function useDeploymentDetail(id: string) {
   ];
   const [approve, approveState] = useMutation<{
     approveDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(APPROVE_DEPLOYMENT, { refetchQueries: refetch });
+  }>(APPROVE_DEPLOYMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: refetch });
   const [abort, abortState] = useMutation<{
     abortDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ABORT_DEPLOYMENT, { refetchQueries: refetch });
+  }>(ABORT_DEPLOYMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: refetch });
   const [rollback, rollbackState] = useMutation<{
     rollbackDeployment: MutationResultLite<AstroliftDeployment>;
-  }>(ROLLBACK_DEPLOYMENT, { refetchQueries: refetch });
+  }>(ROLLBACK_DEPLOYMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: refetch });
   const [redeploy, redeployState] = useMutation<
     { redeployApp: MutationResultLite<AstroliftDeployment> },
     { input: DeploymentByIdInput }
-  >(REDEPLOY_APP, { refetchQueries: refetch });
+  >(REDEPLOY_APP, { onQueryUpdated: refetchAfterMutation, refetchQueries: refetch });
   const [deleteDeployment, deleteState] = useMutation<{
     deleteDeployment: MutationResultLite<Pick<AstroliftDeployment, "id" | "status">>;
   }>(DELETE_DEPLOYMENT);
@@ -225,10 +227,14 @@ export function useDeploymentDetail(id: string) {
 
   async function onApprove() {
     if (!deployment) return;
-    const { data } = await approve({
-      variables: { input: { id: deployment.id } },
-    });
-    reportResult("approveDeployment", data?.approveDeployment);
+    try {
+      const { data } = await approve({
+        variables: { input: { id: deployment.id } },
+      });
+      reportResult("approveDeployment", data?.approveDeployment);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "approveDeployment failed");
+    }
   }
 
   async function onAbort(reason: string) {

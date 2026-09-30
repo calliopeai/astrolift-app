@@ -60,11 +60,7 @@ export function AssignmentsView({
 
   async function handleBulkRevoke() {
     if (!bulkTarget) return;
-    try {
-      if (await onBulkRevoke(bulkTarget.selectedIds)) bulkTarget.clear();
-    } finally {
-      setBulkTarget(null);
-    }
+    if (await onBulkRevoke(bulkTarget.selectedIds)) bulkTarget.clear();
   }
 
   const columns = bindingColumns({ formatDate: fmt.formatDate });

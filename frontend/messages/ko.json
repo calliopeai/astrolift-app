@@ -295,6 +295,7 @@
         "verificationUriHelp": "QR이 스캔되지 않으면 이 URL을 기기에 입력하세요.",
         "toastGenerateFailed": "QR을 생성할 수 없습니다 — 다시 시도하세요.",
         "toastUriCopied": "확인 URL이 복사되었습니다",
+        "toastCopyFailed": "복사할 수 없습니다. 텍스트를 선택하고 직접 복사하세요.",
         "toastPayloadCopied": "페이로드가 복사되었습니다"
       }
     }
@@ -1703,6 +1704,7 @@
         "serviceConfig": "Config",
         "addConfig": "Add key",
         "copied": "TOML copied",
+        "copyFailed": "복사할 수 없습니다. 텍스트를 선택하고 직접 복사하세요.",
         "unsafeTitle": "Can't open this manifest in the visual editor",
         "unsafeBody": "{reason}. Edit it in the Code view — your manifest is untouched.",
         "switchToCode": "Switch to Code view",

@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { CREATE_ROLE } from "@/graphql/identity/identity.mutations";
 import { LIST_ROLES } from "@/graphql/identity/identity.queries";
 import type { AstroliftRole, MutationResult } from "@/graphql/identity/identity.types";
@@ -33,29 +35,34 @@ export function useNewRole() {
     createRole: MutationResult<AstroliftRole>;
   }>(CREATE_ROLE, {
     refetchQueries: ["ListRolesPage", { query: LIST_ROLES }],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
   async function onCreate(draft: RoleDraft): Promise<string | null> {
-    const { data: res } = await create({
-      variables: {
-        input: {
-          slug: draft.slug.trim().toLowerCase(),
-          name: draft.name.trim(),
-          scopeLevel: draft.scopeLevel,
-          permissions: draft.permissions,
-          description: draft.description.trim(),
-          duplicatedFromId: draft.duplicatedFromId,
+    try {
+      const { data: res } = await create({
+        variables: {
+          input: {
+            slug: draft.slug.trim().toLowerCase(),
+            name: draft.name.trim(),
+            scopeLevel: draft.scopeLevel,
+            permissions: draft.permissions,
+            description: draft.description.trim(),
+            duplicatedFromId: draft.duplicatedFromId,
+          },
         },
-      },
-    });
-    const created = res?.createRole;
-    if (created?.ok && created.data) {
-      toast.success(`Role “${draft.name.trim()}” created`);
-      router.push(roleHref(created.data.id));
-      return null;
+      });
+      const created = res?.createRole;
+      if (created?.ok && created.data) {
+        toast.success(`Role “${draft.name.trim()}” created`);
+        router.push(roleHref(created.data.id));
+        return null;
+      }
+      return created?.errors?.[0]?.message ?? "Create failed";
+    } catch (err) {
+      return err instanceof Error ? err.message : "Create failed";
     }
-    return created?.errors?.[0]?.message ?? "Create failed";
   }
 
   return {

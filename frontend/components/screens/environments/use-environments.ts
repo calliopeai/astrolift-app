@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import { useListState, useLocalListState } from "@/components/list/use-list-state";
 import { PAUSE_ENVIRONMENT, RESUME_ENVIRONMENT } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
@@ -25,7 +27,7 @@ function reportResult(
   label: string,
   result: MutationResultLite<AstroliftAppEnvironment> | null | undefined
 ) {
-  if (!result) return;
+  if (!result) throw new Error(`${label} failed`);
   if (result.ok) {
     toast.success(`${label}: ${result.data?.deploysPaused ? "paused" : "active"}`);
   } else {
@@ -66,10 +68,10 @@ export function useEnvironments(appSlug?: string) {
   const refetch = [{ query: LIST_ENVIRONMENTS_PAGE, variables }];
   const [pause, pauseState] = useMutation<{
     pauseEnvironment: MutationResultLite<AstroliftAppEnvironment>;
-  }>(PAUSE_ENVIRONMENT, { refetchQueries: refetch });
+  }>(PAUSE_ENVIRONMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: refetch });
   const [resume, resumeState] = useMutation<{
     resumeEnvironment: MutationResultLite<AstroliftAppEnvironment>;
-  }>(RESUME_ENVIRONMENT, { refetchQueries: refetch });
+  }>(RESUME_ENVIRONMENT, { onQueryUpdated: refetchAfterMutation, refetchQueries: refetch });
 
   /** Throws on failure so the confirm dialog shows the error and stays open. */
   async function onPause(e: AstroliftAppEnvironment) {

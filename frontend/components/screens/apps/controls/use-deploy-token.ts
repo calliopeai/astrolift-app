@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import {
   CREATE_DEPLOY_TOKEN,
   REVOKE_DEPLOY_TOKEN,
@@ -60,7 +62,7 @@ export function useDeployToken(appSlug: string) {
   const [reveal, setReveal] = useState<string | null>(null);
 
   const refetchAll = async () => {
-    await refetch();
+    await refetchAfterMutation({ refetch });
   };
 
   const [create, { loading: creating }] = useMutation<CreateResp>(CREATE_DEPLOY_TOKEN, {
@@ -74,20 +76,25 @@ export function useDeployToken(appSlug: string) {
       { query: LIST_APP_DEPLOY_TOKENS, variables: { appSlug } },
       { query: GET_APP, variables: { slug: appSlug } },
     ],
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
   async function onCreate() {
-    const { data } = await create({
-      variables: {
-        input: { appSlug, name: "default", scopes: ["deploy"] },
-      },
-    });
-    if (data?.createDeployToken.ok && data.createDeployToken.data) {
-      setReveal(data.createDeployToken.data.plaintextSecret);
-      toast.success("Deploy token minted.");
-    } else {
-      toast.error(data?.createDeployToken.errors?.[0]?.message ?? "Create failed.");
+    try {
+      const { data } = await create({
+        variables: {
+          input: { appSlug, name: "default", scopes: ["deploy"] },
+        },
+      });
+      if (data?.createDeployToken.ok && data.createDeployToken.data) {
+        setReveal(data.createDeployToken.data.plaintextSecret);
+        toast.success("Deploy token minted.");
+      } else {
+        toast.error(data?.createDeployToken.errors?.[0]?.message ?? "Create failed.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Create failed.");
     }
   }
 
