@@ -4493,7 +4493,11 @@
         "eligible": "Elegível",
         "selectedTarget": "Selecionado: {target}",
         "revisions": "Revisão desejada {desired} · Revisão aplicada {applied}",
-        "subscriptionsDisabled": "Novas assinaturas estão desativadas para esta implantação. As existentes ainda podem ser revogadas com acesso ao destino."
+        "subscriptionsDisabled": "Novas assinaturas estão desativadas para esta implantação. As existentes ainda podem ser revogadas com acesso ao destino.",
+        "revokedConfirmed": "A revogação desta assinatura está confirmada.",
+        "targetSearch": "Buscar aplicativos e ambientes",
+        "subscriptionSearch": "Buscar assinaturas",
+        "accessConfirmed": "O acesso da assinatura está confirmado para esta revisão."
       },
       "catalogue": {
         "title": "Catálogo do Hugging Face",

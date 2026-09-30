@@ -40,6 +40,58 @@ function deferred() {
 }
 
 describe("shared model subscription review", () => {
+  it("keeps accepted access pending until the exact subscription revision is observed active", async () => {
+    const row = subscriptionProps.subscriptions.rows[0];
+    const props = {
+      ...subscriptionProps,
+      onSubscribe: async (): Promise<SubscriptionActionResult> => ({
+        accepted: true,
+        subscriptionId: row.id,
+        desiredRevision: 4,
+      }),
+    };
+    const { rerender } = render(view(props));
+    await review();
+    fireEvent.click(screen.getByRole("button", { name: "Request subscription" }));
+    expect(await screen.findByText(en.models.shared.subscriptions.accepted)).toBeInTheDocument();
+    rerender(
+      view({
+        ...props,
+        subscriptions: {
+          ...props.subscriptions,
+          rows: [{ ...row, status: "pending", desiredRevision: 4, appliedRevision: 2 }],
+        },
+      })
+    );
+    expect(screen.getByText(en.models.shared.subscriptions.accepted)).toBeInTheDocument();
+    rerender(
+      view({
+        ...props,
+        subscriptions: {
+          ...props.subscriptions,
+          rows: [{ ...row, status: "active", desiredRevision: 4, appliedRevision: 4 }],
+        },
+      })
+    );
+    expect(screen.getByText(en.models.shared.subscriptions.accessConfirmed)).toBeInTheDocument();
+    expect(screen.queryByText(en.models.shared.subscriptions.accepted)).not.toBeInTheDocument();
+  });
+  it.each(Object.keys(locales) as (keyof typeof locales)[])(
+    "distinguishes already-confirmed revocation in %s from a new pending restart",
+    async (locale) => {
+      const text = locales[locale].models.shared.subscriptions;
+      render(
+        view(
+          { ...subscriptionProps, onRevoke: async () => ({ accepted: true, state: "revoked" }) },
+          locale
+        )
+      );
+      fireEvent.click(screen.getByRole("button", { name: text.reviewRevoke }));
+      fireEvent.click(screen.getByRole("button", { name: text.confirmRevoke }));
+      expect(await screen.findByText(text.revokedConfirmed)).toBeInTheDocument();
+      expect(screen.queryByText(text.accepted)).not.toBeInTheDocument();
+    }
+  );
   it("dispatches only the reviewed model/environment IDs and versions, then waits for readiness", async () => {
     const onSubscribe = vi.fn(async (): Promise<SubscriptionActionResult> => ({ accepted: true }));
     render(view({ ...subscriptionProps, onSubscribe }));

@@ -4493,7 +4493,11 @@
         "eligible": "符合条件",
         "selectedTarget": "已选择：{target}",
         "revisions": "期望修订 {desired} · 已应用修订 {applied}",
-        "subscriptionsDisabled": "此部署已禁用新订阅。有目标访问权限时仍可撤销现有订阅。"
+        "subscriptionsDisabled": "此部署已禁用新订阅。有目标访问权限时仍可撤销现有订阅。",
+        "revokedConfirmed": "此订阅的撤销已确认。",
+        "targetSearch": "搜索应用和环境",
+        "subscriptionSearch": "搜索订阅",
+        "accessConfirmed": "此修订版本的订阅访问已确认。"
       },
       "catalogue": {
         "title": "Hugging Face 目录",

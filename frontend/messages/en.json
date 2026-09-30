@@ -4573,7 +4573,11 @@
         "eligible": "Eligible",
         "selectedTarget": "Selected: {target}",
         "revisions": "Desired revision {desired} · Applied revision {applied}",
-        "subscriptionsDisabled": "New subscriptions are disabled for this deployment. Existing subscriptions can still be revoked with destination access."
+        "subscriptionsDisabled": "New subscriptions are disabled for this deployment. Existing subscriptions can still be revoked with destination access.",
+        "revokedConfirmed": "Revocation is confirmed for this subscription.",
+        "targetSearch": "Search apps and environments",
+        "subscriptionSearch": "Search subscriptions",
+        "accessConfirmed": "Subscription access is confirmed for this revision."
       },
       "catalogue": {
         "title": "Hugging Face catalogue",

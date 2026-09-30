@@ -9,6 +9,10 @@
 - Shared model prompt writes refresh current bearer scopes, grants, actor status
   and placement policy after locking, returning public permission refusals before
   queue admission when authority changes (#2213).
+- Connect shared model subscription and independent revocation reviews to actual
+  versioned writes, server-paged app environments and observed desired/applied
+  revisions. Failed refreshes preserve accepted pending requests without replay.
+
 - Wire shared model deployment to actual immutable Hugging Face metadata, server-paged
   cluster selection, complete runtime admission and guarded provision requests. Accepted
   requests remain distinct from scheduling and readiness in all eight locales.

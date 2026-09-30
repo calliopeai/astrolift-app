@@ -65,7 +65,14 @@ export type RevokeSubscriptionRequest = {
   subscriptionId: string;
   subscriptionVersion: number;
 };
-export type SubscriptionActionResult = { accepted: true } | { accepted: false; message: string };
+export type SubscriptionActionResult =
+  | {
+      accepted: true;
+      state?: "pending" | "revoked";
+      subscriptionId?: string;
+      desiredRevision?: number;
+    }
+  | { accepted: false; message: string };
 export type ModelPage<T> = {
   list: ListStateController;
   rows: T[];
@@ -82,6 +89,7 @@ export interface ModelSubscriptionsPanelProps {
   subscriptions: ModelPage<ModelSubscription>;
   onSubscribe: (request: SubscriptionRequest) => Promise<SubscriptionActionResult>;
   onRevoke: (request: RevokeSubscriptionRequest) => Promise<SubscriptionActionResult>;
+  onAccepted?: () => void;
 }
 
 type Review = { scopeRevision: number; modelName: string } & (
@@ -117,6 +125,24 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   const [review, setReview] = useState<Review | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [acceptedState, setAcceptedState] = useState<"pending" | "revoked">("pending");
+  const [acceptedOperation, setAcceptedOperation] = useState<{
+    id: string;
+    revision: number;
+    kind: "subscribe" | "revoke";
+  } | null>(null);
+  const confirmedOperation =
+    acceptedOperation &&
+    !subscriptions.stale &&
+    !subscriptions.error &&
+    subscriptions.rows.some(
+      (row) =>
+        row.id === acceptedOperation.id &&
+        row.desiredRevision === acceptedOperation.revision &&
+        row.appliedRevision != null &&
+        row.appliedRevision >= row.desiredRevision &&
+        row.status === (acceptedOperation.kind === "subscribe" ? "active" : "revoked")
+    );
   const scopeKey = JSON.stringify([
     deployment,
     targets.rows,
@@ -173,6 +199,17 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
         return false;
       }
       setAccepted(true);
+      setAcceptedState(result.state ?? "pending");
+      setAcceptedOperation(
+        result.subscriptionId && result.desiredRevision != null
+          ? { id: result.subscriptionId, revision: result.desiredRevision, kind: candidate.kind }
+          : null
+      );
+      try {
+        latest.current.props.onAccepted?.();
+      } catch {
+        /* Read refresh cannot undo an accepted write. */
+      }
       return true;
     } catch {
       if (
@@ -323,7 +360,14 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
       </form>
       {accepted && (
         <p role="status" className="text-sm">
-          {t("accepted")}
+          {t(
+            acceptedState === "revoked" ||
+              (confirmedOperation && acceptedOperation?.kind === "revoke")
+              ? "revokedConfirmed"
+              : confirmedOperation
+                ? "accessConfirmed"
+                : "accepted"
+          )}
         </p>
       )}
       {failure && !review && (

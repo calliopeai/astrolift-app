@@ -234,3 +234,28 @@ server paging/search, refusal, unknown runtime and permanent stale scopes; 11
 portable placement/client stories render. Typecheck, focused ESLint and formatter
 checks pass. Production browser writes and actual observed scheduling remain
 separate composed acceptance; this leaf does not claim model fit or completion.
+
+## Actual subscriptions and revocation
+
+Shared detail now reads server-paged/searchable destinations and subscriptions.
+The target eligibility and independent `canRevoke` fields come from the server;
+module visibility is never destination authority. New aliases are required and
+review includes the exact app environment, model/environment versions, placement
+and restart impact. Revocation still works when new subscriptions are disabled.
+
+No-cache subscribe/revoke writes preserve all public refusal fields in their
+documents. Before accepting a response, the adapter verifies actual deployment,
+subscription, target, alias, versions, desired revision and pending operation.
+Late replies after permanent model/version/placement scope changes are ignored.
+A confirmed write closes review before separate safe refreshes; failed reads
+retain marked prior rows and the pending acknowledgment, without another write.
+The acknowledgment changes to confirmed only when the matching subscription
+revision is actually read as applied and active/revoked. An idempotent already
+revoked response uses separate confirmed copy rather than a false pending restart.
+
+50 focused Apollo/pure interaction checks pass, including two environments,
+read/write refusals, exact versions, no replay, paged targets, stale callbacks and
+all-eight-locale revocation copy. Twelve portable subscription/client stories
+render; TSC, focused ESLint and formatter checks pass. The backend PostgreSQL
+ownership/reconciliation proof and composed production browser journeys remain
+separate acceptance evidence.

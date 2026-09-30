@@ -4493,7 +4493,11 @@
         "eligible": "사용 가능",
         "selectedTarget": "선택됨: {target}",
         "revisions": "원하는 리비전 {desired} · 적용된 리비전 {applied}",
-        "subscriptionsDisabled": "이 배포의 새 구독이 비활성화되었습니다. 기존 구독은 대상 접근 권한으로 계속 취소할 수 있습니다."
+        "subscriptionsDisabled": "이 배포의 새 구독이 비활성화되었습니다. 기존 구독은 대상 접근 권한으로 계속 취소할 수 있습니다.",
+        "revokedConfirmed": "이 구독의 해지가 확인되었습니다.",
+        "targetSearch": "앱 및 환경 검색",
+        "subscriptionSearch": "구독 검색",
+        "accessConfirmed": "이 리비전의 구독 접근이 확인되었습니다."
       },
       "catalogue": {
         "title": "Hugging Face 카탈로그",

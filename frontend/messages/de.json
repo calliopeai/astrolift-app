@@ -4496,7 +4496,11 @@
         "eligible": "Geeignet",
         "selectedTarget": "Ausgewählt: {target}",
         "revisions": "Gewünschte Revision {desired} · Angewendete Revision {applied}",
-        "subscriptionsDisabled": "Neue Abonnements sind für diese Bereitstellung deaktiviert. Vorhandene Abonnements können mit Zielzugriff weiterhin widerrufen werden."
+        "subscriptionsDisabled": "Neue Abonnements sind für diese Bereitstellung deaktiviert. Vorhandene Abonnements können mit Zielzugriff weiterhin widerrufen werden.",
+        "revokedConfirmed": "Der Widerruf dieses Abonnements ist bestätigt.",
+        "targetSearch": "Apps und Umgebungen suchen",
+        "subscriptionSearch": "Abonnements suchen",
+        "accessConfirmed": "Der Abonnementzugriff ist für diese Revision bestätigt."
       },
       "catalogue": {
         "title": "Hugging-Face-Katalog",

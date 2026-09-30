@@ -4493,7 +4493,11 @@
         "eligible": "利用可能",
         "selectedTarget": "選択中：{target}",
         "revisions": "希望リビジョン {desired} · 適用済みリビジョン {applied}",
-        "subscriptionsDisabled": "このデプロイでは新しいサブスクリプションが無効です。既存のサブスクリプションは対象へのアクセス権があれば取り消せます。"
+        "subscriptionsDisabled": "このデプロイでは新しいサブスクリプションが無効です。既存のサブスクリプションは対象へのアクセス権があれば取り消せます。",
+        "revokedConfirmed": "このサブスクリプションの取り消しが確認されています。",
+        "targetSearch": "アプリと環境を検索",
+        "subscriptionSearch": "サブスクリプションを検索",
+        "accessConfirmed": "このリビジョンのサブスクリプションアクセスが確認されています。"
       },
       "catalogue": {
         "title": "Hugging Face カタログ",

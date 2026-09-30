@@ -4496,7 +4496,11 @@
         "eligible": "Apto",
         "selectedTarget": "Seleccionado: {target}",
         "revisions": "Revisión deseada {desired} · Revisión aplicada {applied}",
-        "subscriptionsDisabled": "Las nuevas suscripciones están desactivadas para este despliegue. Las existentes aún se pueden revocar con acceso al destino."
+        "subscriptionsDisabled": "Las nuevas suscripciones están desactivadas para este despliegue. Las existentes aún se pueden revocar con acceso al destino.",
+        "revokedConfirmed": "La revocación de esta suscripción está confirmada.",
+        "targetSearch": "Buscar aplicaciones y entornos",
+        "subscriptionSearch": "Buscar suscripciones",
+        "accessConfirmed": "El acceso de la suscripción está confirmado para esta revisión."
       },
       "catalogue": {
         "title": "Catálogo de Hugging Face",

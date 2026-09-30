@@ -1,4 +1,13 @@
-import type { ProvisionClusterModelMutation } from "@/graphql/__generated__/operations";
+import type {
+  ProvisionClusterModelMutation,
+  SubscribeClusterModelMutation,
+  RevokeModelSubscriptionMutation,
+} from "@/graphql/__generated__/operations";
+import type {
+  SubscriptionRequest,
+  RevokeSubscriptionRequest,
+  SubscriptionActionResult,
+} from "./ModelSubscriptionsPanel";
 import type { SharedModelRequest } from "./shared-model-form";
 import type { SharedModelDeploymentScreenProps } from "./SharedModelDeploymentScreen";
 type ErrorEnvelope = { ok: boolean; errors: { code: string; message: string }[] };
@@ -42,4 +51,77 @@ export function provisionModelResult(
   )
     return { accepted: false, message: fallback };
   return { accepted: true, deploymentId: data.id };
+}
+type SubscriptionEnvelope =
+  | SubscribeClusterModelMutation["subscribeClusterModel"]
+  | RevokeModelSubscriptionMutation["revokeModelSubscription"];
+export function subscriptionModelResult(
+  envelope: SubscriptionEnvelope | null | undefined,
+  request: SubscriptionRequest | RevokeSubscriptionRequest,
+  fallback: string
+): SubscriptionActionResult {
+  const failure = modelWriteFailure(envelope, fallback),
+    data = envelope?.data;
+  if (failure) return { accepted: false, message: failure };
+  if (
+    !data ||
+    data.restartRequired !== true ||
+    data.deployment.id !== request.modelId ||
+    data.deployment.organizationId !== request.organizationId ||
+    data.deployment.clusterId !== request.expectedClusterId ||
+    data.deployment.providerId !== request.expectedProviderId ||
+    data.subscription.modelDeploymentId !== request.modelId ||
+    !data.subscription.id ||
+    !Number.isSafeInteger(data.subscription.version) ||
+    data.subscription.version < 1
+  )
+    return { accepted: false, message: fallback };
+  const subscription = data.subscription;
+  if ("environmentId" in request) {
+    if (
+      subscription.environmentId !== request.environmentId ||
+      subscription.alias !== request.alias ||
+      !subscription.desiredEnabled ||
+      subscription.status !== "pending" ||
+      data.deployment.version <= request.modelVersion ||
+      subscription.desiredRevision !== data.deployment.desiredSubscriptionRevision
+    )
+      return { accepted: false, message: fallback };
+  } else {
+    if (
+      subscription.id !== request.subscriptionId ||
+      subscription.desiredEnabled ||
+      !["revoking", "revoked"].includes(subscription.status)
+    )
+      return { accepted: false, message: fallback };
+    if (subscription.status === "revoked") {
+      if (subscription.appliedRevision < subscription.desiredRevision || !subscription.reconciledAt)
+        return { accepted: false, message: fallback };
+      return {
+        accepted: true,
+        state: "revoked",
+        subscriptionId: subscription.id,
+        desiredRevision: subscription.desiredRevision,
+      };
+    }
+    if (
+      subscription.version <= request.subscriptionVersion ||
+      data.deployment.version <= request.modelVersion ||
+      subscription.desiredRevision !== data.deployment.desiredSubscriptionRevision
+    )
+      return { accepted: false, message: fallback };
+  }
+  if (
+    data.deployment.status !== "updating" ||
+    !data.deployment.operationId ||
+    data.deployment.operationCompletedAt ||
+    data.deployment.ready === true
+  )
+    return { accepted: false, message: fallback };
+  return {
+    accepted: true,
+    state: "pending",
+    subscriptionId: subscription.id,
+    desiredRevision: subscription.desiredRevision,
+  };
 }
