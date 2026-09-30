@@ -6,6 +6,10 @@
   envelope, including nullable version details, while preserving status auditing
   and bounded real relay outcomes (#2213).
 
+- Add actual owner-gated shared model metrics and tenant cluster snapshots with
+  observed source/time/availability, explicit truncation and full catalogue links
+  in all eight locales. Unknown hardware capacity remains unknown.
+
 - Add the actual organization-bound shared-model detail read, separating desired
   and last-applied resources from recorded readiness and operation facts. Failed
   refreshes retain marked prior data; translated UTC timestamps hydrate without

@@ -140,3 +140,29 @@ timestamp stability. Portable stories cover missing/failed/loading/stale reads,
 CPU, unsupported runtime and long/narrow frames. The metadata route is wired;
 subscription, observation and playground panels and production browser journeys
 remain the following integration work.
+
+## Actual model observations and bounded cluster inventory
+
+The shared detail mounts the existing owner-gated deployment metrics and cluster
+model density queries with exact service, cluster and provider identities. The
+15-minute window is initialized after hydration and refresh requests a new window.
+Neither operation writes. Responses with foreign identities, wrong scope or an
+inconsistent/broader inventory are refused. Implicit tenant responses use neither
+Apollo's shared cache nor request deduplication, including on a physical cluster
+shared by organizations. Changed provider/model context remounts the read scope;
+late replies cannot replace the current observation.
+
+Cards show actual series values, units, aggregation windows, samples, source,
+observation time and availability. Recorded zero is preserved; absent,
+unconfigured, unavailable and unsupported data stays unknown. Stale measured
+values and failed refreshes are marked. KV cache is a fraction and is explicitly
+separate from unsupported GPU/VRAM utilization. Requests and applied resources are
+separate from measured CPU/memory usage and running/ready replicas.
+
+The tenant-only density snapshot shows exact count, returned count, the 20-row
+limit and truncation, with real model links and a link to the full cluster-filtered
+server-paged catalogue. It has no misleading local search. Capacity requires
+verified tenant node-pool mapping and never fabricates zero or global saturation.
+All eight locales translate presentation while preserving IDs, raw units and
+source labels. Focused Apollo/locale/hydration tests and portable stories cover
+these states; production browser journeys remain final composed acceptance.

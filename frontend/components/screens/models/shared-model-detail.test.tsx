@@ -16,6 +16,7 @@ import ko from "@/messages/ko.json";
 import zh from "@/messages/zh-Hans.json";
 import { SharedModelDetailScreen } from "./SharedModelDetailScreen";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
+import { modelObservationsProps } from "./model-observations.fixtures";
 import { SharedModelClient } from "@/app/(app)/models/shared/[id]/shared-model-client";
 const locales = { en, es, fr, de, "pt-BR": pt, ja, ko, "zh-Hans": zh };
 const scope = vi.hoisted(() => ({ id: "org", loading: false, error: null as Error | null }));
@@ -60,19 +61,25 @@ beforeEach(() => {
   scope.error = null;
   requests = [];
   transport = async (request) =>
-    response({
-      clusterModelDeployment: {
-        ...model(),
-        id: request.variables.id,
-        organizationId: request.variables.organizationId,
-      },
-    });
+    request.operationName === "GetModelDeploymentMetrics"
+      ? response({ astroliftModelDeploymentMetrics: modelObservationsProps.metrics.data })
+      : request.operationName === "GetClusterModelDensity"
+        ? response({ astroliftClusterModelDensity: modelObservationsProps.density.data })
+        : response({
+            clusterModelDeployment: {
+              ...model(),
+              id: request.variables.id,
+              organizationId: request.variables.organizationId,
+            },
+          });
 });
 describe("actual shared model detail", () => {
   it("reads the explicit tenant/deployment identity through the actual route client", async () => {
     render(<SharedModelClient id="shared-model" />, { wrapper: wrapper() });
-    await screen.findByText("Qwen production");
-    expect(requests).toHaveLength(1);
+    await screen.findByRole("heading", { name: "Qwen production" });
+    expect(
+      requests.filter((request) => request.operationName === "GetClusterModelDeployment")
+    ).toHaveLength(1);
     expect(requests[0]).toMatchObject({
       operationName: "GetClusterModelDeployment",
       variables: { organizationId: "org", id: "shared-model" },
@@ -106,24 +113,32 @@ describe("actual shared model detail", () => {
   });
   it("retains the last read after refresh failure and allows retry without a write", async () => {
     render(<SharedModelClient id="shared-model" />, { wrapper: wrapper() });
-    await screen.findByText("Qwen production");
+    await screen.findByRole("heading", { name: "Qwen production" });
     transport = async () => new Response("unavailable", { status: 503 });
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByText(en.models.shared.detail.staleFacts);
-    expect(screen.getByText("Qwen production")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Qwen production" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
     transport = async () =>
       response({ clusterModelDeployment: { ...model(), name: "Refreshed model", version: 6 } });
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByText("Refreshed model");
-    expect(requests).toHaveLength(3);
-    expect(requests.every((request) => request.operationName === "GetClusterModelDeployment")).toBe(
-      true
-    );
+    expect(
+      requests.filter((request) => request.operationName === "GetClusterModelDeployment")
+    ).toHaveLength(3);
+    expect(
+      requests.every((request) =>
+        [
+          "GetClusterModelDeployment",
+          "GetModelDeploymentMetrics",
+          "GetClusterModelDensity",
+        ].includes(request.operationName)
+      )
+    ).toBe(true);
   });
   it("does not reuse the previous tenant's deployment while the new identity loads", async () => {
     const { rerender } = render(<SharedModelClient id="shared-model" />, { wrapper: wrapper() });
-    await screen.findByText("Qwen production");
+    await screen.findByRole("heading", { name: "Qwen production" });
     scope.id = "org-two";
     transport = async (request) =>
       response({
@@ -136,7 +151,10 @@ describe("actual shared model detail", () => {
     rerender(<SharedModelClient id="shared-model" />);
     expect(screen.queryByText("Qwen production")).not.toBeInTheDocument();
     await screen.findByText("Other tenant model");
-    expect(requests.at(-1)?.variables.organizationId).toBe("org-two");
+    expect(
+      requests.filter((request) => request.operationName === "GetClusterModelDeployment").at(-1)
+        ?.variables.organizationId
+    ).toBe("org-two");
   });
   it("requires recorded time and positive generation before displaying a reconciliation confirmation", () => {
     render(
