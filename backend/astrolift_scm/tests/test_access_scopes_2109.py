@@ -413,6 +413,25 @@ def test_named_reads_cannot_borrow_another_users_personal_credentials(world, rou
         assert _invoke(world, route, connection=world.personal).error_code is None
 
 
+@pytest.mark.parametrize("route", ["astrolift_available_repos", "astrolift_source_file"])
+@pytest.mark.parametrize("state", ["absent", "inactive", "deleted"])
+def test_named_reads_refuse_unavailable_connections_before_provider_calls(world, route, state):
+    _grant(world)
+    target = world.connection
+    if state == "absent":
+        target = SimpleNamespace(guid=uuid.uuid4())
+    elif state == "inactive":
+        target.is_active = False
+        target.save(update_fields=["is_active", "updated_at", "version"])
+    else:
+        target.soft_delete()
+    with _tenant(world):
+        result = _invoke(world, route, connection=target)
+        assert result.error_code == "NOT_FOUND" and world.calls == []
+        assert _invoke(world, route, connection=world.personal).error_code is None
+    assert len(world.calls) == 1 and world.calls[0][1][0].pk == world.personal.pk
+
+
 def test_connection_lists_keep_org_plus_own_personal_visibility(world):
     _grant(world)
     with _tenant(world):

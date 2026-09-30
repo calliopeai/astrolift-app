@@ -230,6 +230,7 @@ class ScmQuery:
         conn = (
             _source_connections_qs(viewer_pk=_viewer_user_id(info))
             .filter(
+                organization_id=org_id,
                 guid=str(connection_id),
                 is_active=True,
                 deleted_at__isnull=True,
@@ -309,6 +310,7 @@ class ScmQuery:
         conn = (
             _source_connections_qs(viewer_pk=_viewer_user_id(info))
             .filter(
+                organization_id=org_id,
                 guid=str(connection_id),
                 is_active=True,
                 deleted_at__isnull=True,

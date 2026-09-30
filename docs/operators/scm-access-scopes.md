@@ -3,6 +3,11 @@
 SCM routes authorize the resource's owner (#2109). Choosing a team or project
 does not grant access to an organization's connections or a sibling app.
 
+Named repository and source-file reads require a live, active connection in
+the current organization. Missing, inactive, deleted and foreign connections
+return `NOT_FOUND` before any provider request; personal credentials remain
+visible only to their owner.
+
 | Surface | Required owner scope |
 | --- | --- |
 | Source connection lists, repository lists and source-file fetches | `scm.read` at the active organization |

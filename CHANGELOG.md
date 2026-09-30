@@ -49,8 +49,10 @@
   SCM uses the registry's live, coherent app ancestry, so a stale project or
   mismatched project team cannot widen a bearer credential's app ownership.
   Team-bound bearers cannot borrow an org owner's or operator's wider scope.
-  Named repo/file reads preserve personal credential ownership, and installation
-  callbacks refuse stale state from another organization before exchange/write.
+  Named repo/file reads constrain connection IDs to the active organization,
+  preserve personal credential ownership and refuse unavailable connections
+  before provider access. Installation callbacks refuse stale state from another
+  organization before exchange/write.
   All 27 tracked surfaces are covered without guardrail exemptions.
 
 - Billing queries and quota increase requests require `billing.read` at the
