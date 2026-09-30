@@ -17,6 +17,12 @@
   recipient resolves, the mail transport refuses the message or returns zero
   deliveries (#1823). The gate remains reviewable; accepted transport delivery
   is distinct from inbox receipt. See [sender setup](docs/operators/human-gate-email.md).
+- App workload identity policies union grants across coherent live environments
+  on the target cluster (#2093), so a preview deploy preserves production access.
+  Shared policy and namespace trust reconcile serially; Azure outcomes retain
+  each consumer's owner. Empty AWS unions remove the platform inline policy.
+  See [workload identity](docs/operators/preview-names-and-workload-identity.md).
+
 - Preview names remain distinct when manual branch `pr-N` and PR #N collide
   (#2095). Both paths serialize name and namespace allocation per app, including
   duplicate concurrent requests. Explicit occupied names return validation on

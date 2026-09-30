@@ -27,6 +27,7 @@ the canonical pattern.
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
@@ -440,6 +441,9 @@ class IRSADriver(WorkloadIdentityDriver):
                             }
                         ),
                     )
+                else:
+                    with suppress(self._iam.exceptions.NoSuchEntityException):
+                        self._iam.delete_role_policy(RoleName=name, PolicyName="astrolift-workload-policy")
             except Exception as exc:
                 raise map_client_error(exc) from exc
             return self._role_arn(name)
