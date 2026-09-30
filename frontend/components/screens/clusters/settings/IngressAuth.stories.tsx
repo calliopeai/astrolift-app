@@ -30,6 +30,10 @@ export const PoolsError: Story = {
   ),
 };
 
+export const Saving: Story = {
+  render: () => <IngressAuthView {...INGRESS_AUTH} busy reconciling={false} />,
+};
+
 export const Applying: Story = {
   render: () => <IngressAuthView {...INGRESS_AUTH} busy reconciling />,
 };

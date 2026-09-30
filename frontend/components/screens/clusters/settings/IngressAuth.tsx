@@ -92,7 +92,6 @@ export function IngressAuthView({
   clients,
   clientsLoading,
   busy,
-  reconciling,
   onOpenForm,
   onCancelEdit,
   onDisable,
@@ -346,7 +345,7 @@ export function IngressAuthView({
             </dl>
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" onClick={handleApply} disabled={busy} className="gap-1.5">
-                {reconciling && <Loader2Icon className="size-3.5 animate-spin" />}
+                {busy && <Loader2Icon className="size-3.5 animate-spin" />}
                 <RocketIcon className="size-3.5" />
                 Apply to cluster
               </Button>

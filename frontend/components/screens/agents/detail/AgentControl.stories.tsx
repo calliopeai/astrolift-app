@@ -8,6 +8,7 @@ import {
   CONTROL_LONG,
   CONTROL_SAVES_SERVICE,
   pendingSave,
+  PERSISTED_SERVICE_SPEC,
   rejectField,
 } from "./agent-control.fixtures";
 import { EDITOR } from "./agent-trigger-editor.fixtures";
@@ -29,7 +30,7 @@ type Story = StoryObj<typeof AgentControlScreen>;
  * back (replicas + scaling crons seeded, no "save to set" notes).
  */
 export const Full: Story = {
-  args: CONTROL_SAVES_SERVICE,
+  args: { ...CONTROL_SAVES_SERVICE, agent: { ...CONTROL_AGENT, ...PERSISTED_SERVICE_SPEC } },
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
     await userEvent.click(c.getByRole("button", { name: /Save run spec/ }));
@@ -86,16 +87,16 @@ export const SaveRejectedUnmapped: Story = {
 };
 
 export const Loop: Story = {
-  args: { agent: { ...CONTROL_AGENT, runMode: "loop" } },
+  args: { agent: { ...CONTROL_AGENT, runMode: "loop", runMaxParallel: 0 } },
 };
 
 export const Trigger: Story = {
   args: { agent: { ...CONTROL_AGENT, runMode: "trigger" } },
 };
 
-/** Service before any save: default replicas behind the "save to set" note. */
+/** Stored Service replicas are visible before any save. */
 export const Service: Story = {
-  args: { agent: { ...CONTROL_AGENT, runFamily: "service", runPaused: true } },
+  args: { agent: { ...CONTROL_AGENT, runFamily: "service", runPaused: true, replicas: 7 } },
 };
 
 export const LongStrings: Story = {

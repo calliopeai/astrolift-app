@@ -230,18 +230,9 @@ export type AgentControlScreenProps = Omit<ReturnType<typeof useAgentControl>, "
  * Control tab content for an agent (spec 33 PR-11, extended by PR-12) — the
  * run-spec editor.
  *
- * Seeds its initial state from the resolved fleet row (`runFamily` / `runMode`
- * / `runCronExpression` / `runPaused`, all lowercase). The read row
- * (`AstroliftAgentListItem`) does NOT carry the rest of the spec, so several
- * controls cannot be seeded on first load:
- *   - `replicas` (PR-11's known gap),
- *   - `runMaxParallel` (Loop cap — PR-12),
- *   - `scaleUpCron` / `scaleDownCron` / `scheduledScaleTo` (scheduled scaling —
- *     PR-12).
- * Each shows its real stored value only AFTER a save: the mutation returns the
- * persisted `AstroliftAgentRunSpec`, which DOES include all of them, and the
- * editor re-seeds from that. Until then the controls show sensible defaults
- * behind a "save to set" note (see the `*Seeded` flags).
+ * Seeds every run setting from the resolved fleet row. Polls of the same
+ * agent preserve edits; changing agent identity reads the new row. A successful
+ * save reads the persisted values returned by the mutation.
  */
 export function AgentControlScreen({
   agent,
@@ -254,28 +245,19 @@ export function AgentControlScreen({
   const [mode, setMode] = React.useState<AgentRunMode>(() => toMode(agent.runMode));
   const [cron, setCron] = React.useState<string>(agent.runCronExpression ?? "");
   const [paused, setPaused] = React.useState<boolean>(Boolean(agent.runPaused));
-  // Service replica baseline. The list row has no `replicas`, so we can't seed
-  // the real stored value on first load — start at the floor and flag that the
-  // shown value is a default until the first save reads it back.
-  const [replicas, setReplicas] = React.useState<number>(REPLICA_MIN);
-  const [replicasSeeded, setReplicasSeeded] = React.useState<boolean>(false);
-
-  // --- PR-12 controls — none seedable from the list row (same gap as ----------
-  //     `replicas`); each reads back from the persisted spec after a save.
-  // Loop concurrency cap (`runMaxParallel`). Held as a string so empty (=
-  // "leave at the backend serial default") stays distinct from "0" (=
-  // soft-pause). Seeded blank until a save reads back the stored value.
-  const [maxParallel, setMaxParallel] = React.useState<string>("");
-  // Service scheduled scaling (optional). A service runs flat unless this is
-  // enabled. `scaleUpCron` + `scaleTo` scale UP to X; `scaleDownCron` scales to
-  // 0. `scaleTo` is a string for the same empty-vs-0 reason as the loop cap.
-  const [scalingEnabled, setScalingEnabled] = React.useState<boolean>(false);
-  const [scaleUpCron, setScaleUpCron] = React.useState<string>("");
-  const [scaleDownCron, setScaleDownCron] = React.useState<string>("");
-  const [scaleTo, setScaleTo] = React.useState<string>("");
-  // Whether the PR-12 fields reflect a real persisted read-back (post-save) vs
-  // first-load defaults. Drives the shared "save to set" note.
-  const [pr12Seeded, setPr12Seeded] = React.useState<boolean>(false);
+  const [replicas, setReplicas] = React.useState(agent.replicas);
+  // Keep null distinct from a stored zero (the Loop soft-pause value).
+  const [maxParallel, setMaxParallel] = React.useState(
+    agent.runMaxParallel == null ? "" : String(agent.runMaxParallel)
+  );
+  const [scalingEnabled, setScalingEnabled] = React.useState(
+    Boolean(agent.scaleUpCron || agent.scaleDownCron || agent.scheduledScaleTo != null)
+  );
+  const [scaleUpCron, setScaleUpCron] = React.useState(agent.scaleUpCron);
+  const [scaleDownCron, setScaleDownCron] = React.useState(agent.scaleDownCron);
+  const [scaleTo, setScaleTo] = React.useState(
+    agent.scheduledScaleTo == null ? "" : String(agent.scheduledScaleTo)
+  );
 
   // Field-scoped server error (errors[].field → control). Cleared on any edit
   // and on submit so a stale message never lingers under a now-valid control.
@@ -293,16 +275,14 @@ export function AgentControlScreen({
     setMode(toMode(agent.runMode));
     setCron(agent.runCronExpression ?? "");
     setPaused(Boolean(agent.runPaused));
-    setReplicas(REPLICA_MIN);
-    setReplicasSeeded(false);
-    // PR-12 controls — not on the list row, so reset to defaults (same as
-    // first load) until a save reads them back from the persisted spec.
-    setMaxParallel("");
-    setScalingEnabled(false);
-    setScaleUpCron("");
-    setScaleDownCron("");
-    setScaleTo("");
-    setPr12Seeded(false);
+    setReplicas(agent.replicas);
+    setMaxParallel(agent.runMaxParallel == null ? "" : String(agent.runMaxParallel));
+    setScalingEnabled(
+      Boolean(agent.scaleUpCron || agent.scaleDownCron || agent.scheduledScaleTo != null)
+    );
+    setScaleUpCron(agent.scaleUpCron);
+    setScaleDownCron(agent.scaleDownCron);
+    setScaleTo(agent.scheduledScaleTo == null ? "" : String(agent.scheduledScaleTo));
     setFieldError(null);
   }
 
@@ -428,7 +408,6 @@ export function AgentControlScreen({
       // reflects the real stored value.
       if (persisted) {
         setReplicas(persisted.replicas);
-        setReplicasSeeded(true);
         // Loop cap: null read-back → blank (= serial default); 0 → "0"
         // (soft-pause), shown verbatim.
         setMaxParallel(persisted.runMaxParallel == null ? "" : String(persisted.runMaxParallel));
@@ -440,7 +419,6 @@ export function AgentControlScreen({
         setScaleDownCron(downCron);
         setScaleTo(persisted.scheduledScaleTo == null ? "" : String(persisted.scheduledScaleTo));
         setScalingEnabled(upCron.trim().length > 0 || downCron.trim().length > 0);
-        setPr12Seeded(true);
       }
     } else if (result.fieldError) {
       setFieldError(result.fieldError);
@@ -543,15 +521,6 @@ export function AgentControlScreen({
             {/* Loop config (PR-12) — the concurrency cap (`runMaxParallel`). */}
             {mode === "LOOP" && (
               <section className="space-y-2 rounded-md border p-4">
-                {!pr12Seeded && (
-                  <div className="bg-muted/30 text-muted-foreground flex items-start gap-2 rounded-md border border-dashed p-3 text-xs">
-                    <InfoIcon className="mt-0.5 size-4 shrink-0" />
-                    <span>
-                      The current stored cap isn&apos;t available to read here yet — save to set it
-                      explicitly, and it will read back the persisted value.
-                    </span>
-                  </div>
-                )}
                 <Label htmlFor="run-max-parallel">Concurrency cap</Label>
                 <input
                   id="run-max-parallel"
@@ -609,16 +578,6 @@ export function AgentControlScreen({
               The baseline number of replicas the agent Deployment runs. The per-environment maximum
               is applied when the Deployment is scaled.
             </p>
-            {!replicasSeeded && (
-              <div className="bg-muted/30 text-muted-foreground flex items-start gap-2 rounded-md border border-dashed p-3 text-xs">
-                <InfoIcon className="mt-0.5 size-4 shrink-0" />
-                <span>
-                  Showing the default ({REPLICA_MIN}). The current stored replica count isn&apos;t
-                  available to read here yet — save to set it explicitly, and it will read back the
-                  persisted value.
-                </span>
-              </div>
-            )}
             <div className="flex items-center gap-3">
               <span className="text-muted-foreground font-mono text-xs tabular-nums">
                 {REPLICA_MIN}
@@ -684,16 +643,6 @@ export function AgentControlScreen({
 
               {scalingEnabled && (
                 <div className="space-y-4 border-t pt-3">
-                  {!pr12Seeded && (
-                    <div className="bg-muted/30 text-muted-foreground flex items-start gap-2 rounded-md border border-dashed p-3 text-xs">
-                      <InfoIcon className="mt-0.5 size-4 shrink-0" />
-                      <span>
-                        The current stored scaling schedule isn&apos;t available to read here yet —
-                        save to set it explicitly, and it will read back the persisted values.
-                      </span>
-                    </div>
-                  )}
-
                   {/* Scale UP — cron + target replica count X. */}
                   <div className="space-y-2">
                     <CronField
