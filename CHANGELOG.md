@@ -2,129 +2,37 @@
 
 ## Unreleased
 
-- Preserve shared model applied-resource observation time across failed newer
-  revisions; historical configuration without recorded provenance remains
-  undated (#2214).
-
-- Shared model creation refreshes current authority after the bounded Hugging
-  Face revision read, refusing revoked credentials or grants before persisting
-  or queueing a deployment (#2213).
-
-- Shared model prompt writes refresh current bearer scopes, grants, actor status
-  and placement policy after locking, returning public permission refusals before
-  queue admission when authority changes (#2213).
-- Add guarded shared-model resource updates and retained-data deprovisioning with
-  fresh management capability reads, complete request admission, exact placement
-  versions and honest pending/observed operation feedback in all eight locales.
-
-- Connect shared model subscription and independent revocation reviews to actual
-  versioned writes, server-paged app environments and observed desired/applied
-  revisions. Failed refreshes preserve accepted pending requests without replay.
-
-- Wire shared model deployment to actual immutable Hugging Face metadata, server-paged
-  cluster selection, complete runtime admission and guarded provision requests. Accepted
-  requests remain distinct from scheduling and readiness in all eight locales.
-
-- Shared owner prompt admission requires the observed provider and canonical
-  model handle to match the current placement, refusing stale rollout evidence
-  before relay credentials or queue admission (#2213).
-- Cluster retirement refreshes authority after placement locks. Concurrent
-  management cannot reopen retirement, and destructive worker calls retain the
-  placement lock while rechecking live models and bound environments (#2213).
-
-
-- Cluster unregister and decommission refuse while any live shared model remains,
-  including app-free pending or failed deployments. Worker retirement rechecks
-  under the placement lock before removing cluster transport (#2213).
-
-- Shared-model prompt denials return the complete public mutation error
-  envelope, including nullable version details, while preserving status auditing
-  and bounded real relay outcomes (#2213).
-- Add bounded real shared-model prompt tests with exact owner/version/placement
-  admission, structured refusal feedback and no automatic replay in all locales.
-
-- Add actual owner-gated shared model metrics and tenant cluster snapshots with
-  observed source/time/availability, explicit truncation and full catalogue links
-  in all eight locales. Unknown hardware capacity remains unknown.
-
-- Add the actual organization-bound shared-model detail read, separating desired
-  and last-applied resources from recorded readiness and operation facts. Failed
-  refreshes retain marked prior data; translated UTC timestamps hydrate without
-  changing the recorded facts (#2215).
-
-- List snapshots can explicitly hide free-text search when the server exposes no
-  search contract, while existing searchable lists retain their behavior (#2215).
-
-- Make shared cluster deployments the primary Models catalogue, with actual
-  organization-bound server search, filters, Mine and pagination. Preserve a
-  visible app/project/cloud endpoint view and its existing deployment flow;
-  missing legacy compute facts stay unknown instead of implying CPU/GPU (#2215).
-
-- Shared-model operator playground reads and invocations check exact model,
-  cluster, provider and version identities under owner permissions and current
-  region policy. The bounded in-cluster relay derives its private target from
-  persisted UUIDs, preserving actual failure and timeout outcomes (#2213).
-- Shared model deployment/update/deletion and named app-environment subscription
-  mutations now enqueue revision-bound Temporal reconciliation. Independent key
-  changes use Recreate and report pending/revoking until actual model and consumer
-  pod readiness confirms application. Current locked owners, provider identities,
-  bearer scopes, grants and region policies are rechecked before writes. Consumer
-  and ancestor retirement require confirmed revocation; organization retirement
-  also requires its shared deployments to be deprovisioned (#2213).
-
-
-- Shared model catalogue, placement review and subscription-target pages use
-  current organization/provider identities and filter before paging. Runtime
-  admission requires cluster management authority; readable subscriptions have
-  independent destination revoke decisions. Readiness stays unconfirmed until
-  a real generation/auth-revision observation is persisted (#2213).
-
-- The v.next shared vLLM driver foundation renders GUID-owned namespaces,
-  explicit certified CPU/GPU runtimes, immutable model revisions, independent
-  startup credential snapshots and operator-authenticated metrics. Readiness
-  waits for the current Deployment generation and every current pod. App and
-  environment identity labels cannot be overwritten by supplied labels. Existing
-  app-owned endpoint ownership and legacy bindings remain compatible.
-
-- Shared Python model serving has a startup-snapshot ASGI authorization hook:
-  subscription keys reach supported inference routes, while metrics and operator
-  endpoints require the private operator credential. Secret updates require a
-  new matching runtime revision before revocation can be reported (#2213).
+- Add server-side Hugging Face search with bounded filter-bound pagination,
+  immutable revision resolution, source timestamps and honest unavailable or
+  unknown metadata (#2214).
+- Deploy organization-owned shared vLLM models directly to clusters without
+  application/project placeholders, using explicit certified CPU/GPU runtimes,
+  immutable revisions and complete resource admission (#2213).
+- Reconcile named app-environment subscriptions with independent credentials,
+  exact namespace/app/environment network selectors and startup authorization
+  snapshots. Recreate rollouts and observed consumer readiness distinguish
+  accepted requests from applied access and confirmed revocation (#2213).
+- Recheck current actor, bearer scopes, grants, placement identities and versions
+  after locks and upstream reads. Consumer/ancestor retirement requires confirmed
+  revocation; cluster and organization retirement also require shared deployment
+  cleanup. Durable database defaults preserve old inserts during rolling upgrades.
+- Make shared deployments the primary Models catalogue with server search,
+  filters, Mine and paging. Preserve existing app/project/cloud endpoints and
+  deployment routes; missing legacy hardware facts remain unknown (#2215).
+- Connect reviewed deploy, subscribe, revoke, resource-update and retained-data
+  deprovisioning actions to the actual typed APIs in all eight locales. Refusals
+  retain drafts; accepted requests stay pending through read failures without
+  automatic replay or inferred readiness (#2215).
+- Show exact-service observed model metrics and tenant-only density with units,
+  windows, source, timestamps, limits and explicit availability. Separate desired
+  and applied requests from measured use; preserve applied-snapshot provenance
+  across failed updates. Unverified shared hardware capacity and GPU/VRAM
+  attribution remain unknown or unsupported (#2214).
+- Add explicit bounded shared-model tests through the real cluster relay with
+  current owner/version/provider/handle admission and truthful failures. Browser
+  callers cannot supply endpoint URLs or credentials (#2213).
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
-- Models has its own navigation entitlement: organization readers and actual
-  legacy app readers can view it without agent.read. Shared model actions
-  require current organization-level cluster.update, preserving live account,
-  membership, policy and bearer/team ceilings (#2215).
-
-- Shared-model density separates tenant-owned inventory, desired and last-applied
-  requests from exact-service observed running/ready pods and CPU/memory usage
-  and requests. Owner-authorized vLLM metrics
-  and pod-mapped CPU/memory reads expose units, windows, timestamps and explicit
-  no-data/stale/failure states; GPU/VRAM usage and shared-hardware capacity remain
-  unsupported without verified attribution (#2214).
-
-- Add bounded server-side public Hugging Face model search and revision reads,
-  filter-bound paging, immutable SHA proof and explicit unavailable/unknown
-  metadata without browser credentials or inferred runtime fit (#2214).
-- Shared vLLM model storage can identify an explicit organization and cluster
-  owner without an app/project placeholder. Named subscription aliases and
-  reconciliation revisions have database constraints. Unavailable placements
-  remain inspectable while infrastructure transport requires managed, active
-  clusters and enabled providers (#2213).
-- Add translated shared-cluster CPU/GPU deployment reviews with immutable model
-  revisions, exact provider-bound runtime admission, explicit resource requests
-  and restart-impact warnings. Accepted requests remain distinct from observed
-  readiness; actual API and route integration follows the typed contract (#2215).
-
-- Add translated Hugging Face catalogue and immutable revision-selection views
-  backed by the actual paged API, with honest unavailable/unknown metadata and
-  no inferred CPU/GPU fit or catalogue fallback rows (#2215).
-
-- Add Storybook subscription reviews for shared model deployments in all eight
-  locales, with named aliases, immutable target/version checks, restart-impact
-  warnings and distinct accepted versus applied states. Production adapter and
-  route integration follows the shared model API contract (#2215).
 
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
