@@ -422,6 +422,16 @@ export type AstroliftAgentLiveStatus = {
   workloadSlug: Scalars['String']['output'];
 };
 
+export type AstroliftAgentQuarantine = {
+  createdAt: Scalars['DateTime']['output'];
+  evidenceUrl: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  policyId: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  targetId: Scalars['GUID']['output'];
+  targetKind: Scalars['String']['output'];
+};
+
 export type AstroliftAgentRun = {
   createdAt: Scalars['DateTime']['output'];
   durationSeconds?: Maybe<Scalars['Int']['output']>;
@@ -6378,6 +6388,7 @@ export type Mutation = {
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
+  clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
@@ -6946,6 +6957,11 @@ export type MutationCancelTaskArgs = {
 
 export type MutationCancelWorkflowInstanceArgs = {
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationClearAgentQuarantineArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -8965,6 +8981,7 @@ export type Query = {
   agentFleetPage: AstroliftAgentListItemPage;
   agentGallery: Array<AstroliftAgentTask>;
   agentLiveStatus: Array<AstroliftAgentLiveStatus>;
+  agentQuarantines: Array<AstroliftAgentQuarantine>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;

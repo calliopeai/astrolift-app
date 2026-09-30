@@ -51,6 +51,7 @@ from astrolift_agents.schema.types import (
     AgentListItemPageType,
     AgentListItemType,
     AgentLiveStatusType,
+    AgentQuarantineType,
     AgentRuntimeType,
     AgentSecretBundleAttachmentType,
     AgentSecretBundleType,
@@ -791,6 +792,27 @@ def _slice_page(rows: list, page: int | None, page_size: int | None) -> tuple[li
 
 @strawberry.type
 class AgentsQuery:
+    @strawberry.field
+    @require_permission(Permission.AGENT_DISPATCH, any_scope=True)
+    @tenant_scoped()
+    def agent_quarantines(self, info: Info) -> list[AgentQuarantineType]:
+        from astrolift_agents.services.agent_enforcement import visible_quarantines
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        return [
+            AgentQuarantineType(
+                id=GUID(str(row.guid)),
+                target_kind=row.target_kind,
+                target_id=GUID(str(row.target_guid)),
+                reason=row.reason,
+                policy_id=row.policy_id,
+                evidence_url=row.evidence_url,
+                created_at=row.created_at,
+            )
+            for row in visible_quarantines(org_id).order_by("created_at")[:200]
+        ]
+
     @strawberry.field
     @require_permission(Permission.APP_READ, scope=agent_org_scope)
     @tenant_scoped()

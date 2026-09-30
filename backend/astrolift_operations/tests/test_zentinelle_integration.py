@@ -29,7 +29,7 @@ def test_payload_version_locked():
 def test_event_type_count_locked():
     """Lock the catalog so adding an event type requires
     deliberate code review (Zentinelle's parser depends on it)."""
-    assert len(list(ZentinelleEventType)) == 22
+    assert len(list(ZentinelleEventType)) == 23
 
 
 def test_required_keys_present_for_every_event():
