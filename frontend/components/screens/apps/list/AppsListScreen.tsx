@@ -31,7 +31,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFormatters } from "@/lib/i18n/formatters";
-import { TOPOLOGY_META } from "@/lib/topology";
 import { cn } from "@/lib/utils";
 
 import { AppFreshnessRow } from "./AppFreshnessRow";
@@ -86,7 +85,8 @@ function PinButton({
   onToggle: () => void;
   className?: string;
 }) {
-  const label = pinned ? "Unpin app" : "Pin to top";
+  const t = useTranslations("apps.list");
+  const label = pinned ? t("unpinApp") : t("pinApp");
   return (
     <button
       type="button"
@@ -120,7 +120,9 @@ function AppStatus({ app }: { app: AppRow }) {
 }
 
 function Clusters({ clusters }: { clusters: string[] }) {
-  if (clusters.length === 0) return <span className="text-muted-foreground text-xs">none</span>;
+  const t = useTranslations("apps.list");
+  if (clusters.length === 0)
+    return <span className="text-muted-foreground text-xs">{t("none")}</span>;
   return (
     <span className="flex min-w-0 items-center gap-1 font-mono text-xs">
       <span className="min-w-0 truncate" title={clusters.join(", ")}>
@@ -142,6 +144,7 @@ function AppCard({
   pinned: boolean;
   onTogglePin: () => void;
 }) {
+  const t = useTranslations("apps.list");
   return (
     <div className="bg-card hover:bg-accent/30 relative flex h-full min-w-0 flex-col gap-3 rounded-md border p-4 transition-colors">
       <div className="flex min-w-0 items-start gap-3">
@@ -188,7 +191,7 @@ function AppCard({
         {/* #696: live previews, hidden at zero to keep the card tight. */}
         {app.activePreviewCount > 0 && (
           <Badge variant="outline" className="font-mono">
-            {app.activePreviewCount} preview{app.activePreviewCount === 1 ? "" : "s"}
+            {t("previewCount", { count: app.activePreviewCount })}
           </Badge>
         )}
       </div>
@@ -244,15 +247,15 @@ export function AppsListScreen({
     title: t("empty.title"),
     description: t("empty.description"),
     actionHref: "/apps/new",
-    actionLabel: "New app",
+    actionLabel: t("newApp"),
     learnMoreHref: "/documentation/get-started",
-    learnMoreLabel: "Get started",
+    learnMoreLabel: t("getStarted"),
   };
 
   const columns: Column<AppRow>[] = [
     {
       id: "app",
-      header: "App",
+      header: t("columns.app"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (app) => (
@@ -274,28 +277,28 @@ export function AppsListScreen({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("columns.status"),
       sortKey: "status",
       cell: (app) => <AppStatus app={app} />,
     },
     {
       id: "kind",
-      header: "Kind",
+      header: t("columns.kind"),
       cell: (app) => (
         <span className="text-muted-foreground text-xs">
-          {app.topology ? TOPOLOGY_META[app.topology].label : "none yet"}
+          {app.topology ? t(`kinds.${app.topology}`) : t("noneYet")}
         </span>
       ),
     },
     {
       id: "clusters",
-      header: "Cluster",
+      header: t("columns.cluster"),
       cellClassName: "max-w-48",
       cell: (app) => <Clusters clusters={app.clusters} />,
     },
     {
       id: "lastDeploy",
-      header: "Last deploy",
+      header: t("columns.lastDeploy"),
       sortKey: "deployed",
       cell: (app) => (
         <span className={cn(ABOVE_ROW_LINK, "flex min-w-0 flex-col gap-1")}>
@@ -317,18 +320,18 @@ export function AppsListScreen({
     },
     {
       id: "registered",
-      header: "Registered",
+      header: t("columns.registered"),
       sortKey: "created",
       cell: (app) => (
         <span className="text-muted-foreground font-mono text-xs">
-          {app.createdAt ? fmt.formatDateTime(app.createdAt) : "unknown"}
+          {app.createdAt ? fmt.formatDateTime(app.createdAt) : t("unknown")}
         </span>
       ),
     },
     {
       id: "pin",
-      label: "Pin",
-      header: <span className="sr-only">Pin</span>,
+      label: t("pin"),
+      header: <span className="sr-only">{t("pin")}</span>,
       width: "w-12",
       align: "right",
       cellClassName: ABOVE_ROW_LINK,
@@ -350,11 +353,11 @@ export function AppsListScreen({
         }}
       >
         <RotateCcwIcon className="size-3.5" />
-        Rolling restart
+        {t("bulk.restart")}
       </Button>
       <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => setPushTarget(sel)}>
         <KeyIcon className="size-3.5" />
-        Push secrets
+        {t("bulk.pushSecrets")}
       </Button>
       <Button
         size="sm"
@@ -365,7 +368,7 @@ export function AppsListScreen({
         }}
       >
         <RefreshCwIcon className="size-3.5" />
-        Resync manifest
+        {t("bulk.resync")}
       </Button>
     </>
   );
@@ -381,14 +384,14 @@ export function AppsListScreen({
               <Button size="sm" asChild>
                 <Link href="/apps/new">
                   <PlusIcon className="size-4" />
-                  New app
+                  {t("newApp")}
                 </Link>
               </Button>
             </Can>
           ),
         }}
         list={list}
-        label="Apps"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(app) => app.slug}
@@ -447,17 +450,13 @@ export function PushSecretsDialog({
   busy,
   onSubmit,
 }: PushSecretsDialogProps) {
+  const t = useTranslations("apps.list.pushSecrets");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            Push secrets to {appCount} app{appCount === 1 ? "" : "s"}
-          </DialogTitle>
-          <DialogDescription>
-            Project the named secret bundle onto every selected app. Leave environment blank to fan
-            out to every environment the bundle is bound to.
-          </DialogDescription>
+          <DialogTitle>{t("title", { count: appCount })}</DialogTitle>
+          <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
         {/* The content unmounts on close, so every open starts with blank fields. */}
         <PushSecretsForm
@@ -477,6 +476,7 @@ function PushSecretsForm({
   onSubmit,
   onCancel,
 }: Pick<PushSecretsDialogProps, "appCount" | "busy" | "onSubmit"> & { onCancel: () => void }) {
+  const t = useTranslations("apps.list.pushSecrets");
   const [bundleSlug, setBundleSlug] = React.useState("");
   const [environmentName, setEnvironmentName] = React.useState("");
   return (
@@ -489,7 +489,7 @@ function PushSecretsForm({
       className="space-y-3"
     >
       <div className="space-y-1.5">
-        <Label htmlFor="bundle-slug">Bundle slug</Label>
+        <Label htmlFor="bundle-slug">{t("bundle")}</Label>
         <Input
           id="bundle-slug"
           value={bundleSlug}
@@ -502,7 +502,7 @@ function PushSecretsForm({
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="environment-name">Environment (optional)</Label>
+        <Label htmlFor="environment-name">{t("environment")}</Label>
         <Input
           id="environment-name"
           value={environmentName}
@@ -514,10 +514,10 @@ function PushSecretsForm({
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t("cancel")}
         </Button>
         <Button type="submit" disabled={busy || !bundleSlug.trim()}>
-          {busy ? "Pushing..." : `Push to ${appCount} app${appCount === 1 ? "" : "s"}`}
+          {busy ? t("busy") : t("submit", { count: appCount })}
         </Button>
       </DialogFooter>
     </form>

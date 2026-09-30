@@ -339,49 +339,109 @@
   },
   "apps": {
     "list": {
-      "title": "Apps",
-      "description": "Repositories registered for deployment. Each app has workloads, environments, deployments, secrets, and managed services attached.",
-      "register": "Register app",
+      "title": "アプリ",
+      "description": "デプロイ用に登録されたリポジトリです。各アプリにはワークロード、環境、デプロイ、シークレット、マネージドサービスが関連付けられています。",
+      "register": "アプリを登録",
       "empty": {
-        "title": "No apps registered yet",
-        "description": "Register a Git repository — we parse its astrolift.toml, provision a namespace and registry repo, and roll the first deployment from a Temporal workflow.",
-        "action": "Register your first app"
+        "title": "登録済みのアプリはありません",
+        "description": "Git リポジトリを登録すると、astrolift.toml を解析し、名前空間とイメージリポジトリを作成して、Temporal ワークフローで最初のデプロイを実行します。",
+        "action": "最初のアプリを登録"
       },
-      "branchLabel": "branch",
-      "open": "Open",
+      "branchLabel": "ブランチ",
+      "open": "開く",
       "search": {
-        "placeholder": "Search by name, slug, or repo…",
-        "ariaLabel": "Search apps"
+        "placeholder": "名前、スラッグ、リポジトリで検索…",
+        "ariaLabel": "アプリを検索"
       },
       "filters": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
-        "running": "Running",
-        "failed": "Failed",
-        "inflight": "In-flight",
-        "notDeployed": "Not deployed"
+        "ariaLabel": "状態で絞り込み",
+        "all": "すべて",
+        "running": "実行中",
+        "failed": "失敗",
+        "inflight": "処理中",
+        "notDeployed": "未デプロイ",
+        "ok": "正常",
+        "degraded": "劣化",
+        "stale": "更新が古い",
+        "never_deployed": "未デプロイ"
       },
       "noMatch": {
-        "title": "No apps match the current filter",
-        "description": "Try a different search term or switch back to All.",
-        "clear": "Clear filters"
+        "title": "現在の条件に一致するアプリはありません",
+        "description": "別の検索語を試すか、「すべて」に戻してください。",
+        "clear": "絞り込みを解除"
       },
       "errorBanner": {
-        "title": "Couldn't load apps",
-        "retry": "Retry"
+        "title": "アプリを読み込めませんでした",
+        "retry": "再試行"
       },
       "freshness": {
-        "lastDeployed": "Last deployed {when}",
-        "viewFailed": "View failed deploy",
-        "stale": "stale",
-        "never": "no deploys yet",
+        "lastDeployed": "最終デプロイ：{when}",
+        "viewFailed": "失敗したデプロイを表示",
+        "stale": "更新が古い",
+        "never": "デプロイ履歴なし",
         "status": {
-          "OK": "Healthy",
-          "DEGRADED": "Latest deploy failed",
-          "STALE": "No recent deploys",
-          "NEVER": "Never deployed"
+          "OK": "正常",
+          "DEGRADED": "最新のデプロイが失敗",
+          "STALE": "最近のデプロイなし",
+          "NEVER": "未デプロイ"
         }
-      }
+      },
+      "count": "{total} 件中 {shown} 件を表示",
+      "newApp": "新しいアプリ",
+      "getStarted": "はじめに",
+      "pin": "固定",
+      "pinApp": "先頭に固定",
+      "unpinApp": "アプリの固定を解除",
+      "none": "なし",
+      "noneYet": "まだなし",
+      "unknown": "不明",
+      "noWorkloads": "ワークロードはまだありません",
+      "columns": {
+        "app": "アプリ",
+        "status": "状態",
+        "kind": "種類",
+        "cluster": "クラスター",
+        "lastDeploy": "最終デプロイ",
+        "registered": "登録日時",
+        "project": "プロジェクト"
+      },
+      "kinds": {
+        "service": "単一サービス",
+        "service-data": "サービスとデータ",
+        "service-worker": "Web とワーカー",
+        "microservices": "マイクロサービス",
+        "service-agent": "アプリとエージェント",
+        "agent": "エージェント",
+        "functions": "関数",
+        "scheduled": "スケジュール実行",
+        "task": "タスク",
+        "workflow": "ワークフロー",
+        "mixed": "混合"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分のアプリ",
+        "failing": "失敗中",
+        "archived": "アーカイブ済み",
+        "mineNote": "「自分のアプリ」には、アプリの所有者が記録されるまで、直接、またはプロジェクト、チーム、組織を通じてロールを持つアプリが表示されます。"
+      },
+      "bulk": {
+        "restart": "ローリング再起動",
+        "pushSecrets": "シークレットを送信",
+        "resync": "マニフェストを再同期",
+        "succeeded": "{action}：{total} 件中 {okCount} 件のアプリで成功",
+        "failed": "{action}が失敗したアプリ：{failedSlugs}"
+      },
+      "pushSecrets": {
+        "bundle": "バンドルのスラッグ",
+        "environment": "環境（任意）",
+        "cancel": "キャンセル",
+        "busy": "送信中…",
+        "title": "{count, plural, other {# 件のアプリにシークレットを送信}}",
+        "submit": "{count, plural, other {# 件のアプリに送信}}",
+        "description": "指定したシークレットバンドルを選択した各アプリに適用します。環境を空欄にすると、バンドルが関連付けられているすべての環境に適用されます。"
+      },
+      "previewCount": "{count, plural, other {# 件のプレビュー}}"
     },
     "tabs": {
       "ariaLabel": "アプリのセクション",

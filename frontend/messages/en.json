@@ -388,7 +388,62 @@
           "NEVER": "Never deployed"
         }
       },
-      "count": "Showing {shown} of {total}"
+      "count": "Showing {shown} of {total}",
+      "newApp": "New app",
+      "getStarted": "Get started",
+      "pin": "Pin",
+      "pinApp": "Pin to top",
+      "unpinApp": "Unpin app",
+      "none": "none",
+      "noneYet": "none yet",
+      "unknown": "unknown",
+      "noWorkloads": "No workloads yet",
+      "columns": {
+        "app": "App",
+        "status": "Status",
+        "kind": "Kind",
+        "cluster": "Cluster",
+        "lastDeploy": "Last deploy",
+        "registered": "Registered",
+        "project": "Project"
+      },
+      "kinds": {
+        "service": "Single service",
+        "service-data": "Service and data",
+        "service-worker": "Web and worker",
+        "microservices": "Microservices",
+        "service-agent": "App and agent",
+        "agent": "Agent",
+        "functions": "Functions",
+        "scheduled": "Scheduled",
+        "task": "Task",
+        "workflow": "Workflow",
+        "mixed": "Mixed"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "failing": "Failing",
+        "archived": "Archived",
+        "mineNote": "Mine means apps you hold a role on, directly or through their project, team or organization, until apps record who owns them."
+      },
+      "bulk": {
+        "restart": "Rolling restart",
+        "pushSecrets": "Push secrets",
+        "resync": "Resync manifest",
+        "succeeded": "{action}: {okCount}/{total} apps succeeded",
+        "failed": "{action} failed for: {failedSlugs}"
+      },
+      "pushSecrets": {
+        "bundle": "Bundle slug",
+        "environment": "Environment (optional)",
+        "cancel": "Cancel",
+        "busy": "Pushing...",
+        "title": "{count, plural, one {Push secrets to # app} other {Push secrets to # apps}}",
+        "submit": "{count, plural, one {Push to # app} other {Push to # apps}}",
+        "description": "Project the named secret bundle onto every selected app. Leave environment blank to fan out to every environment the bundle is bound to."
+      },
+      "previewCount": "{count, plural, one {# preview} other {# previews}}"
     },
     "tabs": {
       "ariaLabel": "App sections",

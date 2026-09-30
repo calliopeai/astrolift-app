@@ -29,6 +29,10 @@
 - Scaling feedback passes actual ICU values, and API key/project operation dates
   honor the selected locale and timezone. Project operation states and fallback
   scale errors have translations in all supported locales (#2145).
+- App registry columns, kinds, views, filters, pins, bulk outcomes and secret-push
+  dialogs use all eight locales. Translated labels preserve real query values,
+  and an unsuccessful secret push retains selection and form values (#2145).
+
 - The app deploy-activity strip localizes labels, numeric hints, empty copy and
   deployment status tooltips while retaining real deployment links (#2145).
 

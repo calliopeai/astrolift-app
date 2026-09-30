@@ -1,3 +1,5 @@
+"use client";
+
 import {
   BotIcon,
   CalendarClockIcon,
@@ -14,7 +16,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { TOPOLOGY_META, type TopologyKind } from "@/lib/topology";
+import { useTranslations } from "next-intl";
+
+import type { TopologyKind } from "@/lib/topology";
 import { cn } from "@/lib/utils";
 
 const ICON: Record<TopologyKind, LucideIcon> = {
@@ -42,8 +46,9 @@ export interface AppKindGlyphProps {
  * dashboard from. A static mark: it names a kind, it encodes no state.
  */
 export function AppKindGlyph({ topology, className }: AppKindGlyphProps) {
+  const t = useTranslations("apps.list");
   const Icon = topology ? ICON[topology] : PackageIcon;
-  const label = topology ? TOPOLOGY_META[topology].label : "No workloads yet";
+  const label = topology ? t(`kinds.${topology}`) : t("noWorkloads");
   return (
     <span
       role="img"

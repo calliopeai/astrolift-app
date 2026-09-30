@@ -339,49 +339,109 @@
   },
   "apps": {
     "list": {
-      "title": "Apps",
-      "description": "Repositories registered for deployment. Each app has workloads, environments, deployments, secrets, and managed services attached.",
-      "register": "Register app",
+      "title": "应用",
+      "description": "已注册用于部署的仓库。每个应用都关联工作负载、环境、部署、密钥和托管服务。",
+      "register": "注册应用",
       "empty": {
-        "title": "No apps registered yet",
-        "description": "Register a Git repository — we parse its astrolift.toml, provision a namespace and registry repo, and roll the first deployment from a Temporal workflow.",
-        "action": "Register your first app"
+        "title": "尚未注册应用",
+        "description": "注册 Git 仓库后，我们会解析其 astrolift.toml，创建命名空间和镜像仓库，并通过 Temporal 工作流执行首次部署。",
+        "action": "注册第一个应用"
       },
-      "branchLabel": "branch",
-      "open": "Open",
+      "branchLabel": "分支",
+      "open": "打开",
       "search": {
-        "placeholder": "Search by name, slug, or repo…",
-        "ariaLabel": "Search apps"
+        "placeholder": "按名称、标识或仓库搜索…",
+        "ariaLabel": "搜索应用"
       },
       "filters": {
-        "ariaLabel": "Filter by status",
-        "all": "All",
-        "running": "Running",
-        "failed": "Failed",
-        "inflight": "In-flight",
-        "notDeployed": "Not deployed"
+        "ariaLabel": "按状态筛选",
+        "all": "全部",
+        "running": "运行中",
+        "failed": "失败",
+        "inflight": "进行中",
+        "notDeployed": "未部署",
+        "ok": "正常",
+        "degraded": "降级",
+        "stale": "已过时",
+        "never_deployed": "未部署"
       },
       "noMatch": {
-        "title": "No apps match the current filter",
-        "description": "Try a different search term or switch back to All.",
-        "clear": "Clear filters"
+        "title": "没有应用符合当前筛选条件",
+        "description": "请尝试其他搜索词或返回“全部”。",
+        "clear": "清除筛选条件"
       },
       "errorBanner": {
-        "title": "Couldn't load apps",
-        "retry": "Retry"
+        "title": "无法加载应用",
+        "retry": "重试"
       },
       "freshness": {
-        "lastDeployed": "Last deployed {when}",
-        "viewFailed": "View failed deploy",
-        "stale": "stale",
-        "never": "no deploys yet",
+        "lastDeployed": "上次部署：{when}",
+        "viewFailed": "查看失败的部署",
+        "stale": "已过时",
+        "never": "尚未部署",
         "status": {
-          "OK": "Healthy",
-          "DEGRADED": "Latest deploy failed",
-          "STALE": "No recent deploys",
-          "NEVER": "Never deployed"
+          "OK": "正常",
+          "DEGRADED": "最新部署失败",
+          "STALE": "近期无部署",
+          "NEVER": "从未部署"
         }
-      }
+      },
+      "count": "显示 {shown} 项，共 {total} 项",
+      "newApp": "新建应用",
+      "getStarted": "开始使用",
+      "pin": "置顶",
+      "pinApp": "置顶",
+      "unpinApp": "取消应用置顶",
+      "none": "无",
+      "noneYet": "暂无",
+      "unknown": "未知",
+      "noWorkloads": "尚无工作负载",
+      "columns": {
+        "app": "应用",
+        "status": "状态",
+        "kind": "类型",
+        "cluster": "集群",
+        "lastDeploy": "上次部署",
+        "registered": "注册时间",
+        "project": "项目"
+      },
+      "kinds": {
+        "service": "单个服务",
+        "service-data": "服务和数据",
+        "service-worker": "Web 和后台进程",
+        "microservices": "微服务",
+        "service-agent": "应用和智能体",
+        "agent": "智能体",
+        "functions": "函数",
+        "scheduled": "已计划",
+        "task": "任务",
+        "workflow": "工作流",
+        "mixed": "混合"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "failing": "出现故障",
+        "archived": "已归档",
+        "mineNote": "在应用记录所有者之前，“我的”包含您直接或通过其项目、团队或组织拥有角色的应用。"
+      },
+      "bulk": {
+        "restart": "滚动重启",
+        "pushSecrets": "推送密钥",
+        "resync": "重新同步清单",
+        "succeeded": "{action}：{okCount}/{total} 个应用成功",
+        "failed": "{action}失败的应用：{failedSlugs}"
+      },
+      "pushSecrets": {
+        "bundle": "密钥包标识",
+        "environment": "环境（可选）",
+        "cancel": "取消",
+        "busy": "推送中…",
+        "title": "{count, plural, other {向 # 个应用推送密钥}}",
+        "submit": "{count, plural, other {推送到 # 个应用}}",
+        "description": "将指定的密钥包应用到每个选中的应用。环境留空时，会应用到该密钥包绑定的所有环境。"
+      },
+      "previewCount": "{count, plural, other {# 个预览}}"
     },
     "tabs": {
       "ariaLabel": "应用分区",

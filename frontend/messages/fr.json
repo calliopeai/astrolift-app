@@ -340,12 +340,12 @@
   "apps": {
     "list": {
       "title": "Applications",
-      "description": "Dépôts enregistrés pour le déploiement. Chaque application comporte des workloads, des environnements, des déploiements, des secrets et des services managés associés.",
+      "description": "Dépôts enregistrés pour le déploiement. Chaque application possède des charges de travail, des environnements, des déploiements, des secrets et des services gérés associés.",
       "register": "Enregistrer une application",
       "empty": {
         "title": "Aucune application enregistrée",
-        "description": "Enregistrez un dépôt Git — nous parsons son astrolift.toml, provisionnons un namespace et un dépôt de registry, puis lançons le premier déploiement via un workflow Temporal.",
-        "action": "Enregistrer votre première application"
+        "description": "Enregistrez un dépôt Git : nous analysons son astrolift.toml, créons un espace de noms et un dépôt d’images, puis lançons le premier déploiement avec un flux Temporal.",
+        "action": "Enregistrez votre première application"
       },
       "branchLabel": "branche",
       "open": "Ouvrir",
@@ -354,12 +354,16 @@
         "ariaLabel": "Rechercher des applications"
       },
       "filters": {
-        "ariaLabel": "Filtrer par statut",
+        "ariaLabel": "Filtrer par état",
         "all": "Toutes",
         "running": "En cours",
-        "failed": "Échouées",
-        "inflight": "En traitement",
-        "notDeployed": "Non déployées"
+        "failed": "Échec",
+        "inflight": "En cours de traitement",
+        "notDeployed": "Non déployée",
+        "ok": "Saine",
+        "degraded": "Dégradée",
+        "stale": "Obsolète",
+        "never_deployed": "Non déployée"
       },
       "noMatch": {
         "title": "Aucune application ne correspond au filtre actuel",
@@ -371,17 +375,73 @@
         "retry": "Réessayer"
       },
       "freshness": {
-        "lastDeployed": "Last deployed {when}",
-        "viewFailed": "View failed deploy",
-        "stale": "stale",
-        "never": "no deploys yet",
+        "lastDeployed": "Dernier déploiement : {when}",
+        "viewFailed": "Voir le déploiement échoué",
+        "stale": "obsolète",
+        "never": "aucun déploiement",
         "status": {
-          "OK": "Healthy",
-          "DEGRADED": "Latest deploy failed",
-          "STALE": "No recent deploys",
-          "NEVER": "Never deployed"
+          "OK": "Saine",
+          "DEGRADED": "Le dernier déploiement a échoué",
+          "STALE": "Aucun déploiement récent",
+          "NEVER": "Jamais déployée"
         }
-      }
+      },
+      "count": "Affichage de {shown} sur {total}",
+      "newApp": "Nouvelle application",
+      "getStarted": "Bien démarrer",
+      "pin": "Épingler",
+      "pinApp": "Épingler en haut",
+      "unpinApp": "Désépingler l’application",
+      "none": "aucun",
+      "noneYet": "aucun pour l’instant",
+      "unknown": "inconnue",
+      "noWorkloads": "Aucune charge de travail",
+      "columns": {
+        "app": "Application",
+        "status": "État",
+        "kind": "Type",
+        "cluster": "Cluster",
+        "lastDeploy": "Dernier déploiement",
+        "registered": "Enregistrement",
+        "project": "Projet"
+      },
+      "kinds": {
+        "service": "Service unique",
+        "service-data": "Service et données",
+        "service-worker": "Web et traitement en arrière-plan",
+        "microservices": "Microservices",
+        "service-agent": "Application et agent",
+        "agent": "Agent",
+        "functions": "Fonctions",
+        "scheduled": "Planifiée",
+        "task": "Tâche",
+        "workflow": "Flux de travail",
+        "mixed": "Mixte"
+      },
+      "views": {
+        "all": "Toutes",
+        "mine": "Les miennes",
+        "failing": "En échec",
+        "archived": "Archivées",
+        "mineNote": "Les miennes regroupe les applications sur lesquelles vous avez un rôle, directement ou via leur projet, équipe ou organisation, tant que les applications ne consignent pas leur propriétaire."
+      },
+      "bulk": {
+        "restart": "Redémarrage progressif",
+        "pushSecrets": "Envoyer les secrets",
+        "resync": "Resynchroniser le manifeste",
+        "succeeded": "{action} : {okCount}/{total} applications traitées",
+        "failed": "Échec de {action} pour : {failedSlugs}"
+      },
+      "pushSecrets": {
+        "bundle": "Slug du paquet",
+        "environment": "Environnement (facultatif)",
+        "cancel": "Annuler",
+        "busy": "Envoi…",
+        "title": "{count, plural, one {Envoyer les secrets à # application} other {Envoyer les secrets à # applications}}",
+        "submit": "{count, plural, one {Envoyer à # application} other {Envoyer à # applications}}",
+        "description": "Appliquez le paquet de secrets indiqué à chaque application sélectionnée. Laissez l’environnement vide pour l’appliquer à tous les environnements auxquels le paquet est lié."
+      },
+      "previewCount": "{count, plural, one {# aperçu} other {# aperçus}}"
     },
     "tabs": {
       "ariaLabel": "Sections de l’application",

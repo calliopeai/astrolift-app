@@ -340,18 +340,18 @@
   "apps": {
     "list": {
       "title": "Apps",
-      "description": "Für die Bereitstellung registrierte Repositories. Jede App hat zugeordnete Workloads, Umgebungen, Bereitstellungen, Secrets und verwaltete Dienste.",
+      "description": "Für die Bereitstellung registrierte Repositorys. Jede App umfasst Workloads, Umgebungen, Bereitstellungen, Secrets und verwaltete Dienste.",
       "register": "App registrieren",
       "empty": {
         "title": "Noch keine Apps registriert",
-        "description": "Registriere ein Git-Repository — wir parsen die astrolift.toml, stellen einen Namespace und ein Registry-Repository bereit und führen die erste Bereitstellung über einen Temporal-Workflow aus.",
+        "description": "Ein Git-Repository registrieren: Wir lesen astrolift.toml, erstellen einen Namespace und ein Image-Repository und starten die erste Bereitstellung über einen Temporal-Workflow.",
         "action": "Erste App registrieren"
       },
       "branchLabel": "Branch",
       "open": "Öffnen",
       "search": {
-        "placeholder": "Nach Name, Slug oder Repo suchen…",
-        "ariaLabel": "Apps durchsuchen"
+        "placeholder": "Nach Name, Slug oder Repository suchen…",
+        "ariaLabel": "Apps suchen"
       },
       "filters": {
         "ariaLabel": "Nach Status filtern",
@@ -359,29 +359,89 @@
         "running": "Läuft",
         "failed": "Fehlgeschlagen",
         "inflight": "In Bearbeitung",
-        "notDeployed": "Nicht bereitgestellt"
+        "notDeployed": "Nicht bereitgestellt",
+        "ok": "Fehlerfrei",
+        "degraded": "Beeinträchtigt",
+        "stale": "Veraltet",
+        "never_deployed": "Nicht bereitgestellt"
       },
       "noMatch": {
-        "title": "Keine Apps passen zum aktuellen Filter",
-        "description": "Versuche einen anderen Suchbegriff oder wechsle zurück zu Alle.",
-        "clear": "Filter zurücksetzen"
+        "title": "Keine Apps entsprechen dem aktuellen Filter",
+        "description": "Anderen Suchbegriff verwenden oder zu Alle wechseln.",
+        "clear": "Filter löschen"
       },
       "errorBanner": {
         "title": "Apps konnten nicht geladen werden",
         "retry": "Erneut versuchen"
       },
       "freshness": {
-        "lastDeployed": "Last deployed {when}",
-        "viewFailed": "View failed deploy",
-        "stale": "stale",
-        "never": "no deploys yet",
+        "lastDeployed": "Zuletzt bereitgestellt: {when}",
+        "viewFailed": "Fehlgeschlagene Bereitstellung ansehen",
+        "stale": "veraltet",
+        "never": "noch keine Bereitstellungen",
         "status": {
-          "OK": "Healthy",
-          "DEGRADED": "Latest deploy failed",
-          "STALE": "No recent deploys",
-          "NEVER": "Never deployed"
+          "OK": "Fehlerfrei",
+          "DEGRADED": "Letzte Bereitstellung fehlgeschlagen",
+          "STALE": "Keine aktuellen Bereitstellungen",
+          "NEVER": "Noch nie bereitgestellt"
         }
-      }
+      },
+      "count": "{shown} von {total} angezeigt",
+      "newApp": "Neue App",
+      "getStarted": "Erste Schritte",
+      "pin": "Anheften",
+      "pinApp": "Oben anheften",
+      "unpinApp": "App lösen",
+      "none": "keine",
+      "noneYet": "noch keine",
+      "unknown": "unbekannt",
+      "noWorkloads": "Noch keine Workloads",
+      "columns": {
+        "app": "App",
+        "status": "Status",
+        "kind": "Art",
+        "cluster": "Cluster",
+        "lastDeploy": "Letzte Bereitstellung",
+        "registered": "Registriert",
+        "project": "Projekt"
+      },
+      "kinds": {
+        "service": "Einzelner Dienst",
+        "service-data": "Dienst und Daten",
+        "service-worker": "Web und Hintergrunddienst",
+        "microservices": "Microservices",
+        "service-agent": "App und Agent",
+        "agent": "Agent",
+        "functions": "Funktionen",
+        "scheduled": "Geplant",
+        "task": "Aufgabe",
+        "workflow": "Workflow",
+        "mixed": "Gemischt"
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "failing": "Fehlerhaft",
+        "archived": "Archiviert",
+        "mineNote": "Meine umfasst Apps, für die Sie direkt oder über Projekt, Team oder Organisation eine Rolle besitzen, solange Apps ihre Eigentümer noch nicht erfassen."
+      },
+      "bulk": {
+        "restart": "Rollierender Neustart",
+        "pushSecrets": "Secrets übertragen",
+        "resync": "Manifest neu synchronisieren",
+        "succeeded": "{action}: {okCount}/{total} Apps erfolgreich",
+        "failed": "{action} fehlgeschlagen für: {failedSlugs}"
+      },
+      "pushSecrets": {
+        "bundle": "Bundle-Slug",
+        "environment": "Umgebung (optional)",
+        "cancel": "Abbrechen",
+        "busy": "Übertragung…",
+        "title": "{count, plural, one {Secrets an # App übertragen} other {Secrets an # Apps übertragen}}",
+        "submit": "{count, plural, one {An # App übertragen} other {An # Apps übertragen}}",
+        "description": "Das angegebene Secret-Bundle auf alle ausgewählten Apps anwenden. Umgebung leer lassen, um alle Umgebungen einzubeziehen, an die das Bundle gebunden ist."
+      },
+      "previewCount": "{count, plural, one {# Vorschau} other {# Vorschauen}}"
     },
     "tabs": {
       "ariaLabel": "Anwendungsabschnitte",

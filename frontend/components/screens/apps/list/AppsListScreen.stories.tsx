@@ -1,9 +1,12 @@
 import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import spanish from "@/messages/es.json";
+
 import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { APPS_LIST, type AppRow, pinFirst } from "./apps-list";
+import { APPS_LIST, type AppRow, localizedAppsList, pinFirst } from "./apps-list";
 import { AppsListScreen, type AppsListScreenProps, PushSecretsDialog } from "./AppsListScreen";
 import { APPS, LONG_APP, MANY, PUSH_SECRETS, listProps } from "./fixtures";
 
@@ -47,7 +50,9 @@ type Props = Partial<Omit<AppsListScreenProps, "list">> & {
  * numbered pages and lifts the pins, as the hook does with a page.
  */
 function Apps({ apps = ACTIVE, initial, ...patch }: Props) {
-  const list = useLocalListState(APPS_LIST, initial);
+  const t = useTranslations("apps.list");
+  const status = useTranslations("apps.frame");
+  const list = useLocalListState(localizedAppsList(t, status), initial);
   const pinned = patch.pinned ?? new Set(["billing-worker"]);
   const { page, pageSize } = list.state;
   const rows = pinFirst(apps.slice((page - 1) * pageSize, page * pageSize), pinned);
@@ -180,4 +185,15 @@ export const PushSecrets: Story = { render: () => <PushSecretsDialog {...PUSH_SE
 
 export const PushSecretsBusy: Story = {
   render: () => <PushSecretsDialog {...PUSH_SECRETS} busy />,
+};
+
+/** Translated app kinds, filter/view labels and registry columns at minimum console width. */
+export const SpanishWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }}>
+        <Apps />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };
