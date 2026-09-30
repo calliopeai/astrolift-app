@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
+from astrolift_dispatch.managed_runtime_views import validate_managed_runtime
 from astrolift_dispatch.views import (
     agent_callback,
     agent_checkin,
@@ -21,6 +22,11 @@ from astrolift_dispatch.views import (
 app_name = "astrolift_dispatch"
 
 urlpatterns = [
+    path(
+        "api/dispatch/v1/boxes/<uuid:box_id>/runtime/validate/",
+        validate_managed_runtime,
+        name="managed-runtime-validate",
+    ),
     # Registration and heartbeat
     path("api/dispatch/v1/register/", register, name="dispatch-register"),
     path("api/dispatch/v1/heartbeat/", heartbeat, name="dispatch-heartbeat"),

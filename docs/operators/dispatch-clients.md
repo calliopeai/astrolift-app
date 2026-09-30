@@ -4,6 +4,64 @@ The CLI, console and agent clients use Astrolift's existing Dispatch lifecycle.
 The controller schedules work, receives runtime status and records outcomes.
 A chat-based overseer can use the same API as another authenticated client.
 
+## Managed IDE runtime authority
+
+`POST /api/dispatch/v1/boxes/<box-guid>/runtime/validate/` is an internal runtime
+endpoint. It accepts only an expiring, box-scoped `Bearer alft_box_...` credential,
+not a user session or ordinary CLI token. Only its SHA-256 hash is persisted.
+The JSON body, bounded to 4 KiB, is
+`{ version: 1, ownerEpoch, podUid, runtimeInstanceId }`; the runtime instance is
+the current server process's 32-character lowercase hex nonce.
+
+Successful `MutationResult.data` contains:
+
+```json
+{
+  "version": 1,
+  "owner": {
+    "apiUrl": "https://platform.example.test",
+    "organizationId": "organization UUID",
+    "boxId": "box UUID",
+    "ownerEpoch": "stable owner UUID",
+    "workspacePath": "/workspace"
+  },
+  "incarnation": {
+    "namespace": "managed",
+    "podName": "managed-pod",
+    "podUid": "Kubernetes pod UID",
+    "containerName": "ide",
+    "runtimeInstanceId": "32 lowercase hex characters"
+  }
+}
+```
+
+The owner address comes from the control plane, including its configured HTTPS
+`PLATFORM_API_URL`. CLI server aliases are local transport configuration and do
+not enter that address. The response proves resource ownership at validation
+time; it does not prove extension readiness or grant a task transfer claim.
+The receiver must independently require that the returned incarnation names its
+own process and revalidate before transfer admission, acknowledgement and resume.
+
+The internal `certify_managed_runtime` provisioner helper freezes the owner epoch,
+cluster, Job/Pod/PVC UIDs, container and immutable image, and returns a credential
+once with a one-hour expiry. The helper and endpoint both read live resources;
+the primary container must report the configured image as running and a stable
+immutable observed `imageID` (which may differ from a multi-platform index digest).
+Missing or changed observations are refused; `docker-pullable://` is normalized.
+The primary container must have its expected writable claim mounted
+at `/state` and the workspace, with distinct `state` and `workspace` subpaths.
+The first validation binds a process nonce atomically. A different nonce, replaced
+resource, stopped/deleted box, unavailable provider or expired/revoked credential
+is refused. Validation allows and ownership refusals are audited without tokens.
+
+This is a foundation API. No public issuer, managed box provisioning, Secret
+delivery, credential renewal, pod restart recertification or Move capability is
+wired by this change. Existing terminal boxes remain unchanged. A replacement
+runtime cannot take over an existing transfer claim using this endpoint.
+Apply additive migration `astrolift_agents.0042_managed_box_runtime` before using
+the API. For code rollback retain the table, revoke issued credentials and disable
+managed consumers; do not drop ownership records containing recovery evidence.
+
 ## Discover and run work
 
 ### Saved task backlog

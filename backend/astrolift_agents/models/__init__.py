@@ -11,6 +11,7 @@ from astrolift_agents.models.agent_task_input import AgentTaskInputMessage
 from astrolift_agents.models.agent_task_input_reply import AgentTaskInputReply
 from astrolift_agents.models.brief import Brief
 from astrolift_agents.models.dispatcher_instance import DispatcherInstance
+from astrolift_agents.models.managed_box_runtime import ManagedBoxRuntime
 from astrolift_agents.models.org_skill_repo import OrgSkillRepo
 from astrolift_agents.models.skill import (
     AgentSkillRef,
@@ -38,6 +39,7 @@ __all__ = [
     "Brief",
     "BriefSkillRef",
     "DispatcherInstance",
+    "ManagedBoxRuntime",
     "OrgSkillRepo",
     "Skill",
     "TaskMeteringRecord",

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add internal certification and box-scoped validation for managed IDE runtime
+  ownership (#1971). Exact live Job, Pod and persistent claim identities are
+  checked before binding a runtime incarnation. Managed provisioning and Move
+  remain unavailable until their separate lifecycle and transfer integration lands.
+
 - Merge the agent startup-diagnostic and durable-backlog migration branches so
   a combined control-plane upgrade has one migration leaf. Both additive
   migrations remain applicable from either previously deployed branch (#1972, #2190).
