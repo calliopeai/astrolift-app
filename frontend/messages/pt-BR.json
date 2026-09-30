@@ -597,73 +597,125 @@
       }
     },
     "previews": {
-      "title": "{name} · Previews",
-      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "title": "{name} · Prévias",
+      "description": "{slug} · ambientes temporários por PR em pr-N.{subdomain}",
       "disabled": {
-        "title": "Previews are disabled for this app",
-        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+        "title": "As prévias estão desativadas para este app",
+        "description": "Ative as prévias por PR nas configurações para criá-las automaticamente ao abrir um pull request. O histórico continua visível abaixo."
       },
       "stale": {
-        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
-        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+        "title": "{count, plural, one {# prévia desatualizada} other {# prévias desatualizadas}}",
+        "description": "Estas prévias não foram reimplantadas há mais de {days} dias. O PR pode estar inativo ou a remoção automática pode ter falhado; considere removê-las para liberar a cota de namespaces."
       },
-      "openRepo": "Open repo",
-      "enablePreviews": "Enable previews",
-      "openInTab": "Abrir em nova guia",
-      "openPr": "Abrir PR #{pr} no host de origem",
-      "copyHostname": "Copiar hostname do preview",
-      "filterEmpty": "Nenhum preview corresponde ao filtro atual.",
+      "openRepo": "Abrir repositório",
+      "enablePreviews": "Ativar prévias",
+      "openInTab": "Abrir em nova aba",
+      "openPr": "Abrir PR #{pr} no provedor de código",
+      "copyHostname": "Copiar hostname da prévia",
+      "filterEmpty": "Nenhuma prévia corresponde ao filtro atual.",
       "filters": {
-        "active": "Ativos",
-        "running": "Em execução",
-        "failed": "Falhou",
-        "all": "Todos"
+        "active": "Implantadas",
+        "running": "Saudáveis",
+        "failed": "Com falha",
+        "all": "Todas (incluindo removidas)"
       },
-      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
+      "groupSummary": "{running} em execução · {failed} com falha · {tornDown} removidas",
       "columns": {
         "pr": "PR / branch",
         "hostname": "Hostname",
         "ttl": "TTL",
-        "footprint": "Footprint",
-        "lastDeploy": "Último deploy",
+        "footprint": "Recursos",
+        "lastDeploy": "Última implantação",
         "status": "Status",
         "actions": "Ações",
         "prBranch": "PR / branch"
       },
-      "ttlTooltip": "Auto-teardown em {date}",
+      "ttlTooltip": "Remoção automática em {date}",
       "extend": {
-        "1d": "+1d",
-        "7d": "+7d"
+        "1d": "+1 dia",
+        "7d": "+7 dias"
       },
-      "costPerDay": "${cost}/dia",
+      "costPerDay": "{cost}/dia",
       "costUnavailable": "Custo indisponível",
-      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
-      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
-      "staleBadge": "stale",
-      "tearDown": "Derrubar",
-      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
-      "confirmTitle": "Tear down preview for PR #{pr}?",
-      "confirmFallback": "Tear down preview?",
-      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
-      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · {cost}/dia com preços atuais da nuvem",
+      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · API de custos indisponível para este cluster",
+      "staleBadge": "Desatualizada",
+      "tearDown": "Remover",
+      "footer": "Cada app mantém {count, plural, one {# ambiente ativo} other {# ambientes ativos}} de prévia · limite de inatividade: {days, number} dias.",
+      "confirmTitle": "Remover a prévia do PR #{pr}?",
+      "confirmFallback": "Remover a prévia?",
+      "confirmDescription": "O namespace {namespace} será excluído, o hostname de ingress ({hostname}) liberado e os serviços gerenciados desta prévia removidos. A prévia será recriada automaticamente no próximo push para {branch}.",
+      "confirmDescriptionFallback": "O namespace será excluído e o hostname liberado.",
       "empty": {
-        "title": "Ainda não há ambientes de preview",
-        "enabledHint": "Abra um PR e o preview é criado automaticamente — geralmente em menos de dois minutos.",
-        "disabledHint": "Habilite previews nas configurações do app para criar um automaticamente a cada PR.",
-        "step1": "Habilite previews na configuração deste app.",
-        "step2": "Abra um PR no repositório conectado.",
-        "step3": "Acompanhe o preview ser criado em cerca de dois minutos.",
-        "learnMore": "Como funcionam os previews"
+        "title": "Ainda não há ambientes de prévia",
+        "enabledHint": "Abra um pull request para criar a prévia automaticamente, geralmente em menos de dois minutos.",
+        "disabledHint": "Ative as prévias nas configurações para criá-las automaticamente a cada PR.",
+        "step1": "Ative as prévias na configuração deste app.",
+        "step2": "Abra um pull request no repositório conectado.",
+        "step3": "Aguarde a compilação da prévia, normalmente cerca de dois minutos.",
+        "learnMore": "Como as prévias funcionam"
       },
       "toasts": {
-        "teardownEnqueued": "Teardown enfileirado para PR #{pr}",
-        "teardownFailed": "Falha no teardown",
-        "ttlExtended": "Preview do PR #{pr} estendido por {days}d",
-        "extendFailed": "Não foi possível estender o TTL"
+        "teardownEnqueued": "Remoção enfileirada para o PR #{pr}",
+        "teardownFailed": "Falha ao remover",
+        "ttlExtended": "Prévia do PR #{pr} prorrogada por {days} dias",
+        "extendFailed": "Não foi possível estender o TTL",
+        "created": "A prévia de “{branch}” está sendo provisionada",
+        "createFailed": "Não foi possível criar a prévia"
       },
-      "emptyTitle": "No preview environments yet",
-      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
-      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+      "emptyTitle": "Ainda não há ambientes de prévia",
+      "emptyEnabled": "Abra um pull request para este app e crie uma prévia automaticamente.",
+      "emptyDisabled": "Ative as prévias nas configurações para criá-las automaticamente a cada PR.",
+      "filterTooltips": {
+        "active": "Prévias que ainda existem no cluster (não removidas)",
+        "running": "Prévias cujos pods passam nas verificações de prontidão",
+        "failed": "Prévias com erro na implantação ou pods que falharam",
+        "all": "Todas as prévias, incluindo as já removidas"
+      },
+      "create": {
+        "title": "Criar ambiente de prévia",
+        "action": "Criar prévia",
+        "description": "Crie uma prévia de qualquer branch sem abrir um pull request.",
+        "branch": "Nome da branch",
+        "hint": "A branch deve existir no repositório conectado. O ambiente usará o mesmo TTL e os mesmos limites de recursos das prévias automáticas.",
+        "cancel": "Cancelar",
+        "creating": "Criando…"
+      },
+      "manual": "Manual",
+      "tornDownAction": "Removida: nada a alterar",
+      "extendAction": "Estender TTL {duration}",
+      "list": {
+        "label": "Prévias",
+        "search": "Buscar branch, host, commit ou status…",
+        "views": {
+          "all": "Todas",
+          "mine": "Minhas",
+          "waiting": "Aguardando aprovação",
+          "failed": "Com falha",
+          "today": "Hoje",
+          "previews": "Prévias"
+        }
+      },
+      "status": {
+        "building": "Compilando",
+        "running": "Em execução",
+        "failed": "Com falha",
+        "torn_down": "Removida"
+      },
+      "countdown": {
+        "expired": "Expirada",
+        "daysHours": "{days, number}d {hours, number}h",
+        "hoursMinutes": "{hours, number}h {minutes, number}min",
+        "minutes": "{minutes, number}min"
+      },
+      "spend": {
+        "daily": "Gasto diário",
+        "monthly": "Este mês (projeção)",
+        "approximate": "Aproximado",
+        "priced": "{priced, number} de {total, number} prévias com preço",
+        "unpriced": "{count, number} sem preço pelo driver deste cluster",
+        "overcount": "{count, number} calculadas somando todos os SKUs do serviço; o total está superestimado"
+      }
     },
     "observability": {
       "scope": {

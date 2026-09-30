@@ -1082,13 +1082,13 @@
         "1d": "+1d",
         "7d": "+7d"
       },
-      "costPerDay": "${cost}/day",
+      "costPerDay": "{cost}/day",
       "costUnavailable": "Cost unavailable",
-      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · {cost}/day from live cloud pricing",
       "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
       "staleBadge": "stale",
       "tearDown": "Tear down",
-      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
+      "footer": "Preview retention is {count, plural, one {# active environment} other {# active environments}} per app · stale threshold {days, number} days.",
       "confirmTitle": "Tear down preview for PR #{pr}?",
       "confirmFallback": "Tear down preview?",
       "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
@@ -1106,11 +1106,57 @@
         "teardownEnqueued": "Teardown enqueued for PR #{pr}",
         "teardownFailed": "Teardown failed",
         "ttlExtended": "PR #{pr} preview extended by {days}d",
-        "extendFailed": "Could not extend TTL"
+        "extendFailed": "Could not extend TTL",
+        "created": "Preview for \"{branch}\" is provisioning",
+        "createFailed": "Failed to create preview"
       },
       "emptyTitle": "No preview environments yet",
       "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
-      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR.",
+      "create": {
+        "title": "Create preview environment",
+        "action": "Create preview",
+        "description": "Provision a preview from any branch without opening a pull request.",
+        "branch": "Branch name",
+        "hint": "The branch must exist in the connected repository. The environment will use the same TTL and resource limits as auto-preview environments.",
+        "cancel": "Cancel",
+        "creating": "Creating…"
+      },
+      "manual": "manual",
+      "tornDownAction": "Torn down: nothing to change",
+      "extendAction": "Extend TTL {duration}",
+      "list": {
+        "label": "Previews",
+        "search": "Search branch, host, commit or status…",
+        "views": {
+          "all": "All",
+          "mine": "Mine",
+          "waiting": "Waiting approval",
+          "failed": "Failed",
+          "today": "Today",
+          "previews": "Previews"
+        }
+      },
+      "status": {
+        "building": "Building",
+        "running": "Running",
+        "failed": "Failed",
+        "torn_down": "Torn down"
+      },
+      "countdown": {
+        "expired": "expired",
+        "daysHours": "{days, number}d {hours, number}h",
+        "hoursMinutes": "{hours, number}h {minutes, number}m",
+        "minutes": "{minutes, number}m"
+      },
+      "spend": {
+        "daily": "Daily spend",
+        "monthly": "This month (projected)",
+        "approximate": "approximate",
+        "priced": "{priced, number} of {total, number} previews priced",
+        "unpriced": "{count, number} not priced by this cluster's driver",
+        "overcount": "{count, number} priced by summing every SKU in the service, so the total is an over-count"
+      }
     },
     "domains": {
       "title": "Custom domains",

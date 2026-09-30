@@ -597,73 +597,125 @@
       }
     },
     "previews": {
-      "title": "{name} · Previews",
-      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "title": "{name} · Aperçus",
+      "description": "{slug} · environnements éphémères par PR sur pr-N.{subdomain}",
       "disabled": {
-        "title": "Previews are disabled for this app",
-        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+        "title": "Les aperçus sont désactivés pour cette app",
+        "description": "Activez les aperçus par PR dans les paramètres pour en créer automatiquement à chaque demande de fusion. Les aperçus historiques restent visibles ci-dessous."
       },
       "stale": {
-        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
-        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+        "title": "{count, plural, one {# aperçu obsolète} other {# aperçus obsolètes}}",
+        "description": "Ces aperçus n'ont pas été redéployés depuis plus de {days} jours. Le PR est peut-être inactif ou la suppression automatique a échoué ; envisagez de les supprimer pour libérer le quota de namespaces."
       },
-      "openRepo": "Open repo",
-      "enablePreviews": "Enable previews",
+      "openRepo": "Ouvrir le dépôt",
+      "enablePreviews": "Activer les aperçus",
       "openInTab": "Ouvrir dans un nouvel onglet",
-      "openPr": "Ouvrir la PR #{pr} sur l'hôte source",
-      "copyHostname": "Copier le hostname du preview",
-      "filterEmpty": "Aucun preview ne correspond au filtre actuel.",
+      "openPr": "Ouvrir le PR nº {pr} chez le fournisseur de code",
+      "copyHostname": "Copier le nom d'hôte de l'aperçu",
+      "filterEmpty": "Aucun aperçu ne correspond au filtre actuel.",
       "filters": {
-        "active": "Actifs",
-        "running": "En cours",
-        "failed": "Échec",
-        "all": "Tous"
+        "active": "Déployés",
+        "running": "Sains",
+        "failed": "En échec",
+        "all": "Tous (y compris supprimés)"
       },
-      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
+      "groupSummary": "{running} en cours · {failed} en échec · {tornDown} supprimés",
       "columns": {
         "pr": "PR / branche",
-        "hostname": "Hostname",
+        "hostname": "Nom d'hôte",
         "ttl": "TTL",
-        "footprint": "Empreinte",
+        "footprint": "Ressources",
         "lastDeploy": "Dernier déploiement",
-        "status": "Statut",
+        "status": "État",
         "actions": "Actions",
         "prBranch": "PR / branche"
       },
-      "ttlTooltip": "Auto-teardown le {date}",
+      "ttlTooltip": "Suppression automatique le {date}",
       "extend": {
-        "1d": "+1j",
-        "7d": "+7j"
+        "1d": "+1 jour",
+        "7d": "+7 jours"
       },
-      "costPerDay": "${cost}/jour",
+      "costPerDay": "{cost}/jour",
       "costUnavailable": "Coût indisponible",
-      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
-      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
-      "staleBadge": "stale",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · {cost}/jour selon les tarifs cloud actuels",
+      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · API de coûts indisponible pour ce cluster",
+      "staleBadge": "Obsolète",
       "tearDown": "Supprimer",
-      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
-      "confirmTitle": "Tear down preview for PR #{pr}?",
-      "confirmFallback": "Tear down preview?",
-      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
-      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "footer": "Chaque app conserve {count, plural, one {# environnement d'aperçu actif} other {# environnements d'aperçu actifs}} · seuil d'obsolescence : {days, number} jours.",
+      "confirmTitle": "Supprimer l'aperçu du PR nº {pr} ?",
+      "confirmFallback": "Supprimer l'aperçu ?",
+      "confirmDescription": "Le namespace {namespace} sera supprimé, le nom d'hôte ingress ({hostname}) libéré et les services gérés associés à cet aperçu déprovisionnés. L'aperçu sera recréé automatiquement au prochain envoi sur {branch}.",
+      "confirmDescriptionFallback": "Le namespace sera supprimé et le nom d'hôte libéré.",
       "empty": {
-        "title": "Aucun environnement de preview",
-        "enabledHint": "Ouvrez une PR et le preview se construit automatiquement — en général en moins de deux minutes.",
-        "disabledHint": "Activez les previews dans la configuration de l'application pour en lancer un automatiquement sur chaque PR.",
-        "step1": "Activez les previews dans la configuration de cette application.",
-        "step2": "Ouvrez une PR sur le dépôt connecté.",
-        "step3": "Regardez le preview se construire en environ deux minutes.",
-        "learnMore": "Comment fonctionnent les previews"
+        "title": "Aucun environnement d'aperçu pour le moment",
+        "enabledHint": "Ouvrez une demande de fusion pour créer automatiquement l'aperçu, généralement en moins de deux minutes.",
+        "disabledHint": "Activez les aperçus dans les paramètres pour en créer automatiquement à chaque PR.",
+        "step1": "Activez les aperçus dans la configuration de cette app.",
+        "step2": "Ouvrez une demande de fusion sur le dépôt connecté.",
+        "step3": "Attendez la compilation de l'aperçu, en général environ deux minutes.",
+        "learnMore": "Fonctionnement des aperçus"
       },
       "toasts": {
-        "teardownEnqueued": "Teardown en file pour la PR #{pr}",
-        "teardownFailed": "Échec du teardown",
-        "ttlExtended": "Preview de la PR #{pr} prolongé de {days}j",
-        "extendFailed": "Impossible de prolonger le TTL"
+        "teardownEnqueued": "Suppression mise en file pour le PR nº {pr}",
+        "teardownFailed": "Échec de la suppression",
+        "ttlExtended": "Aperçu du PR nº {pr} prolongé de {days} jours",
+        "extendFailed": "Impossible de prolonger le TTL",
+        "created": "L'aperçu de « {branch} » est en cours de création",
+        "createFailed": "Impossible de créer l'aperçu"
       },
-      "emptyTitle": "No preview environments yet",
-      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
-      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+      "emptyTitle": "Aucun environnement d'aperçu pour le moment",
+      "emptyEnabled": "Ouvrez une demande de fusion pour cette app afin de créer automatiquement un aperçu.",
+      "emptyDisabled": "Activez les aperçus dans les paramètres pour en créer automatiquement à chaque PR.",
+      "filterTooltips": {
+        "active": "Aperçus encore présents dans le cluster (non supprimés)",
+        "running": "Aperçus dont les pods passent les contrôles de disponibilité",
+        "failed": "Aperçus en erreur de déploiement ou avec des pods plantés",
+        "all": "Tous les aperçus, même ceux déjà supprimés"
+      },
+      "create": {
+        "title": "Créer un environnement d'aperçu",
+        "action": "Créer un aperçu",
+        "description": "Créez un aperçu depuis n'importe quelle branche sans ouvrir de demande de fusion.",
+        "branch": "Nom de la branche",
+        "hint": "La branche doit exister dans le dépôt connecté. L'environnement utilisera le même TTL et les mêmes limites de ressources que les aperçus automatiques.",
+        "cancel": "Annuler",
+        "creating": "Création…"
+      },
+      "manual": "Manuel",
+      "tornDownAction": "Supprimé : rien à modifier",
+      "extendAction": "Prolonger le TTL {duration}",
+      "list": {
+        "label": "Aperçus",
+        "search": "Rechercher une branche, un hôte, un commit ou un état…",
+        "views": {
+          "all": "Tous",
+          "mine": "Les miens",
+          "waiting": "En attente d'approbation",
+          "failed": "En échec",
+          "today": "Aujourd'hui",
+          "previews": "Aperçus"
+        }
+      },
+      "status": {
+        "building": "Compilation",
+        "running": "En cours",
+        "failed": "En échec",
+        "torn_down": "Supprimé"
+      },
+      "countdown": {
+        "expired": "Expiré",
+        "daysHours": "{days, number}j {hours, number}h",
+        "hoursMinutes": "{hours, number}h {minutes, number}min",
+        "minutes": "{minutes, number}min"
+      },
+      "spend": {
+        "daily": "Dépense quotidienne",
+        "monthly": "Ce mois-ci (projection)",
+        "approximate": "Approximatif",
+        "priced": "{priced, number} aperçus chiffrés sur {total, number}",
+        "unpriced": "{count, number} non chiffrés par le pilote de ce cluster",
+        "overcount": "{count, number} chiffrés en additionnant tous les SKU du service ; le total est surestimé"
+      }
     },
     "observability": {
       "scope": {

@@ -64,6 +64,10 @@
   language in all eight supported locales, including rich environment-variable
   hints. Failed confirmations remain open for retry (#2145; remaining domains
   are still being translated).
+- App preview dialogs, countdowns, statuses and spend warnings use all eight
+  locales. Currency follows the selected locale; unpriced and approximate
+  estimates retain their qualifications (#2145).
+
 - App secret controls, scopes, history and mutation feedback use all eight
   locales. Dates and expiry counts follow the locale; secret values, scope
   identifiers and server-provided errors stay unchanged (#2145).

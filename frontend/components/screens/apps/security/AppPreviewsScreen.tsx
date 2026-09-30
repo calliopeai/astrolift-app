@@ -35,6 +35,7 @@ import type {
   PreviewStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 import { cn } from "@/lib/utils";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { isStale, STALE_DAYS, type useAppPreviews } from "./use-app-previews";
 
@@ -54,17 +55,23 @@ const statusToDot: Record<PreviewStatus, "ok" | "warn" | "error" | "muted" | "pe
 // "Xd Yh" / "Xh Ym" / "Xm" string otherwise. Granularity drops as the
 // window shrinks so the column doesn't show "0d 5h 23m 14s" on a
 // preview about to be torn down.
-function formatCountdown(ttlIsoString: string, now: number): { label: string; expired: boolean } {
+function formatCountdown(
+  ttlIsoString: string,
+  now: number,
+  t: ReturnType<typeof useTranslations<"apps.previews">>
+): { label: string; expired: boolean } {
   const target = new Date(ttlIsoString).getTime();
+  if (!Number.isFinite(target)) return { label: "—", expired: false };
   const delta = target - now;
-  if (delta <= 0) return { label: "expired", expired: true };
+  if (delta <= 0) return { label: t("countdown.expired"), expired: true };
   const seconds = Math.floor(delta / 1000);
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
-  if (days >= 1) return { label: `${days}d ${hours}h`, expired: false };
-  if (hours >= 1) return { label: `${hours}h ${mins}m`, expired: false };
-  return { label: `${mins}m`, expired: false };
+  if (days >= 1) return { label: t("countdown.daysHours", { days, hours }), expired: false };
+  if (hours >= 1)
+    return { label: t("countdown.hoursMinutes", { hours, minutes: mins }), expired: false };
+  return { label: t("countdown.minutes", { minutes: mins }), expired: false };
 }
 
 // Render bytes in Mi / Gi, mirroring kubectl describe so the column
@@ -102,6 +109,7 @@ function CreatePreviewSheet({
   creating: boolean;
   onCreate: (branch: string) => Promise<boolean>;
 }) {
+  const t = useTranslations("apps.previews");
   const [open, setOpen] = React.useState(false);
   const [branch, setBranch] = React.useState("");
 
@@ -119,20 +127,18 @@ function CreatePreviewSheet({
     <>
       <Can permission="app.deploy">
         <Button size="sm" onClick={() => setOpen(true)} disabled={disabled}>
-          <GitBranchIcon className="size-3" /> Create preview
+          <GitBranchIcon className="size-3" /> {t("create.action")}
         </Button>
       </Can>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="flex flex-col">
           <SheetHeader>
-            <SheetTitle>Create preview environment</SheetTitle>
-            <SheetDescription>
-              Provision a preview from any branch without opening a pull request.
-            </SheetDescription>
+            <SheetTitle>{t("create.title")}</SheetTitle>
+            <SheetDescription>{t("create.description")}</SheetDescription>
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="preview-branch">Branch name</Label>
+              <Label htmlFor="preview-branch">{t("create.branch")}</Label>
               <Input
                 id="preview-branch"
                 placeholder="feature/my-branch"
@@ -140,17 +146,14 @@ function CreatePreviewSheet({
                 onChange={(e) => setBranch(e.target.value)}
                 autoFocus
               />
-              <p className="text-muted-foreground text-xs">
-                The branch must exist in the connected repository. The environment will use the same
-                TTL and resource limits as auto-preview environments.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("create.hint")}</p>
             </div>
             <SheetFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                {t("create.cancel")}
               </Button>
               <Button type="submit" disabled={loading || !branch.trim()}>
-                {loading ? "Creating…" : "Create preview"}
+                {loading ? t("create.creating") : t("create.action")}
               </Button>
             </SheetFooter>
           </form>
@@ -191,6 +194,26 @@ export function AppPreviewsScreen({
   configHref,
 }: AppPreviewsScreenProps) {
   const t = useTranslations("apps.previews");
+  const fmt = useFormatters();
+  const viewLabels: Record<string, string> = {
+    all: t("list.views.all"),
+    mine: t("list.views.mine"),
+    waiting: t("list.views.waiting"),
+    failed: t("list.views.failed"),
+    today: t("list.views.today"),
+    previews: t("list.views.previews"),
+  };
+  const localizedList = {
+    ...list,
+    definition: {
+      ...list.definition,
+      searchPlaceholder: t("list.search"),
+      views: list.definition.views?.map((view) => ({
+        ...view,
+        label: viewLabels[view.key] ?? view.label,
+      })),
+    },
+  };
 
   const [tearDownTarget, setTearDownTarget] = React.useState<AstroliftPreviewEnvironment | null>(
     null
@@ -243,7 +266,7 @@ export function AppPreviewsScreen({
               </span>
               {p.isManual && (
                 <Badge variant="outline" className="text-2xs shrink-0 uppercase">
-                  manual
+                  {t("manual")}
                 </Badge>
               )}
             </span>
@@ -284,7 +307,7 @@ export function AppPreviewsScreen({
         if (p.status === "torn_down") {
           return <span className="text-muted-foreground text-xs">—</span>;
         }
-        const countdown = formatCountdown(p.ttlUntil, now);
+        const countdown = formatCountdown(p.ttlUntil, now, t);
         return (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -298,7 +321,11 @@ export function AppPreviewsScreen({
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              {t("ttlTooltip", { date: new Date(p.ttlUntil).toLocaleString() })}
+              {t("ttlTooltip", {
+                date: Number.isFinite(new Date(p.ttlUntil).getTime())
+                  ? fmt.formatDateTime(p.ttlUntil)
+                  : "—",
+              })}
             </TooltipContent>
           </Tooltip>
         );
@@ -323,14 +350,17 @@ export function AppPreviewsScreen({
                 </div>
                 <div className="text-muted-foreground text-xs">
                   {dailyCost != null
-                    ? t("costPerDay", { cost: dailyCost.toFixed(2) })
+                    ? t("costPerDay", { cost: fmt.formatCurrency(dailyCost) })
                     : t("costUnavailable")}
                 </div>
               </div>
             </TooltipTrigger>
             <TooltipContent>
               {dailyCost != null
-                ? t("costTooltip", { pods: aggregate.podCount, cost: dailyCost.toFixed(2) })
+                ? t("costTooltip", {
+                    pods: aggregate.podCount,
+                    cost: fmt.formatCurrency(dailyCost),
+                  })
                 : t("costTooltipUnavailable", { pods: aggregate.podCount })}
               {/* The driver's own qualifications on its own number. */}
               {p.estimatedCostNotes.map((note) => (
@@ -349,7 +379,7 @@ export function AppPreviewsScreen({
       cellClassName: "text-muted-foreground font-mono text-xs whitespace-nowrap",
       cell: (p) => (
         <>
-          {p.lastDeployedAt ? new Date(p.lastDeployedAt).toLocaleString() : "—"}
+          {p.lastDeployedAt ? fmt.formatDateTime(p.lastDeployedAt) : "—"}
           {isStale(p) && (
             <Badge variant="outline" className="text-2xs ml-2 uppercase">
               {t("staleBadge")}
@@ -362,23 +392,23 @@ export function AppPreviewsScreen({
       id: "status",
       header: t("columns.status"),
       cellClassName: "font-mono text-xs",
-      cell: (p) => p.status.replace(/_/g, " "),
+      cell: (p) => <span title={p.status}>{t(`status.${p.status}`)}</span>,
     },
   ];
 
   const rowActions = canDeploy
     ? (p: AstroliftPreviewEnvironment) =>
         p.status === "torn_down" ? (
-          <DropdownMenuItem disabled>Torn down: nothing to change</DropdownMenuItem>
+          <DropdownMenuItem disabled>{t("tornDownAction")}</DropdownMenuItem>
         ) : (
           <>
             <DropdownMenuItem disabled={extending} onSelect={() => void handleExtend(p, 1)}>
               <CalendarClockIcon className="size-4" />
-              Extend TTL {t("extend.1d")}
+              {t("extendAction", { duration: t("extend.1d") })}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={extending} onSelect={() => void handleExtend(p, 7)}>
               <CalendarClockIcon className="size-4" />
-              Extend TTL {t("extend.7d")}
+              {t("extendAction", { duration: t("extend.7d") })}
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
@@ -430,8 +460,8 @@ export function AppPreviewsScreen({
       <TooltipProvider delayDuration={200}>
         <ListPage<AstroliftPreviewEnvironment>
           embedded
-          list={list}
-          label="Previews"
+          list={localizedList}
+          label={t("list.label")}
           columns={columns}
           rows={rows}
           getRowId={(p) => p.id}
@@ -463,7 +493,6 @@ export function AppPreviewsScreen({
         <p className="text-muted-foreground text-center text-xs">
           {t("footer", {
             count: a.previewMaxActive,
-            plural: a.previewMaxActive === 1 ? "" : "s",
             days: STALE_DAYS,
           })}
         </p>
@@ -524,30 +553,30 @@ function Notice({
 
 /** Daily spend, the month's projection, and how much of it is priced. */
 function SpendSummary({ spend }: { spend: AppPreviewsScreenProps["spend"] }) {
+  const t = useTranslations("apps.previews");
+  const fmt = useFormatters();
   return (
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
       <span>
-        <span className="text-muted-foreground">Daily spend </span>
-        <span className="font-mono">${spend.dailyTotal.toFixed(2)}</span>
+        <span className="text-muted-foreground">{t("spend.daily")} </span>
+        <span className="font-mono">{fmt.formatCurrency(spend.dailyTotal)}</span>
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="text-muted-foreground">This month (projected) </span>
-        <span className="font-mono">${spend.monthlyProjection.toFixed(2)}</span>
+        <span className="text-muted-foreground">{t("spend.monthly")} </span>
+        <span className="font-mono">{fmt.formatCurrency(spend.monthlyProjection)}</span>
         {spend.approximate > 0 && (
           <Badge variant="outline" className="text-2xs gap-1 uppercase">
             <AlertTriangleIcon className="size-3" />
-            approximate
+            {t("spend.approximate")}
           </Badge>
         )}
       </span>
       <span className="text-muted-foreground min-w-0 [overflow-wrap:anywhere]">
         <span className="font-mono">
-          {spend.priced} of {spend.liveCount}
-        </span>{" "}
-        previews priced
-        {spend.unpriced > 0 && ` · ${spend.unpriced} not priced by this cluster's driver`}
-        {spend.approximate > 0 &&
-          ` · ${spend.approximate} priced by summing every SKU in the service, so the total is an over-count`}
+          {t("spend.priced", { priced: spend.priced, total: spend.liveCount })}
+        </span>
+        {spend.unpriced > 0 && <> · {t("spend.unpriced", { count: spend.unpriced })}</>}
+        {spend.approximate > 0 && <> · {t("spend.overcount", { count: spend.approximate })}</>}
       </span>
     </div>
   );

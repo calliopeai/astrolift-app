@@ -597,73 +597,125 @@
       }
     },
     "previews": {
-      "title": "{name} · Previews",
-      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "title": "{name} · Vistas previas",
+      "description": "{slug} · entornos efímeros por PR en pr-N.{subdomain}",
       "disabled": {
-        "title": "Previews are disabled for this app",
-        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+        "title": "Las vistas previas están desactivadas para esta app",
+        "description": "Activa las vistas previas por PR en la configuración para crearlas automáticamente al abrir una solicitud de cambios. Abajo puedes seguir viendo el historial."
       },
       "stale": {
-        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
-        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+        "title": "{count, plural, one {# vista previa sin actualizar} other {# vistas previas sin actualizar}}",
+        "description": "Estas vistas previas llevan más de {days} días sin desplegarse. El PR puede estar inactivo o haber fallado la eliminación automática; considera eliminarlas para liberar la cuota de namespaces."
       },
-      "openRepo": "Open repo",
-      "enablePreviews": "Enable previews",
-      "openInTab": "Abrir en una nueva pestaña",
-      "openPr": "Abrir PR #{pr} en el host de origen",
-      "copyHostname": "Copiar nombre de host del preview",
-      "filterEmpty": "Ningún preview coincide con el filtro actual.",
+      "openRepo": "Abrir repositorio",
+      "enablePreviews": "Activar vistas previas",
+      "openInTab": "Abrir en otra pestaña",
+      "openPr": "Abrir PR #{pr} en el proveedor de código",
+      "copyHostname": "Copiar hostname de la vista previa",
+      "filterEmpty": "Ninguna vista previa coincide con el filtro actual.",
       "filters": {
-        "active": "Activos",
-        "running": "Corriendo",
-        "failed": "Fallidos",
-        "all": "Todos"
+        "active": "Desplegadas",
+        "running": "En buen estado",
+        "failed": "Fallidas",
+        "all": "Todas (incluidas las eliminadas)"
       },
-      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
+      "groupSummary": "{running} en ejecución · {failed} fallidas · {tornDown} eliminadas",
       "columns": {
         "pr": "PR / rama",
         "hostname": "Hostname",
         "ttl": "TTL",
-        "footprint": "Huella",
+        "footprint": "Recursos",
         "lastDeploy": "Último despliegue",
         "status": "Estado",
         "actions": "Acciones",
         "prBranch": "PR / rama"
       },
-      "ttlTooltip": "Auto-teardown el {date}",
+      "ttlTooltip": "Eliminación automática el {date}",
       "extend": {
-        "1d": "+1d",
-        "7d": "+7d"
+        "1d": "+1 día",
+        "7d": "+7 días"
       },
-      "costPerDay": "${cost}/día",
-      "costUnavailable": "Costo no disponible",
-      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
-      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
-      "staleBadge": "stale",
+      "costPerDay": "{cost}/día",
+      "costUnavailable": "Coste no disponible",
+      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · {cost}/día según precios actuales de la nube",
+      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · API de costes no disponible para este clúster",
+      "staleBadge": "Sin actualizar",
       "tearDown": "Eliminar",
-      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
-      "confirmTitle": "Tear down preview for PR #{pr}?",
-      "confirmFallback": "Tear down preview?",
-      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
-      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "footer": "Cada app conserva {count, plural, one {# entorno activo} other {# entornos activos}} de vista previa · umbral sin actualizar: {days, number} días.",
+      "confirmTitle": "¿Eliminar la vista previa del PR #{pr}?",
+      "confirmFallback": "¿Eliminar la vista previa?",
+      "confirmDescription": "Se eliminará el namespace {namespace}, se liberará el hostname de ingress ({hostname}) y se eliminarán los servicios gestionados de esta vista previa. La vista previa se creará de nuevo automáticamente al enviar cambios a {branch}.",
+      "confirmDescriptionFallback": "Se eliminará el namespace y se liberará el hostname.",
       "empty": {
-        "title": "Aún no hay entornos de preview",
-        "enabledHint": "Abre un PR y el preview se construye automáticamente — normalmente en menos de dos minutos.",
-        "disabledHint": "Habilita los previews en la configuración de la aplicación para crear uno automáticamente en cada PR.",
-        "step1": "Habilita los previews en la configuración de esta aplicación.",
-        "step2": "Abre un PR contra el repositorio conectado.",
-        "step3": "Observa cómo el preview se construye en unos dos minutos.",
-        "learnMore": "Cómo funcionan los previews"
+        "title": "Aún no hay entornos de vista previa",
+        "enabledHint": "Abre una solicitud de cambios y la vista previa se creará automáticamente, normalmente en menos de dos minutos.",
+        "disabledHint": "Activa las vistas previas en la configuración para crearlas automáticamente en cada PR.",
+        "step1": "Activa las vistas previas en la configuración de esta app.",
+        "step2": "Abre una solicitud de cambios en el repositorio conectado.",
+        "step3": "Espera a que se compile la vista previa, normalmente en unos dos minutos.",
+        "learnMore": "Cómo funcionan las vistas previas"
       },
       "toasts": {
-        "teardownEnqueued": "Teardown encolado para PR #{pr}",
-        "teardownFailed": "Falló el teardown",
-        "ttlExtended": "Preview de PR #{pr} extendido {days}d",
-        "extendFailed": "No se pudo extender el TTL"
+        "teardownEnqueued": "Eliminación en cola para el PR #{pr}",
+        "teardownFailed": "No se pudo eliminar",
+        "ttlExtended": "Vista previa del PR #{pr} ampliada {days} días",
+        "extendFailed": "No se pudo ampliar el TTL",
+        "created": "La vista previa de «{branch}» se está aprovisionando",
+        "createFailed": "No se pudo crear la vista previa"
       },
-      "emptyTitle": "No preview environments yet",
-      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
-      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+      "emptyTitle": "Aún no hay entornos de vista previa",
+      "emptyEnabled": "Abre una solicitud de cambios para esta app y se creará una vista previa automáticamente.",
+      "emptyDisabled": "Activa las vistas previas en la configuración para crearlas automáticamente en cada PR.",
+      "filterTooltips": {
+        "active": "Vistas previas que aún existen en el clúster (no eliminadas)",
+        "running": "Vistas previas cuyos pods superan las comprobaciones de disponibilidad",
+        "failed": "Vistas previas con errores al desplegar o pods bloqueados",
+        "all": "Todo el historial de vistas previas, incluidas las eliminadas"
+      },
+      "create": {
+        "title": "Crear entorno de vista previa",
+        "action": "Crear vista previa",
+        "description": "Crea una vista previa de cualquier rama sin abrir una solicitud de cambios.",
+        "branch": "Nombre de la rama",
+        "hint": "La rama debe existir en el repositorio conectado. El entorno usará el mismo TTL y los mismos límites de recursos que las vistas previas automáticas.",
+        "cancel": "Cancelar",
+        "creating": "Creando…"
+      },
+      "manual": "Manual",
+      "tornDownAction": "Eliminada: no hay nada que cambiar",
+      "extendAction": "Ampliar TTL {duration}",
+      "list": {
+        "label": "Vistas previas",
+        "search": "Buscar rama, host, commit o estado…",
+        "views": {
+          "all": "Todas",
+          "mine": "Mías",
+          "waiting": "Pendientes de aprobación",
+          "failed": "Fallidas",
+          "today": "Hoy",
+          "previews": "Vistas previas"
+        }
+      },
+      "status": {
+        "building": "Compilando",
+        "running": "En ejecución",
+        "failed": "Fallida",
+        "torn_down": "Eliminada"
+      },
+      "countdown": {
+        "expired": "Caducada",
+        "daysHours": "{days, number}d {hours, number}h",
+        "hoursMinutes": "{hours, number}h {minutes, number}min",
+        "minutes": "{minutes, number}min"
+      },
+      "spend": {
+        "daily": "Gasto diario",
+        "monthly": "Este mes (proyección)",
+        "approximate": "Aproximado",
+        "priced": "{priced, number} de {total, number} vistas previas con precio",
+        "unpriced": "{count, number} sin precio del controlador de este clúster",
+        "overcount": "{count, number} calculadas sumando todos los SKU del servicio; el total está sobreestimado"
+      }
     },
     "observability": {
       "scope": {

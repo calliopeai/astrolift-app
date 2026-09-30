@@ -231,10 +231,10 @@ export function useAppPreviews(slug: string) {
     });
     const r = data?.createPreviewEnvironment;
     if (r?.ok) {
-      toast.success(`Preview for "${branch}" is provisioning`);
+      toast.success(t("toasts.created", { branch }));
       return true;
     }
-    toast.error(r?.errors[0]?.message ?? "Failed to create preview");
+    toast.error(r?.errors[0]?.message ?? t("toasts.createFailed"));
     return false;
   }
 

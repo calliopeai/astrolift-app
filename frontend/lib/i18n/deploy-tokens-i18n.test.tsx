@@ -365,3 +365,36 @@ describe("app secret translations", () => {
     }
   );
 });
+
+describe("app preview translations", () => {
+  const same = new Set([
+    "columns.ttl",
+    "es:columns.hostname",
+    "de:columns.hostname",
+    "pt-BR:columns.hostname",
+    "de:columns.status",
+    "pt-BR:columns.status",
+    "fr:columns.actions",
+    "es:manual",
+    "pt-BR:manual",
+    "pt-BR:columns.pr",
+    "pt-BR:columns.prBranch",
+    "es:countdown.daysHours",
+    "pt-BR:countdown.daysHours",
+  ]);
+  it.each(locales)("%s covers the entire preview namespace without English seed copy", (locale) => {
+    const source = leaves(catalogs.en.apps.previews);
+    const translated = leaves(catalogs[locale].apps.previews);
+    expect(Object.keys(translated).sort()).toEqual(Object.keys(source).sort());
+    for (const [key, text] of Object.entries(source)) {
+      expect(argumentsOf(parse(translated[key])), `${locale}:${key}`).toEqual(
+        argumentsOf(parse(text))
+      );
+      if (locale !== "en" && !same.has(key) && !same.has(`${locale}:${key}`))
+        expect(translated[key], `${locale}:${key}`).not.toBe(text);
+      for (const identifier of ["pr-N.", "TTL", "SKU"])
+        if (text.includes(identifier))
+          expect(translated[key], `${locale}:${key}`).toContain(identifier);
+    }
+  });
+});

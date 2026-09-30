@@ -597,73 +597,125 @@
       }
     },
     "previews": {
-      "title": "{name} · Previews",
-      "description": "{slug} · per-PR ephemeral environments at pr-N.{subdomain}",
+      "title": "{name} · 미리보기",
+      "description": "{slug} · PR별 임시 환경 pr-N.{subdomain}",
       "disabled": {
-        "title": "Previews are disabled for this app",
-        "description": "Enable per-PR previews in app settings to spin one up automatically when a pull request opens. You can still see historical preview rows below."
+        "title": "이 앱의 미리보기가 비활성화되어 있습니다",
+        "description": "앱 설정에서 PR별 미리보기를 활성화하면 풀 리퀘스트를 열 때 자동으로 생성됩니다. 이전 미리보기는 아래에서 계속 확인할 수 있습니다."
       },
       "stale": {
-        "title": "{count, plural, one {# preview stale} other {# previews stale}}",
-        "description": "These previews haven't been redeployed in more than {days} days. Either the PR is dormant or auto-teardown missed it — consider tearing them down to free namespace quota."
+        "title": "{count, plural, one {오래된 미리보기 #개} other {오래된 미리보기 #개}}",
+        "description": "이 미리보기는 {days}일 넘게 재배포되지 않았습니다. PR이 비활성 상태이거나 자동 삭제가 누락되었을 수 있습니다. 네임스페이스 할당량을 확보하려면 삭제를 고려하세요."
       },
-      "openRepo": "Open repo",
-      "enablePreviews": "Enable previews",
+      "openRepo": "저장소 열기",
+      "enablePreviews": "미리보기 활성화",
       "openInTab": "새 탭에서 열기",
       "openPr": "소스 호스트에서 PR #{pr} 열기",
-      "copyHostname": "프리뷰 호스트명 복사",
-      "filterEmpty": "현재 필터와 일치하는 프리뷰가 없습니다.",
+      "copyHostname": "미리보기 호스트 이름 복사",
+      "filterEmpty": "현재 필터에 맞는 미리보기가 없습니다.",
       "filters": {
-        "active": "활성",
-        "running": "실행 중",
+        "active": "배포됨",
+        "running": "정상",
         "failed": "실패",
-        "all": "전체"
+        "all": "모두(삭제된 항목 포함)"
       },
-      "groupSummary": "{running} running · {failed} failed · {tornDown} torn down",
+      "groupSummary": "실행 중 {running} · 실패 {failed} · 삭제됨 {tornDown}",
       "columns": {
         "pr": "PR / 브랜치",
-        "hostname": "호스트명",
+        "hostname": "호스트 이름",
         "ttl": "TTL",
-        "footprint": "사용량",
-        "lastDeploy": "최근 배포",
+        "footprint": "리소스 사용량",
+        "lastDeploy": "마지막 배포",
         "status": "상태",
         "actions": "작업",
         "prBranch": "PR / 브랜치"
       },
-      "ttlTooltip": "자동 해체일: {date}",
+      "ttlTooltip": "자동 삭제: {date}",
       "extend": {
         "1d": "+1일",
         "7d": "+7일"
       },
-      "costPerDay": "${cost}/일",
-      "costUnavailable": "비용 정보 없음",
-      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · ${cost}/day from live cloud pricing",
-      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · cost API unavailable for this cluster",
-      "staleBadge": "stale",
-      "tearDown": "해체",
-      "footer": "Preview retention is {count} active env{plural} per app · stale threshold {days}d.",
-      "confirmTitle": "Tear down preview for PR #{pr}?",
-      "confirmFallback": "Tear down preview?",
-      "confirmDescription": "Namespace {namespace} will be deleted, its ingress hostname ({hostname}) released, and any managed-service rows scoped to this preview are deprovisioned. The preview re-spins automatically on the next push to {branch}.",
-      "confirmDescriptionFallback": "Namespace will be deleted and the hostname released.",
+      "costPerDay": "{cost}/일",
+      "costUnavailable": "비용을 확인할 수 없음",
+      "costTooltip": "{pods, plural, one {파드 #개} other {파드 #개}} · 실시간 클라우드 요금 기준 {cost}/일",
+      "costTooltipUnavailable": "{pods, plural, one {파드 #개} other {파드 #개}} · 이 클러스터의 비용 API를 사용할 수 없음",
+      "staleBadge": "오래됨",
+      "tearDown": "삭제",
+      "footer": "앱별로 {count, plural, one {활성 미리보기 환경 #개} other {활성 미리보기 환경 #개}} 유지 · 오래됨 기준: {days, number}일.",
+      "confirmTitle": "PR #{pr}의 미리보기를 삭제할까요?",
+      "confirmFallback": "미리보기를 삭제할까요?",
+      "confirmDescription": "네임스페이스 {namespace}가 삭제되고 ingress 호스트 이름({hostname})이 해제되며 이 미리보기의 관리형 서비스가 제거됩니다. {branch}에 다음 push를 하면 미리보기가 자동으로 다시 생성됩니다.",
+      "confirmDescriptionFallback": "네임스페이스가 삭제되고 호스트 이름이 해제됩니다.",
       "empty": {
-        "title": "아직 프리뷰 환경이 없습니다",
-        "enabledHint": "PR을 열면 프리뷰가 자동으로 생성됩니다 — 보통 2분 이내입니다.",
-        "disabledHint": "앱 설정에서 프리뷰를 활성화하면 각 PR마다 자동으로 생성됩니다.",
-        "step1": "이 앱 설정에서 프리뷰를 활성화합니다.",
-        "step2": "연결된 저장소에 PR을 엽니다.",
-        "step3": "프리뷰가 약 2분 만에 빌드되는 것을 확인합니다.",
-        "learnMore": "프리뷰 작동 방식"
+        "title": "아직 미리보기 환경이 없습니다",
+        "enabledHint": "풀 리퀘스트를 열면 보통 2분 이내에 미리보기가 자동으로 생성됩니다.",
+        "disabledHint": "앱 설정에서 미리보기를 활성화하면 PR마다 자동으로 생성됩니다.",
+        "step1": "이 앱의 설정에서 미리보기를 활성화하세요.",
+        "step2": "연결된 저장소에서 풀 리퀘스트를 여세요.",
+        "step3": "미리보기 빌드가 완료될 때까지 기다리세요. 보통 약 2분이 걸립니다.",
+        "learnMore": "미리보기 작동 방식"
       },
       "toasts": {
-        "teardownEnqueued": "PR #{pr} 해체가 대기열에 추가되었습니다",
-        "teardownFailed": "해체 실패",
-        "ttlExtended": "PR #{pr} 프리뷰가 {days}일 연장됨",
-        "extendFailed": "TTL을 연장할 수 없습니다"
+        "teardownEnqueued": "PR #{pr} 삭제가 대기열에 추가되었습니다",
+        "teardownFailed": "삭제 실패",
+        "ttlExtended": "PR #{pr} 미리보기를 {days}일 연장했습니다",
+        "extendFailed": "TTL을 연장하지 못했습니다",
+        "created": "“{branch}”의 미리보기를 프로비저닝하고 있습니다",
+        "createFailed": "미리보기를 만들지 못했습니다"
       },
-      "emptyTitle": "No preview environments yet",
-      "emptyEnabled": "Open a pull request against this app to spin up a preview automatically.",
-      "emptyDisabled": "Enable previews in app settings to spin one up automatically on each PR."
+      "emptyTitle": "아직 미리보기 환경이 없습니다",
+      "emptyEnabled": "이 앱의 풀 리퀘스트를 열면 미리보기가 자동으로 생성됩니다.",
+      "emptyDisabled": "앱 설정에서 미리보기를 활성화하면 PR마다 자동으로 생성됩니다.",
+      "filterTooltips": {
+        "active": "클러스터에 아직 존재하는 미리보기(삭제되지 않음)",
+        "running": "파드가 준비 상태 검사를 통과한 미리보기",
+        "failed": "배포 중 오류가 발생했거나 파드가 중단된 미리보기",
+        "all": "이미 삭제된 항목을 포함한 모든 미리보기"
+      },
+      "create": {
+        "title": "미리보기 환경 만들기",
+        "action": "미리보기 만들기",
+        "description": "풀 리퀘스트를 열지 않고 원하는 브랜치에서 미리보기를 만드세요.",
+        "branch": "브랜치 이름",
+        "hint": "브랜치가 연결된 저장소에 존재해야 합니다. 환경에는 자동 미리보기와 동일한 TTL 및 리소스 제한이 적용됩니다.",
+        "cancel": "취소",
+        "creating": "만드는 중…"
+      },
+      "manual": "수동",
+      "tornDownAction": "삭제됨: 변경할 항목 없음",
+      "extendAction": "TTL 연장 {duration}",
+      "list": {
+        "label": "미리보기",
+        "search": "브랜치, 호스트, 커밋 또는 상태 검색…",
+        "views": {
+          "all": "모두",
+          "mine": "내 항목",
+          "waiting": "승인 대기",
+          "failed": "실패",
+          "today": "오늘",
+          "previews": "미리보기"
+        }
+      },
+      "status": {
+        "building": "빌드 중",
+        "running": "실행 중",
+        "failed": "실패",
+        "torn_down": "삭제됨"
+      },
+      "countdown": {
+        "expired": "만료됨",
+        "daysHours": "{days, number}일 {hours, number}시간",
+        "hoursMinutes": "{hours, number}시간 {minutes, number}분",
+        "minutes": "{minutes, number}분"
+      },
+      "spend": {
+        "daily": "일일 비용",
+        "monthly": "이번 달(예상)",
+        "approximate": "근사치",
+        "priced": "미리보기 {total, number}개 중 {priced, number}개 비용 산정",
+        "unpriced": "이 클러스터 드라이버에서 {count, number}개의 비용을 산정하지 못함",
+        "overcount": "{count, number}개는 서비스의 모든 SKU를 합산하여 계산되므로 총액이 과대 산정됩니다"
+      }
     },
     "observability": {
       "scope": {
