@@ -227,6 +227,12 @@ export type AstroliftAccessEntryPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftActionPermission = {
+  allowed: Scalars['Boolean']['output'];
+  code: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type AstroliftActiveSession = {
   attestationKind: Scalars['String']['output'];
   attestationTrustLevel: Scalars['String']['output'];
@@ -5289,6 +5295,8 @@ export type AstroliftWorkload = {
   storageSize: Scalars['String']['output'];
   /** Version of this workload for restart and scale preconditions. */
   version: Scalars['Int']['output'];
+  /** Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply. */
+  viewerCan: AstroliftWorkloadViewerCan;
   volumes: Scalars['JSON']['output'];
 };
 
@@ -5389,6 +5397,11 @@ export type AstroliftWorkloadScalingStatus = {
   replicaLowerBound: Scalars['Int']['output'];
   replicaUpperBound: Scalars['Int']['output'];
   sourcedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftWorkloadViewerCan = {
+  restart: AstroliftActionPermission;
+  scale: AstroliftActionPermission;
 };
 
 /** The workloads list's declared filters. Unset fields do not filter; list values match any. */

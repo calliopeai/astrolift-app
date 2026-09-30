@@ -32,6 +32,10 @@ const volumes = (v: Record<string, unknown>[]) => v as unknown as AstroliftWorkl
 
 export function workload(overrides: Partial<AstroliftWorkload> = {}): AstroliftWorkload {
   return {
+    viewerCan: {
+      restart: { allowed: true, code: "", reason: "" },
+      scale: { allowed: true, code: "", reason: "" },
+    },
     version: 1,
     id: "wl-api",
     slug: "api",

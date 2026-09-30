@@ -218,6 +218,12 @@ type AstroliftAccessEntryPage {
   pageSize: Int
 }
 
+type AstroliftActionPermission {
+  allowed: Boolean!
+  code: String!
+  reason: String!
+}
+
 type AstroliftActiveSession {
   id: String!
   expiresAt: DateTime
@@ -5625,6 +5631,11 @@ type AstroliftWorkload {
   storageClass: String!
   storageSize: String!
   registeredAppSlug: String!
+
+  """
+  Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply.
+  """
+  viewerCan: AstroliftWorkloadViewerCan!
   inClusterServiceFqdn: String!
   volumes: JSON!
   ownerUserId: String
@@ -5737,6 +5748,11 @@ type AstroliftWorkloadScalingStatus {
   replicaLowerBound: Int!
   replicaUpperBound: Int!
   sourcedAt: DateTime!
+}
+
+type AstroliftWorkloadViewerCan {
+  restart: AstroliftActionPermission!
+  scale: AstroliftActionPermission!
 }
 
 """

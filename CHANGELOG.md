@@ -24,6 +24,12 @@
   for observed connectivity before reporting an absent agent, and metrics charts
   use distinct SVG gradients when multiple clusters render together (#2148).
 
+- Workloads expose advisory `viewerCan.restart` and `viewerCan.scale` decisions
+  using actual owner, bearer, grant/share and primary-environment policy checks,
+  batched across a page (#1867). Mutations still recheck; web/CLI consumption
+  and the remaining allowed-action acceptance are pending. See
+  [workload action permissions](docs/operators/viewer-actions.md).
+
 - Token creation accepts the documented zero-day value for no expiry (#2148).
 
 - Config editor section links recognize the manifest codec's managed-service
