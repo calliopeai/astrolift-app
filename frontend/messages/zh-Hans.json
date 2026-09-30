@@ -384,35 +384,38 @@
       }
     },
     "tabs": {
-      "ariaLabel": "App sections",
-      "pillarAriaLabel": "App pillars",
-      "overview": "Overview",
-      "deployments": "Deployments",
-      "workloads": "Workloads",
-      "observability": "Observability",
-      "previews": "Previews",
-      "domains": "Domains",
-      "secrets": "Secrets",
-      "security": "Security",
-      "members": "Members",
-      "settings": "Settings",
-      "config": "Config",
-      "manifest": "Manifest",
-      "webhooks": "Webhooks",
-      "environments": "Environments",
-      "jobs": "Jobs",
-      "commands": "Commands",
-      "managedServices": "Managed Services",
-      "tokens": "Tokens",
+      "ariaLabel": "应用分区",
+      "pillarAriaLabel": "应用功能区域",
+      "overview": "概览",
+      "deployments": "部署",
+      "workloads": "工作负载",
+      "observability": "可观测性",
+      "previews": "预览",
+      "domains": "域名",
+      "secrets": "密钥",
+      "security": "安全",
+      "members": "成员",
+      "settings": "设置",
+      "config": "配置",
+      "manifest": "清单",
+      "webhooks": "Webhook",
+      "environments": "环境",
+      "jobs": "任务",
+      "commands": "命令",
+      "managedServices": "托管服务",
+      "tokens": "令牌",
       "pillars": {
-        "build": "Build",
-        "run": "Run",
-        "observe": "Observe",
-        "control": "Control",
-        "secure": "Secure"
+        "build": "构建",
+        "run": "运行",
+        "observe": "观测",
+        "control": "控制",
+        "secure": "防护"
       },
-      "logs": "Logs",
-      "shell": "Shell"
+      "logs": "日志",
+      "shell": "终端",
+      "topology": "拓扑",
+      "logsMetrics": "日志和指标",
+      "access": "访问权限"
     },
     "workloadDetail": {
       "resourceUsage": {
@@ -1293,13 +1296,13 @@
       }
     },
     "common": {
-      "loading": "Loading…",
-      "notFound": "App not found",
-      "notFoundSlug": "No app with slug {slug}",
-      "notFoundDescription": "It may have been soft-deleted, or you may not have permission to read it.",
-      "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
-      "backToApps": "Back to apps",
-      "cancel": "Cancel"
+      "loading": "正在加载…",
+      "notFound": "未找到应用",
+      "notFoundSlug": "不存在标识为 {slug} 的应用",
+      "notFoundDescription": "应用可能已被删除，或你没有读取权限。",
+      "notFoundPermission": "应用不存在，或你没有查看权限。",
+      "backToApps": "返回应用列表",
+      "cancel": "取消"
     },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
@@ -1999,6 +2002,60 @@
         "emptyTitle": "没有源代码仓库",
         "emptyDescription": "连接仓库，使代码推送可以构建并部署此应用。",
         "emptyAction": "打开设置"
+      }
+    },
+    "frame": {
+      "status": {
+        "ready": "就绪",
+        "live": "在线",
+        "pending": "待处理",
+        "provisioning": "预配中",
+        "failed": "失败",
+        "archived": "已归档"
+      },
+      "failed": "资源预配失败",
+      "moreEnvironments": "另有 {count} 个",
+      "clusterTitle": "在管理页面打开集群 {cluster}",
+      "loadError": "无法加载此应用",
+      "retry": "重试",
+      "menu": {
+        "label": "更多操作",
+        "openApp": "打开应用",
+        "openRepo": "打开仓库",
+        "copyId": "复制应用 ID",
+        "copied": "已复制应用 ID",
+        "editConfig": "编辑配置",
+        "archive": "归档应用",
+        "restore": "恢复应用",
+        "delete": "删除应用"
+      },
+      "archive": {
+        "title": "归档 {name}？",
+        "description": "将所有工作负载的副本数降为零并停止部署。清单、密钥、令牌和域名会保留。恢复时，各工作负载将还原到归档前的副本数。",
+        "confirm": "归档"
+      },
+      "sectionsAriaLabel": "分区",
+      "sections": {
+        "deployments": "部署",
+        "previews": "预览",
+        "workloads": "工作负载",
+        "jobs": "计划任务",
+        "managedServices": "托管服务",
+        "logs": "日志",
+        "metrics": "指标",
+        "console": "控制台",
+        "commands": "命令",
+        "members": "成员",
+        "tokens": "部署令牌",
+        "security": "安全扫描",
+        "edge": "边缘访问",
+        "general": "常规",
+        "configuration": "配置",
+        "manifest": "清单",
+        "webhooks": "Webhook",
+        "environments": "环境",
+        "domains": "域名",
+        "dangerZone": "危险操作"
       }
     }
   },

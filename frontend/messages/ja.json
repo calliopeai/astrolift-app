@@ -384,35 +384,38 @@
       }
     },
     "tabs": {
-      "ariaLabel": "App sections",
-      "pillarAriaLabel": "App pillars",
-      "overview": "Overview",
-      "deployments": "Deployments",
-      "workloads": "Workloads",
-      "observability": "Observability",
-      "previews": "Previews",
-      "domains": "Domains",
-      "secrets": "Secrets",
-      "security": "Security",
-      "members": "Members",
-      "settings": "Settings",
-      "config": "Config",
-      "manifest": "Manifest",
-      "webhooks": "Webhooks",
-      "environments": "Environments",
-      "jobs": "Jobs",
-      "commands": "Commands",
-      "managedServices": "Managed Services",
-      "tokens": "Tokens",
+      "ariaLabel": "アプリのセクション",
+      "pillarAriaLabel": "アプリの機能領域",
+      "overview": "概要",
+      "deployments": "デプロイ",
+      "workloads": "ワークロード",
+      "observability": "可観測性",
+      "previews": "プレビュー",
+      "domains": "ドメイン",
+      "secrets": "シークレット",
+      "security": "セキュリティ",
+      "members": "メンバー",
+      "settings": "設定",
+      "config": "構成",
+      "manifest": "マニフェスト",
+      "webhooks": "Webhook",
+      "environments": "環境",
+      "jobs": "ジョブ",
+      "commands": "コマンド",
+      "managedServices": "マネージドサービス",
+      "tokens": "トークン",
       "pillars": {
-        "build": "Build",
-        "run": "Run",
-        "observe": "Observe",
-        "control": "Control",
-        "secure": "Secure"
+        "build": "ビルド",
+        "run": "実行",
+        "observe": "監視",
+        "control": "制御",
+        "secure": "保護"
       },
-      "logs": "Logs",
-      "shell": "Shell"
+      "logs": "ログ",
+      "shell": "ターミナル",
+      "topology": "トポロジー",
+      "logsMetrics": "ログとメトリクス",
+      "access": "アクセス"
     },
     "workloadDetail": {
       "resourceUsage": {
@@ -1293,13 +1296,13 @@
       }
     },
     "common": {
-      "loading": "Loading…",
-      "notFound": "App not found",
-      "notFoundSlug": "No app with slug {slug}",
-      "notFoundDescription": "It may have been soft-deleted, or you may not have permission to read it.",
-      "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
-      "backToApps": "Back to apps",
-      "cancel": "Cancel"
+      "loading": "読み込み中…",
+      "notFound": "アプリが見つかりません",
+      "notFoundSlug": "識別子{slug}のアプリはありません",
+      "notFoundDescription": "削除されているか、読み取り権限がない可能性があります。",
+      "notFoundPermission": "アプリが存在しないか、表示する権限がありません。",
+      "backToApps": "アプリ一覧に戻る",
+      "cancel": "キャンセル"
     },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
@@ -1999,6 +2002,60 @@
         "emptyTitle": "ソースリポジトリがありません",
         "emptyDescription": "リポジトリを接続すると、プッシュ時にこのアプリをビルドしてデプロイできます。",
         "emptyAction": "設定を開く"
+      }
+    },
+    "frame": {
+      "status": {
+        "ready": "準備完了",
+        "live": "稼働中",
+        "pending": "待機中",
+        "provisioning": "プロビジョニング中",
+        "failed": "失敗",
+        "archived": "アーカイブ済み"
+      },
+      "failed": "プロビジョニングに失敗しました",
+      "moreEnvironments": "ほか{count}件",
+      "clusterTitle": "管理画面でクラスター{cluster}を開く",
+      "loadError": "このアプリを読み込めませんでした",
+      "retry": "再試行",
+      "menu": {
+        "label": "その他の操作",
+        "openApp": "アプリを開く",
+        "openRepo": "リポジトリを開く",
+        "copyId": "アプリIDをコピー",
+        "copied": "アプリIDをコピーしました",
+        "editConfig": "設定を編集",
+        "archive": "アプリをアーカイブ",
+        "restore": "アプリを復元",
+        "delete": "アプリを削除"
+      },
+      "archive": {
+        "title": "{name}をアーカイブしますか？",
+        "description": "すべてのワークロードのレプリカ数をゼロにしてデプロイを停止します。マニフェスト、シークレット、トークン、ドメインは保持されます。復元時は各ワークロードのレプリカ数をアーカイブ前の値に戻します。",
+        "confirm": "アーカイブ"
+      },
+      "sectionsAriaLabel": "セクション",
+      "sections": {
+        "deployments": "デプロイ",
+        "previews": "プレビュー",
+        "workloads": "ワークロード",
+        "jobs": "定期実行ジョブ",
+        "managedServices": "マネージドサービス",
+        "logs": "ログ",
+        "metrics": "メトリクス",
+        "console": "コンソール",
+        "commands": "コマンド",
+        "members": "メンバー",
+        "tokens": "デプロイトークン",
+        "security": "セキュリティスキャン",
+        "edge": "エッジアクセス",
+        "general": "一般",
+        "configuration": "設定",
+        "manifest": "マニフェスト",
+        "webhooks": "Webhook",
+        "environments": "環境",
+        "domains": "ドメイン",
+        "dangerZone": "危険な操作"
       }
     }
   },

@@ -384,35 +384,38 @@
       }
     },
     "tabs": {
-      "ariaLabel": "App-Bereiche",
-      "pillarAriaLabel": "App pillars",
+      "ariaLabel": "Anwendungsabschnitte",
+      "pillarAriaLabel": "Anwendungsbereiche",
       "overview": "Übersicht",
       "deployments": "Bereitstellungen",
-      "workloads": "Workloads",
-      "observability": "Observability",
-      "previews": "Previews",
-      "domains": "Domänen",
-      "secrets": "Secrets",
+      "workloads": "Arbeitslasten",
+      "observability": "Beobachtbarkeit",
+      "previews": "Vorschauen",
+      "domains": "Domains",
+      "secrets": "Geheimnisse",
       "security": "Sicherheit",
       "members": "Mitglieder",
       "settings": "Einstellungen",
-      "config": "Config",
+      "config": "Konfiguration",
       "manifest": "Manifest",
       "webhooks": "Webhooks",
-      "environments": "Environments",
-      "jobs": "Jobs",
-      "commands": "Commands",
-      "managedServices": "Managed Services",
+      "environments": "Umgebungen",
+      "jobs": "Aufträge",
+      "commands": "Befehle",
+      "managedServices": "Verwaltete Dienste",
       "tokens": "Tokens",
       "pillars": {
-        "build": "Build",
-        "run": "Run",
-        "observe": "Observe",
-        "control": "Control",
-        "secure": "Secure"
+        "build": "Erstellen",
+        "run": "Ausführen",
+        "observe": "Beobachten",
+        "control": "Steuern",
+        "secure": "Absichern"
       },
-      "logs": "Logs",
-      "shell": "Shell"
+      "logs": "Protokolle",
+      "shell": "Terminal",
+      "topology": "Topologie",
+      "logsMetrics": "Protokolle und Metriken",
+      "access": "Zugriff"
     },
     "workloadDetail": {
       "resourceUsage": {
@@ -1293,13 +1296,13 @@
       }
     },
     "common": {
-      "loading": "Loading…",
-      "notFound": "App not found",
-      "notFoundSlug": "No app with slug {slug}",
-      "notFoundDescription": "It may have been soft-deleted, or you may not have permission to read it.",
-      "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
-      "backToApps": "Back to apps",
-      "cancel": "Cancel"
+      "loading": "Wird geladen…",
+      "notFound": "Anwendung nicht gefunden",
+      "notFoundSlug": "Keine Anwendung mit der Kennung {slug}",
+      "notFoundDescription": "Sie wurde möglicherweise gelöscht oder dir fehlt die Leseberechtigung.",
+      "notFoundPermission": "Die Anwendung existiert nicht oder du hast keine Berechtigung, sie anzusehen.",
+      "backToApps": "Zurück zu Anwendungen",
+      "cancel": "Abbrechen"
     },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
@@ -1999,6 +2002,60 @@
         "emptyTitle": "Kein Quellcode-Repository",
         "emptyDescription": "Verbinde ein Repository, damit ein Code-Push diese Anwendung erstellen und bereitstellen kann.",
         "emptyAction": "Einstellungen öffnen"
+      }
+    },
+    "frame": {
+      "status": {
+        "ready": "Bereit",
+        "live": "Online",
+        "pending": "Ausstehend",
+        "provisioning": "Wird eingerichtet",
+        "failed": "Fehlgeschlagen",
+        "archived": "Archiviert"
+      },
+      "failed": "Einrichtung fehlgeschlagen",
+      "moreEnvironments": "+{count} weitere",
+      "clusterTitle": "Cluster {cluster} in der Administration öffnen",
+      "loadError": "Diese Anwendung konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "menu": {
+        "label": "Weitere Aktionen",
+        "openApp": "Anwendung öffnen",
+        "openRepo": "Repository öffnen",
+        "copyId": "Anwendungs-ID kopieren",
+        "copied": "Anwendungs-ID kopiert",
+        "editConfig": "Konfiguration bearbeiten",
+        "archive": "Anwendung archivieren",
+        "restore": "Anwendung wiederherstellen",
+        "delete": "Anwendung löschen"
+      },
+      "archive": {
+        "title": "{name} archivieren?",
+        "description": "Skaliert alle Arbeitslasten auf null Replikate und unterbindet Bereitstellungen. Manifest, Geheimnisse, Tokens und Domains bleiben erhalten. Beim Wiederherstellen erhält jede Arbeitslast die Replikatanzahl vor der Archivierung.",
+        "confirm": "Archivieren"
+      },
+      "sectionsAriaLabel": "Abschnitte",
+      "sections": {
+        "deployments": "Bereitstellungen",
+        "previews": "Vorschauen",
+        "workloads": "Arbeitslasten",
+        "jobs": "Geplante Aufträge",
+        "managedServices": "Verwaltete Dienste",
+        "logs": "Protokolle",
+        "metrics": "Metriken",
+        "console": "Konsole",
+        "commands": "Befehle",
+        "members": "Mitglieder",
+        "tokens": "Bereitstellungstokens",
+        "security": "Sicherheitsprüfungen",
+        "edge": "Zugriff am Rand",
+        "general": "Allgemein",
+        "configuration": "Konfiguration",
+        "manifest": "Manifest",
+        "webhooks": "Webhooks",
+        "environments": "Umgebungen",
+        "domains": "Domains",
+        "dangerZone": "Gefahrenbereich"
       }
     }
   },

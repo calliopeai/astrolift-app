@@ -384,35 +384,38 @@
       }
     },
     "tabs": {
-      "ariaLabel": "App sections",
-      "pillarAriaLabel": "App pillars",
-      "overview": "Overview",
-      "deployments": "Deployments",
-      "workloads": "Workloads",
-      "observability": "Observability",
-      "previews": "Previews",
-      "domains": "Domains",
-      "secrets": "Secrets",
-      "security": "Security",
-      "members": "Members",
-      "settings": "Settings",
-      "config": "Config",
-      "manifest": "Manifest",
-      "webhooks": "Webhooks",
-      "environments": "Environments",
-      "jobs": "Jobs",
-      "commands": "Commands",
-      "managedServices": "Managed Services",
-      "tokens": "Tokens",
+      "ariaLabel": "앱 섹션",
+      "pillarAriaLabel": "앱 기능 영역",
+      "overview": "개요",
+      "deployments": "배포",
+      "workloads": "워크로드",
+      "observability": "관측 가능성",
+      "previews": "미리보기",
+      "domains": "도메인",
+      "secrets": "시크릿",
+      "security": "보안",
+      "members": "구성원",
+      "settings": "설정",
+      "config": "구성",
+      "manifest": "매니페스트",
+      "webhooks": "웹훅",
+      "environments": "환경",
+      "jobs": "작업",
+      "commands": "명령",
+      "managedServices": "관리형 서비스",
+      "tokens": "토큰",
       "pillars": {
-        "build": "Build",
-        "run": "Run",
-        "observe": "Observe",
-        "control": "Control",
-        "secure": "Secure"
+        "build": "빌드",
+        "run": "실행",
+        "observe": "관찰",
+        "control": "제어",
+        "secure": "보호"
       },
-      "logs": "Logs",
-      "shell": "Shell"
+      "logs": "로그",
+      "shell": "터미널",
+      "topology": "토폴로지",
+      "logsMetrics": "로그 및 지표",
+      "access": "접근 권한"
     },
     "workloadDetail": {
       "resourceUsage": {
@@ -1293,13 +1296,13 @@
       }
     },
     "common": {
-      "loading": "Loading…",
-      "notFound": "App not found",
-      "notFoundSlug": "No app with slug {slug}",
-      "notFoundDescription": "It may have been soft-deleted, or you may not have permission to read it.",
-      "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
-      "backToApps": "Back to apps",
-      "cancel": "Cancel"
+      "loading": "불러오는 중…",
+      "notFound": "앱을 찾을 수 없습니다",
+      "notFoundSlug": "식별자가 {slug}인 앱이 없습니다",
+      "notFoundDescription": "삭제되었거나 읽기 권한이 없을 수 있습니다.",
+      "notFoundPermission": "앱이 존재하지 않거나 볼 권한이 없습니다.",
+      "backToApps": "앱 목록으로 돌아가기",
+      "cancel": "취소"
     },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
@@ -1999,6 +2002,60 @@
         "emptyTitle": "소스 저장소가 없습니다",
         "emptyDescription": "저장소를 연결하면 푸시할 때 앱을 빌드하고 배포할 수 있습니다.",
         "emptyAction": "설정 열기"
+      }
+    },
+    "frame": {
+      "status": {
+        "ready": "준비됨",
+        "live": "서비스 중",
+        "pending": "대기 중",
+        "provisioning": "프로비저닝 중",
+        "failed": "실패",
+        "archived": "보관됨"
+      },
+      "failed": "프로비저닝에 실패했습니다",
+      "moreEnvironments": "외 {count}개",
+      "clusterTitle": "관리 화면에서 {cluster} 클러스터 열기",
+      "loadError": "이 앱을 불러오지 못했습니다",
+      "retry": "다시 시도",
+      "menu": {
+        "label": "추가 작업",
+        "openApp": "앱 열기",
+        "openRepo": "저장소 열기",
+        "copyId": "앱 ID 복사",
+        "copied": "앱 ID를 복사했습니다",
+        "editConfig": "설정 편집",
+        "archive": "앱 보관",
+        "restore": "앱 복원",
+        "delete": "앱 삭제"
+      },
+      "archive": {
+        "title": "{name} 앱을 보관하시겠습니까?",
+        "description": "모든 워크로드의 복제본 수를 0으로 줄이고 배포를 중지합니다. 매니페스트, 시크릿, 토큰 및 도메인은 유지됩니다. 복원하면 각 워크로드의 복제본 수가 보관 이전 값으로 돌아갑니다.",
+        "confirm": "보관"
+      },
+      "sectionsAriaLabel": "섹션",
+      "sections": {
+        "deployments": "배포",
+        "previews": "미리보기",
+        "workloads": "워크로드",
+        "jobs": "예약 작업",
+        "managedServices": "관리형 서비스",
+        "logs": "로그",
+        "metrics": "지표",
+        "console": "콘솔",
+        "commands": "명령",
+        "members": "구성원",
+        "tokens": "배포 토큰",
+        "security": "보안 검사",
+        "edge": "경계 접근",
+        "general": "일반",
+        "configuration": "구성",
+        "manifest": "매니페스트",
+        "webhooks": "웹훅",
+        "environments": "환경",
+        "domains": "도메인",
+        "dangerZone": "위험한 작업"
       }
     }
   },

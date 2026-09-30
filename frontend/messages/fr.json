@@ -384,35 +384,38 @@
       }
     },
     "tabs": {
-      "ariaLabel": "Sections de l'application",
-      "pillarAriaLabel": "App pillars",
-      "overview": "Vue d'ensemble",
+      "ariaLabel": "Sections de l’application",
+      "pillarAriaLabel": "Axes de l’application",
+      "overview": "Vue d’ensemble",
       "deployments": "Déploiements",
-      "workloads": "Workloads",
+      "workloads": "Charges de travail",
       "observability": "Observabilité",
-      "previews": "Prévisualisations",
+      "previews": "Aperçus",
       "domains": "Domaines",
       "secrets": "Secrets",
       "security": "Sécurité",
       "members": "Membres",
       "settings": "Paramètres",
-      "config": "Config",
-      "manifest": "Manifest",
+      "config": "Configuration",
+      "manifest": "Manifeste",
       "webhooks": "Webhooks",
-      "environments": "Environments",
-      "jobs": "Jobs",
-      "commands": "Commands",
-      "managedServices": "Managed Services",
-      "tokens": "Tokens",
+      "environments": "Environnements",
+      "jobs": "Tâches",
+      "commands": "Commandes",
+      "managedServices": "Services gérés",
+      "tokens": "Jetons",
       "pillars": {
-        "build": "Build",
-        "run": "Run",
-        "observe": "Observe",
-        "control": "Control",
-        "secure": "Secure"
+        "build": "Compiler",
+        "run": "Exécuter",
+        "observe": "Observer",
+        "control": "Contrôler",
+        "secure": "Sécuriser"
       },
       "logs": "Journaux",
-      "shell": "Shell"
+      "shell": "Terminal",
+      "topology": "Topologie",
+      "logsMetrics": "Journaux et métriques",
+      "access": "Accès"
     },
     "workloadDetail": {
       "resourceUsage": {
@@ -1293,13 +1296,13 @@
       }
     },
     "common": {
-      "loading": "Loading…",
-      "notFound": "App not found",
-      "notFoundSlug": "No app with slug {slug}",
-      "notFoundDescription": "It may have been soft-deleted, or you may not have permission to read it.",
-      "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
-      "backToApps": "Back to apps",
-      "cancel": "Cancel"
+      "loading": "Chargement…",
+      "notFound": "Application introuvable",
+      "notFoundSlug": "Aucune application avec l’identifiant {slug}",
+      "notFoundDescription": "Elle a peut-être été supprimée ou vous n’avez pas l’autorisation de la consulter.",
+      "notFoundPermission": "L’application n’existe pas ou vous n’avez pas l’autorisation de la consulter.",
+      "backToApps": "Retour aux applications",
+      "cancel": "Annuler"
     },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
@@ -1999,6 +2002,60 @@
         "emptyTitle": "Aucun dépôt source",
         "emptyDescription": "Connectez un dépôt pour compiler et déployer cette application à chaque envoi de code.",
         "emptyAction": "Ouvrir les paramètres"
+      }
+    },
+    "frame": {
+      "status": {
+        "ready": "Prête",
+        "live": "En ligne",
+        "pending": "En attente",
+        "provisioning": "Provisionnement",
+        "failed": "Échec",
+        "archived": "Archivée"
+      },
+      "failed": "Échec du provisionnement",
+      "moreEnvironments": "+{count} autres",
+      "clusterTitle": "Ouvrir le cluster {cluster} dans Administration",
+      "loadError": "Impossible de charger cette application",
+      "retry": "Réessayer",
+      "menu": {
+        "label": "Autres actions",
+        "openApp": "Ouvrir l’application",
+        "openRepo": "Ouvrir le dépôt",
+        "copyId": "Copier l’ID de l’application",
+        "copied": "ID de l’application copié",
+        "editConfig": "Modifier la configuration",
+        "archive": "Archiver l’application",
+        "restore": "Restaurer l’application",
+        "delete": "Supprimer l’application"
+      },
+      "archive": {
+        "title": "Archiver {name} ?",
+        "description": "Réduit toutes les charges de travail à zéro réplique et suspend les déploiements. Le manifeste, les secrets, les jetons et les domaines sont conservés. La restauration rétablit le nombre de répliques de chaque charge avant son archivage.",
+        "confirm": "Archiver"
+      },
+      "sectionsAriaLabel": "Sections",
+      "sections": {
+        "deployments": "Déploiements",
+        "previews": "Aperçus",
+        "workloads": "Charges de travail",
+        "jobs": "Tâches planifiées",
+        "managedServices": "Services gérés",
+        "logs": "Journaux",
+        "metrics": "Métriques",
+        "console": "Console",
+        "commands": "Commandes",
+        "members": "Membres",
+        "tokens": "Jetons de déploiement",
+        "security": "Analyses de sécurité",
+        "edge": "Accès périphérique",
+        "general": "Général",
+        "configuration": "Configuration",
+        "manifest": "Manifeste",
+        "webhooks": "Webhooks",
+        "environments": "Environnements",
+        "domains": "Domaines",
+        "dangerZone": "Zone de danger"
       }
     }
   },

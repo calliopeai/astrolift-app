@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import spanish from "@/messages/es.json";
 import { expect, within } from "storybook/test";
 
 import { LayersIcon } from "lucide-react";
@@ -144,5 +146,15 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <AppFrame {...args} />
     </div>
+  ),
+};
+
+export const SpanishWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }}>
+        <AppFrame {...args} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

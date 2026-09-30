@@ -385,34 +385,37 @@
     },
     "tabs": {
       "ariaLabel": "Seções do aplicativo",
-      "pillarAriaLabel": "App pillars",
+      "pillarAriaLabel": "Áreas do aplicativo",
       "overview": "Visão geral",
       "deployments": "Implantações",
-      "workloads": "Workloads",
+      "workloads": "Cargas de trabalho",
       "observability": "Observabilidade",
-      "previews": "Pré-visualizações",
+      "previews": "Prévias",
       "domains": "Domínios",
       "secrets": "Segredos",
       "security": "Segurança",
       "members": "Membros",
       "settings": "Configurações",
-      "config": "Config",
-      "manifest": "Manifest",
+      "config": "Configuração",
+      "manifest": "Manifesto",
       "webhooks": "Webhooks",
-      "environments": "Environments",
-      "jobs": "Jobs",
-      "commands": "Commands",
-      "managedServices": "Managed Services",
+      "environments": "Ambientes",
+      "jobs": "Tarefas",
+      "commands": "Comandos",
+      "managedServices": "Serviços gerenciados",
       "tokens": "Tokens",
       "pillars": {
-        "build": "Build",
-        "run": "Run",
-        "observe": "Observe",
-        "control": "Control",
-        "secure": "Secure"
+        "build": "Compilar",
+        "run": "Executar",
+        "observe": "Observar",
+        "control": "Controlar",
+        "secure": "Proteger"
       },
       "logs": "Logs",
-      "shell": "Shell"
+      "shell": "Terminal",
+      "topology": "Topologia",
+      "logsMetrics": "Logs e métricas",
+      "access": "Acesso"
     },
     "workloadDetail": {
       "resourceUsage": {
@@ -1293,13 +1296,13 @@
       }
     },
     "common": {
-      "loading": "Loading…",
-      "notFound": "App not found",
-      "notFoundSlug": "No app with slug {slug}",
-      "notFoundDescription": "It may have been soft-deleted, or you may not have permission to read it.",
-      "notFoundPermission": "The app doesn't exist or you don't have permission to view it.",
-      "backToApps": "Back to apps",
-      "cancel": "Cancel"
+      "loading": "Carregando…",
+      "notFound": "Aplicativo não encontrado",
+      "notFoundSlug": "Nenhum aplicativo com o identificador {slug}",
+      "notFoundDescription": "Ele pode ter sido excluído ou você não tem permissão de leitura.",
+      "notFoundPermission": "O aplicativo não existe ou você não tem permissão para vê-lo.",
+      "backToApps": "Voltar aos aplicativos",
+      "cancel": "Cancelar"
     },
     "logViewer": {
       "searchPlaceholder": "Search log buffer…  (press / to focus)",
@@ -1999,6 +2002,60 @@
         "emptyTitle": "Nenhum repositório de código",
         "emptyDescription": "Conecte um repositório para compilar e implantar este aplicativo ao enviar código.",
         "emptyAction": "Abrir configurações"
+      }
+    },
+    "frame": {
+      "status": {
+        "ready": "Pronto",
+        "live": "Online",
+        "pending": "Pendente",
+        "provisioning": "Provisionando",
+        "failed": "Falhou",
+        "archived": "Arquivado"
+      },
+      "failed": "Falha no provisionamento",
+      "moreEnvironments": "+{count} outros",
+      "clusterTitle": "Abrir o cluster {cluster} na Administração",
+      "loadError": "Não foi possível carregar este aplicativo",
+      "retry": "Tentar novamente",
+      "menu": {
+        "label": "Mais ações",
+        "openApp": "Abrir aplicativo",
+        "openRepo": "Abrir repositório",
+        "copyId": "Copiar ID do aplicativo",
+        "copied": "ID do aplicativo copiado",
+        "editConfig": "Editar configuração",
+        "archive": "Arquivar aplicativo",
+        "restore": "Restaurar aplicativo",
+        "delete": "Excluir aplicativo"
+      },
+      "archive": {
+        "title": "Arquivar {name}?",
+        "description": "Reduz todas as cargas de trabalho a zero réplicas e suspende as implantações. Manifesto, segredos, tokens e domínios são mantidos. A restauração devolve a cada carga o número de réplicas anterior ao arquivamento.",
+        "confirm": "Arquivar"
+      },
+      "sectionsAriaLabel": "Seções",
+      "sections": {
+        "deployments": "Implantações",
+        "previews": "Prévias",
+        "workloads": "Cargas de trabalho",
+        "jobs": "Tarefas agendadas",
+        "managedServices": "Serviços gerenciados",
+        "logs": "Logs",
+        "metrics": "Métricas",
+        "console": "Console",
+        "commands": "Comandos",
+        "members": "Membros",
+        "tokens": "Tokens de implantação",
+        "security": "Verificações de segurança",
+        "edge": "Acesso de borda",
+        "general": "Geral",
+        "configuration": "Configuração",
+        "manifest": "Manifesto",
+        "webhooks": "Webhooks",
+        "environments": "Ambientes",
+        "domains": "Domínios",
+        "dangerZone": "Zona de perigo"
       }
     }
   },
