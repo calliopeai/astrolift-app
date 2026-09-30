@@ -75,6 +75,14 @@ def shared_prompt_readiness(service):
     if (
         service.status != ManagedService.Status.ACTIVE
         or service.applied_subscription_revision != service.subscription_revision
+        or service.model_ready_observed_at is None
+        or type(service.model_ready_generation) is not int
+        or service.model_ready_generation <= 0
+        or service.model_ready_auth_revision != service.subscription_revision
+        or not isinstance(service.applied_config, dict)
+        or type(service.applied_config.get("replicas", 1)) is not int
+        or service.applied_config.get("replicas", 1) <= 0
+        or not service.backend_ref
     ):
         return PromptReadinessState.INACTIVE
     cluster = service.tenant_cluster

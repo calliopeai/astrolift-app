@@ -61,8 +61,12 @@ def world(monkeypatch):
         name="shared-prompt-model",
         status="active",
         config={"model": "Qwen/Qwen3-0.6B", "model_revision": "a" * 40, "task": "generate"},
+        applied_config={"model": "Qwen/Qwen3-0.6B", "model_revision": "a" * 40, "replicas": 1},
         subscription_revision=2,
         applied_subscription_revision=2,
+        model_ready_observed_at=timezone.now(),
+        model_ready_generation=3,
+        model_ready_auth_revision=2,
     )
     w.namespace = cluster_model_namespace(
         organization_id=str(w.org.guid),
@@ -385,6 +389,13 @@ def test_retired_or_foreign_ancestry_is_not_visible_to_org_owner(world, monkeypa
         ("missing-relay", "unconfigured_relay"),
         ("missing-model", "unconfigured_model"),
         ("pending-auth", "inactive"),
+        ("missing-observation", "inactive"),
+        ("missing-generation", "inactive"),
+        ("zero-generation", "inactive"),
+        ("old-pod-auth", "inactive"),
+        ("missing-applied-config", "inactive"),
+        ("stopped-applied-replicas", "inactive"),
+        ("malformed-applied-replicas", "inactive"),
         ("unsupported-task", "unsupported"),
     ],
 )
@@ -398,6 +409,22 @@ def test_readiness_refusals_do_not_consume_budget_or_dispatch(world, monkeypatch
         world.model.save()
     elif change == "pending-auth":
         world.model.applied_subscription_revision = 1
+        world.model.save()
+    elif change in {"missing-observation", "missing-generation", "zero-generation", "old-pod-auth"}:
+        field, value = {
+            "missing-observation": ("model_ready_observed_at", None),
+            "missing-generation": ("model_ready_generation", None),
+            "zero-generation": ("model_ready_generation", 0),
+            "old-pod-auth": ("model_ready_auth_revision", 1),
+        }[change]
+        setattr(world.model, field, value)
+        world.model.save()
+    elif change in {"missing-applied-config", "stopped-applied-replicas", "malformed-applied-replicas"}:
+        world.model.applied_config = {
+            "missing-applied-config": None,
+            "stopped-applied-replicas": {"replicas": 0},
+            "malformed-applied-replicas": {"replicas": True},
+        }[change]
         world.model.save()
     elif change == "unsupported-task":
         world.model.config = {**world.model.config, "task": "embed"}

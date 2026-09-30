@@ -37,9 +37,11 @@ captures the model GUID, cluster GUID, provider GUID and expected model version;
 changed targets refuse before rate/job cache access. This is an operator test,
 and an app subscription does not grant that permission or the operator key.
 
-Shared prompts require an active generation model with a confirmed subscription
-revision, managed active cluster, enabled provider, live heartbeat and configured
-agent relay. The internal target and operator Secret are derived from the saved
+Shared prompts require an active generation model with a recorded readiness
+observation, positive Deployment generation, matching applied/pod authentication
+revision and applied positive replicas. They also require a managed active
+cluster, enabled provider, live heartbeat and configured agent relay. The internal
+target and operator Secret are derived from the saved
 organization, cluster and model UUIDs, using the provider's canonical naming.
 The mutation locks model, cluster and provider through admission, rechecks the
 current policy, then releases those locks before waiting for the agent. The
