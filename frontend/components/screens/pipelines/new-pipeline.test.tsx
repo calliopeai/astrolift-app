@@ -42,7 +42,9 @@ async function fill() {
 beforeEach(() => vi.clearAllMocks());
 describe("pipeline creation through Apollo", () => {
   it("matches the committed backend GraphQL input and payload", () => {
-    expect(validate(buildSchema(readFileSync("schema.graphql", "utf8")), CREATE_PIPELINE)).toEqual([]);
+    expect(validate(buildSchema(readFileSync("schema.graphql", "utf8")), CREATE_PIPELINE)).toEqual(
+      []
+    );
   });
   it("sends only the existing organization-owned input and navigates after commit", async () => {
     const result = vi.fn(() => ({
