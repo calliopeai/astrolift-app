@@ -758,8 +758,10 @@ def test_model_and_managed_service_counts_hide_invalid_private_provider_targets(
     assert services.total_count == 0
 
 
-@pytest.mark.parametrize("kind", ["TEAM", "PROJECT", "ORG"])
-def test_bundle_list_respects_exact_team_project_and_policy_org_owner_grants(world, kind):
+@pytest.mark.parametrize(
+    "kind,with_policy", [("TEAM", False), ("PROJECT", False), ("ORG", False), ("ORG", True)]
+)
+def test_bundle_list_respects_exact_team_project_and_policy_org_owner_grants(world, kind, with_policy):
     from astrolift_services.schema.queries import ServicesQuery
     from core.tests.utils.scope_world import make_info
 
@@ -775,7 +777,7 @@ def test_bundle_list_respects_exact_team_project_and_policy_org_owner_grants(wor
     )
     binding.inherits = False
     binding.save(update_fields=["inherits", "updated_at", "version"])
-    if kind == "ORG":
+    if with_policy:
         from astrolift_identity.models import Policy
 
         Policy.objects.create(
