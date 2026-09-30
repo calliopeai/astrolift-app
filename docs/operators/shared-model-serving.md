@@ -92,6 +92,27 @@ including removal of one key while preserving another. They do not establish
 that the provider has mounted it, completed a rollout, or served model inference;
 those remain separate implementation and release gates.
 
+The opt-in provider check `tests/k8s_native/test_shared_model_kind.py` exercises
+the actual native Kubernetes batch adapter against an expendable kind cluster.
+It retains the rendered namespace, mounted guard, credential Secret, deployment
+revision and network policy, replacing the heavy model process with a controlled
+Python HTTP server. Two app keys work initially, subscriber metrics are denied,
+and the operator key can scrape. Updating only the Secret leaves the old process
+using its startup snapshot. A real Recreate rollout then rejects the removed key,
+preserves the remaining key, and removes only the revoked app's network allowance.
+The check passed on 2026-09-30. Kind's default CNI does not establish enforcement
+of that network policy, and this check does not establish vLLM engine startup,
+model downloads, hardware compatibility or inference.
+
+Run it only with an expendable local kind kubeconfig and the controlled image
+`python:3.12-alpine` preloaded on the node:
+
+```sh
+ASTROLIFT_MODEL_TEST_KUBECONFIG=/path/to/expendable-kind.kubeconfig \
+PYTHONPATH=backend/providers:backend \
+python -m pytest backend/providers/tests/k8s_native/test_shared_model_kind.py -q
+```
+
 ## Density and operational statistics
 
 Every displayed metric needs a scope, unit, source, observation time and window.
