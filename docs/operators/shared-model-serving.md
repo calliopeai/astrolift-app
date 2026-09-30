@@ -21,6 +21,11 @@ An app may subscribe to several models through distinct aliases. Multiple apps
 may subscribe to the same deployment. Changing a subscription must not replace
 another model's bindings or grant a sibling environment access.
 
+Application targets and model discovery use server-side search and pagination.
+A capped initial page is not the complete set of eligible applications. Failed,
+pending and unavailable deployments remain inspectable; metadata visibility is
+separate from permission and readiness to perform cluster operations.
+
 ## Search and placement evidence
 
 Hugging Face results report upstream metadata and its observation time. A license
@@ -49,6 +54,11 @@ does not contain its value. Aliases determine which application binding keys are
 written; conflicting keys must refuse before side effects. Reads and mutations
 recheck current tenant ownership, destination environment, token ceilings and
 target identities.
+
+New subscriptions require a named alias. Existing legacy `MODEL_*` bindings keep
+their behavior. A review captures the exact model, environment and subscription
+versions. A changed target invalidates that review, and late mutation responses
+cannot update a different context, including an A → B → A selection change.
 
 The agreed initial runtime mechanism uses the supported Python vLLM frontend's
 API-key list. Credential changes update a projected Secret and restart the model
@@ -82,6 +92,14 @@ zero. A true measured zero remains zero.
 Tenant model counts on shared hardware describe that tenant's inventory. They do
 not measure whole-cluster saturation. Shared endpoint traffic statistics require
 owner-level access; subscribing to an endpoint does not grant other apps' usage.
+
+The initial density scope is `organization_cluster_owned_models`: shared v.next
+deployments belonging to the authorized organization in the selected cluster.
+Existing app/project endpoints remain available in the model catalogue, but this
+scope does not aggregate their potentially hidden ownership descendants. A
+bounded inventory reports its limit and truncation; a displayed partial count is
+not a fleet total. Whole-cluster hardware capacity is unsupported on install-shared
+clusters without a verified mapping to that organization's node pool.
 
 ## Release evidence
 
