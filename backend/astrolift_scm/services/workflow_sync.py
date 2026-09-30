@@ -356,7 +356,9 @@ def _github_aws_region(app: RegisteredApp, ecr_uri: str) -> str:
             or cluster.organization_id not in {None, app.organization_id}
             or cluster.provider_plugin.slug != "aws"
         ):
-            raise ValueError("Managed AWS CI requires a live AWS default cluster belonging to the app or shared.")
+            raise ValueError(
+                "Managed AWS CI requires a live AWS default cluster belonging to the app or shared."
+            )
     if ecr_uri:
         match = _PRIVATE_ECR_URI.fullmatch(ecr_uri)
         if match is None:
