@@ -125,6 +125,7 @@ export function ModelsScreen({
   onRetry,
 }: ModelsScreenProps) {
   const t = useTranslations("models.shared.deployments");
+  const playground = useTranslations("playground");
   return (
     <ListPage<ModelEndpoint>
       header={{
@@ -135,6 +136,9 @@ export function ModelsScreen({
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" asChild>
               <Link href="/models">{t("title")}</Link>
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/playground">{playground("title")}</Link>
             </Button>
             <Button size="sm" asChild>
               <Link href="/models/deploy/legacy">

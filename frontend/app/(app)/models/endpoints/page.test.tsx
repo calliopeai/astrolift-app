@@ -112,6 +112,10 @@ describe("legacy /models/endpoints route", () => {
       "/projects/shared/resources"
     );
     expect(screen.queryByText("2 GPUs")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: messages.playground.title })).toHaveAttribute(
+      "href",
+      "/playground"
+    );
     expect(
       screen
         .getAllByRole("link", { name: text.title })
