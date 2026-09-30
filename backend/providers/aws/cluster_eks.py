@@ -416,7 +416,7 @@ class EKSClusterDriver(ClusterDriver):
                             exception_type="CustomDomainAuthApplyFailed",
                             is_retryable=True,
                             exception_message=(
-                                "custom-domain authentication preparation failed; " "no backend batch was applied"
+                                "custom-domain authentication preparation failed; no backend batch was applied"
                             ),
                         )
                     ],
