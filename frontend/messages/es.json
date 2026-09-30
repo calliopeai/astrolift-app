@@ -3265,5 +3265,11 @@
       "invalid": "La instrucción está vacía o supera el límite de caracteres.",
       "transport": "No se pudo obtener el resultado de la instrucción. El trabajo del servidor puede terminar; no se reintentó."
     }
+  },
+  "shared": {
+    "versionMismatch": {
+      "changed": "Otra sesión modificó este elemento. Actualiza y vuelve a intentarlo.",
+      "refresh": "Actualizar"
+    }
   }
 }

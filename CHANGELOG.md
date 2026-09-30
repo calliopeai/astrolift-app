@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Shared version-conflict feedback can supply translated fallback text and
+  refresh actions without replacing server diagnostics or replaying mutations.
+
 - Translate the bounded real-model playground's prompts, local-session notices,
   readiness and failure states in all eight locales; preserve ICU parameters.
 

@@ -3394,5 +3394,11 @@
       "invalid": "The prompt is empty or exceeds its character limit.",
       "transport": "Could not obtain a prompt result. The server job may still finish; it was not retried."
     }
+  },
+  "shared": {
+    "versionMismatch": {
+      "changed": "This item was modified by another session. Refresh and retry.",
+      "refresh": "Refresh"
+    }
   }
 }

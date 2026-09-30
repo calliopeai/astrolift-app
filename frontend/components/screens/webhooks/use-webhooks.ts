@@ -28,7 +28,7 @@ import type {
   AstroliftWebhookTestResult,
   WebhookFormat,
 } from "@/graphql/operations/operations.types";
-import { handleVersionMismatch } from "@/lib/apollo/version-mismatch";
+import { useVersionMismatch } from "@/lib/apollo/use-version-mismatch";
 
 import { narrows, narrowWebhooks, WEBHOOKS_LIST, webhooksVariables } from "./webhooks-list";
 
@@ -58,6 +58,7 @@ export interface CreateWebhookInput {
  * ConfirmDialog keeps itself open and toasts the message.
  */
 export function useWebhooks(appSlug?: string) {
+  const handleVersionMismatch = useVersionMismatch();
   const [reveal, setReveal] = React.useState<AstroliftWebhookSecretReveal | null>(null);
   const [testResult, setTestResult] = React.useState<AstroliftWebhookTestResult | null>(null);
   const pendingRef = React.useRef(new Set<string>());

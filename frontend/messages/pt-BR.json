@@ -3262,5 +3262,11 @@
       "invalid": "O prompt está vazio ou excede o limite de caracteres.",
       "transport": "Não foi possível obter o resultado do prompt. O trabalho do servidor ainda pode terminar; não houve nova tentativa."
     }
+  },
+  "shared": {
+    "versionMismatch": {
+      "changed": "Este item foi modificado por outra sessão. Atualize e tente novamente.",
+      "refresh": "Atualizar"
+    }
   }
 }

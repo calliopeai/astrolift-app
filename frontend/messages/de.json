@@ -3265,5 +3265,11 @@
       "invalid": "Die Eingabe ist leer oder überschreitet die Zeichengrenze.",
       "transport": "Kein Eingabeergebnis erhalten. Der Serverauftrag kann noch fertig werden; er wurde nicht wiederholt."
     }
+  },
+  "shared": {
+    "versionMismatch": {
+      "changed": "Dieses Element wurde in einer anderen Sitzung geändert. Aktualisieren Sie es und versuchen Sie es erneut.",
+      "refresh": "Aktualisieren"
+    }
   }
 }

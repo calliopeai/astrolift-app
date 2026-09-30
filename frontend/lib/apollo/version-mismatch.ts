@@ -65,17 +65,21 @@ export function handleVersionMismatch(
     label?: string;
     /** Called when the operator clicks Refresh. */
     onRefresh?: () => void | Promise<unknown>;
-  } = {},
+    /** Translated client fallback; server-provided diagnostics take precedence. */
+    fallbackMessage?: string;
+    refreshLabel?: string;
+  } = {}
 ): boolean {
   if (!isVersionMismatch(envelope)) return false;
   const first = envelope?.errors?.[0];
   const message =
     first?.message ??
+    options.fallbackMessage ??
     `This ${options.label ?? "entity"} was modified by another session. Refresh and retry.`;
   if (options.onRefresh) {
     toast.error(message, {
       action: {
-        label: "Refresh",
+        label: options.refreshLabel ?? "Refresh",
         onClick: () => {
           void options.onRefresh?.();
         },

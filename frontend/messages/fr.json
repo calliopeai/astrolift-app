@@ -3265,5 +3265,11 @@
       "invalid": "La requête est vide ou dépasse sa limite de caractères.",
       "transport": "Impossible d’obtenir le résultat. La tâche du serveur peut encore se terminer ; aucune nouvelle tentative n’a été effectuée."
     }
+  },
+  "shared": {
+    "versionMismatch": {
+      "changed": "Cet élément a été modifié par une autre session. Actualisez puis réessayez.",
+      "refresh": "Actualiser"
+    }
   }
 }
