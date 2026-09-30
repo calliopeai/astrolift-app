@@ -33,10 +33,12 @@ def visible_secret_bundles(qs, permission=Permission.APP_READ):
     scopes = granted_scopes(get_current_tenant(), permission)
     if not scopes.org:
         projects = visible_projects(live_projects(Project.objects.all()), permission)
-        qs = qs.filter(
-            Q(project__in=projects)
-            | Q(project_id__isnull=True, team_id__in=scopes.team_ids | scopes.exact_team_ids)
+        covered = Q(project__in=projects) | Q(
+            project_id__isnull=True, team_id__in=scopes.team_ids | scopes.exact_team_ids
         )
+        if scopes.org_only:
+            covered |= Q(project_id__isnull=True, team_id__isnull=True)
+        qs = qs.filter(covered)
     token = get_current_api_token()
     if token is None:
         return qs

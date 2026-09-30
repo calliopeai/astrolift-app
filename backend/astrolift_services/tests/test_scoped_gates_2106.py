@@ -756,3 +756,40 @@ def test_model_and_managed_service_counts_hide_invalid_private_provider_targets(
         )
     assert models.total_count == 0
     assert services.total_count == 0
+
+
+@pytest.mark.parametrize("kind", ["TEAM", "PROJECT", "ORG"])
+def test_bundle_list_respects_exact_team_project_and_policy_org_owner_grants(world, kind):
+    from astrolift_services.schema.queries import ServicesQuery
+    from core.tests.utils.scope_world import make_info
+
+    team_bundle = SecretBundle.objects.create(
+        organization=world.org, team=world.medops, name="Team", slug="team-only", backend_ref="unused"
+    )
+    org_bundle = SecretBundle.objects.create(
+        organization=world.org, name="Organization", slug="org-only", backend_ref="unused"
+    )
+    scope_id = {"TEAM": world.medops.pk, "PROJECT": world.medops_project.pk, "ORG": world.org.pk}[kind]
+    binding = bind_role(
+        world.user, permissions=[Permission.APP_READ], kind=kind, scope_id=scope_id, slug="exact-reader"
+    )
+    binding.inherits = False
+    binding.save(update_fields=["inherits", "updated_at", "version"])
+    if kind == "ORG":
+        from astrolift_identity.models import Policy
+
+        Policy.objects.create(
+            organization=world.org,
+            name="Organization only",
+            slug="organization-only",
+            scope_level="ORG",
+            effect="DENY",
+            action_pattern="app.read",
+            resource_pattern={"project_slug": ["*"]},
+            actor_pattern={},
+            conditions=[],
+        )
+    with subject(world):
+        rows = ServicesQuery().astrolift_secret_bundles(make_info(world.user))
+    expected = {"TEAM": team_bundle, "PROJECT": world.medops_bundle, "ORG": org_bundle}[kind]
+    assert [str(row.id) for row in rows] == [str(expected.guid)]

@@ -23,7 +23,10 @@ Secret bundles keep their recorded owner: project, team, or organization.
 An app-scoped grant on one consumer does not authorize changing its project's
 shared bundle. Bundle collections filter to these owners before their limit;
 managed-service and model collections confine rows before pagination and
-counts. Existing operation-aware filters remain in force.
+counts. An organization-only policy grant sees organization bundles without
+revealing project or team descendants. Non-inheriting team and project grants
+show only bundles at their exact owner. Existing operation-aware filters remain
+in force.
 
 A bearer credential retains its organization and optional team ceiling even
 when its user has an organization role. App shares must delegate every actual
