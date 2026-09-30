@@ -76,6 +76,7 @@ from astrolift_agents.scopes import (
     agent_trigger_scope,
     agent_workload_app_scope,
 )
+from astrolift_agents.services.agent_enforcement import quarantine_scope
 from astrolift_agents.services.agent_package import (
     AgentPackageError,
     normalize_environment_values,
@@ -818,6 +819,28 @@ def _agent_secrets_backend(spec):
 
 @strawberry.type
 class AgentsMutation:
+    @strawberry.field
+    @mutation_audit(action="agents.quarantine.clear")
+    @require_permission(Permission.AGENT_DISPATCH, scope=quarantine_scope)
+    @tenant_scoped()
+    def clear_agent_quarantine(self, info: Info, id: strawberry.ID) -> MutationResultType[None]:
+        from astrolift_agents.services.agent_enforcement import visible_quarantines
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        with transaction.atomic():
+            row = (
+                visible_quarantines(org_id)
+                .select_for_update()
+                .filter(guid=read_guid({"id": id}, "id"), organization_id=org_id)
+                .first()
+            )
+            if row is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "quarantine not found")
+            row.cleared_at, row.cleared_by_id = timezone.now(), tenant.actor_user_id
+            row.save(update_fields=["cleared_at", "cleared_by", "updated_at", "version"])
+        return gql_success(None)
+
     @strawberry.field
     @mutation_audit(action="agents.skill.create")
     @require_permission(Permission.APP_CREATE, scope=agent_org_scope)

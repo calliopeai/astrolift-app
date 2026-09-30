@@ -393,8 +393,10 @@ def _placement_for_task(task):
 
 def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
     from astrolift_agents.models import AgentTask
+    from astrolift_agents.services.agent_enforcement import poll_enforcements
     from astrolift_agents.services.task_target import TaskControlBusy, task_control_lock
 
+    poll_enforcements(AgentTask.objects.select_related("model_gateway_connection").get(pk=task_pk))
     try:
         with task_control_lock(task_pk):
             return _poll_agent_task_locked(task_pk)

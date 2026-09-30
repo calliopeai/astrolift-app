@@ -264,3 +264,79 @@ def is_zentinelle_envelope(event_type: str, payload: Any) -> bool:
         and "idempotency_key" in payload
         and "payload_version" in payload
     )
+
+
+def emit_agent_session_events(task, rows):
+    """Relay durable runner identities through the existing signed outbox.
+
+    The event log remains the source; output/prompt content is not duplicated
+    into the governance stream. Tool names and structured lifecycle metadata
+    still let policy compare registered intent with observed behavior.
+    """
+    connection = task.model_gateway_connection
+    if not rows or not connection or connection.status != "connected" or not task.model_gateway_agent_id:
+        return
+    from astrolift_agents.models import AgentTaskEvent
+    from core.events import Event
+
+    spec = task.environment_spec
+    definition = task.agent_definition
+    names = {}
+    identities = {row.message_id for row in rows}
+    for event in AgentTaskEvent.objects.filter(
+        agent_task=task, kind="tool_call_started", message_id__in=identities
+    ).order_by("sequence"):
+        names[(event.turn_id, event.message_id)] = (event.data or {}).get("name", "")
+    for row in rows:
+        raw = row.data or {}
+        data = {key: value for key, value in raw.items() if key not in {"input", "output", "error"}}
+        if "input" in raw:
+            data["input_keys"] = sorted(str(key) for key in raw["input"])
+        tool_name = names.get((row.turn_id, row.message_id), "")
+        if row.request and row.request.get("kind") == "approval":
+            tool_name = row.request["tool"]["name"]
+        payload = {
+            "task_id": str(task.guid),
+            "sequence": row.sequence,
+            "kind": row.kind,
+            "turn_id": row.turn_id,
+            "message_id": row.message_id,
+            "data": data,
+            "tool_name": tool_name,
+            "tool_call_id": raw.get("call_id") or row.message_id,
+            "install_id": connection.zentinelle_install_id,
+            "agent_id": task.model_gateway_agent_id,
+            "cluster_id": (task.dispatch_target or {}).get("cluster_guid", ""),
+            "team_id": str(task.team.guid) if task.team_id else "",
+            "project_id": str(task.project.guid) if task.project_id else "",
+            "harness": (spec.runtime or spec.agent_type) if spec else "astrolift",
+            "declared_intent": {
+                "agent_id": str(definition.guid) if definition else "",
+                "agent_slug": definition.slug if definition else "",
+                "spec_id": str(spec.guid) if spec else "",
+                "tool_preset": spec.tool_preset if spec else "",
+            },
+        }
+        event_id = str(row.guid)
+        envelope = dataclasses.asdict(
+            ZentinelleEnvelope(
+                payload_version=PAYLOAD_VERSION,
+                event_type=ZentinelleEventType.AGENT_SESSION_EVENT,
+                event_id=event_id,
+                org_id=int(task.organization_id),
+                actor_user_id=None,
+                occurred_at_unix=int(row.created_at.timestamp()),
+                payload=payload,
+                idempotency_key=idempotency_key_for(org_id=int(task.organization_id), event_id=event_id),
+            )
+        )
+        Event.emit(
+            envelope["event_type"],
+            envelope,
+            resource_kind="agent_task",
+            resource_id=str(task.guid),
+            organization_id=task.organization_id,
+            team_id=task.team_id,
+            project_id=task.project_id,
+            registered_app_id=definition.registered_app_id if definition else None,
+        )

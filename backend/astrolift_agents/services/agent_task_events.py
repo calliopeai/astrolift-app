@@ -141,3 +141,12 @@ def commit_task_events(task, prepared):
     AgentTaskEvent.objects.bulk_create(rows)
     task.event_sequence, task.event_bytes = sequence, size
     task.save(update_fields=["event_sequence", "event_bytes", "updated_at", "version"])
+
+    from astrolift_operations.zentinelle_bridge import emit_agent_session_events
+
+    emit_agent_session_events(task, rows)
+    from django.db import transaction
+
+    from astrolift_agents.services.agent_enforcement import poll_enforcements
+
+    transaction.on_commit(lambda: poll_enforcements(task))

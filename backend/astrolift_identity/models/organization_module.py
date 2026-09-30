@@ -20,6 +20,7 @@ class OrganizationModule(BaseCoreModel):
     class Key(models.TextChoices):
         CHAT_STUDIO_INTEGRATION = "chat_studio_integration"
         AGENT_LIVE_ATTACH = "agent_live_attach"
+        AGENT_POLICY_ENFORCEMENT = "agent_policy_enforcement"
         CHAT_STUDIO_AGENT_RUNS = "chat_studio_agent_runs"
 
     organization = models.ForeignKey(

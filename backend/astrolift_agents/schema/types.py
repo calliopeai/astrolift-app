@@ -1322,3 +1322,14 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         created_at=s.created_at,
         updated_at=s.updated_at,
     )
+
+
+@strawberry.type(name="AstroliftAgentQuarantine")
+class AgentQuarantineType:
+    id: GUID
+    target_kind: str
+    target_id: GUID
+    reason: str
+    policy_id: str
+    evidence_url: str
+    created_at: dt.datetime

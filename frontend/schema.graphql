@@ -419,6 +419,16 @@ type AstroliftAgentLiveStatus {
   deploymentReady: Boolean
 }
 
+type AstroliftAgentQuarantine {
+  id: GUID!
+  targetKind: String!
+  targetId: GUID!
+  reason: String!
+  policyId: String!
+  evidenceUrl: String!
+  createdAt: DateTime!
+}
+
 type AstroliftAgentRun {
   id: GUID!
   registeredAppSlug: String!
@@ -7094,6 +7104,7 @@ type Mutation {
   createTrigger(input: CreateTriggerInput!): AstroliftTriggerMutationResult!
   triggerPipelineRun(pipelineId: GUID!, ref: String = null): AstroliftPipelineRunMutationResult!
   cancelPipelineRun(runId: GUID!): AstroliftPipelineRunMutationResult!
+  clearAgentQuarantine(id: ID!): NoneTypeMutationResult!
   createSkill(input: SkillInput!, orgId: ID!): AstroliftSkillMutationResult!
   updateSkill(id: ID!, input: SkillInput!): AstroliftSkillMutationResult!
   deleteSkill(id: ID!): AstroliftSkillMutationResult!
@@ -7797,6 +7808,7 @@ type Query {
   astroliftPipelineRuns(pipelineId: String!, limit: Int! = 50): [AstroliftPipelineRun!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage.")
   astroliftPipelineRunsPage(pipelineId: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftPipelineRunPage!
   astroliftPipelineRun(id: String!): AstroliftPipelineRun
+  agentQuarantines: [AstroliftAgentQuarantine!]!
   skills(orgId: ID!, isGlobal: Boolean! = false): [AstroliftSkill!]!
   skill(id: ID!): AstroliftSkill
   toolDefs(skillId: ID!): [AstroliftToolDef!]!
