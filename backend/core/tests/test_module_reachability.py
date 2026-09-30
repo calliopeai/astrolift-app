@@ -486,7 +486,6 @@ KNOWN_TEST_ONLY: frozenset[str] = frozenset(
         "astrolift_operations.synthetic_checks",
         "astrolift_operations.trace_explorer",
         "astrolift_pipelines.context_eval",
-        "astrolift_pipelines.pipeline_secrets",
         "astrolift_pipelines.views",
         "astrolift_registry.app_claiming",
         "astrolift_scm.services.trigger_tokens",

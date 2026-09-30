@@ -331,9 +331,7 @@ class KanikoBuildDriver:
 
         started = self._clock()
         try:
-            apply_result = self._cluster_driver.apply_manifests(
-                self._cluster_slug, self._namespace, manifests
-            )
+            apply_result = self._cluster_driver.apply_manifests(self._cluster_slug, self._namespace, manifests)
             if not getattr(apply_result, "ok", False):
                 errors = apply_result.summary() if hasattr(apply_result, "summary") else ["apply failed"]
                 return BuildResult(
@@ -394,9 +392,7 @@ class KanikoBuildDriver:
         while True:
             maybe_heartbeat(f"build {job_name}")
             try:
-                status = self._cluster_driver.get_workload_status(
-                    self._cluster_slug, self._namespace, "Job", job_name
-                )
+                status = self._cluster_driver.get_workload_status(self._cluster_slug, self._namespace, "Job", job_name)
                 conditions = status.conditions or []
             except Exception as exc:
                 # A transient read failure shouldn't abort a build that may
