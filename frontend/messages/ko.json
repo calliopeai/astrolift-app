@@ -4584,7 +4584,8 @@
         "changed": "검토한 요청 또는 승인 상태가 변경되었습니다. 취소한 후 현재 요청을 다시 검토하세요.",
         "failed": "배포 결과를 확인할 수 없습니다. 다시 시도하기 전에 새로 고침하세요. 준비 완료는 확인되지 않았습니다.",
         "reviewResources": "요청한 CPU {cpu}, 메모리 {memory}, GPU 장치 {gpu}개, CPU KV 캐시 {cache}.",
-        "notRequested": "요청하지 않음"
+        "notRequested": "요청하지 않음",
+        "clusterSearch": "클러스터 검색"
       },
       "deployments": {
         "title": "공유 모델",

@@ -4587,7 +4587,8 @@
         "changed": "Die geprüfte Anfrage oder Zulassung hat sich geändert. Brechen Sie ab und prüfen Sie die aktuelle Anfrage erneut.",
         "failed": "Das Deployment-Ergebnis konnte nicht geprüft werden. Aktualisieren Sie vor einem neuen Versuch; Bereitschaft ist nicht bestätigt.",
         "reviewResources": "Angeforderte CPU {cpu}; Speicher {memory}; GPU-Geräte {gpu}; CPU-KV-Cache {cache}.",
-        "notRequested": "Nicht angefordert"
+        "notRequested": "Nicht angefordert",
+        "clusterSearch": "Cluster suchen"
       },
       "deployments": {
         "title": "Gemeinsame Modelle",

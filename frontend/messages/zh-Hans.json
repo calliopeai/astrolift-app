@@ -4584,7 +4584,8 @@
         "changed": "已确认的请求或准入状态已变更。请取消并重新确认当前请求。",
         "failed": "无法验证部署结果。请刷新后再重试；尚未确认就绪。",
         "reviewResources": "请求的 CPU：{cpu}；内存：{memory}；GPU 设备数：{gpu}；CPU KV 缓存：{cache}。",
-        "notRequested": "未请求"
+        "notRequested": "未请求",
+        "clusterSearch": "搜索集群"
       },
       "deployments": {
         "title": "共享模型",

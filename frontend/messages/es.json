@@ -4587,7 +4587,8 @@
         "changed": "La solicitud revisada o su admisión han cambiado. Cancela y vuelve a revisar la solicitud actual.",
         "failed": "No se pudo verificar el resultado del despliegue. Actualiza antes de reintentar; no se ha confirmado su disponibilidad.",
         "reviewResources": "CPU solicitada {cpu}; memoria {memory}; dispositivos GPU {gpu}; caché KV en CPU {cache}.",
-        "notRequested": "No solicitada"
+        "notRequested": "No solicitada",
+        "clusterSearch": "Buscar clústeres"
       },
       "deployments": {
         "title": "Modelos compartidos",

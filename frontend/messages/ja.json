@@ -4584,7 +4584,8 @@
         "changed": "確認した要求または実行条件の確認結果が変更されました。キャンセルして、現在の要求をもう一度確認してください。",
         "failed": "デプロイの結果を確認できませんでした。再試行する前に更新してください。準備完了は確認されていません。",
         "reviewResources": "要求する CPU {cpu}、メモリ {memory}、GPU デバイス数 {gpu}、CPU KV キャッシュ {cache}。",
-        "notRequested": "要求なし"
+        "notRequested": "要求なし",
+        "clusterSearch": "クラスターを検索"
       },
       "deployments": {
         "title": "共有モデル",

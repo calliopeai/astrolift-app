@@ -4584,7 +4584,8 @@
         "changed": "A solicitação revisada ou sua admissão mudou. Cancele e revise a solicitação atual novamente.",
         "failed": "Não foi possível verificar o resultado da implantação. Atualize antes de tentar novamente; a prontidão não foi confirmada.",
         "reviewResources": "CPU solicitada {cpu}; memória {memory}; dispositivos GPU {gpu}; cache KV em CPU {cache}.",
-        "notRequested": "Não solicitado"
+        "notRequested": "Não solicitado",
+        "clusterSearch": "Buscar clusters"
       },
       "deployments": {
         "title": "Modelos compartilhados",

@@ -4587,7 +4587,8 @@
         "changed": "La demande vérifiée ou son admission a changé. Annulez et vérifiez à nouveau la demande actuelle.",
         "failed": "Le résultat du déploiement n’a pas pu être vérifié. Actualisez avant de réessayer ; aucune disponibilité n’est confirmée.",
         "reviewResources": "CPU demandés {cpu} ; mémoire {memory} ; GPU {gpu} ; cache KV sur CPU {cache}.",
-        "notRequested": "Non demandé"
+        "notRequested": "Non demandé",
+        "clusterSearch": "Rechercher des clusters"
       },
       "deployments": {
         "title": "Modèles partagés",

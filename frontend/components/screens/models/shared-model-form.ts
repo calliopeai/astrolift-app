@@ -3,15 +3,17 @@ import { z } from "zod";
 export const sharedModelDraftSchema = z
   .object({
     name: z.string().trim().min(1).max(128),
-    computeMode: z.enum(["cpu", "gpu"]),
+    computeMode: z.enum(["", "cpu", "gpu"]),
     cpuRequest: z.string().trim().min(1),
     memoryRequest: z.string().trim().min(1),
     gpuCount: z.string().regex(/^\d+$/),
     cpuKvCacheGiB: z.string().regex(/^$|^[1-9]\d*$/),
     allowSubscriptions: z.boolean(),
   })
-  .refine((draft) =>
-    draft.computeMode === "cpu" ? Number(draft.gpuCount) === 0 : Number(draft.gpuCount) > 0
+  .refine(
+    (draft) =>
+      draft.computeMode !== "" &&
+      (draft.computeMode === "cpu" ? Number(draft.gpuCount) === 0 : Number(draft.gpuCount) > 0)
   );
 export type SharedModelDraft = {
   name: string;
@@ -53,6 +55,7 @@ export function sharedModelRequest(
   )
     return null;
   const value = parsed.data;
+  if (value.computeMode === "") return null;
   const gpuCount = Number(value.gpuCount),
     cpuKvCacheGiB = value.cpuKvCacheGiB ? Number(value.cpuKvCacheGiB) : null;
   if (

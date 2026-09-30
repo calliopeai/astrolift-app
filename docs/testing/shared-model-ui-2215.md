@@ -212,3 +212,25 @@ include the real deployment/subscription fields and complete public error
 metadata. Schema/coercion checks prove required cluster/provider/version fields
 and the retained-data deletion default. This validates document contracts only;
 production adapter writes and composed browser journeys are separate evidence.
+
+## Actual shared deployment request
+
+`/models/deploy` uses real HF metadata/detail resolution and the eligible cluster
+page, preserving `/models/deploy/legacy` for existing app-owned deployments. An
+explicit CPU or GPU request carries exact organization, cluster, provider and
+immutable revision, and requests admission for the complete current resource
+draft. Configured operator admission is not hardware capacity or model-fit proof.
+
+A guarded no-cache provision mutation runs only after review. Complete response
+identity, request resources, pending operation and unconfirmed readiness must
+match before showing the created deployment link. Missing/mixed/foreign or
+premature-ready responses retain the confirmation and draft. Late replies across
+request or tenant A-to-B-to-A changes are discarded without replay. The adapter
+uses RHF and the shared Zod request schema; blank compute is an input state and
+never an executable request.
+
+31 component/Apollo HTTP checks cover CPU/GPU, exact admission/write inputs,
+server paging/search, refusal, unknown runtime and permanent stale scopes; 11
+portable placement/client stories render. Typecheck, focused ESLint and formatter
+checks pass. Production browser writes and actual observed scheduling remain
+separate composed acceptance; this leaf does not claim model fit or completion.

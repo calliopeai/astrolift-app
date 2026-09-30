@@ -4664,7 +4664,8 @@
         "changed": "The reviewed request or admission changed. Cancel and review the current request again.",
         "failed": "The deployment outcome could not be verified. Refresh before retrying; no readiness is confirmed.",
         "reviewResources": "Requested CPU {cpu}; memory {memory}; GPU devices {gpu}; CPU KV cache {cache}.",
-        "notRequested": "Not requested"
+        "notRequested": "Not requested",
+        "clusterSearch": "Search clusters"
       },
       "deployments": {
         "title": "Shared models",

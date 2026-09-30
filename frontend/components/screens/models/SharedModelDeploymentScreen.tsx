@@ -122,6 +122,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
     JSON.stringify(review.request) === requestKey
   );
   const mounted = useRef(true),
+    lifecycle = useRef(0),
     latest = useRef({ props, revision: scope.revision });
   useLayoutEffect(() => {
     latest.current = { props, revision: scope.revision };
@@ -130,6 +131,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      lifecycle.current += 1;
     };
   }, []);
   async function confirm() {
@@ -138,10 +140,16 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
       return false;
     }
     const candidate = review;
+    const epoch = lifecycle.current;
     setFailure(null);
     try {
       const result = await latest.current.props.onDeploy(candidate.request);
-      if (!mounted.current || latest.current.revision !== candidate.revision) return false;
+      if (
+        !mounted.current ||
+        lifecycle.current !== epoch ||
+        latest.current.revision !== candidate.revision
+      )
+        return false;
       if (!result.accepted) {
         setFailure(result.message);
         return false;
