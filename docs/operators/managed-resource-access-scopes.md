@@ -7,6 +7,12 @@ consistent and inside the active organization. Missing and stale targets take
 an explicit organization scope; selecting a team or project supplies no
 fallback authority.
 
+A private resource targets its app environment's cluster. A shared resource
+targets its own cluster. Deleted or foreign organization clusters are refused
+before provider access, including for an organization operator; correct the
+environment or service's cluster reference before using those actions. Platform
+clusters without an organization retain their supported shared use.
+
 Project resource creation checks the destination project. Attachment changes
 check both the owning service and the app or agent recipe being attached.
 The destination app check uses its persisted environment and cluster facts,

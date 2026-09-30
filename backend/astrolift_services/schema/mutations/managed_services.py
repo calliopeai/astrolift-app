@@ -63,6 +63,7 @@ from astrolift_services.schema.types import (
 )
 from astrolift_services.scopes import (
     _app_scope_via,
+    assert_provider_cluster,
     managed_service_attachment_scope,
     managed_service_scope_by_guid,
 )
@@ -783,6 +784,7 @@ class ManagedServiceMutations:
                 f"environment {input.environment_name!r} not found",
                 field="environmentName",
             )
+        assert_provider_cluster(env.tenant_cluster, permission=Permission.APP_UPDATE)
         from astrolift_services.managed_service_catalog import (
             CatalogResolutionError,
             resolve_variant,

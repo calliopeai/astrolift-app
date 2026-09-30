@@ -639,3 +639,120 @@ def test_mcp_creation_policy_facts_match_the_persisted_environment_default(world
     with subject(world):
         facts = _operation_for_tool("astrolift_provision_project_resource", arguments)
     assert facts.environment == expected
+
+
+@pytest.mark.parametrize("invalid", ["foreign", "deleted"])
+@pytest.mark.parametrize("authority", ["APP", "ORG", "ORG_TEAM_TOKEN"])
+def test_private_service_invalid_provider_cluster_is_refused_before_driver_calls(
+    world, invalid, authority, monkeypatch
+):
+    from astrolift_services.schema.mutations import ServicesMutation
+    from astrolift_services.schema.mutations.types import SendManagedServiceTestEmailInput
+    from astrolift_services.schema.queries import ServicesQuery
+    from core.tests.utils.scope_world import make_info
+
+    if invalid == "foreign":
+        foreign = ScopeWorld("foreign-cluster2106")
+        world.medops_env.tenant_cluster = make_cluster(foreign, "foreign-cluster2106")
+        world.medops_env.save(update_fields=["tenant_cluster", "updated_at", "version"])
+    else:
+        world.cluster.deleted_at = timezone.now()
+        world.cluster.save(update_fields=["deleted_at", "updated_at", "version"])
+    world.medops_private.kind = "email"
+    world.medops_private.save(update_fields=["kind", "updated_at", "version"])
+    bind_role(
+        world.user,
+        permissions=list(Permission),
+        kind="APP" if authority == "APP" else "ORG",
+        scope_id=world.medops_app.pk if authority == "APP" else world.org.pk,
+        slug="operator",
+    )
+    calls = []
+
+    def provider(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("invalid provider target must not be invoked")
+
+    monkeypatch.setattr("astrolift_services.email_observability.driver_for_plugin_slug", provider)
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow", provider)
+    with subject(world, token_team=world.medops.pk if authority == "ORG_TEAM_TOKEN" else None):
+        with pytest.raises(PermissionDenied):
+            ServicesQuery().astrolift_email_service_detail(
+                make_info(world.user), managed_service_id=str(world.medops_private.guid)
+            )
+        result = ServicesMutation().send_managed_service_test_email(
+            make_info(world.user),
+            input=SendManagedServiceTestEmailInput(
+                managed_service_id=str(world.medops_private.guid), recipient="test@example.invalid"
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert calls == []
+    world.medops_private.refresh_from_db()
+    assert world.medops_private.status == "pending"
+    assert world.medops_private.last_action_at is None
+
+
+@pytest.mark.parametrize("invalid", ["foreign", "deleted"])
+def test_private_service_creation_refuses_invalid_environment_cluster_without_writes(
+    world, invalid, monkeypatch
+):
+    from astrolift_services.schema.mutations import ProvisionManagedServiceInput, ServicesMutation
+    from core.tests.utils.scope_world import make_info
+
+    if invalid == "foreign":
+        foreign = ScopeWorld("foreign-create2106")
+        world.medops_env.tenant_cluster = make_cluster(foreign, "foreign-create2106")
+        world.medops_env.save(update_fields=["tenant_cluster", "updated_at", "version"])
+    else:
+        world.cluster.deleted_at = timezone.now()
+        world.cluster.save(update_fields=["deleted_at", "updated_at", "version"])
+    bind_role(
+        world.user, permissions=[Permission.APP_UPDATE], kind="ORG", scope_id=world.org.pk, slug="operator"
+    )
+    calls = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow", lambda *args, **kwargs: calls.append((args, kwargs))
+    )
+    before = ManagedService.objects.count()
+    with subject(world):
+        result = ServicesMutation().provision_managed_service(
+            make_info(world.user),
+            input=ProvisionManagedServiceInput(
+                app_slug=world.medops_app.slug, environment_name="production", kind="redis", name="new"
+            ),
+        )
+    assert not result.ok
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert ManagedService.objects.count() == before
+    assert calls == []
+
+
+@pytest.mark.parametrize("invalid", ["foreign", "deleted"])
+def test_model_and_managed_service_counts_hide_invalid_private_provider_targets(world, invalid):
+    from astrolift_services.schema.queries import ServicesQuery
+    from core.tests.utils.scope_world import make_info
+
+    if invalid == "foreign":
+        foreign = ScopeWorld("foreign-list2106")
+        world.medops_env.tenant_cluster = make_cluster(foreign, "foreign-list2106")
+        world.medops_env.save(update_fields=["tenant_cluster", "updated_at", "version"])
+    else:
+        world.cluster.deleted_at = timezone.now()
+        world.cluster.save(update_fields=["deleted_at", "updated_at", "version"])
+    ManagedService.objects.filter(pk=world.medops_private.pk).update(kind="model_endpoint")
+    bind_role(
+        world.user,
+        permissions=[Permission.APP_READ, Permission.PROJECT_READ],
+        kind="ORG",
+        scope_id=world.org.pk,
+        slug="reader",
+    )
+    with subject(world):
+        models = ServicesQuery().astrolift_model_endpoints_page(make_info(world.user), page=1, page_size=10)
+        services = ServicesQuery().astrolift_managed_services_page(
+            make_info(world.user), app_slug=world.medops_app.slug
+        )
+    assert models.total_count == 0
+    assert services.total_count == 0

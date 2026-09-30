@@ -96,12 +96,25 @@ def live_managed_services(qs):
             registered_app__in=apps,
             app_environment__deleted_at__isnull=True,
             app_environment__registered_app_id=F("registered_app_id"),
+            app_environment__tenant_cluster__deleted_at__isnull=True,
         )
         | Q(project__in=projects, tenant_cluster__deleted_at__isnull=True),
         Q(tenant_cluster__isnull=True)
         | Q(tenant_cluster__organization_id=_org_id())
         | Q(tenant_cluster__organization_id__isnull=True),
+        Q(app_environment__isnull=True)
+        | Q(app_environment__tenant_cluster__organization_id=_org_id())
+        | Q(app_environment__tenant_cluster__organization_id__isnull=True),
     )
+
+
+def assert_provider_cluster(cluster, *, permission=Permission.APP_READ):
+    if cluster is None or cluster.deleted_at is not None or cluster.organization_id not in (None, _org_id()):
+        raise PermissionDenied(
+            permission,
+            services_org_scope(),
+            "managed resource provider target is not live in this organization",
+        )
 
 
 def managed_service_scope_by_guid(field="managed_service_id", *, permissions=()):
@@ -109,6 +122,22 @@ def managed_service_scope_by_guid(field="managed_service_id", *, permissions=())
         from astrolift_services.models import ManagedService
 
         guid = read_guid(args, field)
+        if guid:
+            from django.db.models import Q
+
+            target = (
+                ManagedService.objects.filter(
+                    Q(registered_app__organization_id=_org_id()) | Q(project__organization_id=_org_id()),
+                    guid=guid,
+                )
+                .select_related("app_environment__tenant_cluster", "tenant_cluster")
+                .first()
+            )
+            if target is not None:
+                assert_provider_cluster(
+                    target.effective_cluster,
+                    permission=permissions[0] if permissions else Permission.APP_READ,
+                )
         row = (
             live_managed_services(ManagedService.objects.filter(guid=guid))
             .values_list("registered_app_id", "project_id")

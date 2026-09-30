@@ -6,7 +6,10 @@
   and preserve bearer ceilings across GraphQL and all ten project-resource MCP
   tools (#2106). Collections filter before limits and counts; attachments check
   destination ownership and persisted environment facts before any writes.
-  Missing or stale targets require explicit organization authority.
+  Missing or stale targets require explicit organization authority. Private
+  resource provider targets are checked through the app environment; deleted
+  or foreign clusters are refused before provider access, including for an
+  organization operator.
 
 - Pipeline creation requires `app.update` at the active organization (#2115).
   The existing creation input has no app association, so team/project/app
