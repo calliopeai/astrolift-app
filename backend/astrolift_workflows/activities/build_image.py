@@ -263,9 +263,13 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
         inp.image_tag,
     )
 
+    from astrolift_lifecycle.run_history import record, record_failure
+
+    record(deployment.pk, "build", "started")
     try:
         result = prepared.driver.build(spec, prepared.repo_uri, inp.image_tag)
     except Exception as exc:
+        record_failure(deployment.pk, "build", "Build driver failed.")
         log.error("build_image failed deployment=%s: %s", inp.deployment_id, exc)
         raise RuntimeError(f"BuildDriver.build failed: {exc}") from exc
 
@@ -276,8 +280,16 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
         # (#1686). ``aborted_reason`` keeps one line, so the full text is
         # persisted on the deploy row rather than truncated away there.
         _record_build_failure(deployment, "\n".join(parts))
+        record_failure(deployment.pk, "build", "\n".join(parts))
         raise RuntimeError(f"image build failed: {parts[0]}")
 
+    record(deployment.pk, "build", "completed", "Build/push job reported successful completion.")
+    record(
+        deployment.pk,
+        "push",
+        "completed",
+        "Build/push job confirmed registry push; separate push start unavailable.",
+    )
     digest = result.digest or _read_pushed_digest(prepared.registry_driver, prepared.repo_name, inp.image_tag)
     _record_build_outcome(deployment, image_tag=inp.image_tag, digest=digest)
 
@@ -387,6 +399,7 @@ def _prepare_build(app, cluster, deployment_pk: int, image_tag: str, commit_sha:
         build_id=f"{deployment_pk}-{(commit_sha or image_tag)}",
         git_username=git_username,
         git_password=git_password,
+        log_observer=lambda message: _record_build_output(deployment_pk, message),
     )
     return _PreparedBuild(
         driver=driver,
@@ -514,6 +527,12 @@ def _clone_credential(app) -> tuple[str, str]:
         )
         return "", ""
     return ("x-access-token", token) if token else ("", "")
+
+
+def _record_build_output(deployment_id: int, message: str) -> None:
+    from astrolift_lifecycle.run_history import record
+
+    record(deployment_id, "build", "output", message)
 
 
 def _record_build_failure(deployment, detail: str) -> None:

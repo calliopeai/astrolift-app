@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { expect, within } from "storybook/test";
 
 import { MainRail } from "@/components/shell/MainRail";
 import { NAV, type ModuleKey, visibleNav } from "@/lib/shell/nav-model";
@@ -51,4 +52,23 @@ export const AppsOnly: StoryObj = {
 export const AgentsOnly: StoryObj = { render: () => <Frame modules={["agents"]} /> };
 export const Collapsed: StoryObj = {
   render: () => <Frame modules={["apps", "agents", "workflows", "admin"]} startCollapsed />,
+};
+
+/** Operational pages must have a home instead of requiring a remembered URL. */
+export const OperationalPages: StoryObj = {
+  render: () => <Frame modules={["apps", "agents", "workflows", "admin"]} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const name of [
+      "Fleet",
+      "Approvals",
+      "Deployment approvals",
+      "Operations",
+      "Pipelines",
+      "Logs",
+      "Traces",
+    ]) {
+      await expect(canvas.getByRole("link", { name })).toBeVisible();
+    }
+  },
 };

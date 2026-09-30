@@ -516,16 +516,24 @@ def test_a_team_admin_promotes_into_their_team_and_no_other(world, workflow_star
     token issued for Eng must not stretch that to Ops."""
     user = _member(world.a, "authz-team-admin", ("team_admin", "TEAM", world.eng.id))
 
-    for headers in (_bearer(user, world.a), _bearer(user, world.a, team=world.eng)):
+    for token_team in (None, world.eng):
+        headers = _bearer(user, world.a, team=token_team)
         into_ops = _promote(
             _dev_env(world.a, world.cluster_a, user, team=world.eng), headers, team_slug="ops"
         )
         assert into_ops.status_code == 403, into_ops.content
-        assert into_ops.json() == {
-            "detail": "app.create is required on team 'ops'",
-            "reason": "missing_permission",
-            "permission": "app.create",
-        }
+        assert into_ops.json() == (
+            {
+                "detail": "the api token does not cover this live team owner",
+                "reason": "outside_token_team",
+            }
+            if token_team is not None
+            else {
+                "detail": "app.create is required on team 'ops'",
+                "reason": "missing_permission",
+                "permission": "app.create",
+            }
+        )
     assert not RegisteredApp.objects.exists()
     assert workflow_starts == []
 
@@ -569,9 +577,8 @@ def test_a_token_for_a_deleted_team_is_refused(world, workflow_starts):
     sync = _sync(dev, headers)
     assert sync.status_code == 403, sync.content
     assert sync.json() == {
-        "detail": "app.create is required on team 'eng'",
-        "reason": "missing_permission",
-        "permission": "app.create",
+        "detail": "the api token does not cover this live team owner",
+        "reason": "outside_token_team",
     }
     assert DevEnvironment.objects.count() == 1
     assert _untouched(dev)

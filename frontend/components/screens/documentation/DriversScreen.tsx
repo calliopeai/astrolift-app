@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { CheckIcon, MinusIcon, PlugIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -88,6 +90,8 @@ function driversSelect(
 
 export function DriversScreen({
   loading,
+  error,
+  onRetry,
   rows,
   clusterCountByProvider,
   managedKindColumns,
@@ -180,7 +184,9 @@ export function DriversScreen({
       title="Driver reference"
       description="Provider plugins and the per-capability driver implementations they advertise. The matrix below is sourced from the registered ProviderPlugin manifests; when no plugins are live, a static known-provider list is shown."
     >
-      {loading ? (
+      {error ? (
+        <QueryError title="Could not load driver reference" error={error} onRetry={onRetry} />
+      ) : loading ? (
         <Card>
           <CardContent className="p-6">
             <Skeleton className="h-44 w-full" />

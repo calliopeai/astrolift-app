@@ -40,6 +40,124 @@ class DeploymentLifecycleEventType:
     occurred_at: str
 
 
+def _lifecycle_stream_app(org_id, slug):
+    from astrolift_lifecycle.visibility import live_app_rows
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.visibility import visible_registry_apps
+
+    return (
+        visible_registry_apps(
+            live_app_rows(RegisteredApp.objects.filter(organization_id=org_id, slug=slug)),
+            Permission.APP_READ,
+        )
+        .values_list("pk", "guid")
+        .first()
+    )
+
+
+def _lifecycle_stream_event(org_id, event, app_id):
+    from uuid import UUID
+
+    from astrolift_identity.abac import operation_attributes
+    from astrolift_identity.operation_context import deployment_approval_count, environment_context
+    from astrolift_lifecycle.models import Deployment
+    from astrolift_lifecycle.scopes import deployment_app_scope
+    from astrolift_lifecycle.visibility import live_lifecycle_rows
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.scopes import live_app_owners
+    from core.permissions import PermissionDenied, check_permission
+
+    if not isinstance(event, dict):
+        return None
+    try:
+        guid = UUID(str(event.get("deployment_id", "")))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    row = (
+        live_lifecycle_rows(Deployment.objects.all())
+        .filter(
+            guid=guid,
+            registered_app__organization_id=org_id,
+            registered_app__in=live_app_owners(RegisteredApp.objects.filter(organization_id=org_id)),
+        )
+        .select_related("registered_app", "app_environment__tenant_cluster")
+        .first()
+    )
+    if row is None or (app_id is not None and row.registered_app_id != app_id):
+        return None
+    env = row.app_environment
+    if env is not None and (env.deleted_at is not None or env.registered_app_id != row.registered_app_id):
+        return None
+    if (
+        env is not None
+        and env.tenant_cluster is not None
+        and (
+            env.tenant_cluster.deleted_at is not None
+            or not env.tenant_cluster.is_active
+            or env.tenant_cluster.organization_id not in (None, org_id)
+        )
+    ):
+        return None
+    facts = environment_context(env, approvals=deployment_approval_count(row))
+    try:
+        with operation_attributes(**facts.attributes()):
+            scope = deployment_app_scope("id", permission=Permission.APP_READ)({"id": guid})
+            check_permission(Permission.APP_READ, scope=scope)
+    except PermissionDenied:
+        return None
+    return {
+        "deployment_id": str(row.guid),
+        "registered_app_slug": row.registered_app.slug,
+        "environment_name": env.name if env is not None else "",
+        "status": str(event.get("status", "")),
+        "occurred_at": str(event.get("occurred_at", "")),
+    }
+
+
+def _lifecycle_event_for_identity(tenant, token, event, app_id, attributes):
+    """Each event rechecks the pinned identity with a fresh permission cache."""
+    import dataclasses
+
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+    from django.utils import timezone
+
+    from astrolift_identity.abac import request_attributes
+    from astrolift_identity.api_tokens import (
+        reset_current_api_token,
+        session_may_act_in,
+        set_current_api_token,
+        with_active_org_member,
+    )
+    from astrolift_identity.models import ApiToken
+    from core.tenancy import tenant_context
+
+    user = get_user_model().objects.filter(pk=tenant.actor_user_id, is_active=True).first()
+    if user is None or not session_may_act_in(user, tenant.organization_id):
+        return None
+    if token is not None:
+        token = with_active_org_member(
+            ApiToken.objects.filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
+                pk=token.pk,
+                organization_id=tenant.organization_id,
+                user_id=tenant.actor_user_id,
+                is_revoked=False,
+            ),
+            user="user",
+            organization="organization",
+        ).first()
+        if token is None:
+            return None
+    attrs = dataclasses.replace(attributes, cache={})
+    marker = set_current_api_token(token)
+    try:
+        with tenant_context(tenant), request_attributes(attrs):
+            return _lifecycle_stream_event(tenant.organization_id, event, app_id)
+    finally:
+        reset_current_api_token(marker)
+
+
 @strawberry.type
 class _CoreSubscription:
     """Subscriptions native to ``core``. Merged with per-app
@@ -48,70 +166,45 @@ class _CoreSubscription:
     file becoming a dumping ground."""
 
     @strawberry.subscription
+    @ws_identity
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
     async def astrolift_deployment_lifecycle_stream(
         self, info: Info, app_slug: str | None = None
     ) -> AsyncGenerator[DeploymentLifecycleEventType, None]:
-        """Push every Deployment status transition for the current
-        org (or for a single app when ``app_slug`` is given).
-
-        The resolver picks the right broker topic:
-          - org-wide: ``deployment.lifecycle.<org_id>``
-          - per-app:  ``deployment.lifecycle.app.<app_guid>``
-
-        Tenant resolution differs between transports:
-          - HTTP: ``TenantContextMiddleware`` set the contextvar
-            before the resolver runs.
-          - WS: the cookie-aware ASGI handler attached the resolved
-            tenant to ``info.context._ws_tenant``; we set the same
-            contextvar here so ``@tenant_scoped`` and the broker
-            topic key both pick up the right org.
-        """
+        """Stream transitions for permitted live deployments in the active org."""
         from asgiref.sync import sync_to_async
 
-        from astrolift_registry.models import RegisteredApp
+        from astrolift_identity.abac import RequestAttributes, current_attributes
+        from astrolift_identity.api_tokens import get_current_api_token
         from core.pubsub import subscribe
-        from core.tenancy import (
-            TenantContext,
-            get_current_tenant,
-            set_current_tenant,
-        )
-
-        # If we came in over WS, the cookie-aware handler stashed the
-        # tenant on the context. Pin it on the contextvar so the rest
-        # of the platform's tenant-aware code sees it.
-        ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
-        if ws_tenant is not None:
-            set_current_tenant(ws_tenant)
-        from core.schema.ws_auth import pin_ws_identity
-
-        pin_ws_identity(info.context)  # the bearer's scope ceiling (#1943)
+        from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        if org_id is None:
+        token = get_current_api_token()
+        attributes = current_attributes() or RequestAttributes(actor_user_id=tenant.actor_user_id)
+        if token is not None and token.organization_id != org_id:
             return
-
         topic = f"deployment.lifecycle.{org_id}"
+        app_id = None
         if app_slug:
-            app_guid = await sync_to_async(
-                lambda: (
-                    RegisteredApp.objects.filter(organization_id=org_id, slug=app_slug)
-                    .values_list("guid", flat=True)
-                    .first()
-                )
-            )()
-            if app_guid is None:
+            target = await sync_to_async(_lifecycle_stream_app)(org_id, app_slug)
+            if target is None:
                 return
+            app_id, app_guid = target
             topic = f"deployment.lifecycle.app.{app_guid}"
 
-        async for event in subscribe(topic):
-            yield DeploymentLifecycleEventType(
-                deployment_id=event.get("deployment_id", ""),
-                registered_app_slug=event.get("registered_app_slug", ""),
-                environment_name=event.get("environment_name", ""),
-                status=event.get("status", ""),
-                occurred_at=event.get("occurred_at", ""),
-            )
+        inner = subscribe(topic)
+        try:
+            async for event in inner:
+                payload = await sync_to_async(_lifecycle_event_for_identity)(
+                    tenant, token, event, app_id, attributes
+                )
+                if payload is not None:
+                    yield DeploymentLifecycleEventType(**payload)
+        finally:
+            await inner.aclose()
 
     @strawberry.subscription
     async def notification_received(self, info: Info) -> AsyncGenerator[str, None]:

@@ -45,35 +45,60 @@ interface RunsResp {
  */
 export function useOps() {
   const clusters = useQuery<ClustersResp>(LIST_CLUSTERS, {
+    fetchPolicy: "cache-and-network",
     pollInterval: 60000,
   });
   const metrics = useQuery<MetricsResp>(GET_DEPLOYMENT_METRICS, {
     variables: { windowDays: 1 },
+    fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
   const alerts = useQuery<AlertsResp>(LIST_ALERT_EVENTS, {
     variables: { unresolvedOnly: true, limit: 10 },
+    fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
   const audit = useQuery<AuditResp>(LIST_AUDIT_EVENTS, {
     variables: { limit: 10 },
+    fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
   const runs = useQuery<RunsResp>(LIST_WORKFLOW_RUNS, {
     variables: { limit: 5 },
+    fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
 
   return {
     clusters: clusters.data?.astroliftClusters ?? [],
-    clustersLoading: clusters.loading,
+    clustersLoading: clusters.loading && !clusters.data,
+    clustersError: clusters.data ? null : (clusters.error ?? null),
+    onRetryClusters: () => {
+      void clusters.refetch().catch(() => {});
+    },
     metrics: metrics.data?.astroliftDeploymentMetrics,
-    metricsLoading: metrics.loading,
+    metricsLoading: metrics.loading && !metrics.data,
+    metricsError: metrics.data ? null : (metrics.error ?? null),
+    onRetryMetrics: () => {
+      void metrics.refetch().catch(() => {});
+    },
     alerts: alerts.data?.astroliftAlertEvents ?? [],
-    alertsLoading: alerts.loading,
+    alertsLoading: alerts.loading && !alerts.data,
+    alertsError: alerts.data ? null : (alerts.error ?? null),
+    onRetryAlerts: () => {
+      void alerts.refetch().catch(() => {});
+    },
     audit: audit.data?.astroliftAuditEvents ?? [],
-    auditLoading: audit.loading,
+    auditLoading: audit.loading && !audit.data,
+    auditError: audit.data ? null : (audit.error ?? null),
+    onRetryAudit: () => {
+      void audit.refetch().catch(() => {});
+    },
     runs: runs.data?.astroliftWorkflowRuns ?? [],
-    runsLoading: runs.loading,
+    runsLoading: runs.loading && !runs.data,
+    runsError: runs.data ? null : (runs.error ?? null),
+    onRetryRuns: () => {
+      void runs.refetch().catch(() => {});
+    },
   };
 }

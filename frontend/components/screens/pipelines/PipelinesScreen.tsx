@@ -13,6 +13,7 @@ import Link from "next/link";
 import type * as React from "react";
 
 import type { Column } from "@/components/data-table";
+import { Can } from "@/components/Can";
 import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,11 +96,13 @@ export function PipelinesScreen({ tab, onTabChange, pipelinesTab, runsTab }: Pip
           ))}
         </div>
         {tab === "pipelines" && (
-          <Button asChild size="sm">
-            <Link href="/pipelines/new">
-              <PlusIcon className="mr-1 size-4" /> New Pipeline
-            </Link>
-          </Button>
+          <Can permission="app.update" loading={null}>
+            <Button asChild size="sm">
+              <Link href="/pipelines/new">
+                <PlusIcon className="mr-1 size-4" /> New Pipeline
+              </Link>
+            </Button>
+          </Can>
         )}
       </div>
 

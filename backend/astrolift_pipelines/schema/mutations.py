@@ -14,17 +14,24 @@ from astrolift_pipelines.cancellation import cancel_pipeline_run as cascade_canc
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
 from astrolift_pipelines.schema.types import (
     PipelineRunType,
+    PipelineSecretChangeType,
     PipelineType,
     TriggerType,
     pipeline_run_to_type,
     pipeline_to_type,
     trigger_to_type,
 )
-from astrolift_pipelines.scopes import pipeline_app_scope, pipeline_creation_scope, pipeline_run_app_scope
+from astrolift_pipelines.scopes import (
+    live_secret_pipelines,
+    pipeline_app_scope,
+    pipeline_creation_scope,
+    pipeline_run_app_scope,
+    pipeline_secret_scope,
+)
 from astrolift_workflows.client import start_workflow
 from core.decorators import tenant_scoped
-from core.mutations import ErrorCode
-from core.permissions import Permission, require_permission
+from core.mutations import ErrorCode, mutation_audit
+from core.permissions import Permission, PermissionDenied, require_permission
 from core.tenancy import get_current_tenant
 
 # ---------------------------------------------------------------------------
@@ -55,6 +62,63 @@ class CreateTriggerInput:
     config: str = "{}"
 
 
+@strawberry.input
+class SetPipelineSecretInput:
+    pipeline_id: GUID
+    name: str
+    value: str
+
+
+@strawberry.input
+class DeletePipelineSecretInput:
+    pipeline_id: GUID
+    name: str
+
+
+_SECRET_WRITE_PERMISSIONS = (Permission.PIPELINE_SECRET_MANAGE, Permission.SECRET_WRITE)
+_SECRET_WRITE_SCOPE = pipeline_secret_scope("input.pipeline_id", permissions=_SECRET_WRITE_PERMISSIONS)
+
+
+def _change_secret(info, input, *, delete=False):
+    from astrolift_pipelines.pipeline_secrets import (
+        delete_pipeline_secret,
+        set_pipeline_secret,
+        validate_secret_name,
+    )
+
+    try:
+        with transaction.atomic():
+            tenant = get_current_tenant()
+            pipeline = (
+                live_secret_pipelines(
+                    Pipeline.objects.select_for_update(of=("self",)),
+                    organization_id=tenant.organization_id,
+                )
+                .filter(guid=str(input.pipeline_id))
+                .first()
+            )
+            if pipeline is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "Pipeline is unavailable")
+            # The entry gate ran before acquiring the row lock. Recheck the
+            # current owner so an intervening app association cannot widen it.
+            require_permission(*_SECRET_WRITE_PERMISSIONS, scope=_SECRET_WRITE_SCOPE)(
+                lambda info, input: None
+            )(info, input=input)
+            try:
+                name = validate_secret_name(pipeline, input.name)
+            except ValueError as exc:
+                return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="name")
+            if delete:
+                delete_pipeline_secret(pipeline, name)
+            else:
+                set_pipeline_secret(pipeline, name, input.value)
+            return gql_success(PipelineSecretChangeType(pipeline_id=GUID(str(pipeline.guid)), name=name))
+    except PermissionDenied:
+        raise
+    except Exception:  # noqa: BLE001 — backend errors may contain the submitted secret
+        return gql_failure(ErrorCode.INTERNAL.value, "Could not update pipeline secret")
+
+
 # ---------------------------------------------------------------------------
 # Root mutation type
 # ---------------------------------------------------------------------------
@@ -64,6 +128,24 @@ _VALID_TRIGGER_KINDS = {k.value for k in Trigger.Kind}
 
 @strawberry.type
 class PipelinesMutation:
+    @strawberry.field
+    @mutation_audit(action="pipeline.secret.set")
+    @require_permission(*_SECRET_WRITE_PERMISSIONS, scope=_SECRET_WRITE_SCOPE)
+    @tenant_scoped()
+    def set_pipeline_secret(
+        self, info: Info, input: SetPipelineSecretInput
+    ) -> MutationResultType[PipelineSecretChangeType]:
+        return _change_secret(info, input)
+
+    @strawberry.field
+    @mutation_audit(action="pipeline.secret.delete")
+    @require_permission(*_SECRET_WRITE_PERMISSIONS, scope=_SECRET_WRITE_SCOPE)
+    @tenant_scoped()
+    def delete_pipeline_secret(
+        self, info: Info, input: DeletePipelineSecretInput
+    ) -> MutationResultType[PipelineSecretChangeType]:
+        return _change_secret(info, input, delete=True)
+
     @strawberry.field
     @require_permission(Permission.APP_UPDATE, scope=pipeline_creation_scope)
     @tenant_scoped()

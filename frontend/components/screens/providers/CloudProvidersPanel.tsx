@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { CheckCircle2Icon, ChevronDownIcon, ChevronRightIcon, CloudIcon } from "lucide-react";
 import * as React from "react";
 
@@ -34,6 +36,8 @@ function driversOf(p: AstroliftProviderPlugin): string[] {
  */
 export function CloudProvidersPanelView({
   loading,
+  error,
+  onRetry,
   pluginCount,
   configured,
   available,
@@ -56,7 +60,9 @@ export function CloudProvidersPanelView({
         {pluginCount > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
       </div>
 
-      {loading ? (
+      {error ? (
+        <QueryError title="Could not load cloud providers" error={error} onRetry={onRetry} />
+      ) : loading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-44 w-full" />
           <Skeleton className="h-44 w-full" />

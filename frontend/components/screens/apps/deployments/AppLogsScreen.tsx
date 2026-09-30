@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import {
   AlertTriangleIcon,
   BoxIcon,
@@ -70,6 +72,8 @@ export function AppLogsScreen({
   slug,
   app: a,
   loading,
+  appError,
+  onRetryApp,
   streaming,
   toggleStreaming,
   lines,
@@ -111,6 +115,13 @@ export function AppLogsScreen({
     );
   }
 
+  if (!a && appError) {
+    return (
+      <PageShell title="App logs">
+        <QueryError title="Could not load app" error={appError} onRetry={onRetryApp} />
+      </PageShell>
+    );
+  }
   if (!a) {
     return (
       <PageShell title={tCommon("notFound")}>

@@ -30,12 +30,15 @@ export const Empty: Story = {
   render: () => <PipelineSecretsView {...secretsProps({ secrets: [] })} />,
 };
 
-/**
- * The secrets query surfaces no error state here: a failed fetch renders as
- * the empty list. A failed delete shows inline in the confirm dialog.
- */
 export const ErrorState: Story = {
-  render: () => <PipelineSecretsView {...secretsProps({ secrets: [] })} />,
+  render: () => (
+    <PipelineSecretsView
+      {...secretsProps({
+        secrets: [],
+        error: { name: "Error", message: "Permission denied while loading this section" },
+      })}
+    />
+  ),
 };
 
 /** A delete in flight: every row's delete action is disabled. */

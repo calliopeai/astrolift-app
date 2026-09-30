@@ -48,13 +48,13 @@ export function useCommandRunner(slug: string) {
     skip: !workloadSlug,
   });
   const containerList = containers.data?.astroliftContainers ?? [];
-  const [containerName, setContainerName] = React.useState("");
-  React.useEffect(() => {
-    if (!containerName && containerList.length > 0) {
-      const primary = containerList.find((c) => c.isPrimary) ?? containerList[0];
-      setContainerName(primary.name);
-    }
-  }, [containerName, containerList]);
+  const [containerChoice, setContainerChoice] = React.useState({ workloadSlug: "", name: "" });
+  const containerName =
+    containerChoice.workloadSlug === workloadSlug &&
+    containerList.some((c) => c.name === containerChoice.name)
+      ? containerChoice.name
+      : ((containerList.find((c) => c.isPrimary) ?? containerList[0])?.name ?? "");
+  const setContainerName = (name: string) => setContainerChoice({ workloadSlug, name });
 
   const [command, setCommand] = React.useState("");
   const [output, setOutput] = React.useState<OutputChunk[]>([]);

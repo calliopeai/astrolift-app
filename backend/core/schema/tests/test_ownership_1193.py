@@ -116,7 +116,7 @@ def test_profile_image_upload_denies_other_users_profile():
 
 @pytest.mark.django_db
 def test_profile_image_upload_owner_allowed():
-    user_a = User.objects.create_user(username="p1193-o", email="p1193o@t.local")
+    _, user_a = _org_user("p1193-o")
     # Force the whitelisted (non-approval) path and stub the actual save so the
     # test isolates the ownership gate from the draft/approval + S3 machinery.
     with (

@@ -586,6 +586,10 @@ CONSTANCE_CONFIG = {
         "Organizations may turn on the Chat Studio integration module (shipping apps "
         "through the builder API). Off forces the module off for every organization.",
     ),
+    "AGENT_POLICY_ENFORCEMENT_ALLOWED": (
+        True,
+        "Organizations may explicitly enable agent policy enforcement. Otherwise agent policies only record observations.",
+    ),
     "AGENT_LIVE_ATTACH_ALLOWED": (
         True,
         "Organizations may turn on live attach to running agents. Off forces the module "
@@ -829,6 +833,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "fields": (
             "CHAT_STUDIO_INTEGRATION_ALLOWED",
             "AGENT_LIVE_ATTACH_ALLOWED",
+            "AGENT_POLICY_ENFORCEMENT_ALLOWED",
             "CHAT_STUDIO_AGENT_RUNS_ALLOWED",
         ),
         "collapse": False,

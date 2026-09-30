@@ -10,6 +10,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from strawberry.types import Info
 
+from astrolift_agents.scopes import agent_box_scope
 from astrolift_graphql import (
     GUID,
     PageType,
@@ -21,8 +22,7 @@ from astrolift_graphql import (
 )
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_identity.operation_context import deployment_operation, named_environment, row_operation
-from astrolift_identity.operation_visibility import require_app_collection_scope, visible_operation_rows
-from astrolift_identity.scope_visibility import visible_apps
+from astrolift_identity.operation_visibility import require_app_collection_scope
 from astrolift_lifecycle.models import (
     AgentRun,
     AppEnvironment,
@@ -35,6 +35,7 @@ from astrolift_lifecycle.models import (
     ScheduledJobRun,
     TaskRun,
 )
+from astrolift_lifecycle.run_log_api import historical_log_operation, historical_log_scope
 from astrolift_lifecycle.schema.list_contract import (
     COMMAND_RUNS_FILTERS,
     DEPLOYMENTS_DEFAULT_SORT,
@@ -72,6 +73,8 @@ from astrolift_lifecycle.schema.types import (
     DeploymentComparisonType,
     DeploymentLogEntryType,
     DeploymentMetricsType,
+    DeploymentRunLogDownloadType,
+    DeploymentRunLogPageType,
     DeploymentType,
     DeployTokenType,
     DeregisterPreviewType,
@@ -106,6 +109,14 @@ from astrolift_lifecycle.scopes import (
     deployment_app_scope,
     scheduled_job_run_app_scope,
     task_run_app_scope,
+)
+from astrolift_lifecycle.visibility import (
+    cluster_owned_and_live,
+    historical_deployment_rows,
+    live_app_rows,
+    live_lifecycle_rows,
+    visible_apps,
+    visible_operation_rows,
 )
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
@@ -204,7 +215,8 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
     ``app.read_logs``.
     """
     app = (
-        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        live_app_rows(RegisteredApp.objects.all(), org_id=org_id)
+        .select_related("organization", "default_tenant_cluster")
         .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .first()
     )
@@ -215,7 +227,8 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
     namespace = namespace_for_app(app)
     if environment_name:
         env = (
-            AppEnvironment.objects.select_related("tenant_cluster")
+            live_lifecycle_rows(AppEnvironment.objects.all(), org_id=org_id)
+            .select_related("tenant_cluster")
             .filter(
                 registered_app=app,
                 name=environment_name,
@@ -223,13 +236,18 @@ def _list_pods_for_app(app_slug: str, *, org_id: int | None, environment_name: s
             )
             .first()
         )
+        if (
+            env is None
+            and AppEnvironment.all_objects.filter(registered_app=app, name=environment_name).exists()
+        ):
+            return []
         cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
         if cluster is not None:
             # The environment's own namespace when it has one (#1922).
             namespace = namespace_for_environment(env)
     if cluster is None:
         cluster = app.default_tenant_cluster
-    if cluster is None or not getattr(cluster, "is_active", True):
+    if not cluster_owned_and_live(cluster, org_id):
         return []
 
     try:
@@ -277,7 +295,7 @@ def _list_pods_for_box(box_slug: str, *, org_id: int | None) -> list:
         cluster = resolve_agent_cluster(box.organization)
     except Exception:  # noqa: BLE001 — an org with no agent cluster has no pods
         return []
-    if cluster is None or not getattr(cluster, "is_active", True):
+    if not cluster_owned_and_live(cluster, org_id):
         return []
 
     try:
@@ -313,7 +331,8 @@ def _recent_pod_warnings_for_app(
     without inline error chips rather than 502ing the whole list.
     """
     app = (
-        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        live_app_rows(RegisteredApp.objects.all(), org_id=org_id)
+        .select_related("organization", "default_tenant_cluster")
         .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .first()
     )
@@ -324,7 +343,8 @@ def _recent_pod_warnings_for_app(
     namespace = namespace_for_app(app)
     if environment_name:
         env = (
-            AppEnvironment.objects.select_related("tenant_cluster")
+            live_lifecycle_rows(AppEnvironment.objects.all(), org_id=org_id)
+            .select_related("tenant_cluster")
             .filter(
                 registered_app=app,
                 name=environment_name,
@@ -332,12 +352,17 @@ def _recent_pod_warnings_for_app(
             )
             .first()
         )
+        if (
+            env is None
+            and AppEnvironment.all_objects.filter(registered_app=app, name=environment_name).exists()
+        ):
+            return {}
         cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
         if cluster is not None:
             namespace = namespace_for_environment(env)
     if cluster is None:
         cluster = app.default_tenant_cluster
-    if cluster is None or not getattr(cluster, "is_active", True):
+    if not cluster_owned_and_live(cluster, org_id):
         return {}
 
     from core.cluster_observability import (
@@ -485,14 +510,18 @@ def _deployments_qs(
     # Fails closed (empty) when org_id is None (#1183).
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
-    qs = Deployment.objects.select_related("registered_app", "app_environment", "workload").filter(
-        # Deregistered / torn-down apps are soft-deleted; their
-        # deployment rows aren't, so without this they'd keep showing
-        # in the list. Single-deployment + approval-history queries are
-        # id-scoped (a direct link the operator already has), so they
-        # intentionally stay fetchable and don't need this filter.
-        registered_app__deleted_at__isnull=True,
-        registered_app__organization_id=org_id,
+    qs = (
+        live_lifecycle_rows(Deployment.objects.all())
+        .select_related("registered_app", "app_environment", "workload")
+        .filter(
+            # Deregistered / torn-down apps are soft-deleted; their
+            # deployment rows aren't, so without this they'd keep showing
+            # in the list. Single-deployment + approval-history queries are
+            # id-scoped (a direct link the operator already has), so they
+            # intentionally stay fetchable and don't need this filter.
+            registered_app__deleted_at__isnull=True,
+            registered_app__organization_id=org_id,
+        )
     )
     if app_slug:
         qs = qs.filter(registered_app__slug=app_slug)
@@ -554,9 +583,11 @@ def _scheduled_job_runs_qs(
     # (#801, #1118).
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
-    qs = ScheduledJobRun.objects.select_related(
-        "workload", "workload__registered_app", "app_environment"
-    ).filter(workload__registered_app__organization_id=org_id)
+    qs = (
+        live_lifecycle_rows(ScheduledJobRun.objects.all())
+        .select_related("workload", "workload__registered_app", "app_environment")
+        .filter(workload__registered_app__organization_id=org_id)
+    )
     if app_slug:
         qs = qs.filter(workload__registered_app__slug=app_slug)
     if workload_slug:
@@ -591,8 +622,10 @@ def _command_runs_qs(*, app_slug: str | None, search: str | None = None):
     # unconditionally so a null org matches nothing (#1183).
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
-    qs = CommandRun.objects.select_related("registered_app", "workload", "invoked_by").filter(
-        registered_app__organization_id=org_id
+    qs = (
+        live_lifecycle_rows(CommandRun.objects.all())
+        .select_related("registered_app", "workload", "invoked_by")
+        .filter(registered_app__organization_id=org_id)
     )
     if app_slug:
         qs = qs.filter(registered_app__slug=app_slug)
@@ -626,16 +659,20 @@ def _preview_environments_qs(
     # org via registered_app). Fails closed when org_id is None (#1183).
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
-    qs = PreviewEnvironment.objects.select_related(
-        "registered_app",
-        "registered_app__organization",
-        "registered_app__default_tenant_cluster",
-        "app_environment__tenant_cluster",
-        # ``pinned_by_email`` on the type joins to the actor who placed
-        # the pin (#1399); without this the page fans out one extra
-        # query per pinned row.
-        "pinned_by",
-    ).filter(registered_app__organization_id=org_id)
+    qs = (
+        live_lifecycle_rows(PreviewEnvironment.objects.all())
+        .select_related(
+            "registered_app",
+            "registered_app__organization",
+            "registered_app__default_tenant_cluster",
+            "app_environment__tenant_cluster",
+            # ``pinned_by_email`` on the type joins to the actor who placed
+            # the pin (#1399); without this the page fans out one extra
+            # query per pinned row.
+            "pinned_by",
+        )
+        .filter(registered_app__organization_id=org_id)
+    )
     if app_slug:
         qs = qs.filter(registered_app__slug=app_slug)
     if statuses:
@@ -671,10 +708,14 @@ def _app_deploy_tokens_qs(*, app_slug: str, search: str | None = None):
     # when org_id is None (#1183).
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
-    qs = DeployToken.objects.select_related("registered_app").filter(
-        registered_app__slug=app_slug,
-        registered_app__organization_id=org_id,
-        deleted_at__isnull=True,
+    qs = (
+        live_lifecycle_rows(DeployToken.objects.all())
+        .select_related("registered_app")
+        .filter(
+            registered_app__slug=app_slug,
+            registered_app__organization_id=org_id,
+            deleted_at__isnull=True,
+        )
     )
     if search:
         qs = qs.filter(
@@ -710,12 +751,16 @@ def _task_runs_qs(
     # Applied unconditionally so a null org matches nothing (#1183).
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
-    qs = TaskRun.objects.select_related(
-        "workload",
-        "workload__registered_app",
-        "app_environment",
-        "triggered_by_user",
-    ).filter(workload__registered_app__organization_id=org_id)
+    qs = (
+        live_lifecycle_rows(TaskRun.objects.all())
+        .select_related(
+            "workload",
+            "workload__registered_app",
+            "app_environment",
+            "triggered_by_user",
+        )
+        .filter(workload__registered_app__organization_id=org_id)
+    )
     if app_slug:
         qs = qs.filter(workload__registered_app__slug=app_slug)
     if workload_slug:
@@ -761,12 +806,16 @@ def _agent_runs_qs(
     """
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
-    qs = AgentRun.objects.select_related(
-        "workload",
-        "workload__registered_app",
-        "app_environment",
-        "triggered_by_user",
-    ).filter(workload__registered_app__organization_id=org_id)
+    qs = (
+        live_lifecycle_rows(AgentRun.objects.all())
+        .select_related(
+            "workload",
+            "workload__registered_app",
+            "app_environment",
+            "triggered_by_user",
+        )
+        .filter(workload__registered_app__organization_id=org_id)
+    )
     if app_slug:
         qs = qs.filter(workload__registered_app__slug=app_slug)
     if workload_slug:
@@ -834,7 +883,8 @@ class LifecycleQuery:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         qs = (
-            AppEnvironment.objects.select_related(
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related(
                 "registered_app", "tenant_cluster", "tenant_cluster__provider_plugin", "managed_domain"
             )
             .prefetch_related("settings")
@@ -873,7 +923,8 @@ class LifecycleQuery:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         qs = (
-            AppEnvironment.objects.select_related(
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .select_related(
                 "registered_app", "tenant_cluster", "tenant_cluster__provider_plugin", "managed_domain"
             )
             .prefetch_related("settings")
@@ -985,7 +1036,9 @@ class LifecycleQuery:
 
     @strawberry.field
     @require_permission(
-        Permission.APP_READ, scope=deployment_app_scope("id"), operation=deployment_operation("id")
+        Permission.APP_READ,
+        scope=deployment_app_scope("id", permission=Permission.APP_READ),
+        operation=deployment_operation("id"),
     )
     @tenant_scoped()
     def astrolift_deployment(self, info: Info, id: str) -> DeploymentType | None:
@@ -1006,7 +1059,8 @@ class LifecycleQuery:
         if org_id is None:
             return None
         d = (
-            Deployment.objects.select_related("registered_app", "app_environment", "workload")
+            historical_deployment_rows(Deployment.objects.all())
+            .select_related("registered_app", "app_environment", "workload")
             .filter(guid=id, registered_app__organization_id=org_id)
             .first()
         )
@@ -1015,7 +1069,7 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=deployment_app_scope("deployment_id"),
+        scope=deployment_app_scope("deployment_id", permission=Permission.APP_READ),
         operation=deployment_operation("deployment_id"),
     )
     @tenant_scoped()
@@ -1053,9 +1107,8 @@ class LifecycleQuery:
         if org_id is None:
             return []
         deployment = (
-            Deployment.objects.filter(
-                guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=org_id
-            )
+            historical_deployment_rows(Deployment.objects.all())
+            .filter(guid=deployment_id, deleted_at__isnull=True, registered_app__organization_id=org_id)
             .only("id", "guid", "aborted_reason")
             .first()
         )
@@ -1105,7 +1158,7 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ,
-        scope=deployment_app_scope("deployment_id"),
+        scope=deployment_app_scope("deployment_id", permission=Permission.APP_READ),
         operation=deployment_operation("deployment_id"),
     )
     @tenant_scoped()
@@ -1124,7 +1177,8 @@ class LifecycleQuery:
         if org_id is None:
             return None
         deployment = (
-            Deployment.objects.select_related(
+            historical_deployment_rows(Deployment.objects.all())
+            .select_related(
                 "registered_app",
                 "registered_app__organization",
                 "app_environment",
@@ -1144,7 +1198,8 @@ class LifecycleQuery:
         # one reaches running (#1103), so filtering on RUNNING alone found
         # nothing and broke release notes — include SUPERSEDED too.
         prior = (
-            Deployment.objects.filter(
+            historical_deployment_rows(Deployment.objects.all())
+            .filter(
                 registered_app=app,
                 app_environment=env,
                 status__in=[Deployment.Status.RUNNING, Deployment.Status.SUPERSEDED],
@@ -1197,9 +1252,11 @@ class LifecycleQuery:
         org_id = tenant.organization_id if tenant else None
 
         def _get_deploy(guid: str) -> Deployment | None:
-            qs = Deployment.objects.filter(
-                guid=guid, deleted_at__isnull=True, registered_app__organization_id=org_id
-            ).select_related("registered_app", "app_environment")
+            qs = (
+                live_lifecycle_rows(Deployment.objects.all())
+                .filter(guid=guid, deleted_at__isnull=True, registered_app__organization_id=org_id)
+                .select_related("registered_app", "app_environment")
+            )
             return visible_operation_rows(
                 qs, Permission.APP_READ, approvals_field="approvals_received"
             ).first()
@@ -1251,8 +1308,8 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ_LOGS,
-        scope=deployment_app_scope("deployment_id"),
-        operation=deployment_operation("deployment_id"),
+        scope=historical_log_scope,
+        operation=historical_log_operation,
     )
     @tenant_scoped()
     def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
@@ -1264,13 +1321,65 @@ class LifecycleQuery:
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
             return []
-        deployment = Deployment.objects.filter(
-            guid=deployment_id, registered_app__organization_id=org_id
-        ).first()
+        deployment = (
+            historical_deployment_rows(Deployment.objects.all())
+            .filter(guid=deployment_id, registered_app__organization_id=org_id)
+            .first()
+        )
         if deployment is None:
             return []
-        qs = DeploymentLog.objects.filter(deployment=deployment).order_by("occurred_at")
+        qs = DeploymentLog.objects.filter(deployment=deployment).exclude(status="").order_by("occurred_at")
         return [deployment_log_to_type(e) for e in qs[:1000]]
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=historical_log_scope,
+        operation=historical_log_operation,
+    )
+    @tenant_scoped()
+    def astrolift_deployment_run_log_page(
+        self,
+        info: Info,
+        deployment_id: str,
+        cursor: str | None = None,
+        limit: int = 100,
+    ) -> DeploymentRunLogPageType:
+        from astrolift_lifecycle.run_log_api import deployment_for_log, log_window
+
+        deployment = deployment_for_log(deployment_id)
+        if deployment is None:
+            return DeploymentRunLogPageType(
+                items=[], next_cursor=None, has_more=False, page_size=max(1, min(200, limit))
+            )
+        rows, next_cursor, more, page_size = log_window(deployment, cursor, limit)
+        return DeploymentRunLogPageType(
+            items=[deployment_log_to_type(row) for row in rows],
+            next_cursor=next_cursor,
+            has_more=more,
+            page_size=page_size,
+        )
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=historical_log_scope,
+        operation=historical_log_operation,
+    )
+    @tenant_scoped()
+    def astrolift_deployment_run_log_download(
+        self,
+        info: Info,
+        deployment_id: str,
+    ) -> DeploymentRunLogDownloadType | None:
+        from astrolift_lifecycle.run_log_api import deployment_for_log, download_text
+
+        deployment = deployment_for_log(deployment_id)
+        if deployment is None:
+            return None
+        return DeploymentRunLogDownloadType(
+            filename=f"deployment-{deployment.guid}.log", content=download_text(deployment)
+        )
 
     @strawberry.field(
         deprecation_reason=(
@@ -1340,7 +1449,7 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ_LOGS,
-        scope=scheduled_job_run_app_scope("id"),
+        scope=scheduled_job_run_app_scope("id", permission=Permission.APP_READ_LOGS),
         operation=row_operation(
             "astrolift_lifecycle.ScheduledJobRun", "id", app_path="app_environment__registered_app"
         ),
@@ -1359,7 +1468,8 @@ class LifecycleQuery:
         if org_id is None:
             return None
         r = (
-            ScheduledJobRun.objects.select_related("workload", "workload__registered_app", "app_environment")
+            live_lifecycle_rows(ScheduledJobRun.objects.all())
+            .select_related("workload", "workload__registered_app", "app_environment")
             .filter(guid=id, workload__registered_app__organization_id=org_id)
             .first()
         )
@@ -1368,7 +1478,9 @@ class LifecycleQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftCommandRunsPage.")
     )
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ_LOGS)
+    )
     @tenant_scoped()
     def astrolift_command_runs(
         self,
@@ -1380,7 +1492,9 @@ class LifecycleQuery:
         return [command_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ_LOGS)
+    )
     @tenant_scoped()
     def astrolift_command_runs_page(
         self,
@@ -1412,7 +1526,9 @@ class LifecycleQuery:
         return page.map(command_run_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=command_run_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=command_run_app_scope("id", permission=Permission.APP_READ_LOGS)
+    )
     @tenant_scoped()
     def astrolift_command_run(self, info: Info, id: str) -> CommandRunType | None:
         """Single command (one-off exec) run by guid, for cold detail
@@ -1423,7 +1539,8 @@ class LifecycleQuery:
         if org_id is None:
             return None
         r = (
-            CommandRun.objects.select_related("registered_app", "workload", "invoked_by")
+            live_lifecycle_rows(CommandRun.objects.all())
+            .select_related("registered_app", "workload", "invoked_by")
             .filter(guid=id, registered_app__organization_id=org_id)
             .first()
         )
@@ -1548,10 +1665,12 @@ class LifecycleQuery:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         visible_app_ids = visible_apps(
-            RegisteredApp.objects.filter(organization_id=org_id, deleted_at__isnull=True),
+            live_app_rows(RegisteredApp.objects.all()).filter(
+                organization_id=org_id, deleted_at__isnull=True
+            ),
             Permission.APP_READ,
         ).values_list("id", flat=True)
-        qs = Deployment.objects.filter(
+        qs = live_lifecycle_rows(Deployment.objects.all()).filter(
             created_at__gte=since,
             deleted_at__isnull=True,
             registered_app_id__in=visible_app_ids,
@@ -1653,7 +1772,9 @@ class LifecycleQuery:
         org_id = tenant.organization_id if tenant else None
         apps = list(
             visible_apps(
-                RegisteredApp.objects.filter(deleted_at__isnull=True, organization_id=org_id),
+                live_app_rows(RegisteredApp.objects.all()).filter(
+                    deleted_at__isnull=True, organization_id=org_id
+                ),
                 Permission.APP_READ,
             ).order_by("slug")[:300]
         )
@@ -1684,7 +1805,9 @@ class LifecycleQuery:
         # annotations on the app queryset so the counts can't multiply
         # against each other across joins.
         visible_environments = visible_operation_rows(
-            AppEnvironment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True),
+            live_lifecycle_rows(AppEnvironment.objects.all()).filter(
+                registered_app_id__in=app_ids, deleted_at__isnull=True
+            ),
             Permission.APP_READ,
             environment_path="self",
         )
@@ -1692,6 +1815,7 @@ class LifecycleQuery:
             Deployment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True),
             Permission.APP_READ,
             approvals_field="approvals_received",
+            historical=True,
         )
         env_counts = dict(
             visible_environments.values_list("registered_app_id")
@@ -1737,7 +1861,9 @@ class LifecycleQuery:
         return out
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_domains(
         self,
@@ -1750,7 +1876,8 @@ class LifecycleQuery:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         qs = (
-            CustomDomain.objects.select_related("registered_app")
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .select_related("registered_app")
             .filter(
                 registered_app__slug=app_slug,
                 registered_app__organization_id=org_id,
@@ -1773,7 +1900,9 @@ class LifecycleQuery:
         return [app_domain_to_type(d, cluster=cluster) for d in domains]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ_LOGS)
+    )
     @tenant_scoped()
     def astrolift_app_pods(
         self,
@@ -1812,7 +1941,9 @@ class LifecycleQuery:
         return [pod_info_to_type(p, recent_error_event=_event_to_type(warnings.get(p.name))) for p in pods]
 
     @strawberry.field
-    @require_permission(Permission.AGENT_BOX_ATTACH)
+    @require_permission(
+        Permission.AGENT_BOX_ATTACH, scope=agent_box_scope("slug", permission=Permission.AGENT_BOX_ATTACH)
+    )
     @tenant_scoped()
     def agent_box_pods(self, info: Info, slug: str) -> list[AppPodType]:
         """Live pods for an agent box (#129).
@@ -1835,10 +1966,20 @@ class LifecycleQuery:
         """
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
+        from astrolift_agents.visibility import agent_boxes
+
+        if (
+            not agent_boxes(org_id, Permission.AGENT_BOX_ATTACH)
+            .filter(organization_id=org_id, slug=slug)
+            .exists()
+        ):
+            return []
         return [pod_info_to_type(p) for p in _list_pods_for_box(slug, org_id=org_id)]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ_LOGS)
+    )
     @tenant_scoped()
     def astrolift_workload_pod_status_breakdown(
         self,
@@ -1881,7 +2022,9 @@ class LifecycleQuery:
             "Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage."
         )
     )
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_deploy_tokens(
         self,
@@ -1892,7 +2035,9 @@ class LifecycleQuery:
         return [deploy_token_to_type(t) for t in qs]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_deploy_tokens_page(
         self,
@@ -1952,7 +2097,9 @@ class LifecycleQuery:
     # so the single ``except NotImplementedError`` catches both.
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_dns_records(
         self,
@@ -1983,9 +2130,11 @@ class LifecycleQuery:
         # the driver returns the whole resolved zone (unchanged behavior).
         from astrolift_observability.url_resolution import resolved_public_host
 
-        app = RegisteredApp.objects.filter(
-            slug=app_slug, organization_id=org_id, deleted_at__isnull=True
-        ).first()
+        app = (
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            .first()
+        )
         app_host = resolved_public_host(app) if app is not None else None
         try:
             records = driver.list_records_for_app(app_slug, app_host=app_host)
@@ -1999,7 +2148,9 @@ class LifecycleQuery:
         return AppDnsRecordsResult(reason=reason, records=out)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_certificates(
         self,
@@ -2026,7 +2177,8 @@ class LifecycleQuery:
         # which is what ``resolved_public_host`` returns. No host ⇒ the
         # app has no public URL to hold a cert ⇒ not configured.
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -2052,7 +2204,9 @@ class LifecycleQuery:
         return AppCertificatesResult(reason=reason, certificates=out)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
     @tenant_scoped()
     def astrolift_app_identity_binding(
         self,
@@ -2110,7 +2264,9 @@ class LifecycleQuery:
     # business previewing the destructive list.
 
     @strawberry.field
-    @require_permission(Permission.APP_DELETE, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_DELETE, scope=app_scope_by_slug("app_slug", permission=Permission.APP_DELETE)
+    )
     @tenant_scoped()
     def preview_astrolift_deregister(
         self,
@@ -2145,7 +2301,8 @@ class LifecycleQuery:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -2154,10 +2311,12 @@ class LifecycleQuery:
 
         # ---- k8s objects across every active env+cluster pair --------
         envs = list(
-            AppEnvironment.objects.filter(
+            live_lifecycle_rows(AppEnvironment.objects.all())
+            .filter(
                 registered_app=app,
                 deleted_at__isnull=True,
-            ).select_related("tenant_cluster"),
+            )
+            .select_related("tenant_cluster"),
         )
         workloads = list(
             Workload.objects.filter(
@@ -2271,7 +2430,7 @@ class LifecycleQuery:
         # is intentionally None on the preview type so the FE can render
         # token rows under a flat "all environments" header.
         token_rows = list(
-            DeployToken.objects.filter(
+            live_lifecycle_rows(DeployToken.objects.all()).filter(
                 registered_app=app,
                 deleted_at__isnull=True,
             ),
@@ -2305,7 +2464,7 @@ class LifecycleQuery:
         identity_roles: list[DeregisterPreviewIdentityRoleType] = []
         for env in envs:
             cluster = env.tenant_cluster
-            if cluster is None or not getattr(cluster, "is_active", True):
+            if not cluster_owned_and_live(cluster, org_id):
                 continue
             try:
                 driver = driver_for_capability(cluster, "identity")
@@ -2366,7 +2525,7 @@ class LifecycleQuery:
     @require_permission(
         Permission.APP_DEPLOY,
         Permission.APP_UPDATE,
-        scope=app_scope_by_slug("app_slug"),
+        scope=app_scope_by_slug("app_slug", permission=Permission.APP_DEPLOY),
         operation=named_environment("app_slug", "environment_name", all_if_absent=True),
     )
     @tenant_scoped()
@@ -2390,7 +2549,8 @@ class LifecycleQuery:
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         app = (
-            RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
+            live_app_rows(RegisteredApp.objects.all())
+            .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             .select_related("organization")
             .first()
         )
@@ -2398,7 +2558,8 @@ class LifecycleQuery:
             return None
 
         qs = (
-            Deployment.objects.filter(
+            live_lifecycle_rows(Deployment.objects.all())
+            .filter(
                 registered_app=app,
                 status__in=_IN_FLIGHT_STATUSES,
                 deleted_at__isnull=True,
@@ -2513,10 +2674,8 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ_LOGS,
-        scope=task_run_app_scope("id"),
-        operation=row_operation(
-            "astrolift_lifecycle.TaskRun", "id", app_path="app_environment__registered_app"
-        ),
+        scope=task_run_app_scope("id", permission=Permission.APP_READ_LOGS),
+        operation=row_operation("astrolift_lifecycle.TaskRun", "id", app_path="workload__registered_app"),
     )
     @tenant_scoped()
     def astrolift_task_run(self, info: Info, id: str) -> TaskRunType | None:
@@ -2533,7 +2692,8 @@ class LifecycleQuery:
         if org_id is None:
             return None
         r = (
-            TaskRun.objects.select_related(
+            live_lifecycle_rows(TaskRun.objects.all())
+            .select_related(
                 "workload",
                 "workload__registered_app",
                 "app_environment",
@@ -2625,7 +2785,8 @@ def _preview_deploy_failure_reasons(previews) -> dict[int, str]:
     if not wanted:
         return {}
     latest = (
-        Deployment.objects.filter(app_environment_id__in=list(wanted), deleted_at__isnull=True)
+        live_lifecycle_rows(Deployment.objects.all())
+        .filter(app_environment_id__in=list(wanted), deleted_at__isnull=True)
         .order_by("app_environment_id", "-created_at")
         .distinct("app_environment_id")
     )
@@ -2665,7 +2826,7 @@ def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnviro
         cluster = p.registered_app.default_tenant_cluster
 
     pods: list = []
-    if cluster is not None and getattr(cluster, "is_active", True):
+    if cluster_owned_and_live(cluster, p.registered_app.organization_id):
         try:
             pods = list(
                 list_app_pods(
@@ -2824,7 +2985,8 @@ def _resolve_app_cluster(*, app_slug: str, org_id: int | None, environment_name:
     short + the app/cluster lookup is testable without a strawberry
     Info object."""
     app = (
-        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        live_app_rows(RegisteredApp.objects.all(), org_id=org_id)
+        .select_related("organization", "default_tenant_cluster")
         .filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
         .first()
     )
@@ -2833,7 +2995,8 @@ def _resolve_app_cluster(*, app_slug: str, org_id: int | None, environment_name:
     cluster = None
     if environment_name:
         env = (
-            AppEnvironment.objects.select_related("tenant_cluster")
+            live_lifecycle_rows(AppEnvironment.objects.all(), org_id=org_id)
+            .select_related("tenant_cluster")
             .filter(
                 registered_app=app,
                 name=environment_name,
@@ -2841,9 +3004,14 @@ def _resolve_app_cluster(*, app_slug: str, org_id: int | None, environment_name:
             )
             .first()
         )
+        if (
+            env is None
+            and AppEnvironment.all_objects.filter(registered_app=app, name=environment_name).exists()
+        ):
+            return None
         cluster = env.tenant_cluster if env and env.tenant_cluster_id else None
     if cluster is None:
         cluster = app.default_tenant_cluster
-    if cluster is None or not getattr(cluster, "is_active", True):
+    if not cluster_owned_and_live(cluster, org_id):
         return None
     return cluster

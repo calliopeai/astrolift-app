@@ -22,7 +22,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from core.models.base import BaseCoreModel
@@ -245,6 +245,10 @@ class Deployment(BaseCoreModel):
     }
 
     def transition_to(self, new_status: Deployment.Status) -> None:
+        with transaction.atomic():
+            self._transition_to(new_status)
+
+    def _transition_to(self, new_status: Deployment.Status) -> None:
         current = Deployment.Status(self.status)
         allowed = self._TRANSITIONS.get(current, set())
         if new_status not in allowed:
@@ -281,44 +285,49 @@ class Deployment(BaseCoreModel):
             ]
         )
 
-        # Publish the lifecycle event to any active subscribers.
-        # In-process for now; multi-worker deployments swap the
-        # broker for Redis without touching this call site.
-        # Wrapped so a broker error never breaks a transition.
-        try:
-            from core.pubsub import publish_sync
-
-            event = {
-                "deployment_id": str(self.guid),
-                "registered_app_slug": (self.registered_app.slug if self.registered_app_id else ""),
-                "environment_name": (self.app_environment.name if self.app_environment_id else ""),
-                "status": self.status,
-                "occurred_at": now.isoformat(),
-            }
-            org_id = self.registered_app.organization_id if self.registered_app_id else None
-            if org_id is not None:
-                publish_sync(f"deployment.lifecycle.{org_id}", event)
-            if self.registered_app_id:
-                publish_sync(
-                    f"deployment.lifecycle.app.{self.registered_app.guid}",
-                    event,
-                )
-        except Exception:
-            import logging
-
-            logging.getLogger(__name__).warning("deployment.lifecycle publish failed", exc_info=True)
-
         # Append a log entry for every status transition so the deployment
         # detail page lifecycle log is non-empty and operators can audit
         # the exact times each phase was reached.
-        try:
-            from astrolift_lifecycle.models.deployment_log import DeploymentLog
+        from astrolift_lifecycle.models.deployment_log import DeploymentLog
 
-            DeploymentLog.objects.create(
-                deployment=self,
-                status=new_status.value,
-            )
-        except Exception:
-            import logging
+        DeploymentLog.objects.create(
+            deployment=self,
+            status=new_status.value,
+            message=self.aborted_reason if new_status == self.Status.FAILED else "",
+            phase="health"
+            if new_status == self.Status.RUNNING
+            else "failed"
+            if new_status == self.Status.FAILED
+            else "",
+            event="healthy"
+            if new_status == self.Status.RUNNING
+            else "failed"
+            if new_status == self.Status.FAILED
+            else "",
+        )
 
-            logging.getLogger(__name__).warning("DeploymentLog write failed", exc_info=True)
+        # Subscribers must never observe a status whose durable history rolled back.
+        event = {
+            "deployment_id": str(self.guid),
+            "registered_app_slug": self.registered_app.slug if self.registered_app_id else "",
+            "environment_name": self.app_environment.name if self.app_environment_id else "",
+            "status": self.status,
+            "occurred_at": now.isoformat(),
+        }
+        org_id = self.registered_app.organization_id if self.registered_app_id else None
+        app_guid = str(self.registered_app.guid) if self.registered_app_id else None
+
+        def publish():
+            try:
+                from core.pubsub import publish_sync
+
+                if org_id is not None:
+                    publish_sync(f"deployment.lifecycle.{org_id}", event)
+                if app_guid is not None:
+                    publish_sync(f"deployment.lifecycle.app.{app_guid}", event)
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).warning("deployment.lifecycle publish failed", exc_info=True)
+
+        transaction.on_commit(publish)

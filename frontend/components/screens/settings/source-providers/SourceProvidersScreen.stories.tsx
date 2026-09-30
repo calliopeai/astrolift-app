@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import * as React from "react";
+import { expect, userEvent, within } from "storybook/test";
+import { Button } from "@/components/ui/button";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
@@ -176,4 +179,27 @@ export const Width768: Story = {
 /** The one-time reveal shown after a webhook secret rotation. */
 export const SecretRevealed: Story = {
   render: () => <WebhookSecretReveal reveal={REVEAL} onClose={() => {}} />,
+};
+
+function SecretLauncher() {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>Show rotated secret</Button>
+      {open && <WebhookSecretReveal reveal={REVEAL} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+export const SecretKeyboard: Story = {
+  render: () => <SecretLauncher />,
+  play: async ({ canvasElement }) => {
+    const opener = within(canvasElement).getByRole("button", { name: "Show rotated secret" });
+    opener.focus();
+    await userEvent.keyboard("{Enter}");
+    const dialog = within(document.body).getByRole("dialog", { name: "Webhook secret generated" });
+    await expect(within(dialog).getByRole("button", { name: "Copy URL" })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    await expect(opener).toHaveFocus();
+  },
 };

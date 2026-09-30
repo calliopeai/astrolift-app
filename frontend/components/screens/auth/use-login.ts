@@ -27,10 +27,8 @@ export function useLogin() {
   const [idp, setIdp] = React.useState<ActiveIdp | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const apiRoot = process.env.NEXT_PUBLIC_API_ROOT ?? "";
-  const returnPath =
-    typeof window === "undefined"
-      ? "/dashboard"
-      : deviceApprovalReturnPath(new URLSearchParams(window.location.search).get("next"));
+  const returnPath = () =>
+    deviceApprovalReturnPath(new URLSearchParams(window.location.search).get("next"));
 
   React.useEffect(() => {
     if (useDevLogin) {
@@ -42,25 +40,25 @@ export function useLogin() {
       } catch {
         // localStorage may be unavailable in some browser modes.
       }
-      window.location.href = `${apiRoot}/app/auth1/dev-login?next=${encodeURIComponent(returnPath)}`;
+      window.location.href = `${apiRoot}/app/auth1/dev-login?next=${encodeURIComponent(returnPath())}`;
       return;
     }
     fetch(`${apiRoot}/app/auth1/active-idp.json`, { credentials: "include" })
       .then((r) => r.json())
       .then(setIdp)
       .catch((err) => setLoadError(String(err)));
-  }, [apiRoot, returnPath]);
+  }, [apiRoot]);
 
   /** External IdP: kick off the auth1 round-trip. */
   function continueWithIdp() {
     const loginPath = idp?.loginPath ?? "/app/auth1/login";
-    const callback = authCallbackUrl(window.location.origin, returnPath);
+    const callback = authCallbackUrl(window.location.origin, returnPath());
     window.location.href = `${apiRoot}${loginPath}?next=${encodeURIComponent(callback)}`;
   }
 
   /** kind=local: post the credentials, then go to the return path. Failures toast. */
   async function submitLocal(username: string, password: string): Promise<void> {
-    const next = returnPath;
+    const next = returnPath();
     try {
       const res = await fetch(`${apiRoot}/app/auth1/local-login`, {
         method: "POST",

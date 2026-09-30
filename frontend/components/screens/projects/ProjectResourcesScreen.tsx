@@ -70,6 +70,8 @@ export function ProjectResourcesScreen({
   effectiveClusterId,
   effectiveClusterSlug,
   onClusterChange,
+  effectiveBundleClusterId,
+  onBundleClusterChange,
   catalogEntries,
   catalogLoading,
   catalogError,
@@ -114,6 +116,7 @@ export function ProjectResourcesScreen({
   const [selectedAppEnvironments, setSelectedAppEnvironments] = React.useState<string[]>([]);
   const [bundleName, setBundleName] = React.useState("");
   const [bundleSlug, setBundleSlug] = React.useState("");
+  const [bundleSlugTouched, setBundleSlugTouched] = React.useState(false);
   const [keyInputs, setKeyInputs] = React.useState<Record<string, { key: string; value: string }>>(
     {}
   );
@@ -172,6 +175,7 @@ export function ProjectResourcesScreen({
     setBundleOpen(false);
     setBundleName("");
     setBundleSlug("");
+    setBundleSlugTouched(false);
   }
 
   async function setBundleKey(bundleId: string) {
@@ -1075,7 +1079,7 @@ export function ProjectResourcesScreen({
                 value={bundleName}
                 onChange={(event) => {
                   setBundleName(event.target.value);
-                  if (!bundleSlug)
+                  if (!bundleSlugTouched)
                     setBundleSlug(
                       event.target.value
                         .toLowerCase()
@@ -1091,7 +1095,10 @@ export function ProjectResourcesScreen({
                 id="bundle-slug"
                 required
                 value={bundleSlug}
-                onChange={(event) => setBundleSlug(event.target.value)}
+                onChange={(event) => {
+                  setBundleSlugTouched(true);
+                  setBundleSlug(event.target.value);
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -1100,8 +1107,8 @@ export function ProjectResourcesScreen({
                 id="bundle-cluster"
                 required
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                value={effectiveClusterId}
-                onChange={(event) => onClusterChange(event.target.value)}
+                value={effectiveBundleClusterId}
+                onChange={(event) => onBundleClusterChange(event.target.value)}
               >
                 {clusters.map((row) => (
                   <option key={row.id} value={row.id}>
@@ -1114,7 +1121,7 @@ export function ProjectResourcesScreen({
               <Button type="button" variant="outline" onClick={() => setBundleOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!effectiveClusterId || creatingBundle}>
+              <Button type="submit" disabled={!effectiveBundleClusterId || creatingBundle}>
                 Create bundle
               </Button>
             </DialogFooter>

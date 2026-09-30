@@ -165,12 +165,20 @@ def _is_org_manager(organization_id: int | None) -> bool:
     """Whether the caller holds org.manage_members in the active org,
     through the real gate (bearer ceiling and policies included)."""
 
-    from core.permissions import Permission, PermissionDenied, check_permission
+    from astrolift_identity.api_tokens import get_current_api_token
+    from astrolift_identity.models import Organization
+    from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
 
-    if organization_id is None:
+    token = get_current_api_token()
+    if organization_id is None or not Organization.objects.filter(pk=organization_id).exists():
+        return False
+    if token is not None and (token.organization_id != organization_id or token.team_id is not None):
         return False
     try:
-        check_permission(Permission.ORG_MANAGE_MEMBERS)
+        check_permission(
+            Permission.ORG_MANAGE_MEMBERS,
+            scope=PermissionScope(kind=ScopeKind.ORG, id=organization_id),
+        )
     except PermissionDenied:
         return False
     return True
@@ -181,7 +189,14 @@ def _is_org_member(user_pk, organization_id: int | None) -> bool:
 
     if organization_id is None:
         return False
-    return Member.objects.filter(user_id=user_pk, scope_kind="ORG", scope_id=organization_id).exists()
+    return Member.objects.filter(
+        user_id=user_pk,
+        scope_kind="ORG",
+        scope_id=organization_id,
+        is_active=True,
+        lifecycle=Member.Lifecycle.ACTIVE,
+        user__is_active=True,
+    ).exists()
 
 
 def _require_analysis_access(info: Info, *target_pks) -> bool:
@@ -197,10 +212,10 @@ def _require_analysis_access(info: Info, *target_pks) -> bool:
     Returns whether every target may be answered for; raises when the
     caller may not ask at all.
     """
-    caller = info.context.user
-    if not getattr(caller, "is_authenticated", False):
-        raise GraphQLError("Authentication required")
-    if getattr(caller, "is_superuser", False):
+    from core.schema.legacy_access import is_operator_with_credential, require_account_access
+
+    caller = require_account_access(info)
+    if is_operator_with_credential(caller):
         return True
     if target_pks and all(pk is not None and str(pk) == str(caller.pk) for pk in target_pks):
         return True
@@ -453,16 +468,16 @@ class PermissionAnalysisQuery:
         # #537: compare is meaningful across two arbitrary users, so it is
         # never self-service. #2157: an org.manage_members holder may run it
         # for two members of the org.
-        caller = info.context.user
-        if not getattr(caller, "is_authenticated", False):
-            raise GraphQLError("Authentication required")
+        from core.schema.legacy_access import is_operator_with_credential, require_account_access
+
+        caller = require_account_access(info)
 
         from core.schema.common import GlobalIDUtils
 
         pk_a = GlobalIDUtils.get_pk_flexible(user_id_a)
         pk_b = GlobalIDUtils.get_pk_flexible(user_id_b)
         org_id = _caller_org_id()
-        if not getattr(caller, "is_superuser", False):
+        if not is_operator_with_credential(caller):
             if not _is_org_manager(org_id):
                 raise GraphQLError("permission_compare is restricted to superuser or org.manage_members")
             if not (_is_org_member(pk_a, org_id) and _is_org_member(pk_b, org_id)):

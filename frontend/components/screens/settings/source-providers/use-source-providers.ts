@@ -20,7 +20,6 @@ import {
 import {
   LIST_SOURCE_CONNECTIONS,
   LIST_SOURCE_CONNECTIONS_PAGE,
-  LIST_SSH_DEPLOY_KEYS,
   LIST_SSH_DEPLOY_KEYS_PAGE,
 } from "@/graphql/scm/scm.queries";
 import type {
@@ -233,7 +232,7 @@ interface UpdateResp {
  */
 export function useAddClientId() {
   const [update, { loading }] = useMutation<UpdateResp>(UPDATE_SOURCE_CONNECTION, {
-    refetchQueries: [{ query: LIST_SOURCE_CONNECTIONS }],
+    refetchQueries: [{ query: LIST_SOURCE_CONNECTIONS }, REFETCH_CONNECTIONS],
     awaitRefetchQueries: true,
   });
 
@@ -270,7 +269,7 @@ interface GenerateResp {
  */
 export function useGenerateSshKey() {
   const [generate, { loading }] = useMutation<GenerateResp>(GENERATE_SSH_DEPLOY_KEY, {
-    refetchQueries: [{ query: LIST_SSH_DEPLOY_KEYS, variables: { appSlug: null } }],
+    refetchQueries: [REFETCH_KEYS],
     awaitRefetchQueries: true,
   });
 

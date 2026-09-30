@@ -10,10 +10,12 @@ from __future__ import annotations
 from django.urls import path
 
 from astrolift_operations import views
+from astrolift_operations.agent_enforcement_views import agent_enforcement
 
 app_name = "astrolift_operations"
 
 urlpatterns = [
+    path("zentinelle/agent-enforcement/", agent_enforcement, name="agent-enforcement"),
     path(
         "audit_exports/<str:guid>/<str:token>/",
         views.download_audit_export,

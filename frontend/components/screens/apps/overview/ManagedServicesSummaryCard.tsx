@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import {
   AlertTriangleIcon,
   ArchiveIcon,
@@ -168,6 +170,8 @@ export interface ManagedServiceDialogSlots {
 export interface ManagedServicesSummaryViewProps {
   /** First load only; refetches re-render in place. */
   loading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   /** Already sorted: failed first, then in-flight, active, the rest. */
   services: SummaryService[];
   /** The app's full managed-services page. */
@@ -191,6 +195,8 @@ export interface ManagedServicesSummaryViewProps {
  */
 export function ManagedServicesSummaryView({
   loading,
+  error,
+  onRetry,
   services,
   managedServicesHref,
   dialogs,
@@ -199,6 +205,9 @@ export function ManagedServicesSummaryView({
 
   // First-load skeleton hides the section to avoid flashing an empty
   // card then a populated one; subsequent refetches re-render in place.
+  if (error) {
+    return <QueryError title="Could not load managed services" error={error} onRetry={onRetry} />;
+  }
   if (loading) {
     return (
       <Section

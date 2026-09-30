@@ -22,10 +22,11 @@ is ``(-created_at, -pk)``.
 from __future__ import annotations
 
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from django.contrib.auth import get_user_model
-from graphql import GraphQLError
+from django.core.exceptions import PermissionDenied
 
 from astrolift_graphql import MAX_PAGE_LIMIT
 from organization.models import Organization
@@ -203,7 +204,7 @@ def test_organizations_page_refuses_anonymous_callers(caller):
     from django.contrib.auth.models import AnonymousUser
 
     _join(_org("Mine"), caller)
-    with pytest.raises(GraphQLError, match="Authentication required"):
+    with pytest.raises(PermissionDenied, match="Authentication required"):
         OrgQuery().organizations_page(_info(AnonymousUser()))
 
 
@@ -334,15 +335,17 @@ def test_organizations_cursor_round_trips_through_the_schema(caller):
 
 
 def _fill_memberships(org: Organization, count: int) -> None:
-    """Add ``count`` membership rows to ``org``.
-
-    ``OrganizationMember.member`` is nullable, and these rows exist to
-    prove the walk covers every row exactly once — identity is not what
-    is under test, so we skip creating (and cascading profile signals
-    for) hundreds of users.
-    """
-    for _ in range(count):
-        OrganizationMember.objects.create(organization=org, member=None, is_active=True)
+    """Populate live accounts so paging exercises the active-membership boundary."""
+    prefix = uuid4().hex
+    users = User.objects.bulk_create(
+        [
+            User(username=f"page-{prefix}-{n}", email=f"page-{prefix}-{n}@example.test", is_active=True)
+            for n in range(count)
+        ]
+    )
+    OrganizationMember.objects.bulk_create(
+        [OrganizationMember(organization=org, member=user, is_active=True) for user in users]
+    )
 
 
 def test_members_walk_reaches_every_row_exactly_once(caller):
@@ -415,7 +418,7 @@ def test_members_page_refuses_anonymous_callers(caller):
     from django.contrib.auth.models import AnonymousUser
 
     _join(_org("Mine"), caller)
-    with pytest.raises(GraphQLError, match="Authentication required"):
+    with pytest.raises(PermissionDenied, match="Authentication required"):
         OrgQuery().members_page(_info(AnonymousUser()))
 
 
@@ -464,35 +467,29 @@ def test_members_search_matches_the_owning_organization(caller):
     assert page.total_count == 1
 
 
-def test_members_search_over_a_nullable_member_fk_keeps_matching_rows(caller):
-    """``search_q`` ORs across ``member__*`` and ``organization__*``. A
-    membership with a null member must still match on its org rather than
-    being dropped by the join."""
+def test_members_search_omits_null_accounts_even_when_organization_matches(caller):
     org = _org("Nullable Org")
     _join(org, caller)
-    _fill_memberships(org, 3)
+    OrganizationMember.objects.bulk_create(
+        [OrganizationMember(organization=org, member=None, is_active=True) for _ in range(3)]
+    )
 
     page = OrgQuery().members_page(_info(caller), search="Nullable")
-    assert page.total_count == 4
+    assert page.total_count == 1
+    assert [row.member_id for row in page.items] == [caller.pk]
 
 
-def test_members_page_still_shows_soft_deleted_rows_like_the_list_field(caller):
-    """Deliberately unchanged behaviour: ``members`` has always included
-    soft-deleted memberships, and both fields share one queryset builder,
-    so the page field must too. Pinned so the parity is a decision rather
-    than an accident."""
+def test_members_page_and_list_omit_soft_deleted_memberships(caller):
     org = _org("Soft Org")
     caller_membership = _join(org, caller)
-    gone = OrganizationMember.objects.create(organization=org, member=None, is_active=False)
+    gone = _join(org, caller)
     gone.deleted_at = gone.created_at
     gone.save(update_fields=["deleted_at"])
 
     page = OrgQuery().members_page(_info(caller), limit=50)
-    assert {m.pk for m in page.items} == {caller_membership.pk, gone.pk}
-    assert page.total_count == 2
-
-    listed = {m.pk for m in OrgQuery().members(_info(caller))}
-    assert listed == {caller_membership.pk, gone.pk}
+    assert {m.pk for m in page.items} == {caller_membership.pk}
+    assert page.total_count == 1
+    assert {m.pk for m in OrgQuery().members(_info(caller))} == {caller_membership.pk}
 
 
 def test_members_garbage_cursor_restarts_from_the_top(caller):

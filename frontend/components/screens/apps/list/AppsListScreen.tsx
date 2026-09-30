@@ -76,7 +76,7 @@ const DOT: Record<AppStatusKey, "ok" | "warn" | "error" | "muted" | "pending"> =
 // tooltip, link or button in a cell has to sit above it to be reachable.
 const ABOVE_ROW_LINK = "relative z-10";
 
-/** #697: pin or unpin, shared by the card and the row. Both sit inside a link. */
+/** #697: pin or unpin, shared by the card and the row. */
 function PinButton({
   pinned,
   onToggle,
@@ -143,12 +143,17 @@ function AppCard({
   onTogglePin: () => void;
 }) {
   return (
-    <div className="bg-card hover:bg-accent/30 flex h-full min-w-0 flex-col gap-3 rounded-md border p-4 transition-colors">
+    <div className="bg-card hover:bg-accent/30 relative flex h-full min-w-0 flex-col gap-3 rounded-md border p-4 transition-colors">
       <div className="flex min-w-0 items-start gap-3">
         <AppKindGlyph topology={app.topology} />
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold" title={app.name}>
-            {app.name}
+            <Link
+              href={`/apps/${app.slug}`}
+              className="focus-visible:after:ring-ring after:absolute after:inset-0 after:rounded-md focus-visible:outline-none focus-visible:after:ring-2"
+            >
+              {app.name}
+            </Link>
           </div>
           <div
             className="text-muted-foreground truncate font-mono text-xs"
@@ -157,7 +162,7 @@ function AppCard({
             {app.teamSlug}/{app.projectSlug}/{app.slug}
           </div>
         </div>
-        <PinButton pinned={pinned} onToggle={onTogglePin} className="-mt-1 -mr-1" />
+        <PinButton pinned={pinned} onToggle={onTogglePin} className="relative z-10 -mt-1 -mr-1" />
       </div>
 
       <AppStatus app={app} />
@@ -188,7 +193,7 @@ function AppCard({
         )}
       </div>
 
-      <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2">
+      <div className="relative z-10 mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2">
         <AppFreshnessRow
           pulse={app.healthPulse}
           latestDeployment={app.latestDeployment}
@@ -387,7 +392,7 @@ export function AppsListScreen({
         columns={columns}
         rows={rows}
         getRowId={(app) => app.slug}
-        rowHref={(app) => `/apps/${app.slug}`}
+        rowHref={list.mode === "card" ? undefined : (app) => `/apps/${app.slug}`}
         renderCard={(app) => (
           <AppCard
             app={app}

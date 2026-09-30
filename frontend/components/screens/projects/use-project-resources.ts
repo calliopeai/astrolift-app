@@ -142,6 +142,7 @@ export function useProjectResources(slug: string) {
   });
   const refetchResources = () => resources.refetch({ projectId });
   const [clusterId, setClusterId] = React.useState("");
+  const [bundleClusterId, setBundleClusterId] = React.useState("");
   const [consumerService, setConsumerService] = React.useState<AstroliftManagedService | null>(
     null
   );
@@ -222,6 +223,7 @@ export function useProjectResources(slug: string) {
 
   const clusters: ProjectResourceCluster[] = resources.data?.astroliftProjectResourceClusters ?? [];
   const effectiveClusterId = clusterId || clusters[0]?.id || "";
+  const effectiveBundleClusterId = bundleClusterId || clusters[0]?.id || "";
   const effectiveClusterSlug = clusters.find((row) => row.id === effectiveClusterId)?.slug;
   const catalog = useQuery<CatalogData>(LIST_PROJECT_MANAGED_SERVICE_CATALOG, {
     variables: { projectId, clusterId: effectiveClusterId },
@@ -288,7 +290,7 @@ export function useProjectResources(slug: string) {
   async function onCreateBundle(name: string, bundleSlug: string): Promise<boolean> {
     const { data } = await createBundle({
       variables: {
-        input: { projectId, clusterId: effectiveClusterId, name, slug: bundleSlug },
+        input: { projectId, clusterId: effectiveBundleClusterId, name, slug: bundleSlug },
       },
     });
     const result = data?.createProjectSecretBundle as MutationResult<unknown> | undefined;
@@ -516,6 +518,8 @@ export function useProjectResources(slug: string) {
     effectiveClusterId,
     effectiveClusterSlug,
     onClusterChange: setClusterId,
+    effectiveBundleClusterId,
+    onBundleClusterChange: setBundleClusterId,
     catalogEntries: catalog.data?.astroliftProjectManagedServiceCatalog ?? [],
     catalogLoading: catalog.loading,
     catalogError: Boolean(catalog.error),

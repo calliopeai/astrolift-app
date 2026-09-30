@@ -32,6 +32,7 @@ from astrolift_scm.urls import urlpatterns as scm_webhook_urls
 from auth1.forms import AuthAdminForm
 from auth1.sessions import Auth1SessionWorkflow
 from core import views
+from core.permissions import Permission, route_auth
 from core.schema.views import CoreStrawberryView
 from core.utils.browser_guard import require_ui_header_for_session
 from core.utils.debug import autologin
@@ -45,6 +46,11 @@ strawberry_view = CoreStrawberryView.as_view(schema=schema)
 strawberry_auth_view = CoreStrawberryView.as_view(schema=schema_auth)
 
 
+@route_auth(
+    credential="active session or API bearer",
+    permissions=(Permission.ORG_READ,),
+    scope="explicit active organization; bearer org/team ceilings; admin bearer for own-ticket POST",
+)
 def support_tickets_view(request):
     # Keep the support module import lazy so the default-off feature does not
     # add upstream integration imports during ordinary URL setup.

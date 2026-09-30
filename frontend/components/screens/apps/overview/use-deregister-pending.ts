@@ -56,6 +56,7 @@ export function recordDeregisterPending(appSlug: string, workflowId: string): vo
   };
   try {
     window.localStorage.setItem(deregisterPendingKey(appSlug), JSON.stringify(entry));
+    window.dispatchEvent(new Event("astrolift:deregister-pending"));
   } catch {
     // localStorage can throw under quota / private-mode constraints —
     // the banner is non-critical so swallow + fall through.
@@ -67,50 +68,50 @@ export function clearDeregisterPending(appSlug: string): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(deregisterPendingKey(appSlug));
+    window.dispatchEvent(new Event("astrolift:deregister-pending"));
   } catch {
     // Same swallow as above — the banner self-corrects on next mount.
   }
 }
 
-function readPending(appSlug: string): PendingEntry | null {
-  if (typeof window === "undefined") return null;
+function snapshot(appSlug: string): string {
   try {
-    const raw = window.localStorage.getItem(deregisterPendingKey(appSlug));
-    if (!raw) return null;
+    return window.localStorage.getItem(deregisterPendingKey(appSlug)) ?? "";
+  } catch {
+    return "";
+  }
+}
+function readPending(raw: string): PendingEntry | null {
+  try {
     const parsed = JSON.parse(raw) as Partial<PendingEntry>;
-    if (
-      typeof parsed.workflowId !== "string" ||
-      typeof parsed.expiresAtMs !== "number" ||
-      !Number.isFinite(parsed.expiresAtMs)
-    ) {
-      return null;
-    }
-    return { workflowId: parsed.workflowId, expiresAtMs: parsed.expiresAtMs };
+    return typeof parsed.workflowId === "string" &&
+      typeof parsed.expiresAtMs === "number" &&
+      Number.isFinite(parsed.expiresAtMs)
+      ? { workflowId: parsed.workflowId, expiresAtMs: parsed.expiresAtMs }
+      : null;
   } catch {
     return null;
   }
 }
+const emptySnapshot = () => "";
 
 export function useDeregisterPending(appSlug: string) {
   const t = useTranslations("apps.dangerZone.pendingBanner");
-  const [entry, setEntry] = React.useState<PendingEntry | null>(null);
+  const subscribe = React.useCallback((notify: () => void) => {
+    window.addEventListener("focus", notify);
+    window.addEventListener("storage", notify);
+    window.addEventListener("astrolift:deregister-pending", notify);
+    return () => {
+      window.removeEventListener("focus", notify);
+      window.removeEventListener("storage", notify);
+      window.removeEventListener("astrolift:deregister-pending", notify);
+    };
+  }, []);
+  const getSnapshot = React.useCallback(() => snapshot(appSlug), [appSlug]);
+  const raw = React.useSyncExternalStore(subscribe, getSnapshot, emptySnapshot);
+  const entry = React.useMemo(() => readPending(raw), [raw]);
   const [now, setNow] = React.useState<number>(() => Date.now());
   const [cancel, { loading }] = useMutation<CancelResp>(CANCEL_DEREGISTER);
-
-  // On mount + on tab focus, re-read the localStorage entry. The focus
-  // listener catches the cross-tab case where the operator kicked off
-  // the deregister on Settings and then switched to a tab pinned on
-  // app detail — the banner appears as soon as that tab gains focus.
-  React.useEffect(() => {
-    const sync = () => setEntry(readPending(appSlug));
-    sync();
-    window.addEventListener("focus", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("focus", sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, [appSlug]);
 
   // 1-second tick drives the countdown render. Stops once the entry
   // clears (cancel succeeded or window elapsed) so we don't burn a
@@ -127,7 +128,6 @@ export function useDeregisterPending(appSlug: string) {
     if (!entry) return;
     if (now >= entry.expiresAtMs) {
       clearDeregisterPending(appSlug);
-      setEntry(null);
     }
   }, [appSlug, entry, now]);
 
@@ -153,14 +153,13 @@ export function useDeregisterPending(appSlug: string) {
         toast.success(t("toastCancelled"));
       }
       clearDeregisterPending(appSlug);
-      setEntry(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("toastError"));
     }
   }
 
   // null = nothing pending (no entry, or the window has elapsed).
-  const msRemaining = entry ? Math.max(0, entry.expiresAtMs - now) : null;
+  const msRemaining = entry && now < entry.expiresAtMs ? entry.expiresAtMs - now : null;
 
   return { msRemaining, cancelling: loading, onCancel };
 }

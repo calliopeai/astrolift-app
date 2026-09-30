@@ -97,9 +97,11 @@ def test_start_deployment_defers_workflow_until_commit(
 
 
 def test_rollback_defers_workflow_until_commit(
-    org, app, env, actor, fake_info, permission_resolver, deferred_temporal
+    org, app, env, actor, fake_info, permission_resolver, deferred_temporal, monkeypatch
 ):
     starts, callbacks = deferred_temporal
+    published = []
+    monkeypatch.setattr("core.pubsub.publish_sync", lambda topic, event: published.append(event))
     _grant_all(permission_resolver)
     mut = LifecycleMutation()
 
@@ -125,12 +127,15 @@ def test_rollback_defers_workflow_until_commit(
 
     assert result.ok, result.errors
     assert starts == [], "rollback workflow started before the new deploy row committed"
-    assert len(callbacks) == 1
+    assert published == [], "lifecycle update published before its durable history committed"
+    assert callbacks
 
     for fn in callbacks:
         fn()
 
     assert [s[0] for s in starts] == ["RollbackDeploymentWorkflow"]
+    assert all(event["status"] == "rolled_back" for event in published)
+    assert published and all(event["deployment_id"] == str(running.guid) for event in published)
 
 
 def test_deploy_dispatch_emits_app_scoped_event(

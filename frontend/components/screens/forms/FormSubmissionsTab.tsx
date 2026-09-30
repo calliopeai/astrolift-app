@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { type ReactNode, useMemo, useState } from "react";
 import { Loader2Icon, XIcon } from "lucide-react";
 
@@ -33,9 +35,13 @@ const PAGE_SIZE = 25;
 export function FormSubmissionsTab({
   submissions,
   loading,
+  error,
+  onRetry,
 }: {
   submissions: FormSubmission[];
   loading: boolean;
+  error?: { message: string } | null;
+  onRetry?: () => void;
 }) {
   const fmt = useFormatters();
   const [page, setPage] = useState(0);
@@ -57,6 +63,8 @@ export function FormSubmissionsTab({
     );
   }
 
+  if (error && submissions.length === 0)
+    return <QueryError title="Could not load submissions" error={error} onRetry={onRetry} />;
   if (submissions.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">

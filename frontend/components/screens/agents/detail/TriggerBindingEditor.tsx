@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { CheckCircle2Icon, InfoIcon, Loader2Icon, Trash2Icon, WebhookIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -52,6 +54,8 @@ export function TriggerBindingEditorView({
   agentName,
   triggers,
   loading,
+  error,
+  onRetry,
   creating,
   onCreate,
   onUnbind,
@@ -90,7 +94,7 @@ export function TriggerBindingEditorView({
   }
 
   const scmRepoValid = scmRepo.trim().length > 0;
-  const canCreate = !creating && scmRepoValid && mappingError === null;
+  const canCreate = !creating && !loading && !error && scmRepoValid && mappingError === null;
 
   async function handleCreate() {
     if (!canCreate) return;
@@ -179,7 +183,9 @@ export function TriggerBindingEditorView({
       {/* Bound triggers list. */}
       <div className="space-y-2">
         <Label>Bound triggers</Label>
-        {loading && triggers.length === 0 ? (
+        {error ? (
+          <QueryError title="Could not load trigger bindings" error={error} onRetry={onRetry} />
+        ) : loading && triggers.length === 0 ? (
           <Skeleton className="h-16 w-full" />
         ) : triggers.length === 0 ? (
           <p className="text-muted-foreground rounded-md border border-dashed p-4 text-xs">

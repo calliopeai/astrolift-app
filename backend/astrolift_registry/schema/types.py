@@ -806,6 +806,9 @@ def cron_last_run_to_type(run) -> CronJobLastRunType:
 
 @strawberry.type(name="AstroliftWorkload")
 class WorkloadType:
+    version: int = strawberry.field(
+        default=0, description="Version of this workload for restart and scale preconditions."
+    )
     id: GUID
     slug: str
     name: str
@@ -1740,6 +1743,7 @@ def workload_to_type(workload, *, last_run=None) -> WorkloadType:
     tenant = get_current_tenant()
     return WorkloadType(
         id=GUID(str(workload.guid)),
+        version=int(workload.version or 0),
         slug=workload.slug,
         name=workload.name,
         kind=workload.kind,

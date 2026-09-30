@@ -51,7 +51,7 @@ const NO_CAPS: Readonly<Omit<ModuleEntitlement, "key">> = Object.freeze({
  * every helper returns `false`.
  */
 export function useModules() {
-  const { data, loading, error } = useQuery<MeQueryData, MeQueryVariables>(GET_ME, {
+  const { data, loading, error, refetch } = useQuery<MeQueryData, MeQueryVariables>(GET_ME, {
     fetchPolicy: "cache-and-network",
   });
 
@@ -65,14 +65,13 @@ export function useModules() {
     return map;
   }, [data?.me?.modules]);
 
-  const caps = React.useCallback(
-    (key: ModuleKey) => byKey.get(key) ?? NO_CAPS,
-    [byKey],
-  );
+  const caps = React.useCallback((key: ModuleKey) => byKey.get(key) ?? NO_CAPS, [byKey]);
 
   return {
     loading,
     error,
+    refetch,
+    hasData: Boolean(data),
     /** Keyed entitlement map; missing keys are simply absent. */
     modules: byKey,
     /** True when the viewer may see the module's surface. */

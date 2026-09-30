@@ -57,7 +57,13 @@ export const LongStrings: Story = {
   render: () => <ConnectSourceDialogView {...CONNECT_SOURCE_PROPS} />,
   play: async () => {
     const s = await sheet();
-    await userEvent.type(s.getByLabelText("Display name (optional)"), LONG_TEXT);
-    await userEvent.type(s.getByLabelText("Account / org login"), LONG_TEXT);
+    const displayName = s.getByLabelText("Display name (optional)");
+    const account = s.getByLabelText("Account / org login");
+    await userEvent.click(displayName);
+    await userEvent.paste(LONG_TEXT);
+    await userEvent.click(account);
+    await userEvent.paste(LONG_TEXT);
+    await expect(displayName).toHaveValue(LONG_TEXT);
+    await expect(account).toHaveValue(LONG_TEXT);
   },
 };

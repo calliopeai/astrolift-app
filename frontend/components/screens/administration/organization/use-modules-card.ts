@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -9,7 +9,7 @@ import type {
   AstroliftOrganizationModule,
   MutationResult,
 } from "@/graphql/identity/identity.types";
-import { useFeatureFlag } from "@/graphql/server/server.hooks";
+import { SERVER_INFO } from "@/graphql/server/server.queries";
 import { useModules } from "@/graphql/user/user.hooks";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -36,6 +36,12 @@ export const MODULE_CONFIG = [
     description: "Lets Chat Studio launch this organization's registered agents.",
     installFlagKey: "modules.chat_studio_agent_runs_allowed",
   },
+  {
+    key: "agent_policy_enforcement",
+    label: "Agent policy enforcement",
+    description: "Lets Zentinelle apply policy actions to this organization's agents and boxes.",
+    installFlagKey: "modules.agent_policy_enforcement_allowed",
+  },
 ] as const;
 
 export interface ModuleItem {
@@ -49,16 +55,18 @@ export interface ModuleItem {
 
 /** The server half of ModulesCard: entitlements, the install gate and the toggle. */
 export function useModulesCard() {
-  const { modules, loading: modulesLoading } = useModules();
+  const { modules, loading: modulesLoading, error, refetch, hasData } = useModules();
   const { can, loading: permsLoading } = useMyPermissions();
   const canManage = can("org.update");
 
-  // One call per configured module; MODULE_CONFIG is a fixed-length const.
-  const installAllowed = [
-    useFeatureFlag(MODULE_CONFIG[0].installFlagKey),
-    useFeatureFlag(MODULE_CONFIG[1].installFlagKey),
-    useFeatureFlag(MODULE_CONFIG[2].installFlagKey),
-  ];
+  const flags = useQuery<{
+    astroliftServerInfo: { featureFlags: { key: string; enabled: boolean }[] };
+  }>(SERVER_INFO, { fetchPolicy: "cache-first" });
+  const installAllowed = MODULE_CONFIG.map((config) =>
+    (flags.data?.astroliftServerInfo.featureFlags ?? []).some(
+      (flag) => flag.key === config.installFlagKey && flag.enabled
+    )
+  );
 
   const [setModule] = useMutation<{
     setOrganizationModule: MutationResult<AstroliftOrganizationModule>;
@@ -101,7 +109,11 @@ export function useModulesCard() {
 
   return {
     items,
-    loading: modulesLoading && modules.size === 0,
+    loading: (modulesLoading && !hasData) || (flags.loading && !flags.data),
+    error: (hasData ? null : error) ?? (flags.data ? null : flags.error) ?? null,
+    onRetry: () => {
+      void Promise.allSettled([refetch(), flags.refetch()]);
+    },
     canManage,
     permsLoading,
     pendingKey,

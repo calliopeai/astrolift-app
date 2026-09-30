@@ -10,7 +10,7 @@ import pytest
 from django.db import close_old_connections
 from django.utils import timezone
 
-from astrolift_agents.models import AgentBox, AgentEnvironmentSpec, ManagedBoxRuntime
+from astrolift_agents.models import AgentBox, AgentDispatchQuarantine, AgentEnvironmentSpec, ManagedBoxRuntime
 from astrolift_agents.services.agent_box import AgentBoxError, observe_box, start_agent_box, stop_agent_box
 from astrolift_agents.services.managed_box_lifecycle import (
     authority_secret_name,
@@ -495,3 +495,17 @@ def test_managed_stop_sanitizes_provider_failure_and_allows_retry(
     assert world.box.last_error == ""
     assert ("Job", runtime.job_name) not in world.driver.objects
     assert ("PersistentVolumeClaim", runtime.claim_name) in world.driver.objects
+
+
+def test_quarantined_managed_spec_refuses_before_reservation_or_provider_writes(world):
+    AgentDispatchQuarantine.objects.create(
+        organization=world.box.organization,
+        target_kind="spec",
+        target_guid=world.spec.guid,
+        reason="Policy quarantine",
+    )
+    with pytest.raises(AgentBoxError, match="quarantined"):
+        start_agent_box(world.box)
+    assert not ManagedBoxRuntime.objects.exists()
+    assert not world.driver.applied
+    assert not AuditEvent.objects.filter(action="agent_box.runtime.reserve").exists()

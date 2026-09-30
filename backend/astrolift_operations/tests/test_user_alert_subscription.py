@@ -17,7 +17,9 @@ from astrolift_operations.schema.mutations import (
 from astrolift_operations.schema.queries import OperationsQuery
 from astrolift_registry.models import RegisteredApp
 from core.mutations import ErrorCode
+from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
+from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
@@ -41,6 +43,9 @@ def _scaffold():
         provisioning_status="ready",
     )
     user = User.objects.create_user(username="sub-user", email="sub@test")
+    bind_role(
+        user, permissions=[Permission.APP_READ], kind="ORG", scope_id=org.pk, slug="subscription-reader"
+    )
     return org, app, user
 
 

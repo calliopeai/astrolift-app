@@ -1595,6 +1595,7 @@ export function MessageLogPanelView({
   onApplyRecipient,
 }: ReturnType<typeof useMessageLog>) {
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set<string>());
+  const detailsId = React.useId();
   const list = useLocalListState(MESSAGES_LIST, {
     filters: eventKind ? { event: eventKind } : {},
   });
@@ -1639,13 +1640,19 @@ export function MessageLogPanelView({
               type="button"
               onClick={() => toggleExpanded(m.id)}
               aria-expanded={isOpen}
+              aria-controls={`${detailsId}-${m.id}`}
               className="flex min-w-0 items-center gap-1.5 text-left"
             >
               <Chevron className="size-3.5 shrink-0" />
               <span className="text-2xs font-mono [overflow-wrap:anywhere]">{m.recipient}</span>
             </button>
             {isOpen ? (
-              <div className="bg-muted/30 rounded-md">
+              <div
+                id={`${detailsId}-${m.id}`}
+                role="region"
+                aria-label={`Message details for ${m.recipient}`}
+                className="bg-muted/30 rounded-md"
+              >
                 <MessageMetadata
                   eventKind={m.eventKind}
                   messageId={m.messageId}
@@ -1756,6 +1763,7 @@ function MessageMetadata({
           variant="ghost"
           size="icon"
           className="size-5"
+          aria-label="Copy message ID"
           onClick={(e) => {
             e.stopPropagation();
             copyToClipboard(messageId, "Message ID");

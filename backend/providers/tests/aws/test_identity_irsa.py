@@ -323,6 +323,7 @@ class _RecordingIam:
 
     def __init__(self) -> None:
         self.roles: dict[str, dict] = {}  # name -> {"trust": dict, "arn": str}
+        self.inline_policies: dict[tuple[str, str], dict] = {}
         self.attached: dict[str, list[str]] = {}
 
     # boto3's IAM API uses PascalCase kwargs; **kwargs keeps this fake faithful
@@ -350,7 +351,13 @@ class _RecordingIam:
         self.roles[kwargs["RoleName"]]["trust"] = json.loads(kwargs["PolicyDocument"])
 
     def put_role_policy(self, **kwargs) -> None:
-        pass
+        self.inline_policies[(kwargs["RoleName"], kwargs["PolicyName"])] = json.loads(kwargs["PolicyDocument"])
+
+    def delete_role_policy(self, **kwargs) -> None:
+        key = (kwargs["RoleName"], kwargs["PolicyName"])
+        if key not in self.inline_policies:
+            raise self.exceptions.NoSuchEntityException(kwargs["PolicyName"])
+        del self.inline_policies[key]
 
     def attach_role_policy(self, **kwargs) -> None:
         name = kwargs["RoleName"]
@@ -566,3 +573,23 @@ def test_boundary_defaults_to_absent(iam_client) -> None:
         ).permissions_boundary_arn
         == ""
     )
+
+
+def test_empty_reconcile_removes_only_the_platform_inline_policy(driver, iam_client):
+    driver.create_identity_role(
+        name="empty-union",
+        permissions=[{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::retired/*"}],
+    )
+    iam_client.put_role_policy(
+        RoleName="empty-union",
+        PolicyName="external-policy",
+        PolicyDocument=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [{"Effect": "Allow", "Action": "s3:ListBucket", "Resource": "arn:aws:s3:::external"}],
+            }
+        ),
+    )
+    for _ in range(2):
+        driver.create_identity_role(name="empty-union", permissions=[])
+        assert iam_client.list_role_policies(RoleName="empty-union")["PolicyNames"] == ["external-policy"]

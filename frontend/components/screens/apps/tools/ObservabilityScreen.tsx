@@ -30,6 +30,7 @@ import type { Column } from "@/components/data-table";
 import { Feed } from "@/components/feed/Feed";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
+import { useNow } from "@/components/screens/deployments/run-support";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { LogView } from "@/components/run/LogView";
 import {
@@ -779,8 +780,8 @@ function severityBadgeProps(severity: string): {
   }
 }
 
-function formatRemaining(iso: string): string {
-  const ms = new Date(iso).getTime() - Date.now();
+function formatRemaining(iso: string, now: number): string {
+  const ms = new Date(iso).getTime() - now;
   if (ms <= 0) return "expired";
   const minutes = Math.floor(ms / 60000);
   if (minutes < 60) return `${minutes}m`;
@@ -864,6 +865,7 @@ export function AlertRulesPanelView({
   const [createOpen, setCreateOpen] = React.useState(false);
   const [muteTarget, setMuteTarget] = React.useState<AlertRule | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AlertRule | null>(null);
+  const now = useNow(rows.some((r) => Boolean(r.activeMute)));
   const picked = ruleList.find((r) => r.id === pickedRuleId) ?? null;
 
   const columns: Column<AlertRule>[] = [
@@ -900,7 +902,7 @@ export function AlertRulesPanelView({
       cell: (r) =>
         r.activeMute ? (
           <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
-            Muted · {formatRemaining(r.activeMute.ttlUntil)}
+            Muted · {formatRemaining(r.activeMute.ttlUntil, now)}
           </Badge>
         ) : r.isActive ? (
           <span className="inline-flex items-center gap-1.5 text-xs">

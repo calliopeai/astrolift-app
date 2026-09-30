@@ -343,6 +343,20 @@ export type AstroliftAgentEnvironmentSpecMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentEnvironmentSpecPage = {
+  items: Array<AstroliftAgentEnvironmentSpec>;
+  page: Scalars['Int']['output'];
+  pageSize: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentEnvironmentSpecsFilter = {
+  agentType: InputMaybe<Array<Scalars['String']['input']>>;
+  /** User ids, or "me". */
+  createdBy: InputMaybe<Array<Scalars['String']['input']>>;
+  runtime: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type AstroliftAgentFleetFilter = {
   /** Cluster slugs; an agent whose app has an environment on one matches. */
   cluster: InputMaybe<Array<Scalars['String']['input']>>;
@@ -421,6 +435,16 @@ export type AstroliftAgentLiveStatus = {
   runningCount: Scalars['Int']['output'];
   workloadId: Scalars['GUID']['output'];
   workloadSlug: Scalars['String']['output'];
+};
+
+export type AstroliftAgentQuarantine = {
+  createdAt: Scalars['DateTime']['output'];
+  evidenceUrl: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  policyId: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  targetId: Scalars['GUID']['output'];
+  targetKind: Scalars['String']['output'];
 };
 
 export type AstroliftAgentRun = {
@@ -641,6 +665,7 @@ export type AstroliftAgentTaskDispatcher = {
 
 export type AstroliftAgentTaskEvent = {
   createdAt: Scalars['DateTime']['output'];
+  data?: Maybe<Scalars['JSON']['output']>;
   kind: Scalars['String']['output'];
   messageId: Scalars['String']['output'];
   request?: Maybe<Scalars['JSON']['output']>;
@@ -676,6 +701,26 @@ export type AstroliftAgentTaskInputReplyMutationResult = {
   data?: Maybe<AstroliftAgentTaskInputReply>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentTaskLogLine = {
+  container: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  level?: Maybe<Scalars['String']['output']>;
+  message: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  stream: Scalars['String']['output'];
+  timestamp?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftAgentTaskLogPage = {
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftAgentTaskLogLine>;
+  liveOnly: Scalars['Boolean']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  pageSize: Scalars['Int']['output'];
+  windowLimited: Scalars['Boolean']['output'];
 };
 
 export type AstroliftAgentTaskMutationResult = {
@@ -805,6 +850,11 @@ export type AstroliftAlertEventPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftAlertEventSummary = {
+  criticalCount: Scalars['Int']['output'];
+  unresolvedCount: Scalars['Int']['output'];
 };
 
 export type AstroliftAlertMute = {
@@ -2118,6 +2168,7 @@ export type AstroliftDeployment = {
   imageTag: Scalars['String']['output'];
   manifestResyncError: Scalars['String']['output'];
   manifestResyncStatus: Scalars['String']['output'];
+  phases: Array<AstroliftDeploymentPhase>;
   prNumber: Scalars['Int']['output'];
   prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
@@ -2131,6 +2182,8 @@ export type AstroliftDeployment = {
   triggerKind: Scalars['String']['output'];
   triggeredByMe: Scalars['Boolean']['output'];
   triggeredByUserId?: Maybe<Scalars['String']['output']>;
+  /** Version of this deployment snapshot for rollback and redeploy preconditions. */
+  version: Scalars['Int']['output'];
   workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
@@ -2174,9 +2227,11 @@ export type AstroliftDeploymentLifecycleEvent = {
 export type AstroliftDeploymentLogEntry = {
   deploymentId: Scalars['String']['output'];
   detail: Scalars['JSON']['output'];
+  event: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   message: Scalars['String']['output'];
   occurredAt: Scalars['DateTime']['output'];
+  phase: Scalars['String']['output'];
   status: Scalars['String']['output'];
 };
 
@@ -2212,6 +2267,27 @@ export type AstroliftDeploymentPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftDeploymentPhase = {
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  failedAt?: Maybe<Scalars['DateTime']['output']>;
+  healthyAt?: Maybe<Scalars['DateTime']['output']>;
+  name: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftDeploymentRunLogDownload = {
+  content: Scalars['String']['output'];
+  contentType: Scalars['String']['output'];
+  filename: Scalars['String']['output'];
+};
+
+export type AstroliftDeploymentRunLogPage = {
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftDeploymentLogEntry>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  pageSize: Scalars['Int']['output'];
 };
 
 /** The deployments list's declared filters. Unset fields do not filter; list values match any. */
@@ -3501,6 +3577,24 @@ export type AstroliftPipelineRunPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftPipelineSecret = {
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type AstroliftPipelineSecretChange = {
+  name: Scalars['String']['output'];
+  pipelineId: Scalars['GUID']['output'];
+};
+
+export type AstroliftPipelineSecretChangeMutationResult = {
+  data?: Maybe<AstroliftPipelineSecretChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftPodResourceUsage = {
@@ -5199,6 +5293,8 @@ export type AstroliftWorkload = {
   slug: Scalars['String']['output'];
   storageClass: Scalars['String']['output'];
   storageSize: Scalars['String']['output'];
+  /** Version of this workload for restart and scale preconditions. */
+  version: Scalars['Int']['output'];
   volumes: Scalars['JSON']['output'];
 };
 
@@ -5909,6 +6005,11 @@ export type DeleteGroupRoleMappingInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DeletePipelineSecretInput = {
+  name: Scalars['String']['input'];
+  pipelineId: Scalars['GUID']['input'];
+};
+
 export type DeleteRoleInput = {
   id: Scalars['GUID']['input'];
 };
@@ -6403,6 +6504,7 @@ export type Mutation = {
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
+  clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
@@ -6469,6 +6571,7 @@ export type Mutation = {
   deleteGroupRoleMapping: SoftdeletepayloadMutationResult;
   deleteInvitation: AstroliftInvitationMutationResult;
   deletePipeline: AstroliftPipelineMutationResult;
+  deletePipelineSecret: AstroliftPipelineSecretChangeMutationResult;
   deleteProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   deleteProjectSecretBundle: AstroliftSecretBundleMutationResult;
   deleteSkill: AstroliftSkillMutationResult;
@@ -6677,6 +6780,7 @@ export type Mutation = {
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
+  setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
@@ -6971,6 +7075,11 @@ export type MutationCancelTaskArgs = {
 
 export type MutationCancelWorkflowInstanceArgs = {
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationClearAgentQuarantineArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -7307,6 +7416,11 @@ export type MutationDeleteInvitationArgs = {
 
 export type MutationDeletePipelineArgs = {
   id: Scalars['GUID']['input'];
+};
+
+
+export type MutationDeletePipelineSecretArgs = {
+  input: DeletePipelineSecretInput;
 };
 
 
@@ -7777,6 +7891,7 @@ export type MutationRecordClusterBootstrapRunArgs = {
 
 
 export type MutationRedeployAppArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: DeploymentByIdInput;
 };
 
@@ -7928,6 +8043,7 @@ export type MutationResetClusterAuthUserPasswordArgs = {
 
 
 export type MutationRestartAstroliftWorkloadArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: RestartWorkloadInput;
 };
 
@@ -8047,6 +8163,7 @@ export type MutationRevokeTeamAccessFromAppArgs = {
 
 
 export type MutationRollbackDeploymentArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: DeploymentByIdInput;
 };
 
@@ -8110,6 +8227,7 @@ export type MutationRunWorkflowDefinitionArgs = {
 
 
 export type MutationScaleAstroliftWorkloadArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: ScaleWorkloadInput;
 };
 
@@ -8225,6 +8343,11 @@ export type MutationSetNotificationProfileArgs = {
 
 export type MutationSetOrganizationModuleArgs = {
   input: SetOrganizationModuleInput;
+};
+
+
+export type MutationSetPipelineSecretArgs = {
+  input: SetPipelineSecretInput;
 };
 
 
@@ -8986,10 +9109,12 @@ export type Query = {
   agentEnvironmentSpecSecretStatus: Array<AstroliftAgentSecretStatus>;
   agentEnvironmentSpecSecretStatusPage: AstroliftAgentSecretStatusPage;
   agentEnvironmentSpecs: Array<AstroliftAgentEnvironmentSpec>;
+  agentEnvironmentSpecsPage: AstroliftAgentEnvironmentSpecPage;
   agentFleet: Array<AstroliftAgentListItem>;
   agentFleetPage: AstroliftAgentListItemPage;
   agentGallery: Array<AstroliftAgentTask>;
   agentLiveStatus: Array<AstroliftAgentLiveStatus>;
+  agentQuarantines: Array<AstroliftAgentQuarantine>;
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
@@ -8999,6 +9124,7 @@ export type Query = {
   agentTaskInputMessage?: Maybe<AstroliftAgentTaskInputMessage>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
   agentTaskLogs: Array<Scalars['String']['output']>;
+  agentTaskLogsPage: AstroliftAgentTaskLogPage;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
   agentTasks: Array<AstroliftAgentTask>;
   agentTasksPage: AstroliftAgentTaskPage;
@@ -9014,9 +9140,12 @@ export type Query = {
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
   astroliftAgentRuns: Array<AstroliftAgentRun>;
   astroliftAgentRunsPage: AstroliftAgentRunPage;
+  astroliftAlertEvent?: Maybe<AstroliftAlertEvent>;
+  astroliftAlertEventSummary: AstroliftAlertEventSummary;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage. */
   astroliftAlertEvents: Array<AstroliftAlertEvent>;
   astroliftAlertEventsPage: AstroliftAlertEventPage;
+  astroliftAlertRule?: Maybe<AstroliftAlertRule>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftAlertRulesPage. */
   astroliftAlertRules: Array<AstroliftAlertRule>;
   astroliftAlertRulesPage: AstroliftAlertRulePage;
@@ -9094,6 +9223,8 @@ export type Query = {
   astroliftDeploymentLog: Array<AstroliftDeploymentLogEntry>;
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
   astroliftDeploymentReleaseNotes?: Maybe<AstroliftReleaseNotes>;
+  astroliftDeploymentRunLogDownload?: Maybe<AstroliftDeploymentRunLogDownload>;
+  astroliftDeploymentRunLogPage: AstroliftDeploymentRunLogPage;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage. */
   astroliftDeployments: Array<AstroliftDeployment>;
   astroliftDeploymentsPage: AstroliftDeploymentPage;
@@ -9108,6 +9239,7 @@ export type Query = {
   astroliftEmailTemplates: Array<AstroliftEmailTemplate>;
   astroliftEnvironments: Array<AstroliftAppEnvironment>;
   astroliftEnvironmentsPage: AstroliftAppEnvironmentPage;
+  astroliftEvent?: Maybe<AstroliftEvent>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftEventsPage. */
   astroliftEvents: Array<AstroliftEvent>;
   /** @deprecated Caps at 500 buckets folded from a bounded 10k-row scan, so activity older than the scan window is unreachable. Use astroliftEventsAggregatedPage. */
@@ -9156,6 +9288,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage. */
   astroliftPipelineRuns: Array<AstroliftPipelineRun>;
   astroliftPipelineRunsPage: AstroliftPipelineRunPage;
+  astroliftPipelineSecrets: Array<AstroliftPipelineSecret>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage. */
   astroliftPipelines: Array<AstroliftPipeline>;
   astroliftPipelinesPage: AstroliftPipelinePage;
@@ -9223,6 +9356,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage. */
   astroliftTeams: Array<AstroliftTeam>;
   astroliftTeamsPage: AstroliftTeamPage;
+  astroliftTopologyTraffic?: Maybe<TopologyTraffic>;
   astroliftTraceSpans: Array<AstroliftTraceSpan>;
   /** @deprecated Caps at 100 attempts with no way to reach the 101st. Use astroliftWebhookDeliveriesPage. */
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
@@ -9354,6 +9488,7 @@ export type QueryAgentBoxesArgs = {
 
 
 export type QueryAgentEnvironmentSpecArgs = {
+  orgId?: InputMaybe<Scalars['ID']['input']>;
   slug: Scalars['String']['input'];
 };
 
@@ -9380,6 +9515,16 @@ export type QueryAgentEnvironmentSpecSecretStatusPageArgs = {
 
 export type QueryAgentEnvironmentSpecsArgs = {
   orgId: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentEnvironmentSpecsPageArgs = {
+  filter?: InputMaybe<AstroliftAgentEnvironmentSpecsFilter>;
+  orgId: Scalars['ID']['input'];
+  page?: InputMaybe<Scalars['Int']['input']>;
+  pageSize?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9459,6 +9604,13 @@ export type QueryAgentTaskInteractionsArgs = {
 export type QueryAgentTaskLogsArgs = {
   id: Scalars['ID']['input'];
   tail?: Scalars['Int']['input'];
+};
+
+
+export type QueryAgentTaskLogsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -9551,7 +9703,18 @@ export type QueryAstroliftAgentRunsPageArgs = {
 };
 
 
+export type QueryAstroliftAlertEventArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftAlertEventSummaryArgs = {
+  appSlug: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftAlertEventsArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   ruleId?: InputMaybe<Scalars['GUID']['input']>;
   unresolvedOnly?: Scalars['Boolean']['input'];
@@ -9560,6 +9723,7 @@ export type QueryAstroliftAlertEventsArgs = {
 
 export type QueryAstroliftAlertEventsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   ruleId?: InputMaybe<Scalars['GUID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -9567,8 +9731,14 @@ export type QueryAstroliftAlertEventsPageArgs = {
 };
 
 
+export type QueryAstroliftAlertRuleArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftAlertRulesArgs = {
   activeOnly?: Scalars['Boolean']['input'];
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   target?: InputMaybe<Scalars['String']['input']>;
   targetId?: InputMaybe<Scalars['String']['input']>;
 };
@@ -9577,6 +9747,7 @@ export type QueryAstroliftAlertRulesArgs = {
 export type QueryAstroliftAlertRulesPageArgs = {
   activeOnly?: Scalars['Boolean']['input'];
   after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   target?: InputMaybe<Scalars['String']['input']>;
@@ -10008,6 +10179,18 @@ export type QueryAstroliftDeploymentReleaseNotesArgs = {
 };
 
 
+export type QueryAstroliftDeploymentRunLogDownloadArgs = {
+  deploymentId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftDeploymentRunLogPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  deploymentId: Scalars['String']['input'];
+  limit?: Scalars['Int']['input'];
+};
+
+
 export type QueryAstroliftDeploymentsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -10088,6 +10271,11 @@ export type QueryAstroliftEnvironmentsPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftEventArgs = {
+  id: Scalars['GUID']['input'];
 };
 
 
@@ -10306,6 +10494,11 @@ export type QueryAstroliftPipelineRunsPageArgs = {
   limit?: Scalars['Int']['input'];
   pipelineId: Scalars['String']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftPipelineSecretsArgs = {
+  pipelineId: Scalars['GUID']['input'];
 };
 
 
@@ -10598,6 +10791,14 @@ export type QueryAstroliftTeamsPageArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
   sortBy?: InputMaybe<AstroliftListSortKey>;
+};
+
+
+export type QueryAstroliftTopologyTrafficArgs = {
+  appSlug: Scalars['String']['input'];
+  end: Scalars['DateTime']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  start: Scalars['DateTime']['input'];
 };
 
 
@@ -11471,6 +11672,12 @@ export type SetOrganizationModuleInput = {
   key: Scalars['String']['input'];
 };
 
+export type SetPipelineSecretInput = {
+  name: Scalars['String']['input'];
+  pipelineId: Scalars['GUID']['input'];
+  value: Scalars['String']['input'];
+};
+
 export type SetPreviewPinnedInput = {
   id: Scalars['GUID']['input'];
   pinned: Scalars['Boolean']['input'];
@@ -11630,6 +11837,54 @@ export type ToolDefInput = {
   outputSchema: Scalars['JSON']['input'];
   slug: Scalars['String']['input'];
 };
+
+export type TopologyEnvironmentTraffic = {
+  edges: Array<TopologyTrafficEdge>;
+  environmentId: Scalars['ID']['output'];
+  environmentName: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  status: TopologyTrafficStatus;
+  truncated: Scalars['Boolean']['output'];
+};
+
+export type TopologyTraffic = {
+  appSlug: Scalars['String']['output'];
+  edgeLimit: Scalars['Int']['output'];
+  end: Scalars['DateTime']['output'];
+  environmentLimit: Scalars['Int']['output'];
+  environments: Array<TopologyEnvironmentTraffic>;
+  sampleLimit: Scalars['Int']['output'];
+  source: Scalars['String']['output'];
+  start: Scalars['DateTime']['output'];
+  status: TopologyTrafficStatus;
+  stepSeconds: Scalars['Int']['output'];
+  truncated: Scalars['Boolean']['output'];
+};
+
+export type TopologyTrafficEdge = {
+  destinationWorkloadId: Scalars['ID']['output'];
+  destinationWorkloadName: Scalars['String']['output'];
+  errorRate: Scalars['Float']['output'];
+  errorRatio: Scalars['Float']['output'];
+  requestRate: Scalars['Float']['output'];
+  samples: Array<TopologyTrafficSample>;
+  sourceWorkloadId: Scalars['ID']['output'];
+  sourceWorkloadName: Scalars['String']['output'];
+};
+
+export type TopologyTrafficSample = {
+  errorRate: Scalars['Float']['output'];
+  requestRate: Scalars['Float']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
+export type TopologyTrafficStatus =
+  | 'AVAILABLE'
+  | 'NO_DATA'
+  | 'PARTIAL'
+  | 'UNAVAILABLE'
+  | 'UNCONFIGURED';
 
 export type TransferAppInput = {
   appId: Scalars['GUID']['input'];

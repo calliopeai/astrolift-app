@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { AlertTriangleIcon, FileCodeIcon } from "lucide-react";
 import type * as React from "react";
 
@@ -35,6 +37,11 @@ export function ManifestPreviewScreen({
   setImageTag,
   environments,
   loading,
+  error,
+  onRetry,
+  environmentsLoading,
+  environmentsError,
+  onRetryEnvironments,
   result,
 }: ManifestPreviewScreenProps) {
   return (
@@ -51,7 +58,11 @@ export function ManifestPreviewScreen({
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label className="text-xs tracking-wide uppercase">Environment</Label>
-          <Select value={envName} onValueChange={setEnvName}>
+          <Select
+            value={envName}
+            onValueChange={setEnvName}
+            disabled={environmentsLoading || Boolean(environmentsError)}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -78,7 +89,19 @@ export function ManifestPreviewScreen({
         </div>
       </div>
 
-      {loading && !result ? (
+      <QueryError
+        title="Could not load environments"
+        error={environmentsError}
+        onRetry={onRetryEnvironments}
+      />
+      {environmentsLoading && (
+        <p role="status" className="text-muted-foreground text-sm">
+          Loading environments…
+        </p>
+      )}
+      {error ? (
+        <QueryError title="Could not load manifest preview" error={error} onRetry={onRetry} />
+      ) : loading && !result ? (
         <Skeleton className="h-64 w-full" />
       ) : !result ? (
         <Card>

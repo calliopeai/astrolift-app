@@ -36,8 +36,12 @@ export interface DeployModelInput {
  */
 export function useDeployModel() {
   const router = useRouter();
-  const targets = useQuery<ListModelTargetsQuery>(LIST_MODEL_TARGETS);
-  const clusters = useQuery<ListClusterGpusQuery>(LIST_CLUSTER_GPUS, { errorPolicy: "all" });
+  const targets = useQuery<ListModelTargetsQuery>(LIST_MODEL_TARGETS, {
+    fetchPolicy: "cache-and-network",
+  });
+  const clusters = useQuery<ListClusterGpusQuery>(LIST_CLUSTER_GPUS, {
+    fetchPolicy: "cache-and-network",
+  });
   const [provision, { loading }] = useMutation<ProvisionResult>(PROVISION_MANAGED_SERVICE);
 
   /** Resolves null when the deploy was accepted, or the reason it was refused. */
@@ -70,7 +74,15 @@ export function useDeployModel() {
   return {
     envs: targets.data?.astroliftEnvironments ?? [],
     envsLoading: targets.loading && !targets.data,
-    envsError: targets.error ? targets.error.message : null,
+    envsError: targets.data ? null : (targets.error?.message ?? null),
+    onRetryTargets: () => {
+      void targets.refetch().catch(() => {});
+    },
+    clustersLoading: clusters.loading && !clusters.data,
+    clustersError: clusters.data ? null : (clusters.error?.message ?? null),
+    onRetryClusters: () => {
+      void clusters.refetch().catch(() => {});
+    },
     clusters: clusters.data?.astroliftClusters ?? [],
     loading,
     deploy,

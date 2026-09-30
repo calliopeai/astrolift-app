@@ -320,3 +320,39 @@ def test_a_non_azure_cluster_records_no_grants() -> None:
     )
 
     assert WorkloadIdentityGrant.objects.count() == 0
+
+
+@pytest.mark.parametrize("reconcile_failed", [False, True])
+def test_union_assignment_outcomes_stay_on_each_environment_owner(reconcile_failed):
+    app, prod = _environment()
+    preview = AppEnvironment.objects.create(
+        registered_app=app, tenant_cluster=prod.tenant_cluster, name="preview-pr-3"
+    )
+    production = _service(app, prod, kind=ManagedService.Kind.OBJECT_STORE, name="production-blobs")
+    branch = _service(app, preview, kind=ManagedService.Kind.OBJECT_STORE, name="preview-blobs")
+    preview_scope = _BLOB_SCOPE.replace("/containers/data", "/containers/preview")
+    state = "failed" if reconcile_failed else "pending"
+    driver = _FakeIdentityDriver(
+        outcomes=[
+            _outcome(_BLOB_SCOPE, state, reason="production outcome"),
+            _outcome(preview_scope, state, reason="preview outcome"),
+        ],
+        raise_after_reconcile=RuntimeError("reconcile failed") if reconcile_failed else None,
+    )
+    bindings = {
+        production.name: _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])]),
+        branch.name: _Binding([_Grant(preview_scope, ["Storage Blob Data Contributor"])]),
+    }
+    if reconcile_failed:
+        with pytest.raises(RuntimeError, match="reconcile failed"):
+            _run(app, preview, driver, bindings)
+    else:
+        result = _run(app, preview, driver, bindings)
+        assert result["grants_pending"] == 2
+    rows = {row.managed_service_id: row for row in WorkloadIdentityGrant.objects.all()}
+    assert set(rows) == {production.pk, branch.pk}
+    assert rows[production.pk].app_environment_id == prod.pk
+    assert rows[production.pk].reason == "production outcome"
+    assert rows[branch.pk].app_environment_id == preview.pk
+    assert rows[branch.pk].reason == "preview outcome"
+    assert all(row.state == state for row in rows.values())

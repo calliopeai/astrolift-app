@@ -241,8 +241,8 @@ export function DomainsScreen({
             getRowId={(d) => d.id}
             rowHref={domainHref}
             rowClassName={(d) => (d.id === shown?.id ? "bg-muted/50" : undefined)}
-            loading={loading && all.length === 0}
-            error={error && all.length === 0 ? error : null}
+            loading={loading}
+            error={error}
             onRetry={refetch}
             totalCount={totalCount}
             empty={{

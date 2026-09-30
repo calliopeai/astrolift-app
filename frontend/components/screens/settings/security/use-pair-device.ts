@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { copyWithFeedback } from "@/lib/copy-with-feedback";
+
 import { GENERATE_INSTALL_ENROLLMENT_QR } from "@/graphql/identity/identity.mutations";
 import type {
   AstroliftEnrollmentQrPayload,
@@ -37,16 +39,14 @@ export function usePairDevice() {
     }
   }
 
-  function onCopyVerificationUri() {
+  async function onCopyVerificationUri() {
     if (!payload) return;
-    navigator.clipboard.writeText(payload.verificationUri);
-    toast.success(t("toastUriCopied"));
+    await copyWithFeedback(payload.verificationUri, t("toastUriCopied"), t("toastCopyFailed"));
   }
 
-  function onCopyPayload() {
+  async function onCopyPayload() {
     if (!payload) return;
-    navigator.clipboard.writeText(payload.qrPayload);
-    toast.success(t("toastPayloadCopied"));
+    await copyWithFeedback(payload.qrPayload, t("toastPayloadCopied"), t("toastCopyFailed"));
   }
 
   function onClear() {

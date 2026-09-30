@@ -1,29 +1,30 @@
 """User-related mutations migrated from Graphene to Strawberry."""
+
 from __future__ import annotations
 
-import logging
 from typing import Optional
 
+import logging
+
 import strawberry
-from django.conf import settings
 from django.contrib.auth import SESSION_KEY as AUTH_SESSION_KEY
-from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import PermissionDenied
 from graphql import GraphQLError
 from strawberry.types import Info
 
 from core.models import Profile, SignRequest
 from core.permissions import require_platform_operator
-from core.schema.mutations.common import UtilityForm
 from core.schema.common import GlobalIDUtils, MutationResult
-from core.schema.mutations.base import resolve_instance_from_id
-from core.schema.types.user import SignRequestType as StrawberrySignRequestType, UserType as StrawberryUserType
+from core.schema.legacy_access import is_operator_with_credential, require_account_access
+from core.schema.mutations.common import UtilityForm
+from core.schema.types.user import UserType as StrawberryUserType
 
 try:
     from django.contrib.auth import HASH_SESSION_KEY as AUTH_HASH_SESSION_KEY
 except ImportError:
-    AUTH_HASH_SESSION_KEY = '_auth_user_hash'
+    AUTH_HASH_SESSION_KEY = "_auth_user_hash"
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Helper: resolve user from global ID using Graphene registry
 # (many mutations reference Graphene's UserType.get_object / SignRequestType)
 # ---------------------------------------------------------------------------
+
 
 def _get_user_object(info, global_id: str, raise_not_found: bool = True) -> User:
     """Resolve a User from a relay global ID.
@@ -99,20 +101,23 @@ def _may_switch_to(user: User, other_user: User) -> bool:
     ungrouped must not be able to reach each other just because their columns
     match.
     """
+    if not user.is_active or not other_user.is_active:
+        return False
     if user.pk == other_user.pk:
         return True
-    if user.is_superuser:
+    if is_operator_with_credential(user):
         return True
-    group_id = getattr(getattr(user, 'profile', None), 'switch_group_id', None)
+    group_id = getattr(getattr(user, "profile", None), "switch_group_id", None)
     if group_id is None:
         return False
-    other_group_id = getattr(getattr(other_user, 'profile', None), 'switch_group_id', None)
+    other_group_id = getattr(getattr(other_user, "profile", None), "switch_group_id", None)
     return group_id == other_group_id
 
 
 # ---------------------------------------------------------------------------
 # Input types
 # ---------------------------------------------------------------------------
+
 
 @strawberry.input
 class ProfileInput:
@@ -131,6 +136,7 @@ class UserInput:
 # ---------------------------------------------------------------------------
 # Response types
 # ---------------------------------------------------------------------------
+
 
 @strawberry.type
 class LoginResult:
@@ -151,9 +157,9 @@ class UpsertUserResult:
 # Mutations
 # ---------------------------------------------------------------------------
 
+
 @strawberry.type
 class UserMutations:
-
     @strawberry.mutation(description="Authenticate a user with username and password.")
     def login(self, info: Info, username: str, password: str) -> LoginResult:
         user = authenticate(request=info.context.request, username=username, password=password)
@@ -178,33 +184,39 @@ class UserMutations:
 
     @strawberry.mutation(description="Switch the active user (impersonation).")
     def switch_user(self, info: Info, id: strawberry.ID) -> SwitchUserResult:
-        user: User = info.context.user
+        from astrolift_identity.api_tokens import get_current_api_token
+
+        user: User = require_account_access(info)
+        if get_current_api_token() is not None:
+            raise PermissionDenied("User switching requires a browser session.")
         request = info.context.request
 
-        if id == '':
+        if id == "":
             # Return-to-self: the session already proved this identity when it
             # switched away, so it needs no further gate.
-            if 'MAIN_USER_PK' not in request.session:
+            if "MAIN_USER_PK" not in request.session:
                 return SwitchUserResult(user=info.context.user)
-            other_user = User.objects.get(pk=request.session['MAIN_USER_PK'])
+            other_user = User.objects.get(pk=request.session["MAIN_USER_PK"])
+            if not other_user.is_active:
+                raise PermissionDenied("The original account is inactive.")
         else:
             other_user = _get_user_object(info, id, raise_not_found=True)
             if not _may_switch_to(user, other_user):
                 # Indistinguishable from "no such user", deliberately:
                 # confirming an id exists is its own disclosure.
-                raise GraphQLError(f'Object id User:{id} not found')
+                raise GraphQLError(f"Object id User:{id} not found")
 
         # Clear cached user so context sees the switched user
         try:
-            del info.context.__dict__['user']
+            del info.context.__dict__["user"]
         except KeyError:
             pass
 
         request.session[AUTH_SESSION_KEY] = other_user.pk
         request.session[AUTH_HASH_SESSION_KEY] = other_user.get_session_auth_hash()
 
-        if 'MAIN_USER_PK' not in request.session:
-            request.session['MAIN_USER_PK'] = user.pk
+        if "MAIN_USER_PK" not in request.session:
+            request.session["MAIN_USER_PK"] = user.pk
 
         request.session.save()
 
@@ -212,23 +224,24 @@ class UserMutations:
 
     @strawberry.mutation(description="Upsert user profile via UtilityForm.apply_forms.")
     def upsert_user(self, info: Info, input: UserInput) -> UpsertUserResult:
+        require_account_access(info, write=True)
         # Convert strawberry input to dict for UtilityForm
         input_data = {}
         if input.id is not None:
-            input_data['id'] = input.id
-        input_data['username'] = input.username
+            input_data["id"] = input.id
+        input_data["username"] = input.username
         if input.first_name is not None:
-            input_data['first_name'] = input.first_name
+            input_data["first_name"] = input.first_name
         if input.last_name is not None:
-            input_data['last_name'] = input.last_name
+            input_data["last_name"] = input.last_name
         if input.profile is not None:
             profile_data = {}
             if input.profile.avatar is not None:
-                profile_data['avatar'] = input.profile.avatar
-            input_data['profile'] = profile_data
+                profile_data["avatar"] = input.profile.avatar
+            input_data["profile"] = profile_data
 
         # Set the user's global ID as the input ID (same as Graphene version)
-        input_data['id'] = GlobalIDUtils.to_global_id('UserType', info.context.user.pk)
+        input_data["id"] = GlobalIDUtils.to_global_id("UserType", info.context.user.pk)
 
         instance = UtilityForm.apply_forms(None, info, input_data)
         return UpsertUserResult(instance=instance)
@@ -280,28 +293,43 @@ class UserMutations:
 
     @strawberry.mutation(
         description="Request a password reset email. "
-                    "Only the platform operator may send one to another user."
+        "Only the platform operator may send one to another user."
     )
-    def profile_request_pwd_change(self, info: Info, user_gid: Optional[strawberry.ID] = None) -> bool:
+    def profile_request_pwd_change(self, info: Info, user_gid: strawberry.ID | None = None) -> bool:
+        caller = require_account_access(info, write=True)
+        if user_gid and str(GlobalIDUtils.get_pk_flexible(user_gid, expected_type="UserType")) != str(caller.pk):
+            require_platform_operator(caller)
         user = _get_user_object(info, user_gid, raise_not_found=True) if user_gid else info.context.user
-
-        if user != info.context.user:
-            require_platform_operator(info.context.user)
 
         user.profile.request_reset_password()
         return True
 
     @strawberry.mutation(
         description="Request deletion of a user account. "
-                    "Only the platform operator may delete another user."
+        "Only the platform operator may delete another user."
     )
-    def profile_request_delete_user(self, info: Info, user_gid: Optional[strawberry.ID] = None) -> bool:
+    def profile_request_delete_user(self, info: Info, user_gid: strawberry.ID | None = None) -> bool:
+        from django.db import transaction
+
+        from astrolift_identity.anonymize import _sole_owner_org_ids
+        from astrolift_identity.models import Member
+        from astrolift_identity.session_elevation import is_elevated
+
+        caller = require_account_access(info, write=True)
+        if user_gid and str(GlobalIDUtils.get_pk_flexible(user_gid, expected_type="UserType")) != str(caller.pk):
+            require_platform_operator(caller)
         user = _get_user_object(info, user_gid, raise_not_found=True) if user_gid else info.context.user
 
-        if user != info.context.user:
-            require_platform_operator(info.context.user)
+        if user == caller and not is_elevated(getattr(info.context.request, "session", None)):
+            raise PermissionDenied("Account deletion requires an elevated session.")
 
-        Profile.anonymize_user(user)
+        with transaction.atomic():
+            if _sole_owner_org_ids(user.pk) and not is_operator_with_credential(info.context.user):
+                raise PermissionDenied("Only the platform operator can remove an organization's last owner.")
+            Profile.anonymize_user(user)
+            Member.objects.filter(user_id=user.pk).update(
+                lifecycle=Member.Lifecycle.DEACTIVATED, is_active=False
+            )
         if user == info.context.user:
             logout(info.context.request)
 
@@ -309,32 +337,32 @@ class UserMutations:
 
     @strawberry.mutation(description="Update or set the user's PIN.")
     def pin_update(self, info: Info, pin: str) -> bool:
-        user = info.context.user
+        user = require_account_access(info, write=True)
         user.profile.update_pin(pin)
         return True
 
     @strawberry.mutation(
         description="Authenticate a PIN transaction. "
-                    "The proxy_user parameter allows acting on behalf of another user."
+        "The proxy_user parameter allows acting on behalf of another user."
     )
     def pin_transaction(
         self,
         info: Info,
         pin: str,
-        proxy_user: Optional[strawberry.ID] = None,
+        proxy_user: strawberry.ID | None = None,
     ) -> bool:
+        require_account_access(info, write=True)
         if proxy_user:
             # #1979: refused before any lookup or PIN comparison. Refusing
             # only a correct PIN, as the model does, told a caller in any
             # org which guess matched another user's PIN.
-            raise PermissionDenied('Authenticating with another user\'s PIN is not permitted.')
+            raise PermissionDenied("Authenticating with another user's PIN is not permitted.")
         profile: Profile = info.context.user.profile
         profile.authenticate(pin, None, None)
         return True
 
     @strawberry.mutation(
-        description="Request a sign from a user. "
-                    "Sign requests are not available: this always refuses."
+        description="Request a sign from a user. " "Sign requests are not available: this always refuses."
     )
     def sign_request_user(
         self,
@@ -342,33 +370,19 @@ class UserMutations:
         gid: str,
         user_to_request: strawberry.ID,
     ) -> bool:
-        # SignRequestType.get_object can not be used because of the security in SignRequestType
-        # This assumes everyone can request a sign
-        sign_request_pk = _get_sign_request_pk(gid)
-        sign_request = SignRequest.objects.filter(pk=sign_request_pk).first()
-
-        if not sign_request:
-            raise GraphQLError(f'Object id SignRequest:{gid} not found')
-
-        resolved_user = _get_user_object(info, user_to_request, raise_not_found=True)
-        if sign_request.is_rejected:
-            sign_request = sign_request.reset_sign_request(resolved_user)
-
-        sign_request.request_user(resolved_user)
-        return True
+        require_account_access(info)
+        raise PermissionDenied("Sign requests are unavailable.")
 
     @strawberry.mutation(
         description="Sign a sign request. Sign requests are not available: this always refuses."
     )
     def sign_request_sign(self, info: Info, gid: str) -> bool:
-        sign_request = _get_sign_request_object(info, gid, raise_not_found=True)
-        sign_request.sign(info.context.user)
-        return True
+        require_account_access(info)
+        raise PermissionDenied("Sign requests are unavailable.")
 
     @strawberry.mutation(
         description="Cancel a sign request. Sign requests are not available: this always refuses."
     )
     def sign_request_cancel(self, info: Info, gid: str, note: str) -> bool:
-        sign_request = _get_sign_request_object(info, gid)
-        sign_request.cancel(info.context.user, note)
-        return True
+        require_account_access(info)
+        raise PermissionDenied("Sign requests are unavailable.")

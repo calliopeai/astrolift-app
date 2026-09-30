@@ -6,11 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { CREATE_INVITATION, REVOKE_INVITATION } from "@/graphql/identity/identity.mutations";
-import {
-  LIST_INVITATIONS,
-  LIST_ROLES_I_CAN_GRANT,
-  SEARCHABLE_USERS,
-} from "@/graphql/identity/identity.queries";
+import { LIST_ROLES_I_CAN_GRANT, SEARCHABLE_USERS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftInvitation,
   AstroliftRole,
@@ -72,7 +68,7 @@ export function useInviteDialog(open: boolean) {
   const [createInvite, { loading }] = useMutation<{
     createInvitation: MutationResult<InvitationCreated>;
   }>(CREATE_INVITATION, {
-    refetchQueries: [{ query: LIST_INVITATIONS }],
+    refetchQueries: ["ListInvitationsPage"],
     awaitRefetchQueries: true,
   });
 
@@ -80,7 +76,7 @@ export function useInviteDialog(open: boolean) {
     revokeInvitation: MutationResult<AstroliftInvitation>;
   }>(REVOKE_INVITATION, {
     refetchQueries: [
-      { query: LIST_INVITATIONS },
+      "ListInvitationsPage",
       { query: SEARCHABLE_USERS, variables: { query: searchQuery } },
     ],
     awaitRefetchQueries: true,

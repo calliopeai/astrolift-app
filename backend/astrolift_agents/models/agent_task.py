@@ -322,6 +322,10 @@ class AgentTask(BaseCoreModel):
                 raise ValueError(f"AgentTask({self.pk}) is awaiting cancellation")
             if new_status not in allowed:
                 raise ValueError(f"AgentTask({self.pk}) cannot transition {current!r} → {new_status!r}")
+            if new_status in {self.Status.QUEUED, self.Status.PROVISIONING}:
+                from astrolift_agents.services.agent_enforcement import assert_not_quarantined
+
+                assert_not_quarantined(task)
             now = timezone.now()
             task.status = new_status
             if new_status == self.Status.QUEUED:

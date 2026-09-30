@@ -28,7 +28,7 @@ def validate_task_events(value):
         raise TaskEventError(f"events must be a list of at most {MAX_EVENT_BATCH} entries")
     previous = None
     for event in value:
-        if not isinstance(event, dict) or not _FIELDS <= set(event) <= _FIELDS | {"request"}:
+        if not isinstance(event, dict) or not _FIELDS <= set(event) <= _FIELDS | {"request", "data"}:
             raise TaskEventError("each event requires sequence, turn_id, message_id, kind and text")
         sequence = event["sequence"]
         if type(sequence) is not int or not 1 <= sequence <= MAX_TASK_EVENTS:
@@ -54,6 +54,9 @@ def validate_task_events(value):
             raise TaskEventError(f"event text exceeds {MAX_EVENT_BYTES} UTF-8 bytes", 413)
         try:
             validate_request(event.get("request"), event["kind"])
+            from astrolift_agents.services.structured_events import validate
+
+            validate(event["kind"], event.get("data"), text)
         except TaskInputRequestError as exc:
             raise TaskEventError(str(exc), exc.status) from exc
     return value
@@ -96,6 +99,7 @@ def prepare_task_events(task, events):
                 or row.deleted_at is not None
                 or any(getattr(row, key) != event[key] for key in _FIELDS)
                 or row.request != event.get("request")
+                or row.data != event.get("data")
             ):
                 raise TaskEventError("event sequence conflicts with recorded history", 409)
             continue
@@ -113,6 +117,8 @@ def prepare_task_events(task, events):
         ):
             raise TaskEventError("input request only accepts one resolution", 409)
         size += len(event["text"].encode("utf-8"))
+        if event.get("data") is not None:
+            size += request_bytes(event["data"])
         if event.get("request") is not None:
             size += request_bytes(event["request"])
         if size > MAX_TASK_EVENT_BYTES:
@@ -135,3 +141,12 @@ def commit_task_events(task, prepared):
     AgentTaskEvent.objects.bulk_create(rows)
     task.event_sequence, task.event_bytes = sequence, size
     task.save(update_fields=["event_sequence", "event_bytes", "updated_at", "version"])
+
+    from astrolift_operations.zentinelle_bridge import emit_agent_session_events
+
+    emit_agent_session_events(task, rows)
+    from django.db import transaction
+
+    from astrolift_agents.services.agent_enforcement import poll_enforcements
+
+    transaction.on_commit(lambda: poll_enforcements(task))

@@ -1,11 +1,10 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
-import * as React from "react";
 
 import { useCursorFeed } from "@/components/feed/use-cursor-feed";
 import {
-  LIST_EVENTS,
+  GET_EVENT,
   LIST_EVENTS_AGGREGATED_PAGE,
   LIST_EVENTS_PAGE,
 } from "@/graphql/operations/operations.queries";
@@ -41,8 +40,8 @@ interface AggPageResp {
   };
 }
 
-interface ListResp {
-  astroliftEvents: AstroliftEvent[];
+interface DetailResp {
+  astroliftEvent: AstroliftEvent | null;
 }
 
 const DEFAULT_AGGREGATE_WINDOW_SECONDS = 300;
@@ -85,14 +84,22 @@ function perDayCounts(timestamps: string[], windowDays = RATE_WINDOW_DAYS): numb
  * of the same raw stream, so the per-day counts are identical either way.
  */
 export function useEventRate() {
-  const { data } = useQuery<RawPageResp>(LIST_EVENTS_PAGE, {
+  const { data, loading, error, refetch } = useQuery<RawPageResp>(LIST_EVENTS_PAGE, {
     variables: { limit: RATE_SAMPLE_LIMIT },
     fetchPolicy: "cache-and-network",
     pollInterval: RATE_POLL_MS,
   });
   const days = perDayCounts((data?.astroliftEventsPage.items ?? []).map((e) => e.occurredAt));
   const total = days.reduce((a, b) => a + b, 0);
-  return { days, total };
+  return {
+    days,
+    total,
+    loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
+  };
 }
 
 /**
@@ -156,20 +163,19 @@ export function useBucketMembers(bucket: AggregatedEvent) {
   return { loading, members };
 }
 
-/**
- * Event detail (#1106) — full payload + metadata for a single platform event.
- * Reuses the unfiltered LIST_EVENTS window (no singular query exists); a cold
- * deep-link resolves as long as the event is within the recent 200.
- */
+/** A direct owner-filtered read keeps old deep links independent of the stream window. */
 export function useEventDetail(id: string) {
-  const { data, loading } = useQuery<ListResp>(LIST_EVENTS, {
-    variables: { limit: 200, eventType: null },
+  const { data, loading, error, refetch } = useQuery<DetailResp>(GET_EVENT, {
+    variables: { id },
     fetchPolicy: "cache-and-network",
   });
-
-  const event = React.useMemo(
-    () => (data?.astroliftEvents ?? []).find((row) => row.id === id) ?? null,
-    [data, id]
-  );
-  return { id, event, loading };
+  return {
+    id,
+    event: data?.astroliftEvent ?? null,
+    loading: loading && !data,
+    error: data ? null : error?.message,
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
+  };
 }

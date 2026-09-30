@@ -24,6 +24,8 @@ export interface ObservabilitySectionViewProps extends ObservabilitySummary {
 export function ObservabilitySectionView({
   appSlug,
   days,
+  error,
+  onRetry,
   deploysLoading,
   deploysSeries,
   errorSeries,
@@ -40,6 +42,8 @@ export function ObservabilitySectionView({
       icon={<ChartSplineIcon className="size-4" />}
       description={`Last ${days} days · deploy throughput, failure rate, unresolved alerts.`}
       span={span}
+      error={error}
+      onRetry={onRetry}
       actions={
         <>
           <Link
@@ -50,7 +54,7 @@ export function ObservabilitySectionView({
             <ExternalLinkIcon className="size-3" />
           </Link>
           <Link
-            href={`/alerts?app=${appSlug}`}
+            href={`/alerts/events?view=firing&app=${encodeURIComponent(appSlug)}`}
             className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
           >
             Alerts
@@ -59,7 +63,7 @@ export function ObservabilitySectionView({
         </>
       }
     >
-      {deploysLoading && totalDeploys === 0 ? (
+      {deploysLoading ? (
         <div className="grid min-w-0 gap-3 sm:grid-cols-3">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
@@ -176,7 +180,7 @@ function AlertSummaryCard({
 }) {
   return (
     <Link
-      href={`/alerts?app=${appSlug}`}
+      href={`/alerts/events?view=firing&app=${encodeURIComponent(appSlug)}`}
       className="hover:bg-muted/40 group flex min-w-0 flex-col rounded-md border p-3 transition-colors"
     >
       <p className="text-muted-foreground text-2xs flex items-center gap-1 font-medium tracking-wide uppercase">

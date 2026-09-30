@@ -9,8 +9,6 @@ expose their initiator on the GraphQL type.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from astrolift_lifecycle.models import Deployment, ScheduledJobRun, TaskRun
@@ -35,11 +33,14 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def as_token(monkeypatch):
+def as_token(monkeypatch, org, user):
     """Make the request look token-authenticated, with a token that allows everything."""
-    token = SimpleNamespace(pk=7, team_id=None, organization_id=None, scopes=["admin"])
+    from astrolift_identity.models import ApiToken
+
+    token = ApiToken.objects.create(
+        user=user, organization=org, name="Trigger", token_hash="trigger-2152", scopes=["admin"]
+    )
     monkeypatch.setattr("astrolift_identity.api_tokens.get_current_api_token", lambda: token)
-    monkeypatch.setattr("astrolift_identity.api_tokens.token_scope_allows_permission", lambda *_a: True)
     return token
 
 

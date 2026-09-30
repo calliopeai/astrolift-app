@@ -17,6 +17,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_lifecycle.run_history import observed_phase
+
 log = logging.getLogger("astrolift_workflows.activities")
 
 
@@ -1252,6 +1254,7 @@ def _delete_stale_literal_secret(cluster_driver, cluster_slug: str, namespace: s
         )
 
 
+@observed_phase("apply")
 def _apply_manifests_sync(deployment_id: int) -> dict[str, list[str]]:
     from astrolift_lifecycle.models import Deployment
     from astrolift_workflows.activities.direct_apply import DryRunFailed, apply_with_dry_run
@@ -1754,6 +1757,7 @@ async def wait_dns(deployment_id: int, timeout_seconds: int = 300) -> int:
     return n
 
 
+@observed_phase("rollout")
 def _poll_rollout_sync(deployment_id: int, timeout_seconds: int) -> bool:
     from astrolift_lifecycle.models import Deployment
     from core.app_deploy import (
@@ -1800,6 +1804,7 @@ async def poll_rollout(deployment_id: int, timeout_seconds: int = 600) -> bool:
     return await sync_to_async(_poll_rollout_sync)(deployment_id, timeout_seconds)
 
 
+@observed_phase("health")
 def _health_check_sync(deployment_id: int) -> bool:
     from astrolift_lifecycle.models import Deployment
     from core.app_deploy import (

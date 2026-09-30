@@ -793,6 +793,7 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     if events is not None:
         payload["event_sequence"] = task.event_sequence
         payload["input_protocol_version"] = 1
+        payload["structured_event_protocol_version"] = 1
     if "input_request" in body:
         payload["input_response"] = input_response
     payload.update(_steering_input_payload(task, input_intent))

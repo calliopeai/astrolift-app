@@ -29,6 +29,7 @@ from astrolift_operations.schema.types import (
     NotificationType,
     notification_to_type,
 )
+from astrolift_operations.scopes import org_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -39,7 +40,7 @@ from core.tenancy import get_current_tenant
 class NotificationMutations:
     @strawberry.field
     @mutation_audit(action="notification.test")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=org_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def test_notification_channel(
         self, info: Info, input: TestNotificationInput
@@ -336,7 +337,7 @@ class NotificationMutations:
 
     @strawberry.field
     @mutation_audit(action="notification_profile.set")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=org_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def set_notification_profile(
         self, info: Info, input: SetNotificationProfileInput

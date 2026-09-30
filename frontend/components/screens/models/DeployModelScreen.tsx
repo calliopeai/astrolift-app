@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { AlertTriangleIcon, ArrowLeftIcon, ArrowRightIcon, Loader2Icon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
@@ -64,6 +66,10 @@ export function DeployModelScreen({
   envs,
   envsLoading,
   envsError,
+  onRetryTargets,
+  clustersLoading,
+  clustersError,
+  onRetryClusters,
   clusters,
   loading,
   deploy,
@@ -97,6 +103,7 @@ export function DeployModelScreen({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (envsLoading || envsError || clustersLoading || clustersError) return;
     setFormError(null);
     if (step === 1) {
       if (!env) {
@@ -134,6 +141,21 @@ export function DeployModelScreen({
         through MODEL_ENDPOINT_URL, MODEL_API_KEY and MODEL_DEPLOYMENT_NAME.
       </p>
 
+      <QueryError
+        title="Could not load deploy targets"
+        error={envsError}
+        onRetry={onRetryTargets}
+      />
+      <QueryError
+        title="Could not load cluster GPU capabilities"
+        error={clustersError}
+        onRetry={onRetryClusters}
+      />
+      {clustersLoading && (
+        <p role="status" className="text-muted-foreground text-sm">
+          Loading cluster GPU capabilities…
+        </p>
+      )}
       <form
         onSubmit={submit}
         noValidate
@@ -156,6 +178,7 @@ export function DeployModelScreen({
               <Skeleton className="h-9 w-full" />
             ) : (
               <Select
+                disabled={Boolean(envsError)}
                 value={envId}
                 onValueChange={(v) => {
                   setEnvId(v);
@@ -170,7 +193,11 @@ export function DeployModelScreen({
                 >
                   <SelectValue
                     placeholder={
-                      envs.length === 0 ? "No app environments yet" : "Choose where it runs"
+                      envsError
+                        ? "App environments unavailable"
+                        : envs.length === 0
+                          ? "No app environments yet"
+                          : "Choose where it runs"
                     }
                   />
                 </SelectTrigger>
@@ -184,7 +211,7 @@ export function DeployModelScreen({
                 </SelectContent>
               </Select>
             )}
-            <FieldError className="[overflow-wrap:anywhere]">{envError ?? envsError}</FieldError>
+            <FieldError className="[overflow-wrap:anywhere]">{envError}</FieldError>
             <FieldDescription>
               The model runs on this environment&apos;s cluster and is owned by its app.
             </FieldDescription>
@@ -363,12 +390,29 @@ export function DeployModelScreen({
             </Button>
           )}
           {step < 3 ? (
-            <Button type="submit" disabled={step === 1 && envsLoading}>
+            <Button
+              type="submit"
+              disabled={
+                Boolean(envsError || clustersError) ||
+                clustersLoading ||
+                (step === 1 && envsLoading)
+              }
+            >
               Continue
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (
-            <Button type="submit" disabled={!env || !modelId || blocked || loading}>
+            <Button
+              type="submit"
+              disabled={
+                !env ||
+                !modelId ||
+                blocked ||
+                loading ||
+                clustersLoading ||
+                Boolean(envsError || clustersError)
+              }
+            >
               {loading && <Loader2Icon className="size-4 animate-spin" />}
               {loading ? "Deploying..." : "Deploy"}
             </Button>

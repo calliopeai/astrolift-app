@@ -24,8 +24,18 @@ export default meta;
 
 type Story = StoryObj;
 
-const rate = <EventRate days={RATE_DAYS} total={RATE_TOTAL} />;
-const noRate = <EventRate days={new Array<number>(14).fill(0)} total={0} />;
+const rate = (
+  <EventRate loading={false} error={null} onRetry={() => {}} days={RATE_DAYS} total={RATE_TOTAL} />
+);
+const noRate = (
+  <EventRate
+    loading={false}
+    error={null}
+    onRetry={() => {}}
+    days={new Array<number>(14).fill(0)}
+    total={0}
+  />
+);
 const members = () => <BucketMembers loading={false} members={BUCKET_MEMBERS} />;
 
 function Screen({

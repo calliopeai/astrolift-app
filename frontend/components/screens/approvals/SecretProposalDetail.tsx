@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { CheckIcon, Loader2Icon, XCircleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -28,6 +30,8 @@ export type SecretProposalDetailScreenProps = ReturnType<typeof useSecretProposa
 export function SecretProposalDetailScreen({
   proposal,
   loading,
+  error,
+  onRetry,
   canApprove,
   approving,
   rejecting,
@@ -53,6 +57,13 @@ export function SecretProposalDetailScreen({
     );
   }
 
+  if (error) {
+    return (
+      <PageShell title="Secret proposal">
+        <QueryError title="Could not load secret proposal" error={error} onRetry={onRetry} />
+      </PageShell>
+    );
+  }
   if (proposal === null) {
     return (
       <PageShell title={t("notFound.title")} description={t("notFound.description")}>

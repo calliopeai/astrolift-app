@@ -61,7 +61,7 @@ export const LogError: Story = {
 /** Health failed: the reason first, Redeploy as the action, the manifest's render error. */
 export const Failed: Story = { render: () => <DeploymentDetailScreen {...DETAIL_FAILED} /> };
 
-/** The image never built: build failed, the later phases skipped. */
+/** The build failed; later phases have no timing record. */
 export const BuildFailed: Story = {
   render: () => <DeploymentDetailScreen {...DETAIL_BUILD_FAILED} />,
 };
@@ -80,6 +80,23 @@ export const Width768: Story = {
   render: () => (
     <div style={{ width: 768 }}>
       <DeploymentDetailScreen {...DETAIL_FAILED} />
+    </div>
+  ),
+};
+
+export const OlderLogAvailable: Story = {
+  render: () => <DeploymentDetailScreen {...DETAIL} hasOlderLog />,
+};
+export const HistoricalTimingUnavailable: Story = {
+  render: () => (
+    <DeploymentDetailScreen {...DETAIL} deployment={{ ...DETAIL.deployment!, phases: [] }} />
+  ),
+};
+
+export const OlderLogAt768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <DeploymentDetailScreen {...DETAIL} hasOlderLog />
     </div>
   ),
 };

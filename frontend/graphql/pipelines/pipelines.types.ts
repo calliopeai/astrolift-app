@@ -10,9 +10,9 @@ export interface PipelineSecret {
 export interface AstroliftPipeline {
   id: string;
   name: string;
-  slug: string;
-  description: string | null;
-  secrets: PipelineSecret[];
+  repoUrl: string;
+  defaultBranch: string;
+  tomlPath: string;
   createdAt: string;
   updatedAt: string;
 }

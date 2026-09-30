@@ -127,6 +127,7 @@ export const MANY_INTERACTIONS: AstroliftAgentInteraction[] = Array.from({ lengt
 );
 
 export const VNC_POPOUT: AgentVncPopoutProps = {
+  onRetry: () => {},
   taskId: TASK_ID,
   task: {
     id: TASK_ID,

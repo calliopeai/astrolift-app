@@ -45,7 +45,7 @@ export function useSecretProposalDetail(proposalId: string) {
   const { can } = useMyPermissions();
   const canApprove = can("secret.approve");
 
-  const { data, loading, refetch } = useQuery<GetResp>(GET_SECRET_CHANGE_PROPOSAL, {
+  const { data, loading, error, refetch } = useQuery<GetResp>(GET_SECRET_CHANGE_PROPOSAL, {
     variables: { id: proposalId },
     fetchPolicy: "cache-and-network",
   });
@@ -98,6 +98,10 @@ export function useSecretProposalDetail(proposalId: string) {
   return {
     proposal: data?.astroliftSecretChangeProposal ?? null,
     loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
     canApprove,
     approving: approveState.loading,
     rejecting: rejectState.loading,

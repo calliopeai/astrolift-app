@@ -69,7 +69,7 @@ export function taskStages(latest: AstroliftTaskRun | null): TimelineStep[] {
  * the shared run Timeline, a failure's exit code first, and the prior runs
  * below. Real data from TaskRun.
  */
-export function TaskHomeScreen({ runs, loading }: TaskHomeScreenProps) {
+export function TaskHomeScreen({ runs, loading, error, onRetry }: TaskHomeScreenProps) {
   const latest = runs[0] ?? null;
   const failed = latest ? isFailed(latest.status) : false;
 
@@ -80,6 +80,8 @@ export function TaskHomeScreen({ runs, loading }: TaskHomeScreenProps) {
         icon={<ListChecksIcon className="size-4" />}
         span={4}
         loading={loading && runs.length === 0}
+        error={error}
+        onRetry={onRetry}
         failure={
           latest && failed
             ? {
@@ -105,6 +107,8 @@ export function TaskHomeScreen({ runs, loading }: TaskHomeScreenProps) {
         icon={<HistoryIcon className="size-4" />}
         span={8}
         loading={loading && runs.length === 0}
+        error={error}
+        onRetry={onRetry}
         flush
         empty={
           runs.length === 0

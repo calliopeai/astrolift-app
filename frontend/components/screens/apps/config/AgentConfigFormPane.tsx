@@ -13,7 +13,7 @@ import { AlertTriangleIcon, CheckCircle2Icon, CopyIcon, GripVerticalIcon } from 
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { toast } from "sonner";
+import { copyWithFeedback } from "@/lib/copy-with-feedback";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -66,9 +66,8 @@ export function AgentConfigFormPane({
     [onDraftChange]
   );
 
-  const handleCopy = React.useCallback(() => {
-    void navigator.clipboard?.writeText(previewToml);
-    toast.success(t("copied"));
+  const handleCopy = React.useCallback(async () => {
+    await copyWithFeedback(previewToml, t("copied"), t("copyFailed"));
   }, [previewToml, t]);
 
   if (!parsed.safe) {

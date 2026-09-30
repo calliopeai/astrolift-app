@@ -279,6 +279,12 @@ def start_agent_box(box) -> None:
     rather than silently PENDING forever.
     """
     from astrolift_agents.models import AgentBox
+    from astrolift_agents.services.agent_enforcement import assert_not_quarantined
+
+    try:
+        assert_not_quarantined(box)
+    except ValueError as exc:
+        raise AgentBoxError(str(exc)) from exc
     from astrolift_agents.services.agent_cluster import (
         NoAgentClusterError,
         resolve_agent_cluster,
@@ -1089,6 +1095,13 @@ def reap_agent_boxes() -> dict[str, int]:
     for box in boxes:
         summary["evaluated"] += 1
         try:
+            from astrolift_agents.services.agent_enforcement import poll_enforcements
+
+            poll_enforcements(box)
+            box.refresh_from_db()
+            if box.status not in AgentBox.LIVE_STATUSES:
+                summary["unchanged"] += 1
+                continue
             observed = observe_box(box)
         except Exception:  # noqa: BLE001 — an unreachable cluster is not a verdict
             summary["errors"] += 1

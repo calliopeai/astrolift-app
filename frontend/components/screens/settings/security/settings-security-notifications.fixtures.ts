@@ -126,8 +126,8 @@ export function pairProps(over: Partial<PairDeviceViewProps> = {}): PairDeviceVi
     payload: null,
     loading: false,
     onMint: resolved,
-    onCopyVerificationUri: noop,
-    onCopyPayload: noop,
+    onCopyVerificationUri: resolved,
+    onCopyPayload: resolved,
     onClear: noop,
     ...over,
   };
@@ -255,6 +255,8 @@ export const LONG_NOTIFICATIONS: AstroliftNotification[] = [
 export function inboxProps(over: Partial<NotificationsInboxProps> = {}): NotificationsInboxProps {
   return {
     notifications: NOTIFICATIONS,
+    error: null,
+    onRetry: () => {},
     loading: false,
     marking: false,
     markingAll: false,

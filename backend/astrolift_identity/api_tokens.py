@@ -213,7 +213,7 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         return True
     if SCOPE_SECRET_READ in scopes and permission == "secret.read":
         return True
-    if SCOPE_SECRET_WRITE in scopes and permission == "secret.write":
+    if SCOPE_SECRET_WRITE in scopes and permission in {"secret.write", "pipeline.secret_manage"}:
         return True
     if SCOPE_MCP_READ in scopes and permission == "agent.read":
         return True

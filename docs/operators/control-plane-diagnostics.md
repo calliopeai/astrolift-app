@@ -38,3 +38,25 @@ owner restriction.
 Verification: `core/tests/test_access_holes_2174.py` executes GraphQL mutations
 and HTTP routes against real PostgreSQL, checking both successful operations
 and refusals without metadata, deletion or ownership changes.
+
+## Dashboard query failures
+
+An empty collection or a not-found object is shown only after its request
+succeeds. On an initial network or permission failure, the affected screen,
+panel or picker shows the failure and a Retry button (#2142). Retry repeats the
+read; it does not assume the request succeeded or change access permissions.
+For combined views such as cloud providers and driver reference, a failed
+cluster lookup cannot establish that no clusters are bound. Model deployment
+waits for environment targets and cluster GPU capabilities before proceeding.
+
+Background refreshes retain successfully loaded content. A failed poll does
+not close a running VNC session, discard a workflow or agent run, or replace
+cached skill rows with an error frame. The displayed data remains the last
+successful response until a later read succeeds; it is not evidence that the
+latest refresh succeeded. Event rate keeps its frame visible for loading,
+initial failure and a successful zero-event window.
+
+Verification: the frontend `query-states.test.tsx` uses real Apollo clients and
+React hooks to exercise transport refusals, retries and cached refreshes.
+`query-frames.test.tsx` checks that the corresponding rendered screens show the
+failure, preserve their frame and wire the retry action.

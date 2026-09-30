@@ -27,16 +27,17 @@ export function ScalePopoverView({
 }: ScalePopoverViewProps) {
   const [open, setOpen] = React.useState(defaultOpen);
   const [value, setValue] = React.useState(String(currentDesired));
-  React.useEffect(() => {
-    if (open) setValue(String(currentDesired));
-  }, [open, currentDesired]);
+  function onOpenChange(next: boolean) {
+    if (next) setValue(String(currentDesired));
+    setOpen(next);
+  }
 
   async function apply() {
     if (await applyValue(value)) setOpen(false);
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="size-6" title={`Scale ${workloadName}`}>
           <ScalingIcon className="size-3" />

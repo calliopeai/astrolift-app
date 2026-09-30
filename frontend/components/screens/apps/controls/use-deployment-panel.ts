@@ -20,10 +20,10 @@ interface RollbackResp {
  * The most-recent deployment, kept live by the lifecycle stream, and the
  * last-known-good it would roll back to. The data half of
  * DeploymentPanelView. It reads the deploys the app frame already holds
- * (use-app-deploys) and is the reader that keeps them live.
+ * (use-app-deploys) and follows the frame’s poll on every app tab.
  */
 export function useDeploymentPanel(appSlug: string) {
-  const { deployments, loading, refetch } = useAppDeploys(appSlug, { live: true });
+  const { deployments, loading, refetch } = useAppDeploys(appSlug);
 
   // Refetch on any lifecycle event for this app — the row deltas come
   // through the same query so the rollback button stays accurate.

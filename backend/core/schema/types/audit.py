@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Optional
+
+from datetime import datetime
 
 import strawberry
 from graphql import GraphQLError
@@ -42,7 +43,9 @@ def _require_superuser(info: Info) -> None:
     user = info.context.user
     if not getattr(user, "is_authenticated", False):
         raise GraphQLError("Authentication required")
-    if not getattr(user, "is_superuser", False):
+    from core.schema.legacy_access import is_operator_with_credential
+
+    if not is_operator_with_credential(user):
         raise GraphQLError("Audit log access requires superuser")
 
 

@@ -30,7 +30,7 @@ def test_rocket_channel_history_exporter_is_no_longer_registered():
 
 def test_download_file_refuses_the_removed_exporter_without_touching_rocketchat(monkeypatch):
     """A plain, non-operator, non-member user hitting the old URL gets a
-    plain 400 and the view never reaches the Rocket.Chat service account:
+    plain 403 and the view never reaches the Rocket.Chat service account:
     patching ``make_request`` to record calls and asserting it is never
     called is what proves the service-account credentials are not used,
     not just that the HTTP status looks right."""
@@ -43,6 +43,5 @@ def test_download_file_refuses_the_removed_exporter_without_touching_rocketchat(
 
     response = client.get("/app/export/", {"file": "rocket-channel-history", "chat_identifier": "general"})
 
-    assert response.status_code == 400
-    assert b"is not a valid choice" in response.content
+    assert response.status_code == 403
     assert calls == []

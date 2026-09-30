@@ -46,12 +46,14 @@ class DeploymentAdmin(_AllObjectsAdmin):
 
 @admin.register(DeploymentLog)
 class DeploymentLogAdmin(admin.ModelAdmin):
-    list_display = ("deployment", "status", "occurred_at")
-    list_filter = ("status",)
+    list_display = ("deployment", "status", "phase", "event", "occurred_at")
+    list_filter = ("status", "phase", "event")
     readonly_fields = (
         "guid",
         "deployment",
         "status",
+        "phase",
+        "event",
         "message",
         "detail",
         "by_user",

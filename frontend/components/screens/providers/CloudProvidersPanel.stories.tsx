@@ -32,10 +32,6 @@ export const Loading: Story = { args: { loading: true } };
 /** No provider backs a cluster yet; the catalog is still one click away. */
 export const Empty: Story = { args: { configured: [] } };
 
-/**
- * The panel has no error state: a failed query renders like an empty catalog.
- * This is the closest real state: nothing loaded at all.
- */
 export const NothingLoaded: Story = { args: { pluginCount: 0, configured: [], available: [] } };
 
 export const LongStrings: Story = {
@@ -47,4 +43,12 @@ export const LongStrings: Story = {
 
 export const LongStringsList: Story = {
   args: { ...LongStrings.args, viewMode: "list" },
+};
+
+export const QueryFailed: Story = {
+  args: {
+    configured: [],
+    available: [],
+    error: { name: "Error", message: "Permission denied while loading this section" },
+  },
 };

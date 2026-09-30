@@ -1,4 +1,5 @@
 """Notification mutations migrated from Graphene to Strawberry."""
+
 from __future__ import annotations
 
 import logging
@@ -15,12 +16,14 @@ logger = logging.getLogger(__name__)
 
 @strawberry.type
 class NotificationMutations:
-
     @strawberry.mutation(description="Create or update a notification via NotificationSerializer.")
     def notification(self, info: Info, input: strawberry.scalars.JSON) -> MutationResult:
+        from core.schema.legacy_access import require_account_access
+
+        require_account_access(info, write=True)
         from core.serializers.notification import NotificationSerializer
 
-        if input.get('guid'):
+        if input.get("guid"):
             # `guid` names an existing row for an update. `Notification` has
             # no `guid` field (only `BaseCoreModel` subclasses do) and
             # `NotificationSerializer` is a plain ModelSerializer with
@@ -34,7 +37,9 @@ class NotificationMutations:
             # `guid`) are unaffected.
             return MutationResult(
                 ok=False,
-                errors=[ValidationError(field='guid', messages=['Updating a notification is not supported.'])],
+                errors=[
+                    ValidationError(field="guid", messages=["Updating a notification is not supported."])
+                ],
             )
 
         # A notification names its recipient (`user`), across orgs: a caller
@@ -42,12 +47,12 @@ class NotificationMutations:
         # platform operator's (#1990). Nothing in the web app calls this.
         from core.permissions import require_platform_operator
 
-        request = getattr(info.context, 'request', None)
-        caller = getattr(request, 'user', None) or getattr(info.context, 'user', None)
-        if str(input.get('user') or '') != str(getattr(caller, 'pk', '')):
+        request = getattr(info.context, "request", None)
+        caller = getattr(request, "user", None) or getattr(info.context, "user", None)
+        if str(input.get("user") or "") != str(getattr(caller, "pk", "")):
             require_platform_operator(caller)
         serializer = NotificationSerializer(
-            data=input, partial=True, context={'request': info.context.request}
+            data=input, partial=True, context={"request": info.context.request}
         )
         if serializer.is_valid():
             serializer.save()
@@ -58,6 +63,9 @@ class NotificationMutations:
     @strawberry.mutation(description="Mark a notification as read.")
     def notification_read(self, info: Info, gid: strawberry.ID) -> bool:
         from core.models import Notification, NotificationStatus
+        from core.schema.legacy_access import require_account_access
+
+        require_account_access(info, write=True)
 
         # `from core.schema import NotificationType` raised ImportError on
         # this line: the package root exports no type names (the real type
@@ -69,14 +77,14 @@ class NotificationMutations:
         # `expected_type` is load-bearing rather than decorative: resolving
         # the id without it would accept any model's global id and then
         # write `status` onto whatever came back.
-        pk = GlobalIDUtils.get_pk_flexible(gid, expected_type='NotificationType')
+        pk = GlobalIDUtils.get_pk_flexible(gid, expected_type="NotificationType")
         if pk is None:
-            raise GraphQLError('Not a notification id')
-        notification = Notification.objects.filter(pk=pk).first()
+            raise GraphQLError("Not a notification id")
+        notification = Notification.objects.filter(pk=pk, user=info.context.user).first()
         if notification is None:
-            raise GraphQLError('Notification not found')
+            raise GraphQLError("Notification not found")
         if notification.user != info.context.user:
-            raise ValueError('Notification does not belong to user')
+            raise ValueError("Notification does not belong to user")
 
         notification.status = NotificationStatus.READ
         notification.status_date = timezone.now()

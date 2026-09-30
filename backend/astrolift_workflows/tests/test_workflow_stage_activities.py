@@ -1140,6 +1140,58 @@ def test_gate_open_emits_notified_event_with_delivery_outcome(run, definition):
     assert event.resource_id == str(run.guid)
     assert event.payload["stage_name"] == gate.slug
     assert event.payload["delivery"] == {"email": True}
+    assert event.payload["status"] == "notified"
+    assert event.severity == "info"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("backend", ["RefusedBackend", "NoDeliveryBackend"])
+def test_gate_mail_refusal_persists_a_visible_failure_without_stalling_review(
+    run, definition, settings, backend
+):
+    from django.core import mail
+
+    from astrolift_operations.models import Event
+
+    settings.EMAIL_BACKEND = f"astrolift_agents.tests.email_backends_1823.{backend}"
+    gate = _stage(definition, 1)
+    gate.approvers = ["reviewer@example.test"]
+    gate.save()
+
+    execution_id = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    execution = WorkflowStageExecution.objects.get(pk=int(execution_id))
+    assert execution.status == "running"
+    event = Event.objects.get(event_type="workflow.human_gate.notified")
+    assert event.organization_id == run.organization_id
+    assert event.resource_id == str(run.guid)
+    assert event.payload["delivery"] == {"email": False}
+    assert event.payload["status"] == "failed"
+    assert event.severity == "error"
+    assert "reviewer@example.test" not in str(event.payload)
+    assert mail.outbox == []
+
+
+@pytest.mark.django_db
+def test_gate_without_any_recipient_persists_failure_instead_of_claiming_delivery(run, definition):
+    from django.core import mail
+
+    from astrolift_operations.models import Event
+
+    get_user_model().objects.filter(is_superuser=True).update(is_superuser=False)
+    gate = _stage(definition, 1)
+    gate.approvers = []
+    gate.save()
+
+    execution_id = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    assert WorkflowStageExecution.objects.get(pk=int(execution_id)).status == "running"
+    event = Event.objects.get(event_type="workflow.human_gate.notified")
+    assert event.organization_id == run.organization_id
+    assert event.payload["delivery"] == {"email": False}
+    assert event.payload["status"] == "failed"
+    assert event.severity == "error"
+    assert mail.outbox == []
 
 
 @pytest.mark.django_db
@@ -1761,7 +1813,15 @@ async def test_temporal_closure_during_dispatch_cleans_up_after_spawn(
             assert summary.repaired == 1
         else:
             await sync_to_async(cleanup_workflow_tasks)(run.pk)
-        _, status, _ = await task_state()
+        # RUNNING is persisted before the dispatch session lock is released.
+        # Cleanup can correctly answer pending in that window. Exercise the
+        # reconciler's durable retry rather than require one lucky lock attempt.
+        for _ in range(100):
+            _, status, _ = await task_state()
+            if status == "cancelled":
+                break
+            await sync_to_async(cleanup_workflow_tasks)(run.pk)
+            await asyncio.sleep(0.02)
         assert status == "cancelled"
         assert stopped == [external_id]
         await sync_to_async(run.refresh_from_db)()

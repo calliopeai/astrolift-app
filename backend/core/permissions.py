@@ -290,7 +290,12 @@ _ADMIN_VIEW_SLUGS = (
 # Modules an org admin switches on per organization (#1859). The keys match
 # ``astrolift_identity.models.OrganizationModule.Key``; the org-side state
 # lives there because this module sits below the identity app.
-ORG_MODULE_KEYS = ("chat_studio_integration", "agent_live_attach", "chat_studio_agent_runs")
+ORG_MODULE_KEYS = (
+    "chat_studio_integration",
+    "agent_live_attach",
+    "chat_studio_agent_runs",
+    "agent_policy_enforcement",
+)
 
 
 def module_entitlements(
@@ -430,6 +435,14 @@ def module_entitlements(
         can_run=has("agent.dispatch"),
         enabled="chat_studio_agent_runs" in org_on,
     )
+    agent_policy_enforcement = ModuleEntitlement(
+        key="agent_policy_enforcement",
+        can_view=has("agent.read"),
+        can_create=False,
+        can_manage=has("agent.dispatch"),
+        can_run=False,
+        enabled="agent_policy_enforcement" in org_on,
+    )
     return [
         apps,
         agents,
@@ -438,6 +451,7 @@ def module_entitlements(
         chat_studio_integration,
         agent_live_attach,
         chat_studio_agent_runs,
+        agent_policy_enforcement,
     ]
 
 

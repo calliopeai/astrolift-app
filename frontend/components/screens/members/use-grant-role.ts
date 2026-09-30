@@ -5,12 +5,7 @@ import { toast } from "sonner";
 
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { GRANT_ROLE } from "@/graphql/identity/identity.mutations";
-import {
-  LIST_MEMBERS,
-  LIST_PROJECTS,
-  LIST_ROLE_BINDINGS,
-  LIST_TEAMS,
-} from "@/graphql/identity/identity.queries";
+import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftProject,
   AstroliftRoleBinding,
@@ -38,7 +33,7 @@ export function useGrantRole() {
   const [grantRole, { loading }] = useMutation<{
     grantRole: MutationResult<AstroliftRoleBinding>;
   }>(GRANT_ROLE, {
-    refetchQueries: [{ query: LIST_ROLE_BINDINGS }, { query: LIST_MEMBERS }],
+    refetchQueries: ["ListRoleBindingsPage", "ListMembersPage"],
     awaitRefetchQueries: true,
   });
 

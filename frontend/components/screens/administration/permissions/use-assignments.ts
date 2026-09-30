@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
+
 import type { CursorPage } from "@/components/data-table";
 import { useListState } from "@/components/list/use-list-state";
 import {
@@ -62,12 +64,14 @@ export function useAssignments() {
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_ROLE_BINDING, {
     refetchQueries: REVOKE_REFETCH,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
   const [bulkRevoke, { loading: bulkRevoking }] = useMutation<{
     bulkRevokeAstroliftRoleBindings: MutationResult<AstroliftBulkRevokeRoleBindingsPayload>;
   }>(BULK_REVOKE_ROLE_BINDINGS, {
     refetchQueries: REVOKE_REFETCH,
+    onQueryUpdated: refetchAfterMutation,
     awaitRefetchQueries: true,
   });
 
@@ -83,17 +87,17 @@ export function useAssignments() {
 
   /**
    * Revokes the selected bindings. Resolves true when any were revoked, so the
-   * view clears its selection; the view closes its confirm when this settles.
+   * view clears its selection. Total failure rejects so its confirm stays open.
    */
   async function onBulkRevoke(ids: string[]): Promise<boolean> {
     if (ids.length === 0) return false;
     const { data } = await bulkRevoke({ variables: { input: { bindingIds: ids } } });
     const env = data?.bulkRevokeAstroliftRoleBindings;
     if (!env?.ok || !env.data) {
-      toast.error(env?.errors?.[0]?.message ?? "Bulk revoke failed");
-      return false;
+      throw new Error(env?.errors?.[0]?.message ?? "Bulk revoke failed");
     }
     const { revokedCount, failedCount } = env.data;
+    if (revokedCount === 0 && failedCount > 0) throw new Error(`All ${failedCount} revokes failed`);
     if (failedCount === 0) {
       toast.success(`Revoked ${revokedCount} binding${revokedCount === 1 ? "" : "s"}`);
     } else {
