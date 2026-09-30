@@ -1,22 +1,10 @@
-"""Scope resolvers for app-keyed permission gates (#1717).
-
-``@require_permission(Permission.APP_READ)`` with no ``scope=`` checks
-the caller's bindings against the tenant context alone, which on a
-request that names one app means the org. An APP- or TEAM-scoped binding
-on that very app can never match, so the whole sub-org role tier is
-denied its own resources.
-
-These factories turn the app the request names into the scope the check
-runs against. They resolve inside the caller's org, so a slug from
-another tenant yields ``None`` and the gate falls back to the (stricter)
-org check rather than silently granting.
-"""
+"""Resolve app gates inside the live tenant; misses take an explicit org scope."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from core.permissions import PermissionScope, ScopeKind
+from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind
 from core.scope_args import read_arg, read_guid
 from core.tenancy import get_current_tenant
 
@@ -26,97 +14,117 @@ def _org_id() -> int | None:
     return tenant.organization_id if tenant else None
 
 
-def _app_scope(**lookup: Any) -> PermissionScope | None:
+def registry_org_scope(_args=None) -> PermissionScope:
+    return PermissionScope(kind=ScopeKind.ORG, id=_org_id() or 0)
+
+
+def _credential_scope(scope: PermissionScope, permission: Permission | None) -> PermissionScope:
+    if permission is None:
+        return scope
+    from astrolift_identity.api_tokens import get_current_api_token
+    from astrolift_identity.permission_resolver import share_levels
+    from astrolift_registry.models import AppTeamAccess, RegisteredApp
+
+    token = get_current_api_token()
+    if token is None:
+        return scope
     org_id = _org_id()
-    if org_id is None:
-        return None
+    if token.organization_id != org_id:
+        raise PermissionDenied(permission, scope, "credential belongs to another organization")
+    if token.team_id is None:
+        return scope
+    if scope.kind == ScopeKind.APP:
+        owned = RegisteredApp.objects.filter(
+            pk=scope.id,
+            organization_id=org_id,
+            team_id=token.team_id,
+            team__organization_id=org_id,
+            team__deleted_at__isnull=True,
+        ).exists()
+        shared = AppTeamAccess.objects.filter(
+            registered_app_id=scope.id,
+            registered_app__organization_id=org_id,
+            team_id=token.team_id,
+            team__organization_id=org_id,
+            team__deleted_at__isnull=True,
+            access_level__in=share_levels(permission),
+        ).exists()
+        if owned or shared:
+            return scope
+    raise PermissionDenied(permission, scope, "app is outside the credential's team")
+
+
+def _app_scope(*, permission: Permission | None = None, **lookup: Any) -> PermissionScope:
     from astrolift_registry.models import RegisteredApp
 
     app_id = (
-        RegisteredApp.objects.filter(organization_id=org_id, **lookup).values_list("pk", flat=True).first()
-    )
-    return PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else None
-
-
-def app_scope_by_slug(field: str = "app_slug"):
-    """Scope on the app named by ``field`` (a slug argument).
-
-    ``field`` is a dotted path, so a mutation that carries its target on
-    an input object passes ``"input.app_slug"``.
-    """
-
-    def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        slug = read_arg(args, field)
-        return _app_scope(slug=slug) if slug else None
-
-    return _scope
-
-
-def app_scope_by_guid(field: str = "app_id"):
-    """Scope on the app named by ``field`` (a GUID argument)."""
-
-    def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_guid(args, field)
-        return _app_scope(guid=guid) if guid else None
-
-    return _scope
-
-
-def app_scope_by_workload_guid(field: str = "workload_id"):
-    """Scope on the app owning the workload named by ``field``.
-
-    A workload is not a scope of its own -- bindings stop at APP -- so a
-    workload-keyed gate checks the app it belongs to.
-    """
-
-    def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_guid(args, field)
-        if not guid:
-            return None
-        org_id = _org_id()
-        if org_id is None:
-            return None
-        from astrolift_registry.models import Workload
-
-        app_id = (
-            Workload.objects.filter(guid=str(guid), registered_app__organization_id=org_id)
-            .values_list("registered_app_id", flat=True)
-            .first()
+        RegisteredApp.objects.filter(
+            organization_id=_org_id(), organization__deleted_at__isnull=True, **lookup
         )
-        return PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else None
+        .values_list("pk", flat=True)
+        .first()
+    )
+    scope = PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else registry_org_scope()
+    return _credential_scope(scope, permission)
 
-    return _scope
 
+def app_scope_by_slug(field: str = "app_slug", *, permission: Permission | None = None):
+    """Resolve a slug; dotted input paths and existing callers remain supported.
 
-def app_scope_by_workload_slug(field: str = "workload_slug"):
-    """Scope on the app owning the workload ``field`` names (a slug).
-
-    Workload slugs are unique per app, not per org, so a slug matching in
-    more than one app resolves to nothing rather than to whichever row
-    the database returned first -- one app's binding must never become
-    authority over another app's workload.
+    Supplying the gate's permission also enforces the bearer team/share ceiling.
     """
 
-    def _scope(args: dict[str, Any]) -> PermissionScope | None:
+    def _scope(args: dict[str, Any]) -> PermissionScope:
         slug = read_arg(args, field)
         if not slug:
-            return None
-        org_id = _org_id()
-        if org_id is None:
-            return None
-        from astrolift_registry.models import Workload
+            return _credential_scope(registry_org_scope(), permission)
+        return _app_scope(slug=slug, permission=permission)
 
-        app_ids = list(
-            Workload.objects.filter(
-                slug=str(slug),
-                registered_app__organization_id=org_id,
-                deleted_at__isnull=True,
-            )
-            .values_list("registered_app_id", flat=True)
-            .distinct()[:2]
+    return _scope
+
+
+def app_scope_by_guid(field: str = "app_id", *, permission: Permission | None = None):
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        guid = read_guid(args, field)
+        if not guid:
+            return _credential_scope(registry_org_scope(), permission)
+        return _app_scope(guid=guid, permission=permission)
+
+    return _scope
+
+
+def _workload_apps(**lookup):
+    from astrolift_registry.models import Workload
+
+    return Workload.objects.filter(
+        registered_app__organization_id=_org_id(),
+        registered_app__deleted_at__isnull=True,
+        registered_app__organization__deleted_at__isnull=True,
+        **lookup,
+    ).values_list("registered_app_id", flat=True)
+
+
+def app_scope_by_workload_guid(field: str = "workload_id", *, permission: Permission | None = None):
+    """Workloads have no separate RBAC scope; their live app owns the gate."""
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        guid = read_guid(args, field)
+        app_id = _workload_apps(guid=guid).first() if guid else None
+        scope = PermissionScope(kind=ScopeKind.APP, id=app_id) if app_id else registry_org_scope()
+        return _credential_scope(scope, permission)
+
+    return _scope
+
+
+def app_scope_by_workload_slug(field: str = "workload_slug", *, permission: Permission | None = None):
+    """An ambiguous workload slug requires org authority rather than picking an app."""
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        slug = read_arg(args, field)
+        app_ids = list(_workload_apps(slug=slug).distinct()[:2]) if slug else []
+        scope = (
+            PermissionScope(kind=ScopeKind.APP, id=app_ids[0]) if len(app_ids) == 1 else registry_org_scope()
         )
-        if len(app_ids) != 1:
-            return None
-        return PermissionScope(kind=ScopeKind.APP, id=app_ids[0])
+        return _credential_scope(scope, permission)
 
     return _scope
