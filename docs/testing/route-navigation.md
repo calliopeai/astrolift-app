@@ -32,5 +32,7 @@ TZ=UTC npm run test:routes
 
 Use `ROUTE_PORT` and `ROUTE_API_PORT` for independent concurrent runs. Build
 with that API port as well: Next embeds the rewrite origin during compilation.
-CI runs this separate route config after the production build; the Storybook
-layout suite retains its existing config and catalog server.
+CI runs this separate route config after the production build. Routes write
+artifacts to `test-results/routes`, and the Storybook layout suite writes to
+`test-results/layout`, so one suite's cleanup cannot delete the other's traces.
+The suites retain separate config files and catalog/application servers.
