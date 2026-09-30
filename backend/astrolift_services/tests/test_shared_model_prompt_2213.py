@@ -235,7 +235,8 @@ def test_actual_http_bearer_admission_and_revocation(world, monkeypatch, ceiling
     mutation = """mutation($id:GUID!,$cluster:GUID!,$provider:GUID!,$version:Int!){
         testSharedModelEndpoint(input:{managedServiceId:$id,expectedClusterId:$cluster,
         expectedProviderId:$provider,expectedVersion:$version,prompt:"Explicit local refusal regression"}){
-        ok data{status} errors{code message field currentVersion}}}
+        ok data{status} errors{code message field requiresAttestation
+        currentVersion requestedVersion supportedMethods}}}
     """
     no_relay(monkeypatch)
     client = Client()
