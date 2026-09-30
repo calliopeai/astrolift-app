@@ -4226,6 +4226,40 @@
           "both": "Both",
           "none": "None."
         }
+      },
+      "conditionHelp": {
+        "label": "What the conditions need",
+        "intro": "Every check evaluates this policy. A condition the request cannot answer denies.",
+        "failed": "Could not load the condition catalog: {message}",
+        "pending": "Unknown until the catalog loads.",
+        "unknown": "The server does not know this kind: a check cannot answer it, so it denies.",
+        "unknownNeeds": "Needs {needs}.",
+        "needs": {
+          "clock": "Read from the server's clock: every check can answer it.",
+          "client_ip": "Needs the caller's address. A check made without one (a background job, an internal call) cannot answer it, so it denies.",
+          "session": "Needs the caller's own sign-in session. A token or a check made on someone else's behalf has none, so it denies.",
+          "operation": "Needs the operation to say it (an approval, the target environment). A check that does not carry it cannot answer, so it denies."
+        }
+      },
+      "simulation": {
+        "label": "Simulation",
+        "failed": "Could not simulate: {message}",
+        "fallback": "The simulation failed.",
+        "retry": "Retry",
+        "none": "Nobody holds what this policy covers today.",
+        "holders": "{denied, number} of {count, plural, one {# holder} other {# holders}} would be denied.",
+        "unknown": "{count, plural, one {# more depends on something a check cannot always answer, and is denied when it cannot.} other {# more depend on something a check cannot always answer, and are denied when it cannot.}}",
+        "covers": "Covers {actions}",
+        "affected": "Holders it would deny",
+        "outcome": {
+          "DENIED": "denied",
+          "UNKNOWN": "denied, cannot tell",
+          "NOT_DENIED": "not denied"
+        },
+        "at": "at {scope}",
+        "recorded": "Over the last {days, plural, one {# day} other {# days}}, {count, plural, one {# recorded decision} other {# recorded decisions}} would have been checked: {denied, number} denied, {unknown, number} denied for want of an attribute.",
+        "noRecorded": "This organization has no recorded decisions in the last {days, plural, one {# day} other {# days}}, so only today's holders are simulated.",
+        "flipped": "Recorded decisions it would have denied"
       }
     },
     "settings": {

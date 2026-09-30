@@ -4149,6 +4149,40 @@
           "both": "Ambos",
           "none": "Ninguno."
         }
+      },
+      "conditionHelp": {
+        "label": "Qué requieren las condiciones",
+        "intro": "Cada comprobación evalúa esta política. Si la solicitud no permite evaluar una condición, se deniega el acceso.",
+        "failed": "No se pudo cargar el catálogo de condiciones: {message}",
+        "pending": "No se conoce hasta que se cargue el catálogo.",
+        "unknown": "El servidor no conoce este tipo: no puede evaluarlo, por lo que deniega el acceso.",
+        "unknownNeeds": "Requiere {needs}.",
+        "needs": {
+          "clock": "Se obtiene del reloj del servidor: cualquier comprobación puede evaluarlo.",
+          "client_ip": "Requiere la dirección de quien llama. Una comprobación sin ella (una tarea en segundo plano o una llamada interna) no puede evaluarlo y deniega el acceso.",
+          "session": "Requiere la sesión de inicio de sesión de quien llama. Un token o una comprobación en nombre de otra persona no la tiene y deniega el acceso.",
+          "operation": "Requiere que la operación proporcione la información (una aprobación o el entorno de destino). Si la comprobación no la incluye, no puede evaluar la condición y deniega el acceso."
+        }
+      },
+      "simulation": {
+        "label": "Simulación",
+        "failed": "No se pudo simular: {message}",
+        "fallback": "La simulación falló.",
+        "retry": "Reintentar",
+        "none": "Actualmente nadie tiene los permisos que cubre esta política.",
+        "holders": "Se denegaría el acceso a {denied, number} de {count, plural, one {# titular} other {# titulares}}.",
+        "unknown": "{count, plural, one {# titular adicional depende} other {# titulares adicionales dependen}} de información que no siempre se puede comprobar; si falta, se deniega el acceso.",
+        "covers": "Cubre {actions}",
+        "affected": "Titulares a los que denegaría el acceso",
+        "outcome": {
+          "DENIED": "denegado",
+          "UNKNOWN": "denegado, no se puede determinar",
+          "NOT_DENIED": "no denegado"
+        },
+        "at": "en {scope}",
+        "recorded": "En {days, plural, one {el último día} other {los últimos # días}}, {count, plural, one {se habría comprobado # decisión registrada} other {se habrían comprobado # decisiones registradas}}: {denied, number} con acceso denegado y {unknown, number} con acceso denegado por falta de un atributo.",
+        "noRecorded": "Esta organización no tiene decisiones registradas en {days, plural, one {el último día} other {los últimos # días}}, por lo que solo se simulan los titulares actuales.",
+        "flipped": "Decisiones registradas que habría denegado"
       }
     },
     "settings": {

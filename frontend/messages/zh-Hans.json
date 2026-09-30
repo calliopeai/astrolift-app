@@ -4146,6 +4146,40 @@
           "both": "双方",
           "none": "无。"
         }
+      },
+      "conditionHelp": {
+        "label": "条件所需信息",
+        "intro": "每次权限检查都会评估此策略。如果无法根据请求判断条件，则拒绝访问。",
+        "failed": "无法加载条件目录：{message}",
+        "pending": "目录加载完成前无法确定。",
+        "unknown": "服务器不识别此类型：无法判断，因此拒绝访问。",
+        "unknownNeeds": "需要 {needs}。",
+        "needs": {
+          "clock": "读取服务器时钟：每次检查都可以判断。",
+          "client_ip": "需要调用者地址。没有地址的检查（后台任务或内部调用）无法判断，因此拒绝访问。",
+          "session": "需要调用者本人的登录会话。令牌或代表其他用户进行的检查没有该会话，因此拒绝访问。",
+          "operation": "需要操作提供信息（审批或目标环境）。未携带该信息的检查无法判断，因此拒绝访问。"
+        }
+      },
+      "simulation": {
+        "label": "模拟",
+        "failed": "无法模拟：{message}",
+        "fallback": "模拟失败。",
+        "retry": "重试",
+        "none": "目前没有用户拥有此策略涵盖的权限。",
+        "holders": "{count, plural, other {# 位权限持有者}}中有 {denied, number} 位将被拒绝。",
+        "unknown": "另有 {count, plural, other {# 位}}依赖检查不一定能判断的信息，无法判断时将被拒绝。",
+        "covers": "涵盖 {actions}",
+        "affected": "将被拒绝的权限持有者",
+        "outcome": {
+          "DENIED": "已拒绝",
+          "UNKNOWN": "已拒绝，无法判断",
+          "NOT_DENIED": "未拒绝"
+        },
+        "at": "位于 {scope}",
+        "recorded": "过去 {days, plural, other {# 天}}内记录的 {count, plural, other {# 次判定}}将接受检查：{denied, number} 次拒绝，{unknown, number} 次因缺少属性而拒绝。",
+        "noRecorded": "此组织在过去 {days, plural, other {# 天}}内没有判定记录，因此仅模拟当前权限持有者。",
+        "flipped": "本会被拒绝的历史判定"
       }
     },
     "settings": {

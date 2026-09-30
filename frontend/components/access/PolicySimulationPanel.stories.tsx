@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import es from "@/messages/es.json";
 import { expect, within } from "storybook/test";
 
 import { LONG, SIMULATION, SIMULATION_EMPTY } from "./fixtures";
@@ -61,4 +63,15 @@ export const LongStrings: Story = {
 
 export const Width768: Story = {
   decorators: [(Story) => <div style={{ width: 768 }}>{Story()}</div>],
+};
+
+export const Spanish: Story = {
+  args: { simulation: SIMULATION },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="es" messages={es}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

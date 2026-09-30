@@ -5,6 +5,10 @@
 - The browser workload-controls regression checks the actual three-replica web
   and zero-replica worker fixtures independently, keeping unobserved readiness
   unknown rather than inventing healthy pod counts (#2145).
+- Shared policy condition guidance and simulation summaries use all eight
+  locales, preserving unknown-condition denials, recorded-history limits,
+  server catalog metadata, diagnostics, notes and actual holder targets (#2145).
+
 - Shared access diagnostics and comparisons use all eight locales for verdicts,
   reasoning labels and states. Actual resolver diagnostics, technical binding
   targets, permission IDs and comparison partitions remain intact (#2145).

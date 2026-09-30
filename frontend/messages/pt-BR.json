@@ -4146,6 +4146,40 @@
           "both": "Ambos",
           "none": "Nenhuma."
         }
+      },
+      "conditionHelp": {
+        "label": "O que as condições exigem",
+        "intro": "Cada verificação avalia esta política. Se a solicitação não permitir avaliar uma condição, o acesso será negado.",
+        "failed": "Não foi possível carregar o catálogo de condições: {message}",
+        "pending": "Desconhecido até o catálogo ser carregado.",
+        "unknown": "O servidor não conhece este tipo: não pode avaliá-lo e, portanto, nega o acesso.",
+        "unknownNeeds": "Requer {needs}.",
+        "needs": {
+          "clock": "Obtido do relógio do servidor: qualquer verificação pode avaliá-lo.",
+          "client_ip": "Requer o endereço de quem faz a chamada. Uma verificação sem ele (tarefa em segundo plano ou chamada interna) não pode avaliá-lo e nega o acesso.",
+          "session": "Requer a sessão de login de quem faz a chamada. Um token ou uma verificação em nome de outra pessoa não a possui e nega o acesso.",
+          "operation": "Requer informações fornecidas pela operação (uma aprovação ou o ambiente de destino). Sem elas, a verificação não pode avaliar a condição e nega o acesso."
+        }
+      },
+      "simulation": {
+        "label": "Simulação",
+        "failed": "Não foi possível simular: {message}",
+        "fallback": "A simulação falhou.",
+        "retry": "Tentar novamente",
+        "none": "Atualmente ninguém possui as permissões cobertas por esta política.",
+        "holders": "O acesso seria negado a {denied, number} de {count, plural, one {# titular} other {# titulares}}.",
+        "unknown": "{count, plural, one {# titular adicional depende} other {# titulares adicionais dependem}} de informações que nem sempre podem ser verificadas; se faltarem, o acesso será negado.",
+        "covers": "Abrange {actions}",
+        "affected": "Titulares cujo acesso seria negado",
+        "outcome": {
+          "DENIED": "negado",
+          "UNKNOWN": "negado, não é possível determinar",
+          "NOT_DENIED": "não negado"
+        },
+        "at": "em {scope}",
+        "recorded": "Em {days, plural, one {o último dia} other {os últimos # dias}}, {count, plural, one {# decisão registrada teria sido verificada} other {# decisões registradas teriam sido verificadas}}: {denied, number} com acesso negado e {unknown, number} com acesso negado por falta de um atributo.",
+        "noRecorded": "Esta organização não tem decisões registradas em {days, plural, one {o último dia} other {os últimos # dias}}, portanto apenas os titulares atuais são simulados.",
+        "flipped": "Decisões registradas que teriam sido negadas"
       }
     },
     "settings": {

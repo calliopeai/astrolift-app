@@ -4149,6 +4149,40 @@
           "both": "Beide",
           "none": "Keine."
         }
+      },
+      "conditionHelp": {
+        "label": "Voraussetzungen der Bedingungen",
+        "intro": "Jede Prüfung wertet diese Richtlinie aus. Kann eine Bedingung anhand der Anfrage nicht beantwortet werden, wird der Zugriff verweigert.",
+        "failed": "Bedingungskatalog konnte nicht geladen werden: {message}",
+        "pending": "Unbekannt, bis der Katalog geladen ist.",
+        "unknown": "Der Server kennt diesen Typ nicht: Die Prüfung kann ihn nicht beantworten und verweigert daher den Zugriff.",
+        "unknownNeeds": "Benötigt {needs}.",
+        "needs": {
+          "clock": "Wird aus der Serveruhr gelesen: Jede Prüfung kann dies beantworten.",
+          "client_ip": "Benötigt die Adresse des Aufrufers. Eine Prüfung ohne Adresse (Hintergrundauftrag oder interner Aufruf) kann dies nicht beantworten und verweigert den Zugriff.",
+          "session": "Benötigt die eigene Anmeldesitzung des Aufrufers. Ein Token oder eine Prüfung im Namen einer anderen Person hat keine solche Sitzung und verweigert den Zugriff.",
+          "operation": "Benötigt Angaben aus dem Vorgang (eine Genehmigung oder die Zielumgebung). Fehlen diese Angaben, kann die Prüfung die Bedingung nicht beantworten und verweigert den Zugriff."
+        }
+      },
+      "simulation": {
+        "label": "Simulation",
+        "failed": "Simulation fehlgeschlagen: {message}",
+        "fallback": "Die Simulation ist fehlgeschlagen.",
+        "retry": "Erneut versuchen",
+        "none": "Derzeit hat niemand die von dieser Richtlinie erfassten Berechtigungen.",
+        "holders": "{denied, number} von {count, plural, one {# Berechtigungsinhaber} other {# Berechtigungsinhabern}} würde der Zugriff verweigert.",
+        "unknown": "{count, plural, one {# weiterer Berechtigungsinhaber benötigt} other {# weitere Berechtigungsinhaber benötigen}} Angaben, die nicht jede Prüfung beantworten kann. Fehlen sie, wird der Zugriff verweigert.",
+        "covers": "Gilt für {actions}",
+        "affected": "Berechtigungsinhaber, denen der Zugriff verweigert würde",
+        "outcome": {
+          "DENIED": "verweigert",
+          "UNKNOWN": "verweigert, nicht bestimmbar",
+          "NOT_DENIED": "nicht verweigert"
+        },
+        "at": "bei {scope}",
+        "recorded": "In {days, plural, one {dem letzten Tag} other {den letzten # Tagen}} {count, plural, one {wäre # protokollierte Entscheidung geprüft worden} other {wären # protokollierte Entscheidungen geprüft worden}}: {denied, number} verweigert, {unknown, number} wegen eines fehlenden Attributs verweigert.",
+        "noRecorded": "Diese Organisation hat in {days, plural, one {dem letzten Tag} other {den letzten # Tagen}} keine Entscheidungen protokolliert. Daher werden nur die aktuellen Berechtigungsinhaber simuliert.",
+        "flipped": "Protokollierte Entscheidungen, die verweigert worden wären"
       }
     },
     "settings": {

@@ -50,6 +50,25 @@ empty/loading/error/retry and rich-message contracts. The affected diagnostics
 run passes 269 tests including all six related story groups. TypeScript, ESLint
 and formatting pass.
 
-Policy sentence/help/simulation and grant-flow prose remain separate follow-up
-leaves; this document does not claim their completion or close the platform-wide
-#2145 issue.
+The policy-guidance leaf translates `PolicyConditionHelp` and
+`PolicySimulationPanel` under `shared.access.conditionHelp` and
+`shared.access.simulation`. It preserves server-supplied condition catalog
+labels/descriptions and translates the UI guidance about required attributes,
+unknown kinds, catalog failures and loading. Actual condition/attribute IDs stay
+literal. Unknown and unanswerable conditions remain described as denying access.
+
+Simulation summaries localize holder/day/decision counts, outcomes, recorded vs
+unrecorded history, retry and failure chrome. Actual holder links, scope labels,
+action slugs, operator notes, server errors, timestamps and affected/recorded
+partitions remain supplied. Unknown outcome IDs remain literal. The optional
+`holderSentence` presentation callbacks leave its default pure API unchanged.
+
+Its 40 new all-eight-locale tests cover every known attribute requirement, unknown
+and failed catalogs, current holders vs recorded decisions, unknown-denied and
+future outcomes, exact member links, refusal/retry, server diagnostics, literal
+metadata and ICU count contracts. The affected policy-guidance run passes 133
+tests with all policy/grant story states, pure access/policy/grant tests and
+form/accessibility regressions. TypeScript, ESLint and formatting pass.
+
+Policy sentence and grant-flow prose remain separate follow-up leaves; this
+document does not claim their completion or close the platform-wide #2145 issue.

@@ -4149,6 +4149,40 @@
           "both": "Les deux",
           "none": "Aucune."
         }
+      },
+      "conditionHelp": {
+        "label": "Ce que les conditions exigent",
+        "intro": "Chaque vérification évalue cette politique. Si une condition ne peut pas être évaluée à partir de la requête, l’accès est refusé.",
+        "failed": "Impossible de charger le catalogue des conditions : {message}",
+        "pending": "Inconnu tant que le catalogue n’est pas chargé.",
+        "unknown": "Le serveur ne connaît pas ce type : il ne peut pas l’évaluer et refuse donc l’accès.",
+        "unknownNeeds": "Nécessite {needs}.",
+        "needs": {
+          "clock": "Lu depuis l’horloge du serveur : chaque vérification peut l’évaluer.",
+          "client_ip": "Nécessite l’adresse de l’appelant. Une vérification sans adresse (tâche en arrière-plan ou appel interne) ne peut pas l’évaluer et refuse l’accès.",
+          "session": "Nécessite la session de connexion de l’appelant. Un jeton ou une vérification au nom d’une autre personne n’en possède pas et refuse l’accès.",
+          "operation": "Nécessite des informations fournies par l’opération (approbation ou environnement cible). Sans ces informations, la vérification ne peut pas évaluer la condition et refuse l’accès."
+        }
+      },
+      "simulation": {
+        "label": "Simulation",
+        "failed": "Simulation impossible : {message}",
+        "fallback": "La simulation a échoué.",
+        "retry": "Réessayer",
+        "none": "Personne ne détient actuellement les autorisations couvertes par cette politique.",
+        "holders": "L’accès serait refusé à {denied, number} sur {count, plural, one {# détenteur} other {# détenteurs}}.",
+        "unknown": "{count, plural, one {# autre détenteur dépend} other {# autres détenteurs dépendent}} d’informations que la vérification ne peut pas toujours obtenir ; l’accès est refusé si elles manquent.",
+        "covers": "Couvre {actions}",
+        "affected": "Détenteurs auxquels l’accès serait refusé",
+        "outcome": {
+          "DENIED": "refusé",
+          "UNKNOWN": "refusé, impossible à déterminer",
+          "NOT_DENIED": "non refusé"
+        },
+        "at": "à {scope}",
+        "recorded": "Sur {days, plural, one {le dernier jour} other {les # derniers jours}}, {count, plural, one {# décision enregistrée aurait été vérifiée} other {# décisions enregistrées auraient été vérifiées}} : {denied, number} refus, {unknown, number} refus faute d’un attribut.",
+        "noRecorded": "Cette organisation n’a aucune décision enregistrée sur {days, plural, one {le dernier jour} other {les # derniers jours}} ; seuls les détenteurs actuels sont donc simulés.",
+        "flipped": "Décisions enregistrées qui auraient été refusées"
       }
     },
     "settings": {
