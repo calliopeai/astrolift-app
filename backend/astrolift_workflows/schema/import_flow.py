@@ -21,6 +21,7 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
+from astrolift_workflows.import_scopes import workflow_import_org_scope
 from astrolift_workflows.schema.manifest import (
     WorkflowManifestDefinitionType,
     WorkflowManifestStageType,
@@ -111,7 +112,7 @@ class WorkflowImportMutation:
             "definition + stages."
         )
     )
-    @require_permission(Permission.WORKFLOW_CREATE)
+    @require_permission(Permission.WORKFLOW_CREATE, scope=workflow_import_org_scope)
     @tenant_scoped()
     def import_workflow_flow(
         self, info: Info, format: str, payload: JSON, preview: bool = True

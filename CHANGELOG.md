@@ -11,6 +11,15 @@
   or foreign clusters are refused before provider access, including for an
   organization operator.
 
+- Workflow manifest previews accept `workflow.read` at any granted scope
+  without writing (#2114). Flow and new TOML imports require organization
+  `workflow.create`, independent of selected team/project headers. Compatible
+  replacements authorize their existing project owner; a changed shape still
+  creates an organization version and requires organization create permission.
+  Existing update permission, source-managed refusal and bearer organization/
+  team ceilings remain enforced. Replacement rechecks the destination under
+  definition/stage locks before writing; all three guardrail gaps are removed.
+
 - Pipeline creation requires `app.update` at the active organization (#2115).
   The existing creation input has no app association, so team/project/app
   grants and team-bound bearer credentials cannot authorize this organization

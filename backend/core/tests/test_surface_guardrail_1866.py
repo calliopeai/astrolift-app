@@ -400,12 +400,6 @@ GAPS: dict[str, tuple[str, ...]] = {
         "/app/export/",
         "/api/support/v1/tickets/",
     ),
-    # TODO(#2114): workflows routes without a scoped gate; the issue says what each checks today.
-    "#2114": (
-        "Query.previewWorkflowManifest",
-        "Mutation.importWorkflowFlow",
-        "Mutation.importWorkflowManifest",
-    ),
 }
 
 
