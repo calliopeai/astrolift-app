@@ -18,6 +18,8 @@ The following seven-item slice starts from `66b902d1`: **64 React/Apollo checks 
 - Chromium behavior checks cover actual menu admission, separate SVG paint servers, draft choice/readiness, pending rows, command target and uppercase-running input.
 - Typecheck, ESLint and affected Storybook builds/layout checks; the parent runs the final combined route/build checks.
 
+Static follow-up from `4f2adf31`: **38 focused tests across four files**, **92 affected portable stories**, **19 Chromium layout checks**, Storybook production build, TypeScript and ESLint (zero errors, one existing PageShell storage-effect warning). Shared-context hydration and framed/agent-shell behavior remain covered, image configuration is checked against the shipped Dockerfile, and the regenerated reader/packaged documentation copies agree. Other owners' pending fixes and parked routes are preserved.
+
 ## Item evidence
 
 | Item | Status | Current evidence / remaining work |
@@ -74,11 +76,11 @@ The following seven-item slice starts from `66b902d1`: **64 React/Apollo checks 
 | 50. useAgentBoxes hides includeEnded behind a type cast | Pre-existing | useAgentBoxes uses AgentBoxesVars directly with orgId/includeEnded; hidden variable cast is gone. |
 | 51. 'No other sessions' toast can never fire | Fixed | Removed the unreachable no-other-sessions toast callback. The actual count and pending state still guard the disabled sign-out action and confirmation admission. |
 | 52. Identity providers doc link label does not match its target | Pre-existing | Earlier identity-provider organization-label documentation correction is included in the audited base. |
-| 53. Introduction, Get Started and Changelog describe an unrelated boilerplate | Remaining | Introduction/GetStarted/Changelog still require product-fact review; this branch does not claim their static content is accurate. |
-| 54. Changelog shows unknown entry types as destructive | Remaining | ChangelogScreen.typeVariant still gives unrecognized types destructive styling. |
+| 53. Introduction, Get Started and Changelog describe an unrelated boilerplate | Fixed | Introduction and local setup describe the current Astrolift/Kubernetes control plane, Temporal and actual bootstrap/run.sh/Makefile commands. The Changelog page removes unsupported dashboard versions/dates, explicitly reports unavailable versioned notes and links canonical private repository history. Generated reader/packaged docs are refreshed. |
+| 54. Changelog shows unknown entry types as destructive | Fixed | Unknown changelog categories use a neutral outline badge; a React regression prevents them being interpreted as failures. |
 | 55. Cluster prerequisites renders 'whosespec.ingressClassName' | Pre-existing | Earlier cluster prerequisite spec spacing correction is included in the audited base. |
 | 56. Cluster prerequisites cert-manager text loses a space | Pre-existing | Earlier prerequisite cert-manager spacing correction is included in the audited base. |
-| 57. Configuration docs handle an 'image' source nothing uses | Remaining | ConfigurationScreen still advertises image source; only story fixtures currently supply image-source rows. |
+| 57. Configuration docs handle an 'image' source nothing uses | Fixed | The real Configuration reference now includes PYTHONUNBUFFERED=1 as an image-sourced default from backend/Dockerfile. A source-contract regression and the production ImageDefaults story back the source category with actual runtime configuration. |
 | 58. Help copyDiagnostics timer is never cleared | Fixed | Help copy timers are replaced on repeat and cleared at unmount; clipboard completion after unmount is ignored. |
 | 59. Mute hours above 168 are not rejected in the submit handler | Pre-existing | display-logic.test.tsx verifies integer 1..168-hour boundaries and pending refusal. |
 | 60. Dashboard loading skeleton no longer matches the layout | Pre-existing | DashboardLoading was replaced by components/home/HomeScreen HomeSkeleton over current panel spans. |

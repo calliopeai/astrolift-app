@@ -18,6 +18,11 @@
   Reference saves use trimmed variable identities; closing or changing a secret
   dialog cancels reveal timers and ignores late reveal responses (#2148).
 
+- Introduction and local setup describe the current Astrolift control plane and
+  actual development commands. The dashboard links canonical project history
+  when versioned release notes are unavailable, treats unknown note categories
+  neutrally, and documents the image's real unbuffered-logging default (#2148).
+
 - Shared page chrome uses a common context outside app routes. Remove unreachable
   active-provider/session toast callbacks and unused approval/download props;
   approval history uses semantic theme tokens (#2148).
