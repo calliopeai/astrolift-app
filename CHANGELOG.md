@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared owner prompt admission requires the observed provider and canonical
+  model handle to match the current placement, refusing stale rollout evidence
+  before relay credentials or queue admission (#2213).
+
 - Cluster unregister and decommission refuse while any live shared model remains,
   including app-free pending or failed deployments. Worker retirement rechecks
   under the placement lock before removing cluster transport (#2213).

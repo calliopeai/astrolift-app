@@ -6122,6 +6122,12 @@ type ClusterModelDeployment {
   appliedResources: ModelResources
 }
 
+type ClusterModelDeploymentMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ClusterModelDeployment
+}
+
 """One page of a cursor-paginated or numbered list."""
 type ClusterModelDeploymentPage {
   items: [ClusterModelDeployment!]!
@@ -6550,6 +6556,15 @@ type DeploytokenrevokedpayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Deploytokenrevokedpayload
+}
+
+input DeprovisionClusterModelInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  deleteData: Boolean! = false
 }
 
 input DeprovisionManagedServiceInput {
@@ -7137,6 +7152,18 @@ type ModelSubscription {
   reconciledAt: DateTime
 }
 
+type ModelSubscriptionOperation {
+  deployment: ClusterModelDeployment!
+  subscription: ModelSubscription!
+  restartRequired: Boolean!
+}
+
+type ModelSubscriptionOperationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ModelSubscriptionOperation
+}
+
 """One page of a cursor-paginated or numbered list."""
 type ModelSubscriptionPage {
   items: [ModelSubscription!]!
@@ -7513,6 +7540,11 @@ type Mutation {
   refreshCiWorkflowSyncStatus(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult!
   openCiWorkflowReconcilePr(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
+  provisionClusterModel(input: ProvisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  subscribeClusterModel(input: SubscribeClusterModelInput!): ModelSubscriptionOperationMutationResult!
+  revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
+  updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
+  deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
@@ -8705,6 +8737,15 @@ input RevokeMobileDeviceInput {
   id: GUID!
 }
 
+input RevokeModelSubscriptionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  ifMatchDeploymentVersion: Int!
+}
+
 input RevokeRoleBindingInput {
   id: GUID!
 }
@@ -8992,6 +9033,17 @@ type StartWorkflowResult {
   instanceId: ID
 }
 
+input SubscribeClusterModelInput {
+  organizationId: GUID!
+  modelDeploymentId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  appEnvironmentId: GUID!
+  alias: String!
+  ifMatchVersion: Int!
+  ifMatchEnvironmentVersion: Int!
+}
+
 type Subscription {
   astroliftDeploymentLifecycleStream(appSlug: String = null): AstroliftDeploymentLifecycleEvent!
   notificationReceived: String!
@@ -9184,6 +9236,19 @@ input UpdateAppInput {
   minimumApprovals: Int = null
   cronPaused: Boolean = null
   ifMatchVersion: Int = null
+}
+
+input UpdateClusterModelInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  allowSubscriptions: Boolean!
+  cpuRequest: String!
+  memoryRequest: String!
+  gpuCount: Int!
+  cpuKvCacheGiB: Int = null
 }
 
 input UpdateEmailTemplateInput {

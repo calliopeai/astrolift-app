@@ -60,6 +60,7 @@ def prompt_readiness(service):
 def shared_prompt_readiness(service):
     """Shared-owner eligibility without an app placeholder or infrastructure I/O."""
     from astrolift_clusters.models import TenantCluster
+    from astrolift_services.model_admission import canonical_model_handle
 
     if (
         service.organization_id is None
@@ -94,6 +95,13 @@ def shared_prompt_readiness(service):
         or cluster.provider_plugin.deleted_at is not None
     ):
         return PromptReadinessState.UNAVAILABLE
+    if (
+        service.model_ready_provider_guid != cluster.provider_plugin.guid
+        or not service.model_ready_backend_ref
+        or service.model_ready_backend_ref != service.backend_ref
+        or service.backend_ref != canonical_model_handle(service)
+    ):
+        return PromptReadinessState.INACTIVE
     return _relay_readiness(service, cluster)
 
 

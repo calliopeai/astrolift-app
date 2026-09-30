@@ -67,6 +67,7 @@ def world(monkeypatch):
         model_ready_observed_at=timezone.now(),
         model_ready_generation=3,
         model_ready_auth_revision=2,
+        model_ready_provider_guid=w.cluster.provider_plugin.guid,
     )
     w.namespace = cluster_model_namespace(
         organization_id=str(w.org.guid),
@@ -75,6 +76,7 @@ def world(monkeypatch):
     )
     w.resource = cluster_model_resource_name(str(w.model.guid))
     w.model.backend_ref = f"model_endpoint/{w.cluster.guid}/{w.namespace}/{w.resource}"
+    w.model.model_ready_backend_ref = w.model.backend_ref
     w.model.save()
     return w
 
@@ -397,6 +399,11 @@ def test_retired_or_foreign_ancestry_is_not_visible_to_org_owner(world, monkeypa
         ("missing-generation", "inactive"),
         ("zero-generation", "inactive"),
         ("old-pod-auth", "inactive"),
+        ("missing-observed-provider", "inactive"),
+        ("foreign-observed-provider", "inactive"),
+        ("missing-observed-handle", "inactive"),
+        ("changed-handle", "inactive"),
+        ("noncanonical-observed-handle", "inactive"),
         ("missing-applied-config", "inactive"),
         ("stopped-applied-replicas", "inactive"),
         ("malformed-applied-replicas", "inactive"),
@@ -422,6 +429,17 @@ def test_readiness_refusals_do_not_consume_budget_or_dispatch(world, monkeypatch
             "old-pod-auth": ("model_ready_auth_revision", 1),
         }[change]
         setattr(world.model, field, value)
+        world.model.save()
+    elif change in {"missing-observed-provider", "foreign-observed-provider"}:
+        world.model.model_ready_provider_guid = None if change == "missing-observed-provider" else uuid4()
+        world.model.save()
+    elif change == "missing-observed-handle":
+        world.model.model_ready_backend_ref = ""
+        world.model.save()
+    elif change in {"changed-handle", "noncanonical-observed-handle"}:
+        world.model.backend_ref += "-changed"
+        if change == "noncanonical-observed-handle":
+            world.model.model_ready_backend_ref = world.model.backend_ref
         world.model.save()
     elif change in {"missing-applied-config", "stopped-applied-replicas", "malformed-applied-replicas"}:
         world.model.applied_config = {

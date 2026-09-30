@@ -5756,6 +5756,12 @@ export type ClusterModelDeployment = {
   version: Scalars['Int']['output'];
 };
 
+export type ClusterModelDeploymentMutationResult = {
+  data?: Maybe<ClusterModelDeployment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 /** One page of a cursor-paginated or numbered list. */
 export type ClusterModelDeploymentPage = {
   items: Array<ClusterModelDeployment>;
@@ -6169,6 +6175,15 @@ export type DeploytokenrevokedpayloadMutationResult = {
   data?: Maybe<Deploytokenrevokedpayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type DeprovisionClusterModelInput = {
+  deleteData: Scalars['Boolean']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type DeprovisionManagedServiceInput = {
@@ -6738,6 +6753,18 @@ export type ModelSubscription = {
   version: Scalars['Int']['output'];
 };
 
+export type ModelSubscriptionOperation = {
+  deployment: ClusterModelDeployment;
+  restartRequired: Scalars['Boolean']['output'];
+  subscription: ModelSubscription;
+};
+
+export type ModelSubscriptionOperationMutationResult = {
+  data?: Maybe<ModelSubscriptionOperation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 /** One page of a cursor-paginated or numbered list. */
 export type ModelSubscriptionPage = {
   items: Array<ModelSubscription>;
@@ -6904,6 +6931,7 @@ export type Mutation = {
   /** Soft-delete a stage from a writable definition (spec 40 §6). */
   deleteWorkflowStage: MutationResult;
   deployClusterAgent: AstroliftTenantClusterMutationResult;
+  deprovisionClusterModel: ClusterModelDeploymentMutationResult;
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
   deprovisionProjectManagedService: ManagedservicedeletedpayloadMutationResult;
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
@@ -6994,6 +7022,7 @@ export type Mutation = {
   profileRequestPwdChange: Scalars['Boolean']['output'];
   promoteDeployment: AstroliftDeploymentMutationResult;
   proposeSecretChange: AstroliftSecretChangeProposalMutationResult;
+  provisionClusterModel: ClusterModelDeploymentMutationResult;
   provisionManagedDomain: ProvisionManagedDomainPayloadMutationResult;
   provisionManagedService: AstroliftManagedServiceMutationResult;
   provisionProjectManagedService: AstroliftManagedServiceMutationResult;
@@ -7059,6 +7088,7 @@ export type Mutation = {
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
   revokeInvitation: AstroliftInvitationMutationResult;
   revokeMobileDevice: RevokemobiledevicepayloadMutationResult;
+  revokeModelSubscription: ModelSubscriptionOperationMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   revokeTeamAccessFromApp: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
@@ -7123,6 +7153,7 @@ export type Mutation = {
   /** Start a workflow for an object. */
   startWorkflow: StartWorkflowResult;
   submitForm: AstroliftFormSubmissionMutationResult;
+  subscribeClusterModel: ModelSubscriptionOperationMutationResult;
   /** Switch the active user (impersonation). */
   switchUser: SwitchUserResult;
   syncManifestFromRepo: ManifeststagepayloadMutationResult;
@@ -7148,6 +7179,7 @@ export type Mutation = {
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
+  updateClusterModel: ClusterModelDeploymentMutationResult;
   updateEmailTemplate: AstroliftEmailTemplateMutationResult;
   updateFormDefinition: AstroliftFormDefinitionMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
@@ -7795,6 +7827,11 @@ export type MutationDeployClusterAgentArgs = {
 };
 
 
+export type MutationDeprovisionClusterModelArgs = {
+  input: DeprovisionClusterModelInput;
+};
+
+
 export type MutationDeprovisionManagedServiceArgs = {
   input: DeprovisionManagedServiceInput;
 };
@@ -8143,6 +8180,11 @@ export type MutationProposeSecretChangeArgs = {
 };
 
 
+export type MutationProvisionClusterModelArgs = {
+  input: ProvisionClusterModelInput;
+};
+
+
 export type MutationProvisionManagedDomainArgs = {
   clusterId: Scalars['GUID']['input'];
   isPlatformManagedZone?: Scalars['Boolean']['input'];
@@ -8472,6 +8514,11 @@ export type MutationRevokeMobileDeviceArgs = {
 };
 
 
+export type MutationRevokeModelSubscriptionArgs = {
+  input: RevokeModelSubscriptionInput;
+};
+
+
 export type MutationRevokeRoleBindingArgs = {
   input: RevokeRoleBindingInput;
 };
@@ -8773,6 +8820,11 @@ export type MutationSubmitFormArgs = {
 };
 
 
+export type MutationSubscribeClusterModelArgs = {
+  input: SubscribeClusterModelInput;
+};
+
+
 export type MutationSwitchUserArgs = {
   id: Scalars['ID']['input'];
 };
@@ -8894,6 +8946,11 @@ export type MutationUpdateAppArgs = {
 
 export type MutationUpdateAstroliftSecurityPolicyArgs = {
   input: UpdateSecurityPolicyInput;
+};
+
+
+export type MutationUpdateClusterModelArgs = {
+  input: UpdateClusterModelInput;
 };
 
 
@@ -11960,6 +12017,15 @@ export type RevokeMobileDeviceInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type RevokeModelSubscriptionInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchDeploymentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type RevokeRoleBindingInput = {
   id: Scalars['GUID']['input'];
 };
@@ -12247,6 +12313,17 @@ export type StartWorkflowResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type SubscribeClusterModelInput = {
+  alias: Scalars['String']['input'];
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type Subscription = {
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
   astroliftOnAppLog: AstroliftAppLogLine;
@@ -12466,6 +12543,19 @@ export type UpdateAppInput = {
   requiresApproval: InputMaybe<Scalars['Boolean']['input']>;
   sourceUrl: InputMaybe<Scalars['String']['input']>;
   triggerMode: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateClusterModelInput = {
+  allowSubscriptions: Scalars['Boolean']['input'];
+  cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
+  cpuRequest: Scalars['String']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  gpuCount: Scalars['Int']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  memoryRequest: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type UpdateEmailTemplateInput = {
