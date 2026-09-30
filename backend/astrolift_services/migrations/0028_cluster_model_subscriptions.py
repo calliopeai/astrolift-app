@@ -40,42 +40,42 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="managedservice",
             name="subscription_revision",
-            field=models.PositiveBigIntegerField(default=0),
+            field=models.PositiveBigIntegerField(default=0, db_default=0),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
             name="applied_revision",
-            field=models.PositiveBigIntegerField(default=0),
+            field=models.PositiveBigIntegerField(default=0, db_default=0),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
             name="binding_alias",
-            field=models.CharField(blank=True, default="", max_length=32),
+            field=models.CharField(blank=True, default="", db_default="", max_length=32),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
             name="credential_ref",
-            field=models.CharField(blank=True, default="", max_length=512),
+            field=models.CharField(blank=True, default="", db_default="", max_length=512),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
             name="desired_enabled",
-            field=models.BooleanField(default=True),
+            field=models.BooleanField(default=True, db_default=True),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
             name="desired_revision",
-            field=models.PositiveBigIntegerField(default=0),
+            field=models.PositiveBigIntegerField(default=0, db_default=0),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
             name="model_subscription",
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(default=False, db_default=False),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
             name="reconcile_error",
-            field=models.CharField(blank=True, default="", max_length=256),
+            field=models.CharField(blank=True, default="", db_default="", max_length=256),
         ),
         migrations.AddField(
             model_name="managedserviceattachment",
@@ -99,6 +99,7 @@ class Migration(migrations.Migration):
                     ("failed", "failed"),
                 ],
                 default="active",
+                db_default="active",
                 max_length=16,
             ),
         ),

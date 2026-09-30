@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("astrolift_services", "0031_shared_model_operation_placement"),
     ]
@@ -13,6 +12,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="managedservice",
             name="model_ready_backend_ref",
-            field=models.CharField(blank=True, default="", max_length=512),
+            field=models.CharField(blank=True, default="", db_default="", max_length=512),
         ),
     ]

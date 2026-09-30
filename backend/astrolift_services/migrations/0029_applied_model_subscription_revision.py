@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("astrolift_services", "0028_cluster_model_subscriptions"),
     ]
@@ -13,6 +12,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="managedservice",
             name="applied_subscription_revision",
-            field=models.PositiveBigIntegerField(default=0),
+            field=models.PositiveBigIntegerField(default=0, db_default=0),
         ),
     ]
