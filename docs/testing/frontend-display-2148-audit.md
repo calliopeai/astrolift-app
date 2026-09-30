@@ -20,7 +20,7 @@ Feature commits: `4409a668`, `79a022b3`, `302113fd`, `917de312`.
 
 | Item | Status | Current evidence / remaining work |
 | --- | --- | --- |
-| 1. AstroliftPolicy.conditions typed as object but used as an array | Remaining | JSON scalar still generates object types; policy condition arrays need an accurately typed facade/contract. |
+| 1. AstroliftPolicy.conditions typed as object but used as an array | Fixed | The facade treats condition JSON as unknown input for the existing validated parser, allowing arrays and malformed legacy values without an object cast. Policy fixtures use actual arrays; TypeScript and 62 policy story renders pass. |
 | 2. Cluster card view uses plain anchors and reloads the page | Pre-existing | Cluster cards use shared ListPage rowHref/navigation rather than a plain anchor. |
 | 3. Full preflight refresh branch is unreachable | Fixed | Managed row menu exposes onRefresh(cluster,true); real Apollo input and Chromium menu checks. |
 | 4. Organization settings Save is enabled with no changes | Pre-existing | OrganizationSettings passes generalDirty/retentionDirty/policiesDirty to independent save sections. |
