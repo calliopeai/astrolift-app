@@ -60,6 +60,11 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Managed-service summary, connection metadata and test-email/object/queue dialogs
+  use all eight locales, including byte quantities, cache age and queue counts.
+  Actual service identifiers, metadata, reference shims and rejected-email drafts
+  remain intact; read failures retain their server diagnostics (#2145).
+
 - Deployment controls and settings destination cards use all eight locales.
   Section modification captions localize both the sentence and relative time;
   image-tag retries, replica staging and actual destination routes remain intact (#2145).

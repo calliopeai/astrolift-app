@@ -20,7 +20,7 @@ import {
   ServerIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -65,9 +65,9 @@ import type {
 
 /** Compact human-readable size string. Avoids pulling in a new dep
  *  for a single-shot display in a side dialog. */
-function formatBytes(n: number): string {
+function formatBytes(n: number, number: ReturnType<typeof useFormatter>["number"]): string {
   if (!Number.isFinite(n) || n < 0) return "—";
-  if (n < 1024) return `${n} B`;
+  if (n < 1024) return `${number(n)} B`;
   const units = ["KB", "MB", "GB", "TB"];
   let v = n / 1024;
   let i = 0;
@@ -75,17 +75,20 @@ function formatBytes(n: number): string {
     v /= 1024;
     i += 1;
   }
-  return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
+  return `${number(v, { minimumFractionDigits: v < 10 ? 1 : 0, maximumFractionDigits: v < 10 ? 1 : 0 })} ${units[i]}`;
 }
 
-/** "12s" / "3m" / "2h" / "1d" — uses absolute seconds so the snapshot
- *  age renders without pulling in a duration formatter dep. */
-function formatSecondsShort(s: number): string {
+/** Localized compact duration; preserves the snapshot’s existing rounding. */
+function formatSecondsShort(s: number, number: ReturnType<typeof useFormatter>["number"]): string {
   if (!Number.isFinite(s) || s < 0) return "—";
-  if (s < 60) return `${Math.round(s)}s`;
-  if (s < 3600) return `${Math.round(s / 60)}m`;
-  if (s < 86400) return `${Math.round(s / 3600)}h`;
-  return `${Math.round(s / 86400)}d`;
+  const unit = s < 60 ? "second" : s < 3600 ? "minute" : s < 86400 ? "hour" : "day";
+  const value = s < 60 ? s : s < 3600 ? s / 60 : s < 86400 ? s / 3600 : s / 86400;
+  return number(Math.round(value), {
+    style: "unit",
+    unit,
+    unitDisplay: "narrow",
+    maximumFractionDigits: 0,
+  });
 }
 
 /**
@@ -206,7 +209,7 @@ export function ManagedServicesSummaryView({
   // First-load skeleton hides the section to avoid flashing an empty
   // card then a populated one; subsequent refetches re-render in place.
   if (error) {
-    return <QueryError title="Could not load managed services" error={error} onRetry={onRetry} />;
+    return <QueryError title={t("loadFailed")} error={error} onRetry={onRetry} />;
   }
   if (loading) {
     return (
@@ -410,9 +413,8 @@ export type RevealConnectionDialogViewProps = ManagedServiceDialogSlotProps &
  * Reveal-connection modal — mirrors the #424 reveal pattern.
  *
  * Displays the envelope's key set with copy-to-clipboard per key.
- * Values are NEVER plaintext (they live in the secrets backend); the
- * dialog renders `secret-ref:<ref>` / `placeholder:pending` shims so
- * operators can see the wiring without us leaking credentials.
+ * Secret values are masked; nonsecret connection metadata remains visible.
+ * The backend supplies reference / placeholder shims for secret rows.
  */
 export function RevealConnectionDialogView({
   svc,
@@ -603,6 +605,7 @@ export function ListObjectsDialogView({
   onRefresh,
 }: ListObjectsDialogViewProps) {
   const t = useTranslations("apps.settings.managedServicesSummary.objectsDialog");
+  const intl = useFormatter();
   const fmt = useFormatters();
   const objects = result?.objects ?? [];
 
@@ -631,7 +634,9 @@ export function ListObjectsDialogView({
                   className="flex items-center gap-2 rounded-md border bg-transparent p-2 font-mono text-xs"
                 >
                   <span className="text-foreground flex-1 truncate">{o.key}</span>
-                  <span className="text-muted-foreground shrink-0">{formatBytes(o.sizeBytes)}</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {formatBytes(o.sizeBytes, intl.number)}
+                  </span>
                   {o.lastModified ? (
                     <span className="text-muted-foreground text-2xs shrink-0">
                       {fmt.formatRelativeTime(o.lastModified)}
@@ -642,7 +647,7 @@ export function ListObjectsDialogView({
             </ul>
             <p className="text-muted-foreground text-2xs">
               {result?.cacheAgeSeconds != null
-                ? t("cacheAge", { age: formatSecondsShort(result.cacheAgeSeconds) })
+                ? t("cacheAge", { age: formatSecondsShort(result.cacheAgeSeconds, intl.number) })
                 : t("noCacheAge")}
               {result?.truncated ? ` · ${t("truncated")}` : ""}
             </p>
@@ -694,11 +699,15 @@ export function QueueDepthDialogView({
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-md border p-3 text-center">
               <p className="text-muted-foreground text-xs">{t("depth")}</p>
-              <p className="text-foreground mt-1 text-2xl font-semibold">{result.depth}</p>
+              <p className="text-foreground mt-1 text-2xl font-semibold">
+                {fmt.formatNumber(result.depth)}
+              </p>
             </div>
             <div className="rounded-md border p-3 text-center">
               <p className="text-muted-foreground text-xs">{t("inFlight")}</p>
-              <p className="text-foreground mt-1 text-2xl font-semibold">{result.inFlight}</p>
+              <p className="text-foreground mt-1 text-2xl font-semibold">
+                {fmt.formatNumber(result.inFlight)}
+              </p>
             </div>
             <p className="text-muted-foreground text-2xs col-span-2">
               {result.sampledAt

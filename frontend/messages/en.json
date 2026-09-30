@@ -2303,11 +2303,11 @@
         },
         "revealDialog": {
           "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
+          "description": "Envelope keys the workload sees at runtime. Secret values live in the platform secrets backend and are never returned in plaintext.",
           "secretRefLabel": "Secrets backend reference",
           "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
           "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
+          "plaintextWarning": "Plaintext secret values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
           "copy": "Copy",
           "copied": "Copied to clipboard.",
           "copyFailed": "Couldn't copy — select the text and copy manually.",
@@ -2352,7 +2352,8 @@
           "loading": "Loading…",
           "refresh": "Refresh",
           "close": "Close"
-        }
+        },
+        "loadFailed": "Could not load managed services"
       }
     },
     "workloadDetail": {

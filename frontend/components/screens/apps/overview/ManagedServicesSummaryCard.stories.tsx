@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 
 import {
   CONNECTION,
@@ -177,4 +180,29 @@ export const QueueDepthNoResult: StoryObj = {
 
 export const QueryFailed: Story = {
   args: { services: [], error: "Permission denied while loading services", onRetry: () => {} },
+};
+
+export const FrenchEmailWidth768: StoryObj = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <div style={{ width: 768 }}>
+        <SendTestEmailDialogView {...DIALOG_BASE} svc={EMAIL} sending={false} onSend={SEND} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseObjectsWidth768: StoryObj = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <div style={{ width: 768 }}>
+        <ListObjectsDialogView
+          {...DIALOG_BASE}
+          svc={OBJECT_STORE}
+          result={OBJECTS}
+          loading={false}
+          onRefresh={REFRESH}
+        />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

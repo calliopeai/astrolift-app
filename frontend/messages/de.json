@@ -1429,88 +1429,89 @@
         "viewRuns": "Läufe ansehen"
       },
       "managedServicesSummary": {
-        "title": "Managed services",
-        "description": "Bound databases, caches, queues, and integrations at a glance — per-row quick actions for the common operator tasks.",
-        "openAll": "Open all",
-        "viewDetail": "View detail",
-        "actionsLabel": "Quick actions",
-        "statusTooltip": "{kind} · status: {status}",
-        "statusFailed": "failed",
+        "title": "Verwaltete Dienste",
+        "description": "Gebundene Datenbanken, Caches, Warteschlangen und Integrationen im Überblick, mit Schnellaktionen je Zeile für häufige Betriebsaufgaben.",
+        "openAll": "Alle öffnen",
+        "viewDetail": "Details ansehen",
+        "actionsLabel": "Schnellaktionen",
+        "statusTooltip": "{kind} · Status: {status}",
+        "statusFailed": "fehlgeschlagen",
         "lastAction": "{action} · {when}",
         "actionLabels": {
           "connection": {
-            "reveal": "Connection revealed"
+            "reveal": "Verbindung angezeigt"
           },
           "test_email": {
-            "send": "Test email sent"
+            "send": "Test-E-Mail gesendet"
           }
         },
         "actions": {
           "connection": {
-            "reveal": "View connection details"
+            "reveal": "Verbindungsdetails ansehen"
           },
           "objects": {
-            "list": "List recent objects"
+            "list": "Letzte Objekte auflisten"
           },
           "email": {
-            "send": "Send test email"
+            "send": "Test-E-Mail senden"
           },
           "queue": {
-            "depth": "View queue depth"
+            "depth": "Warteschlangenumfang ansehen"
           }
         },
         "revealDialog": {
-          "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
-          "secretRefLabel": "Secrets backend reference",
-          "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
-          "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
-          "copy": "Copy",
-          "copied": "Copied to clipboard.",
-          "copyFailed": "Couldn't copy — select the text and copy manually.",
-          "close": "Close",
-          "loading": "Loading…",
-          "noResponse": "No response from backend.",
-          "failed": "Reveal failed."
+          "title": "Verbindungsdetails · {name}",
+          "description": "Schlüssel, die der Workload zur Laufzeit erhält. Secret-Werte werden im Secret-Speicher der Plattform verwahrt und niemals im Klartext zurückgegeben.",
+          "secretRefLabel": "Referenz zum Secret-Speicher",
+          "noSecretRef": "Noch nicht bereitgestellt: Der Workflow-Zyklus hat diese Bindung noch nicht befüllt.",
+          "revealedAt": "Angezeigt {when}",
+          "plaintextWarning": "Diese Ansicht zeigt keine Secret-Werte im Klartext. Rufen Sie sie über den Client des Secret-Backends der Plattform ab, wenn Sie ihren Inhalt prüfen müssen.",
+          "copy": "Kopieren",
+          "copied": "In die Zwischenablage kopiert.",
+          "copyFailed": "Kopieren nicht möglich: Markieren Sie den Text und kopieren Sie ihn manuell.",
+          "close": "Schließen",
+          "loading": "Wird geladen…",
+          "noResponse": "Keine Antwort vom Server.",
+          "failed": "Anzeige fehlgeschlagen."
         },
         "sendEmailDialog": {
-          "title": "Send test email · {name}",
-          "description": "Fires a one-shot test through this binding to verify the configured email transport. Bypasses unsubscribe; suppression list (hard-bounce / complaint) still applies.",
-          "recipientLabel": "Recipient",
-          "subjectLabel": "Subject (optional)",
-          "subjectPlaceholder": "[Astrolift] Test email",
-          "bodyLabel": "Body (optional)",
-          "bodyPlaceholder": "Hello — this is a deliverability test from Astrolift settings.",
-          "hint": "On success, the toast carries the configured transport so you can confirm which provider received the call.",
-          "send": "Send test",
-          "cancel": "Cancel",
-          "sent": "Sent to {recipient} via {transport}.",
-          "noResponse": "No response from backend.",
-          "noPayload": "Send returned no payload.",
-          "failed": "Test send failed."
+          "title": "Test-E-Mail senden · {name}",
+          "description": "Sendet einen einzelnen Test über diese Bindung, um den konfigurierten E-Mail-Transport zu prüfen. Abmeldungen werden umgangen; die Sperrliste (dauerhafte Zustellfehler und Beschwerden) gilt weiterhin.",
+          "recipientLabel": "Empfänger",
+          "subjectLabel": "Betreff (optional)",
+          "subjectPlaceholder": "[Astrolift] Test-E-Mail",
+          "bodyLabel": "Nachricht (optional)",
+          "bodyPlaceholder": "Hallo: Dies ist ein Zustellbarkeitstest aus den Astrolift-Einstellungen.",
+          "hint": "Bei Erfolg zeigt die Benachrichtigung den konfigurierten Transport, damit Sie den aufgerufenen Anbieter bestätigen können.",
+          "send": "Test senden",
+          "cancel": "Abbrechen",
+          "sent": "An {recipient} über {transport} gesendet.",
+          "noResponse": "Keine Antwort vom Server.",
+          "noPayload": "Der Versand hat kein Ergebnis zurückgegeben.",
+          "failed": "Testversand fehlgeschlagen."
         },
         "objectsDialog": {
-          "title": "Recent objects · {name}",
-          "description": "Top entries from the cached recent-objects snapshot. Live cloud listings require the driver SDK to expose list_recent_objects (tracked separately).",
-          "empty": "No cached objects yet. The workflow loop refreshes this list on a schedule.",
-          "cacheAge": "Snapshot is {age} old.",
-          "noCacheAge": "Cache age not recorded yet.",
-          "truncated": "more available — open the full managed-services page.",
-          "refresh": "Refresh",
-          "close": "Close"
+          "title": "Letzte Objekte · {name}",
+          "description": "Erste Einträge aus dem zwischengespeicherten Snapshot der letzten Objekte. Live-Auflistungen erfordern list_recent_objects im Treiber-SDK (separat erfasst).",
+          "empty": "Noch keine zwischengespeicherten Objekte. Der Workflow-Zyklus aktualisiert diese Liste regelmäßig.",
+          "cacheAge": "Der Snapshot ist {age} alt.",
+          "noCacheAge": "Das Cache-Alter wurde noch nicht erfasst.",
+          "truncated": "Weitere Objekte verfügbar: Öffnen Sie die vollständige Seite der verwalteten Dienste.",
+          "refresh": "Aktualisieren",
+          "close": "Schließen"
         },
         "depthDialog": {
-          "title": "Queue depth · {name}",
-          "description": "Cached depth + in-flight snapshot. Live cloud reads require the driver SDK to expose queue_depth (tracked separately).",
-          "depth": "Backlog",
-          "inFlight": "In-flight",
-          "sampledAt": "Sampled {when}.",
-          "noSnapshot": "No cached snapshot yet — the workflow loop refreshes this on a schedule.",
-          "loading": "Loading…",
-          "refresh": "Refresh",
-          "close": "Close"
-        }
+          "title": "Warteschlangenumfang · {name}",
+          "description": "Zwischengespeicherter Snapshot der wartenden und laufenden Nachrichten. Live-Abfragen erfordern queue_depth im Treiber-SDK (separat erfasst).",
+          "depth": "Wartend",
+          "inFlight": "In Bearbeitung",
+          "sampledAt": "Gemessen {when}.",
+          "noSnapshot": "Noch kein zwischengespeicherter Snapshot: Der Workflow-Zyklus aktualisiert ihn regelmäßig.",
+          "loading": "Wird geladen…",
+          "refresh": "Aktualisieren",
+          "close": "Schließen"
+        },
+        "loadFailed": "Verwaltete Dienste konnten nicht geladen werden"
       }
     },
     "common": {

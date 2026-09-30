@@ -1429,88 +1429,89 @@
         "viewRuns": "Ver execuções"
       },
       "managedServicesSummary": {
-        "title": "Managed services",
-        "description": "Bound databases, caches, queues, and integrations at a glance — per-row quick actions for the common operator tasks.",
-        "openAll": "Open all",
-        "viewDetail": "View detail",
-        "actionsLabel": "Quick actions",
+        "title": "Serviços gerenciados",
+        "description": "Bancos de dados, caches, filas e integrações vinculados em um resumo, com ações rápidas por linha para as tarefas operacionais comuns.",
+        "openAll": "Abrir todos",
+        "viewDetail": "Ver detalhes",
+        "actionsLabel": "Ações rápidas",
         "statusTooltip": "{kind} · status: {status}",
-        "statusFailed": "failed",
+        "statusFailed": "falhou",
         "lastAction": "{action} · {when}",
         "actionLabels": {
           "connection": {
-            "reveal": "Connection revealed"
+            "reveal": "Conexão exibida"
           },
           "test_email": {
-            "send": "Test email sent"
+            "send": "E-mail de teste enviado"
           }
         },
         "actions": {
           "connection": {
-            "reveal": "View connection details"
+            "reveal": "Ver detalhes da conexão"
           },
           "objects": {
-            "list": "List recent objects"
+            "list": "Listar objetos recentes"
           },
           "email": {
-            "send": "Send test email"
+            "send": "Enviar e-mail de teste"
           },
           "queue": {
-            "depth": "View queue depth"
+            "depth": "Ver quantidade de mensagens na fila"
           }
         },
         "revealDialog": {
-          "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
-          "secretRefLabel": "Secrets backend reference",
-          "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
-          "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
-          "copy": "Copy",
-          "copied": "Copied to clipboard.",
-          "copyFailed": "Couldn't copy — select the text and copy manually.",
-          "close": "Close",
-          "loading": "Loading…",
-          "noResponse": "No response from backend.",
-          "failed": "Reveal failed."
+          "title": "Detalhes da conexão · {name}",
+          "description": "Chaves recebidas pela carga de trabalho durante a execução. Os valores dos secrets ficam no armazenamento de secrets da plataforma e nunca são retornados em texto simples.",
+          "secretRefLabel": "Referência do armazenamento de secrets",
+          "noSecretRef": "Ainda não foi provisionado; o ciclo do fluxo de trabalho não preencheu este vínculo.",
+          "revealedAt": "Exibido {when}",
+          "plaintextWarning": "Esta tela não mostra os valores dos secrets em texto simples. Para consultar o conteúdo, obtenha-os pelo cliente do backend de secrets da plataforma.",
+          "copy": "Copiar",
+          "copied": "Copiado para a área de transferência.",
+          "copyFailed": "Não foi possível copiar; selecione o texto e copie manualmente.",
+          "close": "Fechar",
+          "loading": "Carregando…",
+          "noResponse": "Nenhuma resposta do servidor.",
+          "failed": "Falha ao exibir."
         },
         "sendEmailDialog": {
-          "title": "Send test email · {name}",
-          "description": "Fires a one-shot test through this binding to verify the configured email transport. Bypasses unsubscribe; suppression list (hard-bounce / complaint) still applies.",
-          "recipientLabel": "Recipient",
-          "subjectLabel": "Subject (optional)",
-          "subjectPlaceholder": "[Astrolift] Test email",
-          "bodyLabel": "Body (optional)",
-          "bodyPlaceholder": "Hello — this is a deliverability test from Astrolift settings.",
-          "hint": "On success, the toast carries the configured transport so you can confirm which provider received the call.",
-          "send": "Send test",
-          "cancel": "Cancel",
-          "sent": "Sent to {recipient} via {transport}.",
-          "noResponse": "No response from backend.",
-          "noPayload": "Send returned no payload.",
-          "failed": "Test send failed."
+          "title": "Enviar e-mail de teste · {name}",
+          "description": "Envia um teste único por este vínculo para verificar o transporte de e-mail configurado. Ignora o cancelamento de inscrição; a lista de supressão (rejeições permanentes e reclamações) continua sendo aplicada.",
+          "recipientLabel": "Destinatário",
+          "subjectLabel": "Assunto (opcional)",
+          "subjectPlaceholder": "[Astrolift] E-mail de teste",
+          "bodyLabel": "Mensagem (opcional)",
+          "bodyPlaceholder": "Olá: este é um teste de entrega a partir das configurações do Astrolift.",
+          "hint": "Em caso de sucesso, a notificação mostra o transporte configurado para confirmar qual provedor recebeu a chamada.",
+          "send": "Enviar teste",
+          "cancel": "Cancelar",
+          "sent": "Enviado para {recipient} por {transport}.",
+          "noResponse": "Nenhuma resposta do servidor.",
+          "noPayload": "O envio não retornou um resultado.",
+          "failed": "Falha no envio de teste."
         },
         "objectsDialog": {
-          "title": "Recent objects · {name}",
-          "description": "Top entries from the cached recent-objects snapshot. Live cloud listings require the driver SDK to expose list_recent_objects (tracked separately).",
-          "empty": "No cached objects yet. The workflow loop refreshes this list on a schedule.",
-          "cacheAge": "Snapshot is {age} old.",
-          "noCacheAge": "Cache age not recorded yet.",
-          "truncated": "more available — open the full managed-services page.",
-          "refresh": "Refresh",
-          "close": "Close"
+          "title": "Objetos recentes · {name}",
+          "description": "Primeiras entradas do snapshot de objetos recentes em cache. Listagens na nuvem em tempo real exigem list_recent_objects no SDK do driver (acompanhado separadamente).",
+          "empty": "Ainda não há objetos em cache. O ciclo do fluxo de trabalho atualiza esta lista periodicamente.",
+          "cacheAge": "O snapshot tem {age} de idade.",
+          "noCacheAge": "A idade do cache ainda não foi registrada.",
+          "truncated": "há mais objetos disponíveis; abra a página completa de serviços gerenciados.",
+          "refresh": "Atualizar",
+          "close": "Fechar"
         },
         "depthDialog": {
-          "title": "Queue depth · {name}",
-          "description": "Cached depth + in-flight snapshot. Live cloud reads require the driver SDK to expose queue_depth (tracked separately).",
-          "depth": "Backlog",
-          "inFlight": "In-flight",
-          "sampledAt": "Sampled {when}.",
-          "noSnapshot": "No cached snapshot yet — the workflow loop refreshes this on a schedule.",
-          "loading": "Loading…",
-          "refresh": "Refresh",
-          "close": "Close"
-        }
+          "title": "Quantidade de mensagens na fila · {name}",
+          "description": "Snapshot em cache das mensagens pendentes e em andamento. Leituras da nuvem em tempo real exigem queue_depth no SDK do driver (acompanhado separadamente).",
+          "depth": "Pendentes",
+          "inFlight": "Em andamento",
+          "sampledAt": "Medido {when}.",
+          "noSnapshot": "Ainda não há snapshot em cache; o ciclo do fluxo de trabalho o atualiza periodicamente.",
+          "loading": "Carregando…",
+          "refresh": "Atualizar",
+          "close": "Fechar"
+        },
+        "loadFailed": "Não foi possível carregar os serviços gerenciados"
       }
     },
     "common": {

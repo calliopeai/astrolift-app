@@ -1429,88 +1429,89 @@
         "viewRuns": "실행 보기"
       },
       "managedServicesSummary": {
-        "title": "Managed services",
-        "description": "Bound databases, caches, queues, and integrations at a glance — per-row quick actions for the common operator tasks.",
-        "openAll": "Open all",
-        "viewDetail": "View detail",
-        "actionsLabel": "Quick actions",
-        "statusTooltip": "{kind} · status: {status}",
-        "statusFailed": "failed",
+        "title": "관리형 서비스",
+        "description": "바인딩된 데이터베이스, 캐시, 큐 및 연동을 한눈에 확인하고 각 행에서 자주 쓰는 운영 작업을 실행합니다.",
+        "openAll": "모두 열기",
+        "viewDetail": "상세 보기",
+        "actionsLabel": "빠른 작업",
+        "statusTooltip": "{kind} · 상태: {status}",
+        "statusFailed": "실패",
         "lastAction": "{action} · {when}",
         "actionLabels": {
           "connection": {
-            "reveal": "Connection revealed"
+            "reveal": "연결 정보 표시됨"
           },
           "test_email": {
-            "send": "Test email sent"
+            "send": "테스트 이메일 전송됨"
           }
         },
         "actions": {
           "connection": {
-            "reveal": "View connection details"
+            "reveal": "연결 정보 보기"
           },
           "objects": {
-            "list": "List recent objects"
+            "list": "최근 객체 목록 보기"
           },
           "email": {
-            "send": "Send test email"
+            "send": "테스트 이메일 보내기"
           },
           "queue": {
-            "depth": "View queue depth"
+            "depth": "큐 메시지 수 보기"
           }
         },
         "revealDialog": {
-          "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
-          "secretRefLabel": "Secrets backend reference",
-          "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
-          "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
-          "copy": "Copy",
-          "copied": "Copied to clipboard.",
-          "copyFailed": "Couldn't copy — select the text and copy manually.",
-          "close": "Close",
-          "loading": "Loading…",
-          "noResponse": "No response from backend.",
-          "failed": "Reveal failed."
+          "title": "연결 정보 · {name}",
+          "description": "워크로드가 실행 시 받는 키입니다. 시크릿 값은 플랫폼 시크릿 저장소에 보관되며 평문으로 반환되지 않습니다.",
+          "secretRefLabel": "시크릿 저장소 참조",
+          "noSecretRef": "아직 프로비저닝되지 않았습니다. 워크플로 주기에서 이 바인딩이 아직 채워지지 않았습니다.",
+          "revealedAt": "{when} 표시됨",
+          "plaintextWarning": "이 화면에서는 시크릿의 평문 값을 표시하지 않습니다. 내용을 확인하려면 플랫폼 시크릿 백엔드 클라이언트로 가져오세요.",
+          "copy": "복사",
+          "copied": "클립보드에 복사되었습니다.",
+          "copyFailed": "복사하지 못했습니다. 텍스트를 선택하여 직접 복사하세요.",
+          "close": "닫기",
+          "loading": "불러오는 중…",
+          "noResponse": "서버에서 응답을 받지 못했습니다.",
+          "failed": "표시에 실패했습니다."
         },
         "sendEmailDialog": {
-          "title": "Send test email · {name}",
-          "description": "Fires a one-shot test through this binding to verify the configured email transport. Bypasses unsubscribe; suppression list (hard-bounce / complaint) still applies.",
-          "recipientLabel": "Recipient",
-          "subjectLabel": "Subject (optional)",
-          "subjectPlaceholder": "[Astrolift] Test email",
-          "bodyLabel": "Body (optional)",
-          "bodyPlaceholder": "Hello — this is a deliverability test from Astrolift settings.",
-          "hint": "On success, the toast carries the configured transport so you can confirm which provider received the call.",
-          "send": "Send test",
-          "cancel": "Cancel",
-          "sent": "Sent to {recipient} via {transport}.",
-          "noResponse": "No response from backend.",
-          "noPayload": "Send returned no payload.",
-          "failed": "Test send failed."
+          "title": "테스트 이메일 보내기 · {name}",
+          "description": "이 바인딩을 통해 테스트를 한 번 전송하여 설정된 이메일 전송 방식을 확인합니다. 수신 거부는 무시하지만 차단 목록(영구 반송 및 신고)은 계속 적용됩니다.",
+          "recipientLabel": "수신자",
+          "subjectLabel": "제목(선택 사항)",
+          "subjectPlaceholder": "[Astrolift] 테스트 이메일",
+          "bodyLabel": "본문(선택 사항)",
+          "bodyPlaceholder": "안녕하세요. Astrolift 설정에서 보낸 이메일 전달 테스트입니다.",
+          "hint": "성공하면 알림에 설정된 전송 방식이 표시되어 어떤 제공자가 요청을 받았는지 확인할 수 있습니다.",
+          "send": "테스트 보내기",
+          "cancel": "취소",
+          "sent": "{transport}를 통해 {recipient}에게 전송했습니다.",
+          "noResponse": "서버에서 응답을 받지 못했습니다.",
+          "noPayload": "전송 결과가 반환되지 않았습니다.",
+          "failed": "테스트 전송에 실패했습니다."
         },
         "objectsDialog": {
-          "title": "Recent objects · {name}",
-          "description": "Top entries from the cached recent-objects snapshot. Live cloud listings require the driver SDK to expose list_recent_objects (tracked separately).",
-          "empty": "No cached objects yet. The workflow loop refreshes this list on a schedule.",
-          "cacheAge": "Snapshot is {age} old.",
-          "noCacheAge": "Cache age not recorded yet.",
-          "truncated": "more available — open the full managed-services page.",
-          "refresh": "Refresh",
-          "close": "Close"
+          "title": "최근 객체 · {name}",
+          "description": "캐시된 최근 객체 스냅샷의 첫 항목들입니다. 클라우드에서 직접 목록을 가져오려면 드라이버 SDK에 list_recent_objects가 필요합니다(별도 추적 중).",
+          "empty": "아직 캐시된 객체가 없습니다. 워크플로 주기에서 이 목록을 정기적으로 갱신합니다.",
+          "cacheAge": "스냅샷 경과 시간: {age}.",
+          "noCacheAge": "캐시 경과 시간이 아직 기록되지 않았습니다.",
+          "truncated": "추가 객체가 있습니다. 전체 관리형 서비스 페이지를 여세요.",
+          "refresh": "새로 고침",
+          "close": "닫기"
         },
         "depthDialog": {
-          "title": "Queue depth · {name}",
-          "description": "Cached depth + in-flight snapshot. Live cloud reads require the driver SDK to expose queue_depth (tracked separately).",
-          "depth": "Backlog",
-          "inFlight": "In-flight",
-          "sampledAt": "Sampled {when}.",
-          "noSnapshot": "No cached snapshot yet — the workflow loop refreshes this on a schedule.",
-          "loading": "Loading…",
-          "refresh": "Refresh",
-          "close": "Close"
-        }
+          "title": "큐 메시지 수 · {name}",
+          "description": "대기 및 처리 중인 메시지 수의 캐시된 스냅샷입니다. 클라우드에서 직접 읽으려면 드라이버 SDK에 queue_depth가 필요합니다(별도 추적 중).",
+          "depth": "대기 중",
+          "inFlight": "처리 중",
+          "sampledAt": "{when}에 측정됨.",
+          "noSnapshot": "아직 캐시된 스냅샷이 없습니다. 워크플로 주기에서 정기적으로 갱신합니다.",
+          "loading": "불러오는 중…",
+          "refresh": "새로 고침",
+          "close": "닫기"
+        },
+        "loadFailed": "관리형 서비스를 불러오지 못했습니다"
       }
     },
     "common": {

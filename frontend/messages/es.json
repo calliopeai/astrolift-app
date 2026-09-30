@@ -1429,88 +1429,89 @@
         "viewRuns": "Ver ejecuciones"
       },
       "managedServicesSummary": {
-        "title": "Managed services",
-        "description": "Bound databases, caches, queues, and integrations at a glance — per-row quick actions for the common operator tasks.",
-        "openAll": "Open all",
-        "viewDetail": "View detail",
-        "actionsLabel": "Quick actions",
-        "statusTooltip": "{kind} · status: {status}",
-        "statusFailed": "failed",
+        "title": "Servicios gestionados",
+        "description": "Bases de datos, cachés, colas e integraciones vinculadas de un vistazo, con acciones rápidas por fila para las tareas operativas habituales.",
+        "openAll": "Abrir todos",
+        "viewDetail": "Ver detalle",
+        "actionsLabel": "Acciones rápidas",
+        "statusTooltip": "{kind} · estado: {status}",
+        "statusFailed": "fallido",
         "lastAction": "{action} · {when}",
         "actionLabels": {
           "connection": {
-            "reveal": "Connection revealed"
+            "reveal": "Conexión mostrada"
           },
           "test_email": {
-            "send": "Test email sent"
+            "send": "Correo de prueba enviado"
           }
         },
         "actions": {
           "connection": {
-            "reveal": "View connection details"
+            "reveal": "Ver detalles de conexión"
           },
           "objects": {
-            "list": "List recent objects"
+            "list": "Listar objetos recientes"
           },
           "email": {
-            "send": "Send test email"
+            "send": "Enviar correo de prueba"
           },
           "queue": {
-            "depth": "View queue depth"
+            "depth": "Ver mensajes pendientes de la cola"
           }
         },
         "revealDialog": {
-          "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
-          "secretRefLabel": "Secrets backend reference",
-          "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
-          "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
-          "copy": "Copy",
-          "copied": "Copied to clipboard.",
-          "copyFailed": "Couldn't copy — select the text and copy manually.",
-          "close": "Close",
-          "loading": "Loading…",
-          "noResponse": "No response from backend.",
-          "failed": "Reveal failed."
+          "title": "Detalles de conexión · {name}",
+          "description": "Claves que recibe la carga de trabajo durante la ejecución. Los valores de los secretos se guardan en el almacén de secretos de la plataforma y nunca se devuelven en texto plano.",
+          "secretRefLabel": "Referencia al almacén de secretos",
+          "noSecretRef": "Aún no se ha provisionado; el ciclo del flujo de trabajo no ha completado esta vinculación.",
+          "revealedAt": "Mostrado {when}",
+          "plaintextWarning": "Esta vista no muestra los valores de los secretos en texto plano. Si necesitas consultar su contenido, obténlos mediante el cliente del backend de secretos de la plataforma.",
+          "copy": "Copiar",
+          "copied": "Copiado al portapapeles.",
+          "copyFailed": "No se ha podido copiar; selecciona el texto y cópialo manualmente.",
+          "close": "Cerrar",
+          "loading": "Cargando…",
+          "noResponse": "No se ha recibido una respuesta del servidor.",
+          "failed": "No se han podido mostrar los datos."
         },
         "sendEmailDialog": {
-          "title": "Send test email · {name}",
-          "description": "Fires a one-shot test through this binding to verify the configured email transport. Bypasses unsubscribe; suppression list (hard-bounce / complaint) still applies.",
-          "recipientLabel": "Recipient",
-          "subjectLabel": "Subject (optional)",
-          "subjectPlaceholder": "[Astrolift] Test email",
-          "bodyLabel": "Body (optional)",
-          "bodyPlaceholder": "Hello — this is a deliverability test from Astrolift settings.",
-          "hint": "On success, the toast carries the configured transport so you can confirm which provider received the call.",
-          "send": "Send test",
-          "cancel": "Cancel",
-          "sent": "Sent to {recipient} via {transport}.",
-          "noResponse": "No response from backend.",
-          "noPayload": "Send returned no payload.",
-          "failed": "Test send failed."
+          "title": "Enviar correo de prueba · {name}",
+          "description": "Envía una prueba a través de esta vinculación para verificar el transporte de correo configurado. Omite las bajas de suscripción; la lista de supresión (rebotes permanentes y quejas) sigue aplicándose.",
+          "recipientLabel": "Destinatario",
+          "subjectLabel": "Asunto (opcional)",
+          "subjectPlaceholder": "[Astrolift] Correo de prueba",
+          "bodyLabel": "Contenido (opcional)",
+          "bodyPlaceholder": "Hola: esta es una prueba de entrega desde la configuración de Astrolift.",
+          "hint": "Si el envío tiene éxito, la notificación muestra el transporte configurado para confirmar qué proveedor recibió la solicitud.",
+          "send": "Enviar prueba",
+          "cancel": "Cancelar",
+          "sent": "Enviado a {recipient} mediante {transport}.",
+          "noResponse": "No se ha recibido una respuesta del servidor.",
+          "noPayload": "El envío no ha devuelto ningún resultado.",
+          "failed": "El envío de prueba ha fallado."
         },
         "objectsDialog": {
-          "title": "Recent objects · {name}",
-          "description": "Top entries from the cached recent-objects snapshot. Live cloud listings require the driver SDK to expose list_recent_objects (tracked separately).",
-          "empty": "No cached objects yet. The workflow loop refreshes this list on a schedule.",
-          "cacheAge": "Snapshot is {age} old.",
-          "noCacheAge": "Cache age not recorded yet.",
-          "truncated": "more available — open the full managed-services page.",
-          "refresh": "Refresh",
-          "close": "Close"
+          "title": "Objetos recientes · {name}",
+          "description": "Primeras entradas de la instantánea de objetos recientes en caché. Las listas en vivo requieren que el SDK del controlador exponga list_recent_objects (se sigue por separado).",
+          "empty": "Aún no hay objetos en caché. El ciclo del flujo de trabajo actualiza esta lista periódicamente.",
+          "cacheAge": "La instantánea tiene {age} de antigüedad.",
+          "noCacheAge": "Aún no se ha registrado la antigüedad de la caché.",
+          "truncated": "hay más disponibles; abre la página completa de servicios gestionados.",
+          "refresh": "Actualizar",
+          "close": "Cerrar"
         },
         "depthDialog": {
-          "title": "Queue depth · {name}",
-          "description": "Cached depth + in-flight snapshot. Live cloud reads require the driver SDK to expose queue_depth (tracked separately).",
-          "depth": "Backlog",
-          "inFlight": "In-flight",
-          "sampledAt": "Sampled {when}.",
-          "noSnapshot": "No cached snapshot yet — the workflow loop refreshes this on a schedule.",
-          "loading": "Loading…",
-          "refresh": "Refresh",
-          "close": "Close"
-        }
+          "title": "Mensajes de la cola · {name}",
+          "description": "Instantánea en caché de mensajes pendientes y en curso. Las lecturas en vivo requieren que el SDK del controlador exponga queue_depth (se sigue por separado).",
+          "depth": "Pendientes",
+          "inFlight": "En curso",
+          "sampledAt": "Muestreado {when}.",
+          "noSnapshot": "Aún no hay instantánea en caché; el ciclo del flujo de trabajo la actualiza periódicamente.",
+          "loading": "Cargando…",
+          "refresh": "Actualizar",
+          "close": "Cerrar"
+        },
+        "loadFailed": "No se pudieron cargar los servicios administrados"
       }
     },
     "common": {

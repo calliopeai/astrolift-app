@@ -1429,88 +1429,89 @@
         "viewRuns": "查看运行记录"
       },
       "managedServicesSummary": {
-        "title": "Managed services",
-        "description": "Bound databases, caches, queues, and integrations at a glance — per-row quick actions for the common operator tasks.",
-        "openAll": "Open all",
-        "viewDetail": "View detail",
-        "actionsLabel": "Quick actions",
-        "statusTooltip": "{kind} · status: {status}",
-        "statusFailed": "failed",
+        "title": "托管服务",
+        "description": "一目了然地查看已绑定的数据库、缓存、队列和集成，并通过每行的快捷操作处理常见运维任务。",
+        "openAll": "打开全部",
+        "viewDetail": "查看详情",
+        "actionsLabel": "快捷操作",
+        "statusTooltip": "{kind} · 状态：{status}",
+        "statusFailed": "失败",
         "lastAction": "{action} · {when}",
         "actionLabels": {
           "connection": {
-            "reveal": "Connection revealed"
+            "reveal": "已显示连接信息"
           },
           "test_email": {
-            "send": "Test email sent"
+            "send": "已发送测试邮件"
           }
         },
         "actions": {
           "connection": {
-            "reveal": "View connection details"
+            "reveal": "查看连接详情"
           },
           "objects": {
-            "list": "List recent objects"
+            "list": "列出最近的对象"
           },
           "email": {
-            "send": "Send test email"
+            "send": "发送测试邮件"
           },
           "queue": {
-            "depth": "View queue depth"
+            "depth": "查看队列消息数"
           }
         },
         "revealDialog": {
-          "title": "Connection details · {name}",
-          "description": "Envelope keys the workload sees at runtime. Values live in the platform secrets backend and are never returned in plaintext.",
-          "secretRefLabel": "Secrets backend reference",
-          "noSecretRef": "Not yet provisioned — the workflow loop hasn't populated this binding.",
-          "revealedAt": "Revealed {when}",
-          "plaintextWarning": "Plaintext values are not exposed via this surface. Fetch them through the platform secrets-backend client if you need to inspect their content.",
-          "copy": "Copy",
-          "copied": "Copied to clipboard.",
-          "copyFailed": "Couldn't copy — select the text and copy manually.",
-          "close": "Close",
-          "loading": "Loading…",
-          "noResponse": "No response from backend.",
-          "failed": "Reveal failed."
+          "title": "连接详情 · {name}",
+          "description": "工作负载在运行时接收的键。密钥值保存在平台密钥存储中，永远不会以明文返回。",
+          "secretRefLabel": "密钥存储引用",
+          "noSecretRef": "尚未配置；工作流循环尚未填充此绑定。",
+          "revealedAt": "{when}显示",
+          "plaintextWarning": "此界面不显示密钥的明文值。如需查看内容，请通过平台密钥后端客户端获取。",
+          "copy": "复制",
+          "copied": "已复制到剪贴板。",
+          "copyFailed": "无法复制；请选择文本后手动复制。",
+          "close": "关闭",
+          "loading": "正在加载…",
+          "noResponse": "未收到服务器响应。",
+          "failed": "显示失败。"
         },
         "sendEmailDialog": {
-          "title": "Send test email · {name}",
-          "description": "Fires a one-shot test through this binding to verify the configured email transport. Bypasses unsubscribe; suppression list (hard-bounce / complaint) still applies.",
-          "recipientLabel": "Recipient",
-          "subjectLabel": "Subject (optional)",
-          "subjectPlaceholder": "[Astrolift] Test email",
-          "bodyLabel": "Body (optional)",
-          "bodyPlaceholder": "Hello — this is a deliverability test from Astrolift settings.",
-          "hint": "On success, the toast carries the configured transport so you can confirm which provider received the call.",
-          "send": "Send test",
-          "cancel": "Cancel",
-          "sent": "Sent to {recipient} via {transport}.",
-          "noResponse": "No response from backend.",
-          "noPayload": "Send returned no payload.",
-          "failed": "Test send failed."
+          "title": "发送测试邮件 · {name}",
+          "description": "通过此绑定发送一次测试，以验证配置的邮件传输方式。忽略退订状态，但仍应用抑制列表（永久退信和投诉）。",
+          "recipientLabel": "收件人",
+          "subjectLabel": "主题（可选）",
+          "subjectPlaceholder": "[Astrolift] 测试邮件",
+          "bodyLabel": "正文（可选）",
+          "bodyPlaceholder": "您好，这是从 Astrolift 设置发出的邮件送达测试。",
+          "hint": "成功后，通知会显示配置的传输方式，以便确认哪个提供商收到了请求。",
+          "send": "发送测试",
+          "cancel": "取消",
+          "sent": "已通过 {transport} 发送至 {recipient}。",
+          "noResponse": "未收到服务器响应。",
+          "noPayload": "发送未返回结果。",
+          "failed": "测试发送失败。"
         },
         "objectsDialog": {
-          "title": "Recent objects · {name}",
-          "description": "Top entries from the cached recent-objects snapshot. Live cloud listings require the driver SDK to expose list_recent_objects (tracked separately).",
-          "empty": "No cached objects yet. The workflow loop refreshes this list on a schedule.",
-          "cacheAge": "Snapshot is {age} old.",
-          "noCacheAge": "Cache age not recorded yet.",
-          "truncated": "more available — open the full managed-services page.",
-          "refresh": "Refresh",
-          "close": "Close"
+          "title": "最近的对象 · {name}",
+          "description": "缓存的最近对象快照中的前几项。实时云端列表需要驱动 SDK 提供 list_recent_objects（另行跟踪）。",
+          "empty": "暂无缓存对象。工作流循环会定期刷新此列表。",
+          "cacheAge": "快照已存在 {age}。",
+          "noCacheAge": "尚未记录缓存时长。",
+          "truncated": "还有更多对象，请打开完整托管服务页面。",
+          "refresh": "刷新",
+          "close": "关闭"
         },
         "depthDialog": {
-          "title": "Queue depth · {name}",
-          "description": "Cached depth + in-flight snapshot. Live cloud reads require the driver SDK to expose queue_depth (tracked separately).",
-          "depth": "Backlog",
-          "inFlight": "In-flight",
-          "sampledAt": "Sampled {when}.",
-          "noSnapshot": "No cached snapshot yet — the workflow loop refreshes this on a schedule.",
-          "loading": "Loading…",
-          "refresh": "Refresh",
-          "close": "Close"
-        }
+          "title": "队列消息数 · {name}",
+          "description": "缓存的积压和处理中消息快照。实时云端读取需要驱动 SDK 提供 queue_depth（另行跟踪）。",
+          "depth": "积压",
+          "inFlight": "处理中",
+          "sampledAt": "{when}采样。",
+          "noSnapshot": "暂无缓存快照；工作流循环会定期刷新。",
+          "loading": "正在加载…",
+          "refresh": "刷新",
+          "close": "关闭"
+        },
+        "loadFailed": "无法加载托管服务"
       }
     },
     "common": {
