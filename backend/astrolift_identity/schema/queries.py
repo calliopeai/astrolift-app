@@ -204,7 +204,13 @@ class MeType:
         scope, never a bare project/app grant, and is recomputed from
         :func:`core.permissions.granted_scopes` accordingly so it matches
         what create will actually allow.
+
+        Models additionally uses current account/membership and bearer checks:
+        view needs ORG_READ at the actual ORG or a live credential-visible app
+        with APP_READ; create/manage/run need CLUSTER_UPDATE at that ORG.
+        Descendant grants and the selected team cannot supply owner authority.
         """
+        from astrolift_identity.model_entitlements import models_entitlement
         from astrolift_identity.org_modules import enabled_modules
         from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
         from core.tenancy import get_current_tenant
@@ -225,6 +231,8 @@ class MeType:
             is_staff=is_staff,
             org_modules_enabled=enabled_modules(tenant.organization_id),
         )
+        models = models_entitlement(info)
+        rows = [models if row.key == "models" else row for row in rows]
         # The Builder API's create only ever checks ``app.create`` at a TEAM
         # or the ORG scope (#1919): a dev environment always resolves to one
         # of those, never a bare project/app grant. chat_studio_integration's

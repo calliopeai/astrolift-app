@@ -113,3 +113,21 @@ Sources: [vLLM production metrics](https://docs.vllm.ai/en/stable/usage/metrics/
 [Prometheus Operator target relabeling](https://prometheus-operator.dev/docs/api-reference/api/),
 [Prometheus query transport](https://github.com/prometheus/prometheus/blob/main/docs/querying/api.md),
 [histogram quantile semantics](https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile).
+
+## Models navigation capability
+
+`me.modules` includes an always-enabled `models` row, independent of Agents.
+`canView` requires the same explicit-ORG `org.read` and credential ceiling as
+the shared model collection, or `app.read` at any actual live authorized app
+for the legacy catalogue (which may still be empty). The legacy fallback uses
+canonical app ownership, policy visibility, shares and the bearer team ceiling.
+`canCreate`, `canManage` and `canRun` require `cluster.update` at the current
+organization, matching shared model management and advisory/prompt admission.
+A team/project/app grant containing an organization slug cannot grant upward.
+
+These advisory capabilities reload the current account, organization,
+membership and bearer validity before evaluating Models access. Platform
+superusers retain their existing active-account bypass; bearer membership and
+scope/team ceilings still apply. Other module rows retain their contracts.
+An entitlement does not replace the selected target's actual policy, immutable
+identity, readiness or mutation checks.

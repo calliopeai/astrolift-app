@@ -25,6 +25,11 @@
   new matching runtime revision before revocation can be reported (#2213).
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
+- Models has its own navigation entitlement: organization readers and actual
+  legacy app readers can view it without agent.read. Shared model actions
+  require current organization-level cluster.update, preserving live account,
+  membership, policy and bearer/team ceilings (#2215).
+
 - Shared-model density separates tenant-owned inventory, desired and last-applied
   requests from exact-service observed running/ready pods and CPU/memory usage
   and requests. Owner-authorized vLLM metrics

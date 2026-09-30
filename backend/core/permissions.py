@@ -251,7 +251,7 @@ class ModuleEntitlement:
     """One row of the ``me.modules`` capability manifest (spec 34/36 §0.3).
 
     A coarse, server-computed view of what the viewer can do with an
-    entity *module* (apps / agents / workflows / admin), derived from
+    entity *module* (apps / agents / workflows / admin / models), derived from
     the fine-grained permission slugs. The frontend shell reads these to
     decide which top-level modules to show and which in-module actions to
     surface — it never re-derives capability from raw slugs.
@@ -314,7 +314,7 @@ def module_entitlements(
     ``org_modules_enabled`` is the set of :data:`ORG_MODULE_KEYS` that are
     on for the active org (``astrolift_identity.org_modules.enabled_modules``).
     Returns one :class:`ModuleEntitlement` per module in a stable order:
-    ``apps``, ``agents``, ``workflows``, ``admin``,
+    ``apps``, ``agents``, ``workflows``, ``admin``, ``models``,
     ``chat_studio_integration``, ``agent_live_attach``, ``chat_studio_agent_runs``.
 
     The mapping table is fixed (do not re-derive capability anywhere
@@ -326,6 +326,7 @@ def module_entitlements(
     ``apps``                      app.read         app.create         app.update | app.delete       app.deploy
     ``agents``                    agent.read       agent.create       agent.update | agent.delete   agent.dispatch
     ``workflows``                 workflow.read    workflow.create    workflow.update|.delete       workflow.trigger
+    ``models``                    org.read|app.read cluster.update     cluster.update                cluster.update
     ``admin``                     any admin slug   cluster.register   same as can_view              (always false)
                                   OR staff/super   | org.manage_members
     ``chat_studio_integration``   app.read         app.create         app.update | app.delete       app.deploy
@@ -339,10 +340,10 @@ def module_entitlements(
     Agents module that never create or manage, only view + run -- it is
     the capability calliope-chat-studio#694's ``astrolift_capability(...,
     "chat_studio_agent_runs", can="run")`` reads. ``enabled`` is ``True``
-    for the first four (install-wide) and, for the three per-org modules,
+    for the first five (install-wide) and, for the per-org modules,
     whether the key is in ``org_modules_enabled``.
 
-    One deliberate exception to "the mapping table is fixed": the
+    One scoped refinement of "the mapping table is fixed": the
     ``AstroliftMe.modules`` resolver recomputes ``chat_studio_integration``'s
     ``can_create`` from :func:`granted_scopes` instead of taking the row
     returned here (#1919). The Builder API's create only ever checks
@@ -356,6 +357,9 @@ def module_entitlements(
     Superuser short-circuits every ``can_*`` to ``true`` on every module,
     matching the bootstrap-admin bypass elsewhere in this module, but not
     ``enabled``: a superuser cannot use a module that is off for the org.
+    The Models row is recomputed in ``AstroliftMe.modules`` with current live
+    membership, credential ceilings and actual ORG/app scopes. This pure
+    mapping alone cannot establish organization-level model authority.
     The ``admin`` module additionally lights its view/manage capability
     for staff (``is_staff``) even without an explicit admin slug.
     """
@@ -372,7 +376,7 @@ def module_entitlements(
                 can_run=True,
                 enabled=key not in ORG_MODULE_KEYS or key in org_on,
             )
-            for key in ("apps", "agents", "workflows", "admin", *ORG_MODULE_KEYS)
+            for key in ("apps", "agents", "workflows", "admin", "models", *ORG_MODULE_KEYS)
         ]
 
     def has(slug: str) -> bool:
@@ -409,6 +413,14 @@ def module_entitlements(
         can_create=has("cluster.register") or has("org.manage_members"),
         can_manage=admin_view,
         can_run=False,
+        enabled=True,
+    )
+    models = ModuleEntitlement(
+        key="models",
+        can_view=has("org.read") or has("app.read"),
+        can_create=has("cluster.update"),
+        can_manage=has("cluster.update"),
+        can_run=has("cluster.update"),
         enabled=True,
     )
     chat_studio_integration = ModuleEntitlement(
@@ -448,6 +460,7 @@ def module_entitlements(
         agents,
         workflows,
         admin,
+        models,
         chat_studio_integration,
         agent_live_attach,
         chat_studio_agent_runs,
