@@ -17,7 +17,6 @@ from astrolift_registry.schema.types import (
     AppCiWorkflowSyncStatusType,
     build_ci_workflow_sync_status,
 )
-from astrolift_registry.scopes import app_scope_by_guid
 from astrolift_scm.keygen import generate_ed25519_keypair
 from astrolift_scm.models import ScmWebhookInstallation, SourceConnection, SshDeployKey
 from astrolift_scm.schema.types import (
@@ -29,6 +28,7 @@ from astrolift_scm.schema.types import (
     ssh_key_to_type,
     webhook_install_to_type,
 )
+from astrolift_scm.scopes import scm_app_scope, scm_org_scope, ssh_key_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, check_platform_operator, require_permission
@@ -402,7 +402,7 @@ def _ci_drift_app(app_id) -> RegisteredApp | None:
 class ScmMutation:
     @strawberry.field
     @mutation_audit(action="scm.connect")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=scm_org_scope(Permission.SCM_CONNECT))
     @tenant_scoped()
     def connect_source(
         self, info: Info, input: ConnectSourceInput
@@ -442,7 +442,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.connect_existing_github_app")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=scm_org_scope(Permission.SCM_CONNECT))
     @tenant_scoped()
     def connect_existing_github_app(
         self, info: Info, input: ConnectExistingGithubAppInput
@@ -625,7 +625,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.update")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=scm_org_scope(Permission.SCM_CONNECT))
     @tenant_scoped()
     def update_source_connection(
         self, info: Info, input: UpdateSourceConnectionInput
@@ -678,7 +678,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.disconnect")
-    @require_permission(Permission.SCM_DISCONNECT)
+    @require_permission(Permission.SCM_DISCONNECT, scope=scm_org_scope(Permission.SCM_DISCONNECT))
     @tenant_scoped()
     def disconnect_source(
         self, info: Info, input: DisconnectSourceInput
@@ -697,7 +697,10 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.ssh_key.generate")
-    @require_permission(Permission.SCM_KEY_CREATE)
+    @require_permission(
+        Permission.SCM_KEY_CREATE,
+        scope=scm_app_scope(Permission.SCM_KEY_CREATE, "input.app_slug", by_slug=True),
+    )
     @tenant_scoped()
     def generate_ssh_deploy_key(
         self, info: Info, input: GenerateSshDeployKeyInput
@@ -748,7 +751,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.webhook.rotate")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=scm_org_scope(Permission.SCM_CONNECT))
     @tenant_scoped()
     def rotate_webhook_secret(
         self, info: Info, input: RotateWebhookSecretInput
@@ -808,7 +811,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.webhook.install")
-    @require_permission(Permission.SCM_CONNECT)
+    @require_permission(Permission.SCM_CONNECT, scope=scm_org_scope(Permission.SCM_CONNECT))
     @tenant_scoped()
     def install_scm_webhook(
         self, info: Info, input: InstallScmWebhookInput
@@ -1015,7 +1018,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.ssh_key.delete")
-    @require_permission(Permission.SCM_KEY_DELETE)
+    @require_permission(Permission.SCM_KEY_DELETE, scope=ssh_key_scope(Permission.SCM_KEY_DELETE))
     @tenant_scoped()
     def delete_ssh_deploy_key(
         self, info: Info, input: DeleteSshDeployKeyInput
@@ -1034,7 +1037,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.push_ci_workflow")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(Permission.APP_UPDATE, scope=scm_app_scope(Permission.APP_UPDATE))
     @tenant_scoped()
     def push_ci_workflow(
         self, info: Info, input: PushCiWorkflowInput
@@ -1121,7 +1124,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.ci_workflow.resync")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(Permission.APP_UPDATE, scope=scm_app_scope(Permission.APP_UPDATE))
     @tenant_scoped()
     def resync_astrolift_ci_workflow(
         self, info: Info, input: CiWorkflowSyncActionInput
@@ -1157,7 +1160,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.ci_workflow.pull")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(Permission.APP_UPDATE, scope=scm_app_scope(Permission.APP_UPDATE))
     @tenant_scoped()
     def pull_ci_workflow_from_repo(
         self, info: Info, input: CiWorkflowSyncActionInput
@@ -1199,7 +1202,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.ci_workflow.adopt")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(Permission.APP_UPDATE, scope=scm_app_scope(Permission.APP_UPDATE))
     @tenant_scoped()
     def adopt_repo_ci_workflow(
         self, info: Info, input: CiWorkflowSyncActionInput
@@ -1234,7 +1237,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.ci_workflow.refresh")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(Permission.APP_UPDATE, scope=scm_app_scope(Permission.APP_UPDATE))
     @tenant_scoped()
     def refresh_ci_workflow_sync_status(
         self, info: Info, input: CiWorkflowSyncActionInput
@@ -1309,7 +1312,7 @@ class ScmMutation:
 
     @strawberry.field
     @mutation_audit(action="scm.ci_workflow.reconcile_pr")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.app_id"))
+    @require_permission(Permission.APP_UPDATE, scope=scm_app_scope(Permission.APP_UPDATE))
     @tenant_scoped()
     def open_ci_workflow_reconcile_pr(
         self, info: Info, input: CiWorkflowSyncActionInput

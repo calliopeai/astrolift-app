@@ -7,6 +7,14 @@
   environment and cluster, release operation context before yielding events, and
   close their provider streams safely across tasks.
 
+- SCM connection and OAuth/GitHub App routes require their explicit
+  organization permission; per-app SSH keys and CI actions authorize their
+  owning app (#2109). SSH collections filter rows before pagination and counts.
+  Team-bound bearers cannot borrow an org owner's or operator's wider scope.
+  Named repo/file reads preserve personal credential ownership, and installation
+  callbacks refuse stale state from another organization before exchange/write.
+  All 27 tracked surfaces are covered without guardrail exemptions.
+
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep
   the existing production/development server behavior, and other startup
