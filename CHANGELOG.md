@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Token creation accepts the documented zero-day value for no expiry (#2148).
+
 - Config editor section links recognize the manifest codec's managed-service
   headers. Workload links navigate within the app; identity-provider labels show
   ellipses only for truncated identifiers and report activation dates only when
