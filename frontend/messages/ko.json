@@ -2364,6 +2364,31 @@
         "domains": "도메인",
         "dangerZone": "위험한 작업"
       }
+    },
+    "settingsTab": {
+      "groups": {
+        "app": "앱",
+        "source": "소스 및 빌드",
+        "deploys": "배포",
+        "traffic": "트래픽",
+        "data": "데이터",
+        "managedServices": "관리형 서비스"
+      },
+      "identity": {
+        "title": "이름 및 저장소",
+        "description": "앱의 이름과 소스 코드의 위치입니다.",
+        "name": "이름",
+        "nameRequired": "앱 이름을 입력하세요.",
+        "descriptionLabel": "설명",
+        "repository": "저장소",
+        "noRepository": "연결된 저장소 없음",
+        "defaultBranch": "기본 브랜치",
+        "slug": "슬러그",
+        "toastSaved": "앱 정보가 저장되었습니다",
+        "toastFailed": "앱 정보를 저장하지 못했습니다",
+        "save": "저장"
+      },
+      "empty": "이 앱에 표시할 내용이 없습니다."
     }
   },
   "settingsIndex": {

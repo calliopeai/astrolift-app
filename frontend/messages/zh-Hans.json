@@ -2364,6 +2364,31 @@
         "domains": "域名",
         "dangerZone": "危险操作"
       }
+    },
+    "settingsTab": {
+      "groups": {
+        "app": "应用",
+        "source": "源代码和构建",
+        "deploys": "部署",
+        "traffic": "流量",
+        "data": "数据",
+        "managedServices": "托管服务"
+      },
+      "identity": {
+        "title": "名称和仓库",
+        "description": "应用名称及其源代码位置。",
+        "name": "名称",
+        "nameRequired": "请输入应用名称。",
+        "descriptionLabel": "描述",
+        "repository": "仓库",
+        "noRepository": "未连接仓库",
+        "defaultBranch": "默认分支",
+        "slug": "标识",
+        "toastSaved": "应用详情已保存",
+        "toastFailed": "无法保存应用详情",
+        "save": "保存"
+      },
+      "empty": "此应用暂无内容。"
     }
   },
   "settingsIndex": {

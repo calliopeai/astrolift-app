@@ -2364,6 +2364,31 @@
         "domains": "Domaines",
         "dangerZone": "Zone de danger"
       }
+    },
+    "settingsTab": {
+      "groups": {
+        "app": "Application",
+        "source": "Sources et compilation",
+        "deploys": "Déploiements",
+        "traffic": "Trafic",
+        "data": "Données",
+        "managedServices": "Services gérés"
+      },
+      "identity": {
+        "title": "Nom et dépôt",
+        "description": "Le nom de l’application et l’emplacement de son code source.",
+        "name": "Nom",
+        "nameRequired": "L’application doit avoir un nom.",
+        "descriptionLabel": "Description",
+        "repository": "Dépôt",
+        "noRepository": "Aucun dépôt connecté",
+        "defaultBranch": "Branche par défaut",
+        "slug": "Slug",
+        "toastSaved": "Détails de l’application enregistrés",
+        "toastFailed": "Impossible d’enregistrer les détails de l’application",
+        "save": "Enregistrer"
+      },
+      "empty": "Aucun contenu ici pour cette application."
     }
   },
   "settingsIndex": {

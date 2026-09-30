@@ -2364,6 +2364,31 @@
         "domains": "ドメイン",
         "dangerZone": "危険な操作"
       }
+    },
+    "settingsTab": {
+      "groups": {
+        "app": "アプリ",
+        "source": "ソースとビルド",
+        "deploys": "デプロイ",
+        "traffic": "トラフィック",
+        "data": "データ",
+        "managedServices": "マネージドサービス"
+      },
+      "identity": {
+        "title": "名前とリポジトリ",
+        "description": "アプリの名前とソースコードの保存場所です。",
+        "name": "名前",
+        "nameRequired": "アプリの名前を入力してください。",
+        "descriptionLabel": "説明",
+        "repository": "リポジトリ",
+        "noRepository": "接続済みのリポジトリはありません",
+        "defaultBranch": "既定のブランチ",
+        "slug": "スラッグ",
+        "toastSaved": "アプリの情報を保存しました",
+        "toastFailed": "アプリの情報を保存できませんでした",
+        "save": "保存"
+      },
+      "empty": "このアプリの内容はありません。"
     }
   },
   "settingsIndex": {

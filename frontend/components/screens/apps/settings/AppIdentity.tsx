@@ -60,6 +60,7 @@ export function AppIdentityView({
       saving={saving}
       error={error}
       onSave={save}
+      saveLabel={t("save")}
       onCancel={() => {
         setDraft({ name, description });
         setError(null);

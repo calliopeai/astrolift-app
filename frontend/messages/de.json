@@ -2364,6 +2364,31 @@
         "domains": "Domains",
         "dangerZone": "Gefahrenbereich"
       }
+    },
+    "settingsTab": {
+      "groups": {
+        "app": "App",
+        "source": "Quellcode und Build",
+        "deploys": "Bereitstellungen",
+        "traffic": "Datenverkehr",
+        "data": "Daten",
+        "managedServices": "Verwaltete Dienste"
+      },
+      "identity": {
+        "title": "Name und Repository",
+        "description": "Wie die App heißt und wo ihr Quellcode liegt.",
+        "name": "Name",
+        "nameRequired": "Die App benötigt einen Namen.",
+        "descriptionLabel": "Beschreibung",
+        "repository": "Repository",
+        "noRepository": "Kein Repository verbunden",
+        "defaultBranch": "Standardbranch",
+        "slug": "Slug",
+        "toastSaved": "App-Details gespeichert",
+        "toastFailed": "App-Details konnten nicht gespeichert werden",
+        "save": "Speichern"
+      },
+      "empty": "Hier gibt es nichts für diese App."
     }
   },
   "settingsIndex": {

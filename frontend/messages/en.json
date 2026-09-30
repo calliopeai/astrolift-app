@@ -1869,7 +1869,8 @@
         "defaultBranch": "Default branch",
         "slug": "Slug",
         "toastSaved": "App details saved",
-        "toastFailed": "Could not save the app details"
+        "toastFailed": "Could not save the app details",
+        "save": "Save"
       },
       "empty": "Nothing here for this app."
     },

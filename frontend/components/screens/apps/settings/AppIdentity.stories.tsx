@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import french from "@/messages/fr.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -55,5 +58,16 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <AppIdentityView {...args} />
     </div>
+  ),
+};
+
+export const FrenchWidth768: Story = {
+  args: IDENTITY_LONG,
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <div style={{ width: 768 }}>
+        <AppIdentityView {...args} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

@@ -2364,6 +2364,31 @@
         "domains": "Domínios",
         "dangerZone": "Zona de perigo"
       }
+    },
+    "settingsTab": {
+      "groups": {
+        "app": "Aplicativo",
+        "source": "Código-fonte e compilação",
+        "deploys": "Implantações",
+        "traffic": "Tráfego",
+        "data": "Dados",
+        "managedServices": "Serviços gerenciados"
+      },
+      "identity": {
+        "title": "Nome e repositório",
+        "description": "O nome do aplicativo e a localização do código-fonte.",
+        "name": "Nome",
+        "nameRequired": "O aplicativo precisa de um nome.",
+        "descriptionLabel": "Descrição",
+        "repository": "Repositório",
+        "noRepository": "Nenhum repositório conectado",
+        "defaultBranch": "Branch padrão",
+        "slug": "Slug",
+        "toastSaved": "Detalhes do aplicativo salvos",
+        "toastFailed": "Não foi possível salvar os detalhes do aplicativo",
+        "save": "Salvar"
+      },
+      "empty": "Não há conteúdo aqui para este aplicativo."
     }
   },
   "settingsIndex": {

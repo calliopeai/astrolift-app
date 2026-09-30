@@ -19,6 +19,10 @@
   bounded sequential batch cancellation. Replace demo history/starred data with
   validated browser-local records scoped to the active organization and user;
   keep unrelated topology/observability showcases and forms parked (#2148).
+- Complete missing app settings group and identity messages in every locale,
+  including the editor’s save action. Blank names remain refused, failed saves
+  retain user edits and version conflicts use the localized shared notice (#2145).
+
 - Global preview lists, detail panels, states and teardown warnings use all
   eight locales. Resource numbers and USD costs respect the locale; actual PR
   targets, hostname patterns and driver cost caveats remain intact (#2145).
