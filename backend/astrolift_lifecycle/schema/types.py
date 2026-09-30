@@ -269,11 +269,47 @@ class DeploymentType:
     is the row's ``triggered_by_user``. The approval CTA hides on this
     so a deployer can't approve their own deploy from the UI."""
 
+    @strawberry.field
+    def phases(self) -> list[DeploymentPhaseType]:
+        from django.db.models import Max, Min
+
+        from astrolift_lifecycle.models import DeploymentLog
+
+        rows = DeploymentLog.objects.filter(deployment__guid=str(self.id)).exclude(phase="")
+        observations = rows.values("phase", "event").annotate(
+            at=Min("occurred_at"), latest=Max("occurred_at")
+        )
+        phases: dict[str, dict[str, dt.datetime]] = {}
+        for row in observations:
+            phases.setdefault(row["phase"], {})[row["event"]] = (
+                row["at"] if row["event"] == "started" else row["latest"]
+            )
+        return [
+            DeploymentPhaseType(
+                name=name,
+                started_at=events.get("started"),
+                completed_at=events.get("completed"),
+                failed_at=events.get("failed"),
+                healthy_at=events.get("healthy"),
+            )
+            for name in ("build", "push", "apply", "rollout", "health", "failed")
+            if (events := phases.get(name))
+        ]
+
     status_reason: str = ""
     """One line saying why the row is where it is (#2123): what a failed
     deploy died of, or what a pending one is waiting on. Empty for a deploy
     that is running or has succeeded. The full text stays in
     ``abortedReason``, ``buildError`` and ``manifestResyncError``."""
+
+
+@strawberry.type(name="AstroliftDeploymentPhase")
+class DeploymentPhaseType:
+    name: str
+    started_at: dt.datetime | None
+    completed_at: dt.datetime | None
+    failed_at: dt.datetime | None
+    healthy_at: dt.datetime | None
 
 
 @strawberry.type(name="AstroliftDeploymentLogEntry")
@@ -284,6 +320,23 @@ class DeploymentLogEntryType:
     message: str
     detail: JSON
     occurred_at: dt.datetime
+    phase: str = ""
+    event: str = ""
+
+
+@strawberry.type(name="AstroliftDeploymentRunLogPage")
+class DeploymentRunLogPageType:
+    items: list[DeploymentLogEntryType]
+    next_cursor: str | None
+    has_more: bool
+    page_size: int
+
+
+@strawberry.type(name="AstroliftDeploymentRunLogDownload")
+class DeploymentRunLogDownloadType:
+    filename: str
+    content: str
+    content_type: str = "text/plain; charset=utf-8"
 
 
 @strawberry.type(name="AstroliftDeploymentApprovalHistoryEntry")
@@ -870,6 +923,8 @@ def deployment_log_to_type(entry) -> DeploymentLogEntryType:
         message=entry.message or "",
         detail=entry.detail or {},
         occurred_at=entry.occurred_at,
+        phase=entry.phase,
+        event=entry.event,
     )
 
 

@@ -93,6 +93,8 @@ export function DeploymentDetailScreen({
   logError,
   onRetryLog,
   onDownload,
+  hasOlderLog,
+  onLoadOlderLog,
   manifest,
   manifestLoading,
   events,
@@ -295,6 +297,18 @@ export function DeploymentDetailScreen({
           emptyHint: t("noLog"),
         }}
       />
+
+      {hasOlderLog && (
+        <Button
+          variant="outline"
+          disabled={logLoading}
+          onClick={() => {
+            void onLoadOlderLog();
+          }}
+        >
+          {t("olderLog")}
+        </Button>
+      )}
 
       {/* #1553: this rollout rendered the stored manifest, not the repo's.
           It changes what a green deploy means, so it leads the details. */}

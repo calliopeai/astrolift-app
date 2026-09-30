@@ -1,8 +1,8 @@
 """
 DeploymentLog — append-only stream of deployment lifecycle entries.
 
-Every transition_to() call writes one row here so support engineers
-can reconstruct what happened. Rows cannot be updated or deleted at
+Lifecycle transitions, phase observations and captured build output remain
+readable independently of pod lifetime. Rows cannot be updated or deleted at
 the application layer (AppendOnlyMixin); a DB-level rule layered in a
 follow-up migration enforces the same at the storage layer.
 """
@@ -23,7 +23,9 @@ class DeploymentLog(AppendOnlyMixin, models.Model):
         related_name="logs",
         on_delete=models.CASCADE,
     )
-    status = models.CharField(max_length=32)
+    status = models.CharField(max_length=32, blank=True, default="")
+    phase = models.CharField(max_length=16, blank=True, default="")
+    event = models.CharField(max_length=32, blank=True, default="")
     message = models.TextField(blank=True, default="")
     detail = models.JSONField(null=True, blank=True)
     by_user = models.ForeignKey(
@@ -40,7 +42,8 @@ class DeploymentLog(AppendOnlyMixin, models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["deployment", "occurred_at"], name="deploylog_deploy_idx"),
+            models.Index(fields=["deployment", "id"], name="deploylog_cursor_idx"),
         ]
 
     def __str__(self) -> str:
-        return f"DeploymentLog {self.deployment_id} → {self.status}"
+        return f"DeploymentLog {self.deployment_id} → {self.status or self.phase + '/' + self.event}"

@@ -270,6 +270,7 @@ class KanikoBuildDriver:
         timeout_seconds: float = 1800.0,
         sleep: Any = time.sleep,
         clock: Any = time.monotonic,
+        log_observer: Any = None,
     ) -> None:
         self._cluster_driver = cluster_driver
         self._cluster_slug = cluster_slug
@@ -284,9 +285,14 @@ class KanikoBuildDriver:
         self._timeout = timeout_seconds
         self._sleep = sleep
         self._clock = clock
+        self._log_observer = log_observer
+        self._previous_output: list[str] = []
+        self._redactions: list[str] = [git_password] if git_password else []
+        self._log_read_warning = False
 
     @driver_op(cloud="k8s_native", driver="build", audit=True, sensitive_kind="build.run")
     def build(self, spec: BuildSpec, repo: str, tag: str) -> BuildResult:
+        self._redactions.extend(str(v) for v in spec.build_args.values() if v)
         destination = f"{repo}:{tag}"
         job_name = _job_name(self._build_id or f"{repo}-{tag}")
         # A private repo needs a clone credential; a public one must not
@@ -325,7 +331,9 @@ class KanikoBuildDriver:
 
         started = self._clock()
         try:
-            apply_result = self._cluster_driver.apply_manifests(self._cluster_slug, self._namespace, manifests)
+            apply_result = self._cluster_driver.apply_manifests(
+                self._cluster_slug, self._namespace, manifests
+            )
             if not getattr(apply_result, "ok", False):
                 errors = apply_result.summary() if hasattr(apply_result, "summary") else ["apply failed"]
                 return BuildResult(
@@ -386,7 +394,9 @@ class KanikoBuildDriver:
         while True:
             maybe_heartbeat(f"build {job_name}")
             try:
-                status = self._cluster_driver.get_workload_status(self._cluster_slug, self._namespace, "Job", job_name)
+                status = self._cluster_driver.get_workload_status(
+                    self._cluster_slug, self._namespace, "Job", job_name
+                )
                 conditions = status.conditions or []
             except Exception as exc:
                 # A transient read failure shouldn't abort a build that may
@@ -397,6 +407,7 @@ class KanikoBuildDriver:
                     continue
                 return {"success": False, "errors": [f"status read failed: {exc}"]}
 
+            self._capture_output(job_name)
             if _condition_true(conditions, "Complete"):
                 return {"success": True, "errors": []}
             if _condition_true(conditions, "Failed"):
@@ -412,6 +423,38 @@ class KanikoBuildDriver:
                     ],
                 }
             self._sleep(self._poll)
+
+    def _capture_output(self, job_name: str) -> None:
+        if self._log_observer is None:
+            return
+        reader = getattr(self._cluster_driver, "read_job_pod_logs", None)
+        try:
+            if reader is None:
+                raise RuntimeError("cluster driver cannot read build pod logs")
+            text = reader(self._cluster_slug, self._namespace, job_name, tail_lines=1000) or ""
+        except Exception:
+            if not self._log_read_warning:
+                self._log_observer("[capture warning] Build output unavailable; subsequent polls will retry.")
+                self._log_read_warning = True
+            return
+        lines = text.splitlines()
+        overlap = min(len(self._previous_output), len(lines))
+        while overlap and self._previous_output[-overlap:] != lines[:overlap]:
+            overlap -= 1
+        if lines and self._previous_output and not overlap:
+            self._log_observer(
+                "[capture warning] No overlap with previous tail; output may contain gaps or repeated lines."
+            )
+        elif lines and not self._previous_output and len(lines) >= 1000:
+            self._log_observer(
+                "[capture warning] Initial output tail reached 1000 lines; earlier output may be unavailable."
+            )
+        new_output = "\n".join(lines[overlap:])
+        for secret in self._redactions:
+            new_output = new_output.replace(secret, "[redacted]")
+        if new_output:
+            self._log_observer(new_output)
+        self._previous_output = lines
 
     def _failure_logs(self, job_name: str) -> list[str]:
         """The build pod's own output, for a failure that has none.
@@ -434,6 +477,8 @@ class KanikoBuildDriver:
         except Exception as exc:
             return [f"build pod logs unavailable: {exc}"]
         text = (text or "").strip()
+        for secret in self._redactions:
+            text = text.replace(secret, "[redacted]")
         return [f"build pod logs (last {_FAILURE_LOG_LINES} lines):\n{text}"] if text else []
 
 

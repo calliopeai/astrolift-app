@@ -2152,6 +2152,7 @@ export type AstroliftDeployment = {
   imageTag: Scalars['String']['output'];
   manifestResyncError: Scalars['String']['output'];
   manifestResyncStatus: Scalars['String']['output'];
+  phases: Array<AstroliftDeploymentPhase>;
   prNumber: Scalars['Int']['output'];
   prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
@@ -2210,9 +2211,11 @@ export type AstroliftDeploymentLifecycleEvent = {
 export type AstroliftDeploymentLogEntry = {
   deploymentId: Scalars['String']['output'];
   detail: Scalars['JSON']['output'];
+  event: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   message: Scalars['String']['output'];
   occurredAt: Scalars['DateTime']['output'];
+  phase: Scalars['String']['output'];
   status: Scalars['String']['output'];
 };
 
@@ -2248,6 +2251,27 @@ export type AstroliftDeploymentPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftDeploymentPhase = {
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  failedAt?: Maybe<Scalars['DateTime']['output']>;
+  healthyAt?: Maybe<Scalars['DateTime']['output']>;
+  name: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftDeploymentRunLogDownload = {
+  content: Scalars['String']['output'];
+  contentType: Scalars['String']['output'];
+  filename: Scalars['String']['output'];
+};
+
+export type AstroliftDeploymentRunLogPage = {
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftDeploymentLogEntry>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  pageSize: Scalars['Int']['output'];
 };
 
 /** The deployments list's declared filters. Unset fields do not filter; list values match any. */
@@ -9182,6 +9206,8 @@ export type Query = {
   astroliftDeploymentLog: Array<AstroliftDeploymentLogEntry>;
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
   astroliftDeploymentReleaseNotes?: Maybe<AstroliftReleaseNotes>;
+  astroliftDeploymentRunLogDownload?: Maybe<AstroliftDeploymentRunLogDownload>;
+  astroliftDeploymentRunLogPage: AstroliftDeploymentRunLogPage;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage. */
   astroliftDeployments: Array<AstroliftDeployment>;
   astroliftDeploymentsPage: AstroliftDeploymentPage;
@@ -10126,6 +10152,18 @@ export type QueryAstroliftDeploymentMetricsArgs = {
 
 export type QueryAstroliftDeploymentReleaseNotesArgs = {
   deploymentId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftDeploymentRunLogDownloadArgs = {
+  deploymentId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftDeploymentRunLogPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  deploymentId: Scalars['String']['input'];
+  limit?: Scalars['Int']['input'];
 };
 
 

@@ -2253,6 +2253,7 @@ type AstroliftDeployment {
   triggeredByUserId: String
   triggeredByMe: Boolean!
   statusReason: String!
+  phases: [AstroliftDeploymentPhase!]!
 }
 
 type AstroliftDeploymentApprovalHistoryEntry {
@@ -2299,6 +2300,8 @@ type AstroliftDeploymentLogEntry {
   message: String!
   detail: JSON!
   occurredAt: DateTime!
+  phase: String!
+  event: String!
 }
 
 type AstroliftDeploymentMetrics {
@@ -2337,6 +2340,27 @@ type AstroliftDeploymentPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type AstroliftDeploymentPhase {
+  name: String!
+  startedAt: DateTime
+  completedAt: DateTime
+  failedAt: DateTime
+  healthyAt: DateTime
+}
+
+type AstroliftDeploymentRunLogDownload {
+  filename: String!
+  content: String!
+  contentType: String!
+}
+
+type AstroliftDeploymentRunLogPage {
+  items: [AstroliftDeploymentLogEntry!]!
+  nextCursor: String
+  hasMore: Boolean!
+  pageSize: Int!
 }
 
 """
@@ -7777,6 +7801,8 @@ type Query {
   astroliftDeploymentReleaseNotes(deploymentId: String!): AstroliftReleaseNotes
   astroliftCompareDeployments(idA: String!, idB: String!): AstroliftDeploymentComparison
   astroliftDeploymentLog(deploymentId: String!): [AstroliftDeploymentLogEntry!]!
+  astroliftDeploymentRunLogPage(deploymentId: String!, cursor: String = null, limit: Int! = 100): AstroliftDeploymentRunLogPage!
+  astroliftDeploymentRunLogDownload(deploymentId: String!): AstroliftDeploymentRunLogDownload
   astroliftScheduledJobRuns(appSlug: String = null, environmentName: String = null, limit: Int! = 100): [AstroliftScheduledJobRun!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftScheduledJobRunsPage.")
   astroliftScheduledJobRunsPage(appSlug: String = null, environmentName: String = null, workloadSlug: String = null, search: String = null, limit: Int! = 50, after: String = null, filter: AstroliftScheduledJobRunsFilter = null): AstroliftScheduledJobRunPage!
   astroliftScheduledJobRun(id: String!): AstroliftScheduledJobRun

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -19,7 +19,8 @@ import {
 import {
   GET_DEPLOYMENT,
   GET_DEPLOYMENT_APPROVAL_HISTORY,
-  GET_DEPLOYMENT_LOG,
+  GET_DEPLOYMENT_RUN_LOG_PAGE,
+  DOWNLOAD_DEPLOYMENT_RUN_LOG,
   GET_DEPLOYMENT_RELEASE_NOTES,
 } from "@/graphql/lifecycle/lifecycle.queries";
 import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subscriptions";
@@ -33,8 +34,7 @@ import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { IN_FLIGHT } from "./deployments-format";
-import { deploymentLogLines, deploySha } from "./deployments-list";
-import { downloadText, logText, useNow } from "./run-support";
+import { downloadText, useNow } from "./run-support";
 
 interface MutationResultLite<T> {
   ok: boolean;
@@ -47,7 +47,11 @@ interface DeploymentResp {
 }
 
 interface LogResp {
-  astroliftDeploymentLog: AstroliftDeploymentLogEntry[];
+  astroliftDeploymentRunLogPage: {
+    items: AstroliftDeploymentLogEntry[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  };
 }
 
 export interface DeploymentRenderedManifest {
@@ -110,6 +114,7 @@ function reportResult(
  */
 export function useDeploymentDetail(id: string) {
   const t = useTranslations("lists.deploymentDetail");
+  const client = useApolloClient();
   const { can } = useMyPermissions();
   const router = useRouter();
 
@@ -124,7 +129,8 @@ export function useDeploymentDetail(id: string) {
     loading: lLoading,
     error: lError,
     refetch: refetchLog,
-  } = useQuery<LogResp>(GET_DEPLOYMENT_LOG, {
+    fetchMore: fetchMoreLog,
+  } = useQuery<LogResp>(GET_DEPLOYMENT_RUN_LOG_PAGE, {
     variables: { deploymentId: id },
   });
 
@@ -185,7 +191,7 @@ export function useDeploymentDetail(id: string) {
 
   const refetch = [
     { query: GET_DEPLOYMENT, variables: { id } },
-    { query: GET_DEPLOYMENT_LOG, variables: { deploymentId: id } },
+    { query: GET_DEPLOYMENT_RUN_LOG_PAGE, variables: { deploymentId: id } },
   ];
   const [approve, approveState] = useMutation<{
     approveDeployment: MutationResultLite<AstroliftDeployment>;
@@ -211,18 +217,26 @@ export function useDeploymentDetail(id: string) {
     redeployState.loading ||
     deleteState.loading;
 
-  const log = React.useMemo(() => lData?.astroliftDeploymentLog ?? [], [lData]);
+  const log = React.useMemo(() => lData?.astroliftDeploymentRunLogPage.items ?? [], [lData]);
 
   // The run page's clock ticks while the rollout is in flight (spec 44 §5.5).
   const live = Boolean(deployment && IN_FLIGHT.has(deployment.status));
   const now = useNow(live);
 
-  function onDownload() {
-    if (!deployment) return;
-    downloadText(
-      `deploy-${deployment.registeredAppSlug}-${deploySha(deployment)}.log`,
-      logText(deploymentLogLines(log))
-    );
+  async function onDownload() {
+    try {
+      const result = await client.query<{
+        astroliftDeploymentRunLogDownload: { filename: string; content: string } | null;
+      }>({
+        query: DOWNLOAD_DEPLOYMENT_RUN_LOG,
+        variables: { deploymentId: id },
+        fetchPolicy: "network-only",
+      });
+      const artifact = result.data?.astroliftDeploymentRunLogDownload;
+      if (artifact) downloadText(artifact.filename, artifact.content);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("downloadFailed"));
+    }
   }
 
   async function onApprove() {
@@ -296,6 +310,37 @@ export function useDeploymentDetail(id: string) {
       void refetchLog();
     },
     onDownload,
+    hasOlderLog: Boolean(lData?.astroliftDeploymentRunLogPage.hasMore),
+    onLoadOlderLog: async () => {
+      const cursor = lData?.astroliftDeploymentRunLogPage.nextCursor;
+      if (!cursor) return;
+      try {
+        await fetchMoreLog({
+          variables: { deploymentId: id, cursor },
+          updateQuery: (previous, { fetchMoreResult }) => {
+            console.log(
+              "2176debug",
+              previous.astroliftDeploymentRunLogPage.nextCursor,
+              cursor,
+              fetchMoreResult?.astroliftDeploymentRunLogPage.items.length
+            );
+            if (!fetchMoreResult || previous.astroliftDeploymentRunLogPage.nextCursor !== cursor)
+              return previous;
+            return {
+              astroliftDeploymentRunLogPage: {
+                ...fetchMoreResult.astroliftDeploymentRunLogPage,
+                items: [
+                  ...fetchMoreResult.astroliftDeploymentRunLogPage.items,
+                  ...previous.astroliftDeploymentRunLogPage.items,
+                ],
+              },
+            };
+          },
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : t("olderLogFailed"));
+      }
+    },
     manifest: manifest.data?.astroliftRenderedManifest ?? null,
     manifestLoading: manifest.loading,
     events: events.data?.astroliftEvents ?? [],

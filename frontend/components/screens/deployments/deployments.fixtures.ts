@@ -160,6 +160,8 @@ export const START_LONG: StartDeploymentPageProps = {
 const LOG: AstroliftDeploymentLogEntry[] = [
   {
     id: "fl1",
+    phase: "",
+    event: "",
     deploymentId: DEPLOY_RUNNING.id,
     occurredAt: minutesAgo(42),
     status: "pending",
@@ -168,6 +170,8 @@ const LOG: AstroliftDeploymentLogEntry[] = [
   },
   {
     id: "fl2",
+    phase: "",
+    event: "",
     deploymentId: DEPLOY_RUNNING.id,
     occurredAt: minutesAgo(41),
     status: "deploying",
@@ -176,6 +180,8 @@ const LOG: AstroliftDeploymentLogEntry[] = [
   },
   {
     id: "fl3",
+    phase: "",
+    event: "",
     deploymentId: DEPLOY_RUNNING.id,
     occurredAt: minutesAgo(39),
     status: "running",
@@ -184,8 +190,28 @@ const LOG: AstroliftDeploymentLogEntry[] = [
   },
 ];
 
+const phase = (name: string, from: number, to: number | null = null, failed = false) => ({
+  name,
+  startedAt: minutesAgo(from),
+  completedAt: to == null || failed ? null : minutesAgo(to),
+  failedAt: failed && to != null ? minutesAgo(to) : null,
+  healthyAt: name === "health" && to != null && !failed ? minutesAgo(to) : null,
+});
+const OBSERVED_PHASES = [
+  phase("build", 42, 41),
+  { ...phase("push", 42, 41), startedAt: null },
+  phase("apply", 41, 40),
+  phase("rollout", 40, 39),
+  phase("health", 39, 39),
+];
+
 export const DETAIL: DeploymentDetailScreenProps = {
-  deployment: { ...DEPLOY_RUNNING, approvalsRequired: 1, approvalsReceived: 1 },
+  deployment: {
+    ...DEPLOY_RUNNING,
+    phases: OBSERVED_PHASES,
+    approvalsRequired: 1,
+    approvalsReceived: 1,
+  },
   loading: false,
   error: null,
   onRetry: noop,
@@ -194,7 +220,9 @@ export const DETAIL: DeploymentDetailScreenProps = {
   logLoading: false,
   logError: null,
   onRetryLog: noop,
-  onDownload: noop,
+  onDownload: asyncNoop,
+  hasOlderLog: false,
+  onLoadOlderLog: asyncNoop,
   manifest: {
     appSlug: "storefront",
     environmentName: "prod",
@@ -307,11 +335,16 @@ export const DETAIL_EMPTY: DeploymentDetailScreenProps = {
 /** A failed rollout whose manifest also failed to render. */
 export const DETAIL_FAILED: DeploymentDetailScreenProps = {
   ...DETAIL,
-  deployment: DEPLOY_FAILED,
+  deployment: {
+    ...DEPLOY_FAILED,
+    phases: [...OBSERVED_PHASES.slice(0, 4), phase("health", 39, 38, true)],
+  },
   log: [
     ...LOG.slice(0, 2),
     {
       id: "fl4",
+      phase: "",
+      event: "",
       deploymentId: DEPLOY_FAILED.id,
       occurredAt: minutesAgo(60 * 5 - 2),
       status: "failed",
@@ -347,6 +380,8 @@ export const DETAIL_LONG: DeploymentDetailScreenProps = {
     ...LOG.slice(0, 2).map((e) => ({ ...e, message: `${e.message} ${LONG}` })),
     {
       id: "fl9",
+      phase: "",
+      event: "",
       deploymentId: DEPLOY_LONG.id,
       occurredAt: minutesAgo(38),
       status: "failed",
@@ -365,17 +400,26 @@ export const DETAIL_LONG: DeploymentDetailScreenProps = {
 /** Mid-rollout: the rollout step pulses and the clock runs. */
 export const DETAIL_DEPLOYING: DeploymentDetailScreenProps = {
   ...DETAIL,
-  deployment: DEPLOY_DEPLOYING,
-  log: LOG.slice(0, 2).map((e) => ({ ...e, deploymentId: DEPLOY_DEPLOYING.id })),
+  deployment: {
+    ...DEPLOY_DEPLOYING,
+    phases: [...OBSERVED_PHASES.slice(0, 3), phase("rollout", 40)],
+  },
+  log: LOG.slice(0, 2).map((e) => ({
+    ...e,
+    phase: "",
+    event: "",
+    deploymentId: DEPLOY_DEPLOYING.id,
+  })),
   releaseNotes: null,
   approvalHistory: [],
 };
 
-/** The image never built: build failed, the later phases skipped. */
+/** The build failed; no later phase timing was observed. */
 export const DETAIL_BUILD_FAILED: DeploymentDetailScreenProps = {
   ...DETAIL,
   deployment: {
     ...DEPLOY_FAILED,
+    phases: [phase("build", 42, 41, true)],
     imageDigest: "",
     statusReason: "",
     buildError:
