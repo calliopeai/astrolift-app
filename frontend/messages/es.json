@@ -4106,6 +4106,49 @@
           "zentinelle": "Zentinelle",
           "admin": "administración"
         }
+      },
+      "diagnostics": {
+        "failed": "No se pudo comprobar el acceso: {message}",
+        "retry": "Reintentar",
+        "prompt": "Elige una persona y un permiso para ver si lo tiene y por qué.",
+        "answer": {
+          "granted": "Sí.",
+          "denied": "No."
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> puede realizar <action>{permission}</action> en {kind} <target>{name}</target>.",
+          "deniedScope": "<who>{username}</who> no puede realizar <action>{permission}</action> en {kind} <target>{name}</target>.",
+          "grantedOrg": "<who>{username}</who> puede realizar <action>{permission}</action> en esta organización.",
+          "deniedOrg": "<who>{username}</who> no puede realizar <action>{permission}</action> en esta organización."
+        },
+        "superuser": "Como superusuario.",
+        "reasoning": "Razonamiento",
+        "tone": {
+          "pass": "sí",
+          "fail": "no",
+          "info": "no, no es necesario"
+        },
+        "step": {
+          "is_active": "La cuenta está activa",
+          "is_superuser": "Superusuario",
+          "permission_is_declared": "El permiso existe",
+          "has_active_organization": "La solicitud pertenece a una organización",
+          "role_bindings_in_this_org": "Tiene roles en esta organización",
+          "bindings_carrying_this_permission": "Uno de sus roles incluye el permiso",
+          "target_scope": "El objeto pertenece a esta organización",
+          "idp_groups": "Sus grupos del proveedor de identidad",
+          "team_shares": "Una asignación al equipo en la aplicación incluye el permiso",
+          "rbac": "Sus roles conceden el permiso aquí",
+          "abac_policies": "Ninguna política deniega el permiso",
+          "resolver_verdict": "Respuesta del evaluador"
+        },
+        "compare": {
+          "failed": "No se pudo comparar: {message}",
+          "prompt": "Elige dos personas para comparar lo que pueden hacer.",
+          "only": "Solo <who>{username}</who>",
+          "both": "Ambos",
+          "none": "Ninguno."
+        }
       }
     },
     "settings": {

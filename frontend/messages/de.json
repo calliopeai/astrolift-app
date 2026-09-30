@@ -4106,6 +4106,49 @@
           "zentinelle": "Zentinelle",
           "admin": "Verwaltung"
         }
+      },
+      "diagnostics": {
+        "failed": "Zugriff konnte nicht geprüft werden: {message}",
+        "retry": "Erneut versuchen",
+        "prompt": "Wähle eine Person und eine Berechtigung, um zu prüfen, ob und warum sie diese hat.",
+        "answer": {
+          "granted": "Ja.",
+          "denied": "Nein."
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> darf <action>{permission}</action> für {kind} <target>{name}</target> ausführen.",
+          "deniedScope": "<who>{username}</who> darf <action>{permission}</action> für {kind} <target>{name}</target> nicht ausführen.",
+          "grantedOrg": "<who>{username}</who> darf <action>{permission}</action> in dieser Organisation ausführen.",
+          "deniedOrg": "<who>{username}</who> darf <action>{permission}</action> in dieser Organisation nicht ausführen."
+        },
+        "superuser": "Als Superuser.",
+        "reasoning": "Begründung",
+        "tone": {
+          "pass": "ja",
+          "fail": "nein",
+          "info": "nein, nicht erforderlich"
+        },
+        "step": {
+          "is_active": "Das Konto ist aktiv",
+          "is_superuser": "Superuser",
+          "permission_is_declared": "Die Berechtigung existiert",
+          "has_active_organization": "Die Anfrage gehört zu einer Organisation",
+          "role_bindings_in_this_org": "Die Person hat Rollen in dieser Organisation",
+          "bindings_carrying_this_permission": "Eine zugewiesene Rolle enthält diese Berechtigung",
+          "target_scope": "Das Objekt gehört zu dieser Organisation",
+          "idp_groups": "Gruppen beim Identitätsanbieter",
+          "team_shares": "Eine App-Freigabe für ein Team enthält diese Berechtigung",
+          "rbac": "Die Rollen gewähren diese Berechtigung hier",
+          "abac_policies": "Keine Richtlinie verweigert diese Berechtigung",
+          "resolver_verdict": "Antwort der Berechtigungsprüfung"
+        },
+        "compare": {
+          "failed": "Vergleich fehlgeschlagen: {message}",
+          "prompt": "Wähle zwei Personen, um ihre Berechtigungen zu vergleichen.",
+          "only": "Nur <who>{username}</who>",
+          "both": "Beide",
+          "none": "Keine."
+        }
       }
     },
     "settings": {

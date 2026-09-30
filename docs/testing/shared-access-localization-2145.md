@@ -34,6 +34,22 @@ policy-model, grant previews and shared access helpers, principal pickers, form
 state, accessibility and access-query regressions. TypeScript, ESLint and
 formatting pass.
 
-Access diagnostics, policy sentence/help/simulation and grant-flow prose are
-separate follow-up leaves; this document does not claim their completion or
-close the platform-wide #2145 issue.
+The diagnostics leaf translates `AccessExplainer` and `AccessCompare` under
+`shared.access.diagnostics`: verdict sentences, known reasoning-step names,
+pass/fail/informational labels, prompts, errors/retry, comparison headings and
+empty states. Resolver details and unknown check IDs remain literal. Technical
+binding labels retain their canonical `role@SCOPE:id` spelling; parsed roles,
+scopes and IDs reach `bindingHref` unchanged. Supplied verdicts, neutral step
+classification, comparison partitions, loading/error states and server diagnostics
+retain their semantics. Permission strings and usernames are literal rich-text
+values, including angle brackets and braces.
+
+Its 41 new tests use all eight locales for ABAC denial, org-wide/superuser answers,
+unknown checks and raw details, exact binding links, comparison partitions,
+empty/loading/error/retry and rich-message contracts. The affected diagnostics
+run passes 269 tests including all six related story groups. TypeScript, ESLint
+and formatting pass.
+
+Policy sentence/help/simulation and grant-flow prose remain separate follow-up
+leaves; this document does not claim their completion or close the platform-wide
+#2145 issue.

@@ -4183,6 +4183,49 @@
           "zentinelle": "Zentinelle",
           "admin": "administration"
         }
+      },
+      "diagnostics": {
+        "failed": "Could not check access: {message}",
+        "retry": "Retry",
+        "prompt": "Pick a person and a permission to see whether they have it, and why.",
+        "answer": {
+          "granted": "Yes.",
+          "denied": "No."
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> can <action>{permission}</action> on {kind} <target>{name}</target>.",
+          "deniedScope": "<who>{username}</who> cannot <action>{permission}</action> on {kind} <target>{name}</target>.",
+          "grantedOrg": "<who>{username}</who> can <action>{permission}</action> in this organization.",
+          "deniedOrg": "<who>{username}</who> cannot <action>{permission}</action> in this organization."
+        },
+        "superuser": "As a superuser.",
+        "reasoning": "Reasoning",
+        "tone": {
+          "pass": "yes",
+          "fail": "no",
+          "info": "no, not needed"
+        },
+        "step": {
+          "is_active": "The account is active",
+          "is_superuser": "Superuser",
+          "permission_is_declared": "The permission exists",
+          "has_active_organization": "The request is in an organization",
+          "role_bindings_in_this_org": "They hold roles in this organization",
+          "bindings_carrying_this_permission": "A role they hold carries it",
+          "target_scope": "The object is in this organization",
+          "idp_groups": "Their IdP groups",
+          "team_shares": "A team share on the app carries it",
+          "rbac": "Their roles grant it here",
+          "abac_policies": "No policy denies it",
+          "resolver_verdict": "The resolver's answer"
+        },
+        "compare": {
+          "failed": "Could not compare: {message}",
+          "prompt": "Pick two people to compare what they can do.",
+          "only": "Only <who>{username}</who>",
+          "both": "Both",
+          "none": "None."
+        }
       }
     },
     "settings": {

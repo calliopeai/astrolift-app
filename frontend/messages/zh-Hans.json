@@ -4103,6 +4103,49 @@
           "zentinelle": "Zentinelle",
           "admin": "管理"
         }
+      },
+      "diagnostics": {
+        "failed": "无法检查访问权限：{message}",
+        "retry": "重试",
+        "prompt": "选择用户和权限，查看该用户是否拥有此权限及其原因。",
+        "answer": {
+          "granted": "是。",
+          "denied": "否。"
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> 可以在{kind} <target>{name}</target> 上执行 <action>{permission}</action>。",
+          "deniedScope": "<who>{username}</who> 无法在{kind} <target>{name}</target> 上执行 <action>{permission}</action>。",
+          "grantedOrg": "<who>{username}</who> 可以在此组织中执行 <action>{permission}</action>。",
+          "deniedOrg": "<who>{username}</who> 无法在此组织中执行 <action>{permission}</action>。"
+        },
+        "superuser": "以超级用户身份。",
+        "reasoning": "判定依据",
+        "tone": {
+          "pass": "是",
+          "fail": "否",
+          "info": "否，无需满足"
+        },
+        "step": {
+          "is_active": "账户处于启用状态",
+          "is_superuser": "超级用户",
+          "permission_is_declared": "权限已定义",
+          "has_active_organization": "请求属于某个组织",
+          "role_bindings_in_this_org": "用户拥有此组织中的角色",
+          "bindings_carrying_this_permission": "拥有的角色包含此权限",
+          "target_scope": "对象属于此组织",
+          "idp_groups": "身份提供商群组",
+          "team_shares": "应用的团队共享包含此权限",
+          "rbac": "用户的角色在此授予该权限",
+          "abac_policies": "没有策略拒绝该权限",
+          "resolver_verdict": "权限解析器的结果"
+        },
+        "compare": {
+          "failed": "无法比较：{message}",
+          "prompt": "选择两位用户，比较他们可执行的操作。",
+          "only": "仅 <who>{username}</who>",
+          "both": "双方",
+          "none": "无。"
+        }
       }
     },
     "settings": {

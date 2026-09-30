@@ -4103,6 +4103,49 @@
           "zentinelle": "Zentinelle",
           "admin": "administração"
         }
+      },
+      "diagnostics": {
+        "failed": "Não foi possível verificar o acesso: {message}",
+        "retry": "Tentar novamente",
+        "prompt": "Escolha uma pessoa e uma permissão para ver se ela a possui e por quê.",
+        "answer": {
+          "granted": "Sim.",
+          "denied": "Não."
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> pode executar <action>{permission}</action> em {kind} <target>{name}</target>.",
+          "deniedScope": "<who>{username}</who> não pode executar <action>{permission}</action> em {kind} <target>{name}</target>.",
+          "grantedOrg": "<who>{username}</who> pode executar <action>{permission}</action> nesta organização.",
+          "deniedOrg": "<who>{username}</who> não pode executar <action>{permission}</action> nesta organização."
+        },
+        "superuser": "Como superusuário.",
+        "reasoning": "Justificativa",
+        "tone": {
+          "pass": "sim",
+          "fail": "não",
+          "info": "não, não é necessário"
+        },
+        "step": {
+          "is_active": "A conta está ativa",
+          "is_superuser": "Superusuário",
+          "permission_is_declared": "A permissão existe",
+          "has_active_organization": "A solicitação pertence a uma organização",
+          "role_bindings_in_this_org": "A pessoa possui funções nesta organização",
+          "bindings_carrying_this_permission": "Uma de suas funções inclui a permissão",
+          "target_scope": "O objeto pertence a esta organização",
+          "idp_groups": "Seus grupos do provedor de identidade",
+          "team_shares": "Um compartilhamento do aplicativo com uma equipe inclui a permissão",
+          "rbac": "Suas funções concedem a permissão aqui",
+          "abac_policies": "Nenhuma política nega a permissão",
+          "resolver_verdict": "Resposta do avaliador"
+        },
+        "compare": {
+          "failed": "Não foi possível comparar: {message}",
+          "prompt": "Escolha duas pessoas para comparar o que podem fazer.",
+          "only": "Somente <who>{username}</who>",
+          "both": "Ambos",
+          "none": "Nenhuma."
+        }
       }
     },
     "settings": {

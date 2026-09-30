@@ -4103,6 +4103,49 @@
           "zentinelle": "Zentinelle",
           "admin": "管理"
         }
+      },
+      "diagnostics": {
+        "failed": "アクセスを確認できませんでした：{message}",
+        "retry": "再試行",
+        "prompt": "ユーザーと権限を選択すると、その権限の有無と理由を確認できます。",
+        "answer": {
+          "granted": "はい。",
+          "denied": "いいえ。"
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> は {kind} <target>{name}</target> で <action>{permission}</action> を実行できます。",
+          "deniedScope": "<who>{username}</who> は {kind} <target>{name}</target> で <action>{permission}</action> を実行できません。",
+          "grantedOrg": "<who>{username}</who> はこの組織で <action>{permission}</action> を実行できます。",
+          "deniedOrg": "<who>{username}</who> はこの組織で <action>{permission}</action> を実行できません。"
+        },
+        "superuser": "スーパーユーザーとして。",
+        "reasoning": "判定理由",
+        "tone": {
+          "pass": "はい",
+          "fail": "いいえ",
+          "info": "いいえ、不要です"
+        },
+        "step": {
+          "is_active": "アカウントが有効です",
+          "is_superuser": "スーパーユーザー",
+          "permission_is_declared": "権限が定義されています",
+          "has_active_organization": "リクエストは組織に属しています",
+          "role_bindings_in_this_org": "この組織のロールを持っています",
+          "bindings_carrying_this_permission": "保有ロールにこの権限が含まれています",
+          "target_scope": "対象はこの組織に属しています",
+          "idp_groups": "ID プロバイダーのグループ",
+          "team_shares": "アプリのチーム共有にこの権限が含まれています",
+          "rbac": "保有ロールがここでこの権限を付与します",
+          "abac_policies": "拒否するポリシーはありません",
+          "resolver_verdict": "リゾルバーの判定"
+        },
+        "compare": {
+          "failed": "比較できませんでした：{message}",
+          "prompt": "ユーザーを 2 人選択すると、許可される操作を比較できます。",
+          "only": "<who>{username}</who> のみ",
+          "both": "両方",
+          "none": "なし。"
+        }
       }
     },
     "settings": {

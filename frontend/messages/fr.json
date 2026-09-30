@@ -4106,6 +4106,49 @@
           "zentinelle": "Zentinelle",
           "admin": "administration"
         }
+      },
+      "diagnostics": {
+        "failed": "Impossible de vérifier l’accès : {message}",
+        "retry": "Réessayer",
+        "prompt": "Choisissez une personne et une autorisation pour vérifier si elle la possède et pourquoi.",
+        "answer": {
+          "granted": "Oui.",
+          "denied": "Non."
+        },
+        "body": {
+          "grantedScope": "<who>{username}</who> peut effectuer <action>{permission}</action> sur {kind} <target>{name}</target>.",
+          "deniedScope": "<who>{username}</who> ne peut pas effectuer <action>{permission}</action> sur {kind} <target>{name}</target>.",
+          "grantedOrg": "<who>{username}</who> peut effectuer <action>{permission}</action> dans cette organisation.",
+          "deniedOrg": "<who>{username}</who> ne peut pas effectuer <action>{permission}</action> dans cette organisation."
+        },
+        "superuser": "En tant que superutilisateur.",
+        "reasoning": "Raisonnement",
+        "tone": {
+          "pass": "oui",
+          "fail": "non",
+          "info": "non, pas nécessaire"
+        },
+        "step": {
+          "is_active": "Le compte est actif",
+          "is_superuser": "Superutilisateur",
+          "permission_is_declared": "L’autorisation existe",
+          "has_active_organization": "La requête concerne une organisation",
+          "role_bindings_in_this_org": "Cette personne possède des rôles dans cette organisation",
+          "bindings_carrying_this_permission": "Un rôle détenu contient cette autorisation",
+          "target_scope": "L’objet appartient à cette organisation",
+          "idp_groups": "Ses groupes du fournisseur d’identité",
+          "team_shares": "Un partage de l’application avec une équipe contient l’autorisation",
+          "rbac": "Ses rôles accordent cette autorisation ici",
+          "abac_policies": "Aucune politique ne refuse cette autorisation",
+          "resolver_verdict": "Réponse de l’évaluateur"
+        },
+        "compare": {
+          "failed": "Comparaison impossible : {message}",
+          "prompt": "Choisissez deux personnes pour comparer leurs autorisations.",
+          "only": "Uniquement <who>{username}</who>",
+          "both": "Les deux",
+          "none": "Aucune."
+        }
       }
     },
     "settings": {
