@@ -43,6 +43,7 @@ from astrolift_billing.models import (
     QuotaIncreaseRequest,
     QuotaUsageSnapshot,
 )
+from astrolift_billing.scopes import billing_org_scope
 from astrolift_graphql import GUID
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
@@ -516,7 +517,7 @@ def _project_month_end(
 @strawberry.type
 class BillingQuery:
     @strawberry.field
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def astrolift_quotas(self, info: Info) -> list[QuotaType]:
         from core.tenancy import get_current_tenant
@@ -528,7 +529,7 @@ class BillingQuery:
         return [quota_to_type(q) for q in qs]
 
     @strawberry.field
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def astrolift_quota_usage_history(
         self,
@@ -573,7 +574,7 @@ class BillingQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def astrolift_budgets(self, info: Info) -> list[BudgetType]:
         from core.tenancy import get_current_tenant
@@ -585,7 +586,7 @@ class BillingQuery:
         return [budget_to_type(b) for b in qs]
 
     @strawberry.field
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def astrolift_cost_snapshots(
         self,
@@ -607,7 +608,7 @@ class BillingQuery:
         return [cost_to_type(c) for c in qs]
 
     @strawberry.field
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def astrolift_cost_trend(
         self,
@@ -641,7 +642,7 @@ class BillingQuery:
         ]
 
     @strawberry.field
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def astrolift_cost_forecast(self, info: Info) -> CostForecastType:
         from core.tenancy import get_current_tenant
@@ -704,7 +705,7 @@ class BillingQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def astrolift_cost_by_binding(
         self,

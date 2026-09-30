@@ -15,6 +15,14 @@
   callbacks refuse stale state from another organization before exchange/write.
   All 27 tracked surfaces are covered without guardrail exemptions.
 
+- Billing queries and quota increase requests require `billing.read` at the
+  active organization, regardless of the selected team/project (#2113).
+  Team/project grants and team-bound bearer tokens cannot reach organization
+  costs, budgets or quotas, even when a token owner has an organization role.
+  Organization-bound billing automation retains the `admin` token ceiling;
+  authorized requests keep the existing response and notification behavior.
+  See [billing access scopes](docs/operators/billing-access-scopes.md).
+
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep
   the existing production/development server behavior, and other startup

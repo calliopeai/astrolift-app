@@ -579,17 +579,6 @@ GAPS: dict[str, tuple[str, ...]] = {
         "Mutation.updateSubmissionStatus",
         "Subscription.formSubmissionReceived",
     ),
-    # TODO(#2113): billing routes without a scoped gate; the issue says what each checks today.
-    "#2113": (
-        "Query.astroliftQuotas",
-        "Query.astroliftQuotaUsageHistory",
-        "Query.astroliftBudgets",
-        "Query.astroliftCostSnapshots",
-        "Query.astroliftCostTrend",
-        "Query.astroliftCostForecast",
-        "Query.astroliftCostByBinding",
-        "Mutation.requestQuotaIncrease",
-    ),
     # TODO(#2114): workflows routes without a scoped gate; the issue says what each checks today.
     "#2114": (
         "Query.previewWorkflowManifest",

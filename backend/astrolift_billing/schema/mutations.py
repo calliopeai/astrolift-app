@@ -23,6 +23,7 @@ from strawberry.types import Info
 
 from astrolift_billing.models import Quota, QuotaIncreaseRequest
 from astrolift_billing.schema.queries import QuotaIncreaseRequestType, quota_request_to_type
+from astrolift_billing.scopes import billing_org_scope
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
@@ -55,7 +56,7 @@ class RequestQuotaIncreaseInput:
 class BillingMutation:
     @strawberry.field
     @mutation_audit(action="quota.request_increase")
-    @require_permission(Permission.BILLING_READ)
+    @require_permission(Permission.BILLING_READ, scope=billing_org_scope)
     @tenant_scoped()
     def request_quota_increase(
         self,
