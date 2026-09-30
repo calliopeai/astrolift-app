@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The browser workload-controls regression checks the actual three-replica web
+  and zero-replica worker fixtures independently, keeping unobserved readiness
+  unknown rather than inventing healthy pod counts (#2145).
+
 - Shared role summaries and permission/scope pickers translate presentation
   defaults in all eight locales, retaining literal role metadata, permission
   slugs, target IDs, server diagnostics and disabled selection checks (#2145).
