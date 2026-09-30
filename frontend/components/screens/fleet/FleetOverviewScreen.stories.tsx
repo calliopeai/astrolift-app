@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import {
   FLEET_MAP,
@@ -25,6 +26,15 @@ type Story = StoryObj;
 
 export const Full: Story = {
   render: () => <FleetOverviewScreen {...FLEET_OVERVIEW} map={<FleetMapPanel {...FLEET_MAP} />} />,
+};
+
+export const OpenMap: Story = {
+  ...Full,
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole("link", { name: "Open fleet map" })
+    ).toHaveAttribute("href", "/fleet/map");
+  },
 };
 
 export const Loading: Story = {

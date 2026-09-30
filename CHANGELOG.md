@@ -33,6 +33,13 @@
   (#2095). Both paths serialize name and namespace allocation per app, including
   duplicate concurrent requests. Explicit occupied names return validation on
   `environmentName`. See [preview naming](docs/operators/preview-names-and-workload-identity.md).
+- `/pipelines/new` opens a real form using the existing organization-owned
+  creation contract (#2171). Failed creates retain their draft; navigation
+  failure after commit offers the created pipeline link without a duplicate
+  create. Fleet, approvals, pipelines, operations, logs and traces have rail
+  links, and Fleet links its map. Route generation distinguishes real pages
+  from computed compatibility aliases and ignores quoted redirect examples.
+
 - Pipelines expose scoped write-only secret APIs backed by encrypted
   `OrgSecret` storage (#2171). Secret metadata reads and writes resolve live actual owners
   and retain bearer organization/team ceilings. Runtime dispatch reads the
