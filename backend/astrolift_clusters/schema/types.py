@@ -92,9 +92,9 @@ class TenantClusterType:
         # Re-scope by caller org (#1183). This field inherits the parent
         # cluster's scoping, but a leaked parent must not widen access to
         # another org's bootstrap history. The runs are held to the caller's
-        # org too (#1955): a shared cluster resolves for every org, and any
-        # of them can record a run on it. Not @tenant_scoped, so a None
-        # tenant fails closed here; the union and the NULL-org rows would
+        # org too (#1955): a shared cluster resolves for every org, while
+        # an operator can record a run in any active org. With no
+        # @tenant_scoped, a missing tenant fails closed here; the union and NULL-org rows would
         # otherwise both match.
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None

@@ -8,7 +8,8 @@ decommission sweep deleted records in it. Zone names are guessable.
 
 Each path gets a cross-org attempt that is refused with no DNS driver call
 and no workflow, answering exactly as a zone nobody registered would. The
-org's own zone and a shared (org NULL) zone still work on every path. Real
+org's own zone and a shared (org NULL) zone still resolve. Shared managed-zone
+lifecycle writes require the platform operator (#2108). Real
 Postgres; the DNS driver and the Temporal client are recording fakes.
 """
 
@@ -286,10 +287,13 @@ def test_zone_mutations_refuse_another_orgs_zone_like_an_unregistered_one(
 
 @pytest.mark.parametrize("name", ["provision", "revalidate", "reissue"])
 @pytest.mark.parametrize("which", ["own", "shared"])
-def test_zone_mutations_act_on_the_orgs_own_and_shared_zones(
+def test_zone_mutations_allow_org_owners_and_shared_zone_operators(
     name, which, org, cluster, zones, actor, fake_info, permission_resolver, temporal
 ):
     zone = getattr(zones, which).zone
+    if which == "shared":
+        actor.is_superuser = True
+        actor.save(update_fields=["is_superuser"])
     permission_resolver.grant(Permission.CLUSTER_MANAGE)
     with _as(org, actor):
         result = _zone_mutation(name, cluster, zone, fake_info)
