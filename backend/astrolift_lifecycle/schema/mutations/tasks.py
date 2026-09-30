@@ -8,6 +8,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import named_environment
 from astrolift_lifecycle.models import (
     AppEnvironment,
     TaskRun,
@@ -36,7 +37,9 @@ class TaskMutations:
 
     @strawberry.field
     @mutation_audit(action="task.run")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"), operation=named_environment()
+    )
     @tenant_scoped()
     def run_task(
         self,

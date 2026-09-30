@@ -14,11 +14,10 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
-from astrolift_identity.scopes import project_scope_by_guid
+from astrolift_identity.operation_context import bundle_operation, named_environment, row_operation
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp
-from astrolift_registry.scopes import app_scope_by_slug
 from astrolift_services.models import (
     AppSecretBundleRef,
     SecretBundle,
@@ -46,6 +45,8 @@ from astrolift_services.schema.types import (
     secret_bundle_to_type,
 )
 from astrolift_services.scopes import bundle_attachment_app_scope, secret_bundle_project_scope
+from astrolift_services.scopes import services_app_scope_by_slug as app_scope_by_slug
+from astrolift_services.scopes import services_project_scope_by_guid as project_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -93,7 +94,15 @@ class SecretBundleMutations:
     @mutation_audit(action="project.secret.bundle.create")
     @requires_elevation(action_label="project.secret.bundle.create")
     @require_permission(
-        Permission.PROJECT_UPDATE, Permission.SECRET_WRITE, scope=project_scope_by_guid("input.project_id")
+        Permission.PROJECT_UPDATE,
+        Permission.SECRET_WRITE,
+        scope=project_scope_by_guid(
+            "input.project_id",
+            permissions=(
+                Permission.PROJECT_UPDATE,
+                Permission.SECRET_WRITE,
+            ),
+        ),
     )
     @tenant_scoped()
     def create_project_secret_bundle(
@@ -156,7 +165,16 @@ class SecretBundleMutations:
     @mutation_audit(action="project.secret.bundle.update")
     @requires_elevation(action_label="project.secret.bundle.update")
     @require_permission(
-        Permission.PROJECT_UPDATE, Permission.SECRET_WRITE, scope=secret_bundle_project_scope("input.id")
+        Permission.PROJECT_UPDATE,
+        Permission.SECRET_WRITE,
+        scope=secret_bundle_project_scope(
+            "input.id",
+            permissions=(
+                Permission.PROJECT_UPDATE,
+                Permission.SECRET_WRITE,
+            ),
+        ),
+        operation=bundle_operation("input.id"),
     )
     @tenant_scoped()
     def update_project_secret_bundle(
@@ -188,7 +206,16 @@ class SecretBundleMutations:
     @mutation_audit(action="project.secret.bundle.delete")
     @requires_elevation(action_label="project.secret.bundle.delete")
     @require_permission(
-        Permission.PROJECT_UPDATE, Permission.SECRET_WRITE, scope=secret_bundle_project_scope("bundle_id")
+        Permission.PROJECT_UPDATE,
+        Permission.SECRET_WRITE,
+        scope=secret_bundle_project_scope(
+            "bundle_id",
+            permissions=(
+                Permission.PROJECT_UPDATE,
+                Permission.SECRET_WRITE,
+            ),
+        ),
+        operation=bundle_operation("bundle_id"),
     )
     @tenant_scoped()
     def delete_project_secret_bundle(
@@ -225,7 +252,14 @@ class SecretBundleMutations:
     @require_permission(
         Permission.PROJECT_UPDATE,
         Permission.SECRET_WRITE,
-        scope=secret_bundle_project_scope("input.bundle_id"),
+        scope=secret_bundle_project_scope(
+            "input.bundle_id",
+            permissions=(
+                Permission.PROJECT_UPDATE,
+                Permission.SECRET_WRITE,
+            ),
+        ),
+        operation=bundle_operation("input.bundle_id"),
     )
     @tenant_scoped()
     def set_project_bundle_secret_value(
@@ -266,7 +300,14 @@ class SecretBundleMutations:
     @require_permission(
         Permission.PROJECT_UPDATE,
         Permission.SECRET_WRITE,
-        scope=secret_bundle_project_scope("input.bundle_id"),
+        scope=secret_bundle_project_scope(
+            "input.bundle_id",
+            permissions=(
+                Permission.PROJECT_UPDATE,
+                Permission.SECRET_WRITE,
+            ),
+        ),
+        operation=bundle_operation("input.bundle_id"),
     )
     @tenant_scoped()
     def delete_project_bundle_secret_value(
@@ -298,7 +339,16 @@ class SecretBundleMutations:
     @mutation_audit(action="project.secret.bundle.key.reveal")
     @requires_elevation(action_label="project.secret.bundle.key.reveal")
     @require_permission(
-        Permission.PROJECT_READ, Permission.SECRET_READ, scope=secret_bundle_project_scope("input.bundle_id")
+        Permission.PROJECT_READ,
+        Permission.SECRET_READ,
+        scope=secret_bundle_project_scope(
+            "input.bundle_id",
+            permissions=(
+                Permission.PROJECT_READ,
+                Permission.SECRET_READ,
+            ),
+        ),
+        operation=bundle_operation("input.bundle_id"),
     )
     @tenant_scoped()
     def reveal_project_bundle_secret_value(
@@ -335,7 +385,11 @@ class SecretBundleMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.bundle.attach")
     @requires_elevation(action_label="app.secret.bundle.attach")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("input.app_slug", permissions=(Permission.APP_UPDATE,)),
+        operation=named_environment(),
+    )
     @tenant_scoped()
     def attach_secret_bundle(
         self,
@@ -470,7 +524,11 @@ class SecretBundleMutations:
     @strawberry.field
     @mutation_audit(action="app.secret.bundle.detach")
     @requires_elevation(action_label="app.secret.bundle.detach")
-    @require_permission(Permission.APP_UPDATE, scope=bundle_attachment_app_scope("input.attachment_id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=bundle_attachment_app_scope("input.attachment_id", permissions=(Permission.APP_UPDATE,)),
+        operation=row_operation("astrolift_services.AppSecretBundleRef", "input.attachment_id"),
+    )
     @tenant_scoped()
     def detach_secret_bundle(
         self,
@@ -520,7 +578,11 @@ class SecretBundleMutations:
 
     @strawberry.field
     @mutation_audit(action="secret_bundle.rotate")
-    @require_permission(Permission.APP_UPDATE, scope=secret_bundle_project_scope("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=secret_bundle_project_scope("input.id", permissions=(Permission.APP_UPDATE,)),
+        operation=bundle_operation("input.id"),
+    )
     @tenant_scoped()
     def rotate_secret_bundle(
         self,

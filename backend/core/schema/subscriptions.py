@@ -18,6 +18,11 @@ from collections.abc import AsyncGenerator
 import strawberry
 from strawberry.types import Info
 
+from astrolift_forms.scopes import form_org_scope
+from core.decorators import tenant_scoped
+from core.permissions import Permission, require_permission
+from core.schema.ws_auth import ws_identity
+
 
 @strawberry.type(name="AstroliftDeploymentLifecycleEvent")
 class DeploymentLifecycleEventType:
@@ -138,6 +143,9 @@ class _CoreSubscription:
                 pass
 
     @strawberry.subscription
+    @ws_identity
+    @require_permission(Permission.FORM_READ, scope=form_org_scope(Permission.FORM_READ))
+    @tenant_scoped()
     async def form_submission_received(self, info: Info, slug: str) -> AsyncGenerator[str, None]:
         """Subscribe to new submissions for a specific form.
 
@@ -147,35 +155,33 @@ class _CoreSubscription:
         submissions), so the stream is filtered by ``organization_id`` — a
         caller cannot subscribe to another tenant's form submissions.
 
-        Tenant resolution mirrors ``astrolift_deployment_lifecycle_stream``
-        (the org-scoped sibling in this file): over WS the cookie-aware ASGI
-        handler stashes the resolved tenant on ``info.context._ws_tenant``;
-        we pin it on the contextvar and fail closed when no org resolves.
+        WebSocket identity is pinned before the organization ``form.read``
+        gate. Refused callers complete silently. The stream retains the live
+        form's ID so a replacement reusing its slug does not enter the stream.
         """
         from asgiref.sync import sync_to_async
 
-        from astrolift_forms.models import FormSubmission
-        from core.tenancy import (
-            TenantContext,
-            get_current_tenant,
-            set_current_tenant,
-        )
-
-        ws_tenant: TenantContext | None = getattr(info.context, "_ws_tenant", None)
-        if ws_tenant is not None:
-            set_current_tenant(ws_tenant)
-        from core.schema.ws_auth import pin_ws_identity
-
-        pin_ws_identity(info.context)  # the bearer's scope ceiling (#1943)
+        from astrolift_forms.models import FormDefinition, FormSubmission
+        from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         if org_id is None:
             return
 
+        form_id = await sync_to_async(
+            lambda: FormDefinition.objects.filter(organization_id=org_id, slug=slug)
+            .values_list("pk", flat=True)
+            .first()
+        )()
+        if form_id is None:
+            return
+
         def _fetch(after_id):
             qs = FormSubmission.objects.filter(
-                form__slug=slug,
+                form_id=form_id,
+                form__organization_id=org_id,
+                form__deleted_at__isnull=True,
                 organization_id=org_id,
             ).order_by("-submitted_at")
             if after_id:

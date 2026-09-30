@@ -46,7 +46,10 @@ class ProjectMutations:
 
     @strawberry.field
     @mutation_audit(action="project.create")
-    @require_permission(Permission.PROJECT_CREATE, scope=team_scope_by_guid("input.team_id"))
+    @require_permission(
+        Permission.PROJECT_CREATE,
+        scope=team_scope_by_guid("input.team_id", permission=Permission.PROJECT_CREATE),
+    )
     @tenant_scoped()
     def create_project(self, info: Info, input: CreateProjectInput) -> MutationResultType[ProjectType]:
         tenant = get_current_tenant()
@@ -72,7 +75,10 @@ class ProjectMutations:
 
     @strawberry.field
     @mutation_audit(action="project.update")
-    @require_permission(Permission.PROJECT_UPDATE, scope=project_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.PROJECT_UPDATE,
+        scope=project_scope_by_guid("input.id", permission=Permission.PROJECT_UPDATE),
+    )
     @tenant_scoped()
     def update_project(self, info: Info, input: UpdateProjectInput) -> MutationResultType[ProjectType]:
         tenant = get_current_tenant()
@@ -118,7 +124,10 @@ class ProjectMutations:
 
     @strawberry.field
     @mutation_audit(action="project.delete")
-    @require_permission(Permission.PROJECT_DELETE, scope=project_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.PROJECT_DELETE,
+        scope=project_scope_by_guid("input.id", permission=Permission.PROJECT_DELETE),
+    )
     @tenant_scoped()
     def soft_delete_project(
         self, info: Info, input: SoftDeleteByGuidInput

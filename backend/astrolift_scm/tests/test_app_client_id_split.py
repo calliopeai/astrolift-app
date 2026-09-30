@@ -48,6 +48,7 @@ from astrolift_scm.schema.types import source_connection_to_type
 from core.permissions import Permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import TenantContext, tenant_context
+from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
@@ -88,6 +89,9 @@ def org_user_member():
         scope_kind="ORG",
         scope_id=org.pk,
         is_active=True,
+    )
+    bind_role(
+        user, permissions=[Permission.SCM_CONNECT], kind="ORG", scope_id=org.pk, slug="clientid-connect"
     )
     return org, user
 

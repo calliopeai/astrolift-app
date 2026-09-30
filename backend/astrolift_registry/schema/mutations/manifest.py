@@ -253,7 +253,9 @@ def _gate_secret_change(info: Info, app: RegisteredApp, input, env, persisted):
 class ManifestMutations:
     @strawberry.field
     @mutation_audit(action="app.update_manifest")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def update_manifest(
         self,
@@ -389,7 +391,9 @@ class ManifestMutations:
 
     @strawberry.field
     @mutation_audit(action="app.apply_staged_manifest")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def apply_staged_manifest(
         self,
@@ -590,7 +594,9 @@ class ManifestMutations:
 
     @strawberry.field
     @mutation_audit(action="app.sync_manifest_from_repo")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def sync_manifest_from_repo(
         self,
@@ -669,7 +675,9 @@ class ManifestMutations:
 
     @strawberry.field
     @mutation_audit(action="app.push_manifest_to_repo")
-    @require_permission(Permission.APP_UPDATE, scope=app_scope_by_guid("input.id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=app_scope_by_guid("input.id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def push_manifest_to_repo(
         self,

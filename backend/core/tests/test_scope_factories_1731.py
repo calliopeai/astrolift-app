@@ -7,8 +7,8 @@ gate is only as good as the weakest factory:
 
 * it resolves the named object to the scope that owns it,
 * it never resolves an object outside the caller's org,
-* anything it cannot resolve returns ``None``, which leaves the stricter
-  org-scope check standing rather than opening a door.
+* registry misses return an explicit org scope, so a selected team cannot
+  substitute for the missing target (#2105). Other factories have tracked gaps.
 
 The third is the one with teeth. Route params arrive verbatim -- a page
 like ``/agents/runs/overview`` sends ``id="overview"`` -- and the factory
@@ -187,8 +187,8 @@ def test_an_agent_slug_that_matches_two_apps_requires_an_explicit_org_check(worl
 def test_an_object_in_another_org_resolves_to_nothing(world, reba):
     elsewhere = ScopeWorld("sf1731b")
     with as_tenant(world, reba):
-        assert app_scope_by_slug("app_slug")({"app_slug": elsewhere.medops_app.slug}) is None
-        assert app_scope_by_guid("app_id")({"app_id": str(elsewhere.medops_app.guid)}) is None
+        assert app_scope_by_slug("app_slug")({"app_slug": elsewhere.medops_app.slug}).kind == ScopeKind.ORG
+        assert app_scope_by_guid("app_id")({"app_id": str(elsewhere.medops_app.guid)}).kind == ScopeKind.ORG
 
 
 @pytest.mark.parametrize(

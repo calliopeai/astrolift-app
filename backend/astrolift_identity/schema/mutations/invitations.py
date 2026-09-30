@@ -38,6 +38,7 @@ from astrolift_identity.schema.types import (
     InvitationType,
     invitation_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -50,7 +51,9 @@ class InvitationMutations:
 
     @strawberry.field
     @mutation_audit(action="invitation.create")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def create_invitation(
         self, info: Info, input: CreateInvitationInput
@@ -158,7 +161,9 @@ class InvitationMutations:
 
     @strawberry.field
     @mutation_audit(action="invitation.revoke")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def revoke_invitation(
         self, info: Info, input: RevokeInvitationInput
@@ -184,7 +189,9 @@ class InvitationMutations:
 
     @strawberry.field
     @mutation_audit(action="invitation.delete")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def delete_invitation(
         self, info: Info, input: RevokeInvitationInput
@@ -219,7 +226,9 @@ class InvitationMutations:
 
     @strawberry.field
     @mutation_audit(action="invitation.resend")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def resend_invitation(
         self, info: Info, input: ResendInvitationInput

@@ -189,6 +189,32 @@ def test_fleet_capability_discovery_does_not_widen_project_resource_tools(mcp):
     ]
 
 
+@pytest.mark.parametrize("kind", ["PROJECT", "TEAM"])
+def test_project_resource_discovery_and_calls_use_reachable_project(mcp, kind):
+    bind(mcp, kind, [Permission.PROJECT_READ])
+    names = {row["name"] for row in rpc(mcp, "tools/list")["result"]["tools"]}
+    assert "astrolift_list_project_resources" in names
+    data(tool(mcp, "astrolift_list_project_resources", project_id=str(mcp.world.medops_project.guid)))
+    assert tool(mcp, "astrolift_list_project_resources", project_id=str(mcp.world.platform_project.guid))[
+        "isError"
+    ]
+
+
+@pytest.mark.parametrize("unreachable", ["retired", "credential_team", "exact_org"])
+def test_project_resource_discovery_requires_live_project_within_credential(mcp, unreachable):
+    binding = bind(mcp, "ORG" if unreachable == "exact_org" else "PROJECT", [Permission.PROJECT_READ])
+    if unreachable == "retired":
+        mcp.world.medops_project.deleted_at = timezone.now()
+        mcp.world.medops_project.save(update_fields=["deleted_at"])
+    elif unreachable == "credential_team":
+        mcp.credential.team = mcp.world.platform
+    else:
+        binding.inherits = False
+        binding.save(update_fields=["inherits"])
+    names = {row["name"] for row in rpc(mcp, "tools/list")["result"]["tools"]}
+    assert "astrolift_list_project_resources" not in names
+
+
 def test_foreign_token_cannot_use_the_selected_organization(mcp):
     bind(mcp, "ORG", [Permission.AGENT_READ])
     mcp.credential.organization = ScopeWorld("1747-token").org

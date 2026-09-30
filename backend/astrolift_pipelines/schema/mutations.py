@@ -20,7 +20,7 @@ from astrolift_pipelines.schema.types import (
     pipeline_to_type,
     trigger_to_type,
 )
-from astrolift_pipelines.scopes import pipeline_app_scope, pipeline_run_app_scope
+from astrolift_pipelines.scopes import pipeline_app_scope, pipeline_creation_scope, pipeline_run_app_scope
 from astrolift_workflows.client import start_workflow
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode
@@ -65,7 +65,7 @@ _VALID_TRIGGER_KINDS = {k.value for k in Trigger.Kind}
 @strawberry.type
 class PipelinesMutation:
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE)
+    @require_permission(Permission.APP_UPDATE, scope=pipeline_creation_scope)
     @tenant_scoped()
     def create_pipeline(self, info: Info, input: CreatePipelineInput) -> MutationResultType[PipelineType]:
         name = (input.name or "").strip()

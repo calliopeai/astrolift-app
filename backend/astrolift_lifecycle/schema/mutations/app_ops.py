@@ -8,6 +8,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import named_environment, workload_operation
 from astrolift_lifecycle.models import (
     AppEnvironment,
 )
@@ -41,7 +42,11 @@ from core.tenancy import get_current_tenant
 class AppOpsMutations:
     @strawberry.field
     @mutation_audit(action="app.ci.dispatch")
-    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_slug("input.app_slug"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_slug("input.app_slug"),
+        operation=named_environment(environment_field="_absent", all_if_absent=True),
+    )
     @tenant_scoped()
     def trigger_astrolift_deploy_workflow(
         self,
@@ -138,7 +143,11 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.workload.restart")
-    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_workload_guid("input.workload_id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_workload_guid("input.workload_id"),
+        operation=workload_operation(),
+    )
     @tenant_scoped()
     def restart_astrolift_workload(
         self,
@@ -191,7 +200,11 @@ class AppOpsMutations:
 
     @strawberry.field
     @mutation_audit(action="app.workload.scale")
-    @require_permission(Permission.APP_DEPLOY, scope=app_scope_by_workload_guid("input.workload_id"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_workload_guid("input.workload_id"),
+        operation=workload_operation(),
+    )
     @tenant_scoped()
     def scale_astrolift_workload(
         self,

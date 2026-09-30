@@ -9,6 +9,7 @@ from strawberry.types import Info
 from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import environment_operation
 from astrolift_lifecycle.models import (
     AppEnvironment,
     EnvironmentSetting,
@@ -36,7 +37,11 @@ class EnvironmentSettingMutations:
 
     @strawberry.field
     @mutation_audit(action="app.env.setting.set")
-    @require_permission(Permission.APP_UPDATE, scope=environment_app_scope("input.environment_id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=environment_app_scope("input.environment_id"),
+        operation=environment_operation("input.environment_id"),
+    )
     @tenant_scoped()
     def set_environment_setting(
         self,
@@ -79,7 +84,11 @@ class EnvironmentSettingMutations:
 
     @strawberry.field
     @mutation_audit(action="app.env.setting.clear")
-    @require_permission(Permission.APP_UPDATE, scope=environment_app_scope("input.environment_id"))
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=environment_app_scope("input.environment_id"),
+        operation=environment_operation("input.environment_id"),
+    )
     @tenant_scoped()
     def clear_environment_setting(
         self,

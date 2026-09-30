@@ -33,6 +33,7 @@ from astrolift_identity.schema.types import (
     IdentityProviderType,
     identity_provider_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -48,7 +49,7 @@ class IdentityProviderMutations:
     @strawberry.field
     @mutation_audit(action="identity_provider.create")
     @requires_elevation(action_label="identity_provider.create")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def create_identity_provider(
         self, info: Info, input: CreateIdentityProviderInput
@@ -116,7 +117,7 @@ class IdentityProviderMutations:
     @strawberry.field
     @mutation_audit(action="identity_provider.update")
     @requires_elevation(action_label="identity_provider.update")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def update_identity_provider(
         self, info: Info, input: UpdateIdentityProviderInput
@@ -161,7 +162,7 @@ class IdentityProviderMutations:
     @strawberry.field
     @mutation_audit(action="identity_provider.set_active")
     @requires_elevation(action_label="identity_provider.set_active")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def set_active_identity_provider(
         self, info: Info, input: SetActiveIdentityProviderInput
@@ -207,7 +208,7 @@ class IdentityProviderMutations:
 
     @strawberry.field
     @mutation_audit(action="identity_provider.delete")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def soft_delete_identity_provider(
         self, info: Info, input: SoftDeleteByGuidInput

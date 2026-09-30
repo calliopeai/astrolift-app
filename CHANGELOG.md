@@ -2,6 +2,88 @@
 
 ## Unreleased
 
+- Managed-resource gates resolve live app, project, team or organization owners
+  and preserve bearer ceilings across GraphQL and all ten project-resource MCP
+  tools (#2106). Collections filter before limits and counts; attachments check
+  destination ownership and persisted environment facts before any writes.
+  Missing or stale targets require explicit organization authority. Private
+  resource provider targets are checked through the app environment; deleted
+  or foreign clusters are refused before provider access, including for an
+  organization operator.
+
+- Workflow manifest previews accept `workflow.read` at any granted scope
+  without writing (#2114). Flow and new TOML imports require organization
+  `workflow.create`, independent of selected team/project headers. Compatible
+  replacements authorize their existing project owner; a changed shape still
+  creates an organization version and requires organization create permission.
+  Existing update permission, source-managed refusal and bearer organization/
+  team ceilings remain enforced. Replacement rechecks the destination under
+  definition/stage locks before writing; all three guardrail gaps are removed.
+
+- Non-inheriting organization bindings authorize organization-owned collection
+  rows without revealing descendant teams, projects or apps (#2164). Deleted
+  roles stop granting authority through user, group and group-mapping bindings.
+
+- Identity administration gates resolve explicit organization or live target
+  owners (#2103). Team/project and binding collections filter grants and bearer
+  ceilings before counts; scoped binding managers retain their real target
+  authority and grant ceilings. Selected headers cannot authorize owner misses,
+  and project writes verify coherent live team ancestry. Organization bootstrap
+  and personal operations retain their existing contracts. See
+  [identity access scopes](docs/operators/identity-access-scopes.md).
+
+- Pipeline creation requires `app.update` at the active organization (#2115).
+  The existing creation input has no app association, so team/project/app
+  grants and team-bound bearer credentials cannot authorize this organization
+  object through selected headers. Organization grants retain the existing
+  validation and response contract.
+- Form management, response reads and private submission require their
+  declared permissions at the organization's explicit owner scope (#2112).
+  Selected team/project grants and team-bound bearer tokens cannot reach
+  organization forms through an owner's broader role. The submission stream
+  requires `form.read`, silently refuses unauthorized callers, filters the
+  exact live form and organization, and closes polling on cancellation.
+  Published public submissions retain their existing anonymous exception.
+  See [form access scopes](docs/operators/form-access-scopes.md).
+
+- Scoped operation checks resolve owner factories under trusted facts and isolate
+  permission-scope caches per target (#2164). Log subscriptions admit the verified
+  environment and cluster, release operation context before yielding events, and
+  close their provider streams safely across tasks.
+
+- SCM connection and OAuth/GitHub App routes require their explicit
+  organization permission; per-app SSH keys and CI actions authorize their
+  owning app (#2109). SSH collections filter rows before pagination and counts.
+  SCM uses the registry's live, coherent app ancestry, so a stale project or
+  mismatched project team cannot widen a bearer credential's app ownership.
+  Team-bound bearers cannot borrow an org owner's or operator's wider scope.
+  Named repo/file reads constrain connection IDs to the active organization,
+  preserve personal credential ownership and refuse unavailable connections
+  before provider access. Installation callbacks refuse stale state from another
+  organization before exchange/write.
+  All 27 tracked surfaces are covered without guardrail exemptions.
+
+- Billing queries and quota increase requests require `billing.read` at the
+  active organization, regardless of the selected team/project (#2113).
+  Team/project grants and team-bound bearer tokens cannot reach organization
+  costs, budgets or quotas, even when a token owner has an organization role.
+  Organization-bound billing automation retains the `admin` token ceiling;
+  authorized requests keep the existing response and notification behavior.
+  See [billing access scopes](docs/operators/billing-access-scopes.md).
+
+- Observability gates resolve live app/service ownership with explicit organization
+  fallback and permission-specific bearer team/share ceilings (#2111). Selected
+  team headers cannot authorize missing, stale or sibling targets. Historical
+  logs keep their separate permission. Internal metric catalogs no longer become
+  accidental GraphQL root fields; existing data-query contracts are unchanged.
+  See [observability access scopes](docs/operators/observability-access-scopes.md).
+- Registry app and workload gates resolve live tenant-owned targets and take
+  explicit organization scope on missing, ambiguous or stale ownership (#2105).
+  Collections filter rows before pagination; team-scoped bearer credentials
+  retain their owner/share ceiling despite an organization-wide user role.
+  Registration and transfer destinations are checked separately, and source
+  manifest scans require organization authority.
+
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep
   the existing production/development server behavior, and other startup
@@ -95,6 +177,27 @@
   the remaining gaps outside the agent surfaces are tracked per area there.
   Still open (#2102): agent secret refs are confined per org only, so a spec
   writer can bind another team's secret location.
+- Deployment, run and secret permission gates now carry the resolved environment,
+  cluster region and durable approval total (#2164). Environment-specific policies
+  leave other environments usable; app-wide writes check all affected environments,
+  and exact workflow controls cannot borrow approvals from another execution.
+- Scoped policies now reduce collection rows and capabilities, including a grant
+  whose only app is denied; an allowed parent cannot restore a denied child (#2164).
+  Policy writes reject malformed conditions and selector shapes before saving.
+- Operation collections apply each row's environment, frozen dispatch region and
+  recorded approvals before pagination, totals, deployment comparisons and health
+  metrics (#2164). Secret and service lists filter their actual environments;
+  app-wide secret proposals check all affected environments. An approved run
+  cannot lend its votes to another run's read.
+- Deployment approvals now record distinct voter identities under a row lock
+  (#2164). Repeated requests are idempotent, and a legacy counter or anonymous
+  bearer link cannot supply human identities to an ABAC approval requirement.
+  Bulk approvals and rejections apply each deployment's actual app-scope policy.
+- SCIM Groups now supports org-confined provisioning, reads, atomic membership
+  PATCH, replacement and deletion with the existing SCIM credential (#2164).
+  Removal immediately drops group-derived roles without changing direct grants;
+  stale SSO claims cannot restore a removed, deleted or rekeyed group identifier.
+
 - A managed service restores only from a snapshot Astrolift retained for its
   own app, and no longer runs as an identity its config chose (#2087).
   `restore.snapshot_id` and `restore.source_handle` came from the manifest

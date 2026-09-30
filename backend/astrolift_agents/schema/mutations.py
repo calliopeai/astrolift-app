@@ -92,6 +92,7 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Organization
+from astrolift_identity.operation_context import agent_region_operation, agent_task_operation
 from astrolift_identity.step_up import requires_elevation
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
 from astrolift_registry.models import Workload
@@ -1192,7 +1193,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.set", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.set")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def set_agent_secret_value(
         self, info: Info, env_spec_slug: str, env_var: str, value: str
@@ -1233,7 +1234,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.delete", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.delete")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def delete_agent_secret_value(
         self, info: Info, env_spec_slug: str, env_var: str
@@ -1274,7 +1275,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.binding.upsert", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.binding.upsert")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def upsert_agent_secret_ref(
         self, info: Info, env_spec_slug: str, env_var: str, uri: str
@@ -1349,7 +1350,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.binding.remove", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.binding.remove")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def remove_agent_secret_ref(
         self, info: Info, env_spec_slug: str, env_var: str
@@ -1374,7 +1375,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.reveal", target=_agent_secret_target)
     @requires_elevation(action_label="agents.secret.reveal")
-    @require_permission(Permission.SECRET_READ, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_READ, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def reveal_agent_secret_value(
         self, info: Info, env_spec_slug: str, env_var: str
@@ -1422,7 +1423,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.create")
     @requires_elevation(action_label="agents.secret.bundle.create")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def create_agent_secret_bundle(
         self,
@@ -1483,7 +1484,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.update")
     @requires_elevation(action_label="agents.secret.bundle.update")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def update_agent_secret_bundle(
         self,
@@ -1572,7 +1573,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.delete")
     @requires_elevation(action_label="agents.secret.bundle.delete")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def delete_agent_secret_bundle(
         self, info: Info, env_spec_slug: str, bundle_id: strawberry.ID
@@ -1622,7 +1623,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.attach")
     @requires_elevation(action_label="agents.secret.bundle.attach")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def attach_agent_secret_bundle(
         self,
@@ -1677,7 +1678,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.detach")
     @requires_elevation(action_label="agents.secret.bundle.detach")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def detach_agent_secret_bundle(
         self, info: Info, env_spec_slug: str, attachment_id: strawberry.ID
@@ -1704,7 +1705,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.key.set")
     @requires_elevation(action_label="agents.secret.bundle.key.set")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def set_agent_bundle_secret_value(
         self,
@@ -1768,7 +1769,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.key.delete")
     @requires_elevation(action_label="agents.secret.bundle.key.delete")
-    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def delete_agent_bundle_secret_value(
         self,
@@ -1812,7 +1813,7 @@ class AgentsMutation:
     @strawberry.field
     @mutation_audit(action="agents.secret.bundle.key.reveal")
     @requires_elevation(action_label="agents.secret.bundle.key.reveal")
-    @require_permission(Permission.SECRET_READ, scope=agent_org_scope)
+    @require_permission(Permission.SECRET_READ, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def reveal_agent_bundle_secret_value(
         self,
@@ -1862,7 +1863,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.brief.assemble")
-    @require_permission(Permission.APP_DEPLOY, scope=agent_org_scope)
+    @require_permission(Permission.APP_DEPLOY, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def assemble_brief(
         self,
@@ -1936,7 +1937,7 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.task.launch")
-    @require_permission(Permission.APP_DEPLOY, scope=agent_org_scope)
+    @require_permission(Permission.APP_DEPLOY, scope=agent_org_scope, operation=agent_region_operation)
     @tenant_scoped()
     def launch_task(
         self,
@@ -1985,7 +1986,11 @@ class AgentsMutation:
 
     @strawberry.field
     @mutation_audit(action="agents.task.cancel")
-    @require_permission(Permission.AGENT_DISPATCH, scope=agent_task_scope("id", Permission.AGENT_DISPATCH))
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_task_scope("id", Permission.AGENT_DISPATCH),
+        operation=agent_task_operation("id"),
+    )
     @tenant_scoped()
     def cancel_task(self, info: Info, id: strawberry.ID) -> MutationResultType[None]:
         """Cancel an AgentTask.
@@ -2031,7 +2036,9 @@ class AgentsMutation:
         target=lambda self, info, task_id, request_sequence, response: ("AgentTask", str(task_id)),
     )
     @require_permission(
-        Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT)
+        Permission.AGENT_TASK_SEND_INPUT,
+        scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT),
+        operation=agent_task_operation("task_id"),
     )
     @tenant_scoped()
     def reply_agent_task_input(
@@ -2085,7 +2092,9 @@ class AgentsMutation:
         target=lambda self, info, task_id, message, client_request_id=None: ("AgentTask", str(task_id)),
     )
     @require_permission(
-        Permission.AGENT_TASK_SEND_INPUT, scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT)
+        Permission.AGENT_TASK_SEND_INPUT,
+        scope=agent_task_scope("task_id", Permission.AGENT_TASK_SEND_INPUT),
+        operation=agent_task_operation("task_id"),
     )
     @tenant_scoped()
     def send_agent_task_input(
@@ -2155,6 +2164,7 @@ class AgentsMutation:
     @require_permission(
         Permission.AGENT_DISPATCH,
         scope=agent_workload_app_scope("input.agent_slug", Permission.AGENT_DISPATCH),
+        operation=agent_region_operation,
     )
     @tenant_scoped()
     def run_astrolift_agent(
@@ -2248,7 +2258,11 @@ class AgentsMutation:
         action="agents.task.retry",
         target=lambda self, info, id: ("AgentTask", str(id)),
     )
-    @require_permission(Permission.AGENT_DISPATCH, scope=agent_task_scope("id", Permission.AGENT_DISPATCH))
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_task_scope("id", Permission.AGENT_DISPATCH),
+        operation=agent_task_operation("id"),
+    )
     @tenant_scoped()
     def retry_agent_task(self, info: Info, id: strawberry.ID) -> MutationResultType[AgentTaskType]:
         """Run a finished task again with the same brief and inputs (#2155).
@@ -2350,7 +2364,9 @@ class AgentsMutation:
             input.agent_slug or input.environment_spec_slug or input.image,
         ),
     )
-    @require_permission(Permission.AGENT_DISPATCH, scope=agent_box_ensure_scope("input"))
+    @require_permission(
+        Permission.AGENT_DISPATCH, scope=agent_box_ensure_scope("input"), operation=agent_region_operation
+    )
     @tenant_scoped()
     def ensure_agent_box(
         self, info: Info, input: EnsureAgentBoxInput, org_id: strawberry.ID
@@ -2433,7 +2449,11 @@ class AgentsMutation:
         action="agents.box.destroy",
         target=lambda self, info, slug: ("AgentBox", slug),
     )
-    @require_permission(Permission.AGENT_DISPATCH, scope=agent_box_scope("slug", Permission.AGENT_DISPATCH))
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_box_scope("slug", Permission.AGENT_DISPATCH),
+        operation=agent_region_operation,
+    )
     @tenant_scoped()
     def destroy_agent_box(self, info: Info, slug: str) -> MutationResultType[AgentBoxType]:
         """Tear a box down now rather than waiting for it to go idle.
@@ -2471,7 +2491,9 @@ class AgentsMutation:
 
     @strawberry.field
     @require_permission(
-        Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE)
+        Permission.APP_UPDATE,
+        scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE),
+        operation=agent_region_operation,
     )
     @tenant_scoped()
     def create_agent_trigger(
@@ -2570,7 +2592,9 @@ class AgentsMutation:
 
     @strawberry.field
     @require_permission(
-        Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE)
+        Permission.APP_UPDATE,
+        scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE),
+        operation=agent_region_operation,
     )
     @tenant_scoped()
     def scale_service_agent(self, info: Info, agent_slug: str, target_replicas: int) -> AgentScaleResult:
@@ -2627,7 +2651,9 @@ class AgentsMutation:
         target=lambda self, info, agent_slug, input: ("workload", agent_slug),
     )
     @require_permission(
-        Permission.APP_UPDATE, scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE)
+        Permission.APP_UPDATE,
+        scope=agent_workload_app_scope("agent_slug", Permission.APP_UPDATE),
+        operation=agent_region_operation,
     )
     @tenant_scoped()
     def update_agent_run_spec(

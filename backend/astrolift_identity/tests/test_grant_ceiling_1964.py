@@ -257,8 +257,7 @@ def test_platform_operator_grants_anything_without_a_binding(world, stock):
 
 
 def test_the_ceiling_is_where_the_binding_lands_not_the_selected_context(world):
-    """org.manage_members held on a team passes the targetless gate while that
-    team is selected; what it may hand out is still decided per target scope."""
+    """A team's member manager grants on that target, never through selected headers."""
     actor = _member(world, _user("team-mm"))
     _bind(
         actor,
@@ -273,8 +272,12 @@ def test_the_ceiling_is_where_the_binding_lands_not_the_selected_context(world):
 
     assert _denied(at_org)
     assert at_team.ok, at_team.errors
-    # The picker answers for org scope, where an invitation lands.
-    assert within.slug not in _picker(world, actor, team_id=world.team.id)
+    # The picker answers for org scope, where an invitation lands; the
+    # selected team cannot admit a team-only manager to that catalog.
+    from core.permissions import PermissionDenied
+
+    with pytest.raises(PermissionDenied):
+        _picker(world, actor, team_id=world.team.id)
 
 
 def test_owning_another_org_does_not_lift_the_ceiling_here(world, stock):
@@ -599,8 +602,7 @@ def test_a_bulk_revoke_refuses_only_the_bindings_out_of_reach(world, stock):
 
 
 def test_the_revoke_ceiling_is_where_the_binding_is(world):
-    """org.manage_members held on a team passes the gate while that team is
-    selected; it reaches that team's bindings, not the org's."""
+    """Member management reaches the binding's own team, never the selected context."""
     actor = _member(world, _user("team-mm"))
     _bind(
         actor,

@@ -184,9 +184,7 @@ def test_presigned_upload_allows_owned_target():
     fake_upload = SimpleNamespace(
         public_url="https://fake/pub", pre_signed_url="https://fake/put", id=uuid4()
     )
-    with patch(
-        "core.schema.mutations.upload.create_upload", return_value=fake_upload
-    ) as mock_create:
+    with patch("core.schema.mutations.upload.create_upload", return_value=fake_upload) as mock_create:
         result = UploadMutations().pre_signed_url_image_upload(
             info=_info(user_a),
             global_id=target.global_id,
@@ -227,11 +225,19 @@ def test_form_submission_subscription_scopes_to_caller_org():
     the org-A-scoped stream must not.
     """
     from asgiref.sync import sync_to_async
+
     from astrolift_forms.models import FormDefinition, FormSubmission
     from astrolift_identity.models import Organization as IdentityOrg
+    from core.permissions import Permission
+    from core.tests.utils.scope_world import bind_role
 
     org_a = IdentityOrg.objects.create(name="SubOrgA", slug="sub-org-a-1193")
     org_b = IdentityOrg.objects.create(name="SubOrgB", slug="sub-org-b-1193")
+    actor = User.objects.create_user(username="form-reader-1193")
+    bind_role(
+        actor, permissions=[Permission.FORM_READ], kind="ORG", scope_id=org_a.pk, slug="form-reader-1193"
+    )
+    FormDefinition.objects.create(organization=org_a, name="Own", slug="shared-form-1193")
     form_b = FormDefinition.objects.create(organization=org_b, name="Shared", slug="shared-form-1193")
 
     class _Stop(Exception):
@@ -251,7 +257,7 @@ def test_form_submission_subscription_scopes_to_caller_org():
     out = []
 
     async def run():
-        with tenant_context(TenantContext(organization_id=org_a.id)):
+        with tenant_context(TenantContext(organization_id=org_a.id, actor_user_id=actor.pk)):
             agen = _CoreSubscription().form_submission_received(
                 info=SimpleNamespace(context=SimpleNamespace()),
                 slug="shared-form-1193",

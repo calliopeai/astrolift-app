@@ -33,15 +33,12 @@ membership row *is* the provisioning record, it survives
 deprovisioning (soft state, never deleted) so the id an IdP stored
 stays resolvable, and it keeps integer PKs off the wire.
 
-Deliberately not implemented here:
+``/Groups`` and its atomic membership updates live in
+``scim_group_views``. Group grants resolve dynamically from that explicit
+membership relation, so removal revokes them without rewriting direct
+role bindings.
 
-* ``/Groups``. Group-driven role assignment needs the reverse
-  direction to be safe — when the IdP drops a user from a group, the
-  bindings that group granted have to come back off, and
-  ``RoleBinding`` carries no provenance column saying which group
-  granted it. Granting without revoking is the wrong half to ship, so
-  ``GroupRoleMapping`` and ``scim.role_assignments_for_user`` stay
-  unwired until that column exists.
+Deliberately not implemented here:
 * ``externalId``. Nothing in the schema keeps the IdP's own user id,
   so we neither echo it back nor filter on it (see
   ``_SUPPORTED_FILTER_ATTRIBUTES``); the ``id`` we mint on POST is the
@@ -232,6 +229,17 @@ def _resource(member: Member, user) -> dict[str, Any]:
         "displayName": projected.display_name,
         "emails": [{"value": projected.email, "primary": True}],
         "active": projected.active,
+        "groups": [
+            {
+                "value": str(group.guid),
+                "display": group.display_name,
+                "$ref": f"{SCIM_BASE_PATH}Groups/{group.guid}",
+                "type": "direct",
+            }
+            for group in member.scim_groups.filter(organization_id=member.scope_id).order_by("pk")
+        ]
+        if projected.active
+        else [],
         "meta": {
             "resourceType": "User",
             "created": member.created_at.isoformat() if member.created_at else "",
@@ -298,6 +306,7 @@ def _email_taken(email: str, user) -> bool:
     return get_user_model().objects.filter(email__iexact=email).exclude(pk=user.pk).exists()
 
 
+@transaction.atomic
 def _deprovision(member: Member, user) -> None:
     """Deactivate, never delete (spec 04 §11).
 
@@ -320,6 +329,8 @@ def _deprovision(member: Member, user) -> None:
     does the platform operator: one org's IdP cannot lock out the
     install (#1979).
     """
+    Member.objects.select_for_update().get(pk=member.pk)
+    member.scim_groups.clear()
     member.is_active = False
     member.lifecycle = Member.Lifecycle.DEACTIVATED
     member.save(update_fields=["is_active", "lifecycle", "updated_at", "version"])

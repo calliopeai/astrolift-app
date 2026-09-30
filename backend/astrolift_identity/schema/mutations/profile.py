@@ -33,6 +33,7 @@ from astrolift_identity.schema.types import (
     organization_to_type,
     ui_preferences_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -200,7 +201,7 @@ class ProfileMutations:
 
     @strawberry.field
     @mutation_audit(action="organization.mark_onboarding_complete")
-    @require_permission(Permission.ORG_UPDATE)
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def mark_onboarding_complete(
         self, info: Info, input: MarkOnboardingCompleteInput

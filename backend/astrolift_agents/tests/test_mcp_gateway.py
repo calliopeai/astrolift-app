@@ -493,8 +493,8 @@ def test_team_token_cannot_manage_another_teams_project_resources(
         },
     )
 
-    assert hidden_list["result"]["structuredContent"]["code"] == "not_found"
-    assert hidden_update["result"]["structuredContent"]["code"] == "not_found"
+    assert hidden_list["result"]["structuredContent"]["code"] == "permission_denied"
+    assert hidden_update["result"]["structuredContent"]["code"] == "permission_denied"
     assert allowed_list["result"]["isError"] is False
     hidden_service.refresh_from_db()
     assert hidden_service.name == "hidden-bucket"

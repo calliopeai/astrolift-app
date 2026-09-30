@@ -20,6 +20,8 @@ from astrolift_graphql import (
     search_q,
 )
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
+from astrolift_identity.operation_context import deployment_operation, named_environment, row_operation
+from astrolift_identity.operation_visibility import require_app_collection_scope, visible_operation_rows
 from astrolift_identity.scope_visibility import visible_apps
 from astrolift_lifecycle.models import (
     AgentRun,
@@ -518,7 +520,9 @@ def _deployments_qs(
                 "image_tag",
             )
         )
-    return qs
+    return visible_operation_rows(
+        qs, Permission.APP_READ, app_path="registered_app", approvals_field="approvals_received"
+    )
 
 
 def _scheduled_job_runs_qs(
@@ -571,7 +575,7 @@ def _scheduled_job_runs_qs(
                 "k8s_job_name",
             )
         )
-    return qs
+    return visible_operation_rows(qs, Permission.APP_READ_LOGS, app_path="workload__registered_app")
 
 
 def _command_runs_qs(*, app_slug: str | None, search: str | None = None):
@@ -652,7 +656,7 @@ def _preview_environments_qs(
                 "status",
             )
         )
-    return qs
+    return visible_operation_rows(qs, Permission.APP_READ, app_path="registered_app")
 
 
 def _app_deploy_tokens_qs(*, app_slug: str, search: str | None = None):
@@ -730,7 +734,7 @@ def _task_runs_qs(
                 "triggered_by_user__username",
             )
         )
-    return qs
+    return visible_operation_rows(qs, Permission.APP_READ_LOGS, app_path="workload__registered_app")
 
 
 def _agent_runs_qs(
@@ -783,7 +787,7 @@ def _agent_runs_qs(
                 "triggered_by_user__username",
             )
         )
-    return qs
+    return visible_operation_rows(qs, Permission.APP_READ, app_path="workload__registered_app")
 
 
 @strawberry.type
@@ -819,7 +823,8 @@ class LifecycleQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_environments(self, info: Info, app_slug: str | None = None) -> list[AppEnvironmentType]:
         # Org-scope to the caller's tenant: AppEnvironment reaches the org
@@ -838,10 +843,12 @@ class LifecycleQuery:
         )
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
+        qs = visible_operation_rows(qs, Permission.APP_READ, environment_path="self")
         return [app_env_to_type(e) for e in qs[:300]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_environments_page(
         self,
@@ -891,12 +898,14 @@ class LifecycleQuery:
             filter_q(filter, ENVIRONMENTS_FILTERS, me=tenant.actor_user_id if tenant else None)
         )
         order_by = resolve_list_sort(sort, ENVIRONMENTS_SORT_KEYS, default=ENVIRONMENTS_DEFAULT_SORT)
+        qs = visible_operation_rows(qs, Permission.APP_READ, environment_path="self")
         return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(app_env_to_type)
 
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage.")
     )
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_deployments(
         self,
@@ -910,7 +919,8 @@ class LifecycleQuery:
         return [deployment_to_type(d, viewer_user_id=viewer) for d in qs[: max(1, min(limit, 200))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_deployments_page(
         self,
@@ -974,7 +984,9 @@ class LifecycleQuery:
         return page.map(lambda d: deployment_to_type(d, viewer_user_id=viewer))
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=deployment_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ, scope=deployment_app_scope("id"), operation=deployment_operation("id")
+    )
     @tenant_scoped()
     def astrolift_deployment(self, info: Info, id: str) -> DeploymentType | None:
         """Single deployment by guid, scoped to the caller's org (#1118).
@@ -1001,7 +1013,11 @@ class LifecycleQuery:
         return deployment_to_type(d, viewer_user_id=_viewer_user_id(info)) if d else None
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=deployment_app_scope("deployment_id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=deployment_app_scope("deployment_id"),
+        operation=deployment_operation("deployment_id"),
+    )
     @tenant_scoped()
     def astrolift_deployment_approval_history(
         self,
@@ -1087,7 +1103,11 @@ class LifecycleQuery:
         return out
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=deployment_app_scope("deployment_id"))
+    @require_permission(
+        Permission.APP_READ,
+        scope=deployment_app_scope("deployment_id"),
+        operation=deployment_operation("deployment_id"),
+    )
     @tenant_scoped()
     def astrolift_deployment_release_notes(self, info: Info, deployment_id: str) -> ReleaseNotesType | None:
         """Merged-PR descriptions + non-merge commit subjects between the
@@ -1177,12 +1197,12 @@ class LifecycleQuery:
         org_id = tenant.organization_id if tenant else None
 
         def _get_deploy(guid: str) -> Deployment | None:
-            qs = Deployment.objects.filter(guid=guid, deleted_at__isnull=True).select_related(
-                "registered_app", "app_environment"
-            )
-            if org_id is not None:
-                qs = qs.filter(registered_app__organization_id=org_id)
-            return qs.first()
+            qs = Deployment.objects.filter(
+                guid=guid, deleted_at__isnull=True, registered_app__organization_id=org_id
+            ).select_related("registered_app", "app_environment")
+            return visible_operation_rows(
+                qs, Permission.APP_READ, approvals_field="approvals_received"
+            ).first()
 
         dep_a = _get_deploy(id_a)
         dep_b = _get_deploy(id_b)
@@ -1229,7 +1249,11 @@ class LifecycleQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=deployment_app_scope("deployment_id"))
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=deployment_app_scope("deployment_id"),
+        operation=deployment_operation("deployment_id"),
+    )
     @tenant_scoped()
     def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
         # Look up the deployment by guid, scoped to the caller's org (the
@@ -1253,7 +1277,8 @@ class LifecycleQuery:
             "Caps at 500 rows with no way to reach the 501st. Use astroliftScheduledJobRunsPage."
         )
     )
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ_LOGS, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ_LOGS)
     @tenant_scoped()
     def astrolift_scheduled_job_runs(
         self,
@@ -1268,7 +1293,8 @@ class LifecycleQuery:
         return [scheduled_job_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ_LOGS, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ_LOGS)
     @tenant_scoped()
     def astrolift_scheduled_job_runs_page(
         self,
@@ -1312,7 +1338,13 @@ class LifecycleQuery:
         return page.map(scheduled_job_run_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=scheduled_job_run_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=scheduled_job_run_app_scope("id"),
+        operation=row_operation(
+            "astrolift_lifecycle.ScheduledJobRun", "id", app_path="app_environment__registered_app"
+        ),
+    )
     @tenant_scoped()
     def astrolift_scheduled_job_run(self, info: Info, id: str) -> ScheduledJobRunType | None:
         """Single scheduled-job run by guid, for cold detail deep-links (#1118).
@@ -1403,7 +1435,8 @@ class LifecycleQuery:
             "every one of them on read. Use astroliftPreviewEnvironmentsPage."
         )
     )
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_preview_environments(
         self, info: Info, app_slug: str | None = None
@@ -1413,7 +1446,8 @@ class LifecycleQuery:
         return [_preview_with_cost(p) for p in rows]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_preview_environments_page(
         self,
@@ -1462,7 +1496,8 @@ class LifecycleQuery:
         return page.map(lambda p: _preview_with_cost(p, failure_reason=reasons.get(p.pk)))
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_preview_environment_counts(
         self,
@@ -1521,6 +1556,7 @@ class LifecycleQuery:
             deleted_at__isnull=True,
             registered_app_id__in=visible_app_ids,
         )
+        qs = visible_operation_rows(qs, Permission.APP_READ, approvals_field="approvals_received")
 
         in_flight_statuses = {
             Deployment.Status.PENDING_APPROVAL.value,
@@ -1647,9 +1683,18 @@ class LifecycleQuery:
         # in one pass and joined in Python; separate queries rather than
         # annotations on the app queryset so the counts can't multiply
         # against each other across joins.
+        visible_environments = visible_operation_rows(
+            AppEnvironment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True),
+            Permission.APP_READ,
+            environment_path="self",
+        )
+        visible_deployments = visible_operation_rows(
+            Deployment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True),
+            Permission.APP_READ,
+            approvals_field="approvals_received",
+        )
         env_counts = dict(
-            AppEnvironment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True)
-            .values_list("registered_app_id")
+            visible_environments.values_list("registered_app_id")
             .annotate(n=Count("id"))
             .values_list("registered_app_id", "n")
         )
@@ -1659,15 +1704,13 @@ class LifecycleQuery:
         # expression, hence registered_app_id first.
         latest_by_app = {
             d.registered_app_id: d
-            for d in Deployment.objects.filter(registered_app_id__in=app_ids, deleted_at__isnull=True)
-            .order_by("registered_app_id", "-created_at")
-            .distinct("registered_app_id")
+            for d in visible_deployments.order_by("registered_app_id", "-created_at").distinct(
+                "registered_app_id"
+            )
         }
 
         failed_app_ids = set(
-            Deployment.objects.filter(
-                registered_app_id__in=app_ids,
-                deleted_at__isnull=True,
+            visible_deployments.filter(
                 created_at__gte=recent_window,
                 status__in=[
                     Deployment.Status.FAILED.value,
@@ -2320,7 +2363,12 @@ class LifecycleQuery:
     # + ``app.update`` (both required for the destructive surface).
 
     @strawberry.field
-    @require_permission(Permission.APP_DEPLOY, Permission.APP_UPDATE, scope=app_scope_by_slug("app_slug"))
+    @require_permission(
+        Permission.APP_DEPLOY,
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("app_slug"),
+        operation=named_environment("app_slug", "environment_name", all_if_absent=True),
+    )
     @tenant_scoped()
     def preview_astrolift_force_redeploy(
         self,
@@ -2403,7 +2451,8 @@ class LifecycleQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftTaskRunsPage.")
     )
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ_LOGS, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ_LOGS)
     @tenant_scoped()
     def astrolift_task_runs(
         self,
@@ -2424,7 +2473,8 @@ class LifecycleQuery:
         return [task_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ_LOGS, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ_LOGS)
     @tenant_scoped()
     def astrolift_task_runs_page(
         self,
@@ -2461,7 +2511,13 @@ class LifecycleQuery:
         return page.map(task_run_to_type)
 
     @strawberry.field
-    @require_permission(Permission.APP_READ_LOGS, scope=task_run_app_scope("id"))
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=task_run_app_scope("id"),
+        operation=row_operation(
+            "astrolift_lifecycle.TaskRun", "id", app_path="app_environment__registered_app"
+        ),
+    )
     @tenant_scoped()
     def astrolift_task_run(self, info: Info, id: str) -> TaskRunType | None:
         """Single task run by guid, for cold detail deep-links (#1118).
@@ -2491,7 +2547,8 @@ class LifecycleQuery:
     @strawberry.field(
         deprecation_reason=("Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage.")
     )
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_agent_runs(
         self,
@@ -2519,7 +2576,8 @@ class LifecycleQuery:
         return [agent_run_to_type(r) for r in qs[: max(1, min(limit, 500))]]
 
     @strawberry.field
-    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("app_slug"))
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_agent_runs_page(
         self,

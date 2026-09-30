@@ -34,6 +34,7 @@ from astrolift_identity.schema.types import (
     EnrollmentQrPayloadType,
     api_token_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
@@ -46,7 +47,9 @@ class ApiTokenMutations:
 
     @strawberry.field
     @mutation_audit(action="api_token.create")
-    @require_permission(Permission.API_TOKEN_CREATE)
+    @require_permission(
+        Permission.API_TOKEN_CREATE, scope=identity_organization_scope(Permission.API_TOKEN_CREATE)
+    )
     @tenant_scoped()
     def create_api_token(
         self, info: Info, input: CreateApiTokenInput
@@ -105,7 +108,9 @@ class ApiTokenMutations:
 
     @strawberry.field
     @mutation_audit(action="api_token.revoke")
-    @require_permission(Permission.API_TOKEN_REVOKE)
+    @require_permission(
+        Permission.API_TOKEN_REVOKE, scope=identity_organization_scope(Permission.API_TOKEN_REVOKE)
+    )
     @tenant_scoped()
     def revoke_api_token(
         self, info: Info, input: RevokeApiTokenInput

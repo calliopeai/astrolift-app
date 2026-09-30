@@ -31,6 +31,7 @@ from astrolift_identity.schema.types import (
     RoleType,
     role_to_type,
 )
+from astrolift_identity.scopes import identity_organization_scope
 from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -44,7 +45,9 @@ class RoleMutations:
 
     @strawberry.field
     @mutation_audit(action="role.create")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def create_role(self, info: Info, input: CreateRoleInput) -> MutationResultType[RoleType]:
         """Define a custom role for the current org.
@@ -128,7 +131,9 @@ class RoleMutations:
     @strawberry.field
     @mutation_audit(action="role.update")
     @requires_elevation(action_label="role.update")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def update_role(self, info: Info, input: UpdateRoleInput) -> MutationResultType[RoleType]:
         """Update a custom role. System roles are read-only here.
@@ -188,7 +193,9 @@ class RoleMutations:
     @strawberry.field
     @mutation_audit(action="role.delete")
     @requires_elevation(action_label="role.delete")
-    @require_permission(Permission.ORG_MANAGE_MEMBERS)
+    @require_permission(
+        Permission.ORG_MANAGE_MEMBERS, scope=identity_organization_scope(Permission.ORG_MANAGE_MEMBERS)
+    )
     @tenant_scoped()
     def soft_delete_role(self, info: Info, input: DeleteRoleInput) -> MutationResultType[_SoftDeletePayload]:
         """Soft-delete a custom role. Bindings to it stay in place

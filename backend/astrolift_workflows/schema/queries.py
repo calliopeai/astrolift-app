@@ -22,6 +22,7 @@ from astrolift_graphql import (
     parse_sort_spec,
     search_q,
 )
+from astrolift_identity.operation_context import execution_operation, workflow_id_operation
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.client import (
     describe_workflow_instance,
@@ -60,10 +61,10 @@ from core.permissions import (
 )
 from core.tenancy import get_current_tenant
 from workflows.scopes import (
-    covered_project_ids,
     definition_scope_by_slug,
     execution_scope_by_id,
     may_decide_human_gate,
+    visible_project_owned,
     visible_runs,
     workflow_run_scope,
     workflow_run_scope_by_id,
@@ -243,7 +244,11 @@ def _viewer_can_see(workflow_id: str, *, elevated: bool, caller: int | None, org
     if org_wide:
         return True
     try:
-        check_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope(workflow_id, caller))
+        from astrolift_identity.abac import operation_attributes
+        from astrolift_identity.operation_context import workflow_operation
+
+        with operation_attributes(**workflow_operation(workflow_id).attributes()):
+            check_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope(workflow_id, caller))
     except PermissionDenied:
         return False
     return True
@@ -285,12 +290,10 @@ def _visible_workflow_ids(
     visible = set(visible_runs(runs, caller, Permission.AUDIT_LOG_READ).values_list("workflow_id", flat=True))
     instance_only = owned - with_run
     if instance_only:
-        projects = covered_project_ids(caller, Permission.AUDIT_LOG_READ)
         instances = WorkflowInstance.objects.filter(
             temporal_workflow_id__in=instance_only, organization_id=caller, deleted_at__isnull=True
         )
-        if projects is not None:
-            instances = instances.filter(workflow__project_id__in=projects)
+        instances = visible_project_owned(instances, caller, Permission.AUDIT_LOG_READ, "workflow__project")
         visible |= set(instances.values_list("temporal_workflow_id", flat=True))
     return visible
 
@@ -353,7 +356,11 @@ class TemporalWorkflowsQuery:
         return WorkflowInstancePageType(items=items, next_cursor=next_cursor)
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope_by_id("workflow_id"))
+    @require_permission(
+        Permission.AUDIT_LOG_READ,
+        scope=workflow_run_scope_by_id("workflow_id"),
+        operation=workflow_id_operation("workflow_id"),
+    )
     @tenant_scoped()
     def astrolift_workflow_instance_detail(
         self,
@@ -385,7 +392,11 @@ class TemporalWorkflowsQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.AUDIT_LOG_READ, scope=workflow_run_scope_by_id("workflow_id"))
+    @require_permission(
+        Permission.AUDIT_LOG_READ,
+        scope=workflow_run_scope_by_id("workflow_id"),
+        operation=workflow_id_operation("workflow_id"),
+    )
     @tenant_scoped()
     def astrolift_workflow_instance(
         self,
@@ -430,9 +441,7 @@ def _workflows_qs(*, org_pk: int | None, search: str | None = None):
     qs = Workflow.objects.filter(organization_id=org_pk, deleted_at__isnull=True).select_related(
         "definition", "organization"
     )
-    projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
-    if projects is not None:
-        qs = qs.filter(definition__project_id__in=projects)
+    qs = visible_project_owned(qs, org_pk, Permission.WORKFLOW_READ, "definition__project")
     if search:
         qs = qs.filter(
             search_q(
@@ -487,9 +496,7 @@ def _workflow_definitions_qs(
             )
         )
     )
-    projects = covered_project_ids(org_pk, Permission.WORKFLOW_READ)
-    if projects is not None:
-        qs = qs.filter(project_id__in=projects)
+    qs = visible_project_owned(qs, org_pk, Permission.WORKFLOW_READ, "project")
     if project_id is not None:
         try:
             qs = qs.filter(
@@ -512,7 +519,9 @@ class WorkflowsQuery:
     exists; the org match is the actual scoping)."""
 
     @strawberry.field(description="Recorded stage history of an exact owned execution, newest first.")
-    @require_permission(Permission.WORKFLOW_READ, scope=execution_scope_by_id())
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=execution_scope_by_id(), operation=execution_operation
+    )
     @tenant_scoped()
     def workflow_execution_stages(
         self,
@@ -529,7 +538,9 @@ class WorkflowsQuery:
     @strawberry.field(
         description="One owned execution by the WorkflowRun ID returned on dispatch or its GUID."
     )
-    @require_permission(Permission.WORKFLOW_READ, scope=execution_scope_by_id())
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=execution_scope_by_id(), operation=execution_operation
+    )
     @tenant_scoped()
     def workflow_execution(self, info: Info, execution_id: strawberry.ID) -> WorkflowExecutionType | None:
         from astrolift_workflows.execution_controls import execution_state, find_execution

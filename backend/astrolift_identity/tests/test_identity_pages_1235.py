@@ -694,7 +694,7 @@ def test_invitations_page_search_matches_email_and_inviter(org, actor, info, per
 
 
 def test_roles_page_shows_the_system_catalog_and_only_this_orgs_custom_roles(
-    org, other_org, actor, info, permission_resolver
+    org, other_org, actor, info, permission_resolver, system_role_catalog
 ):
     """System roles carry a null organization and belong to every
     tenant; custom roles do not. The conversion has to keep both halves

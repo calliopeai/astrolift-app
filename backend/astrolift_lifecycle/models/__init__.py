@@ -2,6 +2,7 @@ from astrolift_lifecycle.models.agent_run import AgentRun
 from astrolift_lifecycle.models.app_environment import AppEnvironment
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
+from astrolift_lifecycle.models.deployment_approval import DeploymentApproval
 from astrolift_lifecycle.models.deployment_log import DeploymentLog
 from astrolift_lifecycle.models.dev_environment import DevEnvironment
 from astrolift_lifecycle.models.domain_handoff import DomainSessionHandoff
@@ -27,6 +28,7 @@ __all__ = [
     "CustomDomain",
     "DeployToken",
     "Deployment",
+    "DeploymentApproval",
     "DeploymentLog",
     "DevEnvironment",
     "DomainPathRoute",

@@ -19,6 +19,7 @@ from astrolift_scm.schema.types import (
     source_connection_to_type,
     ssh_key_to_type,
 )
+from astrolift_scm.scopes import scm_org_scope, visible_ssh_keys
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -52,7 +53,7 @@ def _viewer_user_id(info: Info) -> int | None:
     the second half of the connection-visibility scope (the first being
     the tenant org).
     """
-    request = getattr(info.context, "request", None)
+    request = getattr(getattr(info, "context", None), "request", None)
     viewer = getattr(request, "user", None) if request else None
     if viewer is not None and getattr(viewer, "is_authenticated", False):
         return viewer.pk
@@ -112,7 +113,7 @@ def _ssh_deploy_keys_qs(*, app_slug: str | None, search: str | None = None):
     if search:
         # Mirrors the settings table's client-side filter.
         qs = qs.filter(search_q(search, "name", "fingerprint_sha256", "registered_app__slug"))
-    return qs
+    return visible_ssh_keys(qs)
 
 
 @strawberry.type
@@ -122,7 +123,7 @@ class ScmQuery:
             "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage."
         )
     )
-    @require_permission(Permission.SCM_READ)
+    @require_permission(Permission.SCM_READ, scope=scm_org_scope(Permission.SCM_READ))
     @tenant_scoped()
     def astrolift_source_connections(self, info: Info) -> list[SourceConnectionType]:
         """Org-level connections + the current viewer's own personal
@@ -134,7 +135,7 @@ class ScmQuery:
         return [source_connection_to_type(c) for c in qs[:200]]
 
     @strawberry.field
-    @require_permission(Permission.SCM_READ)
+    @require_permission(Permission.SCM_READ, scope=scm_org_scope(Permission.SCM_READ))
     @tenant_scoped()
     def astrolift_source_connections_page(
         self,
@@ -167,14 +168,14 @@ class ScmQuery:
             "Caps at 200 rows with no way to reach the 201st. Use astroliftSshDeployKeysPage."
         )
     )
-    @require_permission(Permission.SCM_READ)
+    @require_permission(Permission.SCM_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_ssh_deploy_keys(self, info: Info, app_slug: str | None = None) -> list[SshDeployKeyType]:
         qs = _ssh_deploy_keys_qs(app_slug=app_slug).order_by("registered_app__slug", "name")
         return [ssh_key_to_type(k) for k in qs[:200]]
 
     @strawberry.field
-    @require_permission(Permission.SCM_READ)
+    @require_permission(Permission.SCM_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_ssh_deploy_keys_page(
         self,
@@ -202,7 +203,7 @@ class ScmQuery:
         return page.map(ssh_key_to_type)
 
     @strawberry.field
-    @require_permission(Permission.SCM_READ)
+    @require_permission(Permission.SCM_READ, scope=scm_org_scope(Permission.SCM_READ))
     @tenant_scoped()
     def astrolift_available_repos(
         self,
@@ -226,12 +227,16 @@ class ScmQuery:
                 recoverable=False,
             )
 
-        conn = SourceConnection.objects.filter(
-            organization_id=org_id,
-            guid=str(connection_id),
-            is_active=True,
-            deleted_at__isnull=True,
-        ).first()
+        conn = (
+            _source_connections_qs(viewer_pk=_viewer_user_id(info))
+            .filter(
+                organization_id=org_id,
+                guid=str(connection_id),
+                is_active=True,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
         if conn is None:
             return RemoteRepoListType(
                 repos=[],
@@ -263,7 +268,7 @@ class ScmQuery:
         )
 
     @strawberry.field
-    @require_permission(Permission.SCM_READ)
+    @require_permission(Permission.SCM_READ, scope=scm_org_scope(Permission.SCM_READ))
     @tenant_scoped()
     def astrolift_source_file(
         self,
@@ -302,12 +307,16 @@ class ScmQuery:
                 recoverable=False,
             )
 
-        conn = SourceConnection.objects.filter(
-            organization_id=org_id,
-            guid=str(connection_id),
-            is_active=True,
-            deleted_at__isnull=True,
-        ).first()
+        conn = (
+            _source_connections_qs(viewer_pk=_viewer_user_id(info))
+            .filter(
+                organization_id=org_id,
+                guid=str(connection_id),
+                is_active=True,
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
         if conn is None:
             return SourceFileType(
                 repo_full_name=repo_full_name,

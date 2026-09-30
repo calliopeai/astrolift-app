@@ -67,6 +67,8 @@ from django.views.decorators.http import require_GET
 
 from astrolift_identity.models import Member
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.scopes import require_scm_connect
+from core.permissions import Permission, route_auth
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
 logger = logging.getLogger(__name__)
@@ -473,6 +475,9 @@ def _start_reuse_install(
 
 @login_required
 @require_GET
+@route_auth(
+    credential="session or API bearer", scope="active organization", permissions=[Permission.SCM_CONNECT]
+)
 def github_app_manifest_start(request: HttpRequest) -> Any:
     """Render an HTML form that auto-posts the App manifest to GitHub.
 
@@ -483,6 +488,7 @@ def github_app_manifest_start(request: HttpRequest) -> Any:
     (org install) or ``https://github.com/settings/apps/new?state=…``
     (personal account install).
     """
+    require_scm_connect()
     return_to = _safe_return_to(request.GET.get("return_to"))
     gh_org = (request.GET.get("org") or "").strip()
     if gh_org and not _validate_gh_slug(gh_org):
@@ -620,6 +626,9 @@ def _render_autosubmit_form(*, action_url: str, manifest_payload: str, target_la
 @login_required
 @csrf_exempt  # GitHub bounces the browser back here; the state cookie is the auth.
 @require_GET
+@route_auth(
+    credential="session or API bearer", scope="active organization", permissions=[Permission.SCM_CONNECT]
+)
 def github_app_manifest_callback(request: HttpRequest) -> Any:
     """Exchange the one-time code for App credentials, persist them.
 
@@ -634,6 +643,7 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
     user's authorization code for an access token when they click
     "Connect my GitHub" against this App row.
     """
+    require_scm_connect()
     state_in = request.GET.get("state", "")
     code = request.GET.get("code", "")
     pending = request.session.pop("scm_github_manifest_state", None)
@@ -732,6 +742,9 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
 @login_required
 @csrf_exempt
 @require_GET
+@route_auth(
+    credential="session or API bearer", scope="active organization", permissions=[Permission.SCM_CONNECT]
+)
 def github_app_manifest_setup(request: HttpRequest) -> Any:
     """Land here after the operator installs the App on an org.
 
@@ -741,6 +754,7 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
     ``setup_action`` (e.g. ``request`` from a private-App "request
     install" flow) leaves the row inactive and surfaces an info toast.
     """
+    require_scm_connect()
     state_in = request.GET.get("state", "")
     installation_id = (request.GET.get("installation_id") or "").strip()
     setup_action = (request.GET.get("setup_action") or "").strip()
@@ -759,6 +773,9 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
     ).first()
     if connection is None:
         return _redirect_with_error(return_to, "connection_missing")
+
+    if _active_org_id(request) != connection.organization_id:
+        return _redirect_with_error(return_to, "org_mismatch")
 
     if setup_action != "install" or not installation_id.isdigit():
         # Operator may have cancelled or requested-rather-than-installed.
