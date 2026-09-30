@@ -74,7 +74,11 @@ describe("translated app registry", () => {
         </MockedProvider>
       );
       const slug = APPS[0].slug;
-      fireEvent.click(screen.getByRole("checkbox", { name: `Select row ${slug}` }));
+      const row = screen.getByRole("row", {
+        name: (name) => name.includes(APPS[0].name) && name.includes(slug),
+      });
+      const checkbox = within(row).getByRole("checkbox");
+      fireEvent.click(checkbox);
       fireEvent.click(screen.getByRole("button", { name: push }));
       const dialog = await screen.findByRole("dialog");
       fireEvent.change(within(dialog).getByLabelText(bundle), {
@@ -93,7 +97,7 @@ describe("translated app registry", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: submit }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       expect(onPushSecrets).toHaveBeenCalledTimes(2);
-      expect(screen.getByRole("checkbox", { name: `Select row ${slug}` })).not.toBeChecked();
+      expect(checkbox).not.toBeChecked();
       expect(onError).not.toHaveBeenCalled();
     }
   );
