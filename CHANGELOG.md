@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Scoped operation checks resolve owner factories under trusted facts and isolate
+  permission-scope caches per target (#2164). Log subscriptions admit the verified
+  environment and cluster, release operation context before yielding events, and
+  close their provider streams safely across tasks.
+
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep
   the existing production/development server behavior, and other startup

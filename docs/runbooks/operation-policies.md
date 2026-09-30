@@ -36,6 +36,19 @@ fail-closed policy evaluation. Missing region values never become an unrestricte
 region. Context ends when the resolver returns, including on errors, so one
 operation cannot lend its facts to the next request.
 
+Owner scope factories resolve inside the operation context. Each context starts
+with a fresh permission-scope memo, including collections that admit any owned
+scope. Multi-target operations authorize every target independently; facts from
+one permitted region cannot authorize another target.
+
+Log subscriptions authorize on first iteration using the actual persisted app,
+cluster and namespace. An explicitly named environment must exist. Legacy pod
+streams bind an environment only when a unique persisted cluster/namespace pair
+proves it; otherwise they bind only the cluster's region. Facts and scope memos
+are bound while advancing or closing the inner stream and released before each
+outward event. Interleaved subscriptions retain their own contexts, and a stream
+can close in another task without leaving operation facts in its caller.
+
 Deployment approval requests record one `DeploymentApproval` per authenticated
 user. Repeated and concurrent requests from the same user are idempotent. The
 emailed bearer link records a separate single credential vote for a one-approval

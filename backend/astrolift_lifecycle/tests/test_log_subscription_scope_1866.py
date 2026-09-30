@@ -154,6 +154,7 @@ async def test_log_admission_uses_persisted_environment_and_region(world, plural
 @pytest.mark.asyncio
 async def test_log_operation_context_is_bound_until_inner_stream_is_closed(world):
     import asyncio
+
     from asgiref.sync import sync_to_async
 
     from astrolift_identity.abac import current_attributes

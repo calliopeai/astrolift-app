@@ -142,7 +142,7 @@ def agent_tasks(org_id, permission):
     qs = AgentTask.objects.filter(
         organization_id=org_id, organization__deleted_at__isnull=True
     ).select_related("project", "team", "agent_definition__registered_app")
-    return _owned_rows(qs, org_id, permission)
+    return visible_agent_task_operations(_owned_rows(qs, org_id, permission), permission)
 
 
 def agent_boxes(org_id, permission):
@@ -192,7 +192,7 @@ def _owned_rows(qs, org_id, permission):
     )
     if scopes.org_only and (token is None or token.team_id is None):
         visible |= Q(project_id__isnull=True, team_id__isnull=True, agent_definition__isnull=True)
-    return visible_agent_task_operations(qs.filter(visible), permission)
+    return qs.filter(visible)
 
 
 def environment_specs(org_id, permission):
