@@ -65,6 +65,8 @@ import inspect
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from contextlib import contextmanager, suppress
+from contextvars import ContextVar
 from typing import Any, Literal, TypeVar
 
 # Prometheus, OTEL, and temporalio are optional at import time so the SDK
@@ -145,6 +147,17 @@ _op_histogram = _get_or_create_histogram()
 _REDACTED = "<redacted>"
 _CloudLiteral = Literal["aws", "gcp", "azure", "k8s_native"] | None
 F = TypeVar("F", bound=Callable[..., Any])
+_heartbeat_sink: ContextVar[Callable[[str], None] | None] = ContextVar("provider_heartbeat_sink", default=None)
+
+
+@contextmanager
+def heartbeat_sink(callback: Callable[[str], None]):
+    """Route this operation's heartbeats to its caller's execution context."""
+    token = _heartbeat_sink.set(callback)
+    try:
+        yield
+    finally:
+        _heartbeat_sink.reset(token)
 
 
 def maybe_heartbeat(detail: str = "") -> None:
@@ -155,6 +168,11 @@ def maybe_heartbeat(detail: str = "") -> None:
     default ``start_to_close_timeout``. Outside Temporal -- CLI tools,
     Django request handlers, unit tests -- the function returns silently.
     """
+    sink = _heartbeat_sink.get()
+    if sink is not None:
+        with suppress(Exception):
+            sink(detail)
+        return
     if not _TEMPORAL_AVAILABLE:
         return
     try:
