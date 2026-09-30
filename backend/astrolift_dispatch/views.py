@@ -637,7 +637,10 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     input_intent = body.get("input_intent")
     if input_intent not in {None, "peek", "consume"}:
         return JsonResponse({"error": f"invalid input_intent: {input_intent!r}"}, status=400)
+    from astrolift_agents.services.task_backlog import commit_backlog, prepare_backlog, validate_backlog
+
     try:
+        backlog = validate_backlog(body["backlog"]) if "backlog" in body else None
         events = validate_task_events(body["events"]) if "events" in body else None
     except TaskEventError as exc:
         return JsonResponse({"error": str(exc)}, status=exc.status)
@@ -684,6 +687,7 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
 
         try:
             prepared_events = prepare_task_events(task, events or [])
+            prepared_backlog = prepare_backlog(task, backlog) if backlog is not None else None
             if "input_request" in body:
                 if new_status not in {None, "running"} or input_intent is not None:
                     raise TaskInputRequestError(
@@ -766,6 +770,7 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             logger.warning("Could not reserve input wait for task %s", task.guid, exc_info=True)
             return JsonResponse({"error": "Could not reserve input wait; retry the callback"}, status=503)
         commit_task_events(task, prepared_events)
+        commit_backlog(task, prepared_backlog)
 
     record_interaction(
         task,
@@ -783,6 +788,8 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     )
 
     payload = {"ok": True, "continue": task.status == AgentTask.Status.RUNNING}
+    payload["task_backlog_protocol_version"] = 1
+    payload["backlog_revision"] = (task.backlog_snapshot or {}).get("revision", 0)
     if events is not None:
         payload["event_sequence"] = task.event_sequence
         payload["input_protocol_version"] = 1

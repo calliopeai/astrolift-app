@@ -43,6 +43,7 @@ from _sdk.k8s_dynamic_client import (
 from _sdk.k8s_dynamic_client import (
     NotFoundError as _NotFound,
 )
+from _sdk.k8s_dynamic_client import PreconditionFailedError as _PreconditionFailed
 from azure._errors import NotFoundError, map_api_error
 from k8s_native.management import (
     ManagementBackend,
@@ -250,6 +251,7 @@ class AKSClusterDriver(ClusterDriver):
         manifests,
         *,
         dry_run=False,
+        create_only=False,
     ):
         client = self._k8s(cluster)
         created: list[str] = []
@@ -261,7 +263,8 @@ class AKSClusterDriver(ClusterDriver):
             kind = m.get("kind", "")
             name = m.get("metadata", {}).get("name", "")
             try:
-                outcome = client.server_side_apply(
+                operation = client.create_manifest if create_only else client.server_side_apply
+                outcome = operation(
                     namespace=namespace,
                     manifest=m,
                     dry_run=dry_run,
@@ -277,6 +280,8 @@ class AKSClusterDriver(ClusterDriver):
                         is_retryable=classify_apply_error(exc),
                     )
                 )
+                if create_only:
+                    break
                 continue
             ref = f"{kind}/{name}"
             if outcome == "created":
@@ -295,14 +300,20 @@ class AKSClusterDriver(ClusterDriver):
     @driver_op(cloud="azure", driver="cluster")
     def delete_manifests(self, cluster, namespace, manifests, *, propagation_policy=None):
         client = self._k8s(cluster)
-        deleted, not_found, errors = [], [], []
+        deleted, not_found, errors, conflicts = [], [], [], []
         for m in manifests:
             api_version = m.get("apiVersion", "")
             kind_bare = m.get("kind", "")
             # For CRDs (apiVersion is "group/version") construct the
             # "group/version/Kind" form that split_kind accepts.
             kind = f"{api_version}/{kind_bare}" if "/" in api_version else kind_bare
-            name = m.get("metadata", {}).get("name", "")
+            meta = m.get("metadata", {}) or {}
+            name = meta.get("name", "")
+            preconditions = {}
+            if meta.get("uid"):
+                preconditions["uid"] = meta["uid"]
+            if meta.get("resourceVersion"):
+                preconditions["resource_version"] = meta["resourceVersion"]
             ref = f"{kind}/{name}"
             try:
                 client.delete(
@@ -310,16 +321,20 @@ class AKSClusterDriver(ClusterDriver):
                     namespace=namespace,
                     name=name,
                     propagation_policy=propagation_policy,
+                    **preconditions,
                 )
                 deleted.append(ref)
             except _NotFound:
                 not_found.append(ref)
+            except _PreconditionFailed as exc:
+                conflicts.append(f"{ref}: {exc}")
             except Exception as exc:
                 errors.append(f"{ref}: {exc}")
         return DeleteResult(
             deleted=deleted,
             not_found=not_found,
             errors=errors,
+            conflicts=conflicts,
         )
 
     @driver_op(cloud="azure", driver="cluster")

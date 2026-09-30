@@ -646,6 +646,22 @@ type AstroliftAgentTask {
   triggeredByMe: Boolean!
 }
 
+type AstroliftAgentTaskBacklog {
+  harness: String!
+  sessionId: String!
+  revision: Int!
+  updatedAt: DateTime!
+  items: [AstroliftAgentTaskBacklogItem!]!
+}
+
+type AstroliftAgentTaskBacklogItem {
+  id: String!
+  text: String!
+  status: String!
+  activeForm: String
+  details: String
+}
+
 type AstroliftAgentTaskDispatcher {
   id: GUID!
   name: String!
@@ -7992,6 +8008,7 @@ type Query {
   agentTaskInputMessage(taskId: ID!, clientRequestId: String!): AstroliftAgentTaskInputMessage
   agentTaskByClientRequestId(orgId: ID!, clientRequestId: String!): AstroliftAgentTask
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
+  agentTaskBacklog(orgId: ID!, taskId: ID!): AstroliftAgentTaskBacklog
   agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
   agentTaskLogsPage(id: ID!, cursor: String = null, limit: Int! = 100): AstroliftAgentTaskLogPage!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
