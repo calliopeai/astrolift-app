@@ -3363,6 +3363,13 @@
       "approximately": "cerca de {count}",
       "newer": "Mais recentes",
       "older": "Mais antigos"
+    },
+    "confirmation": {
+      "confirm": "Confirmar",
+      "cancel": "Cancelar",
+      "working": "Processando…",
+      "reasonRequired": "É necessário informar um motivo",
+      "failed": "A ação falhou"
     }
   }
 }

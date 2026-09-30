@@ -4,6 +4,9 @@
 
 - Shared numbered and cursor pagination translates controls and count sentences
   in all eight locales, retaining page/cursor callbacks and unknown totals.
+- Shared confirmation dialogs use all eight locales for default actions,
+  pending labels and validation feedback, preserving server errors and retry
+  behavior (#2145).
 
 - Shared version-conflict feedback can supply translated fallback text and
   refresh actions without replacing server diagnostics or replaying mutations.

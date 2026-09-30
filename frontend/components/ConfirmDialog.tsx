@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import {
   AlertDialog,
@@ -93,13 +94,14 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   destructive = false,
   confirmDisabled = false,
   onConfirm,
   reason,
 }: ConfirmDialogProps) {
+  const t = useTranslations("shared.confirmation");
   const [pending, setPending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
@@ -126,7 +128,7 @@ export function ConfirmDialog({
     if (pending || confirmDisabled) return;
     const trimmed = draft.trim();
     if (reason && !trimmed) {
-      setError(reason.requiredError ?? "Reason required");
+      setError(reason.requiredError ?? t("reasonRequired"));
       return;
     }
     setError(null);
@@ -140,7 +142,7 @@ export function ConfirmDialog({
           ? err.message
           : typeof err === "string" && err
             ? err
-            : "Action failed";
+            : t("failed");
       toast.error(message);
     } finally {
       setPending(false);
@@ -189,13 +191,13 @@ export function ConfirmDialog({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{cancelLabel ?? t("cancel")}</AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
             disabled={pending || confirmDisabled}
             onClick={handleConfirm}
           >
-            {pending ? "Working…" : confirmLabel}
+            {pending ? t("working") : (confirmLabel ?? t("confirm"))}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

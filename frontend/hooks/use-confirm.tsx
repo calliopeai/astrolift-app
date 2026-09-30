@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import {
   AlertDialog,
@@ -24,6 +25,7 @@ type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const t = useTranslations("shared.confirmation");
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<ConfirmOptions>({ title: "" });
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
@@ -59,10 +61,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }): Re
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleCancel}>
-              {options.cancelLabel ?? "Cancel"}
+              {options.cancelLabel ?? t("cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              {options.confirmLabel ?? "Confirm"}
+              {options.confirmLabel ?? t("confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

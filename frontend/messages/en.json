@@ -3489,6 +3489,13 @@
       "approximately": "about {count}",
       "newer": "Newer",
       "older": "Older"
+    },
+    "confirmation": {
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "working": "Working…",
+      "reasonRequired": "Reason required",
+      "failed": "Action failed"
     }
   }
 }

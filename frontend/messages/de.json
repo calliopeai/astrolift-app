@@ -3366,6 +3366,13 @@
       "approximately": "etwa {count}",
       "newer": "Neuere",
       "older": "Ältere"
+    },
+    "confirmation": {
+      "confirm": "Bestätigen",
+      "cancel": "Abbrechen",
+      "working": "Wird ausgeführt…",
+      "reasonRequired": "Eine Begründung ist erforderlich",
+      "failed": "Aktion fehlgeschlagen"
     }
   }
 }

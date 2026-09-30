@@ -3363,6 +3363,13 @@
       "approximately": "约{count}",
       "newer": "较新项",
       "older": "较早项"
+    },
+    "confirmation": {
+      "confirm": "确认",
+      "cancel": "取消",
+      "working": "处理中…",
+      "reasonRequired": "请填写原因",
+      "failed": "操作失败"
     }
   }
 }

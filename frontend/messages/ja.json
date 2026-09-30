@@ -3363,6 +3363,13 @@
       "approximately": "約{count}",
       "newer": "新しい項目",
       "older": "古い項目"
+    },
+    "confirmation": {
+      "confirm": "確認",
+      "cancel": "キャンセル",
+      "working": "処理中…",
+      "reasonRequired": "理由を入力してください",
+      "failed": "操作に失敗しました"
     }
   }
 }

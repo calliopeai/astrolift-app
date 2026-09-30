@@ -3363,6 +3363,13 @@
       "approximately": "약 {count}",
       "newer": "최신 항목",
       "older": "이전 항목"
+    },
+    "confirmation": {
+      "confirm": "확인",
+      "cancel": "취소",
+      "working": "처리 중…",
+      "reasonRequired": "사유를 입력해 주세요",
+      "failed": "작업에 실패했습니다"
     }
   }
 }

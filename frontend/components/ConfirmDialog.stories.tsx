@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { NextIntlClientProvider } from "next-intl";
+import french from "@/messages/fr.json";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -53,5 +55,13 @@ export const WithReasonAndLongTitle: StoryObj = {
         placeholder: "Why are you discarding this deploy?",
       }}
     />
+  ),
+};
+
+export const FrenchDefaults: StoryObj = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <Demo title="Confirmer l’action ?" reason={{ label: "Motif" }} />
+    </NextIntlClientProvider>
   ),
 };
