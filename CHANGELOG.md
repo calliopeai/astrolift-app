@@ -5,6 +5,9 @@
 - Confirmation dialogs retain handled false outcomes and entered reasons for
   retry without duplicating action diagnostics. Workload restart confirmations
   propagate the actual outcome; existing void-success callbacks still close.
+- Object and queue snapshot refreshes keep their dialogs open, disable duplicate
+  refreshes while pending and retain the selected service’s last snapshot with
+  visible read diagnostics on failure. Initial read errors no longer look empty.
 
 - The browser workload-controls regression checks the actual three-replica web
   and zero-replica worker fixtures independently, keeping unobserved readiness

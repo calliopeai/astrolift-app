@@ -211,19 +211,22 @@ export function useManagedServiceObjects(svc: SummaryService, open: boolean) {
 
   React.useEffect(() => {
     if (open) {
-      void load({ variables: { managedServiceId: svc.id, limit: 10 } });
+      void load({ variables: { managedServiceId: svc.id, limit: 10 } }).catch(() => undefined);
     }
   }, [open, load, svc.id]);
 
-  const result =
-    (query.data?.astroliftManagedServiceObjects as AstroliftManagedServiceObjects | undefined) ??
-    null;
+  // A failed refresh may clear current data; retain only this service’s snapshot.
+  const snapshot = (query.data ?? query.previousData)?.astroliftManagedServiceObjects;
+  const result = snapshot?.managedServiceId === svc.id ? snapshot : null;
 
   return {
     result,
     loading: query.loading && !result,
+    refreshing: query.loading,
+    error: query.error?.message ?? null,
     onRefresh: () => {
-      void load({ variables: { managedServiceId: svc.id, limit: 10 } });
+      // Refetch forces a read; error state above presents any rejected request.
+      void query.refetch({ managedServiceId: svc.id, limit: 10 }).catch(() => undefined);
     },
   };
 }
@@ -236,20 +239,20 @@ export function useQueueDepth(svc: SummaryService, open: boolean) {
 
   React.useEffect(() => {
     if (open) {
-      void load({ variables: { managedServiceId: svc.id } });
+      void load({ variables: { managedServiceId: svc.id } }).catch(() => undefined);
     }
   }, [open, load, svc.id]);
 
-  const result =
-    (query.data?.astroliftManagedServiceQueueDepth as
-      | AstroliftManagedServiceQueueDepth
-      | undefined) ?? null;
+  const snapshot = (query.data ?? query.previousData)?.astroliftManagedServiceQueueDepth;
+  const result = snapshot?.managedServiceId === svc.id ? snapshot : null;
 
   return {
     result,
     loading: query.loading && !result,
+    refreshing: query.loading,
+    error: query.error?.message ?? null,
     onRefresh: () => {
-      void load({ variables: { managedServiceId: svc.id } });
+      void query.refetch({ managedServiceId: svc.id }).catch(() => undefined);
     },
   };
 }

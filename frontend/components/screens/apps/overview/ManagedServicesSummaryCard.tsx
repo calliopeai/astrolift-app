@@ -594,7 +594,10 @@ export function SendTestEmailDialogView({
 // ─── list objects dialog ────────────────────────────────────────────
 
 export type ListObjectsDialogViewProps = ManagedServiceDialogSlotProps &
-  ReturnType<typeof useManagedServiceObjects>;
+  Omit<ReturnType<typeof useManagedServiceObjects>, "error" | "refreshing"> & {
+    error?: string | null;
+    refreshing?: boolean;
+  };
 
 export function ListObjectsDialogView({
   svc,
@@ -603,15 +606,18 @@ export function ListObjectsDialogView({
   result,
   loading,
   onRefresh,
+  error,
+  refreshing = false,
 }: ListObjectsDialogViewProps) {
   const t = useTranslations("apps.settings.managedServicesSummary.objectsDialog");
+  const summary = useTranslations("apps.settings.managedServicesSummary");
   const intl = useFormatter();
   const fmt = useFormatters();
   const objects = result?.objects ?? [];
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-h-[85vh] overflow-y-auto">
+      <AlertDialogContent className="max-h-[85vh] overflow-y-auto" aria-busy={refreshing}>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <HardDriveIcon className="size-4" />
@@ -619,9 +625,10 @@ export function ListObjectsDialogView({
           </AlertDialogTitle>
           <AlertDialogDescription>{t("description")}</AlertDialogDescription>
         </AlertDialogHeader>
+        {error ? <QueryError title={summary("loadFailed")} error={error} /> : null}
         {loading ? (
           <Skeleton className="h-32 w-full" />
-        ) : objects.length === 0 ? (
+        ) : error && !result ? null : objects.length === 0 ? (
           <div className="bg-muted/40 rounded-md border p-4 text-xs">
             <p className="text-muted-foreground">{t("empty")}</p>
           </div>
@@ -654,12 +661,14 @@ export function ListObjectsDialogView({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogAction asChild onClick={onRefresh}>
-            <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing || loading}>
+            {refreshing ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
               <RefreshCwIcon className="size-3.5" />
-              {t("refresh")}
-            </Button>
-          </AlertDialogAction>
+            )}
+            {t("refresh")}
+          </Button>
           <AlertDialogCancel>{t("close")}</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -670,7 +679,10 @@ export function ListObjectsDialogView({
 // ─── queue depth dialog ─────────────────────────────────────────────
 
 export type QueueDepthDialogViewProps = ManagedServiceDialogSlotProps &
-  ReturnType<typeof useQueueDepth>;
+  Omit<ReturnType<typeof useQueueDepth>, "error" | "refreshing"> & {
+    error?: string | null;
+    refreshing?: boolean;
+  };
 
 export function QueueDepthDialogView({
   svc,
@@ -679,13 +691,16 @@ export function QueueDepthDialogView({
   result,
   loading,
   onRefresh,
+  error,
+  refreshing = false,
 }: QueueDepthDialogViewProps) {
   const t = useTranslations("apps.settings.managedServicesSummary.depthDialog");
+  const summary = useTranslations("apps.settings.managedServicesSummary");
   const fmt = useFormatters();
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent aria-busy={refreshing}>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <GaugeIcon className="size-4" />
@@ -693,6 +708,7 @@ export function QueueDepthDialogView({
           </AlertDialogTitle>
           <AlertDialogDescription>{t("description")}</AlertDialogDescription>
         </AlertDialogHeader>
+        {error ? <QueryError title={summary("loadFailed")} error={error} /> : null}
         {loading ? (
           <Skeleton className="h-20 w-full" />
         ) : result ? (
@@ -715,16 +731,18 @@ export function QueueDepthDialogView({
                 : t("noSnapshot")}
             </p>
           </div>
-        ) : (
-          <p className="text-muted-foreground text-xs">{t("loading")}</p>
+        ) : error ? null : (
+          <p className="text-muted-foreground text-xs">{t("noSnapshot")}</p>
         )}
         <AlertDialogFooter>
-          <AlertDialogAction asChild onClick={onRefresh}>
-            <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing || loading}>
+            {refreshing ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
               <RefreshCwIcon className="size-3.5" />
-              {t("refresh")}
-            </Button>
-          </AlertDialogAction>
+            )}
+            {t("refresh")}
+          </Button>
           <AlertDialogCancel>{t("close")}</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
