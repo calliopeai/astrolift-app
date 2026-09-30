@@ -24,9 +24,12 @@ const id = "11111111-1111-4111-8111-111111111111";
 const sharedModelId = "22222222-2222-4222-8222-222222222222";
 const sharedClusterId = "33333333-3333-4333-8333-333333333333";
 const sharedProviderId = "44444444-4444-4444-8444-444444444444";
+const createdModelId = "77777777-7777-4777-8777-777777777777";
 const observedAt = "2026-09-30T15:30:00Z";
 const object = (extra = {}) => ({ ...extra });
 const observations = { errors: [], mutations: 0, promptInvocations: [] };
+const modelWriteRequests = [];
+let acceptedModel = null;
 const sharedResources = {
   cpuRequest: "2",
   memoryRequest: "8Gi",
@@ -95,7 +98,12 @@ function value(type, field, args, role) {
       page: args.page,
       pageSize: args.pageSize,
     });
-  if (field === "clusterModelDeployment") return args.id === sharedModelId ? sharedModel : null;
+  if (field === "clusterModelDeployment")
+    return args.id === sharedModelId
+      ? sharedModel
+      : args.id === acceptedModel?.id
+        ? acceptedModel
+        : null;
   if (field === "clusterModelSubscriptionsPage" || field === "clusterModelSubscriptionTargetsPage")
     return object({
       items: [],
@@ -145,15 +153,17 @@ function value(type, field, args, role) {
       retryAfterSeconds: null,
       model: args.repoId === hubModel.repoId ? hubModel : null,
     });
-  if (field === "astroliftSharedModelPromptReadiness")
+  if (field === "astroliftSharedModelPromptReadiness") {
+    const ready = role === "owner" && args.id === sharedModelId && args.expectedVersion === 5;
     return object({
-      state: role === "owner" ? "READY" : "UNAVAILABLE",
-      eligible: role === "owner",
+      state: ready ? "READY" : "INACTIVE",
+      eligible: ready,
       maxPromptChars: 4000,
       maxOutputTokens: 128,
       promptsPerMinute: 6,
       maxWaitSeconds: 40,
     });
+  }
   if (field === "astroliftModelDeploymentMetrics")
     return object({
       serviceId: args.serviceId,
@@ -350,6 +360,8 @@ createServer(async (req, res) => {
     observations.errors.length = 0;
     observations.mutations = 0;
     observations.promptInvocations.length = 0;
+    modelWriteRequests.length = 0;
+    acceptedModel = null;
     res.statusCode = 204;
     res.end();
     return;
@@ -357,6 +369,11 @@ createServer(async (req, res) => {
   if (req.url === "/observations") {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(observations));
+    return;
+  }
+  if (req.url === "/observations/model-writes") {
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(modelWriteRequests));
     return;
   }
   let body = "";
@@ -372,6 +389,46 @@ createServer(async (req, res) => {
       rootValue: {},
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
+          if (
+            info.fieldName === "provisionClusterModel" &&
+            role === "owner" &&
+            args.input.organizationId === id &&
+            args.input.clusterId === sharedClusterId &&
+            args.input.expectedProviderId === sharedProviderId &&
+            args.input.modelRepo === hubModel.repoId &&
+            args.input.revisionSha === hubModel.revisionSha &&
+            args.input.computeMode === "cpu" &&
+            args.input.gpuCount === 0 &&
+            args.input.name === "Controlled newly created CPU model" &&
+            modelWriteRequests.length === 0
+          ) {
+            const input = args.input;
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            acceptedModel = {
+              ...sharedModel,
+              id: createdModelId,
+              version: 3,
+              name: input.name,
+              subscriptionsEnabled: input.allowSubscriptions,
+              status: "updating",
+              ready: false,
+              readinessObservedAt: null,
+              readinessGeneration: null,
+              desiredSubscriptionRevision: 0,
+              appliedSubscriptionRevision: 0,
+              operationId: "controlled-accepted-create",
+              operationCompletedAt: null,
+              appliedResources: null,
+              desiredResources: {
+                cpuRequest: input.cpuRequest,
+                memoryRequest: input.memoryRequest,
+                gpuCount: input.gpuCount,
+                cpuKvCacheGiB: input.cpuKvCacheGiB ?? null,
+                replicas: 1,
+              },
+            };
+            return object({ ok: true, errors: [], data: acceptedModel });
+          }
           if (
             info.fieldName === "testSharedModelEndpoint" &&
             role === "owner" &&
