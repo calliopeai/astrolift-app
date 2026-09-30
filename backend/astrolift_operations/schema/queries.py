@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import strawberry
 from django.db.models import Count, Prefetch, Q
@@ -69,6 +69,7 @@ from astrolift_operations.schema.types import (
     zentinelle_connection_to_type,
 )
 from astrolift_operations.scopes import org_scope, provider_read_operation, webhook_scope
+from astrolift_operations.topology_traffic import TopologyTraffic, query_topology_traffic, topology_operations
 from astrolift_operations.visibility import rules_for_app, visible_events, visible_rules, visible_webhooks
 from astrolift_registry.scopes import app_scope_by_slug, live_app_owners
 from core.decorators import tenant_scoped
@@ -308,6 +309,23 @@ def _alert_events_qs(
 
 @strawberry.type
 class OperationsQuery:
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ_METRICS,
+        scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ_METRICS),
+        operation=topology_operations,
+    )
+    @tenant_scoped()
+    def astrolift_topology_traffic(
+        self,
+        info: Info,
+        app_slug: str,
+        start: datetime,
+        end: datetime,
+        environment_name: str | None = None,
+    ) -> TopologyTraffic | None:
+        return query_topology_traffic(app_slug, start, end, environment_name)
+
     # GUID is a runtime Strawberry scalar; mypy cannot use it as a static type.
     @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)

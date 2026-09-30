@@ -8,6 +8,12 @@
   owner enforcement remains a separate release after migration; existing refs
   continue to resolve. See [the maintenance sequence](docs/operators/agent-secret-owners.md).
 
+- Topology traffic exposes measured Istio request/error rates per directed
+  intra-app edge over a bounded window (#2177). Actual app ownership, bearer
+  ceilings and environment policies apply before HTTP or cache reads. Empty,
+  unavailable and unconfigured sources remain explicit; no synthetic rates
+  fill gaps. See [topology traffic](docs/operators/topology-traffic.md).
+
 - Dashboard polling and refreshes keep the active filtered page current (#2143).
   The app header owns the shared deploy poll across tabs; task and security
   reads filter before limits. App alert counts cover every visible firing and

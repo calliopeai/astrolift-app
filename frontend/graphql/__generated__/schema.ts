@@ -9339,6 +9339,7 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage. */
   astroliftTeams: Array<AstroliftTeam>;
   astroliftTeamsPage: AstroliftTeamPage;
+  astroliftTopologyTraffic?: Maybe<TopologyTraffic>;
   astroliftTraceSpans: Array<AstroliftTraceSpan>;
   /** @deprecated Caps at 100 attempts with no way to reach the 101st. Use astroliftWebhookDeliveriesPage. */
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
@@ -10770,6 +10771,14 @@ export type QueryAstroliftTeamsPageArgs = {
 };
 
 
+export type QueryAstroliftTopologyTrafficArgs = {
+  appSlug: Scalars['String']['input'];
+  end: Scalars['DateTime']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  start: Scalars['DateTime']['input'];
+};
+
+
 export type QueryAstroliftTraceSpansArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -11805,6 +11814,54 @@ export type ToolDefInput = {
   outputSchema: Scalars['JSON']['input'];
   slug: Scalars['String']['input'];
 };
+
+export type TopologyEnvironmentTraffic = {
+  edges: Array<TopologyTrafficEdge>;
+  environmentId: Scalars['ID']['output'];
+  environmentName: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  status: TopologyTrafficStatus;
+  truncated: Scalars['Boolean']['output'];
+};
+
+export type TopologyTraffic = {
+  appSlug: Scalars['String']['output'];
+  edgeLimit: Scalars['Int']['output'];
+  end: Scalars['DateTime']['output'];
+  environmentLimit: Scalars['Int']['output'];
+  environments: Array<TopologyEnvironmentTraffic>;
+  sampleLimit: Scalars['Int']['output'];
+  source: Scalars['String']['output'];
+  start: Scalars['DateTime']['output'];
+  status: TopologyTrafficStatus;
+  stepSeconds: Scalars['Int']['output'];
+  truncated: Scalars['Boolean']['output'];
+};
+
+export type TopologyTrafficEdge = {
+  destinationWorkloadId: Scalars['ID']['output'];
+  destinationWorkloadName: Scalars['String']['output'];
+  errorRate: Scalars['Float']['output'];
+  errorRatio: Scalars['Float']['output'];
+  requestRate: Scalars['Float']['output'];
+  samples: Array<TopologyTrafficSample>;
+  sourceWorkloadId: Scalars['ID']['output'];
+  sourceWorkloadName: Scalars['String']['output'];
+};
+
+export type TopologyTrafficSample = {
+  errorRate: Scalars['Float']['output'];
+  requestRate: Scalars['Float']['output'];
+  timestamp: Scalars['DateTime']['output'];
+};
+
+export type TopologyTrafficStatus =
+  | 'AVAILABLE'
+  | 'NO_DATA'
+  | 'PARTIAL'
+  | 'UNAVAILABLE'
+  | 'UNCONFIGURED';
 
 export type TransferAppInput = {
   appId: Scalars['GUID']['input'];

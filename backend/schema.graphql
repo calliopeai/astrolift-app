@@ -7736,6 +7736,7 @@ type Query {
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
+  astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
   astroliftEvent(id: GUID!): AstroliftEvent
   astroliftAlertRule(id: GUID!): AstroliftAlertRule
   astroliftAlertEvent(id: GUID!): AstroliftAlertEvent
@@ -8638,6 +8639,55 @@ input ToolDefInput {
   outputSchema: JSON!
   handlerRef: String!
   implementationConfig: JSON = null
+}
+
+type TopologyEnvironmentTraffic {
+  environmentId: ID!
+  environmentName: String!
+  namespace: String!
+  status: TopologyTrafficStatus!
+  reason: String
+  edges: [TopologyTrafficEdge!]!
+  truncated: Boolean!
+}
+
+type TopologyTraffic {
+  appSlug: String!
+  start: DateTime!
+  end: DateTime!
+  stepSeconds: Int!
+  status: TopologyTrafficStatus!
+  environments: [TopologyEnvironmentTraffic!]!
+  edgeLimit: Int!
+  sampleLimit: Int!
+  environmentLimit: Int!
+  source: String!
+  truncated: Boolean!
+}
+
+type TopologyTrafficEdge {
+  sourceWorkloadId: ID!
+  sourceWorkloadName: String!
+  destinationWorkloadId: ID!
+  destinationWorkloadName: String!
+  requestRate: Float!
+  errorRate: Float!
+  errorRatio: Float!
+  samples: [TopologyTrafficSample!]!
+}
+
+type TopologyTrafficSample {
+  timestamp: DateTime!
+  requestRate: Float!
+  errorRate: Float!
+}
+
+enum TopologyTrafficStatus {
+  AVAILABLE
+  NO_DATA
+  UNCONFIGURED
+  UNAVAILABLE
+  PARTIAL
 }
 
 input TransferAppInput {
