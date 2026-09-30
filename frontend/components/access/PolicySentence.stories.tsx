@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
+import es from "@/messages/es.json";
 import * as React from "react";
 
 import { AFTER_HOURS, EVERY_KIND, INVALID_POLICY, LONG_POLICY, SECRETS_OFFICE } from "./fixtures";
@@ -79,4 +82,25 @@ export const Width768: Story = {
     ),
   ],
   render: () => <Editor start={EVERY_KIND} />,
+};
+
+export const JapaneseEveryKind: Story = {
+  args: { policy: EVERY_KIND },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+export const SpanishEditor: Story = {
+  render: () => <Editor start={EVERY_KIND} />,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="es" messages={es}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

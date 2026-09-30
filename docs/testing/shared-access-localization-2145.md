@@ -70,5 +70,27 @@ metadata and ICU count contracts. The affected policy-guidance run passes 133
 tests with all policy/grant story states, pure access/policy/grant tests and
 form/accessibility regressions. TypeScript, ESLint and formatting pass.
 
-Policy sentence and grant-flow prose remain separate follow-up leaves; this
-document does not claim their completion or close the platform-wide #2145 issue.
+The policy-editor leaf translates `PolicySentence` and its controls under
+`shared.access.policy`. Rich sentences allow locale-specific order while retaining
+DENY-unless and ALLOW-only-when direction. Catalog actions, globs, scope values,
+actor groups/roles, time ranges/zones, network ranges and factors remain literal.
+Weekdays and list separators are formatted for display; canonical weekday IDs and
+condition values remain unchanged. Future weekday/condition IDs are shown
+literally rather than replaced with inferred metadata.
+
+The original pure policy model’s parse/serialize/validation/English sentence APIs
+are untouched. `policy-copy.ts` maps only known client condition-validation
+messages at the presentation boundary; future diagnostics pass through. JSON
+shape refusal is localized, keeps the draft open and sends no change. Opaque
+native parser diagnostics remain original. Unknown condition JSON is kept and
+serialized verbatim.
+
+Its 41 new all-eight-locale tests cover effect direction, every condition kind,
+raw future IDs, exact edited/serialized payloads, weekday/factor IDs, all known
+client validation messages, JSON refusal and retry, native parser diagnostics and
+ICU/rich-tag contracts. The affected policy-editor run passes 196 tests including
+all policy/grant stories and the actual policy-editor screen stories. TypeScript,
+ESLint and formatting pass.
+
+Grant-flow prose remains a separate follow-up leaf; this document does not claim
+its completion or close the platform-wide #2145 issue.
