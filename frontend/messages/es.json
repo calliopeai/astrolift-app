@@ -3928,7 +3928,17 @@
       },
       "remove": "Quitar {kind} {name}",
       "viaRich": "a través de {kind} <identifier>{name}</identifier>",
-      "inheritedRich": "heredado de {kind} <identifier>{name}</identifier>"
+      "inheritedRich": "heredado de {kind} <identifier>{name}</identifier>",
+      "picker": {
+        "placeholder": "Buscar personas por nombre o correo electrónico",
+        "change": "Cambiar",
+        "changeField": "Cambiar {field}",
+        "searchField": "{field}: {placeholder}",
+        "searchFailed": "La búsqueda falló: {message}",
+        "none": "Nadie coincide con «{query}».",
+        "type": "Escribe para buscar.",
+        "pick": "Seleccionar {name}"
+      }
     }
   },
   "agentSecrets": {

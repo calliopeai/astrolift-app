@@ -3925,7 +3925,17 @@
       },
       "remove": "移除{kind} {name}",
       "viaRich": "通过{kind} <identifier>{name}</identifier>",
-      "inheritedRich": "继承自{kind} <identifier>{name}</identifier>"
+      "inheritedRich": "继承自{kind} <identifier>{name}</identifier>",
+      "picker": {
+        "placeholder": "按姓名或邮箱搜索用户",
+        "change": "更改",
+        "changeField": "更改{field}",
+        "searchField": "{field}：{placeholder}",
+        "searchFailed": "搜索失败：{message}",
+        "none": "没有与“{query}”匹配的用户。",
+        "type": "输入搜索内容。",
+        "pick": "选择{name}"
+      }
     }
   },
   "agentSecrets": {

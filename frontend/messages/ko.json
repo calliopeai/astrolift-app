@@ -3925,7 +3925,17 @@
       },
       "remove": "{kind} {name} 제거",
       "viaRich": "{kind} <identifier>{name}</identifier>을(를) 통해",
-      "inheritedRich": "{kind} <identifier>{name}</identifier>에서 상속"
+      "inheritedRich": "{kind} <identifier>{name}</identifier>에서 상속",
+      "picker": {
+        "placeholder": "이름 또는 이메일로 사용자 검색",
+        "change": "변경",
+        "changeField": "{field} 변경",
+        "searchField": "{field}: {placeholder}",
+        "searchFailed": "검색 실패: {message}",
+        "none": "\"{query}\"와(과) 일치하는 사용자가 없습니다.",
+        "type": "검색어를 입력하세요.",
+        "pick": "{name} 선택"
+      }
     }
   },
   "agentSecrets": {

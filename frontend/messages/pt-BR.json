@@ -3925,7 +3925,17 @@
       },
       "remove": "Remover {kind} {name}",
       "viaRich": "via {kind} <identifier>{name}</identifier>",
-      "inheritedRich": "herdado de {kind} <identifier>{name}</identifier>"
+      "inheritedRich": "herdado de {kind} <identifier>{name}</identifier>",
+      "picker": {
+        "placeholder": "Buscar pessoas por nome ou e-mail",
+        "change": "Alterar",
+        "changeField": "Alterar {field}",
+        "searchField": "{field}: {placeholder}",
+        "searchFailed": "Falha na busca: {message}",
+        "none": "Nenhuma pessoa corresponde a \"{query}\".",
+        "type": "Digite para buscar.",
+        "pick": "Selecionar {name}"
+      }
     }
   },
   "agentSecrets": {

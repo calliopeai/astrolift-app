@@ -4005,7 +4005,17 @@
       },
       "remove": "Remove {kind} {name}",
       "viaRich": "via {kind} <identifier>{name}</identifier>",
-      "inheritedRich": "inherited from {kind} <identifier>{name}</identifier>"
+      "inheritedRich": "inherited from {kind} <identifier>{name}</identifier>",
+      "picker": {
+        "placeholder": "Search people by name or email",
+        "change": "Change",
+        "changeField": "Change {field}",
+        "searchField": "{field}: {placeholder}",
+        "searchFailed": "Search failed: {message}",
+        "none": "No one matches \"{query}\".",
+        "type": "Type to search.",
+        "pick": "Pick {name}"
+      }
     }
   },
   "agentSecrets": {

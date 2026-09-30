@@ -3925,7 +3925,17 @@
       },
       "remove": "{kind} {name} を削除",
       "viaRich": "{kind} <identifier>{name}</identifier> 経由",
-      "inheritedRich": "{kind} <identifier>{name}</identifier> から継承"
+      "inheritedRich": "{kind} <identifier>{name}</identifier> から継承",
+      "picker": {
+        "placeholder": "名前またはメールアドレスでユーザーを検索",
+        "change": "変更",
+        "changeField": "{field} を変更",
+        "searchField": "{field}：{placeholder}",
+        "searchFailed": "検索に失敗しました：{message}",
+        "none": "「{query}」に一致するユーザーはいません。",
+        "type": "入力して検索してください。",
+        "pick": "{name} を選択"
+      }
     }
   },
   "agentSecrets": {
