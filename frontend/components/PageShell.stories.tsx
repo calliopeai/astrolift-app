@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import Link from "next/link";
 import { AppChromeProvider } from "@/app/(app)/apps/[slug]/components/app-chrome-context";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +17,26 @@ export const Default: StoryObj = {
       actions={<Button size="sm">+ Run agent</Button>}
     >
       <p className="text-sm">Page content.</p>
+    </PageShell>
+  ),
+};
+
+/** Project headers put real breadcrumb navigation in the description slot. */
+export const BreadcrumbDescription: StoryObj = {
+  render: () => (
+    <PageShell
+      title="Project"
+      description={
+        <nav aria-label="Project breadcrumb">
+          <ol>
+            <li>
+              <Link href="/projects">Projects</Link>
+            </li>
+          </ol>
+        </nav>
+      }
+    >
+      <p>Project workloads.</p>
     </PageShell>
   ),
 };

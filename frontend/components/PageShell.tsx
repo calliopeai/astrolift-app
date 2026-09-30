@@ -33,6 +33,7 @@ function saveOpen(storageKey: string | undefined, open: boolean) {
 
 interface PageShellProps {
   title: React.ReactNode;
+  /** Supporting text or flow content such as breadcrumb navigation. */
   description?: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
@@ -105,9 +106,9 @@ export function PageShell({
               {title}
             </h1>
             {description && (
-              <p className="text-muted-foreground mt-1 max-w-2xl text-sm [overflow-wrap:anywhere]">
+              <div className="text-muted-foreground mt-1 max-w-2xl text-sm [overflow-wrap:anywhere]">
                 {description}
-              </p>
+              </div>
             )}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -181,7 +182,7 @@ function CollapsibleHeaderShell({
           {hasFoldable && (
             <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               {description && (
-                <p className="text-muted-foreground max-w-2xl text-sm">{description}</p>
+                <div className="text-muted-foreground max-w-2xl text-sm">{description}</div>
               )}
               {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
             </div>
