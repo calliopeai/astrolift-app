@@ -2,6 +2,8 @@
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import type {
   ListRolesICanGrantQuery,
@@ -49,7 +51,10 @@ export interface SearchedPrincipal {
 }
 
 /** A searched user, group or team as a pick; anything else (an invitation) is not one. */
-export function principalOfSearch(p: SearchedPrincipal): Principal | null {
+export function principalOfSearch(
+  p: SearchedPrincipal,
+  groupDetail?: (count: number) => string
+): Principal | null {
   if (p.kind === "USER" && p.userId) {
     return { kind: "user", id: p.userId, name: p.name, detail: p.secondary || undefined };
   }
@@ -59,7 +64,7 @@ export function principalOfSearch(p: SearchedPrincipal): Principal | null {
       kind: "group",
       id: p.groupExternalId,
       name: p.name,
-      detail: `IdP group · ${n} ${n === 1 ? "member" : "members"}`,
+      detail: groupDetail ? groupDetail(n) : `IdP group · ${n} ${n === 1 ? "member" : "members"}`,
     };
   }
   if (p.kind === "TEAM" && p.teamId) {
@@ -124,7 +129,10 @@ export function sourceOfPreview(via: PreviewSource | undefined): GrantSourceInfo
 }
 
 /** The server's preview as the flow's review. */
-export function previewOf(p: PreviewResp["astroliftGrantPreview"]): GrantPreview {
+export function previewOf(
+  p: PreviewResp["astroliftGrantPreview"],
+  refusal = "You cannot grant this role here."
+): GrantPreview {
   const person = (u: PreviewPerson["user"]): Principal => ({
     kind: "user",
     id: u.id,
@@ -140,7 +148,7 @@ export function previewOf(p: PreviewResp["astroliftGrantPreview"]): GrantPreview
     gainingCount: p.gainingCount,
     alreadyCount: p.unchangedCount,
     groups: p.groups,
-    refusal: p.allowed ? null : (p.refusal ?? "You cannot grant this role here."),
+    refusal: p.allowed ? null : p.refusal || refusal,
     notes: p.notes,
   };
 }
@@ -159,6 +167,8 @@ export function previewOf(p: PreviewResp["astroliftGrantPreview"]): GrantPreview
  *   time of the grant, each with the picked expiry.
  */
 export function useGrantAccess() {
+  const t = useTranslations("shared.access.grant");
+  const accessT = useTranslations("shared.access");
   const client = useApolloClient();
   const [query, setQuery] = React.useState("");
   const term = useDebounce(query.trim(), 250);
@@ -186,7 +196,7 @@ export function useGrantAccess() {
 
   const results: Principal[] = term
     ? (search.data?.astroliftPrincipalSearch.items ?? [])
-        .map(principalOfSearch)
+        .map((p) => principalOfSearch(p, (count) => t("groupDetail", { count })))
         .filter((p): p is Principal => p !== null)
     : [];
 
@@ -237,9 +247,9 @@ export function useGrantAccess() {
       fetchPolicy: "network-only",
     });
     const p = data?.astroliftGrantPreview;
-    if (!p) throw new Error("Could not preview the grant");
-    if (!p.ok) throw new Error(p.errors.join(" ") || "Could not preview the grant");
-    return previewOf(p);
+    if (!p) throw new Error(t("previewFailed"));
+    if (!p.ok) throw new Error(p.errors.join(" ") || t("previewFailed"));
+    return previewOf(p, t("cannotGrant"));
   }
 
   async function onSubmit(draft: GrantDraft): Promise<GrantOutcome[]> {
@@ -249,7 +259,11 @@ export function useGrantAccess() {
     const outcomes: GrantOutcome[] = [];
     for (const principal of holders) {
       if (principal.kind !== "user" && principal.kind !== "group") {
-        outcomes.push({ principal, ok: false, error: `A ${principal.kind} cannot hold a role.` });
+        outcomes.push({
+          principal,
+          ok: false,
+          error: t("cannotHold", { kind: accessT(`principal.${principal.kind}`) }),
+        });
         continue;
       }
       try {
@@ -270,20 +284,25 @@ export function useGrantAccess() {
         outcomes.push(
           r?.ok
             ? { principal, ok: true }
-            : { principal, ok: false, error: r?.errors?.[0]?.message ?? "The grant failed" }
+            : { principal, ok: false, error: r?.errors?.[0]?.message || t("grantFailed") }
         );
       } catch (err) {
         outcomes.push({
           principal,
           ok: false,
-          error: err instanceof Error ? err.message : "The grant failed",
+          error: err instanceof Error ? err.message : t("grantFailed"),
         });
       }
     }
     if (outcomes.some((o) => o.ok)) {
-      await client.refetchQueries({
-        include: [LIST_ROLE_BINDINGS, LIST_ROLE_BINDINGS_PAGE, LIST_MEMBERS, "AccessOn"],
-      });
+      try {
+        await client.refetchQueries({
+          include: [LIST_ROLE_BINDINGS, LIST_ROLE_BINDINGS_PAGE, LIST_MEMBERS, "AccessOn"],
+        });
+      } catch {
+        // The writes already succeeded. A stale list is not a failed grant.
+        toast.warning(t("refreshFailed"));
+      }
     }
     return outcomes;
   }

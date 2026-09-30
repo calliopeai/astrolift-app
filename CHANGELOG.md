@@ -38,6 +38,12 @@
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
 
+- Grant access uses genuine copy in all eight locales for selection, expiry,
+  review, exact preview counts, partial outcomes and retry feedback. Selected
+  identities, permissions, server diagnostics and expiry payloads remain intact.
+  A failed access-list refresh warns after successful writes without repeating
+  those grants; failed or empty previews/results cannot report success (#2145).
+
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
 - Model prompt relay admission, dispatch and result transitions atomically retain

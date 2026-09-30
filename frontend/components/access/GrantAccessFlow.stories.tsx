@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { NextIntlClientProvider, useTranslations } from "next-intl";
 import { expect, userEvent, within } from "storybook/test";
+import fr from "@/messages/fr.json";
 
 import type { Principal } from "./access-model";
 import {
@@ -48,11 +50,16 @@ function useFakeSearch(pool: Principal[] = PRINCIPALS) {
 }
 
 function Flow(props: Partial<GrantAccessFlowProps> & { pool?: Principal[] }) {
+  const t = useTranslations("shared.access.grant");
   const { pool, ...rest } = props;
   const search = useFakeSearch(pool);
   return (
     <GrantAccessFlow
-      crumbs={CRUMBS}
+      crumbs={[
+        { label: t("admin"), href: "/administration" },
+        { label: t("access"), href: "/administration/access" },
+        { label: t("title") },
+      ]}
       search={search}
       roles={ROLES}
       scopeTree={{ roots: SCOPE_TREE }}
@@ -277,4 +284,56 @@ export const Width768: Story = {
       <Flow initialDraft={READY} initialStep={4} initialPreview={PREVIEW} />
     </div>
   ),
+};
+
+/** Real translated review, with a literal server refusal. */
+export const FrenchRefusedWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <div style={{ width: 768 }} className="overflow-hidden border">
+        <Flow
+          initialDraft={READY}
+          initialStep={4}
+          initialPreview={{ ...PREVIEW, refusal: "SERVER_DENIAL: app.deploy" }}
+        />
+      </div>
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await expect(c.getByRole("alert")).toHaveTextContent("SERVER_DENIAL: app.deploy");
+    await expect(c.getByRole("button", { name: "Accorder à 2" })).toBeDisabled();
+  },
+};
+
+/** A handled refusal stays on review; keyboard retry sends only the failed holder. */
+export const RetryRefusal: Story = {
+  render: () => (
+    <Flow
+      initialDraft={READY}
+      initialStep={4}
+      initialPreview={PREVIEW}
+      initialOutcomes={[
+        { principal: DANA, ok: true },
+        { principal: SAM, ok: false, error: "SERVER_DENIAL: app.deploy" },
+      ]}
+      onSubmit={(draft) =>
+        Promise.resolve(
+          draft.principals.map((principal) => ({
+            principal,
+            ok: false,
+            error: "SERVER_DENIAL: app.deploy",
+          }))
+        )
+      }
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    const retry = c.getByRole("button", { name: "Retry 1" });
+    retry.focus();
+    await userEvent.keyboard("{Enter}");
+    await expect(c.getByRole("heading", { name: "Review" })).toBeInTheDocument();
+    await expect(c.getByText("SERVER_DENIAL: app.deploy")).toBeInTheDocument();
+  },
 };
