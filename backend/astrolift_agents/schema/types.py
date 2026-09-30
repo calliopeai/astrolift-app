@@ -17,6 +17,28 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="AstroliftAgentTaskLogLine")
+class AgentTaskLogLineType:
+    id: str
+    timestamp: dt.datetime | None
+    level: str | None
+    stream: str
+    message: str
+    pod_name: str
+    container: str
+
+
+@strawberry.type(name="AstroliftAgentTaskLogPage")
+class AgentTaskLogPageType:
+    items: list[AgentTaskLogLineType]
+    next_cursor: str | None
+    has_more: bool
+    page_size: int
+    live_only: bool
+    window_limited: bool
+    expires_at: dt.datetime | None
+
+
 @strawberry.enum
 class AgentRunFamily(enum.Enum):
     """The agent's native Job-vs-Deployment split (spec 33).

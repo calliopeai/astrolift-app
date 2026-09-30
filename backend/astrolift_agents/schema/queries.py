@@ -59,6 +59,7 @@ from astrolift_agents.schema.types import (
     AgentSecretStatusType,
     AgentTaskEventType,
     AgentTaskInputMessageType,
+    AgentTaskLogPageType,
     AgentTaskPageType,
     AgentTasksFilterInput,
     AgentTaskType,
@@ -1382,6 +1383,23 @@ class AgentsQuery:
             )
             for row in rows
         ]
+
+    @strawberry.field
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_task_scope("id"), operation=agent_task_operation("id")
+    )
+    @tenant_scoped()
+    def agent_task_logs_page(
+        self, info: Info, id: strawberry.ID, cursor: str | None = None, limit: int = 100
+    ) -> AgentTaskLogPageType:
+        """Newest pod-log page; its cursor reads earlier lines in a temporary snapshot."""
+        from astrolift_agents.task_log_pages import empty_log_page, task_log_page
+
+        tenant = get_current_tenant()
+        guid = _valid_guid(id)
+        if tenant is None or tenant.organization_id is None or guid is None:
+            return empty_log_page(max(1, min(limit, 200)))
+        return task_log_page(tenant.organization_id, guid, cursor=cursor, limit=limit)
 
     @strawberry.field
     @require_permission(

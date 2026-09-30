@@ -664,6 +664,26 @@ type AstroliftAgentTaskInputReplyMutationResult {
   data: AstroliftAgentTaskInputReply
 }
 
+type AstroliftAgentTaskLogLine {
+  id: String!
+  timestamp: DateTime
+  level: String
+  stream: String!
+  message: String!
+  podName: String!
+  container: String!
+}
+
+type AstroliftAgentTaskLogPage {
+  items: [AstroliftAgentTaskLogLine!]!
+  nextCursor: String
+  hasMore: Boolean!
+  pageSize: Int!
+  liveOnly: Boolean!
+  windowLimited: Boolean!
+  expiresAt: DateTime
+}
+
 type AstroliftAgentTaskMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
@@ -7827,6 +7847,7 @@ type Query {
   agentTaskByClientRequestId(orgId: ID!, clientRequestId: String!): AstroliftAgentTask
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
+  agentTaskLogsPage(id: ID!, cursor: String = null, limit: Int! = 100): AstroliftAgentTaskLogPage!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!
   agentBoxes(orgId: ID!, includeEnded: Boolean! = false): [AstroliftAgentBox!]!

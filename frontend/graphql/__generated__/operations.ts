@@ -662,6 +662,26 @@ export type AstroliftAgentTaskInputReplyMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentTaskLogLine = {
+  container: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  level?: Maybe<Scalars['String']['output']>;
+  message: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  stream: Scalars['String']['output'];
+  timestamp?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftAgentTaskLogPage = {
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftAgentTaskLogLine>;
+  liveOnly: Scalars['Boolean']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  pageSize: Scalars['Int']['output'];
+  windowLimited: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentTaskMutationResult = {
   data?: Maybe<AstroliftAgentTask>;
   errors: Array<MutationError>;
@@ -8990,6 +9010,7 @@ export type Query = {
   agentTaskInputMessage?: Maybe<AstroliftAgentTaskInputMessage>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
   agentTaskLogs: Array<Scalars['String']['output']>;
+  agentTaskLogsPage: AstroliftAgentTaskLogPage;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
   agentTasks: Array<AstroliftAgentTask>;
   agentTasksPage: AstroliftAgentTaskPage;
@@ -9444,6 +9465,13 @@ export type QueryAgentTaskInteractionsArgs = {
 export type QueryAgentTaskLogsArgs = {
   id: Scalars['ID']['input'];
   tail?: Scalars['Int']['input'];
+};
+
+
+export type QueryAgentTaskLogsPageArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
+  limit?: Scalars['Int']['input'];
 };
 
 

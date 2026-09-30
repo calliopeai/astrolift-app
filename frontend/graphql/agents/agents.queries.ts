@@ -193,6 +193,28 @@ export const AGENT_TASK_LOGS = gql`
   }
 `;
 
+export const AGENT_TASK_LOGS_PAGE = gql`
+  query AgentTaskLogsPage($id: ID!, $cursor: String, $limit: Int) {
+    agentTaskLogsPage(id: $id, cursor: $cursor, limit: $limit) {
+      items {
+        id
+        timestamp
+        level
+        stream
+        message
+        podName
+        container
+      }
+      nextCursor
+      hasMore
+      pageSize
+      liveOnly
+      windowLimited
+      expiresAt
+    }
+  }
+`;
+
 // Org-scoped AgentEnvironmentSpecs — the reusable container-environment recipes
 // (image/runtime/tool-preset/VNC) an agent task can launch into. The Dispatch
 // command center's Advanced section offers these as the `environmentSpecId`

@@ -14,6 +14,13 @@
   Bulk actions authorize every app and affected operation before acting, and
   secret attachment also authorizes its source bundle. Audit trails, retention,
   notification settings and Zentinelle management require organization authority.
+- Agent Observe logs use an additive structured page API with timestamp,
+  level, stream and stable cursors (#2175). Each page checks current task
+  ownership, bearer ceilings and policies; frozen dispatch placement supplies
+  the source. Temporary bounded pod-log snapshots support loading earlier
+  lines and report their live-only limits. The legacy string-list query is
+  unchanged. See [agent task log pages](docs/operators/agent-task-log-pages.md).
+
 - Rollback, redeploy, workload restart and scale accept optional top-level
   `ifMatchVersion` preconditions (#2162). Clients read deployment or workload
   versions from the target row; stale requests return structured version
