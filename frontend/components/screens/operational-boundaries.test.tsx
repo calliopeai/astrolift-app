@@ -213,3 +213,28 @@ it("replaces diagnostic copy timers and clears them on unmount", async () => {
   hook.unmount();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it("does not install a diagnostic timer when clipboard completion arrives after unmount", async () => {
+  vi.useFakeTimers();
+  let finish: () => void = () => {};
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      writeText: () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    },
+  });
+  const hook = renderHook(() => useHelp("1.0"));
+  let copying: Promise<void>;
+  act(() => {
+    copying = hook.result.current.copyDiagnostics();
+  });
+  hook.unmount();
+  await act(async () => {
+    finish();
+    await copying!;
+  });
+  expect(vi.getTimerCount()).toBe(0);
+});
