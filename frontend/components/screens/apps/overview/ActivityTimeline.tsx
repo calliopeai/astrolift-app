@@ -10,6 +10,7 @@ import {
   SettingsIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Panel, type PanelSpan } from "@/components/panel/Panel";
@@ -23,13 +24,13 @@ import type { useActivityTimeline } from "./use-activity-timeline";
 
 // #711 — event-type filter chips. Maps each chip key to a prefix
 // match on `eventType`; chip 'all' bypasses the filter.
-const TYPE_FILTERS: Array<{ key: string; label: string; prefixes: string[] }> = [
-  { key: "all", label: "All", prefixes: [] },
-  { key: "deploy", label: "Deploys", prefixes: ["deployment."] },
-  { key: "config", label: "Config", prefixes: ["manifest.", "config.", "environment.", "app."] },
-  { key: "secret", label: "Secrets", prefixes: ["secret."] },
-  { key: "token", label: "Tokens", prefixes: ["deploy_token.", "app.deploy_token."] },
-  { key: "alert", label: "Alerts", prefixes: ["alert."] },
+const TYPE_FILTERS: Array<{ key: string; prefixes: string[] }> = [
+  { key: "all", prefixes: [] },
+  { key: "deploy", prefixes: ["deployment."] },
+  { key: "config", prefixes: ["manifest.", "config.", "environment.", "app."] },
+  { key: "secret", prefixes: ["secret."] },
+  { key: "token", prefixes: ["deploy_token.", "app.deploy_token."] },
+  { key: "alert", prefixes: ["alert."] },
 ];
 
 export type ActivityTimelineViewProps = Pick<
@@ -66,6 +67,7 @@ export function ActivityTimelineView({
   span = 8,
 }: ActivityTimelineViewProps) {
   const fmt = useFormatters();
+  const t = useTranslations("apps.overview.activity");
   // #711 — local filter state (event type chip + free-text search).
   // Defaults to 'all' and empty so the existing summary view is
   // unchanged for operators who never touch the filters.
@@ -92,15 +94,15 @@ export function ActivityTimelineView({
 
   return (
     <Panel
-      title="Activity"
+      title={t("title")}
       icon={<ActivityIcon className="size-4" />}
       span={span}
       actions={
         events.length > 0 ? (
           <p className="text-muted-foreground text-2xs font-mono">
             {filterActive
-              ? `${events.length} of ${allForApp.length} events`
-              : `${events.length} events`}
+              ? t("filteredCount", { count: events.length, total: allForApp.length })
+              : t("count", { count: events.length })}
           </p>
         ) : undefined
       }
@@ -125,7 +127,7 @@ export function ActivityTimelineView({
                   : "border-border text-muted-foreground hover:bg-accent"
               )}
             >
-              {f.label}
+              {t(`filters.${f.key}`)}
             </button>
           );
         })}
@@ -137,25 +139,28 @@ export function ActivityTimelineView({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
+            placeholder={t("searchPlaceholder")}
             className="h-7 w-40 pl-7 text-xs"
-            aria-label="Search activity"
+            aria-label={t("searchLabel")}
           />
         </div>
       </div>
 
       {filterActive && events.length === 0 && allForApp.length > 0 ? (
         <p className="text-muted-foreground py-1 text-xs italic">
-          No events match{" "}
-          <Badge variant="secondary" className="text-2xs">
-            {activeFilter.label}
-            {needle ? ` · "${needle}"` : ""}
-          </Badge>
-          .
+          {t.rich(needle ? "noMatchesQuery" : "noMatches", {
+            filter: t(`filters.${activeFilter.key}`),
+            query: needle,
+            badge: (chunks) => (
+              <Badge variant="secondary" className="text-2xs">
+                {chunks}
+              </Badge>
+            ),
+          })}
         </p>
       ) : (
         <Feed
-          label="Activity"
+          label={t("title")}
           items={events}
           keyOf={(e) => e.id}
           groupBy={{ day: (e) => e.occurredAt }}
@@ -165,10 +170,10 @@ export function ActivityTimelineView({
           loading={loading}
           error={error}
           onRetry={onRetry}
-          errorTitle="Could not load activity"
+          errorTitle={t("loadError")}
           empty={{
             icon: <ActivityIcon className="size-5" />,
-            title: "No recent events for this app",
+            title: t("emptyTitle"),
           }}
           hasMore={hasMore}
           loadingMore={loadingMore}

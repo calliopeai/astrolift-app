@@ -877,33 +877,33 @@
     "detail": {
       "reprovision": {
         "headline": {
-          "failed": "Le provisionnement a échoué",
-          "pending": "Le provisionnement n'a pas commencé",
+          "failed": "Échec du provisionnement",
+          "pending": "Le provisionnement n’a pas commencé",
           "provisioning": "Provisionnement en cours",
-          "ready_missing_registry": "Coordonnées du registre de conteneurs manquantes",
+          "ready_missing_registry": "Les coordonnées du registre de conteneurs sont manquantes",
           "unknown": "Le provisionnement nécessite votre attention"
         },
         "description": {
-          "failed": "Réessayez pour reconstruire le dépôt de registre et l'espace de noms.",
-          "pending": "Lancez-le pour mettre l'application en ligne.",
-          "provisioning": "Patientez — ne relancez que s'il bloque.",
-          "ready_missing_registry": "Reprovisionnez pour reconstruire le dépôt ECR et le rôle de push ; sinon les déploiements ne font rien.",
-          "unknown": "Reprovisionnez pour récupérer."
+          "failed": "Réessayez pour reconstruire le dépôt du registre et l’espace de noms.",
+          "pending": "Démarrez-le pour mettre l’application en ligne.",
+          "provisioning": "Patientez ; relancez uniquement en cas de blocage.",
+          "ready_missing_registry": "Reprovisionnez pour reconstruire le dépôt du registre de conteneurs et les identifiants de publication. Jusque-là, les déploiements resteront sans effet et sans avertissement.",
+          "unknown": "Reprovisionnez pour rétablir l’application."
         },
-        "elapsed": "démarré il y a {minutes}min",
+        "elapsed": "démarré il y a {minutes} min",
         "cta": "Reprovisionner",
         "confirm": {
           "title": "Reprovisionner {slug} ?",
-          "description": "Annule les déploiements en cours, supprime les objets k8s par workload et relance le workflow CI de déploiement. Les approbations existantes sont rejouées.",
+          "description": "Annule les déploiements en cours, supprime les objets Kubernetes de chaque charge de travail et relance le workflow CI de déploiement. Les approbations existantes sont réexécutées.",
           "confirm": "Oui, reprovisionner"
         },
         "toast": {
-          "dispatched": "Reprovisionnement déclenché — le workflow de déploiement est relancé.",
-          "partial": "Récupération partielle : le nettoyage a réussi mais l'envoi du déploiement a échoué ({message})."
+          "dispatched": "Reprovisionnement lancé : le workflow de déploiement est relancé.",
+          "partial": "Récupération partielle : le nettoyage a été effectué, mais le lancement du déploiement a échoué ({message})."
         },
         "error": {
-          "noResponse": "Reprovisionnement échoué : aucune réponse du backend.",
-          "generic": "Reprovisionnement échoué."
+          "noResponse": "Échec du reprovisionnement : aucune réponse du serveur.",
+          "generic": "Échec du reprovisionnement."
         }
       },
       "configDrift": {
@@ -1857,6 +1857,27 @@
       "unavailable": "Les autorisations ou la version actuelles de la charge sont indisponibles. Actualisez la page.",
       "selectedEnvironmentUnsupported": "Cette action cible l’environnement principal. Elle ne peut pas cibler un environnement sélectionné.",
       "permissionDenied": "Autorisation refusée"
+    },
+    "overview": {
+      "activity": {
+        "title": "Activité",
+        "filteredCount": "{count, plural, one {# événement} other {# événements}} sur {total, number}",
+        "count": "{count, plural, one {# événement} other {# événements}}",
+        "searchPlaceholder": "Rechercher…",
+        "searchLabel": "Rechercher dans l’activité",
+        "loadError": "Impossible de charger l’activité",
+        "emptyTitle": "Aucun événement récent pour cette application",
+        "noMatches": "Aucun événement ne correspond à <badge>{filter}</badge>.",
+        "noMatchesQuery": "Aucun événement ne correspond à <badge>{filter} · « {query} »</badge>.",
+        "filters": {
+          "all": "Tous",
+          "deploy": "Déploiements",
+          "config": "Configuration",
+          "secret": "Secrets",
+          "token": "Jetons",
+          "alert": "Alertes"
+        }
+      }
     }
   },
   "settingsIndex": {

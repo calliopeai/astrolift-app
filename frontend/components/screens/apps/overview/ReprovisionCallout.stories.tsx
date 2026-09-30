@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import french from "@/messages/fr.json";
 import { expect, userEvent, within } from "storybook/test";
 
 import {
@@ -67,5 +69,16 @@ export const LongStrings: Story = {
       appSlug={LONG}
       reprovision={{ ...REPROVISION_FAILED, state: LONG, reason: `${LONG} ${LONG}` }}
     />
+  ),
+};
+
+export const FrenchUnknown: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <ReprovisionCalloutView
+        {...REPROVISION}
+        reprovision={{ ...REPROVISION_FAILED, state: "future_state", reason: "" }}
+      />
+    </NextIntlClientProvider>
   ),
 };

@@ -877,33 +877,33 @@
     "detail": {
       "reprovision": {
         "headline": {
-          "failed": "Provisionamento falhou",
-          "pending": "Provisionamento ainda não iniciou",
+          "failed": "Falha no provisionamento",
+          "pending": "O provisionamento não começou",
           "provisioning": "Provisionamento em andamento",
-          "ready_missing_registry": "Coordenadas do registry de contêiner estão faltando",
+          "ready_missing_registry": "Faltam as coordenadas do registro de contêineres",
           "unknown": "O provisionamento precisa de atenção"
         },
         "description": {
-          "failed": "Tente novamente para reconstruir o repo do registry e o namespace.",
-          "pending": "Inicie para colocar o app online.",
-          "provisioning": "Aguarde — só reexecute se ficar travado.",
-          "ready_missing_registry": "Reprovisione para reconstruir o repo ECR e o papel de push; até então os deploys não fazem nada.",
-          "unknown": "Reprovisione para recuperar."
+          "failed": "Tente novamente para recriar o repositório do registro e o namespace.",
+          "pending": "Inicie para colocar o aplicativo online.",
+          "provisioning": "Aguarde; execute novamente somente se o processo travar.",
+          "ready_missing_registry": "Provisione novamente para recriar o repositório do registro de contêineres e a credencial de envio. Até lá, as implantações não terão efeito nem exibirão avisos.",
+          "unknown": "Provisione novamente para recuperar o aplicativo."
         },
-        "elapsed": "iniciado há {minutes}min",
-        "cta": "Reprovisionar",
+        "elapsed": "iniciado há {minutes} min",
+        "cta": "Provisionar novamente",
         "confirm": {
-          "title": "Reprovisionar {slug}?",
-          "description": "Cancela os deploys em andamento, exclui os objetos k8s por workload e re-dispara o workflow de CI de deploy. As aprovações existentes são reexecutadas.",
-          "confirm": "Sim, reprovisionar"
+          "title": "Provisionar {slug} novamente?",
+          "description": "Cancela as implantações em andamento, exclui os objetos Kubernetes de cada carga de trabalho e executa novamente o workflow CI de implantação. As aprovações existentes são executadas novamente.",
+          "confirm": "Sim, provisionar novamente"
         },
         "toast": {
-          "dispatched": "Reprovisionamento despachado — o workflow de deploy está rodando novamente.",
-          "partial": "Recuperação parcial: a limpeza rodou mas o dispatch do deploy falhou ({message})."
+          "dispatched": "Novo provisionamento iniciado: o workflow de implantação está sendo executado novamente.",
+          "partial": "Recuperação parcial: a limpeza foi realizada, mas o início da implantação falhou ({message})."
         },
         "error": {
-          "noResponse": "Reprovisionamento falhou: sem resposta do backend.",
-          "generic": "Reprovisionamento falhou."
+          "noResponse": "Falha no novo provisionamento: o servidor não respondeu.",
+          "generic": "Falha no novo provisionamento."
         }
       },
       "configDrift": {
@@ -1857,6 +1857,27 @@
       "unavailable": "As permissões ou a versão atuais da carga estão indisponíveis. Atualize a página.",
       "selectedEnvironmentUnsupported": "Esta ação se destina ao ambiente principal. Não pode atingir um ambiente selecionado.",
       "permissionDenied": "Permissão negada"
+    },
+    "overview": {
+      "activity": {
+        "title": "Atividade",
+        "filteredCount": "{count, plural, one {# evento} other {# eventos}} de {total, number}",
+        "count": "{count, plural, one {# evento} other {# eventos}}",
+        "searchPlaceholder": "Pesquisar…",
+        "searchLabel": "Pesquisar atividade",
+        "loadError": "Não foi possível carregar a atividade",
+        "emptyTitle": "Nenhum evento recente para este aplicativo",
+        "noMatches": "Nenhum evento corresponde a <badge>{filter}</badge>.",
+        "noMatchesQuery": "Nenhum evento corresponde a <badge>{filter} · “{query}”</badge>.",
+        "filters": {
+          "all": "Todos",
+          "deploy": "Implantações",
+          "config": "Configuração",
+          "secret": "Segredos",
+          "token": "Tokens",
+          "alert": "Alertas"
+        }
+      }
     }
   },
   "settingsIndex": {

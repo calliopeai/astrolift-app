@@ -9,6 +9,10 @@
 - Scaling feedback passes actual ICU values, and API key/project operation dates
   honor the selected locale and timezone. Project operation states and fallback
   scale errors have translations in all supported locales (#2145).
+- App activity filters, search and count/empty states use all eight locales.
+  Reprovision notices use real translated fallback keys for unknown states;
+  confirmations retain failure-and-retry behavior (#2145).
+
 - Audit feed labels, filters, decision badges, retention and export copy use all
   eight locales. Translated filter labels preserve the original server values;
   counts use locale-aware ICU plurals (#2145).

@@ -878,32 +878,32 @@
       "reprovision": {
         "headline": {
           "failed": "Bereitstellung fehlgeschlagen",
-          "pending": "Bereitstellung hat noch nicht begonnen",
+          "pending": "Bereitstellung noch nicht gestartet",
           "provisioning": "Bereitstellung läuft",
-          "ready_missing_registry": "Container-Registry-Koordinaten fehlen",
+          "ready_missing_registry": "Koordinaten der Containerregistrierung fehlen",
           "unknown": "Bereitstellung erfordert Aufmerksamkeit"
         },
         "description": {
-          "failed": "Erneut versuchen, um Registry und Namespace neu aufzubauen.",
-          "pending": "Starten Sie die Bereitstellung, um die App online zu bringen.",
-          "provisioning": "Bitte warten — nur erneut ausführen, wenn es hängt.",
-          "ready_missing_registry": "Neu bereitstellen, um ECR-Repo und Push-Rolle wiederherzustellen; Deployments laufen sonst still leer.",
-          "unknown": "Neu bereitstellen zur Wiederherstellung."
+          "failed": "Versuche es erneut, um das Registrierungsrepository und den Namensraum neu zu erstellen.",
+          "pending": "Starte die Bereitstellung, um die Anwendung online zu bringen.",
+          "provisioning": "Warte ab; führe den Vorgang nur erneut aus, wenn er hängen bleibt.",
+          "ready_missing_registry": "Stelle die Ressourcen erneut bereit, um das Repository der Containerregistrierung und die Zugangsdaten zum Hochladen neu zu erstellen. Bis dahin bleiben Bereitstellungen ohne Wirkung und ohne Warnung.",
+          "unknown": "Stelle die Ressourcen zur Wiederherstellung erneut bereit."
         },
-        "elapsed": "vor {minutes}m gestartet",
-        "cta": "Neu bereitstellen",
+        "elapsed": "vor {minutes} Min. gestartet",
+        "cta": "Ressourcen erneut bereitstellen",
         "confirm": {
-          "title": "{slug} neu bereitstellen?",
-          "description": "Bricht laufende Deployments ab, löscht die per-Workload-k8s-Objekte und feuert den Deploy-CI-Workflow erneut. Bestehende Freigaben werden neu durchlaufen.",
-          "confirm": "Ja, neu bereitstellen"
+          "title": "Ressourcen für {slug} erneut bereitstellen?",
+          "description": "Bricht laufende Bereitstellungen ab, löscht die Kubernetes-Objekte jeder Arbeitslast und startet den CI-Bereitstellungsworkflow erneut. Bestehende Genehmigungen werden erneut ausgeführt.",
+          "confirm": "Ja, erneut bereitstellen"
         },
         "toast": {
-          "dispatched": "Neubereitstellung gestartet — Deploy-Workflow läuft erneut.",
-          "partial": "Teilweiser Erfolg: Bereinigung lief, aber Deploy-Dispatch schlug fehl ({message})."
+          "dispatched": "Erneute Ressourcenbereitstellung gestartet; der Bereitstellungsworkflow läuft erneut.",
+          "partial": "Teilweise Wiederherstellung: Die Bereinigung wurde durchgeführt, aber der Bereitstellungsstart ist fehlgeschlagen ({message})."
         },
         "error": {
-          "noResponse": "Neubereitstellung fehlgeschlagen: keine Antwort vom Backend.",
-          "generic": "Neubereitstellung fehlgeschlagen."
+          "noResponse": "Erneute Ressourcenbereitstellung fehlgeschlagen: keine Antwort vom Server.",
+          "generic": "Erneute Ressourcenbereitstellung fehlgeschlagen."
         }
       },
       "configDrift": {
@@ -1857,6 +1857,27 @@
       "unavailable": "Aktuelle Workload-Berechtigungen oder Version sind nicht verfügbar. Lade die Seite neu.",
       "selectedEnvironmentUnsupported": "Diese Aktion betrifft die primäre Umgebung. Eine ausgewählte Umgebung kann nicht adressiert werden.",
       "permissionDenied": "Berechtigung verweigert"
+    },
+    "overview": {
+      "activity": {
+        "title": "Aktivität",
+        "filteredCount": "{count, plural, one {# Ereignis} other {# Ereignisse}} von {total, number}",
+        "count": "{count, plural, one {# Ereignis} other {# Ereignisse}}",
+        "searchPlaceholder": "Suchen…",
+        "searchLabel": "Aktivität durchsuchen",
+        "loadError": "Aktivität konnte nicht geladen werden",
+        "emptyTitle": "Keine aktuellen Ereignisse für diese Anwendung",
+        "noMatches": "Keine Ereignisse passen zu <badge>{filter}</badge>.",
+        "noMatchesQuery": "Keine Ereignisse passen zu <badge>{filter} · „{query}“</badge>.",
+        "filters": {
+          "all": "Alle",
+          "deploy": "Bereitstellungen",
+          "config": "Konfiguration",
+          "secret": "Geheimnisse",
+          "token": "Tokens",
+          "alert": "Warnungen"
+        }
+      }
     }
   },
   "settingsIndex": {

@@ -878,32 +878,32 @@
       "reprovision": {
         "headline": {
           "failed": "프로비저닝 실패",
-          "pending": "프로비저닝이 아직 시작되지 않음",
+          "pending": "프로비저닝이 시작되지 않았습니다",
           "provisioning": "프로비저닝 진행 중",
-          "ready_missing_registry": "컨테이너 레지스트리 정보 누락",
-          "unknown": "프로비저닝에 주의가 필요합니다"
+          "ready_missing_registry": "컨테이너 레지스트리 연결 정보가 없습니다",
+          "unknown": "프로비저닝 확인이 필요합니다"
         },
         "description": {
-          "failed": "다시 시도해 레지스트리와 네임스페이스를 다시 구성하세요.",
-          "pending": "앱을 온라인 상태로 만들려면 시작하세요.",
-          "provisioning": "잠시 기다리세요 — 멈춘 경우에만 다시 실행하세요.",
-          "ready_missing_registry": "ECR 레포지토리와 푸시 역할을 재구성하려면 재프로비저닝하세요. 그 전까지는 배포가 동작하지 않습니다.",
-          "unknown": "복구하려면 재프로비저닝하세요."
+          "failed": "다시 시도하여 레지스트리 저장소와 네임스페이스를 다시 만드세요.",
+          "pending": "시작하여 앱을 온라인으로 전환하세요.",
+          "provisioning": "기다려 주세요. 멈춘 경우에만 다시 실행하세요.",
+          "ready_missing_registry": "다시 프로비저닝하여 컨테이너 레지스트리 저장소와 푸시 인증 정보를 다시 만드세요. 그때까지 배포는 실행되지 않으며 경고도 표시되지 않습니다.",
+          "unknown": "다시 프로비저닝하여 복구하세요."
         },
-        "elapsed": "{minutes}분 전 시작",
-        "cta": "재프로비저닝",
+        "elapsed": "{minutes}분 전에 시작",
+        "cta": "다시 프로비저닝",
         "confirm": {
-          "title": "{slug}을(를) 재프로비저닝하시겠습니까?",
-          "description": "진행 중인 배포를 취소하고, 워크로드별 k8s 객체를 삭제한 뒤 배포 CI 워크플로를 다시 실행합니다. 기존 승인은 다시 수행됩니다.",
-          "confirm": "예, 재프로비저닝"
+          "title": "{slug}을 다시 프로비저닝하시겠습니까?",
+          "description": "진행 중인 배포를 취소하고 워크로드별 Kubernetes 객체를 삭제한 후 배포 CI 워크플로를 다시 실행합니다. 기존 승인도 다시 실행됩니다.",
+          "confirm": "예, 다시 프로비저닝"
         },
         "toast": {
-          "dispatched": "재프로비저닝 시작 — 배포 워크플로가 재실행 중입니다.",
-          "partial": "부분 성공: 정리는 완료되었지만 배포 디스패치가 실패했습니다 ({message})."
+          "dispatched": "다시 프로비저닝을 시작했습니다. 배포 워크플로가 다시 실행되고 있습니다.",
+          "partial": "부분 복구: 정리는 완료했지만 배포 시작에 실패했습니다({message})."
         },
         "error": {
-          "noResponse": "재프로비저닝 실패: 백엔드 응답 없음.",
-          "generic": "재프로비저닝 실패."
+          "noResponse": "다시 프로비저닝 실패: 서버 응답이 없습니다.",
+          "generic": "다시 프로비저닝에 실패했습니다."
         }
       },
       "configDrift": {
@@ -1857,6 +1857,27 @@
       "unavailable": "현재 워크로드 권한 또는 버전을 확인할 수 없습니다. 페이지를 새로고침하세요.",
       "selectedEnvironmentUnsupported": "이 작업은 기본 환경을 대상으로 합니다. 선택한 환경을 대상으로 할 수 없습니다.",
       "permissionDenied": "권한이 거부되었습니다"
+    },
+    "overview": {
+      "activity": {
+        "title": "활동",
+        "filteredCount": "이벤트 {total, number}개 중 {count, plural, one {#개} other {#개}}",
+        "count": "{count, plural, one {이벤트 #개} other {이벤트 #개}}",
+        "searchPlaceholder": "검색…",
+        "searchLabel": "활동 검색",
+        "loadError": "활동을 불러오지 못했습니다",
+        "emptyTitle": "이 앱에 최근 이벤트가 없습니다",
+        "noMatches": "<badge>{filter}</badge>에 일치하는 이벤트가 없습니다.",
+        "noMatchesQuery": "<badge>{filter} · “{query}”</badge>에 일치하는 이벤트가 없습니다.",
+        "filters": {
+          "all": "전체",
+          "deploy": "배포",
+          "config": "설정",
+          "secret": "시크릿",
+          "token": "토큰",
+          "alert": "알림"
+        }
+      }
     }
   },
   "settingsIndex": {

@@ -878,31 +878,31 @@
       "reprovision": {
         "headline": {
           "failed": "プロビジョニングに失敗しました",
-          "pending": "プロビジョニングがまだ開始されていません",
+          "pending": "プロビジョニングはまだ開始されていません",
           "provisioning": "プロビジョニング中",
-          "ready_missing_registry": "コンテナレジストリの情報が不足しています",
-          "unknown": "プロビジョニングに注意が必要です"
+          "ready_missing_registry": "コンテナレジストリの接続情報がありません",
+          "unknown": "プロビジョニングの確認が必要です"
         },
         "description": {
-          "failed": "再試行してレジストリと名前空間を再構築します。",
-          "pending": "アプリをオンラインにするには開始してください。",
-          "provisioning": "お待ちください — 停止した場合のみ再実行してください。",
-          "ready_missing_registry": "ECRリポジトリとプッシュロールを再構築するために再プロビジョニングしてください。それまでデプロイは無効です。",
-          "unknown": "復旧するには再プロビジョニングしてください。"
+          "failed": "再試行してレジストリのリポジトリと名前空間を再構築してください。",
+          "pending": "開始するとアプリがオンラインになります。",
+          "provisioning": "しばらくお待ちください。停止した場合のみ再実行してください。",
+          "ready_missing_registry": "再プロビジョニングしてコンテナレジストリのリポジトリとプッシュ用認証情報を再構築してください。それまではデプロイが実行されず、警告も表示されません。",
+          "unknown": "再プロビジョニングして復旧してください。"
         },
         "elapsed": "{minutes}分前に開始",
         "cta": "再プロビジョニング",
         "confirm": {
-          "title": "{slug} を再プロビジョニングしますか？",
-          "description": "進行中のデプロイをキャンセルし、ワークロードごとのk8sオブジェクトを削除し、デプロイCIワークフローを再実行します。既存の承認は再度実行されます。",
-          "confirm": "はい、再プロビジョニング"
+          "title": "{slug}を再プロビジョニングしますか？",
+          "description": "進行中のデプロイを取り消し、各ワークロードのKubernetesオブジェクトを削除し、デプロイ用CIワークフローを再実行します。既存の承認も再実行されます。",
+          "confirm": "はい、再プロビジョニングします"
         },
         "toast": {
-          "dispatched": "再プロビジョニングを開始 — デプロイワークフローを再実行中。",
-          "partial": "部分的に成功: クリーンアップは完了しましたがデプロイのディスパッチに失敗しました ({message})。"
+          "dispatched": "再プロビジョニングを開始しました。デプロイワークフローを再実行しています。",
+          "partial": "一部のみ復旧しました。クリーンアップは完了しましたが、デプロイの開始に失敗しました（{message}）。"
         },
         "error": {
-          "noResponse": "再プロビジョニングに失敗: バックエンドからの応答なし。",
+          "noResponse": "再プロビジョニングに失敗しました。サーバーから応答がありません。",
           "generic": "再プロビジョニングに失敗しました。"
         }
       },
@@ -1857,6 +1857,27 @@
       "unavailable": "現在のワークロードの権限またはバージョンを取得できません。ページを更新してください。",
       "selectedEnvironmentUnsupported": "この操作はプライマリ環境が対象です。選択した環境を対象にすることはできません。",
       "permissionDenied": "権限がありません"
+    },
+    "overview": {
+      "activity": {
+        "title": "アクティビティ",
+        "filteredCount": "{total, number}件中{count, plural, one {#件のイベント} other {#件のイベント}}",
+        "count": "{count, plural, one {#件のイベント} other {#件のイベント}}",
+        "searchPlaceholder": "検索…",
+        "searchLabel": "アクティビティを検索",
+        "loadError": "アクティビティを読み込めませんでした",
+        "emptyTitle": "このアプリの最近のイベントはありません",
+        "noMatches": "<badge>{filter}</badge>に一致するイベントはありません。",
+        "noMatchesQuery": "<badge>{filter} · 「{query}」</badge>に一致するイベントはありません。",
+        "filters": {
+          "all": "すべて",
+          "deploy": "デプロイ",
+          "config": "設定",
+          "secret": "シークレット",
+          "token": "トークン",
+          "alert": "アラート"
+        }
+      }
     }
   },
   "settingsIndex": {

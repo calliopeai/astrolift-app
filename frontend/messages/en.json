@@ -772,6 +772,25 @@
         "emptyTitle": "No source repo",
         "emptyDescription": "Connect a repo so a push can build and deploy this app.",
         "emptyAction": "Open settings"
+      },
+      "activity": {
+        "title": "Activity",
+        "filteredCount": "{count, plural, one {# event} other {# events}} of {total, number}",
+        "count": "{count, plural, one {# event} other {# events}}",
+        "searchPlaceholder": "Search…",
+        "searchLabel": "Search activity",
+        "loadError": "Could not load activity",
+        "emptyTitle": "No recent events for this app",
+        "noMatches": "No events match <badge>{filter}</badge>.",
+        "noMatchesQuery": "No events match <badge>{filter} · \"{query}\"</badge>.",
+        "filters": {
+          "all": "All",
+          "deploy": "Deploys",
+          "config": "Config",
+          "secret": "Secrets",
+          "token": "Tokens",
+          "alert": "Alerts"
+        }
       }
     },
     "wizard": {

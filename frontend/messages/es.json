@@ -877,33 +877,33 @@
     "detail": {
       "reprovision": {
         "headline": {
-          "failed": "El aprovisionamiento ha fallado",
+          "failed": "El aprovisionamiento falló",
           "pending": "El aprovisionamiento no ha comenzado",
           "provisioning": "Aprovisionamiento en curso",
           "ready_missing_registry": "Faltan las coordenadas del registro de contenedores",
           "unknown": "El aprovisionamiento requiere atención"
         },
         "description": {
-          "failed": "Vuelva a intentarlo para reconstruir el repositorio y el espacio de nombres.",
-          "pending": "Inícielo para poner la aplicación en línea.",
-          "provisioning": "Espere — vuelva a ejecutar solo si se atasca.",
-          "ready_missing_registry": "Reaprovisione para reconstruir el repo de ECR y el rol de push; los despliegues no harán nada hasta entonces.",
-          "unknown": "Reaprovisione para recuperar."
+          "failed": "Reintenta para reconstruir el repositorio del registro y el espacio de nombres.",
+          "pending": "Inícialo para poner la aplicación en línea.",
+          "provisioning": "Espera; vuelve a ejecutarlo solo si se bloquea.",
+          "ready_missing_registry": "Vuelve a aprovisionar para reconstruir el repositorio del registro de contenedores y la credencial de publicación. Hasta entonces, los despliegues no harán nada ni mostrarán avisos.",
+          "unknown": "Vuelve a aprovisionar para recuperar la aplicación."
         },
-        "elapsed": "comenzó hace {minutes}m",
-        "cta": "Reaprovisionar",
+        "elapsed": "iniciado hace {minutes} min",
+        "cta": "Volver a aprovisionar",
         "confirm": {
-          "title": "¿Reaprovisionar {slug}?",
-          "description": "Cancela los despliegues en curso, elimina los objetos de k8s por workload y vuelve a disparar el workflow de CI de despliegue. Las aprobaciones existentes se ejecutan de nuevo.",
-          "confirm": "Sí, reaprovisionar"
+          "title": "¿Volver a aprovisionar {slug}?",
+          "description": "Cancela los despliegues en curso, elimina los objetos de Kubernetes de cada carga de trabajo y vuelve a ejecutar el flujo de despliegue de CI. Las aprobaciones existentes se vuelven a ejecutar.",
+          "confirm": "Sí, volver a aprovisionar"
         },
         "toast": {
-          "dispatched": "Reaprovisionamiento enviado — el workflow de despliegue se está reejecutando.",
-          "partial": "Recuperación parcial: la limpieza se ejecutó pero falló el envío del despliegue ({message})."
+          "dispatched": "Reaprovisionamiento solicitado: el flujo de despliegue se está ejecutando de nuevo.",
+          "partial": "Recuperación parcial: se realizó la limpieza, pero no se pudo iniciar el despliegue ({message})."
         },
         "error": {
-          "noResponse": "Reaprovisionamiento falló: sin respuesta del backend.",
-          "generic": "Reaprovisionamiento falló."
+          "noResponse": "El reaprovisionamiento falló: el servidor no respondió.",
+          "generic": "El reaprovisionamiento falló."
         }
       },
       "configDrift": {
@@ -1857,6 +1857,27 @@
       "unavailable": "Los permisos o la versión actuales de la carga no están disponibles. Actualiza la página.",
       "selectedEnvironmentUnsupported": "Esta acción afecta al entorno principal. No puede dirigirse a un entorno seleccionado.",
       "permissionDenied": "Permiso denegado"
+    },
+    "overview": {
+      "activity": {
+        "title": "Actividad",
+        "filteredCount": "{count, plural, one {# evento} other {# eventos}} de {total, number}",
+        "count": "{count, plural, one {# evento} other {# eventos}}",
+        "searchPlaceholder": "Buscar…",
+        "searchLabel": "Buscar actividad",
+        "loadError": "No se pudo cargar la actividad",
+        "emptyTitle": "No hay eventos recientes para esta aplicación",
+        "noMatches": "Ningún evento coincide con <badge>{filter}</badge>.",
+        "noMatchesQuery": "Ningún evento coincide con <badge>{filter} · «{query}»</badge>.",
+        "filters": {
+          "all": "Todos",
+          "deploy": "Despliegues",
+          "config": "Configuración",
+          "secret": "Secretos",
+          "token": "Tokens",
+          "alert": "Alertas"
+        }
+      }
     }
   },
   "settingsIndex": {
