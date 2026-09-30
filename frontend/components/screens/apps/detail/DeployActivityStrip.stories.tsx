@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import french from "@/messages/fr.json";
 
 import { ACTIVITY, DEPLOYMENTS, LONG } from "./app-detail-shell.fixtures";
 import { DeployActivityStrip } from "./DeployActivityStrip";
@@ -36,5 +38,15 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <DeployActivityStrip {...args} />
     </div>
+  ),
+};
+
+export const FrenchWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={french}>
+      <div style={{ width: 768 }}>
+        <DeployActivityStrip {...args} />
+      </div>
+    </NextIntlClientProvider>
   ),
 };

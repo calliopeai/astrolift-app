@@ -983,6 +983,12 @@
         "confirm": "デプロイ",
         "started": "デプロイを開始しました：{tag} → {env}",
         "failed": "デプロイに失敗しました"
+      },
+      "deployActivity": {
+        "title": "デプロイのアクティビティ",
+        "latest": "直近<mono>{limit, number}</mono>件",
+        "inFlight": "· <mono>{count, number}</mono>件が進行中",
+        "all": "すべて表示"
       }
     },
     "deployStrategy": {

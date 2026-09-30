@@ -983,6 +983,12 @@
         "confirm": "Bereitstellen",
         "started": "Bereitstellung gestartet: {tag} in {env}",
         "failed": "Bereitstellung fehlgeschlagen"
+      },
+      "deployActivity": {
+        "title": "Bereitstellungsaktivität",
+        "latest": "Letzte <mono>{limit, number}</mono>",
+        "inFlight": "· <mono>{count, number}</mono> in Bearbeitung",
+        "all": "Alle ansehen"
       }
     },
     "deployStrategy": {

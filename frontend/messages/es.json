@@ -983,6 +983,12 @@
         "confirm": "Desplegar",
         "started": "Despliegue iniciado: {tag} en {env}",
         "failed": "El despliegue falló"
+      },
+      "deployActivity": {
+        "title": "Actividad de despliegue",
+        "latest": "Últimos <mono>{limit, number}</mono>",
+        "inFlight": "· <mono>{count, number}</mono> en curso",
+        "all": "Ver todos"
       }
     },
     "deployStrategy": {

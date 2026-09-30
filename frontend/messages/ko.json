@@ -983,6 +983,12 @@
         "confirm": "배포",
         "started": "배포 시작: {tag} → {env}",
         "failed": "배포 실패"
+      },
+      "deployActivity": {
+        "title": "배포 활동",
+        "latest": "최근 <mono>{limit, number}</mono>개",
+        "inFlight": "· <mono>{count, number}</mono>개 진행 중",
+        "all": "모두 보기"
       }
     },
     "deployStrategy": {

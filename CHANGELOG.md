@@ -18,6 +18,9 @@
 - Scaling feedback passes actual ICU values, and API key/project operation dates
   honor the selected locale and timezone. Project operation states and fallback
   scale errors have translations in all supported locales (#2145).
+- The app deploy-activity strip localizes labels, numeric hints, empty copy and
+  deployment status tooltips while retaining real deployment links (#2145).
+
 - App detail deploy/delete confirmations, config-drift notices and URL health
   hints use all eight locales. Translated confirmations preserve actual image,
   environment and app identifiers and require acceptance before writes (#2145).

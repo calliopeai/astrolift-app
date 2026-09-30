@@ -983,6 +983,12 @@
         "confirm": "Implantar",
         "started": "Implantação iniciada: {tag} em {env}",
         "failed": "Falha na implantação"
+      },
+      "deployActivity": {
+        "title": "Atividade de implantação",
+        "latest": "Últimas <mono>{limit, number}</mono>",
+        "inFlight": "· <mono>{count, number}</mono> em andamento",
+        "all": "Ver todas"
       }
     },
     "deployStrategy": {

@@ -80,7 +80,10 @@ describe("app detail translated confirmations", () => {
       const t = createTranslator({ locale, messages: messages.apps.detail, onError });
       for (const key of leaves(en.apps.detail))
         expect(
-          t(key as Parameters<typeof t>[0], {
+          t.rich(key as Parameters<typeof t.rich>[0], {
+            mono: (chunks) => chunks,
+            count: 2,
+            limit: 24,
             tag: "sha-123",
             slug: "checkout",
             env: "production",

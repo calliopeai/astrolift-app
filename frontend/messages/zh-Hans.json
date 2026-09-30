@@ -983,6 +983,12 @@
         "confirm": "部署",
         "started": "部署已启动：{tag} → {env}",
         "failed": "部署失败"
+      },
+      "deployActivity": {
+        "title": "部署活动",
+        "latest": "最近 <mono>{limit, number}</mono> 次",
+        "inFlight": "· <mono>{count, number}</mono> 次正在进行",
+        "all": "查看全部"
       }
     },
     "deployStrategy": {

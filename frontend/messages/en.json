@@ -671,6 +671,12 @@
         "confirm": "Deploy",
         "started": "Deploy started: {tag} to {env}",
         "failed": "Deploy failed"
+      },
+      "deployActivity": {
+        "title": "Deploy activity",
+        "latest": "Last <mono>{limit, number}</mono>",
+        "inFlight": "· <mono>{count, number}</mono> in flight",
+        "all": "View all"
       }
     },
     "overview": {
