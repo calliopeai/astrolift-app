@@ -202,6 +202,12 @@ class K8sJobSpawner(ContainerSpawner):
             service_account=model_service_account,
             model_env=model_env,
         )
+        from astrolift_dispatch.pod_hardening import AgentRuntimeClassError, preflight_agent_runtime
+
+        try:
+            preflight_agent_runtime(self._cluster, job_manifest["spec"]["template"]["spec"])
+        except AgentRuntimeClassError as exc:
+            return SpawnResult(external_id=job_name, ok=False, error=str(exc))
 
         # Inject Brief env vars
         job_manifest = inject_brief_into_job_spec(job_manifest, task)

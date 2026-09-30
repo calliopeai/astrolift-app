@@ -34,6 +34,9 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False, spec=None) -> di
     first container, the agent, plus the GPU-pool tolerations and type
     affinity a manifest workload gets (#2039).
     """
+    runtime_class = str(settings.AGENT_RUNTIME_CLASS or "").strip()
+    if runtime_class:
+        pod_spec["runtimeClassName"] = runtime_class
     pod_spec["automountServiceAccountToken"] = False
     pod_security = pod_spec.setdefault("securityContext", {})
     pod_security["seccompProfile"] = {"type": "RuntimeDefault"}
@@ -73,3 +76,29 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False, spec=None) -> di
         if "affinity" in scheduling:
             pod_spec["affinity"] = scheduling["affinity"]
     return pod_spec
+
+
+class AgentRuntimeClassError(RuntimeError):
+    pass
+
+
+def preflight_agent_runtime(cluster, pod_spec: dict) -> None:
+    runtime_class = pod_spec.get("runtimeClassName")
+    if not runtime_class:
+        return
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    try:
+        manifest = _driver_for_cluster(cluster).get_manifest(
+            _context_for_cluster(cluster).slug, None, "RuntimeClass", runtime_class
+        )
+    except Exception as exc:
+        raise AgentRuntimeClassError(
+            f"Cannot verify agent RuntimeClass {runtime_class!r}; install it on the target cluster "
+            "and allow the control plane to read RuntimeClasses, or clear AGENT_RUNTIME_CLASS."
+        ) from exc
+    if not manifest or manifest.get("metadata", {}).get("deletionTimestamp"):
+        raise AgentRuntimeClassError(
+            f"Agent RuntimeClass {runtime_class!r} is not available on the target cluster; "
+            "install it before dispatch, or clear AGENT_RUNTIME_CLASS."
+        )
