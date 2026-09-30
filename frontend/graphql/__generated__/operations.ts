@@ -3326,6 +3326,25 @@ export type AstroliftModelEndpointsFilter = {
   variant: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
+export type AstroliftModelPromptReadiness = {
+  eligible: Scalars['Boolean']['output'];
+  maxOutputTokens: Scalars['Int']['output'];
+  maxPromptChars: Scalars['Int']['output'];
+  maxWaitSeconds: Scalars['Int']['output'];
+  promptsPerMinute: Scalars['Int']['output'];
+  state: AstroliftModelPromptReadinessState;
+};
+
+export type AstroliftModelPromptReadinessState =
+  | 'INACTIVE'
+  | 'READY'
+  | 'STALE_HEARTBEAT'
+  | 'UNAVAILABLE'
+  | 'UNCONFIGURED_MODEL'
+  | 'UNCONFIGURED_RELAY'
+  | 'UNKNOWN_HEARTBEAT'
+  | 'UNSUPPORTED';
+
 export type AstroliftModuleEntitlement = {
   canCreate: Scalars['Boolean']['output'];
   canManage: Scalars['Boolean']['output'];
@@ -9279,6 +9298,7 @@ export type Query = {
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
+  astroliftModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -10444,6 +10464,11 @@ export type QueryAstroliftModelEndpointsPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftModelPromptReadinessArgs = {
+  id: Scalars['GUID']['input'];
 };
 
 
@@ -14322,6 +14347,20 @@ export type ListPipelineSecretsQueryVariables = Exact<{
 
 
 export type ListPipelineSecretsQuery = { astroliftPipelineSecrets: Array<{ id: string, name: string, createdAt: string, updatedAt: string }> };
+
+export type PlaygroundPromptMutationVariables = Exact<{
+  input: TestModelEndpointInput;
+}>;
+
+
+export type PlaygroundPromptMutation = { testModelEndpoint: { ok: boolean, errors: Array<{ code: string, field?: string | null }>, data?: { status: string, reply: string, latencyMs?: number | null, promptTokens?: number | null, completionTokens?: number | null, totalTokens?: number | null } | null } };
+
+export type ModelPromptReadinessQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+}>;
+
+
+export type ModelPromptReadinessQuery = { astroliftModelPromptReadiness?: { state: AstroliftModelPromptReadinessState, eligible: boolean, maxPromptChars: number, maxOutputTokens: number, promptsPerMinute: number, maxWaitSeconds: number } | null };
 
 export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
 

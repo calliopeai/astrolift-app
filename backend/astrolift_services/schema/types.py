@@ -9,10 +9,23 @@ import strawberry
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
+from astrolift_services.model_prompt import PromptReadinessState
 from astrolift_services.models import WorkloadIdentityGrant, grant_state_for
 from astrolift_services.secret_visibility import can_reveal_app_secrets
 
 JSON = strawberry.scalars.JSON
+
+ModelPromptReadinessState = strawberry.enum(PromptReadinessState, name="AstroliftModelPromptReadinessState")
+
+
+@strawberry.type(name="AstroliftModelPromptReadiness")
+class ModelPromptReadinessType:
+    state: ModelPromptReadinessState
+    eligible: bool
+    max_prompt_chars: int
+    max_output_tokens: int
+    prompts_per_minute: int
+    max_wait_seconds: int
 
 
 @strawberry.type(name="AstroliftSecretEditor")

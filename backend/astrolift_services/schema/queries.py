@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import functools
+
 import strawberry
 from django.db.models import Count, Prefetch, Q
 from django.db.models.functions import Lower
+from graphql import GraphQLError
 from strawberry.types import Info
 
+from astrolift_clusters import agent_test_jobs
 from astrolift_clusters.models import TenantCluster
 from astrolift_clusters.schema.types import TenantClusterType, cluster_to_type
 from astrolift_graphql import (
@@ -32,6 +36,7 @@ from astrolift_lifecycle.models import AppEnvironment
 from astrolift_manifest.env_edit import read_app_env
 from astrolift_manifest.env_injection import envelope_keys_for
 from astrolift_registry.models import RegisteredApp
+from astrolift_services.model_prompt import PromptReadinessState, live_model_prompt_service, prompt_readiness
 from astrolift_services.models import (
     AppSecretBundleRef,
     AppSecretMetadata,
@@ -61,6 +66,7 @@ from astrolift_services.schema.types import (
     ManagedServiceQueueDepthType,
     ManagedServiceType,
     ModelEndpointsFilterInput,
+    ModelPromptReadinessType,
     SecretBundleType,
     SecretChangeProposalType,
     SecretHistoryActorType,
@@ -86,8 +92,21 @@ from astrolift_services.secret_literals import (
 from astrolift_services.secret_metadata_ops import scope_in_force
 from astrolift_services.visibility import credential_managed_services, visible_secret_bundles
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, PermissionDenied, require_permission
 from core.tenancy import get_current_tenant
+
+
+def _prompt_read_permission_errors(resolver):
+    @functools.wraps(resolver)
+    def wrapped(*args, **kwargs):
+        try:
+            return resolver(*args, **kwargs)
+        except PermissionDenied as exc:
+            raise GraphQLError(
+                "Model prompt access is denied", extensions={"code": "PERMISSION_DENIED"}
+            ) from exc
+
+    return wrapped
 
 
 def _caller_org_id() -> int | None:
@@ -785,6 +804,38 @@ class ServicesQuery:
         order_by = resolve_list_sort(sort, _MODEL_ENDPOINT_SORTS, default="name")
         return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(
             managed_service_to_type
+        )
+
+    @strawberry.field
+    @_prompt_read_permission_errors
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=managed_service_scope_by_guid("id", permissions=(Permission.APP_UPDATE,)),
+        operation=managed_service_operation("id"),
+    )
+    @tenant_scoped()
+    def astrolift_model_prompt_readiness(self, info: Info, id: GUID) -> ModelPromptReadinessType | None:
+        """Read-time eligibility for one bounded prompt, never an invocation.
+
+        The heartbeat does not advertise prompt relay capability. A READY
+        snapshot only permits an attempt; the mutation rechecks all facts and
+        access, and actual agent/provider outcomes can still fail or time out.
+        """
+        service = live_model_prompt_service(id)
+        if service is None:
+            return None
+        state = prompt_readiness(service)
+        return ModelPromptReadinessType(
+            state=state,
+            eligible=state == PromptReadinessState.READY,
+            max_prompt_chars=agent_test_jobs.MAX_PROMPT_CHARS,
+            max_output_tokens=agent_test_jobs.MAX_TOKENS,
+            prompts_per_minute=agent_test_jobs.RATE_LIMIT_PER_MINUTE,
+            max_wait_seconds=int(
+                agent_test_jobs.wait_cap_seconds(
+                    service.effective_cluster.heartbeat_interval_seconds if service.effective_cluster else 0
+                )
+            ),
         )
 
     @strawberry.field

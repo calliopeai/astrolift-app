@@ -70,6 +70,11 @@
 - HPA-managed Deployments release replica ownership so an image redeploy does not
   overwrite a live autoscaler count. Fixed-size deployments and preview clamps
   keep explicit replicas; document separate workload, CPU-node and GPU policies.
+- Add selected-endpoint model prompt readiness and harden the existing real vLLM
+  prompt relay against retired/incoherent owners and inactive clusters before
+  heartbeat, configuration, rate, or job reads. Readiness is advisory and exposes
+  only invocation limits; reported agent versions do not establish relay support
+  (#2148).
 
 - Deregistration loads its authorized resource preview before displaying the
   count badge, refreshes on confirmation and treats unavailable/refused reads

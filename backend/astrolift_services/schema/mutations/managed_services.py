@@ -11,8 +11,6 @@ from strawberry.types import Info
 from astrolift_agents.models import AgentEnvironmentSpec
 from astrolift_agents.scopes import agent_env_spec_scope
 from astrolift_clusters import agent_test_jobs
-from astrolift_clusters.heartbeat_status import is_live as cluster_agent_is_live
-from astrolift_clusters.heartbeat_status import resolve as resolve_heartbeat_status
 from astrolift_clusters.models import TenantCluster
 from astrolift_drivers.isolation import IsolationError, parse_mode
 from astrolift_graphql import GUID, MutationResultType
@@ -29,6 +27,7 @@ from astrolift_identity.operation_context import (
 from astrolift_identity.step_up import requires_elevation
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp, Workload
+from astrolift_services.model_prompt import PromptReadinessState, live_model_prompt_service, prompt_readiness
 from astrolift_services.models import (
     ManagedService,
     ManagedServiceAttachment,
@@ -1455,77 +1454,28 @@ class ManagedServiceMutations:
                 field="prompt",
             )
 
-        # Same org-scoping shape as reveal/update: a managed service has no
-        # direct org column, so the constraint runs through the owning app.
-        svc = (
-            ManagedService.objects.select_related(
-                "app_environment__tenant_cluster",
-                "registered_app__organization",
-            )
-            .filter(
-                guid=str(input.managed_service_id),
-                registered_app__organization_id=_caller_org_id(),
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
+        svc = live_model_prompt_service(input.managed_service_id)
         if svc is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value, "managed service not found", field="managedServiceId"
             )
-        if svc.kind != ManagedService.Kind.MODEL_ENDPOINT or svc.variant != "vllm":
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                "test prompt is only supported for vllm-hosted models",
-                field="managedServiceId",
+        state = prompt_readiness(svc)
+        messages = {
+            PromptReadinessState.UNSUPPORTED: "test prompt is only supported for vllm-hosted models",
+            PromptReadinessState.INACTIVE: "wait for the managed service to become active",
+            PromptReadinessState.UNAVAILABLE: "managed service has no active provisioning cluster",
+            PromptReadinessState.UNKNOWN_HEARTBEAT: "this cluster has no connected agent",
+            PromptReadinessState.STALE_HEARTBEAT: "this cluster has no connected agent",
+            PromptReadinessState.UNCONFIGURED_RELAY: "this cluster has not opted the keep-alive agent into the model's NetworkPolicy",
+            PromptReadinessState.UNCONFIGURED_MODEL: "managed service has no model configured",
+        }
+        if state != PromptReadinessState.READY:
+            code = (
+                ErrorCode.VALIDATION if state == PromptReadinessState.UNSUPPORTED else ErrorCode.PRECONDITION
             )
-        if svc.status != ManagedService.Status.ACTIVE:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"managed service is {svc.status}; wait for it to become active",
-                field="managedServiceId",
-            )
-
-        cluster = svc.app_environment.tenant_cluster if svc.app_environment_id else None
-        if cluster is None:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "managed service has no provisioning cluster",
-                field="managedServiceId",
-            )
-
-        heartbeat_status = resolve_heartbeat_status(
-            last_heartbeat_at=cluster.last_heartbeat_at,
-            interval_seconds=cluster.heartbeat_interval_seconds,
-            now=timezone.now(),
-        )
-        if not cluster_agent_is_live(heartbeat_status):
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "this cluster has no connected agent; deploy the keep-alive agent from the "
-                "cluster's settings and wait for it to report healthy before testing a model",
-                field="managedServiceId",
-            )
-
-        agent_namespace = str(
-            ((cluster.provider_config or {}).get("vllm_agent_test") or {}).get("namespace") or ""
-        )
-        if not agent_namespace:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "this cluster has not opted the keep-alive agent into the model's "
-                "NetworkPolicy (set provider_config.vllm_agent_test.namespace on the "
-                "cluster); testing would only time out",
-                field="managedServiceId",
-            )
-
-        model = str((svc.config or {}).get("model") or "")
-        if not model:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "managed service has no model configured",
-                field="managedServiceId",
-            )
+            return gql_failure(code.value, messages[state], field="managedServiceId")
+        cluster = svc.app_environment.tenant_cluster
+        model = svc.config["model"].strip()
 
         # Lazy: this schema module is imported by the schema-export command,
         # which runs without the provider plugins installed (see

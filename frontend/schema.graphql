@@ -3479,6 +3479,26 @@ input AstroliftModelEndpointsFilter {
   deployedBy: [String!] = null
 }
 
+type AstroliftModelPromptReadiness {
+  state: AstroliftModelPromptReadinessState!
+  eligible: Boolean!
+  maxPromptChars: Int!
+  maxOutputTokens: Int!
+  promptsPerMinute: Int!
+  maxWaitSeconds: Int!
+}
+
+enum AstroliftModelPromptReadinessState {
+  READY
+  UNSUPPORTED
+  INACTIVE
+  UNAVAILABLE
+  UNKNOWN_HEARTBEAT
+  STALE_HEARTBEAT
+  UNCONFIGURED_RELAY
+  UNCONFIGURED_MODEL
+}
+
 type AstroliftModuleEntitlement {
   key: String!
   canView: Boolean!
@@ -7906,6 +7926,7 @@ type Query {
   astroliftProjectManagedServiceCatalog(projectId: GUID!, clusterId: GUID!): [AstroliftManagedServiceCatalogEntry!]!
   astroliftModelEndpoints: [AstroliftManagedService!]!
   astroliftModelEndpointsPage(search: String = null, filter: AstroliftModelEndpointsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftManagedServicePage!
+  astroliftModelPromptReadiness(id: GUID!): AstroliftModelPromptReadiness
   astroliftModelEndpoint(id: GUID!): AstroliftManagedService
   astroliftProjectManagedServices(projectId: GUID!): [AstroliftManagedService!]!
   astroliftProjectSecretBundles(projectId: GUID!): [AstroliftSecretBundle!]!

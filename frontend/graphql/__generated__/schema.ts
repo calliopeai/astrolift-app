@@ -3326,6 +3326,25 @@ export type AstroliftModelEndpointsFilter = {
   variant: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
+export type AstroliftModelPromptReadiness = {
+  eligible: Scalars['Boolean']['output'];
+  maxOutputTokens: Scalars['Int']['output'];
+  maxPromptChars: Scalars['Int']['output'];
+  maxWaitSeconds: Scalars['Int']['output'];
+  promptsPerMinute: Scalars['Int']['output'];
+  state: AstroliftModelPromptReadinessState;
+};
+
+export type AstroliftModelPromptReadinessState =
+  | 'INACTIVE'
+  | 'READY'
+  | 'STALE_HEARTBEAT'
+  | 'UNAVAILABLE'
+  | 'UNCONFIGURED_MODEL'
+  | 'UNCONFIGURED_RELAY'
+  | 'UNKNOWN_HEARTBEAT'
+  | 'UNSUPPORTED';
+
 export type AstroliftModuleEntitlement = {
   canCreate: Scalars['Boolean']['output'];
   canManage: Scalars['Boolean']['output'];
@@ -9279,6 +9298,7 @@ export type Query = {
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
+  astroliftModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -10444,6 +10464,11 @@ export type QueryAstroliftModelEndpointsPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftModelPromptReadinessArgs = {
+  id: Scalars['GUID']['input'];
 };
 
 
