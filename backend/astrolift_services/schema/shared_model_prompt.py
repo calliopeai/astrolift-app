@@ -12,7 +12,6 @@ from astrolift_clusters.models import TenantCluster
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
-from astrolift_identity.abac import operation_attributes
 from astrolift_identity.operation_context import OperationContext
 from astrolift_services.cluster_models import cluster_model_org_scope, live_cluster_model_by_guid
 from astrolift_services.model_prompt import (
@@ -26,7 +25,7 @@ from astrolift_services.schema.model_reads import _catalogue_audience
 from astrolift_services.schema.types import ModelEndpointTestType, ModelPromptReadinessType
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode
-from core.permissions import Permission, PermissionDenied, check_permission, require_permission
+from core.permissions import Permission, PermissionDenied, require_permission
 from core.scope_args import read_guid
 from core.tenancy import get_current_tenant
 
@@ -168,13 +167,9 @@ class SharedModelPromptMutations:
                 return gql_failure(ErrorCode.PRECONDITION.value, "Shared model prompt target changed")
             if service is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "Shared model deployment not found")
-            _catalogue_audience(info)
-            with operation_attributes(
-                environment=None, region=service.tenant_cluster.region or None, approvals=0
-            ):
-                check_permission(
-                    Permission.CLUSTER_UPDATE, scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE)({})
-                )
+            from astrolift_services.schema.cluster_model_mutations import _recheck_authority
+
+            _recheck_authority(info, Permission.CLUSTER_UPDATE, service.tenant_cluster)
             if shared_prompt_readiness(service) != PromptReadinessState.READY:
                 return gql_failure(ErrorCode.PRECONDITION.value, "Shared model prompt relay is not ready")
             target = shared_agent_test_target(service)

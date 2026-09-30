@@ -339,6 +339,40 @@ def test_mutation_rechecks_actual_region_after_advisory_permission_before_queue(
     assert not result.ok and result.errors[0].code == "PERMISSION_DENIED"
 
 
+@pytest.mark.parametrize("change", ["narrowed-token", "revoked-token", "retired-grant", "inactive-actor"])
+def test_prompt_rechecks_current_authority_after_placement_locks(world, monkeypatch, change):
+    from astrolift_services.schema import shared_model_prompt
+
+    role = grant(world)
+    token = ApiToken.objects.create(
+        user=world.user,
+        organization=world.org,
+        name="prompt lock authority",
+        token_hash=uuid4().hex,
+        scopes=["admin"],
+    )
+    original = shared_model_prompt._target
+
+    def authority_changes(*args, **kwargs):
+        service = original(*args, **kwargs)
+        if kwargs.get("lock"):
+            if change == "narrowed-token":
+                ApiToken.objects.filter(pk=token.pk).update(scopes=["read:clusters"])
+            elif change == "revoked-token":
+                ApiToken.objects.filter(pk=token.pk).update(is_revoked=True)
+            elif change == "retired-grant":
+                role.soft_delete()
+            else:
+                type(world.user).objects.filter(pk=world.user.pk).update(is_active=False)
+        return service
+
+    monkeypatch.setattr(shared_model_prompt, "_target", authority_changes)
+    no_relay(monkeypatch)
+    with caller(world, token):
+        result = send(world)
+    assert not result.ok and result.errors[0].code == "PERMISSION_DENIED"
+
+
 @pytest.mark.parametrize("field", ["id", "expected_cluster_id", "expected_provider_id", "expected_version"])
 def test_missing_or_changed_immutable_target_fails_before_queue(world, monkeypatch, field):
     grant(world)

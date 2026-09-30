@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared model prompt writes refresh current bearer scopes, grants, actor status
+  and placement policy after locking, returning public permission refusals before
+  queue admission when authority changes (#2213).
+
 - Shared owner prompt admission requires the observed provider and canonical
   model handle to match the current placement, refusing stale rollout evidence
   before relay credentials or queue admission (#2213).
