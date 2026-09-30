@@ -195,3 +195,12 @@ prompt/reply content. Actual Apollo HTTP tests validate documents and request
 identities, refusals, duplicate/stale/unmounted operations and rendered translated
 callbacks. Shared deployment/subscription writes and final production browser
 journeys remain the following composed acceptance work.
+
+The pure subscription review now carries expected cluster/provider identities in
+addition to model and destination versions. Foreign-cluster targets cannot be
+selected even if their admission flag is true; provider replacement and return
+cannot revive an old review. Operator-disabled new subscriptions are distinct
+from unsupported runtime and do not prevent destination-authorized revocation of
+existing bindings. Reconciliation copy now uses the actual desired/applied
+revision terminology. These are the frozen write adapter prerequisites; pure
+stories do not stand in for production mutation proof.

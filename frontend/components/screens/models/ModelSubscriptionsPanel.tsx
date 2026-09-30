@@ -22,14 +22,15 @@ export type ModelSubscription = {
   appSlug: string;
   environmentName: string;
   status: SubscriptionStatus;
-  desiredVersion: number;
-  appliedVersion: number | null;
+  desiredRevision: number;
+  appliedRevision: number | null;
   reason: string | null;
   canRevoke: boolean;
 };
 export type SubscriptionTarget = {
   id: string;
   version: number;
+  clusterId: string;
   appSlug: string;
   environmentName: string;
   admission: "allowed" | "denied" | "unknown";
@@ -41,11 +42,16 @@ export type SubscriptionModel = {
   organizationId: string;
   name: string;
   runtimeAdmission: "configured" | "unsupported" | "unknown";
+  clusterId: string;
+  providerId: string;
+  subscriptionsEnabled: boolean;
 };
 export type SubscriptionRequest = {
   organizationId: string;
   modelId: string;
   modelVersion: number;
+  expectedClusterId: string;
+  expectedProviderId: string;
   environmentId: string;
   environmentVersion: number;
   alias: string;
@@ -54,6 +60,8 @@ export type RevokeSubscriptionRequest = {
   organizationId: string;
   modelId: string;
   modelVersion: number;
+  expectedClusterId: string;
+  expectedProviderId: string;
   subscriptionId: string;
   subscriptionVersion: number;
 };
@@ -121,6 +129,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   ]);
   const [scope, setScope] = useState({ key: scopeKey, revision: 0 });
   if (scope.key !== scopeKey) setScope({ key: scopeKey, revision: scope.revision + 1 });
+  const lifecycle = useRef(0);
   const mounted = useRef(true);
   const latest = useRef({ props, revision: scope.revision });
   useLayoutEffect(() => {
@@ -130,6 +139,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      lifecycle.current += 1;
     };
   }, []);
   const reviewCurrent = review ? reviewIsCurrent(review, props, scope.revision) : false;
@@ -143,7 +153,8 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
       return false;
     }
     setFailure(null);
-    const candidate = review;
+    const candidate = review,
+      lifecycleRevision = lifecycle.current;
     try {
       const result =
         candidate.kind === "subscribe"
@@ -151,6 +162,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
           : await latest.current.props.onRevoke(candidate.request);
       if (
         !mounted.current ||
+        lifecycleRevision !== lifecycle.current ||
         candidate.scopeRevision !== latest.current.revision ||
         latest.current.props.deployment.id !== candidate.request.modelId ||
         latest.current.props.deployment.organizationId !== candidate.request.organizationId
@@ -163,12 +175,18 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
       setAccepted(true);
       return true;
     } catch {
-      if (!mounted.current || candidate.scopeRevision !== latest.current.revision) return false;
+      if (
+        !mounted.current ||
+        lifecycleRevision !== lifecycle.current ||
+        candidate.scopeRevision !== latest.current.revision
+      )
+        return false;
       setFailure(t("requestFailed"));
       return false;
     }
   }
   const ready =
+    deployment.subscriptionsEnabled &&
     deployment.runtimeAdmission === "configured" &&
     !targetsLoading &&
     !targetsError &&
@@ -184,6 +202,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
       <p className="border-warning-border bg-warning-bg text-warning-fg rounded-md border p-3 text-sm">
         {t("restartImpact")}
       </p>
+      {!deployment.subscriptionsEnabled && <p role="status">{t("subscriptionsDisabled")}</p>}
       {deployment.runtimeAdmission !== "configured" && (
         <p role="status">
           {t(
@@ -208,7 +227,11 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
                   type="button"
                   variant="ghost"
                   className="h-auto text-left break-all whitespace-normal"
-                  disabled={!ready || target.admission !== "allowed"}
+                  disabled={
+                    !ready ||
+                    target.admission !== "allowed" ||
+                    target.clusterId !== deployment.clusterId
+                  }
                   onClick={() =>
                     form.setValue("environmentId", target.id, { shouldValidate: true })
                   }
@@ -221,7 +244,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
               id: "admission",
               header: t("state"),
               cell: (target) =>
-                target.admission === "allowed"
+                target.clusterId === deployment.clusterId && target.admission === "allowed"
                   ? t("eligible")
                   : (target.reason ?? t("notVerified")),
             },
@@ -244,7 +267,10 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
         className="grid gap-4 sm:grid-cols-2"
         onSubmit={form.handleSubmit((draft) => {
           const target = targets.rows.find(
-            (item) => item.id === draft.environmentId && item.admission === "allowed"
+            (item) =>
+              item.id === draft.environmentId &&
+              item.admission === "allowed" &&
+              item.clusterId === deployment.clusterId
           );
           if (!ready || !target) {
             setFailure(t("changed"));
@@ -261,6 +287,8 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
               organizationId: deployment.organizationId,
               modelId: deployment.id,
               modelVersion: deployment.version,
+              expectedClusterId: deployment.clusterId,
+              expectedProviderId: deployment.providerId,
               environmentId: target.id,
               environmentVersion: target.version,
               alias: draft.alias,
@@ -338,9 +366,9 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
               <div className="space-y-1">
                 <p>{t(`status.${row.status}`)}</p>
                 <p className="text-muted-foreground text-xs">
-                  {t("versions", {
-                    desired: row.desiredVersion,
-                    applied: row.appliedVersion ?? t("notObserved"),
+                  {t("revisions", {
+                    desired: row.desiredRevision,
+                    applied: row.appliedRevision ?? t("notObserved"),
                   })}
                 </p>
                 {row.reason && <p className="text-destructive text-sm break-words">{row.reason}</p>}
@@ -371,6 +399,8 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
                       organizationId: deployment.organizationId,
                       modelId: deployment.id,
                       modelVersion: deployment.version,
+                      expectedClusterId: deployment.clusterId,
+                      expectedProviderId: deployment.providerId,
                       subscriptionId: row.id,
                       subscriptionVersion: row.version,
                     },
@@ -442,11 +472,14 @@ function reviewIsCurrent(
     current.deployment.organizationId !== candidate.request.organizationId ||
     current.deployment.id !== candidate.request.modelId ||
     current.deployment.version !== candidate.request.modelVersion ||
+    current.deployment.clusterId !== candidate.request.expectedClusterId ||
+    current.deployment.providerId !== candidate.request.expectedProviderId ||
     current.deployment.runtimeAdmission !== "configured"
   )
     return false;
   if (candidate.kind === "subscribe")
     return (
+      current.deployment.subscriptionsEnabled &&
       !current.targets.stale &&
       !current.targets.loading &&
       !current.targets.error &&
@@ -454,6 +487,7 @@ function reviewIsCurrent(
         (target) =>
           target.id === candidate.request.environmentId &&
           target.version === candidate.request.environmentVersion &&
+          target.clusterId === candidate.request.expectedClusterId &&
           target.admission === "allowed"
       )
     );

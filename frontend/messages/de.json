@@ -4477,7 +4477,6 @@
         "state": "Zustand",
         "actions": "Aktionen",
         "legacyAlias": "Bisheriger Standard",
-        "versions": "Gewünschte Version {desired}; angewendete Version {applied}",
         "notObserved": "nicht beobachtet",
         "reviewRevoke": "Widerruf prüfen",
         "subscribeTitle": "{name} abonnieren?",
@@ -4495,7 +4494,9 @@
         },
         "searchTargets": "App-Umgebungen suchen",
         "eligible": "Geeignet",
-        "selectedTarget": "Ausgewählt: {target}"
+        "selectedTarget": "Ausgewählt: {target}",
+        "revisions": "Gewünschte Revision {desired} · Angewendete Revision {applied}",
+        "subscriptionsDisabled": "Neue Abonnements sind für diese Bereitstellung deaktiviert. Vorhandene Abonnements können mit Zielzugriff weiterhin widerrufen werden."
       },
       "catalogue": {
         "title": "Hugging-Face-Katalog",

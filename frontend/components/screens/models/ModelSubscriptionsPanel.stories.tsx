@@ -34,8 +34,8 @@ export const PendingRestart: Story = {
         {
           ...subscriptionProps.subscriptions.rows[0],
           status: "pending",
-          desiredVersion: 3,
-          appliedVersion: 2,
+          desiredRevision: 3,
+          appliedRevision: 2,
           canRevoke: false,
         },
       ],
@@ -50,8 +50,8 @@ export const Failed: Story = {
         {
           ...subscriptionProps.subscriptions.rows[0],
           status: "failed",
-          desiredVersion: 3,
-          appliedVersion: 2,
+          desiredRevision: 3,
+          appliedRevision: 2,
           reason: "Observed generation has not reached the requested generation",
         },
       ],
@@ -110,4 +110,11 @@ export const Width768: Story = {
       <ModelSubscriptionsPanel {...args} />
     </div>
   ),
+};
+
+export const NewSubscriptionsDisabled: Story = {
+  args: {
+    ...subscriptionProps,
+    deployment: { ...subscriptionProps.deployment, subscriptionsEnabled: false },
+  },
 };

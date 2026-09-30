@@ -4554,7 +4554,6 @@
         "state": "State",
         "actions": "Actions",
         "legacyAlias": "Legacy default",
-        "versions": "Desired version {desired}; applied version {applied}",
         "notObserved": "not observed",
         "reviewRevoke": "Review revocation",
         "subscribeTitle": "Subscribe to {name}?",
@@ -4572,7 +4571,9 @@
         },
         "searchTargets": "Search app environments",
         "eligible": "Eligible",
-        "selectedTarget": "Selected: {target}"
+        "selectedTarget": "Selected: {target}",
+        "revisions": "Desired revision {desired} · Applied revision {applied}",
+        "subscriptionsDisabled": "New subscriptions are disabled for this deployment. Existing subscriptions can still be revoked with destination access."
       },
       "catalogue": {
         "title": "Hugging Face catalogue",

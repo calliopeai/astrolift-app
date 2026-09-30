@@ -52,6 +52,8 @@ describe("shared model subscription review", () => {
       organizationId: "org",
       modelId: "shared-model",
       modelVersion: 5,
+      expectedClusterId: "cluster-one",
+      expectedProviderId: "provider-one",
       environmentId: "env-staging",
       environmentVersion: 4,
       alias: "assistant",
@@ -174,6 +176,8 @@ describe("shared model subscription review", () => {
         organizationId: "org",
         modelId: "shared-model",
         modelVersion: 5,
+        expectedClusterId: "cluster-one",
+        expectedProviderId: "provider-one",
         subscriptionId: "subscription-one",
         subscriptionVersion: 2,
       })
@@ -203,6 +207,54 @@ describe("shared model subscription review", () => {
     expect(screen.getByRole("button", { name: "Request revocation" })).toBeDisabled();
   });
 
+  it("separately refuses operator-disabled new subscriptions while allowing reviewed destination-authorized cleanup", async () => {
+    const onSubscribe = vi.fn(),
+      onRevoke = vi.fn(async (): Promise<SubscriptionActionResult> => ({ accepted: true }));
+    render(
+      view({
+        ...subscriptionProps,
+        deployment: { ...subscriptionProps.deployment, subscriptionsEnabled: false },
+        onSubscribe,
+        onRevoke,
+      })
+    );
+    expect(
+      screen.getByText(en.models.shared.subscriptions.subscriptionsDisabled)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review subscription" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "storefront / staging" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Review revocation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Request revocation" }));
+    await waitFor(() => expect(onRevoke).toHaveBeenCalledTimes(1));
+    expect(onSubscribe).not.toHaveBeenCalled();
+  });
+  it("refuses an allowed target that belongs to another cluster", () => {
+    render(
+      view({
+        ...subscriptionProps,
+        targets: {
+          ...subscriptionProps.targets,
+          rows: subscriptionProps.targets.rows.map((target) => ({
+            ...target,
+            clusterId: "other-cluster",
+          })),
+        },
+      })
+    );
+    expect(screen.getByRole("button", { name: "storefront / staging" })).toBeDisabled();
+    expect(screen.queryByText("Eligible")).not.toBeInTheDocument();
+  });
+  it("does not revive a review after provider replacement and return", async () => {
+    const onSubscribe = vi.fn(),
+      props = { ...subscriptionProps, onSubscribe };
+    const { rerender } = render(view(props));
+    await review();
+    rerender(view({ ...props, deployment: { ...props.deployment, providerId: "provider-two" } }));
+    rerender(view(props));
+    expect(screen.getByRole("button", { name: "Request subscription" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Request subscription" }));
+    expect(onSubscribe).not.toHaveBeenCalled();
+  });
   it.each(["unknown", "unsupported"] as const)(
     "blocks unverified runtime %s",
     (runtimeAdmission) => {

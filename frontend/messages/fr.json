@@ -4477,7 +4477,6 @@
         "state": "État",
         "actions": "Actions",
         "legacyAlias": "Valeur historique par défaut",
-        "versions": "Version souhaitée {desired} ; version appliquée {applied}",
         "notObserved": "non observée",
         "reviewRevoke": "Vérifier la révocation",
         "subscribeTitle": "S’abonner à {name} ?",
@@ -4495,7 +4494,9 @@
         },
         "searchTargets": "Rechercher des environnements",
         "eligible": "Admissible",
-        "selectedTarget": "Sélection : {target}"
+        "selectedTarget": "Sélection : {target}",
+        "revisions": "Révision souhaitée {desired} · Révision appliquée {applied}",
+        "subscriptionsDisabled": "Les nouveaux abonnements sont désactivés pour ce déploiement. Les abonnements existants peuvent toujours être révoqués avec les droits sur la destination."
       },
       "catalogue": {
         "title": "Catalogue Hugging Face",

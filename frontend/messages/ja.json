@@ -4474,7 +4474,6 @@
         "state": "状態",
         "actions": "操作",
         "legacyAlias": "従来のデフォルト",
-        "versions": "要求バージョン {desired}、適用バージョン {applied}",
         "notObserved": "未観測",
         "reviewRevoke": "取り消しを確認",
         "subscribeTitle": "{name} を利用しますか？",
@@ -4492,7 +4491,9 @@
         },
         "searchTargets": "アプリ環境を検索",
         "eligible": "利用可能",
-        "selectedTarget": "選択中：{target}"
+        "selectedTarget": "選択中：{target}",
+        "revisions": "希望リビジョン {desired} · 適用済みリビジョン {applied}",
+        "subscriptionsDisabled": "このデプロイでは新しいサブスクリプションが無効です。既存のサブスクリプションは対象へのアクセス権があれば取り消せます。"
       },
       "catalogue": {
         "title": "Hugging Face カタログ",

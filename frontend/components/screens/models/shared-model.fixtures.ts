@@ -9,6 +9,9 @@ export const subscriptionProps: ModelSubscriptionsPanelProps = {
     organizationId: "org",
     name: "Qwen production",
     runtimeAdmission: "configured",
+    clusterId: "cluster-one",
+    providerId: "provider-one",
+    subscriptionsEnabled: true,
   },
   targets: fakeModelPage({
     rows: [
@@ -18,6 +21,7 @@ export const subscriptionProps: ModelSubscriptionsPanelProps = {
         appSlug: "storefront",
         environmentName: "production",
         admission: "allowed",
+        clusterId: "cluster-one",
         reason: null,
       },
       {
@@ -26,6 +30,7 @@ export const subscriptionProps: ModelSubscriptionsPanelProps = {
         appSlug: "storefront",
         environmentName: "staging",
         admission: "allowed",
+        clusterId: "cluster-one",
         reason: null,
       },
     ],
@@ -40,8 +45,8 @@ export const subscriptionProps: ModelSubscriptionsPanelProps = {
         appSlug: "storefront",
         environmentName: "production",
         status: "active",
-        desiredVersion: 2,
-        appliedVersion: 2,
+        desiredRevision: 2,
+        appliedRevision: 2,
         reason: null,
         canRevoke: true,
       },

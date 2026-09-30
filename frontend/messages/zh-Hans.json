@@ -4474,7 +4474,6 @@
         "state": "状态",
         "actions": "操作",
         "legacyAlias": "旧版默认值",
-        "versions": "期望版本 {desired}；已应用版本 {applied}",
         "notObserved": "未观测",
         "reviewRevoke": "查看撤销",
         "subscribeTitle": "订阅 {name}？",
@@ -4492,7 +4491,9 @@
         },
         "searchTargets": "搜索应用环境",
         "eligible": "符合条件",
-        "selectedTarget": "已选择：{target}"
+        "selectedTarget": "已选择：{target}",
+        "revisions": "期望修订 {desired} · 已应用修订 {applied}",
+        "subscriptionsDisabled": "此部署已禁用新订阅。有目标访问权限时仍可撤销现有订阅。"
       },
       "catalogue": {
         "title": "Hugging Face 目录",

@@ -4477,7 +4477,6 @@
         "state": "Estado",
         "actions": "Acciones",
         "legacyAlias": "Predeterminado heredado",
-        "versions": "Versión deseada {desired}; versión aplicada {applied}",
         "notObserved": "no observada",
         "reviewRevoke": "Revisar revocación",
         "subscribeTitle": "¿Suscribirse a {name}?",
@@ -4495,7 +4494,9 @@
         },
         "searchTargets": "Buscar entornos de aplicaciones",
         "eligible": "Apto",
-        "selectedTarget": "Seleccionado: {target}"
+        "selectedTarget": "Seleccionado: {target}",
+        "revisions": "Revisión deseada {desired} · Revisión aplicada {applied}",
+        "subscriptionsDisabled": "Las nuevas suscripciones están desactivadas para este despliegue. Las existentes aún se pueden revocar con acceso al destino."
       },
       "catalogue": {
         "title": "Catálogo de Hugging Face",

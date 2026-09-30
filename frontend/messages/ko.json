@@ -4474,7 +4474,6 @@
         "state": "상태",
         "actions": "작업",
         "legacyAlias": "기존 기본값",
-        "versions": "요청 버전 {desired}; 적용 버전 {applied}",
         "notObserved": "관측되지 않음",
         "reviewRevoke": "철회 검토",
         "subscribeTitle": "{name}을(를) 구독하시겠습니까?",
@@ -4492,7 +4491,9 @@
         },
         "searchTargets": "앱 환경 검색",
         "eligible": "사용 가능",
-        "selectedTarget": "선택됨: {target}"
+        "selectedTarget": "선택됨: {target}",
+        "revisions": "원하는 리비전 {desired} · 적용된 리비전 {applied}",
+        "subscriptionsDisabled": "이 배포의 새 구독이 비활성화되었습니다. 기존 구독은 대상 접근 권한으로 계속 취소할 수 있습니다."
       },
       "catalogue": {
         "title": "Hugging Face 카탈로그",
