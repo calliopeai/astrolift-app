@@ -25,6 +25,7 @@ export const LONG =
 
 export function workload(overrides: Partial<AstroliftWorkload> = {}): AstroliftWorkload {
   return {
+    version: 1,
     id: "wl-1",
     slug: "api",
     name: "API",

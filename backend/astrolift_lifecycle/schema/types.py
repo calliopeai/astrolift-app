@@ -165,6 +165,9 @@ class DeploymentApproverType:
 @strawberry.type(name="AstroliftDeployment")
 class DeploymentType:
     id: GUID
+    version: int = strawberry.field(
+        default=0, description="Version of this deployment snapshot for rollback and redeploy preconditions."
+    )
     registered_app_slug: str
     environment_name: str
     workload_slug: str | None
@@ -547,6 +550,7 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
     pr_url = _build_pr_url(repo_url, pr_number) if (repo_url and pr_number) else ""
     return DeploymentType(
         id=GUID(str(d.guid)),
+        version=int(d.version or 0),
         registered_app_slug=d.registered_app.slug,
         environment_name=d.app_environment.name,
         workload_slug=d.workload.slug if d.workload_id else None,

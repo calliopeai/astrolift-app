@@ -14,6 +14,14 @@
   Bulk actions authorize every app and affected operation before acting, and
   secret attachment also authorizes its source bundle. Audit trails, retention,
   notification settings and Zentinelle management require organization authority.
+- Rollback, redeploy, workload restart and scale accept optional top-level
+  `ifMatchVersion` preconditions (#2162). Clients read deployment or workload
+  versions from the target row; stale requests return structured version
+  details before writes or external calls. Actions lock and recheck the live
+  target and environment; rollback selects an older superseded revision only
+  within the current running deployment's environment. Existing callers may
+  omit the argument. See [mobile quick-action preconditions](docs/operators/mobile-quick-action-preconditions.md).
+
 - Lifecycle gates authorize coherent live app owners and preserve bearer
   team/share ceilings before collection counts and side effects (#2104).
   Builder requests check the stored owner and destination; invalid clusters

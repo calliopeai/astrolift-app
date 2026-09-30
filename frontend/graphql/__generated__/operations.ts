@@ -2115,6 +2115,8 @@ export type AstroliftDeployment = {
   triggerKind: Scalars['String']['output'];
   triggeredByMe: Scalars['Boolean']['output'];
   triggeredByUserId?: Maybe<Scalars['String']['output']>;
+  /** Version of this deployment snapshot for rollback and redeploy preconditions. */
+  version: Scalars['Int']['output'];
   workloadSlug?: Maybe<Scalars['String']['output']>;
 };
 
@@ -5183,6 +5185,8 @@ export type AstroliftWorkload = {
   slug: Scalars['String']['output'];
   storageClass: Scalars['String']['output'];
   storageSize: Scalars['String']['output'];
+  /** Version of this workload for restart and scale preconditions. */
+  version: Scalars['Int']['output'];
   volumes: Scalars['JSON']['output'];
 };
 
@@ -7761,6 +7765,7 @@ export type MutationRecordClusterBootstrapRunArgs = {
 
 
 export type MutationRedeployAppArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: DeploymentByIdInput;
 };
 
@@ -7912,6 +7917,7 @@ export type MutationResetClusterAuthUserPasswordArgs = {
 
 
 export type MutationRestartAstroliftWorkloadArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: RestartWorkloadInput;
 };
 
@@ -8031,6 +8037,7 @@ export type MutationRevokeTeamAccessFromAppArgs = {
 
 
 export type MutationRollbackDeploymentArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: DeploymentByIdInput;
 };
 
@@ -8094,6 +8101,7 @@ export type MutationRunWorkflowDefinitionArgs = {
 
 
 export type MutationScaleAstroliftWorkloadArgs = {
+  ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: ScaleWorkloadInput;
 };
 

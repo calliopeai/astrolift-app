@@ -60,6 +60,7 @@ export const ENV_LONG: AstroliftAppEnvironment = {
 // ---------------------------------------------------------------- workloads
 
 export const WORKLOAD_WEB: AstroliftWorkload = {
+  version: 1,
   id: "wl-web",
   name: "Web",
   slug: "web",
@@ -161,6 +162,7 @@ export const DEPLOY_TOKEN: DeployTokenControlViewProps = {
 // ---------------------------------------------------------------- deployments
 
 export const DEPLOYMENT: AstroliftDeployment = {
+  version: 1,
   id: "d3b07384-d9a0-4c9b-8f1e-000000000001",
   registeredAppSlug: "storefront",
   environmentName: "prod",

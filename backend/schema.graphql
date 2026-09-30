@@ -2159,6 +2159,11 @@ type AstroliftDeployTokenPage {
 
 type AstroliftDeployment {
   id: GUID!
+
+  """
+  Version of this deployment snapshot for rollback and redeploy preconditions.
+  """
+  version: Int!
   registeredAppSlug: String!
   environmentName: String!
   workloadSlug: String
@@ -5496,6 +5501,8 @@ type AstroliftWorkflowRun {
 }
 
 type AstroliftWorkload {
+  """Version of this workload for restart and scale preconditions."""
+  version: Int!
   id: GUID!
   slug: String!
   name: String!
@@ -6989,8 +6996,8 @@ type Mutation {
   rejectDeploymentByToken(input: RejectByTokenInput!): AstroliftDeploymentMutationResult!
   abortDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
   deleteDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
-  rollbackDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
-  redeployApp(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
+  rollbackDeployment(input: DeploymentByIdInput!, ifMatchVersion: Int = null): AstroliftDeploymentMutationResult!
+  redeployApp(input: DeploymentByIdInput!, ifMatchVersion: Int = null): AstroliftDeploymentMutationResult!
   promoteDeployment(input: PromoteDeploymentInput!): AstroliftDeploymentMutationResult!
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   resumeEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
@@ -7017,8 +7024,8 @@ type Mutation {
   archiveAppRegistryRepo(input: ArchiveAppRegistryRepoInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
   deleteAppIngress(input: DeleteAppIngressInput!): AstroliftCapabilityDeprovisionPayloadMutationResult!
   triggerAstroliftDeployWorkflow(input: TriggerDeployWorkflowInput!): AstroliftTriggerDeployWorkflowPayloadMutationResult!
-  restartAstroliftWorkload(input: RestartWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
-  scaleAstroliftWorkload(input: ScaleWorkloadInput!): AstroliftWorkloadOpPayloadMutationResult!
+  restartAstroliftWorkload(input: RestartWorkloadInput!, ifMatchVersion: Int = null): AstroliftWorkloadOpPayloadMutationResult!
+  scaleAstroliftWorkload(input: ScaleWorkloadInput!, ifMatchVersion: Int = null): AstroliftWorkloadOpPayloadMutationResult!
   installAstroliftSourceWebhook(input: InstallSourceWebhookInput!): AstroliftInstallSourceWebhookPayloadMutationResult!
   pushAstroliftCiSecretsToRepo(input: PushCiSecretsToRepoInput!): AstroliftPushCiSecretsPayloadMutationResult!
   validateAstroliftCiSecrets(input: ValidateAstroliftCiSecretsInput!): AstroliftValidateCiSecretsPayloadMutationResult!
