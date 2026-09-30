@@ -1,298 +1,161 @@
 # Shared model UI — #2215
 
-The subscription view is a pure Storybook surface, pending the #2213 typed
-GraphQL adapter and production route integration. Its props are presentation
-facts, not a new server API or a source of permission authority.
+## Product flow and routes
 
-New subscriptions require a named lowercase alias matching
-`[a-z][a-z0-9_]{0,31}`. Existing legacy `MODEL_*` bindings remain readable.
-The target picker and subscription list use embedded `ListPage` surfaces with
-server search and pagination supplied by their adapters. A reviewed target must
-still be on the verified current page. Changing pages requires a fresh review;
-no browser filtering or cap hides later eligible environments.
+`/models` is the organization-owned shared deployment catalogue. Hugging Face
+selection at `/models/deploy` leads to an explicit CPU or GPU deployment to a
+cluster, without an app/project owner. `/models/shared/[id]` shows deployment
+facts, named app subscriptions, measurements, an explicit bounded model test and
+management controls. Existing app/project/cloud endpoints remain accessible at
+`/models/endpoints`, with their unchanged create flow at `/models/deploy/legacy`.
 
-The review captures organization, model and environment identities and versions;
-revocation captures the attachment identity/version as well. Identity changes
-clear the form/review state. Target, model or attachment replacement permanently
-invalidates an old review, including changing away and back. Late accepted or
-failed replies cannot supply completion for a replaced context. The backend must
-still enforce its live ownership and version preconditions.
+The Models rail consumes the server's dedicated `models` entitlement. Viewing
+models does not require agent-read permission. Management controls read a fresh
+`models.canManage` manifest; every actual server operation still checks current
+ownership, bearer ceilings, grants, placement and version preconditions.
 
-Adding or revoking a subscription requests a shared model restart. The view
-warns that all consumers may temporarily lose access and distinguishes accepted
-requests from applied access. Only server-provided reconciliation status can show
-active or revoked. Unknown/unsupported credential-list runtimes block review.
-Credentials are references on the server; the view has no credential-value props.
+Screens are pure Storybook components. Route clients map actual typed GraphQL
+reads and writes into their props. All eight locales translate presentation;
+model repositories, immutable revisions, aliases, binding prefixes, resource
+quantities, IDs, prompts/replies and actual server diagnostics remain literal.
 
-All eight locales supply translated presentation text. Immutable aliases, IDs,
-binding prefixes and server diagnostics remain literal. The view's existing
-subscription list may include legacy aliases; the new-subscription form cannot
-create one.
+## Hugging Face and deployment
 
-Validation for the view layer includes React interactions and portable stories:
-exact request identities, required aliases, explicit refusal/retry, model and
-target version changes, organization A→B→A, late subscribe/revoke replies,
-unverified runtime admission, server search/paging callbacks and rendered locale
-copy. This is not yet proof of #2215 production HF/cluster/subscription journeys,
-shared playground dispatch or metrics availability. Those acceptance items remain
-open until their actual API adapters and browser checks land.
+`SearchHuggingFaceModels` sends search, publisher, task, library, license, gating,
+ordering and bounded cursor pages to the server. There is no fabricated Mine
+relation for public Hub metadata. CPU/GPU compatibility remains UNKNOWN: task,
+library, popularity and repository metadata do not establish runtime fit.
+Unavailable/rate-limited reads show failures; missing metadata stays unknown.
+Search and detail results retain their actual source and observation time.
 
-## Shared cluster placement review
+Selecting a repository performs `GetHuggingFaceModel`. A branch or tag must
+resolve to a verified 40-character SHA before selection can be used. Changed
+revision input blocks use immediately, including during debounce. Missing or
+foreign identities cannot produce a pin. Tenant changes permanently discard
+old selection and late responses, including changing away and back.
 
-The placement screen is a pure Storybook surface until the #2213 runtime
-admission and provision documents are exported. It requires a verified immutable
-Hugging Face revision, an eligible current-page cluster and an explicit CPU or
-GPU request. The complete review binds organization, cluster and provider IDs,
-resource requests, CPU KV-cache allocation and subscription enablement. Replacing
-the provider under the same cluster ID invalidates the review permanently.
+Deployment uses server-paged eligible clusters and an explicit CPU/GPU resource
+draft through RHF and Zod. The review binds organization, cluster/provider,
+immutable revision, CPU/memory/GPU requests, optional CPU KV cache and subscription
+enablement. Configured operator runtime admission applies to the complete exact
+request; it proves neither available hardware nor model fit. Replacing a provider
+or changing the draft permanently invalidates an older review.
 
-Only admission for the identical complete request enables deployment review.
-Configured runtime admission does not establish node capacity, model fit or live
-readiness. CPU is never inferred from zero GPU devices. Subscription enablement
-warns about later Recreate restarts and availability impact for all consumers.
-The server must recheck permission, placement and runtime admission during create.
+Only confirmation invokes the no-cache `ProvisionClusterModel` write. The
+response must match the complete request and contain a deployment identity,
+pending operation and unconfirmed readiness before the detail link is shown.
+Refusals retain the review and draft; missing, mixed, foreign or premature-ready
+replies cannot produce success. Late replies never replay a request.
 
-Handled refusals keep the confirmation and draft open. Missing deployment identity
-cannot render success. Late replies for changed contexts are ignored; an accepted
-request has a detail link but no readiness claim, and changing the request clears
-that completion permanently. React tests exercise exact payloads, CPU/GPU
-admission, provider replacement, changed-back requests, late replies, refusal and
-all eight locales. Portable stories cover admission/loading/error states,
-translated reviews and long content at 768 pixels. Actual create and route
-journeys remain separate acceptance work.
+## Catalogue and detail facts
 
-## Hugging Face catalogue view and adapter
+`clusterModelDeploymentsPage` applies organization, search, cluster, explicit
+compute, status, recorded-readiness and subscription filters before server
+pagination. Mine uses the actual creator relation. Missing totals remain unknown;
+foreign-organization responses cannot populate counts or rows.
 
-The catalogue uses the real `SearchHuggingFaceModels` and
-`GetHuggingFaceModel` documents from #2214. Search, publisher, task, library,
-license, gating, ordering and bounded cursor pages are sent to the server.
-The catalogue has one All view: public repository metadata has no viewer-owned
-relation for a truthful Mine view. CPU/GPU compatibility is UNKNOWN; neither
-model popularity nor library/task metadata establishes runtime support or fit.
+The shared detail query binds organization and deployment ID. Denials remain
+read diagnostics rather than a missing deployment claim. Failed refreshes retain
+explicitly stale prior facts with retry. Inspection and refresh do not write.
+Desired resources, last-applied resources, subscription revisions and operation
+facts remain separate. Recorded reconciliation requires a timestamp and positive
+generation and is labeled as historical evidence rather than live health.
+Timestamps use explicit UTC across locales and hydration. Technical identifiers,
+row versions and generation are available in a collapsed disclosure.
 
-Unavailable and rate-limited reads render failures rather than an empty catalogue
-or substitute rows. Nullable metadata remains unknown. Search and revision reads
-each retain their actual source and observation time; timestamps are formatted
-with an explicit UTC zone to keep cold render and hydration consistent.
+Legacy hosted endpoints require persisted compute facts; absent data never
+implies CPU/GPU or a device count. Cloud compute is not applicable.
 
-Selecting a repository performs a separate detail read. A moving branch or tag
-must resolve to a verified 40-character immutable SHA before the deployment flow
-can receive it. Changing revision blocks use immediately, including the debounce
-interval. Missing or foreign detail identities cannot produce a selected pin.
-Changing organization clears a selection and does not revive it on returning.
-No deployment mutation or credential write is part of catalogue inspection.
+## App subscriptions and independent revocation
 
-Apollo HTTP regressions exercise actual operation names and variables, opaque
-cursor walking, debounced search and revision reads, all supported server filters,
-rate limits, unavailable responses, missing revisions and eight-locale selection.
-Both operation documents validate against the backend-produced SDL. Portable
-stories cover loading, empty, unavailable, rate-limited, resolving, pinned,
-translated and long/narrow frames. Production route wiring and the CPU/GPU
-placement/subscription browser journeys still remain open.
+Destinations and subscriptions use server search and pagination through embedded
+`ListPage` surfaces. New subscriptions require a lowercase named alias matching
+`[a-z][a-z0-9_]{0,31}`. Legacy `MODEL_*` bindings remain readable. A reviewed target
+must remain on the verified current page and in the deployment's cluster.
 
-## Primary shared deployment catalogue
+`SubscribeClusterModel` binds organization, model, environment, placement and
+model/environment versions. `RevokeModelSubscription` binds the attachment version
+and deployment version as well. Server eligibility and independent `canRevoke`
+decisions control the actions. Disabling new subscriptions does not revoke old
+access or prevent independently authorized revocation. Unsupported credential-list
+runtimes block new attachment review.
 
-`/models` now reads `clusterModelDeploymentsPage` for the active organization.
-Search, cluster ID, explicit compute mode, status, recorded readiness and
-subscription enablement are server filters applied before numbered pagination.
-Mine uses the server's actual creator relation. Invalid Boolean filters refuse
-the read rather than silently widening it. Missing totals remain unknown;
-foreign-organization response identities cannot supply rows or counts.
+Reviews warn that changes restart the shared model and can interrupt all
+consumers. No credential values are exposed in UI props. Writes use no cache and
+query the complete public refusal fields. Accepted results must match deployment,
+subscription, alias, versions, revision and operation. Pending/revoking states
+remain distinct from observed active/revoked states. Sibling aliases retain their
+own identities and access state.
 
-The Models rail entry consumes the server's dedicated `models` entitlement;
-agent-read permission is not inferred as model-read authority. Backend module
-ownership and credential-ceiling proof lives with #2213/#2214. Frontend tests
-exercise the exact row contract and rendered Models-only rail.
+Accepted acknowledgments survive read failures without replay. They become
+confirmed only when the matching revision is read as applied and active/revoked.
+Already-revoked idempotent replies use separate confirmed copy. Model/target
+replacement, pagination, tenant changes and unmounts permanently invalidate old
+reviews and late responses, including changing away and back.
 
-`/models/endpoints` preserves the existing app/project/cloud endpoint contract,
-owner links and server paging. Its existing create flow remains reachable at
-`/models/deploy/legacy`. Hosted variants no longer imply GPU mode or capacity;
-legacy CPU/GPU mode requires explicit persisted `compute_mode`. Cloud compute is
-not applicable and missing hosted compute is unknown. Device summaries no longer
-invent a GPU count or interpret zero devices as CPU runtime support.
+## Resource updates and retained-data cleanup
 
-All six new read documents validate against the combined exported SDL. Apollo
-HTTP tests prove exact organization/filter/page variables, later-page access,
-transport failure/retry, no inspection mutations and foreign-identity refusal.
-The list and translated filter callbacks render in all eight locales. Pure
-stories retain long/narrow, loading, stale, empty, failed and unknown states.
-The primary read route is wired; shared detail/create/subscription/playground
-adapters and complete production browser journeys remain separate acceptance.
+Management preserves repository, SHA, compute mode and placement. Resource
+updates request admission for the exact current draft, then review and invoke
+`UpdateClusterModel` with the deployment version and cluster/provider identities.
+Accepted updates remain distinct from restart and readiness confirmation.
 
-## Shared deployment detail read
+`DeprovisionClusterModel` is available for idle active/failed deployments even
+when runtime admission is unavailable. The review requires subscription revocation
+and explicitly sends `deleteData: false`. The backend refuses removal until
+revocations are confirmed; a refusal keeps the review open and never renders
+accepted removal. A valid accepted operation remains visibly pending. Stale facts,
+unknown/denied management access and an existing operation block new writes.
 
-`/models/shared/[id]` uses the actual organization-and-ID detail query. A returned
-foreign organization or deployment identity cannot populate the screen. Read
-denials remain diagnostic frames and do not claim that the deployment is missing.
-Failed refreshes retain explicitly stale prior facts with an enabled retry;
-inspection and refresh do not write.
+## Honest observations and density
 
-The detail separates desired resources, last-applied resources, subscription
-revisions and reconciliation operation facts. Stored quantities remain literal;
-missing resources stay unknown. Reconciliation confirmation requires the returned
-recorded time and positive generation and is labeled as a historical fact rather
-than live health or capacity. Display timestamps use explicit UTC in every locale.
+Owner-gated metrics and cluster inventory reads bind exact service, cluster and
+provider identities. A 15-minute window starts after hydration and refresh uses
+a new window. Responses with foreign identities, wrong scope or inconsistent
+inventory are refused. Implicit tenant reads bypass shared cache and deduplication;
+changed model/provider context discards late observations.
 
-Actual route-client Apollo HTTP tests cover exact identities, mismatched replies,
-permission errors, refresh/retry and tenant changes. Eight locales preserve model
-IDs, SHA and resource units; French/Japanese SSR hydration regressions check
-timestamp stability. Portable stories cover missing/failed/loading/stale reads,
-CPU, unsupported runtime and long/narrow frames. Raw organization/provider IDs, internal row version, operation identifiers and
-generation remain available in a collapsed native technical-details disclosure.
-The primary view leads with model/revision, cluster/compute/resources and recorded
-readiness; opening the disclosure is covered by an actual interaction test.
-The metadata route is wired;
-subscription, observation and playground panels and production browser journeys
-remain the following integration work.
+Cards preserve actual units, windows, samples, source, observation time and
+availability. Measured zero remains zero. Missing, stale, unconfigured, unavailable
+and unsupported states are explicit. KV-cache fraction is distinct from GPU/VRAM
+utilization. Desired and applied requests are distinct from measured CPU/memory
+usage and observed running/ready replicas.
 
-## Actual model observations and bounded cluster inventory
+The tenant inventory states exact count, returned count, its 20-row limit and
+truncation, with model links and the full server-paged cluster catalogue. It has
+no local search that hides later rows. Hardware capacity requires a verified
+tenant node-pool mapping; it cannot fabricate zero or global saturation.
 
-The shared detail mounts the existing owner-gated deployment metrics and cluster
-model density queries with exact service, cluster and provider identities. The
-15-minute window is initialized after hydration and refresh requests a new window.
-Neither operation writes. Responses with foreign identities, wrong scope or an
-inconsistent/broader inventory are refused. Implicit tenant responses use neither
-Apollo's shared cache nor request deduplication, including on a physical cluster
-shared by organizations. Changed provider/model context remounts the read scope;
-late replies cannot replace the current observation.
+## Explicit bounded model test
 
-Cards show actual series values, units, aggregation windows, samples, source,
-observation time and availability. Recorded zero is preserved; absent,
-unconfigured, unavailable and unsupported data stays unknown. Stale measured
-values and failed refreshes are marked. KV cache is a fraction and is explicitly
-separate from unsupported GPU/VRAM utilization. Requests and applied resources are
-separate from measured CPU/memory usage and running/ready replicas.
+The model test reads dedicated shared readiness and invokes
+`testSharedModelEndpoint` only after user action. Both carry exact deployment
+version, cluster and provider. Browser callers supply no URL, credential or
+runtime configuration. The server checks actual cluster-owner admission.
 
-The tenant-only density snapshot shows exact count, returned count, the 20-row
-limit and truncation, with real model links and a link to the full cluster-filtered
-server-paged catalogue. It has no misleading local search. Capacity requires
-verified tenant node-pool mapping and never fabricates zero or global saturation.
-All eight locales translate presentation while preserving IDs, raw units and
-source labels. Focused Apollo/locale/hydration tests and portable stories cover
-these states; production browser journeys remain final composed acceptance.
+Unknown, stale, unsupported, unconfigured, denied and malformed admission blocks
+spend. Positive limits stay within the existing relay bounds. The UI states the
+resource/cost impact. Mixed refusals, empty replies and timeouts never produce
+success. Pending requests block duplicate sends; changed scopes and unmounts
+permanently discard late results. No failure automatically retries inference.
 
-## Actual shared owner prompt
+## Verification boundaries
 
-The shared detail's model test uses the existing dedicated shared-readiness query
-and `testSharedModelEndpoint` mutation. Both carry the exact deployment version,
-cluster and provider; the mutation carries only the bounded trimmed prompt and
-persisted deployment ID. Browser callers cannot provide a URL, credential or
-runtime configuration. Actual cluster-owner admission is checked by the server;
-module visibility is not substituted for it.
+Apollo HTTP tests validate actual operation names/variables, SDL coercion,
+server paging/search, complete refusals, stale contexts, no replay and all locale
+callbacks. Portable stories cover loading, denied, unavailable, accepted-pending,
+unknown-runtime cleanup, stale reads, long strings and 768-pixel layouts.
 
-Readiness limits must be positive and within the existing relay bounds. Unknown,
-stale, unsupported, unconfigured, denied and malformed admission refuses spend.
-The screen states that a request consumes model resources and can incur cost;
-recorded reconciliation remains advisory. An incomplete/mixed refusal envelope,
-missing/empty reply or timeout never produces success. Complete structured
-concurrency error metadata is queried and current/requested versions stay literal.
+`e2e-routes/shared-models.spec.ts` walks the actual production Next UI against
+controlled schema-backed HTTP fixtures: catalogue/metrics/model test, CPU/GPU
+app-free deployment, independent subscription/revocation, resource update,
+retained-data cleanup and subscription-dependent removal refusal. Inspection
+requires zero writes; confirmed actions require one exact reviewed write. These
+fixtures prove browser wiring and truthful state handling, not real model weights,
+hardware fit, live tenant inference or production CNI enforcement.
 
-Pending requests block duplicate sends. Changed org/model/version/provider scopes,
-A-to-B-to-A transitions and unmounts permanently discard late UI replies. Checking
-readiness is read-only; no failure or timeout automatically retries a prompt.
-Eight locales translate labels, limits and state descriptions while preserving
-prompt/reply content. Actual Apollo HTTP tests validate documents and request
-identities, refusals, duplicate/stale/unmounted operations and rendered translated
-callbacks. Shared deployment/subscription writes and final production browser
-journeys remain the following composed acceptance work.
-
-The pure subscription review now carries expected cluster/provider identities in
-addition to model and destination versions. Foreign-cluster targets cannot be
-selected even if their admission flag is true; provider replacement and return
-cannot revive an old review. Operator-disabled new subscriptions are distinct
-from unsupported runtime and do not prevent destination-authorized revocation of
-existing bindings. Reconciliation copy now uses the actual desired/applied
-revision terminology. These are the frozen write adapter prerequisites; pure
-stories do not stand in for production mutation proof.
-
-All five frontend write documents now use the composed exported schema:
-`provisionClusterModel`, `subscribeClusterModel`, `revokeModelSubscription`,
-`updateClusterModel` and `deprovisionClusterModel`. Generated input/result types
-include the real deployment/subscription fields and complete public error
-metadata. Schema/coercion checks prove required cluster/provider/version fields
-and the retained-data deletion default. This validates document contracts only;
-production adapter writes and composed browser journeys are separate evidence.
-
-## Actual shared deployment request
-
-`/models/deploy` uses real HF metadata/detail resolution and the eligible cluster
-page, preserving `/models/deploy/legacy` for existing app-owned deployments. An
-explicit CPU or GPU request carries exact organization, cluster, provider and
-immutable revision, and requests admission for the complete current resource
-draft. Configured operator admission is not hardware capacity or model-fit proof.
-
-A guarded no-cache provision mutation runs only after review. Complete response
-identity, request resources, pending operation and unconfirmed readiness must
-match before showing the created deployment link. Missing/mixed/foreign or
-premature-ready responses retain the confirmation and draft. Late replies across
-request or tenant A-to-B-to-A changes are discarded without replay. The adapter
-uses RHF and the shared Zod request schema; blank compute is an input state and
-never an executable request.
-
-31 component/Apollo HTTP checks cover CPU/GPU, exact admission/write inputs,
-server paging/search, refusal, unknown runtime and permanent stale scopes; 11
-portable placement/client stories render. Typecheck, focused ESLint and formatter
-checks pass. Production browser writes and actual observed scheduling remain
-separate composed acceptance; this leaf does not claim model fit or completion.
-
-## Actual subscriptions and revocation
-
-Shared detail now reads server-paged/searchable destinations and subscriptions.
-The target eligibility and independent `canRevoke` fields come from the server;
-module visibility is never destination authority. New aliases are required and
-review includes the exact app environment, model/environment versions, placement
-and restart impact. Revocation still works when new subscriptions are disabled.
-
-No-cache subscribe/revoke writes preserve all public refusal fields in their
-documents. Before accepting a response, the adapter verifies actual deployment,
-subscription, target, alias, versions, desired revision and pending operation.
-Late replies after permanent model/version/placement scope changes are ignored.
-A confirmed write closes review before separate safe refreshes; failed reads
-retain marked prior rows and the pending acknowledgment, without another write.
-The acknowledgment changes to confirmed only when the matching subscription
-revision is actually read as applied and active/revoked. An idempotent already
-revoked response uses separate confirmed copy rather than a false pending restart.
-
-50 focused Apollo/pure interaction checks pass, including two environments,
-read/write refusals, exact versions, no replay, paged targets, stale callbacks and
-all-eight-locale revocation copy. Twelve portable subscription/client stories
-render; TSC, focused ESLint and formatter checks pass. The backend PostgreSQL
-ownership/reconciliation proof and composed production browser journeys remain
-separate acceptance evidence.
-
-## Actual update and deprovision management
-
-Shared detail now mounts resource management and retained-data removal reviews.
-A freshly read no-cache Models management capability is an advisory control gate,
-not Models visibility or destination authority. A failed capability read has a
-read-only retry. The server still rechecks exact current owner, placement, region,
-credential and version for each mutation.
-
-RHF/Zod resource drafts retain the existing immutable model/SHA/compute/placement.
-Updates request actual runtime admission for the complete edited resource draft,
-then send only the existing update input with exact model version and expected
-cluster/provider. Reviews explain restart impact and distinguish disabling new
-subscriptions from revoking existing access.
-
-Deprovisioning stays available to an authorized idle failed model with unknown or
-unconfigured runtime, without falsely requiring successful runtime admission for
-cleanup. It always sends `deleteData:false`; the review states that persisted data
-is retained and every subscription must first be revoked and reconciled. Actual
-backend precondition refusals remain visible in the open confirmation. Busy
-models, readers and failed/missing capability responses cannot issue writes.
-
-Both no-cache mutation responses are correlated to exact persisted identities,
-versions and pending operation state; updates also verify the requested resources.
-Mixed/missing/foreign or premature-complete responses never acknowledge success.
-Permanent version/draft A-to-B-to-A scopes discard late replies without replay.
-Accepted operations survive independent refresh failure. A further update becomes
-available only after the exact accepted operation is read as completed; completed
-resource reconciliation is explicitly not a live health check.
-
-28 management HTTP/locale interactions, 18 detail read/SSR checks and seven portable
-management stories pass (53 checks). TSC, focused ESLint, formatter and whitespace
-checks pass. Existing detail fixtures now include valid read-only Me and empty
-subscription-page responses, and their exact no-write query allowlist includes
-those new reads. Production browser management journeys, backend/store proof and
-final composed release gates remain root integration evidence, not a claim that
-controlled UI fixtures performed cloud reconciliation.
+Backend evidence is separate: real PostgreSQL ownership/lifecycle regressions,
+real Temporal activities/history replay, native Kubernetes apply/binding/pod
+checks and an enforcing Calico traffic test. The heavy model process is controlled
+for local tests. Release requires generated contracts, full CI and separately
+recorded immutable image/migration/control-plane deployment evidence.

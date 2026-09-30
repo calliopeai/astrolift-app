@@ -188,9 +188,11 @@ export const BoundedSnapshotWithoutSearch: StoryObj = {
   ),
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).queryByRole("searchbox")).not.toBeInTheDocument();
-    await expect(
-      within(canvasElement).getByRole("link", { name: RUNS[0].id.split("-")[0] })
-    ).toHaveAttribute("href", `#run-${RUNS[0].id}`);
+    const rowLink = within(canvasElement)
+      .getAllByRole("link")
+      .find((link) => link.getAttribute("href") === `#run-${RUNS[0].id}`);
+    await expect(rowLink).toBeVisible();
+    await expect(rowLink).toHaveTextContent(RUNS[0].id.split("-")[0]);
   },
 };
 

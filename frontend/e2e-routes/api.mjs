@@ -122,8 +122,8 @@ function value(type, field, args, role) {
   if (isNonNullType(type)) return value(type.ofType, field, args, role);
   if (field === "clusterModelDeploymentsPage")
     return object({
-      items: [currentSharedModel],
-      totalCount: 1,
+      items: acceptedModel ? [currentSharedModel, acceptedModel] : [currentSharedModel],
+      totalCount: acceptedModel ? 2 : 1,
       nextCursor: null,
       page: args.page,
       pageSize: args.pageSize,
@@ -187,7 +187,7 @@ function value(type, field, args, role) {
     return object({
       eligible: role === "owner",
       reason: null,
-      runtimeVersion: "0.15.1+cpu",
+      runtimeVersion: args.input?.computeMode === "gpu" ? "0.15.1" : "0.15.1+cpu",
       architecture: "amd64",
       hardwareAdmission: "unknown",
     });
@@ -239,25 +239,26 @@ function value(type, field, args, role) {
       ],
     });
   if (field === "astroliftClusterModelDensity") {
-    const resourceTotals = {
+    const resourceTotals = (resources) => ({
       source: "persisted_model_configuration",
       observedAt,
       replicas: 1,
-      cpuCoresPerReplica: 2,
+      cpuCoresPerReplica: Number(resources.cpuRequest),
       memoryBytesPerReplica: 8589934592,
-      gpuDevicesPerReplica: 0,
-      gpuResource: null,
-      totalCpuCores: 2,
+      gpuDevicesPerReplica: resources.gpuCount,
+      gpuResource: resources.gpuCount > 0 ? "nvidia.com/gpu" : null,
+      totalCpuCores: Number(resources.cpuRequest),
       totalMemoryBytes: 8589934592,
-      totalGpuDevices: 0,
-    };
+      totalGpuDevices: resources.gpuCount,
+    });
+    const models = acceptedModel ? [currentSharedModel, acceptedModel] : [currentSharedModel];
     return object({
       clusterId: args.clusterId,
       start: args.start,
       end: args.end,
       retrievedAt: observedAt,
-      modelCount: 1,
-      returnedCount: 1,
+      modelCount: models.length,
+      returnedCount: models.length,
       inventoryLimit: 20,
       truncated: false,
       scope: "organization_cluster_owned_models",
@@ -272,16 +273,23 @@ function value(type, field, args, role) {
         vramBytes: null,
         freshnessSeconds: 1800,
       }),
-      items: [
+      items: models.map((model) =>
         object({
-          serviceId: sharedModelId,
-          name: sharedModel.name,
-          status: "active",
-          desired: resourceTotals,
-          applied: resourceTotals,
-          observations: [measurement("ready_replicas", "count", 1)],
-        }),
-      ],
+          serviceId: model.id,
+          name: model.name,
+          status: model.status,
+          desired: resourceTotals(model.desiredResources),
+          applied: model.appliedResources ? resourceTotals(model.appliedResources) : null,
+          observations: [
+            measurement(
+              "ready_replicas",
+              "count",
+              model.ready ? 1 : null,
+              model.ready ? "AVAILABLE" : "NO_DATA"
+            ),
+          ],
+        })
+      ),
     });
   }
   if (field === "astroliftModelEndpointsPage")
@@ -415,14 +423,19 @@ createServer(async (req, res) => {
     res.end("ok");
     return;
   }
-  if (req.url === "/observations/reset" && req.method === "POST") {
+  if (
+    ["/observations/reset", "/observations/reset?model=unsubscribed"].includes(req.url) &&
+    req.method === "POST"
+  ) {
     observations.errors.length = 0;
     observations.mutations = 0;
     observations.promptInvocations.length = 0;
     modelWriteRequests.length = 0;
     acceptedModel = null;
     currentSharedModel = sharedModel;
-    subscriptionRows = [activeSubscription, siblingSubscription];
+    subscriptionRows = req.url.endsWith("model=unsubscribed")
+      ? []
+      : [activeSubscription, siblingSubscription];
     res.statusCode = 204;
     res.end();
     return;
@@ -451,6 +464,65 @@ createServer(async (req, res) => {
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
           const input = args.input;
+          const update = info.fieldName === "updateClusterModel";
+          const deprovision = info.fieldName === "deprovisionClusterModel";
+          if (
+            (update || deprovision) &&
+            role === "owner" &&
+            modelWriteRequests.length === 0 &&
+            input.organizationId === id &&
+            input.id === sharedModelId &&
+            input.expectedClusterId === sharedClusterId &&
+            input.expectedProviderId === sharedProviderId &&
+            input.ifMatchVersion === 5 &&
+            (update
+              ? input.cpuRequest === "3" &&
+                input.memoryRequest === "8Gi" &&
+                input.gpuCount === 0 &&
+                input.cpuKvCacheGiB === 2 &&
+                input.allowSubscriptions === true
+              : input.deleteData === false)
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            if (deprovision && subscriptionRows.length > 0)
+              return object({
+                ok: false,
+                errors: [
+                  object({
+                    code: "CONFLICT",
+                    message:
+                      "Controlled refusal: reconcile all subscription revocations before removal.",
+                    field: null,
+                    resource: null,
+                    retryAfter: null,
+                    currentVersion: null,
+                    requestedVersion: null,
+                  }),
+                ],
+                data: null,
+              });
+            currentSharedModel = {
+              ...sharedModel,
+              version: 7,
+              status: update ? "updating" : "deprovisioning",
+              ready: false,
+              readinessObservedAt: null,
+              readinessGeneration: null,
+              desiredSubscriptionRevision: 3,
+              operationId: update ? "controlled-accepted-update" : "controlled-accepted-delete",
+              operationCompletedAt: null,
+              desiredResources: update
+                ? {
+                    ...sharedModel.desiredResources,
+                    cpuRequest: input.cpuRequest,
+                    memoryRequest: input.memoryRequest,
+                    gpuCount: input.gpuCount,
+                    cpuKvCacheGiB: input.cpuKvCacheGiB,
+                  }
+                : sharedModel.desiredResources,
+            };
+            return object({ ok: true, errors: [], data: currentSharedModel });
+          }
           const subscribe = info.fieldName === "subscribeClusterModel";
           const revoke = info.fieldName === "revokeModelSubscription";
           if (
@@ -516,9 +588,12 @@ createServer(async (req, res) => {
             args.input.expectedProviderId === sharedProviderId &&
             args.input.modelRepo === hubModel.repoId &&
             args.input.revisionSha === hubModel.revisionSha &&
-            args.input.computeMode === "cpu" &&
-            args.input.gpuCount === 0 &&
-            args.input.name === "Controlled newly created CPU model" &&
+            ((args.input.computeMode === "cpu" &&
+              args.input.gpuCount === 0 &&
+              args.input.name === "Controlled newly created CPU model") ||
+              (args.input.computeMode === "gpu" &&
+                args.input.gpuCount === 1 &&
+                args.input.name === "Controlled newly created GPU model")) &&
             modelWriteRequests.length === 0
           ) {
             const input = args.input;
@@ -528,6 +603,7 @@ createServer(async (req, res) => {
               id: createdModelId,
               version: 3,
               name: input.name,
+              computeMode: input.computeMode,
               subscriptionsEnabled: input.allowSubscriptions,
               status: "updating",
               ready: false,
