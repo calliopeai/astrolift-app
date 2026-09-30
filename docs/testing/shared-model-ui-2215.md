@@ -204,3 +204,11 @@ from unsupported runtime and do not prevent destination-authorized revocation of
 existing bindings. Reconciliation copy now uses the actual desired/applied
 revision terminology. These are the frozen write adapter prerequisites; pure
 stories do not stand in for production mutation proof.
+
+All five frontend write documents now use the composed exported schema:
+`provisionClusterModel`, `subscribeClusterModel`, `revokeModelSubscription`,
+`updateClusterModel` and `deprovisionClusterModel`. Generated input/result types
+include the real deployment/subscription fields and complete public error
+metadata. Schema/coercion checks prove required cluster/provider/version fields
+and the retained-data deletion default. This validates document contracts only;
+production adapter writes and composed browser journeys are separate evidence.
