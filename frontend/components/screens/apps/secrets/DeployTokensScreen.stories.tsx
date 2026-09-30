@@ -1,3 +1,11 @@
+import { NextIntlClientProvider } from "next-intl";
+import es from "@/messages/es.json";
+import fr from "@/messages/fr.json";
+import de from "@/messages/de.json";
+import pt from "@/messages/pt-BR.json";
+import ja from "@/messages/ja.json";
+import ko from "@/messages/ko.json";
+import zh from "@/messages/zh-Hans.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -114,4 +122,60 @@ export const RotationConfiguredWindow: Story = {
     await expect(await within(dialog).findByText(/Configured grace window: 1m 30s/)).toBeVisible();
     await expect(within(dialog).getByRole("button", { name: "Rotate token" })).toBeEnabled();
   },
+};
+
+export const Spanish: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={es} timeZone="UTC">
+      <Screen {...TOKENS_SCREEN} reveal={{ ...TOKEN_REVEAL, rotationGraceSeconds: 90 }} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const French: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <Screen {...TOKENS_SCREEN} reveal={{ ...TOKEN_REVEAL, rotationGraceSeconds: 90 }} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const German: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={de} timeZone="UTC">
+      <Screen {...TOKENS_SCREEN} reveal={{ ...TOKEN_REVEAL, rotationGraceSeconds: 90 }} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const Portuguese: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="pt-BR" messages={pt} timeZone="UTC">
+      <Screen {...TOKENS_SCREEN} reveal={{ ...TOKEN_REVEAL, rotationGraceSeconds: 90 }} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const Japanese: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <Screen {...TOKENS_SCREEN} reveal={{ ...TOKEN_REVEAL, rotationGraceSeconds: 90 }} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const Korean: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ko" messages={ko} timeZone="UTC">
+      <Screen {...TOKENS_SCREEN} reveal={{ ...TOKEN_REVEAL, rotationGraceSeconds: 90 }} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const Chinese: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="zh-Hans" messages={zh} timeZone="UTC">
+      <Screen {...TOKENS_SCREEN} reveal={{ ...TOKEN_REVEAL, rotationGraceSeconds: 90 }} />
+    </NextIntlClientProvider>
+  ),
 };

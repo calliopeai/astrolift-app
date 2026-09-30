@@ -698,71 +698,80 @@
       }
     },
     "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
+      "title": "Tokens de despliegue",
+      "description": "Tokens de API que los ejecutores de CI usan para desplegar en {slug}. El secreto se muestra una vez al crear o rotar; solo almacenamos el hash.",
+      "createToken": "Crear token",
+      "emptyTitle": "Aún no hay tokens de despliegue",
+      "emptyDescription": "Crea un token para desplegar desde CI. El secreto se muestra una vez al crearlo.",
+      "rotate": "Rotar",
+      "revoke": "Revocar",
+      "allScopes": "todos",
+      "never": "nunca",
+      "createFailed": "No se pudo crear",
+      "revokeFailed": "No se pudo revocar",
+      "revokedToast": "Se revocó {name}",
       "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
+        "name": "Nombre",
+        "last4": "Últimos 4",
+        "scopes": "Ámbitos",
+        "lastUsed": "Último uso",
+        "expires": "Caduca",
+        "state": "Estado",
+        "actions": "Acciones"
       },
       "status": {
-        "active": "active",
-        "revoked": "revoked"
+        "active": "activo",
+        "revoked": "revocado"
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "Agente de usuario"
       },
       "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
+        "title": "Crear token de despliegue",
+        "description": "El secreto se muestra una vez en la siguiente pantalla. Cópialo inmediatamente al almacén de secretos de CI.",
+        "name": "Nombre",
+        "scopes": "Ámbitos (separados por comas)",
+        "scopesHint": "Déjalo vacío para incluir todos los ámbitos.",
+        "expires": "Caduca en (días)",
+        "submit": "Crear token",
+        "submitting": "Creando…"
       },
       "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+        "title": "Token creado: cópialo ahora",
+        "description": "Esta es la única vez que se mostrará el secreto. Pégalo inmediatamente en el almacén de secretos de CI.",
+        "last4Label": "últimos 4",
+        "copy": "Copiar",
+        "copied": "Copiado al portapapeles",
+        "done": "Listo",
+        "graceNote": "El secreto anterior sigue siendo válido durante {window}; las ejecuciones de CI en curso no fallarán."
       },
       "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Plazo de gracia configurado: {window}. El token anterior sigue siendo válido durante este plazo tras la rotación.",
-        "newLine": "La confirmación emite un nuevo token.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token",
-        "loading": "Leyendo el plazo de rotación configurado…",
-        "unavailable": "No se pudo leer el plazo de rotación. La rotación está bloqueada hasta que esté disponible.",
+        "title": "¿Rotar {name}?",
+        "fallbackTitle": "¿Rotar token?",
+        "graceLine": "Período de gracia configurado: {window}. El token anterior sigue siendo válido durante este período después de la rotación.",
+        "newLine": "La confirmación emite un token nuevo.",
+        "immediateHint": "Usa Revocar para invalidarlo inmediatamente si sospechas que se ha comprometido.",
+        "confirm": "Rotar token",
+        "loading": "Leyendo el período de gracia configurado…",
+        "unavailable": "No se pudo leer el período de gracia. La rotación está bloqueada hasta que esté disponible.",
         "retry": "Reintentar",
-        "snapshotHint": "Esta es la configuración actual. La rotación vuelve a comprobar el acceso y lee el plazo al emitir el nuevo token."
+        "snapshotHint": "Esta es la configuración actual. La rotación vuelve a comprobar el acceso y lee de nuevo el período al emitir el token."
       },
       "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
+        "title": "¿Revocar {name}?",
+        "fallbackTitle": "¿Revocar token?",
+        "description": "Los flujos de CI que usan este token fallarán inmediatamente. Crea otro token después y actualiza el secreto de CI. Usa Rotar para cambiarlo con un período de gracia.",
+        "confirm": "Revocar token"
+      },
+      "rotateFailed": "No se pudo rotar",
+      "searchPlaceholder": "Buscar tokens por nombre, últimos 4, IP o agente de usuario…",
+      "allView": "Todos",
+      "graceDuration": {
+        "days": "{count} d",
+        "hours": "{count} h",
+        "minutes": "{count} min",
+        "seconds": "{count} s"
       }
     },
     "domains": {

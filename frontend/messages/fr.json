@@ -698,71 +698,80 @@
       }
     },
     "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
+      "title": "Jetons de déploiement",
+      "description": "Jetons d’API utilisés par les exécuteurs CI pour déployer sur {slug}. Le secret n’est affiché qu’une fois à la création ou à la rotation ; seul le hachage est conservé.",
+      "createToken": "Créer un jeton",
+      "emptyTitle": "Aucun jeton de déploiement",
+      "emptyDescription": "Créez un jeton pour déployer depuis CI. Le secret n’est affiché qu’une fois à sa création.",
+      "rotate": "Renouveler",
+      "revoke": "Révoquer",
+      "allScopes": "toutes",
+      "never": "jamais",
+      "createFailed": "Échec de la création",
+      "revokeFailed": "Échec de la révocation",
+      "revokedToast": "{name} révoqué",
       "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
+        "name": "Nom",
+        "last4": "4 derniers",
+        "scopes": "Portées",
+        "lastUsed": "Dernière utilisation",
+        "expires": "Expiration",
+        "state": "État",
         "actions": "Actions"
       },
       "status": {
-        "active": "active",
-        "revoked": "revoked"
+        "active": "actif",
+        "revoked": "révoqué"
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "Agent utilisateur"
       },
       "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
+        "title": "Créer un jeton de déploiement",
+        "description": "Le secret n’est affiché qu’une fois sur l’écran suivant. Copiez-le immédiatement dans le coffre de secrets CI.",
+        "name": "Nom",
+        "scopes": "Portées (séparées par des virgules)",
+        "scopesHint": "Laissez vide pour inclure toutes les portées.",
+        "expires": "Expire dans (jours)",
+        "submit": "Créer un jeton",
+        "submitting": "Création…"
       },
       "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+        "title": "Jeton créé : copiez-le maintenant",
+        "description": "C’est la seule fois où le secret sera affiché. Collez-le immédiatement dans le coffre de secrets CI.",
+        "last4Label": "4 derniers",
+        "copy": "Copier",
+        "copied": "Copié dans le presse-papiers",
+        "done": "Terminé",
+        "graceNote": "L’ancien secret reste valide pendant {window} ; les exécutions CI en cours ne seront pas interrompues."
       },
       "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Délai de grâce configuré : {window}. Le jeton précédent reste valide pendant ce délai après la rotation.",
+        "title": "Renouveler {name} ?",
+        "fallbackTitle": "Renouveler le jeton ?",
+        "graceLine": "Délai de grâce configuré : {window}. L’ancien jeton reste valide pendant ce délai après le renouvellement.",
         "newLine": "La confirmation émet un nouveau jeton.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token",
-        "loading": "Lecture du délai de rotation configuré…",
-        "unavailable": "Le délai de rotation n’a pas pu être lu. La rotation est bloquée jusqu’à ce qu’il soit disponible.",
+        "immediateHint": "Utilisez Révoquer pour une invalidation immédiate en cas de compromission suspectée.",
+        "confirm": "Renouveler le jeton",
+        "loading": "Lecture du délai de grâce configuré…",
+        "unavailable": "Le délai de grâce n’a pas pu être lu. Le renouvellement est bloqué jusqu’à ce qu’il soit disponible.",
         "retry": "Réessayer",
-        "snapshotHint": "Il s’agit de la configuration actuelle. La rotation vérifie à nouveau l’accès et relit le délai lors de l’émission du nouveau jeton."
+        "snapshotHint": "Il s’agit de la configuration actuelle. Le renouvellement vérifie à nouveau l’accès et relit le délai lors de l’émission du nouveau jeton."
       },
       "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
+        "title": "Révoquer {name} ?",
+        "fallbackTitle": "Révoquer le jeton ?",
+        "description": "Les flux CI utilisant ce jeton échoueront immédiatement. Créez ensuite un nouveau jeton et mettez à jour le secret CI. Utilisez Renouveler pour un remplacement avec délai de grâce.",
+        "confirm": "Révoquer le jeton"
+      },
+      "rotateFailed": "Échec du renouvellement",
+      "searchPlaceholder": "Rechercher par nom, 4 derniers caractères, IP ou agent utilisateur…",
+      "allView": "Tous",
+      "graceDuration": {
+        "days": "{count} j",
+        "hours": "{count} h",
+        "minutes": "{count} min",
+        "seconds": "{count} s"
       }
     },
     "domains": {

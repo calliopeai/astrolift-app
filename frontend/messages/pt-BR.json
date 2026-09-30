@@ -698,71 +698,80 @@
       }
     },
     "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
+      "title": "Tokens de implantação",
+      "description": "Tokens de API usados pelos executores de CI para implantar em {slug}. O segredo é exibido uma vez na criação ou rotação; armazenamos apenas o hash.",
+      "createToken": "Criar token",
+      "emptyTitle": "Nenhum token de implantação ainda",
+      "emptyDescription": "Crie um token para implantar pelo CI. O segredo é exibido uma única vez na criação.",
+      "rotate": "Rotacionar",
+      "revoke": "Revogar",
+      "allScopes": "todos",
+      "never": "nunca",
+      "createFailed": "Falha ao criar",
+      "revokeFailed": "Falha ao revogar",
+      "revokedToast": "{name} revogado",
       "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
+        "name": "Nome",
+        "last4": "Últimos 4",
+        "scopes": "Escopos",
+        "lastUsed": "Último uso",
+        "expires": "Expiração",
+        "state": "Estado",
+        "actions": "Ações"
       },
       "status": {
-        "active": "active",
-        "revoked": "revoked"
+        "active": "ativo",
+        "revoked": "revogado"
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "Agente de usuário"
       },
       "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
+        "title": "Criar token de implantação",
+        "description": "O segredo será exibido uma vez na próxima tela. Copie-o imediatamente para o armazenamento de segredos do CI.",
+        "name": "Nome",
+        "scopes": "Escopos (separados por vírgulas)",
+        "scopesHint": "Deixe em branco para incluir todos os escopos.",
+        "expires": "Expira em (dias)",
+        "submit": "Criar token",
+        "submitting": "Criando…"
       },
       "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+        "title": "Token criado: copie agora",
+        "description": "Esta é a única vez que o segredo será exibido. Cole-o imediatamente no armazenamento de segredos do CI.",
+        "last4Label": "últimos 4",
+        "copy": "Copiar",
+        "copied": "Copiado para a área de transferência",
+        "done": "Concluído",
+        "graceNote": "O segredo anterior continua válido por {window}; as execuções de CI em andamento não falharão."
       },
       "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Período de tolerância configurado: {window}. O token anterior permanece válido por esse período após a rotação.",
+        "title": "Rotacionar {name}?",
+        "fallbackTitle": "Rotacionar token?",
+        "graceLine": "Período de tolerância configurado: {window}. O token anterior continua válido por esse período após a rotação.",
         "newLine": "A confirmação emite um novo token.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token",
-        "loading": "Lendo o período de rotação configurado…",
-        "unavailable": "Não foi possível ler o período de rotação. A rotação está bloqueada até que ele esteja disponível.",
+        "immediateHint": "Use Revogar para invalidar imediatamente se houver suspeita de comprometimento.",
+        "confirm": "Rotacionar token",
+        "loading": "Lendo o período de tolerância configurado…",
+        "unavailable": "Não foi possível ler o período de tolerância. A rotação fica bloqueada até que ele esteja disponível.",
         "retry": "Tentar novamente",
-        "snapshotHint": "Esta é a configuração atual. A rotação verifica novamente o acesso e lê o período ao emitir o novo token."
+        "snapshotHint": "Esta é a configuração atual. A rotação verifica o acesso e lê o período novamente ao emitir o novo token."
       },
       "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
+        "title": "Revogar {name}?",
+        "fallbackTitle": "Revogar token?",
+        "description": "Os fluxos de CI que usam este token falharão imediatamente. Crie um novo token depois e atualize o segredo do CI. Use Rotacionar para uma troca com período de tolerância.",
+        "confirm": "Revogar token"
+      },
+      "rotateFailed": "Falha ao rotacionar",
+      "searchPlaceholder": "Buscar tokens por nome, últimos 4 caracteres, IP ou agente de usuário…",
+      "allView": "Todos",
+      "graceDuration": {
+        "days": "{count} d",
+        "hours": "{count} h",
+        "minutes": "{count} min",
+        "seconds": "{count} s"
       }
     },
     "domains": {

@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useFormatters } from "@/lib/i18n/formatters";
+
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/PageShell";
@@ -68,6 +70,7 @@ export function DeployTokensScreen({
   tabs,
 }: DeployTokensScreenProps) {
   const tr = useTranslations("apps.tokens");
+  const fmt = useFormatters();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rotation, setRotation] = React.useState<{ token: DeployToken; scope: string } | null>(
     null
@@ -117,8 +120,7 @@ export function DeployTokensScreen({
       header: tr("columns.expires"),
       width: "w-28",
       cellClassName: "text-muted-foreground text-xs",
-      cell: (token) =>
-        token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : tr("never"),
+      cell: (token) => (token.expiresAt ? fmt.formatDate(token.expiresAt) : tr("never")),
     },
     {
       id: "state",
@@ -183,7 +185,14 @@ export function DeployTokensScreen({
       <TooltipProvider>
         <ListPage<DeployToken>
           embedded
-          list={list}
+          list={{
+            ...list,
+            definition: {
+              ...list.definition,
+              searchPlaceholder: tr("searchPlaceholder"),
+              views: [{ key: "all", label: tr("allView"), filters: {} }],
+            },
+          }}
           label={tr("title")}
           columns={columns}
           rows={rows}
@@ -259,6 +268,7 @@ function RotationDialog({
   onRotate: (token: DeployToken) => Promise<void>;
 }) {
   const tr = useTranslations("apps.tokens.rotateDialog");
+  const grace = useTranslations("apps.tokens.graceDuration");
   const [attempt, retry] = React.useReducer((n: number) => n + 1, 0);
   const [result, setResult] = React.useState<{
     loader: typeof onLoad;
@@ -297,7 +307,9 @@ function RotationDialog({
           {metadata?.seconds != null ? (
             <>
               <span className="block">
-                {tr("graceLine", { window: humanizeGrace(metadata.seconds) })}
+                {tr("graceLine", {
+                  window: humanizeGrace(metadata.seconds, (unit, count) => grace(unit, { count })),
+                })}
               </span>
               <span className="text-muted-foreground block text-xs">{tr("snapshotHint")}</span>
             </>
@@ -343,10 +355,11 @@ function RotationDialog({
 
 function LastUsedCell({ token }: { token: DeployToken }) {
   const tr = useTranslations("apps.tokens.lastUsedCell");
+  const fmt = useFormatters();
   if (!token.lastUsedAt) {
     return <span>—</span>;
   }
-  const stamp = new Date(token.lastUsedAt).toLocaleString();
+  const stamp = fmt.formatDateTime(token.lastUsedAt);
   const hasForensics = Boolean(token.lastUsedIp || token.lastUsedAgent);
   if (!hasForensics) {
     return <span>{stamp}</span>;
@@ -377,16 +390,19 @@ function LastUsedCell({ token }: { token: DeployToken }) {
 }
 
 // Preserve the configured duration exactly, including non-whole hours/minutes.
-function humanizeGrace(seconds: number): string {
+function humanizeGrace(
+  seconds: number,
+  format: (unit: "days" | "hours" | "minutes" | "seconds", count: number) => string
+): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const remaining = seconds % 60;
   return [
-    days && `${days}d`,
-    hours && `${hours}h`,
-    minutes && `${minutes}m`,
-    remaining && `${remaining}s`,
+    days && format("days", days),
+    hours && format("hours", hours),
+    minutes && format("minutes", minutes),
+    remaining && format("seconds", remaining),
   ]
     .filter(Boolean)
     .join(" ");
@@ -503,6 +519,7 @@ function RevealDialog({
   onOpenChange: () => void;
 }) {
   const tr = useTranslations("apps.tokens.revealDialog");
+  const grace = useTranslations("apps.tokens.graceDuration");
   return (
     <AlertDialog open={reveal !== null} onOpenChange={(o) => !o && onOpenChange()}>
       <AlertDialogContent>
@@ -534,7 +551,9 @@ function RevealDialog({
             {reveal.rotationGraceSeconds > 0 && (
               <p className="text-muted-foreground text-xs">
                 {tr("graceNote", {
-                  window: humanizeGrace(reveal.rotationGraceSeconds),
+                  window: humanizeGrace(reveal.rotationGraceSeconds, (unit, count) =>
+                    grace(unit, { count })
+                  ),
                 })}
               </p>
             )}

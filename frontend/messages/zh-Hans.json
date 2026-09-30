@@ -698,71 +698,80 @@
       }
     },
     "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
+      "title": "部署令牌",
+      "description": "CI 运行器用于向 {slug} 推送部署的 API 令牌。明文仅在创建或轮换时显示一次；系统只存储哈希值。",
+      "createToken": "创建令牌",
+      "emptyTitle": "暂无部署令牌",
+      "emptyDescription": "创建令牌以通过 CI 执行部署。明文仅在创建时显示一次。",
+      "rotate": "轮换",
+      "revoke": "撤销",
+      "allScopes": "全部",
+      "never": "永不",
+      "createFailed": "创建失败",
+      "revokeFailed": "撤销失败",
+      "revokedToast": "已撤销 {name}",
       "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
+        "name": "名称",
+        "last4": "末尾 4 位",
+        "scopes": "权限范围",
+        "lastUsed": "上次使用",
+        "expires": "到期时间",
+        "state": "状态",
+        "actions": "操作"
       },
       "status": {
-        "active": "active",
-        "revoked": "revoked"
+        "active": "有效",
+        "revoked": "已撤销"
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "用户代理"
       },
       "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
+        "title": "创建部署令牌",
+        "description": "明文将在下一屏显示一次。请立即将其复制到 CI 密钥存储中。",
+        "name": "名称",
+        "scopes": "权限范围（以逗号分隔）",
+        "scopesHint": "留空表示包含全部权限范围。",
+        "expires": "有效期（天）",
+        "submit": "创建令牌",
+        "submitting": "正在创建…"
       },
       "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+        "title": "令牌已创建，请立即复制",
+        "description": "明文仅在此时显示一次。请立即将其粘贴到 CI 密钥存储中。",
+        "last4Label": "末尾 4 位",
+        "copy": "复制",
+        "copied": "已复制到剪贴板",
+        "done": "完成",
+        "graceNote": "旧密钥在 {window} 内仍然有效，进行中的 CI 运行不会因此失败。"
       },
       "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "配置的宽限期：{window}。轮换后，旧令牌在此期间内仍然有效。",
-        "newLine": "确认后将发放新令牌。",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token",
-        "loading": "正在读取配置的轮换宽限期…",
-        "unavailable": "无法读取轮换宽限期。在获取该信息之前，无法进行轮换。",
+        "title": "轮换 {name}？",
+        "fallbackTitle": "轮换令牌？",
+        "graceLine": "已配置的宽限期：{window}。轮换后，旧令牌在此期间仍然有效。",
+        "newLine": "确认后将签发新令牌。",
+        "immediateHint": "如怀疑令牌泄露，请使用撤销操作立即使其失效。",
+        "confirm": "轮换令牌",
+        "loading": "正在读取已配置的轮换宽限期…",
+        "unavailable": "无法读取轮换宽限期。在信息可用之前，轮换操作将被阻止。",
         "retry": "重试",
-        "snapshotHint": "这是当前配置。发放新令牌时，轮换操作会重新检查访问权限并再次读取宽限期。"
+        "snapshotHint": "这是当前配置。签发新令牌时，轮换操作会重新检查访问权限并再次读取宽限期。"
       },
       "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
+        "title": "撤销 {name}？",
+        "fallbackTitle": "撤销令牌？",
+        "description": "使用此令牌的 CI 流程将立即失败。随后请创建新令牌并更新 CI 密钥。如需在宽限期内切换，请使用轮换。",
+        "confirm": "撤销令牌"
+      },
+      "rotateFailed": "轮换失败",
+      "searchPlaceholder": "按名称、末尾 4 位、IP 或用户代理搜索令牌…",
+      "allView": "全部",
+      "graceDuration": {
+        "days": "{count} 天",
+        "hours": "{count} 小时",
+        "minutes": "{count} 分钟",
+        "seconds": "{count} 秒"
       }
     },
     "domains": {

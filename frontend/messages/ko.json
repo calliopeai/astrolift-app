@@ -698,71 +698,80 @@
       }
     },
     "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
+      "title": "배포 토큰",
+      "description": "CI 실행기가 {slug}에 배포할 때 사용하는 API 토큰입니다. 비밀 값은 생성하거나 교체할 때 한 번만 표시되며 해시만 저장합니다.",
+      "createToken": "토큰 생성",
+      "emptyTitle": "아직 배포 토큰이 없습니다",
+      "emptyDescription": "CI에서 배포하려면 토큰을 생성하세요. 비밀 값은 생성 시 한 번만 표시됩니다.",
+      "rotate": "교체",
+      "revoke": "폐기",
+      "allScopes": "전체",
+      "never": "없음",
+      "createFailed": "생성 실패",
+      "revokeFailed": "폐기 실패",
+      "revokedToast": "{name} 폐기됨",
       "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
+        "name": "이름",
+        "last4": "마지막 4자",
+        "scopes": "범위",
+        "lastUsed": "마지막 사용",
+        "expires": "만료일",
+        "state": "상태",
+        "actions": "작업"
       },
       "status": {
-        "active": "active",
-        "revoked": "revoked"
+        "active": "활성",
+        "revoked": "폐기됨"
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "사용자 에이전트"
       },
       "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
+        "title": "배포 토큰 생성",
+        "description": "비밀 값은 다음 화면에서 한 번만 표시됩니다. 즉시 CI 비밀 저장소에 복사하세요.",
+        "name": "이름",
+        "scopes": "범위(쉼표로 구분)",
+        "scopesHint": "전체 범위를 포함하려면 비워 두세요.",
+        "expires": "만료까지 남은 일수",
+        "submit": "토큰 생성",
+        "submitting": "생성 중…"
       },
       "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+        "title": "토큰이 생성되었습니다. 지금 복사하세요",
+        "description": "비밀 값은 이번에만 표시됩니다. 즉시 CI 비밀 저장소에 붙여 넣으세요.",
+        "last4Label": "마지막 4자",
+        "copy": "복사",
+        "copied": "클립보드에 복사됨",
+        "done": "완료",
+        "graceNote": "이전 비밀 값은 {window} 동안 유효하므로 진행 중인 CI 실행은 실패하지 않습니다."
       },
       "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
+        "title": "{name}을(를) 교체할까요?",
+        "fallbackTitle": "토큰을 교체할까요?",
         "graceLine": "설정된 유예 기간: {window}. 교체 후에도 이 기간 동안 이전 토큰이 유효합니다.",
         "newLine": "확인하면 새 토큰이 발급됩니다.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token",
-        "loading": "설정된 교체 유예 기간을 읽는 중…",
-        "unavailable": "교체 유예 기간을 읽을 수 없습니다. 확인될 때까지 교체가 차단됩니다.",
+        "immediateHint": "유출이 의심되면 폐기를 사용해 즉시 무효화하세요.",
+        "confirm": "토큰 교체",
+        "loading": "설정된 유예 기간을 읽는 중…",
+        "unavailable": "유예 기간을 읽지 못했습니다. 정보를 읽을 수 있을 때까지 교체가 차단됩니다.",
         "retry": "다시 시도",
         "snapshotHint": "현재 설정입니다. 새 토큰을 발급할 때 접근 권한과 유예 기간을 다시 확인합니다."
       },
       "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
+        "title": "{name}을(를) 폐기할까요?",
+        "fallbackTitle": "토큰을 폐기할까요?",
+        "description": "이 토큰을 사용하는 CI 흐름은 즉시 실패합니다. 이후 새 토큰을 발급하고 CI 비밀 값을 업데이트하세요. 유예 기간을 두고 바꾸려면 교체를 사용하세요.",
+        "confirm": "토큰 폐기"
+      },
+      "rotateFailed": "교체 실패",
+      "searchPlaceholder": "이름, 마지막 4자, IP 또는 사용자 에이전트로 토큰 검색…",
+      "allView": "전체",
+      "graceDuration": {
+        "days": "{count}일",
+        "hours": "{count}시간",
+        "minutes": "{count}분",
+        "seconds": "{count}초"
       }
     },
     "domains": {

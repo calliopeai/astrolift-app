@@ -1956,7 +1956,7 @@
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "User agent"
       },
       "createSheet": {
         "title": "Create deploy token",
@@ -1994,6 +1994,15 @@
         "fallbackTitle": "Revoke token?",
         "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
         "confirm": "Revoke token"
+      },
+      "rotateFailed": "Rotate failed",
+      "searchPlaceholder": "Search tokens by name, last 4, IP or user agent…",
+      "allView": "All",
+      "graceDuration": {
+        "days": "{count}d",
+        "hours": "{count}h",
+        "minutes": "{count}m",
+        "seconds": "{count}s"
       }
     },
     "logs": {

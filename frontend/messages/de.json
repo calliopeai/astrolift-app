@@ -698,71 +698,80 @@
       }
     },
     "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
+      "title": "Deployment-Token",
+      "description": "API-Token, mit denen CI-Runner Deployments an {slug} senden. Das Geheimnis wird nur bei Erstellung oder Rotation angezeigt; gespeichert wird nur der Hash.",
+      "createToken": "Token erstellen",
+      "emptyTitle": "Noch keine Deployment-Token",
+      "emptyDescription": "Erstellen Sie einen Token für Deployments aus CI. Das Geheimnis wird bei der Erstellung einmal angezeigt.",
+      "rotate": "Rotieren",
+      "revoke": "Widerrufen",
+      "allScopes": "alle",
+      "never": "nie",
+      "createFailed": "Erstellung fehlgeschlagen",
+      "revokeFailed": "Widerruf fehlgeschlagen",
+      "revokedToast": "{name} widerrufen",
       "columns": {
         "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
+        "last4": "Letzte 4",
+        "scopes": "Berechtigungsbereiche",
+        "lastUsed": "Zuletzt verwendet",
+        "expires": "Ablauf",
+        "state": "Status",
+        "actions": "Aktionen"
       },
       "status": {
-        "active": "active",
-        "revoked": "revoked"
+        "active": "aktiv",
+        "revoked": "widerrufen"
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "User-Agent"
       },
       "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
+        "title": "Deployment-Token erstellen",
+        "description": "Das Geheimnis wird auf dem nächsten Bildschirm einmal angezeigt. Kopieren Sie es sofort in den CI-Geheimnisspeicher.",
         "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
+        "scopes": "Berechtigungsbereiche (kommagetrennt)",
+        "scopesHint": "Leer lassen, um alle Berechtigungsbereiche einzuschließen.",
+        "expires": "Läuft ab in (Tagen)",
+        "submit": "Token erstellen",
+        "submitting": "Wird erstellt…"
       },
       "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+        "title": "Token erstellt: jetzt kopieren",
+        "description": "Das Geheimnis wird nur dieses eine Mal angezeigt. Fügen Sie es sofort in den CI-Geheimnisspeicher ein.",
+        "last4Label": "letzte 4",
+        "copy": "Kopieren",
+        "copied": "In die Zwischenablage kopiert",
+        "done": "Fertig",
+        "graceNote": "Das bisherige Geheimnis bleibt für {window} gültig; laufende CI-Ausführungen schlagen dadurch nicht fehl."
       },
       "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "Konfiguriertes Kulanzfenster: {window}. Das vorherige Token bleibt nach der Rotation für diesen Zeitraum gültig.",
-        "newLine": "Die Bestätigung gibt ein neues Token aus.",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token",
-        "loading": "Das konfigurierte Rotationsfenster wird gelesen…",
-        "unavailable": "Das Rotationsfenster konnte nicht gelesen werden. Die Rotation ist blockiert, bis es verfügbar ist.",
+        "title": "{name} rotieren?",
+        "fallbackTitle": "Token rotieren?",
+        "graceLine": "Konfigurierte Übergangsfrist: {window}. Der bisherige Token bleibt nach der Rotation für diese Dauer gültig.",
+        "newLine": "Die Bestätigung stellt einen neuen Token aus.",
+        "immediateHint": "Verwenden Sie Widerrufen für eine sofortige Ungültigmachung bei vermutetem Missbrauch.",
+        "confirm": "Token rotieren",
+        "loading": "Konfigurierte Übergangsfrist wird gelesen…",
+        "unavailable": "Die Übergangsfrist konnte nicht gelesen werden. Die Rotation bleibt gesperrt, bis sie verfügbar ist.",
         "retry": "Erneut versuchen",
-        "snapshotHint": "Dies ist die aktuelle Konfiguration. Die Rotation prüft den Zugriff und liest das Zeitfenster bei der Ausgabe des neuen Tokens erneut."
+        "snapshotHint": "Dies ist die aktuelle Konfiguration. Bei der Ausgabe des neuen Tokens prüft die Rotation den Zugriff und liest die Frist erneut."
       },
       "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
+        "title": "{name} widerrufen?",
+        "fallbackTitle": "Token widerrufen?",
+        "description": "CI-Abläufe mit diesem Token schlagen sofort fehl. Erstellen Sie danach einen neuen Token und aktualisieren Sie das CI-Geheimnis. Verwenden Sie Rotieren für einen Wechsel mit Übergangsfrist.",
+        "confirm": "Token widerrufen"
+      },
+      "rotateFailed": "Rotation fehlgeschlagen",
+      "searchPlaceholder": "Token nach Name, letzten 4 Zeichen, IP oder User-Agent suchen…",
+      "allView": "Alle",
+      "graceDuration": {
+        "days": "{count} T",
+        "hours": "{count} Std.",
+        "minutes": "{count} Min.",
+        "seconds": "{count} Sek."
       }
     },
     "domains": {

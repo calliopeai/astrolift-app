@@ -698,71 +698,80 @@
       }
     },
     "tokens": {
-      "title": "Deploy tokens",
-      "description": "API tokens that CI runners use to push deployments to {slug}. Plaintext is shown once at create/rotate; we store only the hash.",
-      "createToken": "Create token",
-      "emptyTitle": "No deploy tokens yet",
-      "emptyDescription": "Create a token to run deployments from CI. The plaintext is shown once on creation.",
-      "rotate": "Rotate",
-      "revoke": "Revoke",
-      "allScopes": "all",
-      "never": "never",
-      "createFailed": "Create failed",
-      "revokeFailed": "Revoke failed",
-      "revokedToast": "Revoked {name}",
+      "title": "デプロイトークン",
+      "description": "CI ランナーが {slug} にデプロイするための API トークンです。秘密値は作成時またはローテーション時に一度だけ表示され、保存されるのはハッシュのみです。",
+      "createToken": "トークンを作成",
+      "emptyTitle": "デプロイトークンはまだありません",
+      "emptyDescription": "CI からデプロイするためのトークンを作成します。秘密値は作成時に一度だけ表示されます。",
+      "rotate": "ローテーション",
+      "revoke": "失効させる",
+      "allScopes": "すべて",
+      "never": "なし",
+      "createFailed": "作成に失敗しました",
+      "revokeFailed": "失効に失敗しました",
+      "revokedToast": "{name} を失効させました",
       "columns": {
-        "name": "Name",
-        "last4": "Last 4",
-        "scopes": "Scopes",
-        "lastUsed": "Last used",
-        "expires": "Expires",
-        "state": "State",
-        "actions": "Actions"
+        "name": "名前",
+        "last4": "末尾4文字",
+        "scopes": "スコープ",
+        "lastUsed": "最終使用日時",
+        "expires": "有効期限",
+        "state": "状態",
+        "actions": "操作"
       },
       "status": {
-        "active": "active",
-        "revoked": "revoked"
+        "active": "有効",
+        "revoked": "失効済み"
       },
       "lastUsedCell": {
         "ip": "IP",
-        "agent": "Agent"
+        "agent": "ユーザーエージェント"
       },
       "createSheet": {
-        "title": "Create deploy token",
-        "description": "The plaintext secret is shown once on the next screen — copy it into your CI secret store immediately.",
-        "name": "Name",
-        "scopes": "Scopes (comma-separated)",
-        "scopesHint": "Leave blank for all scopes.",
-        "expires": "Expires in (days)",
-        "submit": "Create token",
-        "submitting": "Creating…"
+        "title": "デプロイトークンを作成",
+        "description": "秘密値は次の画面で一度だけ表示されます。すぐに CI のシークレットストアにコピーしてください。",
+        "name": "名前",
+        "scopes": "スコープ（カンマ区切り）",
+        "scopesHint": "すべてのスコープを含める場合は空欄にします。",
+        "expires": "有効期間（日）",
+        "submit": "トークンを作成",
+        "submitting": "作成中…"
       },
       "revealDialog": {
-        "title": "Token created — copy now",
-        "description": "This is the only time the plaintext secret will be shown. Paste it into your CI secret store immediately.",
-        "last4Label": "last 4",
-        "copy": "Copy",
-        "copied": "Copied to clipboard",
-        "done": "Done",
-        "graceNote": "Previous secret stays valid for {window} — in-flight CI runs will not fail."
+        "title": "トークンを作成しました。今すぐコピーしてください",
+        "description": "秘密値が表示されるのはこの一度だけです。すぐに CI のシークレットストアに貼り付けてください。",
+        "last4Label": "末尾4文字",
+        "copy": "コピー",
+        "copied": "クリップボードにコピーしました",
+        "done": "完了",
+        "graceNote": "以前の秘密値は {window} の間有効なため、実行中の CI は失敗しません。"
       },
       "rotateDialog": {
-        "title": "Rotate {name}?",
-        "fallbackTitle": "Rotate token?",
-        "graceLine": "設定された猶予期間：{window}。ローテーション後も、この期間中は以前のトークンが有効です。",
-        "newLine": "確認すると、新しいトークンが発行されます。",
-        "immediateHint": "Use Revoke for an immediate cutover after a suspected compromise.",
-        "confirm": "Rotate token",
-        "loading": "設定されたローテーション期間を読み込み中…",
-        "unavailable": "ローテーション期間を読み取れませんでした。取得できるまでローテーションは実行できません。",
+        "title": "{name} をローテーションしますか？",
+        "fallbackTitle": "トークンをローテーションしますか？",
+        "graceLine": "設定済みの猶予期間：{window}。ローテーション後も、この期間中は以前のトークンが有効です。",
+        "newLine": "確認すると新しいトークンが発行されます。",
+        "immediateHint": "漏えいが疑われる場合は、失効操作で直ちに無効にしてください。",
+        "confirm": "トークンをローテーション",
+        "loading": "設定済みの猶予期間を読み込み中…",
+        "unavailable": "猶予期間を読み込めませんでした。取得できるまでローテーションはできません。",
         "retry": "再試行",
-        "snapshotHint": "現在の設定です。新しいトークンの発行時に、アクセス権と期間を再確認します。"
+        "snapshotHint": "これは現在の設定です。新しいトークンの発行時に、アクセス権と猶予期間が再確認されます。"
       },
       "revokeDialog": {
-        "title": "Revoke {name}?",
-        "fallbackTitle": "Revoke token?",
-        "description": "CI flows holding this token break immediately. Mint a new token afterwards and update the CI secret. Use Rotate instead for a grace-period swap.",
-        "confirm": "Revoke token"
+        "title": "{name} を失効させますか？",
+        "fallbackTitle": "トークンを失効させますか？",
+        "description": "このトークンを使う CI フローは直ちに失敗します。新しいトークンを作成し、CI のシークレットを更新してください。猶予期間付きで切り替える場合はローテーションを使用します。",
+        "confirm": "トークンを失効させる"
+      },
+      "rotateFailed": "ローテーションに失敗しました",
+      "searchPlaceholder": "名前、末尾4文字、IP、ユーザーエージェントでトークンを検索…",
+      "allView": "すべて",
+      "graceDuration": {
+        "days": "{count}日",
+        "hours": "{count}時間",
+        "minutes": "{count}分",
+        "seconds": "{count}秒"
       }
     },
     "domains": {

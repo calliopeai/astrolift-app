@@ -109,7 +109,7 @@ export function useDeployTokens(slug: string) {
       const next = data.rotateDeployToken.data;
       if (next) setReveal(next);
     } else {
-      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? "Rotate failed");
+      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? tr("rotateFailed"));
     }
   }
 
