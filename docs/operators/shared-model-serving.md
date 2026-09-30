@@ -66,6 +66,15 @@ cluster. App-free pending and failed deployments also block retirement: their
 cluster transport remains necessary for cleanup. Retirement and model admission
 serialize on the cluster row, and the retirement worker rechecks before changing
 the cluster lifecycle. Soft-deleted deployments no longer block retirement.
+After a lock wait, retirement re-reads the actor, bearer scopes, grants and actual
+cluster region. Bring/refresh and their worker state transitions cannot reopen a
+retiring or retired cluster. RBAC removal and cloud teardown hold the placement
+lock while checking the current retiring state and absence of live models or
+bound environments, then calling the driver. A stale management failure cannot
+reset a retiring cluster; an actual retirement failure still enters the retryable
+error state. The existing Temporal activity arguments and workflow histories are
+unchanged. These guards do not provide exactly-once cloud effects after transport
+uncertainty.
 
 New subscriptions require a named alias. Existing legacy `MODEL_*` bindings keep
 their behavior. A review captures the exact model, environment and subscription

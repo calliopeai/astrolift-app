@@ -13,6 +13,10 @@
 - Shared owner prompt admission requires the observed provider and canonical
   model handle to match the current placement, refusing stale rollout evidence
   before relay credentials or queue admission (#2213).
+- Cluster retirement refreshes authority after placement locks. Concurrent
+  management cannot reopen retirement, and destructive worker calls retain the
+  placement lock while rechecking live models and bound environments (#2213).
+
 
 - Cluster unregister and decommission refuse while any live shared model remains,
   including app-free pending or failed deployments. Worker retirement rechecks

@@ -1029,35 +1029,50 @@ class ClustersMutation:
         against a managing/managed row no-ops the lifecycle flip and
         joins the in-flight workflow."""
 
-        tenant = get_current_tenant()
-        cluster = TenantCluster.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            guid=str(input.cluster_id),
-            deleted_at__isnull=True,
-        ).first()
-        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
-        if cluster is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
-        if not cluster.is_active:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "cluster is inactive — re-activate before bringing into management",
-            )
-        if cluster.lifecycle == TenantCluster.Lifecycle.MANAGING.value:
-            # Already in flight — surface the current state without
-            # re-kicking the workflow (the existing run picks up the
-            # same workflow id anyway, but skipping the DB write
-            # keeps the row's updated_at stable for the UI).
-            return gql_success(cluster_to_type(cluster))
-
-        actor = _actor_from_request(info)
         with transaction.atomic():
-            _kick_bring_into_management(
-                cluster=cluster,
-                actor=actor,
-                force_preflight=True,
+            tenant = get_current_tenant()
+            cluster = (
+                TenantCluster.objects.select_for_update()
+                .filter(
+                    Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                    guid=str(input.cluster_id),
+                    deleted_at__isnull=True,
+                )
+                .first()
             )
-        return gql_success(cluster_to_type(cluster))
+            _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
+            if cluster is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+            from astrolift_services.cluster_retirement import recheck_cluster_authority
+
+            recheck_cluster_authority(cluster, Permission.CLUSTER_MANAGE)
+            if cluster.lifecycle in (
+                TenantCluster.Lifecycle.DECOMMISSIONING.value,
+                TenantCluster.Lifecycle.DECOMMISSIONED.value,
+            ):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value, "Retiring clusters cannot return to management."
+                )
+            if not cluster.is_active:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "cluster is inactive — re-activate before bringing into management",
+                )
+            if cluster.lifecycle == TenantCluster.Lifecycle.MANAGING.value:
+                # Already in flight — surface the current state without
+                # re-kicking the workflow (the existing run picks up the
+                # same workflow id anyway, but skipping the DB write
+                # keeps the row's updated_at stable for the UI).
+                return gql_success(cluster_to_type(cluster))
+
+            actor = _actor_from_request(info)
+            with transaction.atomic():
+                _kick_bring_into_management(
+                    cluster=cluster,
+                    actor=actor,
+                    force_preflight=True,
+                )
+            return gql_success(cluster_to_type(cluster))
 
     @strawberry.field
     @mutation_audit(action="cluster.refresh_management")
@@ -1076,29 +1091,44 @@ class ClustersMutation:
         ``forcePreflight=true`` re-runs the Job; default false skips
         it for a fast probe + RBAC reconcile."""
 
-        tenant = get_current_tenant()
-        cluster = TenantCluster.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            guid=str(input.cluster_id),
-            deleted_at__isnull=True,
-        ).first()
-        _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
-        if cluster is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
-        if not cluster.is_active:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "cluster is inactive — re-activate before refreshing management",
-            )
-
-        actor = _actor_from_request(info)
         with transaction.atomic():
-            _kick_bring_into_management(
-                cluster=cluster,
-                actor=actor,
-                force_preflight=bool(input.force_preflight),
+            tenant = get_current_tenant()
+            cluster = (
+                TenantCluster.objects.select_for_update()
+                .filter(
+                    Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                    guid=str(input.cluster_id),
+                    deleted_at__isnull=True,
+                )
+                .first()
             )
-        return gql_success(cluster_to_type(cluster))
+            _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
+            if cluster is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+            from astrolift_services.cluster_retirement import recheck_cluster_authority
+
+            recheck_cluster_authority(cluster, Permission.CLUSTER_MANAGE)
+            if cluster.lifecycle in (
+                TenantCluster.Lifecycle.DECOMMISSIONING.value,
+                TenantCluster.Lifecycle.DECOMMISSIONED.value,
+            ):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value, "Retiring clusters cannot return to management."
+                )
+            if not cluster.is_active:
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "cluster is inactive — re-activate before refreshing management",
+                )
+
+            actor = _actor_from_request(info)
+            with transaction.atomic():
+                _kick_bring_into_management(
+                    cluster=cluster,
+                    actor=actor,
+                    force_preflight=bool(input.force_preflight),
+                )
+            return gql_success(cluster_to_type(cluster))
 
     @strawberry.field
     @mutation_audit(action="cluster.decommission")
@@ -1138,6 +1168,9 @@ class ClustersMutation:
             _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
             if cluster is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+            from astrolift_services.cluster_retirement import recheck_cluster_authority
+
+            recheck_cluster_authority(cluster, Permission.CLUSTER_UNREGISTER)
             if cluster.lifecycle in (
                 TenantCluster.Lifecycle.DECOMMISSIONED.value,
                 TenantCluster.Lifecycle.DECOMMISSIONING.value,
@@ -1392,7 +1425,13 @@ class ClustersMutation:
             _require_operator_for_shared(info, cluster, Permission.CLUSTER_UNREGISTER)
             if cluster is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found")
-            from astrolift_services.cluster_retirement import MODEL_CLEANUP_REQUIRED, has_cluster_owned_models
+            from astrolift_services.cluster_retirement import (
+                MODEL_CLEANUP_REQUIRED,
+                has_cluster_owned_models,
+                recheck_cluster_authority,
+            )
+
+            recheck_cluster_authority(cluster, Permission.CLUSTER_UNREGISTER)
 
             if has_cluster_owned_models(cluster.pk):
                 return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)

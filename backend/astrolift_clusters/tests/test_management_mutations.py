@@ -21,6 +21,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.auth import get_user_model
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_clusters.schema.mutations import (
@@ -29,7 +30,7 @@ from astrolift_clusters.schema.mutations import (
     RefreshClusterManagementInputType,
 )
 from astrolift_graphql import GUID
-from astrolift_identity.models import Organization
+from astrolift_identity.models import Member, Organization
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 
@@ -60,7 +61,10 @@ def _no_opensearch_profile_index(monkeypatch):
 
 @pytest.fixture
 def org():
-    return Organization.objects.create(name="Acme", slug=f"acme-{uuid.uuid4().hex[:6]}")
+    org = Organization.objects.create(name="Acme", slug=f"acme-{uuid.uuid4().hex[:6]}")
+    org.test_actor = get_user_model().objects.create_user(username=f"manager-{uuid.uuid4().hex}")
+    Member.objects.create(user=org.test_actor, scope_kind="ORG", scope_id=org.pk)
+    return org
 
 
 @pytest.fixture
@@ -95,14 +99,13 @@ def cluster(org, plugin):
 
 
 def _info(org):
-    """Resolver-shaped Info object. Anonymous user — the permission
-    resolver fixture grants the permission directly."""
-    request = SimpleNamespace(user=None)
-    return SimpleNamespace(context=SimpleNamespace(request=request, user=None))
+    """Active actor; the permission fixture still controls each grant/denial."""
+    request = SimpleNamespace(user=org.test_actor)
+    return SimpleNamespace(context=SimpleNamespace(request=request, user=org.test_actor))
 
 
 def _ctx(org):
-    return tenant_context(TenantContext(organization_id=org.id))
+    return tenant_context(TenantContext(organization_id=org.id, actor_user_id=org.test_actor.pk))
 
 
 # ---- bringClusterIntoManagement ----------------------------------
