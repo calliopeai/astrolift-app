@@ -1915,7 +1915,11 @@ class LifecycleQuery:
         org_id = tenant.organization_id if tenant else None
         from astrolift_agents.visibility import agent_boxes
 
-        if not agent_boxes(org_id, Permission.AGENT_BOX_ATTACH).filter(slug=slug).exists():
+        if (
+            not agent_boxes(org_id, Permission.AGENT_BOX_ATTACH)
+            .filter(organization_id=org_id, slug=slug)
+            .exists()
+        ):
             return []
         return [pod_info_to_type(p) for p in _list_pods_for_box(slug, org_id=org_id)]
 

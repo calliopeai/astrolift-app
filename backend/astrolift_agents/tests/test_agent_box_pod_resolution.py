@@ -40,7 +40,7 @@ from core.decorators import TenantRequired
 from core.permissions import Permission, PermissionDenied
 from core.schema.exec_ws import _check_box_attach_permission
 from core.tenancy import TenantContext, tenant_context
-from core.tests.utils.scope_world import bind_role
+from core.tests.utils.scope_world import bind_role, make_cluster
 
 pytestmark = pytest.mark.django_db
 
@@ -72,18 +72,6 @@ def _pod(name="agent-box-abc123-x9k2p"):
     )
 
 
-def _fake_cluster():
-    return SimpleNamespace(
-        slug="agents-cluster",
-        auth_method="kubeconfig",
-        auth_config={},
-        endpoint="https://k8s.example.net",
-        ca_cert="",
-        default_namespace_prefix="",
-        is_active=True,
-    )
-
-
 @pytest.fixture
 def pod_backend():
     backend = _RecordingPodBackend()
@@ -94,10 +82,10 @@ def pod_backend():
 
 @pytest.fixture
 def agent_cluster(monkeypatch):
-    """Point the box's cluster resolution at an in-memory cluster."""
+    """Use a live persisted shared cluster and replace only its selection."""
     import astrolift_agents.services.agent_cluster as agent_cluster_mod
 
-    cluster = _fake_cluster()
+    cluster = make_cluster(SimpleNamespace(org=None), "box-pod-resolution")
     monkeypatch.setattr(agent_cluster_mod, "resolve_agent_cluster", lambda _org: cluster)
     return cluster
 
