@@ -7,6 +7,15 @@
   grants and team-bound bearer credentials cannot authorize this organization
   object through selected headers. Organization grants retain the existing
   validation and response contract.
+- Form management, response reads and private submission require their
+  declared permissions at the organization's explicit owner scope (#2112).
+  Selected team/project grants and team-bound bearer tokens cannot reach
+  organization forms through an owner's broader role. The submission stream
+  requires `form.read`, silently refuses unauthorized callers, filters the
+  exact live form and organization, and closes polling on cancellation.
+  Published public submissions retain their existing anonymous exception.
+  See [form access scopes](docs/operators/form-access-scopes.md).
+
 - Scoped operation checks resolve owner factories under trusted facts and isolate
   permission-scope caches per target (#2164). Log subscriptions admit the verified
   environment and cluster, release operation context before yielding events, and

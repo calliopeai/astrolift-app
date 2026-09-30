@@ -547,19 +547,6 @@ GAPS: dict[str, tuple[str, ...]] = {
         "/app/export/",
         "/api/support/v1/tickets/",
     ),
-    # TODO(#2112): forms routes without a scoped gate; the issue says what each checks today.
-    "#2112": (
-        "Query.formDefinitions",
-        "Query.formDefinition",
-        "Query.formSubmissions",
-        "Mutation.createFormDefinition",
-        "Mutation.updateFormDefinition",
-        "Mutation.publishForm",
-        "Mutation.archiveForm",
-        "Mutation.deleteFormDefinition",
-        "Mutation.updateSubmissionStatus",
-        "Subscription.formSubmissionReceived",
-    ),
     # TODO(#2114): workflows routes without a scoped gate; the issue says what each checks today.
     "#2114": (
         "Query.previewWorkflowManifest",
