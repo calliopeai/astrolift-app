@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Public install discovery has a dedicated, rate-limited GraphQL transport with
+  only the curated server handshake. Mobile clients can inspect an install before
+  login while the main API retains its authentication requirement (#2185).
+
 - Manifest conflict resolution labels the unsaved local-draft choice as “Keep
   mine”; saving remains a separate action. Workload controls show pod readiness
   as unknown instead of treating desired replicas as healthy pods (#2148).
