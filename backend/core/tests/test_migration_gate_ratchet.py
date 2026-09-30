@@ -48,6 +48,13 @@ GRANDFATHERED_DESTRUCTIVE: frozenset[str] = frozenset(
         # scoped constraint. Constraint metadata is dropped and recreated;
         # no table rows or columns are removed.
         "astrolift_services/0023_manifest_managed_services",
+        # Constraint-only replacement (#2213): preserve the existing app/project
+        # owner branches while adding explicit org+cluster-owned vLLM models.
+        # Recreate msvc_attachment_unique_app_env for live legacy attachments,
+        # with separate live named-subscription alias uniqueness. Both removed
+        # constraints are replaced in this atomic migration; no rows or columns
+        # are removed, and legacy/live uniqueness remains enforced.
+        "astrolift_services/0028_cluster_model_subscriptions",
         # Drops `TenantCluster.node_arch` after copying it into the new
         # `node_archs` list (#1604). Accepted deliberately, and the data loss
         # is bounded to a case that cannot occur in this tree: nothing has
