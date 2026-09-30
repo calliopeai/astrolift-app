@@ -22,6 +22,8 @@ const at = (m: number) => new Date(Date.UTC(2026, 8, 28, 12, m)).toISOString();
 function entry(status: string, minute: number, message = ""): AstroliftDeploymentLogEntry {
   return {
     id: `${status}-${minute}`,
+    phase: "",
+    event: "",
     deploymentId: "d",
     status,
     message,
@@ -90,48 +92,78 @@ describe("deploymentSteps", () => {
   const states = (steps: { id: string; state: string }[]) =>
     Object.fromEntries(steps.map((s) => [s.id, s.state]));
 
-  it("a live deploy: image done, rollout done, health ok", () => {
-    const log = [entry("pending", 0), entry("deploying", 1), entry("running", 3, "3 of 3 ready")];
+  const phase = (
+    name: string,
+    started = 0,
+    completed: number | null = null,
+    failed: number | null = null
+  ) => ({
+    name,
+    startedAt: at(started),
+    completedAt: completed == null ? null : at(completed),
+    failedAt: failed == null ? null : at(failed),
+    healthyAt: null,
+  });
+
+  it("image tags and legacy status rows do not invent successful phase timing", () => {
+    const log = [entry("pending", 0), entry("deploying", 1), entry("running", 3)];
     expect(states(deploymentSteps(DEPLOY_RUNNING, log, 0))).toEqual({
-      build: "ok",
-      push: "ok",
-      rollout: "ok",
-      health: "ok",
+      build: "pending",
+      push: "pending",
+      apply: "pending",
+      rollout: "pending",
+      health: "pending",
     });
   });
 
-  it("mid-rollout: the rollout runs and its clock ticks", () => {
-    const log = [entry("pending", 0), entry("deploying", 1)];
-    const steps = deploymentSteps(DEPLOY_DEPLOYING, log, Date.parse(at(2)));
+  it("shows actual observed phases and keeps an unavailable push start unset", () => {
+    const d = {
+      ...DEPLOY_RUNNING,
+      phases: [
+        phase("build", 0, 1),
+        { ...phase("push", 0, 1), startedAt: null },
+        phase("apply", 1, 2),
+        phase("rollout", 2, 3),
+        { ...phase("health", 3, 4), healthyAt: at(4) },
+      ],
+    };
+    const steps = deploymentSteps(d, [], 0);
+    expect(states(steps)).toEqual({
+      build: "ok",
+      push: "ok",
+      apply: "ok",
+      rollout: "ok",
+      health: "ok",
+    });
+    expect(steps.find((s) => s.id === "push")?.durationMs).toBeNull();
+  });
+
+  it("a started rollout runs and its clock ticks", () => {
+    const d = { ...DEPLOY_DEPLOYING, phases: [phase("rollout", 1)] };
+    const steps = deploymentSteps(d, [], Date.parse(at(2)));
     expect(states(steps)).toMatchObject({ rollout: "running", health: "pending" });
     expect(steps.find((s) => s.id === "rollout")?.durationMs).toBe(60_000);
   });
 
-  it("a probe failure fails health, not the rollout", () => {
-    const log = [entry("deploying", 1), entry("failed", 4, "Readiness probe failed on 2 of 3")];
-    expect(states(deploymentSteps(DEPLOY_FAILED, log, 0))).toMatchObject({
-      rollout: "ok",
-      health: "failed",
-    });
+  it("a failed health activity keeps the completed rollout separate", () => {
+    const d = { ...DEPLOY_FAILED, phases: [phase("rollout", 1, 3), phase("health", 3, null, 4)] };
+    expect(states(deploymentSteps(d, [], 0))).toMatchObject({ rollout: "ok", health: "failed" });
   });
 
-  it("any other failure fails the rollout and skips health", () => {
-    const log = [entry("deploying", 1), entry("failed", 2, "Image pull denied")];
-    const d = { ...DEPLOY_FAILED, statusReason: "Image pull denied" };
-    expect(states(deploymentSteps(d, log, 0))).toMatchObject({
-      rollout: "failed",
-      health: "skipped",
-    });
-  });
-
-  it("a build error fails build and skips everything after", () => {
-    const d = { ...DEPLOY_FAILED, buildError: "npm ERR! code ERESOLVE" };
-    expect(states(deploymentSteps(d, [], 0))).toEqual({
+  it("an unsuccessful build has no successful push or later phase", () => {
+    const d = { ...DEPLOY_FAILED, phases: [phase("build", 1, null, 2)] };
+    expect(states(deploymentSteps(d, [], 0))).toMatchObject({
       build: "failed",
-      push: "skipped",
-      rollout: "skipped",
-      health: "skipped",
+      push: "pending",
+      apply: "pending",
+      rollout: "pending",
+      health: "pending",
     });
+  });
+
+  it("a successful retry supersedes an earlier failure observation", () => {
+    const d = { ...DEPLOY_RUNNING, phases: [phase("apply", 1, 4, 2)] };
+    expect(states(deploymentSteps(d, [], 0)).apply).toBe("ok");
   });
 
   it("waiting on approvals shows an approval step in progress", () => {

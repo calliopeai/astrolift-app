@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@apollo/client/react", () => ({
+  useApolloClient: () => ({ query: vi.fn() }),
   useQuery: (query: unknown) => ({
     data:
       query === GET_DEPLOYMENT && !mocks.missing

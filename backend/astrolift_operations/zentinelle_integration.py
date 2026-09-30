@@ -101,6 +101,7 @@ class ZentinelleEventType(StrEnum):
     AGENT_WORKFLOW_STAGE_CHANGED = "AUDIT.agent.workflow.stage_changed"
     AGENT_WORKFLOW_GATE_DECIDED = "AUDIT.agent.workflow.gate_decided"
     AGENT_MODEL_SPEND = "AUDIT.agent.model_spend"
+    AGENT_SESSION_EVENT = "AUDIT.agent.session.event"
 
 
 # Event types that Zentinelle's default subscription template
@@ -263,6 +264,23 @@ REQUIRED_PAYLOAD_KEYS: dict[ZentinelleEventType, frozenset[str]] = {
     ZentinelleEventType.AGENT_ENV_SPEC_CHANGED: frozenset({"env_spec_slug", "fields_changed"}),
     ZentinelleEventType.AGENT_WORKFLOW_STAGE_CHANGED: frozenset({"workflow_run_id", "stage_id", "status"}),
     ZentinelleEventType.AGENT_WORKFLOW_GATE_DECIDED: frozenset({"workflow_run_id", "stage_id", "decision"}),
+    ZentinelleEventType.AGENT_SESSION_EVENT: frozenset(
+        {
+            "task_id",
+            "sequence",
+            "kind",
+            "turn_id",
+            "message_id",
+            "data",
+            "install_id",
+            "agent_id",
+            "cluster_id",
+            "team_id",
+            "project_id",
+            "harness",
+            "declared_intent",
+        }
+    ),
     ZentinelleEventType.AGENT_MODEL_SPEND: frozenset(
         {"task_id", "provider", "model_id", "input_tokens", "output_tokens", "estimated_usd"}
     ),
@@ -391,6 +409,7 @@ _FRAMEWORK_RELEVANCE: dict[ZentinelleEventType, frozenset[str]] = {
     ZentinelleEventType.AGENT_WORKFLOW_STAGE_CHANGED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
     ZentinelleEventType.AGENT_WORKFLOW_GATE_DECIDED: frozenset({"soc2", "iso27001", "mitre_atlas"}),
     ZentinelleEventType.AGENT_MODEL_SPEND: frozenset({"soc2", "iso27001", "mitre_atlas"}),
+    ZentinelleEventType.AGENT_SESSION_EVENT: frozenset({"soc2", "iso27001", "mitre_atlas"}),
 }
 
 

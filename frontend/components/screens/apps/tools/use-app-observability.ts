@@ -1,5 +1,7 @@
 "use client";
 
+import { podEventsVariables } from "./observability-query-variables";
+
 import { useLazyQuery, useQuery, useSubscription } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -127,11 +129,6 @@ function pickDefaultContainer(
   }
   const nonSidecar = containers.find((c) => !KNOWN_SIDECARS.has(c));
   return nonSidecar ?? containers[0];
-}
-
-/** The platform events the Pods panel reads: this app's, filtered on the server. */
-export function podEventsVariables(appSlug: string) {
-  return { limit: 100, appSlug };
 }
 
 /**

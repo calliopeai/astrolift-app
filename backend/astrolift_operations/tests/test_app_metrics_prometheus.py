@@ -14,6 +14,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from django.utils import timezone
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
@@ -245,6 +246,8 @@ def test_resolver_falls_back_to_synthetic_on_promql_error(monkeypatch, permissio
 
 def test_resolver_cache_dedupes_within_window(monkeypatch, permission_resolver):
     """Two calls inside the cache TTL share Prometheus requests."""
+    window_end = timezone.now()
+    monkeypatch.setattr("astrolift_operations.schema.queries.timezone.now", lambda: window_end)
     org, app = _scaffold(prometheus_endpoint="http://prom.acme:9090")
     permission_resolver.grant(Permission.APP_READ_METRICS)
 

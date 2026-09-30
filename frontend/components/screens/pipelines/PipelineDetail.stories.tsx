@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 
@@ -25,6 +26,16 @@ const graph = <RunGraphView {...RUN_GRAPH} />;
 
 export const Full: Story = {
   render: () => <PipelineDetailScreen {...DETAIL} runGraph={graph} secrets={secrets} />,
+};
+
+export const SecretsRoute: Story = {
+  render: () => <PipelineDetailScreen {...DETAIL} pipelineId="pipeline-guid" secrets={secrets} />,
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByRole("link", { name: "Secrets" })).toHaveAttribute(
+      "href",
+      "/pipelines/pipeline-guid/secrets"
+    );
+  },
 };
 
 export const Loading: Story = {

@@ -30,9 +30,7 @@ export function usePendingDeployments(appSlug: string, { live = false }: { live?
   const { can } = useMyPermissions();
   const canApprove = can("app.approve_deploy");
 
-  // The frame's deploys read (use-app-deploys). On the Overview the
-  // latest-deploy panel keeps it live; on the Deployments tab the queue is
-  // the only reader, so it passes `live`.
+  // The app frame owns the shared poll on every tab.
   const { deployments, loading, refetch } = useAppDeploys(appSlug, { live });
 
   const pending = deployments.filter((d) => d.status === "pending_approval");

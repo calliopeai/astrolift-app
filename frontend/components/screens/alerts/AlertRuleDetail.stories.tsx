@@ -26,10 +26,7 @@ export const Loading: Story = {
   render: () => <AlertRuleDetail {...RULE_DETAIL} rule={null} loading />,
 };
 
-/**
- * No such rule. This is also the closest real state to "empty" and "error":
- * the screen has no error view, a failed LIST_ALERT_RULES lands here.
- */
+/** A successful direct read returned no visible record. */
 export const NotFound: Story = {
   render: () => <AlertRuleDetail {...RULE_DETAIL} rule={null} />,
 };
@@ -41,5 +38,11 @@ export const LongStrings: Story = {
       rule={{ ...LONG_RULE, managedServiceId: `ms-postgres-${LONG_RULE.targetId}` }}
       loading={false}
     />
+  ),
+};
+
+export const Error: Story = {
+  render: () => (
+    <AlertRuleDetail {...RULE_DETAIL} rule={null} error="Permission denied" onRetry={() => {}} />
   ),
 };

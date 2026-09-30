@@ -19,6 +19,13 @@ const logsOf = (task: typeof RUNNING_TASK, lines: string[]) => (
     error={null}
     onRetry={() => {}}
     onDownload={() => {}}
+    onLoadEarlier={() => {}}
+    onRefresh={() => {}}
+    hasMore={false}
+    loadingEarlier={false}
+    pageError={null}
+    liveOnly
+    windowLimited={false}
   />
 );
 

@@ -36,6 +36,12 @@ export const MODULE_CONFIG = [
     description: "Lets Chat Studio launch this organization's registered agents.",
     installFlagKey: "modules.chat_studio_agent_runs_allowed",
   },
+  {
+    key: "agent_policy_enforcement",
+    label: "Agent policy enforcement",
+    description: "Lets Zentinelle apply policy actions to this organization's agents and boxes.",
+    installFlagKey: "modules.agent_policy_enforcement_allowed",
+  },
 ] as const;
 
 export interface ModuleItem {

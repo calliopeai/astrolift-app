@@ -1119,3 +1119,9 @@ def zentinelle_connection_to_type(row) -> ZentinelleConnectionType:
         gateway_feature_enabled=gateway_feature_enabled(),
         clusters=[zentinelle_cluster_gateway_to_type(g) for g in gateways],
     )
+
+
+@strawberry.type(name="AstroliftAlertEventSummary")
+class AlertEventSummaryType:
+    unresolved_count: int
+    critical_count: int

@@ -26,8 +26,8 @@ export function appDeploysVariables(appSlug: string) {
 /**
  * The app's recent deploys, newest first: the one `LIST_DEPLOYMENTS` read
  * the frame and the Overview share. Readers mount it cache-first, so a
- * second reader on the page is served from the cache; `live` makes this
- * reader the one that keeps it fresh (one poll per page, not one per panel).
+ * second reader on the page is served from the cache; `live` makes the app frame
+ * the reader that keeps it fresh across tabs (one poll per page, not one per panel).
  */
 export function useAppDeploys(appSlug: string, { live = false }: { live?: boolean } = {}) {
   const q = useQuery<DeploymentsResp>(LIST_DEPLOYMENTS, {

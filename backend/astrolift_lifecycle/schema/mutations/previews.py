@@ -376,89 +376,118 @@ class PreviewMutations:
                 f"app {app.slug!r} has no default tenant cluster bound — provision one first",
             )
 
-        # Idempotent re-fire: existing active manual preview for the
-        # same (app, branch) returns success rather than racing a
-        # second namespace through the unique index.
-        existing = (
-            live_lifecycle_rows(PreviewEnvironment.objects.all())
-            .select_related("registered_app")
-            .filter(
-                registered_app=app,
-                branch=branch,
-                is_manual=True,
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
-        if existing is not None:
-            return gql_success(preview_to_type(existing))
-
-        environment_name = (input.environment_name or "").strip() or f"preview-{branch_slug}"
-        org_slug = (
-            getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
-        ).lower()
-        from astrolift_registry.namespaces import namespace_for_new_preview
-
-        # The preview's deploys render into this namespace (#1922), so it may
-        # not be one another app or environment already holds (a branch
-        # named ``pr-3`` computes PR #3's name).
-        namespace = namespace_for_new_preview(
-            app,
-            name=environment_name,
-            preferred=_manual_preview_namespace(
-                org_slug=org_slug, app_slug=app.slug, branch_slug=branch_slug
-            ),
-        )
-        # Hostname follows the platform's preview wildcard convention
-        # but keyed on the branch slug (no PR number). The cluster's
-        # ingress-target resolution happens at apply time in the
-        # BuildPreviewWorkflow; here we just record the stable name
-        # the operator-facing surfaces (#751 FE, audit log) cite.
-        from astrolift_clusters.models import resolve_managed_domain
-
-        _managed_domain = resolve_managed_domain(app.organization, for_preview=True)
-        # ``preview-<branch>.<app>.<org>`` plus the install's managed zone
-        # when one exists; without a zone, stop at the org slug rather than
-        # repeating it (the old ``... or org_slug`` fallback doubled it).
-        _base = f"preview-{branch_slug}.{app.slug}.{org_slug}"
-        _zone = getattr(_managed_domain, "zone", None)
-        hostname = (f"{_base}.{_zone}" if _zone else _base).lower()
-
-        from astrolift_lifecycle.services.preview_lineage import (
-            resolve_previewed_environment,
-        )
-
-        actor = _actor_from_request(info)
-        opener_id = actor.user_id if actor.kind == "user" else None
         with transaction.atomic():
-            env = AppEnvironment.objects.create(
-                registered_app=app,
-                tenant_cluster=cluster,
+            # The PR webhook locks this app too, before choosing its name and namespace.
+            RegisteredApp.objects.select_for_update().get(pk=app.pk)
+            # Idempotent re-fire: existing active manual preview for the
+            # same (app, branch) returns success rather than racing a
+            # second namespace through the unique index.
+            existing = (
+                live_lifecycle_rows(PreviewEnvironment.objects.all())
+                .select_related("registered_app")
+                .filter(
+                    registered_app=app,
+                    branch=branch,
+                    is_manual=True,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            if existing is not None:
+                return gql_success(preview_to_type(existing))
+
+            from astrolift_lifecycle.services.preview_names import preview_environment_name
+
+            requested_name = (input.environment_name or "").strip()
+            if len(requested_name) > 128:
+                return MutationResultType(
+                    ok=False,
+                    errors=gql_failure(
+                        ErrorCode.VALIDATION.value,
+                        "environment name must be at most 128 characters",
+                        field="environmentName",
+                    ).errors,
+                )
+            if (
+                requested_name
+                and AppEnvironment.objects.filter(registered_app=app, name=requested_name).exists()
+            ):
+                return MutationResultType(
+                    ok=False,
+                    errors=gql_failure(
+                        ErrorCode.VALIDATION.value,
+                        "environment name is already used by this app",
+                        field="environmentName",
+                    ).errors,
+                )
+            environment_name = preview_environment_name(
+                app, requested_name or f"preview-{branch_slug}", source=f"branch:{branch}"
+            )
+            org_slug = (
+                getattr(app.organization, "slug", None) or getattr(app.organization, "name", "") or "org"
+            ).lower()
+            from astrolift_registry.namespaces import namespace_for_new_preview
+
+            # The preview's deploys render into this namespace (#1922), so it may
+            # not be one another app or environment already holds (a branch
+            # named ``pr-3`` computes PR #3's name).
+            namespace = namespace_for_new_preview(
+                app,
                 name=environment_name,
-                created_by_id=opener_id,
-                k8s_namespace=namespace,
-                url=f"https://{hostname}",
-                managed_domain=_managed_domain,
-                required_approvals=0,
-                # What this is a preview OF (#1578 feature 2). Both preview
-                # creation paths resolve it the same way; a manual
-                # branch preview is no less a preview of something than a
-                # PR one.
-                previewed_environment=resolve_previewed_environment(app, cluster),
+                preferred=_manual_preview_namespace(
+                    org_slug=org_slug, app_slug=app.slug, branch_slug=branch_slug
+                ),
             )
-            preview = PreviewEnvironment.objects.create(
-                registered_app=app,
-                pr_number=None,
-                branch=branch,
-                is_manual=True,
-                status=PreviewEnvironment.Status.BUILDING,
-                hostname=hostname,
-                namespace=namespace,
-                app_environment=env,
-                # Who opened it (#2155); a manual preview has no PR author.
-                created_by_id=opener_id,
-                opened_by_login=(actor.display if actor.kind == "user" else "")[:255],
+            # Hostname follows the platform's preview wildcard convention
+            # but keyed on the branch slug (no PR number). The cluster's
+            # ingress-target resolution happens at apply time in the
+            # BuildPreviewWorkflow; here we just record the stable name
+            # the operator-facing surfaces (#751 FE, audit log) cite.
+            from astrolift_clusters.models import resolve_managed_domain
+
+            _managed_domain = resolve_managed_domain(app.organization, for_preview=True)
+            # ``preview-<branch>.<app>.<org>`` plus the install's managed zone
+            # when one exists; without a zone, stop at the org slug rather than
+            # repeating it (the old ``... or org_slug`` fallback doubled it).
+            _base = f"preview-{branch_slug}.{app.slug}.{org_slug}"
+            _zone = getattr(_managed_domain, "zone", None)
+            hostname = (f"{_base}.{_zone}" if _zone else _base).lower()
+
+            from astrolift_lifecycle.services.preview_lineage import (
+                resolve_previewed_environment,
             )
+
+            actor = _actor_from_request(info)
+            opener_id = actor.user_id if actor.kind == "user" else None
+            with transaction.atomic():
+                env = AppEnvironment.objects.create(
+                    registered_app=app,
+                    tenant_cluster=cluster,
+                    name=environment_name,
+                    created_by_id=opener_id,
+                    k8s_namespace=namespace,
+                    url=f"https://{hostname}",
+                    managed_domain=_managed_domain,
+                    required_approvals=0,
+                    # What this is a preview OF (#1578 feature 2). Both preview
+                    # creation paths resolve it the same way; a manual
+                    # branch preview is no less a preview of something than a
+                    # PR one.
+                    previewed_environment=resolve_previewed_environment(app, cluster),
+                )
+                preview = PreviewEnvironment.objects.create(
+                    registered_app=app,
+                    pr_number=None,
+                    branch=branch,
+                    is_manual=True,
+                    status=PreviewEnvironment.Status.BUILDING,
+                    hostname=hostname,
+                    namespace=namespace,
+                    app_environment=env,
+                    # Who opened it (#2155); a manual preview has no PR author.
+                    created_by_id=opener_id,
+                    opened_by_login=(actor.display if actor.kind == "user" else "")[:255],
+                )
 
         handle = start_workflow(
             "BuildPreviewWorkflow",

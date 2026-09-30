@@ -7,15 +7,19 @@ import {
   EntityDetailShell,
   type Dot,
 } from "@/components/detail/EntityDetailShell";
+import { QueryError } from "@/components/QueryError";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { prettyJson } from "./alert-format";
 import type { useAlertEventDetail } from "./use-alert-event-detail";
 
-export type AlertEventDetailProps = ReturnType<typeof useAlertEventDetail>;
+export type AlertEventDetailProps = Omit<
+  ReturnType<typeof useAlertEventDetail>,
+  "error" | "onRetry"
+> & { error?: string | null; onRetry?: () => void };
 
 /** Alert event detail (#1106) — the payload/timeline behind a fired alert. */
-export function AlertEventDetail({ id, event: e, loading }: AlertEventDetailProps) {
+export function AlertEventDetail({ id, event: e, loading, error, onRetry }: AlertEventDetailProps) {
   const state = e
     ? e.resolvedAt
       ? "resolved"
@@ -35,7 +39,7 @@ export function AlertEventDetail({ id, event: e, loading }: AlertEventDetailProp
   return (
     <EntityDetailShell
       loading={loading}
-      notFound={!e}
+      notFound={!e && !error}
       breadcrumb={{ label: "Alerts", href: "/alerts" }}
       heading={e ? `Event ${e.id.slice(0, 8)}` : `Event ${id.slice(0, 8)}`}
       status={state}
@@ -64,6 +68,7 @@ export function AlertEventDetail({ id, event: e, loading }: AlertEventDetailProp
           : []
       }
     >
+      {error ? <QueryError title="Could not load detail" error={error} onRetry={onRetry} /> : null}
       {e ? (
         <Card>
           <CardHeader>

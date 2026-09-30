@@ -255,6 +255,8 @@ export const LONG_NOTIFICATIONS: AstroliftNotification[] = [
 export function inboxProps(over: Partial<NotificationsInboxProps> = {}): NotificationsInboxProps {
   return {
     notifications: NOTIFICATIONS,
+    error: null,
+    onRetry: () => {},
     loading: false,
     marking: false,
     markingAll: false,

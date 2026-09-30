@@ -36,6 +36,9 @@ __all__ = [
     "AgentHostAuthority",
     "AgentHostProjection",
     "AgentHostTerminal",
+    "AgentDispatchQuarantine",
+    "AgentEnforcementAction",
+    "AgentEnforcementNonce",
     "AgentEnvironmentSpec",
     "AgentInteraction",
     "AgentSecretBindingOverride",
@@ -60,3 +63,9 @@ __all__ = [
     "record_interaction",
     "resolve_agent_task_for_run",
 ]
+
+from astrolift_agents.models.agent_enforcement import (
+    AgentDispatchQuarantine,
+    AgentEnforcementAction,
+    AgentEnforcementNonce,
+)

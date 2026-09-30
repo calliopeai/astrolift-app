@@ -45,12 +45,33 @@ def resolve_pipeline_secrets(pipeline_run: PipelineRun, secret_names: list[str])
     - Never log, never serialize to Temporal, never store in DB
     - Pass directly to materialize_job_secrets() for K8s mounting
     """
-    org = pipeline_run.pipeline.organization
+    from astrolift_pipelines.models import Pipeline, PipelineRun
+    from astrolift_pipelines.pipeline_secrets import _secret_key, validate_secret_name
+    from astrolift_pipelines.scopes import live_secret_pipelines
+
+    # Reload the owner; a cached run/pipeline relation must not revive a
+    # deleted pipeline, organization or app ancestor at dispatch time.
+    pipeline = (
+        live_secret_pipelines(Pipeline.objects.all(), organization_id=pipeline_run.pipeline.organization_id)
+        .select_related("organization")
+        .filter(pk=pipeline_run.pipeline_id)
+        .first()
+    )
+    if (
+        pipeline is None
+        or not PipelineRun.objects.filter(pk=pipeline_run.pk, pipeline_id=pipeline.pk).exists()
+    ):
+        raise SecretResolutionError("Pipeline secret owner is unavailable")
+    org = pipeline.organization
     resolved: dict[str, str] = {}
     missing: list[str] = []
 
     for name in secret_names:
-        value = _read_org_secret(org, name)
+        try:
+            name = validate_secret_name(pipeline, name)
+        except ValueError as exc:
+            raise SecretResolutionError("Invalid pipeline secret name") from exc
+        value = _read_org_secret(org, _secret_key(pipeline, name))
         if value is None:
             missing.append(name)
         else:

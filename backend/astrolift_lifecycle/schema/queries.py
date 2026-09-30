@@ -35,6 +35,7 @@ from astrolift_lifecycle.models import (
     ScheduledJobRun,
     TaskRun,
 )
+from astrolift_lifecycle.run_log_api import historical_log_operation, historical_log_scope
 from astrolift_lifecycle.schema.list_contract import (
     COMMAND_RUNS_FILTERS,
     DEPLOYMENTS_DEFAULT_SORT,
@@ -72,6 +73,8 @@ from astrolift_lifecycle.schema.types import (
     DeploymentComparisonType,
     DeploymentLogEntryType,
     DeploymentMetricsType,
+    DeploymentRunLogDownloadType,
+    DeploymentRunLogPageType,
     DeploymentType,
     DeployTokenType,
     DeregisterPreviewType,
@@ -1305,8 +1308,8 @@ class LifecycleQuery:
     @strawberry.field
     @require_permission(
         Permission.APP_READ_LOGS,
-        scope=deployment_app_scope("deployment_id", permission=Permission.APP_READ_LOGS),
-        operation=deployment_operation("deployment_id"),
+        scope=historical_log_scope,
+        operation=historical_log_operation,
     )
     @tenant_scoped()
     def astrolift_deployment_log(self, info: Info, deployment_id: str) -> list[DeploymentLogEntryType]:
@@ -1325,8 +1328,58 @@ class LifecycleQuery:
         )
         if deployment is None:
             return []
-        qs = DeploymentLog.objects.filter(deployment=deployment).order_by("occurred_at")
+        qs = DeploymentLog.objects.filter(deployment=deployment).exclude(status="").order_by("occurred_at")
         return [deployment_log_to_type(e) for e in qs[:1000]]
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=historical_log_scope,
+        operation=historical_log_operation,
+    )
+    @tenant_scoped()
+    def astrolift_deployment_run_log_page(
+        self,
+        info: Info,
+        deployment_id: str,
+        cursor: str | None = None,
+        limit: int = 100,
+    ) -> DeploymentRunLogPageType:
+        from astrolift_lifecycle.run_log_api import deployment_for_log, log_window
+
+        deployment = deployment_for_log(deployment_id)
+        if deployment is None:
+            return DeploymentRunLogPageType(
+                items=[], next_cursor=None, has_more=False, page_size=max(1, min(200, limit))
+            )
+        rows, next_cursor, more, page_size = log_window(deployment, cursor, limit)
+        return DeploymentRunLogPageType(
+            items=[deployment_log_to_type(row) for row in rows],
+            next_cursor=next_cursor,
+            has_more=more,
+            page_size=page_size,
+        )
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ_LOGS,
+        scope=historical_log_scope,
+        operation=historical_log_operation,
+    )
+    @tenant_scoped()
+    def astrolift_deployment_run_log_download(
+        self,
+        info: Info,
+        deployment_id: str,
+    ) -> DeploymentRunLogDownloadType | None:
+        from astrolift_lifecycle.run_log_api import deployment_for_log, download_text
+
+        deployment = deployment_for_log(deployment_id)
+        if deployment is None:
+            return None
+        return DeploymentRunLogDownloadType(
+            filename=f"deployment-{deployment.guid}.log", content=download_text(deployment)
+        )
 
     @strawberry.field(
         deprecation_reason=(

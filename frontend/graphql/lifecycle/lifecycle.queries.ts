@@ -258,6 +258,13 @@ export const GET_DEPLOYMENT = gql`
       approvalsRequired
       approvalsReceived
       requiredApproverCount
+      phases {
+        name
+        startedAt
+        completedAt
+        failedAt
+        healthyAt
+      }
       startedAt
       succeededAt
       failedAt
@@ -345,6 +352,36 @@ export const GET_DEPLOYMENT_LOG = gql`
       message
       detail
       occurredAt
+    }
+  }
+`;
+
+export const GET_DEPLOYMENT_RUN_LOG_PAGE = gql`
+  query GetDeploymentRunLogPage($deploymentId: String!, $cursor: String, $limit: Int = 100) {
+    astroliftDeploymentRunLogPage(deploymentId: $deploymentId, cursor: $cursor, limit: $limit) {
+      items {
+        id
+        deploymentId
+        status
+        phase
+        event
+        message
+        detail
+        occurredAt
+      }
+      nextCursor
+      hasMore
+      pageSize
+    }
+  }
+`;
+
+export const DOWNLOAD_DEPLOYMENT_RUN_LOG = gql`
+  query DownloadDeploymentRunLog($deploymentId: String!) {
+    astroliftDeploymentRunLogDownload(deploymentId: $deploymentId) {
+      filename
+      content
+      contentType
     }
   }
 `;
@@ -1161,6 +1198,24 @@ export const LIST_AGENT_RUNS_PAGE = gql`
       }
       nextCursor
       totalCount
+    }
+  }
+`;
+
+export const GET_APP_DEPLOYMENT_ACTIVITY = gql`
+  query GetAppDeploymentActivity(
+    $appSlug: String!
+    $filter: AstroliftDeploymentsFilter
+    $after: String
+  ) {
+    astroliftDeploymentsPage(appSlug: $appSlug, filter: $filter, limit: 100, after: $after) {
+      items {
+        id
+        status
+        createdAt
+        startedAt
+      }
+      nextCursor
     }
   }
 `;

@@ -5,16 +5,22 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
-from astrolift_graphql import PageType, keyset_page, search_q
+from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from astrolift_identity.scope_visibility import visible_apps
 from astrolift_pipelines.models import Pipeline, PipelineRun
 from astrolift_pipelines.schema.types import (
     PipelineRunType,
+    PipelineSecretType,
     PipelineType,
     pipeline_run_to_type,
     pipeline_to_type,
 )
-from astrolift_pipelines.scopes import pipeline_app_scope, pipeline_run_app_scope
+from astrolift_pipelines.scopes import (
+    live_secret_pipelines,
+    pipeline_app_scope,
+    pipeline_run_app_scope,
+    pipeline_secret_scope,
+)
 from astrolift_registry.models import RegisteredApp
 from core.decorators import tenant_scoped
 from core.permissions import Permission, granted_scopes, require_permission
@@ -94,6 +100,37 @@ def _pipeline_runs_qs(*, pipeline_id: str, search: str | None = None):
 
 @strawberry.type
 class PipelinesQuery:
+    @strawberry.field
+    @require_permission(Permission.SECRET_LIST, scope=pipeline_secret_scope())
+    @tenant_scoped()
+    def astrolift_pipeline_secrets(self, info: Info, pipeline_id: GUID) -> list[PipelineSecretType]:
+        from astrolift_lifecycle.models import OrgSecret
+        from astrolift_pipelines.pipeline_secrets import _secret_key
+
+        tenant = get_current_tenant()
+        pipeline = (
+            live_secret_pipelines(Pipeline.objects.all(), organization_id=tenant.organization_id)
+            .filter(guid=str(pipeline_id))
+            .first()
+        )
+        if pipeline is None:
+            return []
+        prefix = _secret_key(pipeline, "")
+        rows = (
+            OrgSecret.objects.filter(organization_id=pipeline.organization_id, key__startswith=prefix)
+            .only("guid", "key", "created_at", "updated_at")
+            .order_by("key")
+        )
+        return [
+            PipelineSecretType(
+                id=GUID(str(row.guid)),
+                name=row.key.removeprefix(prefix),
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
+
     @strawberry.field(
         deprecation_reason="Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage."
     )

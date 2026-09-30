@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -85,9 +86,10 @@ interface EventsPageResp {
 export function useAlerts() {
   const t = useTranslations("lists.alerts");
 
+  const appSlug = useSearchParams()?.get("app") || null;
   const list = useListState(ALERT_RULES_LIST);
   const rules = useQuery<RulesPageResp>(LIST_ALERT_RULES_PAGE, {
-    variables: rulesVariables(list.filters, list.state),
+    variables: { ...rulesVariables(list.filters, list.state), appSlug },
     fetchPolicy: "cache-and-network",
   });
   const rulesData = rules.data ?? rules.previousData;
@@ -96,11 +98,11 @@ export function useAlerts() {
   // Stat counts. `totalCount` is computed over the whole filtered set, so
   // `limit: 1` buys the number without the rows.
   const activeRules = useQuery<RulesPageResp>(LIST_ALERT_RULES_PAGE, {
-    variables: { activeOnly: true, limit: 1 },
+    variables: { activeOnly: true, limit: 1, appSlug },
     fetchPolicy: "cache-and-network",
   });
   const unresolved = useQuery<EventsPageResp>(LIST_ALERT_EVENTS_PAGE, {
-    variables: { unresolvedOnly: true, limit: 1 },
+    variables: { unresolvedOnly: true, limit: 1, appSlug },
     fetchPolicy: "cache-and-network",
     pollInterval: 30000,
   });
@@ -238,8 +240,9 @@ export function useAlerts() {
  * the pill, and Ack. The data half of AlertEventsScreen.
  */
 export function useAlertEvents(view: AlertEventsView) {
+  const appSlug = useSearchParams()?.get("app") || null;
   const { feed } = useCursorFeed<EventsPageResp, AlertEvent>(LIST_ALERT_EVENTS_PAGE, {
-    variables: { unresolvedOnly: view === "firing", search: null },
+    variables: { unresolvedOnly: view === "firing", search: null, appSlug },
     select: (d) => d?.astroliftAlertEventsPage,
     keyOf: (e) => e.id,
     pollInterval: 30000,

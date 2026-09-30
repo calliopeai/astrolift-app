@@ -121,112 +121,58 @@ export function deploySha(d: Pick<AstroliftDeployment, "commitSha" | "id">): str
   return (d.commitSha || d.id).slice(0, 8);
 }
 
-const ROLLOUT = new Set(["deploying", "redeploying"]);
 const ENDED_BADLY = new Set(["failed", "rolled_back"]);
-// A failure whose message names a probe or health check failed after the
-// manifests applied: the rollout finished, the health gate did not.
-const HEALTH_FAILURE = /readiness|liveness|startup probe|probe failed|health|crashloop/i;
-
 function lastFailure(log: AstroliftDeploymentLogEntry[]) {
   return log.findLast((e) => ENDED_BADLY.has(e.status));
 }
 
-/**
- * The deploy's phases on the Timeline: build and push (the image this
- * deploy was handed, built outside Astrolift), approval when the
- * environment requires one, rollout (the manifests applying) and health
- * (the replicas becoming ready). Rollout and health read the lifecycle log,
- * which records status transitions; the image phases read the deployment.
- */
+/** Phase timing comes from persisted runtime observations, including retries. */
 export function deploymentSteps(
   d: AstroliftDeployment,
-  log: AstroliftDeploymentLogEntry[],
+  _log: AstroliftDeploymentLogEntry[],
   now: number
 ): TimelineStep[] {
-  const hasImage = Boolean(d.imageTag || d.imageDigest);
-  const buildFailed = isBuildFailure(d, log);
-  const steps: TimelineStep[] = [
-    {
-      id: "build",
-      name: "build",
-      state: buildFailed ? "failed" : hasImage ? "ok" : "pending",
-      detail: buildFailed
-        ? firstLine(d.buildError)
-        : d.ciProvider
-          ? `${d.ciProvider}${d.branch ? ` · ${d.branch}` : ""}`
-          : d.branch || undefined,
-    },
-    {
-      id: "push",
-      name: "push",
-      state: buildFailed ? "skipped" : hasImage ? "ok" : "pending",
-      detail: d.imageDigest || d.imageTag || undefined,
-    },
-  ];
-
-  const rolloutAt = log.findIndex((e) => ROLLOUT.has(e.status));
-  const rollout = rolloutAt >= 0 ? log[rolloutAt] : null;
-  const afterRollout = rolloutAt >= 0 ? log[rolloutAt + 1] : undefined;
-  const failed = lastFailure(log);
-  const terminal = !IN_FLIGHT.has(d.status) && d.status !== "running";
-  // A build that failed never reached the cluster: every later phase is skipped.
-  if (buildFailed) {
-    for (const id of ["rollout", "health"]) steps.push({ id, name: id, state: "skipped" });
-    return steps;
-  }
-
+  const phases = new Map((d.phases ?? []).map((p) => [p.name, p]));
+  const steps = ["build", "push", "apply", "rollout", "health"].map((name): TimelineStep => {
+    const phase = phases.get(name);
+    const failed =
+      phase?.failedAt &&
+      (!phase.completedAt || Date.parse(phase.failedAt) > Date.parse(phase.completedAt));
+    const end = failed ? phase.failedAt : (phase?.healthyAt ?? phase?.completedAt);
+    const state = failed
+      ? "failed"
+      : end
+        ? "ok"
+        : phase?.startedAt && IN_FLIGHT.has(d.status)
+          ? "running"
+          : "pending";
+    return {
+      id: name,
+      name,
+      state,
+      durationMs: phase?.startedAt
+        ? spanMs(phase.startedAt, end ?? (state === "running" ? now : null))
+        : null,
+      detail: !phase
+        ? "No phase timing recorded"
+        : name === "push" && !phase.startedAt
+          ? "Push confirmed; separate start unavailable"
+          : undefined,
+    };
+  });
   if (d.approvalsRequired > 0) {
-    const waiting = d.status === "pending_approval";
-    const refused = !waiting && !rollout && terminal;
-    steps.push({
+    steps.splice(2, 0, {
       id: "approval",
       name: "approval",
-      state: waiting ? "running" : refused ? "failed" : "ok",
+      state:
+        d.status === "pending_approval"
+          ? "running"
+          : d.approvalsReceived >= d.approvalsRequired
+            ? "ok"
+            : "pending",
       detail: `${d.approvalsReceived}/${d.approvalsRequired} approvals`,
     });
   }
-
-  const liveRollout = ROLLOUT.has(d.status) && !afterRollout;
-  const healthFailed =
-    Boolean(failed && afterRollout === failed) && HEALTH_FAILURE.test(failed?.message ?? "");
-
-  let rolloutState: TimelineStep["state"];
-  const wentLive = d.status === "running" || d.status === "superseded";
-  if (liveRollout) rolloutState = "running";
-  else if (!rollout) rolloutState = wentLive ? "ok" : terminal ? "skipped" : "pending";
-  else if (afterRollout && ENDED_BADLY.has(afterRollout.status) && !healthFailed)
-    rolloutState = "failed";
-  else rolloutState = afterRollout ? "ok" : "pending";
-
-  steps.push({
-    id: "rollout",
-    name: "rollout",
-    state: rolloutState,
-    durationMs: rollout
-      ? spanMs(
-          rollout.occurredAt,
-          afterRollout ? afterRollout.occurredAt : liveRollout ? now : null
-        )
-      : null,
-    detail:
-      rolloutState === "failed"
-        ? d.abortedReason || afterRollout?.message || d.statusReason
-        : rollout?.message || undefined,
-  });
-
-  const ready = log.find((e) => e.status === "running");
-  let healthState: TimelineStep["state"];
-  if (healthFailed) healthState = "failed";
-  else if (ready || d.status === "running" || d.status === "superseded") healthState = "ok";
-  else if (rolloutState === "failed" || rolloutState === "skipped") healthState = "skipped";
-  else healthState = "pending";
-
-  steps.push({
-    id: "health",
-    name: "health",
-    state: healthState,
-    detail: healthFailed ? failed?.message : ready?.message || undefined,
-  });
   return steps;
 }
 
@@ -248,11 +194,11 @@ export function deploymentFailure(
 
 /** A build error on a deploy that never reached a rollout: the image never existed. */
 function isBuildFailure(d: AstroliftDeployment, log: AstroliftDeploymentLogEntry[]): boolean {
-  return d.status === "failed" && Boolean(d.buildError) && !log.some((e) => ROLLOUT.has(e.status));
-}
-
-function firstLine(text: string): string {
-  return text.split("\n").find((l) => l.trim()) ?? text;
+  return (
+    d.status === "failed" &&
+    Boolean(d.buildError) &&
+    !log.some((e) => ["deploying", "redeploying"].includes(e.status))
+  );
 }
 
 const LEVEL: Partial<Record<string, LogLine["level"]>> = {
@@ -264,11 +210,11 @@ const LEVEL: Partial<Record<string, LogLine["level"]>> = {
 /** The lifecycle log as log lines: the transition and its message, then any detail. */
 export function deploymentLogLines(log: AstroliftDeploymentLogEntry[]): LogLine[] {
   return log.flatMap((e) => {
-    const status = e.status.replace(/_/g, " ");
+    const status = e.phase ? `${e.phase}/${e.event}` : e.status.replace(/_/g, " ");
     const head: LogLine = {
       ts: e.occurredAt,
       message: e.message ? `${status}: ${e.message}` : status,
-      level: LEVEL[e.status] ?? "info",
+      level: LEVEL[e.status] ?? LEVEL[e.event] ?? "info",
     };
     const detail =
       e.detail && typeof e.detail === "object" && Object.keys(e.detail).length > 0

@@ -21,3 +21,9 @@ The PostgreSQL regression suite exercises real RoleBindings with sibling
 selected scopes, organization grants, token ceilings and HTTP requests. It
 also checks that rejected requests create no pipeline rows. The surface
 guardrail has no remaining `#2115` exception.
+
+The console exposes this contract at `/pipelines/new`, reached from the
+Pipelines list. It sends only the four existing input fields, preserves a
+failed draft for retry, and retains the created GUID if navigation fails after
+commit. The create action requires `app.update` in the frontend permission set;
+the API remains authoritative for its explicit organization scope.

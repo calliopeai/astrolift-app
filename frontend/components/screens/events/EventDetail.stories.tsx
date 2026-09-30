@@ -20,8 +20,7 @@ export const Loading: Story = {
 };
 
 /**
- * The event is past the recent-200 window the detail reads (or never
- * existed). The screen has no separate error state; this is the closest.
+ * A successful direct read returned no visible event.
  */
 export const NotFound: Story = {
   render: () => (
@@ -36,4 +35,16 @@ export const Empty: Story = {
 
 export const LongStrings: Story = {
   render: () => <EventDetail id={EVENTS_LONG[0].id} event={EVENTS_LONG[0]} loading={false} />,
+};
+
+export const Error: Story = {
+  render: () => (
+    <EventDetail
+      id={EVENTS[0].id}
+      event={null}
+      loading={false}
+      error="Permission denied"
+      onRetry={() => {}}
+    />
+  ),
 };

@@ -96,6 +96,14 @@ export const NAV: NavArea[] = [
       {
         functions: [
           { key: "agents", label: "Agents", href: "/agents", icon: BotIcon, module: "agents" },
+          { key: "fleet", label: "Fleet", href: "/fleet", icon: BoxesIcon, module: "agents" },
+          {
+            key: "approvals",
+            label: "Approvals",
+            href: "/gates",
+            icon: ClipboardListIcon,
+            module: "agents",
+          },
           {
             key: "workflows",
             label: "Workflows",
@@ -123,6 +131,13 @@ export const NAV: NavArea[] = [
             label: "Tools",
             href: "/agents/tools",
             icon: WrenchIcon,
+            module: "agents",
+          },
+          {
+            key: "environment-specs",
+            label: "Environment specs",
+            href: "/agents/environment-specs",
+            icon: BoxesIcon,
             module: "agents",
           },
           {
@@ -154,10 +169,24 @@ export const NAV: NavArea[] = [
         functions: [
           { key: "apps", label: "Apps", href: "/apps", icon: PackageIcon, module: "apps" },
           {
+            key: "pipelines",
+            label: "Pipelines",
+            href: "/pipelines",
+            icon: WorkflowIcon,
+            module: "apps",
+          },
+          {
             key: "deployments",
             label: "Deployments",
             href: "/deployments",
             icon: RocketIcon,
+            module: "apps",
+          },
+          {
+            key: "deployment-approvals",
+            label: "Deployment approvals",
+            href: "/approvals",
+            icon: ClipboardListIcon,
             module: "apps",
           },
           {
@@ -294,6 +323,15 @@ export const NAV: NavArea[] = [
           },
           { key: "alerts", label: "Alerts", href: "/alerts", icon: BellIcon, module: "admin" },
           { key: "events", label: "Events", href: "/events", icon: ActivityIcon, module: "admin" },
+          { key: "logs", label: "Logs", href: "/logs", icon: ScrollTextIcon, module: "admin" },
+          { key: "traces", label: "Traces", href: "/traces", icon: ActivityIcon, module: "admin" },
+          {
+            key: "operations",
+            label: "Operations",
+            href: "/ops",
+            icon: ActivityIcon,
+            module: "admin",
+          },
         ],
       },
     ],

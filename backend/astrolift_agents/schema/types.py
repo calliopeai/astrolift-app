@@ -17,6 +17,28 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.type(name="AstroliftAgentTaskLogLine")
+class AgentTaskLogLineType:
+    id: str
+    timestamp: dt.datetime | None
+    level: str | None
+    stream: str
+    message: str
+    pod_name: str
+    container: str
+
+
+@strawberry.type(name="AstroliftAgentTaskLogPage")
+class AgentTaskLogPageType:
+    items: list[AgentTaskLogLineType]
+    next_cursor: str | None
+    has_more: bool
+    page_size: int
+    live_only: bool
+    window_limited: bool
+    expires_at: dt.datetime | None
+
+
 @strawberry.enum
 class AgentRunFamily(enum.Enum):
     """The agent's native Job-vs-Deployment split (spec 33).
@@ -321,6 +343,21 @@ class AgentEnvironmentSpecType:
     project_id: GUID | None
     created_at: dt.datetime
     updated_at: dt.datetime
+
+
+@strawberry.input(name="AstroliftAgentEnvironmentSpecsFilter")
+class AgentEnvironmentSpecsFilterInput:
+    agent_type: list[str] | None = strawberry.field(default=None)
+    runtime: list[str] | None = strawberry.field(default=None)
+    created_by: list[str] | None = strawberry.field(default=None, description='User ids, or "me".')
+
+
+@strawberry.type(name="AstroliftAgentEnvironmentSpecPage")
+class AgentEnvironmentSpecPageType:
+    items: list[AgentEnvironmentSpecType]
+    total_count: int
+    page: int
+    page_size: int
 
 
 @strawberry.type(name="AstroliftAgentBox")
@@ -1348,3 +1385,14 @@ def agent_env_spec_to_type(s) -> AgentEnvironmentSpecType:
         created_at=s.created_at,
         updated_at=s.updated_at,
     )
+
+
+@strawberry.type(name="AstroliftAgentQuarantine")
+class AgentQuarantineType:
+    id: GUID
+    target_kind: str
+    target_id: GUID
+    reason: str
+    policy_id: str
+    evidence_url: str
+    created_at: dt.datetime

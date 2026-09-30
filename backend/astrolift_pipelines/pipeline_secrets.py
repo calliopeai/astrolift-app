@@ -28,16 +28,19 @@ def _secret_key(pipeline: Pipeline, name: str) -> str:
     return f"astrolift/pipelines/{pipeline.guid}/secrets/{name}"
 
 
+def validate_secret_name(pipeline: Pipeline, name: str) -> str:
+    name = name.strip()
+    if not name or "/" in name or "\x00" in name or len(_secret_key(pipeline, name)) > 512:
+        raise ValueError("Secret name must be nonempty, fit the store key, and contain no slash or NUL")
+    return name
+
+
 def set_pipeline_secret(pipeline: Pipeline, name: str, value: str) -> None:
     """Write a secret value to the org's secret store for a pipeline.
 
     Raises ValueError if the name is invalid (empty, contains slashes, etc.)
     """
-    name = name.strip()
-    if not name:
-        raise ValueError("Secret name must not be empty")
-    if "/" in name:
-        raise ValueError(f"Secret name must not contain slashes: {name!r}")
+    name = validate_secret_name(pipeline, name)
 
     key = _secret_key(pipeline, name)
 
@@ -47,11 +50,12 @@ def set_pipeline_secret(pipeline: Pipeline, name: str, value: str) -> None:
         write_org_secret(pipeline.organization, key, value)
         logger.info("pipeline.secrets: set secret %s for pipeline %s", name, pipeline.name)
     except Exception as exc:
-        raise RuntimeError(f"Failed to write pipeline secret {name!r}: {exc}") from exc
+        raise RuntimeError("Failed to write pipeline secret") from exc
 
 
 def delete_pipeline_secret(pipeline: Pipeline, name: str) -> None:
     """Remove a secret from the org's secret store for a pipeline."""
+    name = validate_secret_name(pipeline, name)
     key = _secret_key(pipeline, name)
     try:
         from astrolift_lifecycle.services.secrets import delete_org_secret
@@ -59,7 +63,7 @@ def delete_pipeline_secret(pipeline: Pipeline, name: str) -> None:
         delete_org_secret(pipeline.organization, key)
         logger.info("pipeline.secrets: deleted secret %s for pipeline %s", name, pipeline.name)
     except Exception as exc:
-        raise RuntimeError(f"Failed to delete pipeline secret {name!r}: {exc}") from exc
+        raise RuntimeError("Failed to delete pipeline secret") from exc
 
 
 def get_pipeline_secret_names(pipeline: Pipeline) -> list[str]:
@@ -68,13 +72,10 @@ def get_pipeline_secret_names(pipeline: Pipeline) -> list[str]:
     Does NOT return values — only names. Use set_pipeline_secret to update.
     """
     prefix = f"astrolift/pipelines/{pipeline.guid}/secrets/"
-    try:
-        from astrolift_lifecycle.services.secrets import list_org_secrets
+    from astrolift_lifecycle.services.secrets import list_org_secrets
 
-        keys = list_org_secrets(pipeline.organization, prefix=prefix)
-        return [k.removeprefix(prefix) for k in keys]
-    except Exception:  # noqa: BLE001
-        return []
+    keys = list_org_secrets(pipeline.organization, prefix=prefix)
+    return [k.removeprefix(prefix) for k in keys]
 
 
 def check_pipeline_secret_exists(pipeline: Pipeline, name: str) -> bool:

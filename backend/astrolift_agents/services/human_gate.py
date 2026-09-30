@@ -70,7 +70,7 @@ def notify_human_gate(workflow_run: WorkflowRun, stage: dict) -> dict[str, bool]
     results: dict[str, bool] = {}
 
     if "email" in channels:
-        ok = True
+        ok = bool(recipients)
         for recipient_email in recipients:
             ok = send_gate_notification_email(recipient_email, workflow_run, stage) and ok
         results["email"] = ok
@@ -141,8 +141,7 @@ def send_gate_notification_email(
             to=[recipient_email],
         )
         msg.attach_alternative(html_body, "text/html")
-        msg.send(fail_silently=False)
-        return True
+        return msg.send(fail_silently=False) == 1
 
     except Exception:
         log.exception(
@@ -287,6 +286,13 @@ def _emit_gate_event(
             "workflow_run_guid": str(workflow_run.guid),
             "stage_name": stage.get("name"),
             "delivery": delivery_results,
+            "status": (
+                "failed"
+                if any(not ok for ok in delivery_results.values())
+                else "notified"
+                if delivery_results
+                else "skipped"
+            ),
         },
         resource_kind="workflow_run",
         resource_id=str(workflow_run.guid),

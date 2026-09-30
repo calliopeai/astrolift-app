@@ -193,3 +193,43 @@ def _rule_operations(qs, permission):
         if all(allows(*point, context) for context in contexts):
             ids.append(pk)
     return qs.filter(pk__in=ids)
+
+
+def rules_for_app(qs, app_slug):
+    """Match persisted app, environment, workload and private-service targets."""
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import Workload
+    from astrolift_services.models import ManagedService
+    from astrolift_services.scopes import live_managed_services
+
+    app_rows = apps().filter(slug=app_slug)
+    envs = AppEnvironment.objects.filter(registered_app__in=app_rows, deleted_at__isnull=True)
+    workloads = Workload.objects.filter(registered_app__in=app_rows, deleted_at__isnull=True)
+    services = live_managed_services(
+        ManagedService.objects.filter(registered_app__in=app_rows, deleted_at__isnull=True)
+    )
+    return qs.filter(
+        Q(managed_service__in=services)
+        | Q(managed_service__isnull=True, target="app", target_id__in=app_rows.values("slug"))
+        | Q(managed_service__isnull=True, target="app", target_id__in=_ids(app_rows))
+        | Q(managed_service__isnull=True, target="env", target_id__in=_ids(envs))
+        | Q(managed_service__isnull=True, target="workload", target_id__in=_ids(workloads))
+        | Q(
+            managed_service__isnull=True,
+            target="env",
+            target_id__in=envs.filter(
+                name__in=_unique_slugs(
+                    AppEnvironment.objects.filter(registered_app__in=apps(), deleted_at__isnull=True), "name"
+                )
+            ).values("name"),
+        )
+        | Q(
+            managed_service__isnull=True,
+            target="workload",
+            target_id__in=workloads.filter(
+                slug__in=_unique_slugs(
+                    Workload.objects.filter(registered_app__in=apps(), deleted_at__isnull=True)
+                )
+            ).values("slug"),
+        )
+    )

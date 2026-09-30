@@ -1,7 +1,7 @@
 /** Formatting helpers shared by the alerts list and the alert detail screens. */
 
-export function formatRemaining(iso: string): string {
-  const ms = new Date(iso).getTime() - Date.now();
+export function formatRemaining(iso: string, now = Date.now()): string {
+  const ms = new Date(iso).getTime() - now;
   if (ms <= 0) return "0m";
   return formatDurationSeconds(Math.round(ms / 1000));
 }

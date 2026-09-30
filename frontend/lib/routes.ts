@@ -1,5 +1,6 @@
 export const routeLabels: Record<string, string> = {
   dashboard: "Overview",
+  "environment-specs": "Environment specs",
   apps: "Apps",
   projects: "Projects",
   teams: "Teams",

@@ -224,6 +224,8 @@ const ZEROES = Array.from({ length: 14 }, () => 0);
 export const OBSERVABILITY: ObservabilitySectionViewProps = {
   appSlug: "checkout",
   days: 14,
+  error: null,
+  onRetry: () => {},
   deploysLoading: false,
   deploysSeries: series([2, 1, 0, 3, 4, 2, 0, 0, 5, 3, 2, 1, 4, 3]),
   errorSeries: series([0, 0, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 1, 0]),

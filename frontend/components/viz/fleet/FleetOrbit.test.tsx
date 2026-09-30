@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { makeFleet } from "../core/fleet-model";
@@ -17,6 +19,29 @@ describe("FleetOrbit", () => {
     expect(root.getAttribute("aria-label")).toContain(
       `10 agents across 2 clusters, ${failing} failing`
     );
+  });
+
+  it("hydrates server-rendered cluster titles with their accessible region text", async () => {
+    const tree = <FleetOrbit snapshot={fleet} motion="reduced" />;
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(tree);
+    document.body.append(container);
+    const svg = container.querySelector("svg");
+    const recover = vi.fn();
+    let root!: ReturnType<typeof hydrateRoot>;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, tree, { onRecoverableError: recover });
+      });
+      expect(recover).not.toHaveBeenCalled();
+      expect(container.querySelector("svg")).toBe(svg);
+      expect([...container.querySelectorAll("title")].map((title) => title.textContent)).toContain(
+        `${fleet.clusters[0].name} (${fleet.clusters[0].region})`
+      );
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+    }
   });
 
   it("selects an agent with Enter", () => {

@@ -25,6 +25,7 @@ export const APP = { name: "Storefront", slug: "storefront", sourceRepo: "exampl
 
 export const DEPLOY_RUNNING: AstroliftDeployment = {
   version: 1,
+  phases: [],
   id: "d3b07384-d9a0-4c9b-8f1e-000000000010",
   registeredAppSlug: "storefront",
   environmentName: "prod",

@@ -3435,11 +3435,14 @@ async def fetch_task_pod_logs(
     task_guid: str,
     pod_name_hint: str = "",
     tail: int = 200,
-) -> list[str]:
+    structured: bool = False,
+) -> list[Any]:
     """Operator-facing one-shot log read for an agent-task pod.
 
     Resolves the task's pod in ``namespace`` and returns up to ``tail``
-    of its most recent log message lines (no timestamps, no follow).
+    of its most recent log message lines (no follow). ``structured=True``
+    preserves provider ``PodLogLine`` records, including timestamp and stream;
+    the default retains the legacy message-string contract.
     Built on the same driver plumbing the app-log surface uses —
     :func:`list_app_pods` for discovery and :func:`stream_app_logs`
     (``follow=False``) for the byte stream — so it inherits the
@@ -3526,6 +3529,7 @@ async def fetch_task_pod_logs(
         namespace=namespace,
         pod_name=pod_name,
         tail=tail,
+        structured=structured,
     )
 
 
@@ -3535,7 +3539,8 @@ async def fetch_pod_log_tail(
     namespace: str,
     pod_name: str,
     tail: int = 200,
-) -> list[str]:
+    structured: bool = False,
+) -> list[Any]:
     """One-shot read of the last ``tail`` message lines from ``pod_name``.
 
     The read half of :func:`fetch_task_pod_logs`, split out because
@@ -3567,12 +3572,12 @@ async def fetch_pod_log_tail(
         logger.exception("fetch_pod_log_tail: failed to open log stream for pod %s", pod_name)
         return []
 
-    lines: list[str] = []
+    lines: list[Any] = []
 
     async def _collect() -> None:
         async for line in inner:
             message = getattr(line, "message", "")
-            lines.append(message if isinstance(message, str) else str(message))
+            lines.append(line if structured else message if isinstance(message, str) else str(message))
             if len(lines) >= tail:
                 break
 

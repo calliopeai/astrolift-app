@@ -193,6 +193,28 @@ export const AGENT_TASK_LOGS = gql`
   }
 `;
 
+export const AGENT_TASK_LOGS_PAGE = gql`
+  query AgentTaskLogsPage($id: ID!, $cursor: String, $limit: Int) {
+    agentTaskLogsPage(id: $id, cursor: $cursor, limit: $limit) {
+      items {
+        id
+        timestamp
+        level
+        stream
+        message
+        podName
+        container
+      }
+      nextCursor
+      hasMore
+      pageSize
+      liveOnly
+      windowLimited
+      expiresAt
+    }
+  }
+`;
+
 // Org-scoped AgentEnvironmentSpecs — the reusable container-environment recipes
 // (image/runtime/tool-preset/VNC) an agent task can launch into. The Dispatch
 // command center's Advanced section offers these as the `environmentSpecId`
@@ -212,6 +234,67 @@ export const LIST_AGENT_ENVIRONMENT_SPECS = gql`
       managedModel
     }
   }
+`;
+
+const ENVIRONMENT_SPEC_FIELDS = gql`
+  fragment EnvironmentSpecHomeFields on AstroliftAgentEnvironmentSpec {
+    id
+    slug
+    name
+    runtime
+    imageTag
+    agentType
+    toolPreset
+    vncEnabled
+    managedModel
+    modelGateway
+    runAsNonRoot
+    allowInstall
+    teamId
+    projectId
+    configRepo
+    configBranch
+    configManifestPath
+    secretRefs
+    updatedAt
+  }
+`;
+
+export const AGENT_ENVIRONMENT_SPECS_PAGE = gql`
+  query AgentEnvironmentSpecsPage(
+    $orgId: ID!
+    $search: String
+    $filter: AstroliftAgentEnvironmentSpecsFilter
+    $sort: String
+    $page: Int
+    $pageSize: Int
+  ) {
+    agentEnvironmentSpecsPage(
+      orgId: $orgId
+      search: $search
+      filter: $filter
+      sort: $sort
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        ...EnvironmentSpecHomeFields
+      }
+      totalCount
+      page
+      pageSize
+    }
+  }
+  ${ENVIRONMENT_SPEC_FIELDS}
+`;
+
+export const AGENT_ENVIRONMENT_SPEC_DETAIL = gql`
+  query AgentEnvironmentSpecDetail($slug: String!, $orgId: ID!) {
+    agentEnvironmentSpec(slug: $slug, orgId: $orgId) {
+      ...EnvironmentSpecHomeFields
+    }
+  }
+  ${ENVIRONMENT_SPEC_FIELDS}
 `;
 
 // Per-ref presence status for a spec's secret refs (#1173) — metadata only

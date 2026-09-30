@@ -16,6 +16,7 @@ export const LONG =
 
 export const DEPLOYMENT: AstroliftDeployment = {
   version: 1,
+  phases: [],
   id: "5f1c2a4e-8d7b-4a61-9a3e-0c2f7b9d1e44",
   status: "pending_approval",
   statusReason: "",

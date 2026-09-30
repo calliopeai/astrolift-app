@@ -2530,6 +2530,9 @@
       }
     },
     "deploymentDetail": {
+      "olderLog": "Load older run log",
+      "olderLogFailed": "Could not load older run log",
+      "downloadFailed": "Run log download failed",
       "title": "{app} → {env}",
       "subtitle": "Deployment {id}",
       "loadingTitle": "Deployment",

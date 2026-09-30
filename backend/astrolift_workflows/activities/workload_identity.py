@@ -231,37 +231,83 @@ def _ensure_cluster_oidc_issuer(cluster: Any) -> None:
     cluster.save(update_fields=["auth_config"])
 
 
-def _other_identity_namespaces(app: Any, cluster: Any, environment: Any, namespace: str) -> list[str]:
-    """The namespaces, besides ``namespace``, of ``app``'s other live
-    environments on ``cluster`` that consume a managed service, so their
-    rendered ServiceAccount assumes the app's role too (#1922)."""
-    from astrolift_lifecycle.models import AppEnvironment
-    from astrolift_workflows.activities.app_lifecycle import _managed_services_for_environment
-    from core.app_deploy import namespace_for_environment
+def _identity_services_by_environment(app, cluster):
+    """One app role covers coherent consumers on this live provider target."""
+    from django.db.models import Prefetch, Q
 
-    out: set[str] = set()
-    others = (
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.models import ManagedService, ManagedServiceAttachment
+
+    environments = list(
         AppEnvironment.objects.filter(registered_app=app, tenant_cluster=cluster)
-        .exclude(pk=environment.pk)
         .select_related("registered_app__organization")
         .order_by("pk")
     )
-    for other in others:
-        other_namespace = namespace_for_environment(other)
-        if other_namespace != namespace and _managed_services_for_environment(other).exists():
-            out.add(other_namespace)
-    return sorted(out)
+    environment_ids = [env.pk for env in environments]
+    rows = (
+        ManagedService.objects.filter(
+            Q(app_environment_id__in=environment_ids)
+            | Q(attachments__app_environment_id__in=environment_ids, attachments__deleted_at__isnull=True),
+        )
+        .filter(
+            Q(
+                registered_app=app,
+                project__isnull=True,
+                app_environment__registered_app=app,
+                app_environment__tenant_cluster=cluster,
+                app_environment__deleted_at__isnull=True,
+            )
+            | Q(
+                registered_app__isnull=True,
+                app_environment__isnull=True,
+                project_id=app.project_id,
+                project__deleted_at__isnull=True,
+                tenant_cluster=cluster,
+            ),
+            Q(tenant_cluster__isnull=True) | Q(tenant_cluster=cluster),
+        )
+        .select_related("app_environment__tenant_cluster__provider_plugin", "tenant_cluster__provider_plugin")
+        .prefetch_related(
+            Prefetch(
+                "attachments",
+                queryset=ManagedServiceAttachment.objects.filter(app_environment_id__in=environment_ids),
+                to_attr="identity_attachments",
+            )
+        )
+        .distinct()
+        .order_by("pk")
+    )
+    services_by_env: dict[int, list[ManagedService]] = {env.pk: [] for env in environments}
+    for service in rows:
+        consumers = {attachment.app_environment_id for attachment in service.identity_attachments}
+        if service.app_environment_id in services_by_env:
+            consumers.add(service.app_environment_id)
+        for env_id in consumers:
+            services_by_env[env_id].append(service)
+    return [(env, services_by_env[env.pk]) for env in environments]
 
 
-def _ensure_workload_identity_sync(
+def _ensure_workload_identity_sync(registered_app_id: int, app_environment_id: int) -> dict[str, Any]:
+    from django.db import transaction
+
+    # The shared policy and trust must reconcile together across concurrent deploys.
+    failure = None
+    with transaction.atomic():
+        try:
+            return _ensure_workload_identity_locked(registered_app_id, app_environment_id)
+        except Exception as exc:
+            # Assignment failures must remain observable after the activity raises.
+            failure = exc
+    raise failure
+
+
+def _ensure_workload_identity_locked(
     registered_app_id: int,
     app_environment_id: int,
 ) -> dict[str, Any]:
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_lifecycle.visibility import cluster_owned_and_live, live_app_rows
     from astrolift_registry.models import RegisteredApp
-    from astrolift_workflows.activities.app_lifecycle import (
-        _managed_services_for_environment,
-    )
     from astrolift_workflows.activities.capability_deprovision import (
         _resolve_capability_driver,
     )
@@ -270,9 +316,15 @@ def _ensure_workload_identity_sync(
     )
     from core.app_deploy import namespace_for_environment, workload_identity_role_name
 
-    app = RegisteredApp.all_objects.select_related("organization").get(
-        pk=registered_app_id,
+    app = (
+        RegisteredApp.objects.select_for_update(of=("self",))
+        .select_related("organization")
+        .get(
+            pk=registered_app_id,
+        )
     )
+    if not live_app_rows(RegisteredApp.objects.filter(pk=app.pk), org_id=app.organization_id).exists():
+        raise ValueError("workload identity app has no coherent live owner")
 
     environment = AppEnvironment.all_objects.select_related(
         "registered_app",
@@ -282,20 +334,6 @@ def _ensure_workload_identity_sync(
         registered_app_id=registered_app_id,
         deleted_at__isnull=True,
     )
-    services = list(
-        _managed_services_for_environment(environment).select_related(
-            "app_environment__tenant_cluster__provider_plugin",
-            "tenant_cluster__provider_plugin",
-        ),
-    )
-
-    if not services:
-        return {
-            "skipped": True,
-            "reason": "no managed services",
-            "registered_app_id": registered_app_id,
-        }
-
     cluster = environment.tenant_cluster
     if cluster is None:
         return {
@@ -303,6 +341,16 @@ def _ensure_workload_identity_sync(
             "reason": "no tenant cluster bound to environment",
             "registered_app_id": registered_app_id,
         }
+    if not cluster_owned_and_live(cluster, app.organization_id):
+        raise ValueError("workload identity cluster is not live in the app organization")
+    groups = _identity_services_by_environment(app, cluster)
+    if not next((services for env, services in groups if env.pk == environment.pk), []):
+        return {
+            "skipped": True,
+            "reason": "no managed services",
+            "registered_app_id": registered_app_id,
+        }
+    services = list({service.pk: service for _, group in groups for service in group}.values())
 
     plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
     bindings = [_managed_binding_for(svc) for svc in services]
@@ -325,7 +373,29 @@ def _ensure_workload_identity_sync(
             len(services),
             ", ".join(sorted(unprovisioned)),
         )
-    declared_by_service = _permissions_by_binding(bindings, plugin_slug=plugin_slug)
+    declared_by_id = dict(
+        zip(
+            [service.pk for service in services],
+            _permissions_by_binding(bindings, plugin_slug=plugin_slug),
+            strict=True,
+        )
+    )
+
+    def persist_states():
+        counts: dict[str, int] = {}
+        for env, group in groups:
+            states = _persist_grant_state(
+                environment=env,
+                services=group,
+                declared_by_service=[declared_by_id[service.pk] for service in group],
+                driver=identity_driver,
+                plugin_slug=plugin_slug,
+                identity_role_name=role_name,
+            )
+            for state, count in states.items():
+                counts[state] = counts.get(state, 0) + count
+        return counts
+
     # Self-sufficient: the IRSA trust policy needs the cluster's OIDC issuer.
     # Discover it from EKS + cache on the cluster row when absent, so the
     # trust isn't malformed by an empty issuer (which yields a broken
@@ -345,23 +415,9 @@ def _ensure_workload_identity_sync(
     try:
         role_arn = identity_driver.create_identity_role(role_name, permissions)
     except Exception:
-        _persist_grant_state(
-            environment=environment,
-            services=services,
-            declared_by_service=declared_by_service,
-            driver=identity_driver,
-            plugin_slug=plugin_slug,
-            identity_role_name=role_name,
-        )
+        persist_states()
         raise
-    states = _persist_grant_state(
-        environment=environment,
-        services=services,
-        declared_by_service=declared_by_service,
-        driver=identity_driver,
-        plugin_slug=plugin_slug,
-        identity_role_name=role_name,
-    )
+    states = persist_states()
     refusals = list(getattr(identity_driver, "prune_refusals", list)())
     for refusal in refusals:
         log.warning(
@@ -377,7 +433,12 @@ def _ensure_workload_identity_sync(
     # cluster whose render carries the ServiceAccount is bound, this one
     # last; with every environment in the app namespace that is the one
     # call it always was.
-    for other in _other_identity_namespaces(app, cluster, environment, namespace):
+    other_namespaces = {
+        namespace_for_environment(env)
+        for env, group in groups
+        if group and env.pk != environment.pk and namespace_for_environment(env) != namespace
+    }
+    for other in sorted(other_namespaces):
         identity_driver.bind_service_account(cluster.slug, other, role_name, role_name)
     annotation = identity_driver.bind_service_account(
         cluster.slug,

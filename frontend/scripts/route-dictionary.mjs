@@ -19,6 +19,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { redirectOf } from "./route-source.mjs";
 
 const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const APP_DIR = join(FRONTEND, "app", "(app)");
@@ -112,15 +113,15 @@ const rows = walkPages(APP_DIR)
     // call. Handles both the literal form redirect("/x") and the
     // query-forwarding conditional redirect(qs ? `/x?${qs}` : "/x") — the
     // `?${…}` tail is stripped so the table shows the bare destination.
-    const redirectAt = src.indexOf("redirect(");
-    const redirectTarget =
-      redirectAt === -1
-        ? null
-        : (src.slice(redirectAt, redirectAt + 200).match(/["'`](\/[^"'`?]*)/)?.[1] ?? null);
+    // Inspect executable calls, not comments, and retain helper-computed
+    // aliases. Those must also be exercised by the browser route contract.
+    const redirectCall = redirectOf(file, src);
+    const redirectTarget = redirectCall?.target;
     const flag = flagFor(route, flags);
 
     let kind = "page";
     if (redirectTarget) kind = `redirect → \`${redirectTarget}\``;
+    else if (redirectCall) kind = "redirect (computed)";
     else if (flag) kind = "flagged";
 
     const homes = [];
@@ -129,7 +130,7 @@ const rows = walkPages(APP_DIR)
 
     const notes = [];
     if (flag) notes.push(`off via \`${flag}\` in lib/route-flags.ts`);
-    if (redirectTarget) notes.push("thin server alias");
+    if (redirectCall) notes.push("thin server alias");
 
     return {
       route,

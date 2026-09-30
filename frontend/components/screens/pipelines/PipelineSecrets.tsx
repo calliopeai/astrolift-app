@@ -192,7 +192,7 @@ export function PipelineSecretsView({
         rows={page.rows}
         getRowId={(s) => s.id}
         rowActions={(s) => (
-          <Can permission="pipeline.secret_manage">
+          <Can permission={{ allOf: ["pipeline.secret_manage", "secret.write"] }} loading={<></>}>
             <DropdownMenuItem
               variant="destructive"
               disabled={deleting}
@@ -216,7 +216,7 @@ export function PipelineSecretsView({
 
       {/* "Add secret" action — only when the form is not already open */}
       {!addOpen && (
-        <Can permission="pipeline.secret_manage">
+        <Can permission={{ allOf: ["pipeline.secret_manage", "secret.write"] }} loading={<></>}>
           <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
             <PlusIcon className="size-4" />
             Add secret

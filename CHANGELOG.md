@@ -2,6 +2,75 @@
 
 ## Unreleased
 
+- Persisted deployment logs retain actual owner deny policies and current bearer
+  ceilings after app/environment teardown or cluster retirement. Failed history
+  diagnostics preserve the original provider failure; completion writes still
+  fail the activity when durable storage is unavailable. Durable database defaults
+  keep old log writers compatible during migration-first rollout (#2176).
+
+- Add explicit, reviewed agent secret-owner maintenance tools (#2102): private
+  metadata-only plans, full-payload copies before atomic ref changes, operator and
+  paused-writer checks, and resumable application without source deletion. Runtime
+  owner enforcement remains a separate release after migration; existing refs
+  continue to resolve. See [the maintenance sequence](docs/operators/agent-secret-owners.md).
+
+- Topology traffic exposes measured Istio request/error rates per directed
+  intra-app edge over a bounded window (#2177). Actual app ownership, bearer
+  ceilings and environment policies apply before HTTP or cache reads. Empty,
+  unavailable and unconfigured sources remain explicit; no synthetic rates
+  fill gaps. See [topology traffic](docs/operators/topology-traffic.md).
+
+- Dashboard polling and refreshes keep the active filtered page current (#2143).
+  The app header owns the shared deploy poll across tabs; task and security
+  reads filter before limits. App alert counts cover every visible firing and
+  deployment charts walk their complete fourteen-day window. Direct event,
+  alert and rule reads keep old links independent of recent-list caps, with
+  owner, bearer and environment-policy filters preserved. See
+  [dashboard query freshness](docs/operators/frontend-query-freshness.md).
+- Agent environment specs have an org-scoped paged list and detail home under
+  Agents (#2178), with server search/filter/sort/counts and live owner/bearer
+  visibility. Optional detail `orgId` validates the explicit tenant; the client
+  separates identical slugs and refresh snapshots by organization.
+- Human-gate email delivery records a failed, error-severity event when no
+  recipient resolves, the mail transport refuses the message or returns zero
+  deliveries (#1823). The gate remains reviewable; accepted transport delivery
+  is distinct from inbox receipt. See [sender setup](docs/operators/human-gate-email.md).
+- App workload identity policies union grants across coherent live environments
+  on the target cluster (#2093), so a preview deploy preserves production access.
+  Shared policy and namespace trust reconcile serially; Azure outcomes retain
+  each consumer's owner. Empty AWS unions remove the platform inline policy.
+  See [workload identity](docs/operators/preview-names-and-workload-identity.md).
+
+- Preview names remain distinct when manual branch `pr-N` and PR #N collide
+  (#2095). Both paths serialize name and namespace allocation per app, including
+  duplicate concurrent requests. Explicit occupied names return validation on
+  `environmentName`. See [preview naming](docs/operators/preview-names-and-workload-identity.md).
+
+- App Pods preloads import their scoped query-variable builder from a shared
+  server-safe module, so the production Metrics route no longer calls a
+  client export from a server component (#2171).
+
+- `/pipelines/new` opens a real form using the existing organization-owned
+  creation contract (#2171). Failed creates retain their draft; navigation
+  failure after commit offers the created pipeline link without a duplicate
+  create. Fleet, approvals, pipelines, operations, logs and traces have rail
+  links, and Fleet links its map. Route generation distinguishes real pages
+  from computed compatibility aliases and ignores quoted redirect examples.
+
+- Pipelines expose scoped write-only secret APIs backed by encrypted
+  `OrgSecret` storage (#2171). Secret metadata reads and writes resolve live actual owners
+  and retain bearer organization/team ceilings. Runtime dispatch reads the
+  same pipeline namespace, refuses stale owners and does not fall back to
+  bare or sibling names. The Secrets route opens its section; failed refreshes
+  after committed writes remain distinct from rejected writes. See
+  [pipeline secret access](docs/operators/pipeline-secrets-access.md).
+
+- App cards provide separate app, pin and failed-deployment keyboard actions
+  without nested links or buttons (#2144). Email bounce and complaint details
+  expose their disclosure state and named details region. The one-time webhook
+  secret reveal uses the shared modal with a title, description, focus trap,
+  Escape dismissal and focus return after rotation.
+
 - Core legacy APIs enforce active account, platform-operator and bearer
   ceilings without removing GraphQL declarations (#2110). Permission analysis
   checks explicit organization management; legacy self-deletion keeps
@@ -14,6 +83,13 @@
   Bulk actions authorize every app and affected operation before acting, and
   secret attachment also authorizes its source bundle. Audit trails, retention,
   notification settings and Zentinelle management require organization authority.
+- Agent Observe logs use an additive structured page API with timestamp,
+  level, stream and stable cursors (#2175). Each page checks current task
+  ownership, bearer ceilings and policies; frozen dispatch placement supplies
+  the source. Temporary bounded pod-log snapshots support loading earlier
+  lines and report their live-only limits. The legacy string-list query is
+  unchanged. See [agent task log pages](docs/operators/agent-task-log-pages.md).
+
 - Rollback, redeploy, workload restart and scale accept optional top-level
   `ifMatchVersion` preconditions (#2162). Clients read deployment or workload
   versions from the target row; stale requests return structured version
@@ -120,6 +196,12 @@
   account permissions allow it. The existing `mcp:dispatch` scope now includes
   `agent_box.attach`; read-only tokens and organization/RBAC boundaries remain
   enforced (#2188).
+- App cards provide separate app, pin and failed-deployment keyboard actions
+  without nested links or buttons (#2144). Email bounce and complaint details
+  expose their disclosure state and named details region. The one-time webhook
+  secret reveal uses the shared modal with a title, description, focus trap,
+  Escape dismissal and focus return after rotation.
+
 - Frontend forms retain edits across query refreshes and failed retries (#2147).
   Successful tool and skill saves keep their accepted values until fresh data
   arrives, without clearing edits made while the save was pending. Reopened
