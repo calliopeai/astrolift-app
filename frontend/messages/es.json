@@ -4665,7 +4665,7 @@
         "runtimeUnknown": "Entorno sin verificar",
         "readiness": "Conciliación registrada",
         "noConfirmation": "Sin confirmación de conciliación actual",
-        "confirmedAt": "Última conciliación confirmada el {time} (generación {generation}).",
+        "confirmedAt": "Última conciliación confirmada: {time}.",
         "noLiveHealth": "Esta confirmación registrada no es una comprobación de salud o capacidad en vivo.",
         "desired": "Recursos deseados",
         "applied": "Últimos recursos aplicados",
@@ -4683,7 +4683,9 @@
         "cache": "Solicitud de caché KV en CPU (GiB)",
         "unknown": "Desconocido",
         "identityMismatch": "La respuesta no coincide con la identidad del despliegue actual. Actualiza antes de realizar cualquier acción.",
-        "staleFacts": "Se conservan los últimos datos legibles; la actualización falló."
+        "staleFacts": "Se conservan los últimos datos legibles; la actualización falló.",
+        "technical": "Detalles técnicos",
+        "generation": "Generación de disponibilidad"
       },
       "observations": {
         "title": "Métricas observadas del modelo",

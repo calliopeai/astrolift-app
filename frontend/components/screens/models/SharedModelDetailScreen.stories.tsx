@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NextIntlClientProvider } from "next-intl";
+import { expect, userEvent, within } from "storybook/test";
 import fr from "@/messages/fr.json";
 import ja from "@/messages/ja.json";
 import { SharedModelDetailScreen } from "./SharedModelDetailScreen";
@@ -11,7 +12,16 @@ const meta = {
 } satisfies Meta<typeof SharedModelDetailScreen>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const Full: Story = { args: sharedModelDetailProps };
+export const Full: Story = {
+  args: sharedModelDetailProps,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("provider-one")).not.toBeVisible();
+    await userEvent.click(canvas.getByText("Technical details"));
+    await expect(canvas.getByText("provider-one")).toBeVisible();
+    await expect(canvas.getByText("operation-model-123")).toBeVisible();
+  },
+};
 export const Loading: Story = { args: { ...sharedModelDetailProps, model: null, loading: true } };
 export const Missing: Story = { args: { ...sharedModelDetailProps, model: null } };
 export const FailedRead: Story = {

@@ -4665,7 +4665,7 @@
         "runtimeUnknown": "Laufzeit nicht verifiziert",
         "readiness": "Gespeicherter Abgleich",
         "noConfirmation": "Keine aktuelle Abgleichbestätigung",
-        "confirmedAt": "Letzter Abgleich bestätigt am {time} (Generation {generation}).",
+        "confirmedAt": "Letzter bestätigter Abgleich: {time}.",
         "noLiveHealth": "Diese gespeicherte Bestätigung ist keine aktuelle Zustands- oder Kapazitätsprüfung.",
         "desired": "Gewünschte Ressourcen",
         "applied": "Zuletzt angewendete Ressourcen",
@@ -4683,7 +4683,9 @@
         "cache": "CPU-KV-Cache-Anforderung (GiB)",
         "unknown": "Unbekannt",
         "identityMismatch": "Die Antwort entspricht nicht der aktuellen Bereitstellungsidentität. Aktualisieren Sie vor einer Aktion.",
-        "staleFacts": "Die letzten lesbaren Daten bleiben erhalten; die Aktualisierung ist fehlgeschlagen."
+        "staleFacts": "Die letzten lesbaren Daten bleiben erhalten; die Aktualisierung ist fehlgeschlagen.",
+        "technical": "Technische Details",
+        "generation": "Bereitschaftsgeneration"
       },
       "observations": {
         "title": "Beobachtete Modellmetriken",

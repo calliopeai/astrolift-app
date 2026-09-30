@@ -4742,7 +4742,7 @@
         "runtimeUnknown": "Runtime unverified",
         "readiness": "Recorded reconciliation",
         "noConfirmation": "No current reconciliation confirmation",
-        "confirmedAt": "Last reconciliation confirmed at {time} (generation {generation}).",
+        "confirmedAt": "Last confirmed reconciliation at {time}.",
         "noLiveHealth": "This recorded confirmation is not a live health or capacity check.",
         "desired": "Desired resources",
         "applied": "Last-applied resources",
@@ -4760,7 +4760,9 @@
         "cache": "CPU KV-cache request (GiB)",
         "unknown": "Unknown",
         "identityMismatch": "The response does not match the current deployment identity. Refresh before taking any action.",
-        "staleFacts": "The last readable facts are retained; the refresh failed."
+        "staleFacts": "The last readable facts are retained; the refresh failed.",
+        "technical": "Technical details",
+        "generation": "Readiness generation"
       },
       "observations": {
         "title": "Observed model metrics",

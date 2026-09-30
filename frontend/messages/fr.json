@@ -4665,7 +4665,7 @@
         "runtimeUnknown": "Environnement non vérifié",
         "readiness": "Rapprochement enregistré",
         "noConfirmation": "Aucune confirmation actuelle du rapprochement",
-        "confirmedAt": "Dernier rapprochement confirmé le {time} (génération {generation}).",
+        "confirmedAt": "Dernière réconciliation confirmée le {time}.",
         "noLiveHealth": "Cette confirmation enregistrée n’est pas un contrôle de santé ou de capacité en direct.",
         "desired": "Ressources souhaitées",
         "applied": "Dernières ressources appliquées",
@@ -4683,7 +4683,9 @@
         "cache": "Cache KV demandé sur CPU (GiB)",
         "unknown": "Inconnu",
         "identityMismatch": "La réponse ne correspond pas à l’identité du déploiement actuel. Actualisez avant toute action.",
-        "staleFacts": "Les dernières données accessibles sont conservées ; l’actualisation a échoué."
+        "staleFacts": "Les dernières données accessibles sont conservées ; l’actualisation a échoué.",
+        "technical": "Détails techniques",
+        "generation": "Génération de disponibilité"
       },
       "observations": {
         "title": "Métriques observées du modèle",

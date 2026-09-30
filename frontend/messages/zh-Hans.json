@@ -4662,7 +4662,7 @@
         "runtimeUnknown": "运行时未验证",
         "readiness": "已记录的协调结果",
         "noConfirmation": "没有当前协调确认记录",
-        "confirmedAt": "上次协调确认于 {time}（代次 {generation}）。",
+        "confirmedAt": "最近确认的协调时间：{time}。",
         "noLiveHealth": "此已记录的确认结果并非实时健康或容量检查。",
         "desired": "期望资源",
         "applied": "上次应用的资源",
@@ -4680,7 +4680,9 @@
         "cache": "CPU KV 缓存请求量（GiB）",
         "unknown": "未知",
         "identityMismatch": "响应与当前部署身份不匹配。请先刷新再执行操作。",
-        "staleFacts": "保留上次可读取的信息；刷新失败。"
+        "staleFacts": "保留上次可读取的信息；刷新失败。",
+        "technical": "技术详情",
+        "generation": "就绪状态代次"
       },
       "observations": {
         "title": "模型观测指标",

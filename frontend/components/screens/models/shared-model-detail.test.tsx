@@ -156,6 +156,19 @@ describe("actual shared model detail", () => {
         ?.variables.organizationId
     ).toBe("org-two");
   });
+  it("prioritizes model facts and reveals internal identity only when technical details are opened", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <SharedModelDetailScreen {...sharedModelDetailProps} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.getByText("Qwen/Qwen3-8B")).toBeVisible();
+    expect(screen.getByText("provider-one")).not.toBeVisible();
+    expect(screen.getByText("operation-model-123")).not.toBeVisible();
+    fireEvent.click(screen.getByText(en.models.shared.detail.technical));
+    expect(screen.getByText("provider-one")).toBeVisible();
+    expect(screen.getByText("operation-model-123")).toBeVisible();
+  });
   it("requires recorded time and positive generation before displaying a reconciliation confirmation", () => {
     render(
       <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">

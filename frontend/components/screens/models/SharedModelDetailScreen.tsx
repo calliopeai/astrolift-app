@@ -95,20 +95,12 @@ export function SharedModelDetailScreen({
               <DefinitionList
                 items={[
                   {
-                    term: t("organization"),
-                    description: <code className="break-all">{model.organizationId}</code>,
-                  },
-                  {
                     term: common("cluster"),
                     description: (
                       <span className="break-all">
                         {model.clusterName} · {model.clusterSlug}
                       </span>
                     ),
-                  },
-                  {
-                    term: t("provider"),
-                    description: <code className="break-all">{model.providerId}</code>,
                   },
                   {
                     term: common("model"),
@@ -118,7 +110,6 @@ export function SharedModelDetailScreen({
                     term: t("revision"),
                     description: <code className="break-all">{model.revisionSha ?? unknown}</code>,
                   },
-                  { term: t("version"), description: format.number(model.version) },
                   {
                     term: common("compute"),
                     description:
@@ -167,7 +158,6 @@ export function SharedModelDetailScreen({
                         {confirmed
                           ? t("confirmedAt", {
                               time: time(model.readinessObservedAt),
-                              generation: model.readinessGeneration!,
                             })
                           : t("noConfirmation")}
                         <span className="text-muted-foreground block">{t("noLiveHealth")}</span>
@@ -202,20 +192,50 @@ export function SharedModelDetailScreen({
                   applied: model.appliedSubscriptionRevision,
                 })}
               </p>
-              <DefinitionList
-                items={[
-                  {
-                    term: t("operationId"),
-                    description: <code className="break-all">{model.operationId ?? unknown}</code>,
-                  },
-                  { term: t("operationStarted"), description: time(model.operationStartedAt) },
-                  { term: t("operationCompleted"), description: time(model.operationCompletedAt) },
-                ]}
-              />
             </Section>
             {subscriptions}
             {observations}
             {prompt}
+            <details className="rounded-lg border p-4">
+              <summary className="cursor-pointer font-medium">{t("technical")}</summary>
+              <div className="mt-4 space-y-4">
+                <DefinitionList
+                  items={[
+                    {
+                      term: t("organization"),
+                      description: <code className="break-all">{model.organizationId}</code>,
+                    },
+                    {
+                      term: t("provider"),
+                      description: <code className="break-all">{model.providerId}</code>,
+                    },
+                    { term: t("version"), description: format.number(model.version) },
+                    {
+                      term: t("generation"),
+                      description:
+                        model.readinessGeneration == null
+                          ? unknown
+                          : format.number(model.readinessGeneration),
+                    },
+                  ]}
+                />
+                <DefinitionList
+                  items={[
+                    {
+                      term: t("operationId"),
+                      description: (
+                        <code className="break-all">{model.operationId ?? unknown}</code>
+                      ),
+                    },
+                    { term: t("operationStarted"), description: time(model.operationStartedAt) },
+                    {
+                      term: t("operationCompleted"),
+                      description: time(model.operationCompletedAt),
+                    },
+                  ]}
+                />
+              </div>
+            </details>
           </>
         )}
       </div>

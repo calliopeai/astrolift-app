@@ -4662,7 +4662,7 @@
         "runtimeUnknown": "ランタイム未確認",
         "readiness": "整合確認の記録",
         "noConfirmation": "現在の整合確認記録なし",
-        "confirmedAt": "前回の整合確認：{time}（世代 {generation}）。",
+        "confirmedAt": "最後に確認された調整: {time}。",
         "noLiveHealth": "この記録済みの確認は、現在の稼働状態や容量の検査ではありません。",
         "desired": "要求するリソース",
         "applied": "最後に適用されたリソース",
@@ -4680,7 +4680,9 @@
         "cache": "CPU KV キャッシュの要求量（GiB）",
         "unknown": "不明",
         "identityMismatch": "応答が現在のデプロイの識別情報と一致しません。操作する前に更新してください。",
-        "staleFacts": "最後に読み取れた情報を保持しています。更新に失敗しました。"
+        "staleFacts": "最後に読み取れた情報を保持しています。更新に失敗しました。",
+        "technical": "技術的な詳細",
+        "generation": "準備状態の世代"
       },
       "observations": {
         "title": "モデルの観測メトリクス",

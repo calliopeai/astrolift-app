@@ -137,7 +137,11 @@ Actual route-client Apollo HTTP tests cover exact identities, mismatched replies
 permission errors, refresh/retry and tenant changes. Eight locales preserve model
 IDs, SHA and resource units; French/Japanese SSR hydration regressions check
 timestamp stability. Portable stories cover missing/failed/loading/stale reads,
-CPU, unsupported runtime and long/narrow frames. The metadata route is wired;
+CPU, unsupported runtime and long/narrow frames. Raw organization/provider IDs, internal row version, operation identifiers and
+generation remain available in a collapsed native technical-details disclosure.
+The primary view leads with model/revision, cluster/compute/resources and recorded
+readiness; opening the disclosure is covered by an actual interaction test.
+The metadata route is wired;
 subscription, observation and playground panels and production browser journeys
 remain the following integration work.
 
