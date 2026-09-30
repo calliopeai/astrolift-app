@@ -41,6 +41,11 @@ function Screen({ initial, ...patch }: Props) {
 
 export const Full: Story = { render: () => <Screen /> };
 
+/** One subscription is changing; other subscriptions remain actionable. */
+export const OneRowPending: Story = {
+  render: () => <Screen pendingRows={new Set([SUBSCRIPTIONS[0].id])} />,
+};
+
 /** Scoped to one app (its Settings section): embedded, the description names it. */
 export const AppScoped: Story = { render: () => <Screen appSlug="storefront" /> };
 

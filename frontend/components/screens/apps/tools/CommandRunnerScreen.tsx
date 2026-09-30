@@ -189,7 +189,10 @@ export function CommandRunnerScreen({
                   Stop
                 </Button>
               ) : (
-                <Button onClick={onRun} disabled={!command.trim() || !workloadSlug}>
+                <Button
+                  onClick={onRun}
+                  disabled={!command.trim() || !workloadSlug || !containerName}
+                >
                   <PlayIcon className="size-3.5" />
                   Run
                 </Button>

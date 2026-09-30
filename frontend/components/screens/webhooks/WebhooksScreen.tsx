@@ -116,9 +116,7 @@ export function WebhooksScreen({
   error,
   onRetry,
   creating,
-  rotating,
-  firing,
-  deleting,
+  pendingRows,
   reveal,
   dismissReveal,
   copySecret,
@@ -248,6 +246,7 @@ export function WebhooksScreen({
   ];
 
   function rowActions(s: AstroliftWebhookSubscription) {
+    const busy = pendingRows.has(s.id);
     return (
       <>
         <DropdownMenuItem onSelect={() => setExpandedId(s.id)}>
@@ -255,15 +254,15 @@ export function WebhooksScreen({
           Deliveries
         </DropdownMenuItem>
         <Can permission="webhook.update">
-          <DropdownMenuItem onSelect={() => void onToggleActive(s)}>
+          <DropdownMenuItem disabled={busy} onSelect={() => void onToggleActive(s)}>
             {s.isActive ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
             {s.isActive ? "Pause" : "Resume"}
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={firing || !s.isActive} onSelect={() => setTestTarget(s)}>
+          <DropdownMenuItem disabled={busy || !s.isActive} onSelect={() => setTestTarget(s)}>
             <SendIcon className="size-4" />
             Send test event
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={rotating} onSelect={() => setRotateTarget(s)}>
+          <DropdownMenuItem disabled={busy} onSelect={() => setRotateTarget(s)}>
             <KeyRoundIcon className="size-4" />
             Rotate secret
           </DropdownMenuItem>
@@ -272,7 +271,7 @@ export function WebhooksScreen({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
-            disabled={deleting}
+            disabled={busy}
             onSelect={() => setDeleteTarget(s)}
           >
             <Trash2Icon className="size-4" />

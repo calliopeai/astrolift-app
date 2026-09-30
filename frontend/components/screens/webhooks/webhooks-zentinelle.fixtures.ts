@@ -174,6 +174,7 @@ export const WEBHOOKS: Omit<WebhooksScreenProps, "renderDetail" | "list"> = {
   error: null,
   onRetry: noop,
   creating: false,
+  pendingRows: new Set(),
   rotating: false,
   firing: false,
   deleting: false,

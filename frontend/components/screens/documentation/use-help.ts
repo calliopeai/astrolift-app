@@ -9,6 +9,15 @@ import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 export function useHelp(platformVersion: string) {
   const { org } = useActiveOrg();
   const [copied, setCopied] = React.useState(false);
+  const copiedTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = React.useRef(true);
+  React.useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
+    };
+  }, []);
 
   async function copyDiagnostics() {
     if (typeof navigator === "undefined") return;
@@ -23,11 +32,16 @@ export function useHelp(platformVersion: string) {
     const text = JSON.stringify(diagnostics, null, 2);
     try {
       await navigator.clipboard.writeText(text);
+      if (!mounted.current) return;
+      if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
       setCopied(true);
       toast.success("Diagnostic info copied — paste into your ticket");
-      setTimeout(() => setCopied(false), 1500);
+      copiedTimer.current = setTimeout(() => {
+        copiedTimer.current = null;
+        setCopied(false);
+      }, 1500);
     } catch {
-      toast.error("Couldn't copy — clipboard access blocked");
+      if (mounted.current) toast.error("Couldn't copy — clipboard access blocked");
     }
   }
 

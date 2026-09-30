@@ -60,6 +60,21 @@ export interface CreateWebhookInput {
 export function useWebhooks(appSlug?: string) {
   const [reveal, setReveal] = React.useState<AstroliftWebhookSecretReveal | null>(null);
   const [testResult, setTestResult] = React.useState<AstroliftWebhookTestResult | null>(null);
+  const pendingRef = React.useRef(new Set<string>());
+  const [pendingRows, setPendingRows] = React.useState<ReadonlySet<string>>(new Set());
+
+  async function runRowAction(id: string, action: () => Promise<void>) {
+    if (pendingRef.current.has(id))
+      throw new Error("An action is already running for this subscription");
+    pendingRef.current.add(id);
+    setPendingRows(new Set(pendingRef.current));
+    try {
+      await action();
+    } finally {
+      pendingRef.current.delete(id);
+      setPendingRows(new Set(pendingRef.current));
+    }
+  }
 
   // `astroliftWebhookSubscriptionsPage` takes `appSlug`, `search`, `limit`
   // and `after`, no sort argument, so no column declares a `sortKey`.
@@ -147,76 +162,96 @@ export function useWebhooks(appSlug?: string) {
   }
 
   async function onDelete(s: AstroliftWebhookSubscription) {
-    const { data } = await deleteWebhook({ variables: { input: { id: s.id } } });
-    if (data?.deleteWebhookSubscription.ok) {
-      toast.success("Deleted");
-    } else {
-      throw new Error(data?.deleteWebhookSubscription.errors?.[0]?.message ?? "Delete failed");
-    }
+    return runRowAction(s.id, async () => {
+      const { data } = await deleteWebhook({ variables: { input: { id: s.id } } });
+      if (data?.deleteWebhookSubscription.ok) {
+        toast.success("Deleted");
+      } else {
+        throw new Error(data?.deleteWebhookSubscription.errors?.[0]?.message ?? "Delete failed");
+      }
+    });
   }
 
   async function onToggleActive(s: AstroliftWebhookSubscription) {
-    const next = !s.isActive;
-    const { data } = await updateWebhook({
-      variables: { input: { id: s.id, isActive: next, ifMatchVersion: s.version } },
-    });
-    if (data?.updateWebhookSubscription.ok) {
-      toast.success(next ? "Resumed" : "Paused");
-    } else if (
-      handleVersionMismatch(data?.updateWebhookSubscription, {
-        label: "webhook subscription",
-        onRefresh: refetchList,
-      })
-    ) {
-      // toast already raised by helper
-    } else {
-      toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Toggle failed");
+    try {
+      await runRowAction(s.id, async () => {
+        const next = !s.isActive;
+        const { data } = await updateWebhook({
+          variables: { input: { id: s.id, isActive: next, ifMatchVersion: s.version } },
+        });
+        if (data?.updateWebhookSubscription.ok) {
+          toast.success(next ? "Resumed" : "Paused");
+        } else if (
+          handleVersionMismatch(data?.updateWebhookSubscription, {
+            label: "webhook subscription",
+            onRefresh: refetchList,
+          })
+        ) {
+          // toast already raised by helper
+        } else {
+          toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Toggle failed");
+        }
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
     }
   }
 
   async function onFormatChange(s: AstroliftWebhookSubscription, next: WebhookFormat) {
-    const { data } = await updateWebhook({
-      variables: { input: { id: s.id, format: next, ifMatchVersion: s.version } },
-    });
-    if (data?.updateWebhookSubscription.ok) {
-      toast.success(`Format set to ${next}`);
-    } else if (
-      handleVersionMismatch(data?.updateWebhookSubscription, {
-        label: "webhook subscription",
-        onRefresh: refetchList,
-      })
-    ) {
-      // toast already raised by helper
-    } else {
-      toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Update failed");
+    try {
+      await runRowAction(s.id, async () => {
+        const { data } = await updateWebhook({
+          variables: { input: { id: s.id, format: next, ifMatchVersion: s.version } },
+        });
+        if (data?.updateWebhookSubscription.ok) {
+          toast.success(`Format set to ${next}`);
+        } else if (
+          handleVersionMismatch(data?.updateWebhookSubscription, {
+            label: "webhook subscription",
+            onRefresh: refetchList,
+          })
+        ) {
+          // toast already raised by helper
+        } else {
+          toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Update failed");
+        }
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
     }
   }
 
   async function onRotate(s: AstroliftWebhookSubscription) {
-    const { data } = await rotateSecret({ variables: { input: { id: s.id } } });
-    if (data?.rotateOutboundWebhookSecret.ok && data.rotateOutboundWebhookSecret.data) {
-      setReveal(data.rotateOutboundWebhookSecret.data);
-      toast.success("Secret rotated — copy the new value now");
-    } else {
-      throw new Error(data?.rotateOutboundWebhookSecret.errors?.[0]?.message ?? "Rotation failed");
-    }
+    return runRowAction(s.id, async () => {
+      const { data } = await rotateSecret({ variables: { input: { id: s.id } } });
+      if (data?.rotateOutboundWebhookSecret.ok && data.rotateOutboundWebhookSecret.data) {
+        setReveal(data.rotateOutboundWebhookSecret.data);
+        toast.success("Secret rotated — copy the new value now");
+      } else {
+        throw new Error(
+          data?.rotateOutboundWebhookSecret.errors?.[0]?.message ?? "Rotation failed"
+        );
+      }
+    });
   }
 
   async function onTestFire(s: AstroliftWebhookSubscription) {
-    const { data } = await testFireWebhook({ variables: { input: { id: s.id } } });
-    if (data?.testWebhookSubscription.ok && data.testWebhookSubscription.data) {
-      setTestResult(data.testWebhookSubscription.data);
-      const code = data.testWebhookSubscription.data.statusCode;
-      if (code && code >= 200 && code < 300) {
-        toast.success(`Delivered: HTTP ${code}`);
-      } else if (code) {
-        toast.warning(`Subscriber returned HTTP ${code}`);
+    return runRowAction(s.id, async () => {
+      const { data } = await testFireWebhook({ variables: { input: { id: s.id } } });
+      if (data?.testWebhookSubscription.ok && data.testWebhookSubscription.data) {
+        setTestResult(data.testWebhookSubscription.data);
+        const code = data.testWebhookSubscription.data.statusCode;
+        if (code && code >= 200 && code < 300) {
+          toast.success(`Delivered: HTTP ${code}`);
+        } else if (code) {
+          toast.warning(`Subscriber returned HTTP ${code}`);
+        } else {
+          toast.error(`Transport failure: ${data.testWebhookSubscription.data.error || "unknown"}`);
+        }
       } else {
-        toast.error(`Transport failure: ${data.testWebhookSubscription.data.error || "unknown"}`);
+        throw new Error(data?.testWebhookSubscription.errors?.[0]?.message ?? "Test fire failed");
       }
-    } else {
-      throw new Error(data?.testWebhookSubscription.errors?.[0]?.message ?? "Test fire failed");
-    }
+    });
   }
 
   function copySecret() {
@@ -234,6 +269,7 @@ export function useWebhooks(appSlug?: string) {
     error: query.error && !data ? { message: query.error.message } : null,
     onRetry: refetchList,
     creating,
+    pendingRows,
     rotating,
     firing,
     deleting,

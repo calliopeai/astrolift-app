@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Operational forms stay blocked during secret rotation and require a command
+  container. Terminal agent-run aliases stop polling, uppercase running tasks
+  accept overseer input, help copy timers are cleaned up, and webhook writes
+  block only their own subscription while preventing duplicate actions (#2148).
+
 - Public install discovery has a dedicated, rate-limited GraphQL transport with
   only the curated server handshake. Mobile clients can inspect an install before
   login while the main API retains its authentication requirement (#2185).
