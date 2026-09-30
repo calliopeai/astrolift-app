@@ -910,15 +910,15 @@
         }
       },
       "configDrift": {
-        "headline": "構成のドリフトを検出しました",
-        "description": "{env} 環境の最後のデプロイは現在のマニフェストと一致しません。",
-        "descriptionNoEnv": "最後のデプロイは現在のマニフェストと一致しません。",
+        "headline": "設定のずれを検出しました",
+        "description": "環境{env}の最後のデプロイが現在のマニフェストと一致しません。",
+        "descriptionNoEnv": "最後のデプロイが現在のマニフェストと一致しません。",
         "cta": "ソースから同期",
         "field": {
-          "manifest_hash": "マニフェストハッシュが最後のデプロイから変更されました",
+          "manifest_hash": "最後のデプロイ以降にマニフェストのハッシュが変更されました",
           "image_tag": "イメージタグがスナップショットと異なります",
-          "repo_unsynced": "ソースリポジトリがプラットフォームより進んでいます — 同期して取り込んでください",
-          "unknown": "{field} が変更されました"
+          "repo_unsynced": "ソースリポジトリにプラットフォーム未反映の変更があります。再同期して取り込んでください",
+          "unknown": "{field}が変更されました"
         },
         "toast": {
           "synced": "ソースから同期しました。",
@@ -926,61 +926,62 @@
         }
       },
       "latestDeploy": {
-        "empty": "まだデプロイがありません — CLIから実行するか、デプロイブランチにプッシュしてください。",
-        "ariaLabel": "最新のデプロイ: {status}, {when}"
+        "empty": "デプロイはまだありません。CLIから開始するか、デプロイ用ブランチにプッシュしてください。",
+        "ariaLabel": "最新のデプロイ：{status}、{when}"
       },
       "actions": {
-        "open": "Open",
-        "deploy": "Deploy",
-        "config": "Config",
-        "source": "Source",
-        "delete": "Delete"
+        "open": "開く",
+        "deploy": "デプロイ",
+        "config": "設定",
+        "source": "ソース",
+        "delete": "削除"
       },
       "provisioning": {
-        "failed": "Provisioning failed"
+        "failed": "プロビジョニングに失敗しました"
       },
       "topology": {
-        "title": "Topology",
-        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
-        "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "title": "トポロジー",
+        "description": "プロビジョニングされた公開イングレス、サービス、ワークロード、接続されたマネージドサービスです。ノードを選ぶと詳細を確認できます。",
+        "emptyTitle": "トポロジーはまだありません",
+        "emptyDescription": "このアプリにワークロードを登録するとトポロジーが表示されます。",
+        "open": "トポロジーを開く"
       },
       "delete": {
-        "title": "Delete {slug}?",
-        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
-        "confirm": "Delete app"
+        "title": "{slug}を削除しますか？",
+        "description": "論理削除のみ行います。識別子は再利用できますが、ワークロードは停止したままです。組織の所有者は30日以内に復元できます。",
+        "confirm": "アプリを削除"
       },
       "urlHealth": {
-        "checking": "Checking…",
-        "unknown": "Unchecked",
-        "ariaLabel": "URL health: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
+        "checking": "確認中…",
+        "unknown": "未確認",
+        "ariaLabel": "URLの状態：{status}",
+        "ok": "{latency}ミリ秒",
+        "degraded": "{statusCode} · {latency}ミリ秒",
         "down": "{reason}",
-        "downNoReason": "Unreachable",
+        "downNoReason": "接続できません",
         "tooltip": {
-          "title": "Recent probes",
-          "empty": "No probe history yet.",
-          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
-          "now": "now",
-          "secondsAgo": "{seconds}s ago",
-          "minutesAgo": "{minutes}m ago",
-          "hoursAgo": "{hours}h ago",
-          "recheck": "Click to re-run probe",
-          "rechecking": "Re-running probe…"
+          "title": "最近のチェック",
+          "empty": "チェック履歴はまだありません。",
+          "uptime": "成功 {ok}/{total} · 平均 {avgMs}ミリ秒",
+          "now": "現在",
+          "secondsAgo": "{seconds}秒前",
+          "minutesAgo": "{minutes}分前",
+          "hoursAgo": "{hours}時間前",
+          "recheck": "クリックしてチェックを再実行",
+          "rechecking": "チェックを再実行中…"
         }
       },
       "groups": {
-        "deployment": "Deployment",
-        "controls": "Controls & access",
-        "insights": "Observability & activity",
-        "links": "Quick links"
+        "deployment": "デプロイ",
+        "controls": "制御とアクセス",
+        "insights": "可観測性とアクティビティ",
+        "links": "クイックリンク"
       },
       "headerDeploy": {
-        "title": "{tag} を {env} にデプロイしますか?",
-        "description": "直近のイメージタグを再デプロイします。別のタグや環境は環境ページから選択してください。",
+        "title": "{tag}を{env}にデプロイしますか？",
+        "description": "最新のイメージタグを再デプロイします。別のタグや環境を選ぶ場合は、環境ページを開いてください。",
         "confirm": "デプロイ",
-        "started": "デプロイ開始: {tag} → {env}",
+        "started": "デプロイを開始しました：{tag} → {env}",
         "failed": "デプロイに失敗しました"
       }
     },

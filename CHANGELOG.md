@@ -15,6 +15,10 @@
 - Scaling feedback passes actual ICU values, and API key/project operation dates
   honor the selected locale and timezone. Project operation states and fallback
   scale errors have translations in all supported locales (#2145).
+- App detail deploy/delete confirmations, config-drift notices and URL health
+  hints use all eight locales. Translated confirmations preserve actual image,
+  environment and app identifiers and require acceptance before writes (#2145).
+
 - App frame, section/tab labels and shared app loading/not-found messages are
   translated in all eight locales. Locale changes preserve actual route targets,
   active tabs and retry callbacks (#2145).

@@ -910,75 +910,76 @@
         }
       },
       "configDrift": {
-        "headline": "Drift de configuração detectado",
-        "description": "O último deploy do ambiente {env} não corresponde ao manifesto atual.",
-        "descriptionNoEnv": "O último deploy não corresponde ao manifesto atual.",
-        "cta": "Sincronizar da origem",
+        "headline": "Divergência de configuração detectada",
+        "description": "A última implantação no ambiente {env} não corresponde ao manifesto atual.",
+        "descriptionNoEnv": "A última implantação não corresponde ao manifesto atual.",
+        "cta": "Sincronizar a partir do código-fonte",
         "field": {
-          "manifest_hash": "Hash do manifesto mudou desde o último deploy",
-          "image_tag": "Tag da imagem diverge do snapshot",
-          "repo_unsynced": "Repo de origem está à frente da plataforma — ressincronize para puxar",
+          "manifest_hash": "O hash do manifesto mudou desde a última implantação",
+          "image_tag": "A tag da imagem difere da captura",
+          "repo_unsynced": "O repositório tem alterações ainda não refletidas na plataforma; sincronize novamente para obtê-las",
           "unknown": "{field} mudou"
         },
         "toast": {
-          "synced": "Sincronizado da origem.",
-          "failed": "Falha ao sincronizar da origem."
+          "synced": "Sincronizado a partir do código-fonte.",
+          "failed": "Falha na sincronização a partir do código-fonte."
         }
       },
       "latestDeploy": {
-        "empty": "Nenhum deploy ainda — dispare um pelo CLI ou faça push no branch de deploy.",
-        "ariaLabel": "Último deploy: {status}, {when}"
+        "empty": "Ainda não há implantações; inicie uma pela CLI ou envie código para a branch de implantação.",
+        "ariaLabel": "Última implantação: {status}, {when}"
       },
       "actions": {
-        "open": "Open",
-        "deploy": "Deploy",
-        "config": "Config",
-        "source": "Source",
-        "delete": "Delete"
+        "open": "Abrir",
+        "deploy": "Implantar",
+        "config": "Configuração",
+        "source": "Código-fonte",
+        "delete": "Excluir"
       },
       "provisioning": {
-        "failed": "Provisioning failed"
+        "failed": "Falha no provisionamento"
       },
       "topology": {
-        "title": "Topology",
-        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
-        "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "title": "Topologia",
+        "description": "Componentes provisionados: entrada pública, serviços, cargas de trabalho e serviços gerenciados vinculados. Clique em um nó para ver os detalhes.",
+        "emptyTitle": "Ainda não há topologia",
+        "emptyDescription": "A topologia aparece após o registro de cargas de trabalho para este aplicativo.",
+        "open": "Abrir topologia"
       },
       "delete": {
-        "title": "Delete {slug}?",
-        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
-        "confirm": "Delete app"
+        "title": "Excluir {slug}?",
+        "description": "Somente exclusão lógica: o identificador fica disponível, mas as cargas de trabalho permanecem desativadas. Um proprietário da organização pode restaurar o aplicativo por 30 dias.",
+        "confirm": "Excluir aplicativo"
       },
       "urlHealth": {
-        "checking": "Checking…",
-        "unknown": "Unchecked",
-        "ariaLabel": "URL health: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
+        "checking": "Verificando…",
+        "unknown": "Não verificado",
+        "ariaLabel": "Integridade da URL: {status}",
+        "ok": "{latency} ms",
+        "degraded": "{statusCode} · {latency} ms",
         "down": "{reason}",
-        "downNoReason": "Unreachable",
+        "downNoReason": "Inacessível",
         "tooltip": {
-          "title": "Recent probes",
-          "empty": "No probe history yet.",
-          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
-          "now": "now",
-          "secondsAgo": "{seconds}s ago",
-          "minutesAgo": "{minutes}m ago",
-          "hoursAgo": "{hours}h ago",
-          "recheck": "Click to re-run probe",
-          "rechecking": "Re-running probe…"
+          "title": "Verificações recentes",
+          "empty": "Ainda não há histórico de verificações.",
+          "uptime": "{ok}/{total} bem-sucedidas · média {avgMs} ms",
+          "now": "agora",
+          "secondsAgo": "há {seconds} s",
+          "minutesAgo": "há {minutes} min",
+          "hoursAgo": "há {hours} h",
+          "recheck": "Clique para executar a verificação novamente",
+          "rechecking": "Executando verificação novamente…"
         }
       },
       "groups": {
-        "deployment": "Deployment",
-        "controls": "Controls & access",
-        "insights": "Observability & activity",
-        "links": "Quick links"
+        "deployment": "Implantação",
+        "controls": "Controles e acesso",
+        "insights": "Observabilidade e atividade",
+        "links": "Links rápidos"
       },
       "headerDeploy": {
         "title": "Implantar {tag} em {env}?",
-        "description": "Reimplanta a tag de imagem mais recente. Use a página de ambientes para escolher outra tag ou ambiente.",
+        "description": "Implanta novamente a tag de imagem mais recente. Use a página de ambientes para escolher outra tag ou outro ambiente.",
         "confirm": "Implantar",
         "started": "Implantação iniciada: {tag} em {env}",
         "failed": "Falha na implantação"

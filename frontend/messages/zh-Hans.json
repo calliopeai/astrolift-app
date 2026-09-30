@@ -910,77 +910,78 @@
         }
       },
       "configDrift": {
-        "headline": "检测到配置漂移",
-        "description": "{env} 环境的最后一次部署与当前清单不一致。",
-        "descriptionNoEnv": "最后一次部署与当前清单不一致。",
-        "cta": "从源同步",
+        "headline": "检测到配置偏差",
+        "description": "{env} 环境的最近部署与当前清单不一致。",
+        "descriptionNoEnv": "最近部署与当前清单不一致。",
+        "cta": "从源代码同步",
         "field": {
-          "manifest_hash": "清单哈希自上次部署以来已更改",
-          "image_tag": "镜像标签与快照不同",
-          "repo_unsynced": "源仓库领先于平台 — 重新同步以应用",
+          "manifest_hash": "清单哈希自上次部署后发生变化",
+          "image_tag": "镜像标签与快照不一致",
+          "repo_unsynced": "源代码仓库包含尚未同步到平台的更新，请重新同步以获取",
           "unknown": "{field} 已更改"
         },
         "toast": {
-          "synced": "已从源同步。",
-          "failed": "从源同步失败。"
+          "synced": "已从源代码同步。",
+          "failed": "从源代码同步失败。"
         }
       },
       "latestDeploy": {
-        "empty": "尚无部署 — 从 CLI 触发或推送到部署分支。",
-        "ariaLabel": "最新部署: {status}, {when}"
+        "empty": "尚无部署，请从 CLI 启动或推送到部署分支。",
+        "ariaLabel": "最近部署：{status}，{when}"
       },
       "actions": {
-        "open": "Open",
-        "deploy": "Deploy",
-        "config": "Config",
-        "source": "Source",
-        "delete": "Delete"
+        "open": "打开",
+        "deploy": "部署",
+        "config": "配置",
+        "source": "源代码",
+        "delete": "删除"
       },
       "provisioning": {
-        "failed": "Provisioning failed"
+        "failed": "资源预配失败"
       },
       "topology": {
-        "title": "Topology",
-        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
-        "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "title": "拓扑",
+        "description": "已预配的公共入口、服务、工作负载和关联的托管服务。点击节点查看详情。",
+        "emptyTitle": "尚无拓扑",
+        "emptyDescription": "为此应用注册工作负载后，会显示拓扑。",
+        "open": "打开拓扑"
       },
       "delete": {
-        "title": "Delete {slug}?",
-        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
-        "confirm": "Delete app"
+        "title": "删除 {slug}？",
+        "description": "仅执行逻辑删除：标识可被重新使用，但工作负载仍保持拆除状态。组织所有者可在 30 天内恢复。",
+        "confirm": "删除应用"
       },
       "urlHealth": {
-        "checking": "Checking…",
-        "unknown": "Unchecked",
-        "ariaLabel": "URL health: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
+        "checking": "正在检查…",
+        "unknown": "未检查",
+        "ariaLabel": "URL 状态：{status}",
+        "ok": "{latency} 毫秒",
+        "degraded": "{statusCode} · {latency} 毫秒",
         "down": "{reason}",
-        "downNoReason": "Unreachable",
+        "downNoReason": "无法访问",
         "tooltip": {
-          "title": "Recent probes",
-          "empty": "No probe history yet.",
-          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
-          "now": "now",
-          "secondsAgo": "{seconds}s ago",
-          "minutesAgo": "{minutes}m ago",
-          "hoursAgo": "{hours}h ago",
-          "recheck": "Click to re-run probe",
-          "rechecking": "Re-running probe…"
+          "title": "近期探测",
+          "empty": "尚无探测历史。",
+          "uptime": "{ok}/{total} 次成功 · 平均 {avgMs} 毫秒",
+          "now": "现在",
+          "secondsAgo": "{seconds} 秒前",
+          "minutesAgo": "{minutes} 分钟前",
+          "hoursAgo": "{hours} 小时前",
+          "recheck": "点击重新运行探测",
+          "rechecking": "正在重新运行探测…"
         }
       },
       "groups": {
-        "deployment": "Deployment",
-        "controls": "Controls & access",
-        "insights": "Observability & activity",
-        "links": "Quick links"
+        "deployment": "部署",
+        "controls": "控制和访问权限",
+        "insights": "可观测性和活动",
+        "links": "快捷链接"
       },
       "headerDeploy": {
-        "title": "将 {tag} 部署到 {env}?",
-        "description": "重新部署最近的镜像标签。要选择其他标签或环境，请前往环境页面。",
+        "title": "将 {tag} 部署到 {env}？",
+        "description": "重新部署最近的镜像标签。请使用环境页面选择其他标签或环境。",
         "confirm": "部署",
-        "started": "部署已开始:{tag} → {env}",
+        "started": "部署已启动：{tag} → {env}",
         "failed": "部署失败"
       }
     },

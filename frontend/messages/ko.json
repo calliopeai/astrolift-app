@@ -910,75 +910,76 @@
         }
       },
       "configDrift": {
-        "headline": "구성 드리프트가 감지되었습니다",
+        "headline": "구성 차이가 감지되었습니다",
         "description": "{env} 환경의 마지막 배포가 현재 매니페스트와 일치하지 않습니다.",
         "descriptionNoEnv": "마지막 배포가 현재 매니페스트와 일치하지 않습니다.",
         "cta": "소스에서 동기화",
         "field": {
-          "manifest_hash": "매니페스트 해시가 마지막 배포 이후 변경됨",
-          "image_tag": "이미지 태그가 스냅샷과 다름",
-          "repo_unsynced": "소스 레포가 플랫폼보다 앞서 있습니다 — 동기화하여 가져오세요",
-          "unknown": "{field}이(가) 변경되었습니다"
+          "manifest_hash": "마지막 배포 이후 매니페스트 해시가 변경되었습니다",
+          "image_tag": "이미지 태그가 스냅샷과 다릅니다",
+          "repo_unsynced": "소스 저장소에 플랫폼에 반영되지 않은 변경 사항이 있습니다. 다시 동기화하여 가져오세요",
+          "unknown": "{field} 변경됨"
         },
         "toast": {
           "synced": "소스에서 동기화했습니다.",
-          "failed": "소스에서 동기화 실패."
+          "failed": "소스 동기화에 실패했습니다."
         }
       },
       "latestDeploy": {
-        "empty": "아직 배포가 없습니다 — CLI에서 실행하거나 배포 브랜치에 푸시하세요.",
-        "ariaLabel": "최신 배포: {status}, {when}"
+        "empty": "아직 배포가 없습니다. CLI에서 시작하거나 배포 브랜치에 푸시하세요.",
+        "ariaLabel": "최근 배포: {status}, {when}"
       },
       "actions": {
-        "open": "Open",
-        "deploy": "Deploy",
-        "config": "Config",
-        "source": "Source",
-        "delete": "Delete"
+        "open": "열기",
+        "deploy": "배포",
+        "config": "구성",
+        "source": "소스",
+        "delete": "삭제"
       },
       "provisioning": {
-        "failed": "Provisioning failed"
+        "failed": "프로비저닝 실패"
       },
       "topology": {
-        "title": "Topology",
-        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
-        "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "title": "토폴로지",
+        "description": "프로비저닝된 공개 인그레스, 서비스, 워크로드 및 연결된 관리형 서비스입니다. 노드를 클릭하여 자세히 확인하세요.",
+        "emptyTitle": "아직 토폴로지가 없습니다",
+        "emptyDescription": "이 앱에 워크로드를 등록하면 토폴로지가 표시됩니다.",
+        "open": "토폴로지 열기"
       },
       "delete": {
-        "title": "Delete {slug}?",
-        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
-        "confirm": "Delete app"
+        "title": "{slug}을 삭제하시겠습니까?",
+        "description": "논리 삭제만 수행합니다. 식별자는 다시 사용할 수 있지만 워크로드는 중지된 상태로 남습니다. 조직 소유자는 30일 이내에 복구할 수 있습니다.",
+        "confirm": "앱 삭제"
       },
       "urlHealth": {
-        "checking": "Checking…",
-        "unknown": "Unchecked",
-        "ariaLabel": "URL health: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
+        "checking": "확인 중…",
+        "unknown": "확인되지 않음",
+        "ariaLabel": "URL 상태: {status}",
+        "ok": "{latency}밀리초",
+        "degraded": "{statusCode} · {latency}밀리초",
         "down": "{reason}",
-        "downNoReason": "Unreachable",
+        "downNoReason": "연결할 수 없음",
         "tooltip": {
-          "title": "Recent probes",
-          "empty": "No probe history yet.",
-          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
-          "now": "now",
-          "secondsAgo": "{seconds}s ago",
-          "minutesAgo": "{minutes}m ago",
-          "hoursAgo": "{hours}h ago",
-          "recheck": "Click to re-run probe",
-          "rechecking": "Re-running probe…"
+          "title": "최근 검사",
+          "empty": "아직 검사 기록이 없습니다.",
+          "uptime": "{ok}/{total} 성공 · 평균 {avgMs}밀리초",
+          "now": "지금",
+          "secondsAgo": "{seconds}초 전",
+          "minutesAgo": "{minutes}분 전",
+          "hoursAgo": "{hours}시간 전",
+          "recheck": "클릭하여 검사 다시 실행",
+          "rechecking": "검사 다시 실행 중…"
         }
       },
       "groups": {
-        "deployment": "Deployment",
-        "controls": "Controls & access",
-        "insights": "Observability & activity",
-        "links": "Quick links"
+        "deployment": "배포",
+        "controls": "제어 및 접근 권한",
+        "insights": "관측 가능성 및 활동",
+        "links": "빠른 링크"
       },
       "headerDeploy": {
-        "title": "{tag}을(를) {env}에 배포할까요?",
-        "description": "가장 최근 이미지 태그를 다시 배포합니다. 다른 태그나 환경은 환경 페이지에서 선택하세요.",
+        "title": "{tag}을 {env}에 배포하시겠습니까?",
+        "description": "최근 이미지 태그를 다시 배포합니다. 다른 태그나 환경을 선택하려면 환경 페이지를 사용하세요.",
         "confirm": "배포",
         "started": "배포 시작: {tag} → {env}",
         "failed": "배포 실패"

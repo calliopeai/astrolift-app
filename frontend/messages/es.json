@@ -910,71 +910,72 @@
         }
       },
       "configDrift": {
-        "headline": "Deriva de configuración detectada",
+        "headline": "Se detectó una divergencia de configuración",
         "description": "El último despliegue del entorno {env} no coincide con el manifiesto actual.",
         "descriptionNoEnv": "El último despliegue no coincide con el manifiesto actual.",
-        "cta": "Sincronizar desde origen",
+        "cta": "Sincronizar desde el repositorio",
         "field": {
           "manifest_hash": "El hash del manifiesto cambió desde el último despliegue",
-          "image_tag": "La etiqueta de la imagen difiere del snapshot",
-          "repo_unsynced": "El repo de origen está adelantado a la plataforma — resincronice para alinearlos",
-          "unknown": "{field} ha cambiado"
+          "image_tag": "La etiqueta de imagen difiere de la instantánea",
+          "repo_unsynced": "El repositorio tiene cambios que aún no están en la plataforma; vuelve a sincronizar para incorporarlos",
+          "unknown": "Cambió {field}"
         },
         "toast": {
-          "synced": "Sincronizado desde origen.",
-          "failed": "La sincronización desde origen falló."
+          "synced": "Sincronizado desde el repositorio.",
+          "failed": "La sincronización desde el repositorio falló."
         }
       },
       "latestDeploy": {
-        "empty": "Aún no hay despliegues — dispara uno desde la CLI o haz push a la rama de despliegue.",
+        "empty": "Aún no hay despliegues: inicia uno desde la CLI o publica en la rama de despliegue.",
         "ariaLabel": "Último despliegue: {status}, {when}"
       },
       "actions": {
-        "open": "Open",
-        "deploy": "Deploy",
-        "config": "Config",
-        "source": "Source",
-        "delete": "Delete"
+        "open": "Abrir",
+        "deploy": "Desplegar",
+        "config": "Configuración",
+        "source": "Código fuente",
+        "delete": "Eliminar"
       },
       "provisioning": {
-        "failed": "Provisioning failed"
+        "failed": "El aprovisionamiento falló"
       },
       "topology": {
-        "title": "Topology",
-        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
-        "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "title": "Topología",
+        "description": "Componentes aprovisionados: entrada pública, servicios, cargas de trabajo y servicios gestionados vinculados. Selecciona un nodo para ver sus detalles.",
+        "emptyTitle": "Aún no hay topología",
+        "emptyDescription": "La topología aparece cuando se registran cargas de trabajo para esta aplicación.",
+        "open": "Abrir topología"
       },
       "delete": {
-        "title": "Delete {slug}?",
-        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
-        "confirm": "Delete app"
+        "title": "¿Eliminar {slug}?",
+        "description": "Se elimina sin borrar el registro: el identificador queda disponible, pero las cargas de trabajo permanecen desmanteladas. Un propietario de la organización puede recuperarla durante 30 días.",
+        "confirm": "Eliminar aplicación"
       },
       "urlHealth": {
-        "checking": "Checking…",
-        "unknown": "Unchecked",
-        "ariaLabel": "URL health: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
+        "checking": "Comprobando…",
+        "unknown": "Sin comprobar",
+        "ariaLabel": "Estado de la URL: {status}",
+        "ok": "{latency} ms",
+        "degraded": "{statusCode} · {latency} ms",
         "down": "{reason}",
-        "downNoReason": "Unreachable",
+        "downNoReason": "No accesible",
         "tooltip": {
-          "title": "Recent probes",
-          "empty": "No probe history yet.",
-          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
-          "now": "now",
-          "secondsAgo": "{seconds}s ago",
-          "minutesAgo": "{minutes}m ago",
-          "hoursAgo": "{hours}h ago",
-          "recheck": "Click to re-run probe",
-          "rechecking": "Re-running probe…"
+          "title": "Comprobaciones recientes",
+          "empty": "Aún no hay historial de comprobaciones.",
+          "uptime": "{ok}/{total} correctas · promedio {avgMs} ms",
+          "now": "ahora",
+          "secondsAgo": "hace {seconds} s",
+          "minutesAgo": "hace {minutes} min",
+          "hoursAgo": "hace {hours} h",
+          "recheck": "Selecciona para repetir la comprobación",
+          "rechecking": "Repitiendo comprobación…"
         }
       },
       "groups": {
-        "deployment": "Deployment",
-        "controls": "Controls & access",
-        "insights": "Observability & activity",
-        "links": "Quick links"
+        "deployment": "Despliegue",
+        "controls": "Controles y acceso",
+        "insights": "Observabilidad y actividad",
+        "links": "Enlaces rápidos"
       },
       "headerDeploy": {
         "title": "¿Desplegar {tag} en {env}?",

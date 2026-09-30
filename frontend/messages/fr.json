@@ -910,77 +910,78 @@
         }
       },
       "configDrift": {
-        "headline": "Dérive de configuration détectée",
-        "description": "Le dernier déploiement de l'environnement {env} ne correspond pas au manifeste actuel.",
+        "headline": "Écart de configuration détecté",
+        "description": "Le dernier déploiement de l’environnement {env} ne correspond pas au manifeste actuel.",
         "descriptionNoEnv": "Le dernier déploiement ne correspond pas au manifeste actuel.",
-        "cta": "Synchroniser depuis la source",
+        "cta": "Synchroniser depuis le dépôt",
         "field": {
-          "manifest_hash": "Le hash du manifeste a changé depuis le dernier déploiement",
-          "image_tag": "Le tag d'image diffère du snapshot",
-          "repo_unsynced": "Le dépôt source est en avance sur la plateforme — resynchronisez pour le prendre en compte",
+          "manifest_hash": "L’empreinte du manifeste a changé depuis le dernier déploiement",
+          "image_tag": "L’étiquette de l’image diffère de l’instantané",
+          "repo_unsynced": "Le dépôt source contient des changements absents de la plateforme ; resynchronisez pour les récupérer",
           "unknown": "{field} a changé"
         },
         "toast": {
-          "synced": "Synchronisé depuis la source.",
-          "failed": "Échec de la synchronisation depuis la source."
+          "synced": "Synchronisation depuis le dépôt terminée.",
+          "failed": "Échec de la synchronisation depuis le dépôt."
         }
       },
       "latestDeploy": {
-        "empty": "Aucun déploiement pour l'instant — déclenchez-en un via la CLI ou poussez sur la branche de déploiement.",
+        "empty": "Aucun déploiement : lancez-en un depuis la CLI ou poussez vers la branche de déploiement.",
         "ariaLabel": "Dernier déploiement : {status}, {when}"
       },
       "actions": {
-        "open": "Open",
-        "deploy": "Deploy",
-        "config": "Config",
+        "open": "Ouvrir",
+        "deploy": "Déployer",
+        "config": "Configuration",
         "source": "Source",
-        "delete": "Delete"
+        "delete": "Supprimer"
       },
       "provisioning": {
-        "failed": "Provisioning failed"
+        "failed": "Échec du provisionnement"
       },
       "topology": {
-        "title": "Topology",
-        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
-        "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "title": "Topologie",
+        "description": "Composants provisionnés : entrée publique, services, charges de travail et services gérés liés. Cliquez sur un nœud pour consulter ses détails.",
+        "emptyTitle": "Aucune topologie pour le moment",
+        "emptyDescription": "La topologie apparaît après l’enregistrement de charges de travail pour cette application.",
+        "open": "Ouvrir la topologie"
       },
       "delete": {
-        "title": "Delete {slug}?",
-        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
-        "confirm": "Delete app"
+        "title": "Supprimer {slug} ?",
+        "description": "Suppression logique uniquement : l’identifiant redevient disponible, mais les charges restent démantelées. Un propriétaire de l’organisation peut restaurer l’application pendant 30 jours.",
+        "confirm": "Supprimer l’application"
       },
       "urlHealth": {
-        "checking": "Checking…",
-        "unknown": "Unchecked",
-        "ariaLabel": "URL health: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
+        "checking": "Vérification…",
+        "unknown": "Non vérifiée",
+        "ariaLabel": "État de l’URL : {status}",
+        "ok": "{latency} ms",
+        "degraded": "{statusCode} · {latency} ms",
         "down": "{reason}",
-        "downNoReason": "Unreachable",
+        "downNoReason": "Inaccessible",
         "tooltip": {
-          "title": "Recent probes",
-          "empty": "No probe history yet.",
-          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
-          "now": "now",
-          "secondsAgo": "{seconds}s ago",
-          "minutesAgo": "{minutes}m ago",
-          "hoursAgo": "{hours}h ago",
-          "recheck": "Click to re-run probe",
-          "rechecking": "Re-running probe…"
+          "title": "Sondes récentes",
+          "empty": "Aucun historique de sondes pour le moment.",
+          "uptime": "{ok}/{total} réussies · moyenne {avgMs} ms",
+          "now": "maintenant",
+          "secondsAgo": "il y a {seconds} s",
+          "minutesAgo": "il y a {minutes} min",
+          "hoursAgo": "il y a {hours} h",
+          "recheck": "Cliquer pour relancer la sonde",
+          "rechecking": "Sonde relancée…"
         }
       },
       "groups": {
-        "deployment": "Deployment",
-        "controls": "Controls & access",
-        "insights": "Observability & activity",
-        "links": "Quick links"
+        "deployment": "Déploiement",
+        "controls": "Commandes et accès",
+        "insights": "Observabilité et activité",
+        "links": "Liens rapides"
       },
       "headerDeploy": {
-        "title": "Déployer {tag} vers {env} ?",
-        "description": "Redéploie le tag d'image le plus récent. Utilisez la page environnements pour choisir un autre tag ou environnement.",
+        "title": "Déployer {tag} dans {env} ?",
+        "description": "Redéploie la dernière étiquette d’image. Utilisez la page des environnements pour choisir une autre étiquette ou un autre environnement.",
         "confirm": "Déployer",
-        "started": "Déploiement lancé : {tag} vers {env}",
+        "started": "Déploiement lancé : {tag} dans {env}",
         "failed": "Échec du déploiement"
       }
     },

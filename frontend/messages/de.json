@@ -910,78 +910,79 @@
         }
       },
       "configDrift": {
-        "headline": "Konfigurationsdrift erkannt",
-        "description": "Das letzte Deployment der Umgebung {env} stimmt nicht mit dem aktuellen Manifest überein.",
-        "descriptionNoEnv": "Das letzte Deployment stimmt nicht mit dem aktuellen Manifest überein.",
-        "cta": "Aus Quelle synchronisieren",
+        "headline": "Konfigurationsabweichung erkannt",
+        "description": "Die letzte Bereitstellung in der Umgebung {env} entspricht nicht dem aktuellen Manifest.",
+        "descriptionNoEnv": "Die letzte Bereitstellung entspricht nicht dem aktuellen Manifest.",
+        "cta": "Aus Repository synchronisieren",
         "field": {
-          "manifest_hash": "Manifest-Hash hat sich seit dem letzten Deployment geändert",
-          "image_tag": "Image-Tag weicht vom Snapshot ab",
-          "repo_unsynced": "Quellrepo ist vor der Plattform — synchronisieren, um es zu übernehmen",
-          "unknown": "{field} hat sich geändert"
+          "manifest_hash": "Manifest-Hash seit der letzten Bereitstellung geändert",
+          "image_tag": "Image-Tag weicht vom Schnappschuss ab",
+          "repo_unsynced": "Das Quellcode-Repository enthält neuere Änderungen als die Plattform; synchronisiere erneut, um sie zu übernehmen",
+          "unknown": "{field} geändert"
         },
         "toast": {
-          "synced": "Aus Quelle synchronisiert.",
-          "failed": "Synchronisierung aus Quelle fehlgeschlagen."
+          "synced": "Aus Repository synchronisiert.",
+          "failed": "Synchronisierung aus dem Repository fehlgeschlagen."
         }
       },
       "latestDeploy": {
-        "empty": "Noch keine Deployments — lösen Sie eines über die CLI aus oder pushen Sie in den Deploy-Branch.",
-        "ariaLabel": "Letztes Deployment: {status}, {when}"
+        "empty": "Noch keine Bereitstellungen; starte eine über die CLI oder übertrage Code in den Bereitstellungsbranch.",
+        "ariaLabel": "Letzte Bereitstellung: {status}, {when}"
       },
       "actions": {
-        "open": "Open",
-        "deploy": "Deploy",
-        "config": "Config",
-        "source": "Source",
-        "delete": "Delete"
+        "open": "Öffnen",
+        "deploy": "Bereitstellen",
+        "config": "Konfiguration",
+        "source": "Quellcode",
+        "delete": "Löschen"
       },
       "provisioning": {
-        "failed": "Provisioning failed"
+        "failed": "Einrichtung fehlgeschlagen"
       },
       "topology": {
-        "title": "Topology",
-        "description": "Provisioned components — public ingress, services, workloads, and attached managed services. Click a node to drill in.",
-        "emptyTitle": "No topology yet",
-        "emptyDescription": "Topology fills in once workloads are registered for this app."
+        "title": "Topologie",
+        "description": "Eingerichtete Komponenten: öffentlicher Eingang, Dienste, Arbeitslasten und verbundene verwaltete Dienste. Klicke auf einen Knoten für Details.",
+        "emptyTitle": "Noch keine Topologie",
+        "emptyDescription": "Die Topologie erscheint, sobald Arbeitslasten für diese Anwendung registriert sind.",
+        "open": "Topologie öffnen"
       },
       "delete": {
-        "title": "Delete {slug}?",
-        "description": "Soft delete only — its slug becomes reclaimable but workloads stay torn down. Recoverable for 30 days by an org owner.",
-        "confirm": "Delete app"
+        "title": "{slug} löschen?",
+        "description": "Nur logische Löschung: Die Kennung wird wieder verfügbar, aber die Arbeitslasten bleiben abgebaut. Ein Organisationseigentümer kann die Anwendung 30 Tage lang wiederherstellen.",
+        "confirm": "Anwendung löschen"
       },
       "urlHealth": {
-        "checking": "Checking…",
-        "unknown": "Unchecked",
-        "ariaLabel": "URL health: {status}",
-        "ok": "{latency}ms",
-        "degraded": "{statusCode} · {latency}ms",
+        "checking": "Wird geprüft…",
+        "unknown": "Nicht geprüft",
+        "ariaLabel": "URL-Zustand: {status}",
+        "ok": "{latency} ms",
+        "degraded": "{statusCode} · {latency} ms",
         "down": "{reason}",
-        "downNoReason": "Unreachable",
+        "downNoReason": "Nicht erreichbar",
         "tooltip": {
-          "title": "Recent probes",
-          "empty": "No probe history yet.",
-          "uptime": "{ok}/{total} ok · avg {avgMs}ms",
-          "now": "now",
-          "secondsAgo": "{seconds}s ago",
-          "minutesAgo": "{minutes}m ago",
-          "hoursAgo": "{hours}h ago",
-          "recheck": "Click to re-run probe",
-          "rechecking": "Re-running probe…"
+          "title": "Letzte Prüfungen",
+          "empty": "Noch kein Prüfverlauf.",
+          "uptime": "{ok}/{total} erfolgreich · Durchschnitt {avgMs} ms",
+          "now": "jetzt",
+          "secondsAgo": "vor {seconds} s",
+          "minutesAgo": "vor {minutes} Min.",
+          "hoursAgo": "vor {hours} Std.",
+          "recheck": "Klicken, um die Prüfung erneut auszuführen",
+          "rechecking": "Prüfung wird erneut ausgeführt…"
         }
       },
       "groups": {
-        "deployment": "Deployment",
-        "controls": "Controls & access",
-        "insights": "Observability & activity",
-        "links": "Quick links"
+        "deployment": "Bereitstellung",
+        "controls": "Steuerung und Zugriff",
+        "insights": "Beobachtbarkeit und Aktivität",
+        "links": "Schnellzugriffe"
       },
       "headerDeploy": {
-        "title": "{tag} nach {env} deployen?",
-        "description": "Stellt das zuletzt verwendete Image-Tag erneut bereit. Anderes Tag oder Environment: Environments-Seite.",
-        "confirm": "Deployen",
-        "started": "Deploy gestartet: {tag} nach {env}",
-        "failed": "Deploy fehlgeschlagen"
+        "title": "{tag} in {env} bereitstellen?",
+        "description": "Stellt das zuletzt verwendete Image-Tag erneut bereit. Wähle auf der Umgebungsseite ein anderes Tag oder eine andere Umgebung.",
+        "confirm": "Bereitstellen",
+        "started": "Bereitstellung gestartet: {tag} in {env}",
+        "failed": "Bereitstellung fehlgeschlagen"
       }
     },
     "deployStrategy": {
