@@ -3905,6 +3905,27 @@
       "search": "検索…",
       "results": "{count, plural, other {#件の結果}}",
       "sortKey": "<order>並べ替えキー</order>{index, number}"
+    },
+    "access": {
+      "direct": "直接",
+      "via": "{kind} {name} 経由",
+      "inherited": "{kind} {name} から継承",
+      "combined": "{via}、{inherited}",
+      "principal": {
+        "user": "ユーザー",
+        "group": "グループ",
+        "team": "チーム",
+        "token": "トークン"
+      },
+      "scope": {
+        "ORG": "組織",
+        "TEAM": "チーム",
+        "PROJECT": "プロジェクト",
+        "APP": "アプリ"
+      },
+      "remove": "{kind} {name} を削除",
+      "viaRich": "{kind} <identifier>{name}</identifier> 経由",
+      "inheritedRich": "{kind} <identifier>{name}</identifier> から継承"
     }
   },
   "agentSecrets": {

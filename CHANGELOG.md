@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Translate grant-source phrases, principal removal labels and Home’s app ownership note in all eight locales while preserving identifiers, edit links and callbacks (#2145).
+
 - The explicit agent environment-spec picker translates access boundaries,
   shared-recipe notices, search and pagination in all eight locales (#2145).
 - Shared list and table controls, empty/error/loading states, selection and live

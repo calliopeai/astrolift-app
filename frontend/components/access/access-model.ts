@@ -106,7 +106,21 @@ export interface GrantSourceInfo {
 }
 
 /** "direct", "via group okta:eng", "inherited from org acme", or both parts. */
-export function describeSource(source: GrantSourceInfo): string {
+export interface GrantSourceLabels {
+  direct: string;
+  via: (kind: GrantVia["kind"], name: string) => string;
+  inherited: (kind: ScopeKind, name: string) => string;
+  combined: (via: string, inherited: string) => string;
+}
+
+export function describeSource(source: GrantSourceInfo, labels?: GrantSourceLabels): string {
+  if (labels) {
+    const via = source.via ? labels.via(source.via.kind, viaName(source.via)) : null;
+    const inherited = source.inheritedFrom
+      ? labels.inherited(source.inheritedFrom.kind, source.inheritedFrom.name)
+      : null;
+    return via && inherited ? labels.combined(via, inherited) : (via ?? inherited ?? labels.direct);
+  }
   const parts: string[] = [];
   if (source.via) parts.push(`via ${source.via.kind} ${viaName(source.via)}`);
   if (source.inheritedFrom) {

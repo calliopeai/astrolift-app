@@ -3985,6 +3985,27 @@
       "search": "Search…",
       "results": "{count, plural, one {# result} other {# results}}",
       "sortKey": "<order>sort key </order>{index, number}"
+    },
+    "access": {
+      "direct": "direct",
+      "via": "via {kind} {name}",
+      "inherited": "inherited from {kind} {name}",
+      "combined": "{via}, {inherited}",
+      "principal": {
+        "user": "user",
+        "group": "group",
+        "team": "team",
+        "token": "token"
+      },
+      "scope": {
+        "ORG": "org",
+        "TEAM": "team",
+        "PROJECT": "project",
+        "APP": "app"
+      },
+      "remove": "Remove {kind} {name}",
+      "viaRich": "via {kind} <identifier>{name}</identifier>",
+      "inheritedRich": "inherited from {kind} <identifier>{name}</identifier>"
     }
   },
   "agentSecrets": {

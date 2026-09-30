@@ -3905,6 +3905,27 @@
       "search": "Buscar…",
       "results": "{count, plural, one {# resultado} other {# resultados}}",
       "sortKey": "<order>chave de ordenação </order>{index, number}"
+    },
+    "access": {
+      "direct": "direto",
+      "via": "via {kind} {name}",
+      "inherited": "herdado de {kind} {name}",
+      "combined": "{via}, {inherited}",
+      "principal": {
+        "user": "usuário",
+        "group": "grupo",
+        "team": "equipe",
+        "token": "token"
+      },
+      "scope": {
+        "ORG": "organização",
+        "TEAM": "equipe",
+        "PROJECT": "projeto",
+        "APP": "aplicativo"
+      },
+      "remove": "Remover {kind} {name}",
+      "viaRich": "via {kind} <identifier>{name}</identifier>",
+      "inheritedRich": "herdado de {kind} <identifier>{name}</identifier>"
     }
   },
   "agentSecrets": {

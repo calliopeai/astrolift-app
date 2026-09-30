@@ -3905,6 +3905,27 @@
       "search": "搜索…",
       "results": "{count, plural, other {#条结果}}",
       "sortKey": "<order>排序键</order>{index, number}"
+    },
+    "access": {
+      "direct": "直接",
+      "via": "通过{kind} {name}",
+      "inherited": "继承自{kind} {name}",
+      "combined": "{via}，{inherited}",
+      "principal": {
+        "user": "用户",
+        "group": "群组",
+        "team": "团队",
+        "token": "令牌"
+      },
+      "scope": {
+        "ORG": "组织",
+        "TEAM": "团队",
+        "PROJECT": "项目",
+        "APP": "应用"
+      },
+      "remove": "移除{kind} {name}",
+      "viaRich": "通过{kind} <identifier>{name}</identifier>",
+      "inheritedRich": "继承自{kind} <identifier>{name}</identifier>"
     }
   },
   "agentSecrets": {

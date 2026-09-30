@@ -3905,6 +3905,27 @@
       "search": "검색…",
       "results": "{count, plural, other {결과 #개}}",
       "sortKey": "<order>정렬 키 </order>{index, number}"
+    },
+    "access": {
+      "direct": "직접",
+      "via": "{kind} {name}을(를) 통해",
+      "inherited": "{kind} {name}에서 상속",
+      "combined": "{via}, {inherited}",
+      "principal": {
+        "user": "사용자",
+        "group": "그룹",
+        "team": "팀",
+        "token": "토큰"
+      },
+      "scope": {
+        "ORG": "조직",
+        "TEAM": "팀",
+        "PROJECT": "프로젝트",
+        "APP": "앱"
+      },
+      "remove": "{kind} {name} 제거",
+      "viaRich": "{kind} <identifier>{name}</identifier>을(를) 통해",
+      "inheritedRich": "{kind} <identifier>{name}</identifier>에서 상속"
     }
   },
   "agentSecrets": {

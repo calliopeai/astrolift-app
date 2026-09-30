@@ -2,10 +2,11 @@
 
 import { KeyRoundIcon, UserIcon, UsersIcon, UsersRoundIcon, XIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
-import { type Principal, PRINCIPAL_NOUN, type PrincipalKind } from "./access-model";
+import { type Principal, type PrincipalKind } from "./access-model";
 
 const ICON: Record<PrincipalKind, typeof UserIcon> = {
   user: UserIcon,
@@ -38,8 +39,9 @@ export function PrincipalChip({
   onRemove,
   className,
 }: PrincipalChipProps) {
+  const t = useTranslations("shared.access");
   const Icon = ICON[p.kind];
-  const noun = PRINCIPAL_NOUN[p.kind];
+  const noun = t(`principal.${p.kind}`);
   const idShown = showId && p.id !== p.name;
 
   const body = (
@@ -91,7 +93,7 @@ export function PrincipalChip({
         <button
           type="button"
           onClick={onRemove}
-          aria-label={`Remove ${noun} ${p.name}`}
+          aria-label={t("remove", { kind: noun, name: p.name })}
           className="text-muted-foreground hover:text-foreground focus-visible:ring-ring shrink-0 rounded-full p-0.5 focus-visible:ring-2 focus-visible:outline-none"
         >
           <XIcon className="size-3" />

@@ -3908,6 +3908,27 @@
       "search": "Buscar…",
       "results": "{count, plural, one {# resultado} other {# resultados}}",
       "sortKey": "<order>clave de orden </order>{index, number}"
+    },
+    "access": {
+      "direct": "directo",
+      "via": "a través de {kind} {name}",
+      "inherited": "heredado de {kind} {name}",
+      "combined": "{via}, {inherited}",
+      "principal": {
+        "user": "usuario",
+        "group": "grupo",
+        "team": "equipo",
+        "token": "token"
+      },
+      "scope": {
+        "ORG": "organización",
+        "TEAM": "equipo",
+        "PROJECT": "proyecto",
+        "APP": "aplicación"
+      },
+      "remove": "Quitar {kind} {name}",
+      "viaRich": "a través de {kind} <identifier>{name}</identifier>",
+      "inheritedRich": "heredado de {kind} <identifier>{name}</identifier>"
     }
   },
   "agentSecrets": {
