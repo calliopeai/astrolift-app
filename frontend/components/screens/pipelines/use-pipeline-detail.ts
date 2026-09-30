@@ -98,7 +98,12 @@ export function usePipelineDetail(pipelineId: string) {
     router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
   }
 
-  const { data: runsData, loading: runsLoading } = useQuery<{
+  const {
+    data: runsData,
+    loading: runsLoading,
+    error: runsError,
+    refetch: refetchRuns,
+  } = useQuery<{
     astroliftPipelineRuns: PipelineDetailRun[];
   }>(GET_PIPELINE_RUNS, {
     variables: { pipelineId, limit: 50 },
@@ -109,7 +114,16 @@ export function usePipelineDetail(pipelineId: string) {
 
   const runs = runsData?.astroliftPipelineRuns ?? [];
 
-  return { tab, onTabChange, runs, runsLoading };
+  return {
+    tab,
+    onTabChange,
+    runs,
+    runsLoading: runsLoading && !runsData,
+    runsError: runsData ? null : (runsError ?? null),
+    onRetryRuns: () => {
+      void refetchRuns().catch(() => {});
+    },
+  };
 }
 
 /**

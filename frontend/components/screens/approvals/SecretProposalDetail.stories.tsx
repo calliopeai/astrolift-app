@@ -17,7 +17,6 @@ export const Full: Story = {};
 
 export const Loading: Story = { args: { proposal: null, loading: true } };
 
-/** No proposal with this id; also what a failed query shows (there is no error state). */
 export const NotFound: Story = { args: { proposal: null } };
 
 /** Pending, but the viewer lacks secret.approve: only Withdraw. */
@@ -38,3 +37,10 @@ export const Decided: Story = {
 };
 
 export const LongStrings: Story = { args: { proposal: LONG_PROPOSAL } };
+
+export const QueryFailed: Story = {
+  args: {
+    proposal: null,
+    error: { name: "Error", message: "Permission denied while loading this section" },
+  },
+};

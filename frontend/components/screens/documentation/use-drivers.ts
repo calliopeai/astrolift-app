@@ -173,17 +173,22 @@ function normalize(plugin: AstroliftProviderPlugin): DriverRow {
 
 /** Provider plugins and bound-cluster counts behind the Driver reference screen. */
 export function useDrivers() {
-  const { data, loading } = useQuery<Resp>(LIST_PROVIDER_PLUGINS, {
+  const { data, loading, error, refetch } = useQuery<Resp>(LIST_PROVIDER_PLUGINS, {
     fetchPolicy: "cache-first",
   });
-  const { data: clusterData } = useQuery<ClusterCountResp>(LIST_CLUSTERS, {
+  const {
+    data: clusterData,
+    loading: clustersLoading,
+    error: clustersError,
+    refetch: refetchClusters,
+  } = useQuery<ClusterCountResp>(LIST_CLUSTERS, {
     fetchPolicy: "cache-first",
   });
 
   const rows: DriverRow[] = React.useMemo(() => {
     const live = data?.astroliftProviderPlugins ?? [];
     if (live.length > 0) return live.map(normalize);
-    return FALLBACK_PROVIDERS.map((p) => ({ ...p }));
+    return data ? FALLBACK_PROVIDERS.map((p) => ({ ...p })) : [];
   }, [data]);
 
   // Bound-cluster count per provider slug. Drives the inline 'N
@@ -209,7 +214,18 @@ export function useDrivers() {
     return Array.from(seen).sort();
   }, [rows]);
 
-  const usingFallback = !loading && (data?.astroliftProviderPlugins?.length ?? 0) === 0;
+  const usingFallback =
+    Boolean(data) && !loading && (data?.astroliftProviderPlugins?.length ?? 0) === 0;
 
-  return { loading, rows, clusterCountByProvider, managedKindColumns, usingFallback };
+  return {
+    loading: (loading && !data) || (clustersLoading && !clusterData),
+    error: (data ? null : error) ?? (clusterData ? null : clustersError) ?? null,
+    onRetry: () => {
+      void Promise.allSettled([refetch(), refetchClusters()]);
+    },
+    rows,
+    clusterCountByProvider,
+    managedKindColumns,
+    usingFallback,
+  };
 }

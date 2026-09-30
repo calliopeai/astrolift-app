@@ -44,3 +44,16 @@ export const RenderFailed: Story = {
 };
 
 export const LongStrings: Story = { args: { slug: LONG, result: LONG_RENDERED } };
+
+export const QueryFailed: Story = {
+  args: {
+    result: null,
+    error: { name: "Error", message: "Permission denied while loading this section" },
+  },
+};
+export const EnvironmentsFailed: Story = {
+  args: {
+    environments: [],
+    environmentsError: { name: "Error", message: "Permission denied while loading this section" },
+  },
+};

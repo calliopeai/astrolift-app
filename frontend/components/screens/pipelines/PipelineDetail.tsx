@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import { ActivityIcon, DownloadIcon, ScrollIcon, SettingsIcon, UsersIcon } from "lucide-react";
 import type * as React from "react";
 
@@ -37,6 +39,8 @@ export function PipelineDetailScreen({
   onTabChange,
   runs,
   runsLoading,
+  runsError,
+  onRetryRuns,
   runGraph,
   secrets,
 }: PipelineDetailScreenProps) {
@@ -64,7 +68,12 @@ export function PipelineDetailScreen({
       {tab === "runs" && (
         <div className="space-y-4">
           {runsLoading && runs.length === 0 && <Skeleton className="h-40 w-full" />}
-          {!runsLoading && runs.length === 0 && (
+          <QueryError
+            title="Could not load pipeline runs"
+            error={runsError}
+            onRetry={onRetryRuns}
+          />
+          {!runsLoading && !runsError && runs.length === 0 && (
             <EmptyState
               icon={<ActivityIcon className="size-5" />}
               title="No runs yet"

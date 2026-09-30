@@ -35,12 +35,15 @@ export const Empty: Story = {
   render: () => <PipelineDetailScreen {...DETAIL} runs={[]} secrets={secrets} />,
 };
 
-/**
- * The runs query surfaces no error state in this screen: a failed fetch
- * renders as the empty Runs tab. This is the closest real state.
- */
 export const ErrorState: Story = {
-  render: () => <PipelineDetailScreen {...DETAIL} runs={[]} secrets={secrets} />,
+  render: () => (
+    <PipelineDetailScreen
+      {...DETAIL}
+      runs={[]}
+      runsError={{ name: "Error", message: "Permission denied while loading this section" }}
+      secrets={secrets}
+    />
+  ),
 };
 
 /** The latest run's graph is still loading. */

@@ -1,5 +1,7 @@
 "use client";
 
+import { QueryError } from "@/components/QueryError";
+
 import {
   ActivityIcon,
   BellIcon,
@@ -62,14 +64,24 @@ function formatPct(rate: number | null | undefined): string {
 export function OpsScreen({
   clusters: clusterList,
   clustersLoading,
+  clustersError,
+  onRetryClusters,
   metrics: m,
   metricsLoading,
+  metricsError,
+  onRetryMetrics,
   alerts: alertList,
   alertsLoading,
+  alertsError,
+  onRetryAlerts,
   audit: auditList,
   auditLoading,
+  auditError,
+  onRetryAudit,
   runs: runList,
   runsLoading,
+  runsError,
+  onRetryRuns,
 }: OpsScreenProps) {
   const fmt = useFormatters();
   // Active clusters with a recent capabilities probe count as "active";
@@ -89,6 +101,8 @@ export function OpsScreen({
         <KpiTile
           icon={LayersIcon}
           label="Clusters"
+          error={clustersError}
+          onRetry={onRetryClusters}
           value={clustersLoading ? null : clusterTotal}
           sub={
             clustersLoading
@@ -100,6 +114,8 @@ export function OpsScreen({
         <KpiTile
           icon={RocketIcon}
           label="Deploys · 24h"
+          error={metricsError}
+          onRetry={onRetryMetrics}
           value={metricsLoading ? null : (m?.total ?? 0)}
           sub={
             metricsLoading
@@ -111,6 +127,8 @@ export function OpsScreen({
         <KpiTile
           icon={CheckCircle2Icon}
           label="Success rate"
+          error={metricsError}
+          onRetry={onRetryMetrics}
           value={metricsLoading ? null : formatPct(m?.successRate)}
           sub={
             metricsLoading
@@ -122,6 +140,8 @@ export function OpsScreen({
         <KpiTile
           icon={BellIcon}
           label="Unresolved alerts"
+          error={alertsError}
+          onRetry={onRetryAlerts}
           value={alertsLoading ? null : alertList.length}
           sub={
             alertsLoading
@@ -154,7 +174,13 @@ export function OpsScreen({
           </Link>
         </CardHeader>
         <CardContent className="p-0">
-          {clustersLoading && clusterList.length === 0 ? (
+          {clustersError ? (
+            <QueryError
+              title="Could not load cluster fleet"
+              error={clustersError}
+              onRetry={onRetryClusters}
+            />
+          ) : clustersLoading && clusterList.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
@@ -227,7 +253,13 @@ export function OpsScreen({
             </Link>
           </CardHeader>
           <CardContent className="p-0">
-            {alertsLoading && alertList.length === 0 ? (
+            {alertsError ? (
+              <QueryError
+                title="Could not load alerts"
+                error={alertsError}
+                onRetry={onRetryAlerts}
+              />
+            ) : alertsLoading && alertList.length === 0 ? (
               <div className="space-y-2 p-6">
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
@@ -287,7 +319,13 @@ export function OpsScreen({
             </Link>
           </CardHeader>
           <CardContent className="p-0">
-            {runsLoading && runList.length === 0 ? (
+            {runsError ? (
+              <QueryError
+                title="Could not load workflow runs"
+                error={runsError}
+                onRetry={onRetryRuns}
+              />
+            ) : runsLoading && runList.length === 0 ? (
               <div className="space-y-2 p-6">
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
@@ -354,7 +392,13 @@ export function OpsScreen({
           </Link>
         </CardHeader>
         <CardContent className="p-0">
-          {auditLoading && auditList.length === 0 ? (
+          {auditError ? (
+            <QueryError
+              title="Could not load audit events"
+              error={auditError}
+              onRetry={onRetryAudit}
+            />
+          ) : auditLoading && auditList.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
@@ -423,9 +467,23 @@ interface KpiTileProps {
   sub: React.ReactNode | null;
   href: string;
   tone?: "warn" | "error";
+  error?: { message: string } | null;
+  onRetry?: () => void;
 }
 
-function KpiTile({ icon: Icon, label, value, sub, href, tone }: KpiTileProps) {
+function KpiTile({ icon: Icon, label, value, sub, href, tone, error, onRetry }: KpiTileProps) {
+  if (error)
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <QueryError
+            title={`Could not load ${label.toLowerCase()}`}
+            error={error}
+            onRetry={onRetry}
+          />
+        </CardContent>
+      </Card>
+    );
   const accent =
     tone === "error"
       ? "border-danger-border bg-danger/5"

@@ -30,7 +30,12 @@ interface MutationResult<T> {
  */
 export function usePipelineSecrets(pipelineId: string) {
   const list = useLocalListState(PIPELINE_SECRETS_LIST);
-  const { data, loading } = useQuery<SecretsResp>(LIST_PIPELINE_SECRETS, {
+  const {
+    data,
+    loading,
+    error,
+    refetch: refetchSecrets,
+  } = useQuery<SecretsResp>(LIST_PIPELINE_SECRETS, {
     variables: { pipelineId },
     fetchPolicy: "cache-and-network",
   });
@@ -76,7 +81,11 @@ export function usePipelineSecrets(pipelineId: string) {
   return {
     list,
     secrets,
-    loading,
+    loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetchSecrets().catch(() => {});
+    },
     deleting: deleteState.loading,
     saveSecret,
     deleteSecret,

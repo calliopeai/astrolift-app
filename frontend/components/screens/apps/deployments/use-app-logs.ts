@@ -85,6 +85,10 @@ export function useAppLogs({
     app: a,
     /** First load of the app only. */
     loading: app.loading && !a,
+    appError: a ? null : (app.error ?? null),
+    onRetryApp: () => {
+      void app.refetch().catch(() => {});
+    },
     streaming,
     toggleStreaming: () => setStreaming((s) => !s),
     lines: logBuffer,

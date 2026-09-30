@@ -165,6 +165,8 @@ export const DETAIL_RUNS: PipelineDetailRun[] = RUN_ROWS.map(
 );
 
 export const DETAIL: Omit<PipelineDetailScreenProps, "secrets"> = {
+  runsError: null,
+  onRetryRuns: () => {},
   tab: "runs",
   onTabChange: noop,
   runs: DETAIL_RUNS,
@@ -240,6 +242,8 @@ export function secretsProps(
 ): PipelineSecretsViewProps {
   return {
     secrets: SECRETS,
+    error: null,
+    onRetry: () => {},
     loading: false,
     deleting: false,
     saveSecret: resolveTrue,

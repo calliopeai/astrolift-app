@@ -328,6 +328,16 @@ export const AUDIT: AstroliftAuditEvent[] = [
 ];
 
 export const OPS: OpsScreenProps = {
+  clustersError: null,
+  onRetryClusters: () => {},
+  metricsError: null,
+  onRetryMetrics: () => {},
+  alertsError: null,
+  onRetryAlerts: () => {},
+  auditError: null,
+  onRetryAudit: () => {},
+  runsError: null,
+  onRetryRuns: () => {},
   clusters: CLUSTERS,
   clustersLoading: false,
   metrics: OPS_METRICS,
@@ -341,6 +351,16 @@ export const OPS: OpsScreenProps = {
 };
 
 export const OPS_LOADING: OpsScreenProps = {
+  clustersError: null,
+  onRetryClusters: () => {},
+  metricsError: null,
+  onRetryMetrics: () => {},
+  alertsError: null,
+  onRetryAlerts: () => {},
+  auditError: null,
+  onRetryAudit: () => {},
+  runsError: null,
+  onRetryRuns: () => {},
   clusters: [],
   clustersLoading: true,
   metrics: undefined,
@@ -354,6 +374,16 @@ export const OPS_LOADING: OpsScreenProps = {
 };
 
 export const OPS_EMPTY: OpsScreenProps = {
+  clustersError: null,
+  onRetryClusters: () => {},
+  metricsError: null,
+  onRetryMetrics: () => {},
+  alertsError: null,
+  onRetryAlerts: () => {},
+  auditError: null,
+  onRetryAudit: () => {},
+  runsError: null,
+  onRetryRuns: () => {},
   clusters: [],
   clustersLoading: false,
   metrics: { ...NO_ROLLOUTS_METRICS, windowDays: 1 },

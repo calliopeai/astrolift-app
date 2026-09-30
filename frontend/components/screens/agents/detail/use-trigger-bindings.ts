@@ -41,11 +41,14 @@ export function useTriggerBindings({
   agentName: string;
   orgId: string;
 }) {
-  const { data, loading } = useQuery<AgentTriggersData, AgentTriggersVars>(AGENT_TRIGGERS, {
-    variables: { orgId, agentSlug },
-    skip: !orgId,
-    fetchPolicy: "cache-and-network",
-  });
+  const { data, loading, error, refetch } = useQuery<AgentTriggersData, AgentTriggersVars>(
+    AGENT_TRIGGERS,
+    {
+      variables: { orgId, agentSlug },
+      skip: !orgId,
+      fetchPolicy: "cache-and-network",
+    }
+  );
   const triggers = data?.agentTriggers ?? [];
 
   // Refetch the list after either write so a bind/unbind reflects immediately.
@@ -88,6 +91,10 @@ export function useTriggerBindings({
   return {
     agentSlug,
     agentName,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
     triggers,
     // `!orgId` (the #1022 cold-load race) skips the query, so treat it as
     // pending too — otherwise the empty state flashes before it resolves.

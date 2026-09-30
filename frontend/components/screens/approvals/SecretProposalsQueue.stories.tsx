@@ -18,7 +18,11 @@ export const Loading: Story = { args: { proposals: [], loading: true } };
 
 export const Empty: Story = { args: { proposals: [] } };
 
-/** The queue has no error state; a failed query renders as empty. */
-export const QueryFailed: Story = { args: { proposals: [] } };
+export const QueryFailed: Story = {
+  args: {
+    proposals: [],
+    error: { name: "Error", message: "Permission denied while loading this section" },
+  },
+};
 
 export const LongStrings: Story = { args: { proposals: [LONG_PROPOSAL] } };

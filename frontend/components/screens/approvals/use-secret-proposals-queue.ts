@@ -15,7 +15,7 @@ interface ListResp {
  * first response, matching the queue's skeleton rule.
  */
 export function useSecretProposalsQueue() {
-  const { data, loading } = useQuery<ListResp>(LIST_SECRET_CHANGE_PROPOSALS, {
+  const { data, loading, error, refetch } = useQuery<ListResp>(LIST_SECRET_CHANGE_PROPOSALS, {
     variables: { appSlug: null, status: "pending" },
     fetchPolicy: "cache-and-network",
     pollInterval: 30_000,
@@ -24,5 +24,9 @@ export function useSecretProposalsQueue() {
   return {
     proposals: data?.astroliftSecretChangeProposals ?? [],
     loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
   };
 }

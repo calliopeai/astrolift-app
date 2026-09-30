@@ -155,6 +155,8 @@ export const DOCS_E_DRIVER_ROWS: DriverRow[] = [
 ];
 
 export const DOCS_E_DRIVERS: DriversScreenProps = {
+  error: null,
+  onRetry: () => {},
   loading: false,
   rows: DOCS_E_DRIVER_ROWS,
   clusterCountByProvider: new Map([["aws", 3]]),
@@ -171,6 +173,8 @@ export const DOCS_E_DRIVERS_LOADING: DriversScreenProps = {
 
 /** The hook's no-plugins branch: the static provider list with the fallback notice. */
 export const DOCS_E_DRIVERS_FALLBACK: DriversScreenProps = {
+  error: null,
+  onRetry: () => {},
   loading: false,
   rows: [
     {
@@ -192,6 +196,8 @@ export const DOCS_E_DRIVERS_FALLBACK: DriversScreenProps = {
 };
 
 export const DOCS_E_DRIVERS_LONG: DriversScreenProps = {
+  error: null,
+  onRetry: () => {},
   loading: false,
   rows: [
     {

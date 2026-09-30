@@ -22,8 +22,10 @@ interface ClustersResp {
  * of CloudProvidersPanelView.
  */
 export function useCloudProviders() {
-  const plugins = useQuery<PluginsResp>(LIST_PROVIDER_PLUGINS);
-  const clusters = useQuery<ClustersResp>(LIST_CLUSTERS);
+  const plugins = useQuery<PluginsResp>(LIST_PROVIDER_PLUGINS, {
+    fetchPolicy: "cache-and-network",
+  });
+  const clusters = useQuery<ClustersResp>(LIST_CLUSTERS, { fetchPolicy: "cache-and-network" });
   const [viewMode, setViewMode] = useViewToggle("astrolift_view_providers", "card");
 
   const allPlugins = plugins.data?.astroliftProviderPlugins ?? [];
@@ -38,7 +40,11 @@ export function useCloudProviders() {
   }
 
   return {
-    loading: plugins.loading || clusters.loading,
+    loading: (plugins.loading && !plugins.data) || (clusters.loading && !clusters.data),
+    error: (plugins.data ? null : plugins.error) ?? (clusters.data ? null : clusters.error) ?? null,
+    onRetry: () => {
+      void Promise.allSettled([plugins.refetch(), clusters.refetch()]);
+    },
     pluginCount: allPlugins.length,
     configured: allPlugins
       .filter((p) => clustersBySlug.has(p.slug))

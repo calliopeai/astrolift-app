@@ -22,7 +22,6 @@ export const Loading: Story = {
   render: () => <FormSubmissionsTab submissions={[]} loading />,
 };
 
-/** The tab has no error state of its own; empty is the closest. */
 export const Empty: Story = {
   render: () => <FormSubmissionsTab submissions={[]} loading={false} />,
 };
@@ -35,4 +34,15 @@ export const LongStrings: Story = {
     await userEvent.click(c.getByText("v3"));
     await expect(within(document.body).getByText("Submission detail")).toBeInTheDocument();
   },
+};
+
+export const QueryFailed: Story = {
+  render: () => (
+    <FormSubmissionsTab
+      submissions={[]}
+      loading={false}
+      error={{ message: "Permission denied while loading this section" }}
+      onRetry={() => {}}
+    />
+  ),
 };

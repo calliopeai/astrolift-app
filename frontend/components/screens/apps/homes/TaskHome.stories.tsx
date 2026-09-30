@@ -17,7 +17,6 @@ export const Loading: Story = { render: () => <TaskHomeScreen {...TASK} runs={[]
 
 export const Empty: Story = { render: () => <TaskHomeScreen {...TASK} runs={[]} /> };
 
-/** The screen has no fetch-error state; a failed latest run is the closest. */
 export const LatestRunFailed: Story = {
   render: () => <TaskHomeScreen {...TASK} runs={TASK_RUNS.slice(2)} />,
 };
@@ -33,5 +32,15 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <TaskHomeScreen {...TASK} runs={TASK_RUNS.slice(2)} />
     </div>
+  ),
+};
+
+export const QueryFailed: Story = {
+  render: () => (
+    <TaskHomeScreen
+      {...TASK}
+      runs={[]}
+      error={{ name: "Error", message: "Permission denied while loading task runs" }}
+    />
   ),
 };

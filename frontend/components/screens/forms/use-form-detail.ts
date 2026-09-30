@@ -12,7 +12,12 @@ import {
 /** A form definition, its submissions, and the publish / archive mutations. */
 export function useFormDetail(slug: string) {
   const { form, loading, error } = useFormDefinition(slug);
-  const { submissions, loading: submissionsLoading } = useFormSubmissions(slug);
+  const {
+    submissions,
+    loading: submissionsLoading,
+    error: submissionsError,
+    refetch: refetchSubmissions,
+  } = useFormSubmissions(slug);
   const [publishForm] = usePublishForm();
   const [archiveForm] = useArchiveForm();
 
@@ -36,5 +41,18 @@ export function useFormDetail(slug: string) {
     return false;
   };
 
-  return { slug, form, loading, error, submissions, submissionsLoading, onPublish, onArchive };
+  return {
+    slug,
+    form,
+    loading,
+    error,
+    submissions,
+    submissionsLoading,
+    submissionsError,
+    onRetrySubmissions: () => {
+      void refetchSubmissions().catch(() => {});
+    },
+    onPublish,
+    onArchive,
+  };
 }

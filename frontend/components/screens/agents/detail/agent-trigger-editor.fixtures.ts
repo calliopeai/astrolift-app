@@ -70,6 +70,8 @@ export const CREATED: AstroliftAgentTriggerResult = {
 };
 
 export const EDITOR: TriggerBindingEditorViewProps = {
+  error: null,
+  onRetry: () => {},
   agentSlug: "release-notes",
   agentName: "Release notes",
   triggers: TRIGGERS,

@@ -108,6 +108,8 @@ export function PipelineSecretsView({
   list,
   secrets,
   loading,
+  error,
+  onRetry,
   deleting,
   saveSecret,
   deleteSecret,
@@ -202,6 +204,8 @@ export function PipelineSecretsView({
           </Can>
         )}
         loading={loading && secrets.length === 0}
+        error={error}
+        onRetry={onRetry}
         totalCount={page.totalCount}
         empty={{
           icon: <KeyIcon className="size-5" />,

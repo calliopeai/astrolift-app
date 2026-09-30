@@ -217,6 +217,8 @@ const LOG_LINES: AstroliftAppLogLine[] = [
 }));
 
 export const LOGS: AppLogsScreenProps = {
+  appError: null,
+  onRetryApp: () => {},
   slug: "storefront",
   app: APP,
   loading: false,

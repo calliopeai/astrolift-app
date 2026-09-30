@@ -174,6 +174,11 @@ export const RENDERED: RenderedManifest = {
 };
 
 export const PREVIEW_PROPS: ManifestPreviewScreenProps = {
+  error: null,
+  onRetry: () => {},
+  environmentsLoading: false,
+  environmentsError: null,
+  onRetryEnvironments: () => {},
   slug: "checkout",
   envName: "__preview__",
   setEnvName: noop,

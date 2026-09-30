@@ -427,11 +427,11 @@ export function useAppDomains(slug: string) {
   };
 
   return {
-    loading: domains.loading,
+    loading: (domains.loading && !domains.data) || (envs.loading && !envs.data),
     /** The domains query failed with nothing cached. */
-    error: domains.data ? null : (domains.error ?? null),
+    error: (domains.data ? null : domains.error) ?? (envs.data ? null : envs.error) ?? null,
     refetch: (): void => {
-      void domains.refetch();
+      void Promise.allSettled([domains.refetch(), envs.refetch()]);
     },
     domains: all,
     list,

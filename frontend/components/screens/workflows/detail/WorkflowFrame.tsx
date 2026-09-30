@@ -96,8 +96,20 @@ export function WorkflowFrame({
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <ShellHeader
-          crumbs={[areaCrumb, listCrumb, { label: pending ? slug : "Not found" }]}
-          title={pending ? <Skeleton className="h-6 w-48" /> : "Workflow not found"}
+          crumbs={[
+            areaCrumb,
+            listCrumb,
+            { label: pending ? slug : error ? "Unavailable" : "Not found" },
+          ]}
+          title={
+            pending ? (
+              <Skeleton className="h-6 w-48" />
+            ) : error ? (
+              "Workflow unavailable"
+            ) : (
+              "Workflow not found"
+            )
+          }
           tabs={pending ? tabs : undefined}
           tabsAriaLabel="Workflow sections"
         />

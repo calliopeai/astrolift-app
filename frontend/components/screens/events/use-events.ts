@@ -85,14 +85,22 @@ function perDayCounts(timestamps: string[], windowDays = RATE_WINDOW_DAYS): numb
  * of the same raw stream, so the per-day counts are identical either way.
  */
 export function useEventRate() {
-  const { data } = useQuery<RawPageResp>(LIST_EVENTS_PAGE, {
+  const { data, loading, error, refetch } = useQuery<RawPageResp>(LIST_EVENTS_PAGE, {
     variables: { limit: RATE_SAMPLE_LIMIT },
     fetchPolicy: "cache-and-network",
     pollInterval: RATE_POLL_MS,
   });
   const days = perDayCounts((data?.astroliftEventsPage.items ?? []).map((e) => e.occurredAt));
   const total = days.reduce((a, b) => a + b, 0);
-  return { days, total };
+  return {
+    days,
+    total,
+    loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
+  };
 }
 
 /**

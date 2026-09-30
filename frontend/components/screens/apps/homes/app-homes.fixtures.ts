@@ -187,7 +187,13 @@ export const TASK_RUNS: AstroliftTaskRun[] = [
   taskRun("r1", "failed", "2026-09-26T10:00:00Z", 7),
 ];
 
-export const TASK: TaskHomeScreenProps = { name: "Migrate", runs: TASK_RUNS, loading: false };
+export const TASK: TaskHomeScreenProps = {
+  error: null,
+  onRetry: () => {},
+  name: "Migrate",
+  runs: TASK_RUNS,
+  loading: false,
+};
 
 // ── Function ───────────────────────────────────────────────────────────────
 

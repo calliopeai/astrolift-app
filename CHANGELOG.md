@@ -118,6 +118,12 @@
   fails; bulk deployment actions refresh the list even after total failure.
   Agent config and device pairing report copy success only after the clipboard
   write completes, and offer manual-copy guidance when it fails.
+- Frontend query failures show an error with Retry inside the affected frame
+  instead of empty lists, missing objects, disabled modules, static driver facts,
+  or zero Operations metrics (#2142). Model deployment waits for target and GPU
+  capability reads. Event rate distinguishes loading, failure and a successful
+  zero-event window. Failed background refreshes preserve loaded workflows,
+  agent runs, live VNC sessions and skill rows.
 
 - Backend startup exits when schema migration fails, before dependent
   bootstrap commands or the HTTP server (#2187). Successful migrations keep

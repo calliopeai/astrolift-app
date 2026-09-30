@@ -76,3 +76,8 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const CapabilitiesFailed: Story = {
+  args: { clusters: [], clustersError: "Could not read cluster GPU capabilities" },
+};
+export const CapabilitiesLoading: Story = { args: { clusters: [], clustersLoading: true } };

@@ -23,10 +23,6 @@ export const Empty: Story = {
   args: { triggers: [] },
 };
 
-/**
- * The editor has no query-error state (a failed list read falls back to the
- * empty list); the real error it shows is an invalid input mapping.
- */
 export const InvalidMapping: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -55,4 +51,11 @@ export const Creating: Story = {
 
 export const LongStrings: Story = {
   args: { agentName: "A deliberately long agent name that keeps going", triggers: LONG_TRIGGERS },
+};
+
+export const QueryFailed: Story = {
+  args: {
+    triggers: [],
+    error: { name: "Error", message: "Permission denied while loading this section" },
+  },
 };

@@ -10,11 +10,21 @@ import type { AstroliftTaskRun } from "@/graphql/lifecycle/lifecycle.types";
  * app-scoped, so this workload's runs are kept here.
  */
 export function useTaskRuns(appSlug: string, workloadSlug: string) {
-  const { data, loading } = useQuery<{ astroliftTaskRuns: AstroliftTaskRun[] }>(LIST_TASK_RUNS, {
-    variables: { appSlug, limit: 30 },
-    fetchPolicy: "cache-and-network",
-    pollInterval: 15000,
-  });
+  const { data, loading, error, refetch } = useQuery<{ astroliftTaskRuns: AstroliftTaskRun[] }>(
+    LIST_TASK_RUNS,
+    {
+      variables: { appSlug, limit: 30 },
+      fetchPolicy: "cache-and-network",
+      pollInterval: 15000,
+    }
+  );
   const runs = (data?.astroliftTaskRuns ?? []).filter((r) => r.workloadSlug === workloadSlug);
-  return { runs, loading };
+  return {
+    runs,
+    loading: loading && !data,
+    error: data ? null : (error ?? null),
+    onRetry: () => {
+      void refetch().catch(() => {});
+    },
+  };
 }
