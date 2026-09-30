@@ -9,6 +9,8 @@ refactor can't silently change the shape.
 
 from __future__ import annotations
 
+import pytest
+
 from astrolift_manifest.render import render_manifests
 from astrolift_manifest.types import (
     ContainerManifest,
@@ -331,6 +333,8 @@ def test_command_and_args_render_as_lists():
 
 def test_hpa_renders_when_min_and_max_set():
     out = _render((_deployment_workload(hpa_min=2, hpa_max=10, hpa_target_cpu_pct=70),))
+    dep = next(r for r in out if r["kind"] == "Deployment")
+    assert "replicas" not in dep["spec"]
     hpa = next(r for r in out if r["kind"] == "HorizontalPodAutoscaler")
     assert hpa["spec"]["minReplicas"] == 2
     assert hpa["spec"]["maxReplicas"] == 10
@@ -343,6 +347,26 @@ def test_hpa_not_rendered_when_only_min_set():
     operator notice rather than silently extrapolating."""
     out = _render((_deployment_workload(hpa_min=2),))
     assert all(r["kind"] != "HorizontalPodAutoscaler" for r in out)
+    assert next(r for r in out if r["kind"] == "Deployment")["spec"]["replicas"] == 1
+
+
+@pytest.mark.parametrize("kind", ["deployment", "agent", "workflow"])
+@pytest.mark.parametrize("hpa_min,hpa_max", [(None, None), (2, None), (None, 6)])
+def test_fixed_and_incomplete_hpa_workloads_retain_explicit_replicas(kind, hpa_min, hpa_max):
+    workload = WorkloadManifest(
+        name="fixed",
+        kind=kind,
+        run_family="service",
+        replicas=4,
+        hpa_min=hpa_min,
+        hpa_max=hpa_max,
+        workflow_type="Worker",
+        task_queue="workers",
+        containers=(_container(),),
+    )
+    out = _render((workload,))
+    assert all(r["kind"] != "HorizontalPodAutoscaler" for r in out)
+    assert next(r for r in out if r["kind"] == "Deployment")["spec"]["replicas"] == 4
 
 
 # ---- CronJob ----------------------------------------------------------
@@ -463,7 +487,7 @@ def test_agent_renders_deployment_service_hpa_with_annotation_and_env():
 
     dep = next(r for r in out if r["kind"] == "Deployment")
     assert dep["apiVersion"] == "apps/v1"
-    assert dep["spec"]["replicas"] == 2
+    assert "replicas" not in dep["spec"]
 
     # Pod-template annotation marks this as an agent for the control plane.
     annotations = dep["spec"]["template"]["metadata"]["annotations"]
@@ -534,7 +558,7 @@ def test_service_family_agent_renders_deployment_service_hpa():
     kinds = sorted(r["kind"] for r in out)
     assert kinds == ["Deployment", "HorizontalPodAutoscaler", "Service"]
     dep = next(r for r in out if r["kind"] == "Deployment")
-    assert dep["spec"]["replicas"] == 3
+    assert "replicas" not in dep["spec"]
     assert dep["spec"]["template"]["metadata"]["annotations"]["astrolift.dev/workload-kind"] == "agent"
 
 
@@ -761,7 +785,7 @@ def test_workflow_worker_renders_deployment_service_hpa_with_annotation_and_env(
 
     dep = next(r for r in out if r["kind"] == "Deployment")
     assert dep["apiVersion"] == "apps/v1"
-    assert dep["spec"]["replicas"] == 2
+    assert "replicas" not in dep["spec"]
 
     # Pod-template annotation marks this as a workflow worker for the
     # control plane.

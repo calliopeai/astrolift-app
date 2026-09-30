@@ -28,6 +28,9 @@
 - Deploy-token controls, rotation metadata states and exact grace durations now
   use all eight dashboard locales. Expiry and last-use dates follow the selected
   locale; technical token scopes and one-time secret values are unchanged (#2145).
+- HPA-managed Deployments release replica ownership so an image redeploy does not
+  overwrite a live autoscaler count. Fixed-size deployments and preview clamps
+  keep explicit replicas; document separate workload, CPU-node and GPU policies.
 
 - Deregistration loads its authorized resource preview before displaying the
   count badge, refreshes on confirmation and treats unavailable/refused reads

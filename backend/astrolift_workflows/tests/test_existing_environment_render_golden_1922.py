@@ -15,7 +15,10 @@ managed-subdomain Ingress, workload-identity ServiceAccount), the Secrets
 ``update_secrets`` applies, the namespace ``provision_namespace`` ensures, the
 ``render_manifests`` activity's output, the service accounts workload identity
 trusts, what a migration drain deletes and what app teardown deletes. A
-deliberate change to any of those updates the digest; #1922 must not.
+deliberate change must be accounted for explicitly; #1922 must not change it.
+The HPA ownership correction omits only web Deployment spec.replicas. Assert
+that change separately, then restore that one historical field for the original
+namespace/resource digest so unrelated changes remain detectable.
 """
 
 from __future__ import annotations
@@ -292,4 +295,11 @@ def test_an_existing_environment_renders_byte_for_byte_as_before(placed):
     assert {call[1] for call in doc["drain"]} == {"acme-test-hello-app"}
     assert doc["teardown"] == [["delete_namespace", "acme-test-hello-app"]]
 
+    resource_sets = [doc["render"], doc["render_manifests"], doc["drain"][0][2]]
+    for resources in resource_sets:
+        deployment = next(
+            r for r in resources if r["kind"] == "Deployment" and r["metadata"]["name"] == "web"
+        )
+        assert "replicas" not in deployment["spec"]
+        deployment["spec"]["replicas"] = 2
     assert _digest(doc) == _GOLDEN_SHA256
