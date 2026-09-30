@@ -1813,7 +1813,15 @@ async def test_temporal_closure_during_dispatch_cleans_up_after_spawn(
             assert summary.repaired == 1
         else:
             await sync_to_async(cleanup_workflow_tasks)(run.pk)
-        _, status, _ = await task_state()
+        # RUNNING is persisted before the dispatch session lock is released.
+        # Cleanup can correctly answer pending in that window. Exercise the
+        # reconciler's durable retry rather than require one lucky lock attempt.
+        for _ in range(100):
+            _, status, _ = await task_state()
+            if status == "cancelled":
+                break
+            await sync_to_async(cleanup_workflow_tasks)(run.pk)
+            await asyncio.sleep(0.02)
         assert status == "cancelled"
         assert stopped == [external_id]
         await sync_to_async(run.refresh_from_db)()

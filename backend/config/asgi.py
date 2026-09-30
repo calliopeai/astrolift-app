@@ -53,6 +53,7 @@ _websocket_app = None
 # GraphQL serves the schema, whose fields the surface guardrail walks one by
 # one; each handler here declares its own ``route_auth`` (#1866).
 WEBSOCKET_ROUTES = (
+    ("/app/ahp", "astrolift_agents.agent_host_ws", "agent_host_ws_application"),
     ("/app/exec/", "core.schema.exec_ws", "exec_ws_application"),
     ("/app/vnc/", "core.schema.vnc_ws", "vnc_ws_application"),
 )

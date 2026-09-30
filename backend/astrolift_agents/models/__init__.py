@@ -1,5 +1,11 @@
 from astrolift_agents.models.agent_box import AgentBox
 from astrolift_agents.models.agent_environment_spec import AgentEnvironmentSpec
+from astrolift_agents.models.agent_host import (
+    AgentHostAction,
+    AgentHostAuthority,
+    AgentHostProjection,
+    AgentHostTerminal,
+)
 from astrolift_agents.models.agent_interaction import AgentInteraction, record_interaction
 from astrolift_agents.models.agent_secret_binding import (
     AgentSecretBindingOverride,
@@ -26,6 +32,10 @@ from astrolift_agents.models.workflow_trigger import WorkflowSchedule, WorkflowW
 
 __all__ = [
     "AgentBox",
+    "AgentHostAction",
+    "AgentHostAuthority",
+    "AgentHostProjection",
+    "AgentHostTerminal",
     "AgentEnvironmentSpec",
     "AgentInteraction",
     "AgentSecretBindingOverride",

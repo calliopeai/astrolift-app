@@ -1,0 +1,41 @@
+name: Agent host wire conformance
+
+on:
+  pull_request:
+    paths:
+      - 'backend/astrolift_agents/**'
+      - 'scripts/ahp/**'
+      - '.github/workflows/agent-host-conformance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/astrolift_agents/**'
+      - 'scripts/ahp/**'
+      - '.github/workflows/agent-host-conformance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reducer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vscode
+          ref: 08d4889f9ec4a1685d257b9b95de036c8e1ce1e5
+          path: upstream
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the pinned upstream compiler
+        run: |
+          npm install --prefix reducer-tools --no-save --ignore-scripts 'typescript@npm:@typescript/typescript6@6.0.2'
+          mkdir -p upstream/node_modules
+          ln -s "$PWD/reducer-tools/node_modules/typescript" upstream/node_modules/typescript
+      - name: Verify the projection against the actual protocol reducer
+        env:
+          AHP_SOURCE: upstream
+        run: node scripts/ahp/check-chat-projection.mjs

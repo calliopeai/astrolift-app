@@ -170,7 +170,7 @@ def callback_input_response(task, sequence):
 
 
 @transaction.atomic
-def reply_to_request(*, task, sequence, response, author=None, author_label=""):
+def reply_to_request(*, task, sequence, response, author=None, author_label="", _policy_checked=False):
     from astrolift_agents.services.agent_task_events import MAX_TASK_EVENT_BYTES
 
     task = AgentTask.objects.select_for_update().get(pk=task.pk, organization_id=task.organization_id)
@@ -196,6 +196,17 @@ def reply_to_request(*, task, sequence, response, author=None, author_label=""):
         sequence__gt=event.sequence,
     ).exists():
         raise TaskInputRequestError("input request is already resolved", 409)
+    if (
+        event.kind == AgentTaskEvent.Kind.APPROVAL_REQUIRED
+        and response["decision"] == "allow"
+        and not _policy_checked
+    ):
+        from astrolift_agents.services.agent_host_policy import AgentHostPolicyError, guard_approval
+
+        try:
+            guard_approval(task, event, author)
+        except AgentHostPolicyError as exc:
+            raise TaskInputRequestError(str(exc), 403) from exc
     size = request_bytes(response)
     if task.event_bytes + size > MAX_TASK_EVENT_BYTES:
         raise TaskInputRequestError("task event history capacity exceeded", 413)
