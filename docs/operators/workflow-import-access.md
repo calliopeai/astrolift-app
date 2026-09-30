@@ -20,7 +20,7 @@ Missing, deleted, foreign or incoherent project/team ancestry resolves to the
 explicit active organization scope, never the selected scope.
 
 Bearer credentials must belong to the active organization and allow the declared
-permission (`workflow:write` or `admin` for imports). Team-bound credentials can
+permission (`workflow:write`, `write:apps` or `admin` for imports). Team-bound credentials can
 replace a compatible definition owned by their own team's live project, subject
 to their user's grants. They cannot create organization definitions, create an
 organization version, or replace a sibling team's definition; an operator's wider

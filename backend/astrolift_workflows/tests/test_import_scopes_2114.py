@@ -146,7 +146,8 @@ def test_imports_keep_create_permission_at_their_org_destination(world, route, p
     [
         ("org", "admin", True),
         ("org", "workflow:write", True),
-        ("org", "read", False),
+        ("org", "write:apps", True),
+        ("org", "read:apps", False),
         ("own", "admin", False),
         ("sibling", "admin", False),
         ("foreign", "admin", False),
@@ -228,7 +229,8 @@ def test_shape_changed_replace_creates_an_org_version_and_requires_org_create(wo
     [
         ("own", "admin", True),
         ("own", "workflow:write", True),
-        ("own", "read", False),
+        ("own", "write:apps", True),
+        ("own", "read:apps", False),
         ("sibling", "admin", False),
         ("foreign", "admin", False),
         ("org", "admin", True),
