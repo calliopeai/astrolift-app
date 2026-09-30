@@ -46,7 +46,7 @@ export const ManagedServicesSection: Story = {
   play: async ({ canvasElement }) => {
     await openCodeView(canvasElement);
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Managed services", exact: true }));
+    await userEvent.click(canvas.getByRole("button", { name: "Managed services" }));
     const editor = canvas.getByPlaceholderText("# astrolift.toml") as HTMLTextAreaElement;
     await expect(editor.value.slice(editor.selectionStart, editor.selectionEnd)).toBe(
       "[[managed_services]]"
