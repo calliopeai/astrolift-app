@@ -1006,12 +1006,43 @@ def _audit(request: HttpRequest, name: str, *, decision: str, duration_ms: int, 
         log.exception("failed to audit MCP tool call %s", name)
 
 
+def _has_project_resource_target(request: HttpRequest, meta: dict[str, Any]) -> bool:
+    from astrolift_identity.models import Project
+    from astrolift_identity.scope_visibility import visible_projects
+    from astrolift_services.scopes import live_projects
+    from core.permissions import granted_scopes
+
+    projects = live_projects(Project.objects.all())
+    token = _token(request)
+    permissions = meta.get("permissions") or (meta["permission"],)
+    # Organization-wide capability metadata remains available before the first
+    # project exists. Scoped credentials must reach an existing live project.
+    if token.team_id is None and all(
+        granted_scopes(get_current_tenant(), permission).org for permission in permissions
+    ):
+        return True
+    if token.team_id is not None:
+        projects = projects.filter(team_id=token.team_id)
+    for permission in permissions:
+        projects = visible_projects(projects, permission)
+    return projects.exists()
+
+
 def _tool_list(request: HttpRequest) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for name, meta in _TOOL_META.items():
         # Listing has no target: a scoped tool is offered where its grant is
         # held anywhere; the call itself checks the target.
         if not _may(request, meta, any_scope=name in TOOL_SCOPES):
+            continue
+        # An APP grant cannot authorize its parent project. Project-targeted
+        # resource capabilities require at least one live reachable project.
+        if name in {
+            "astrolift_list_project_resource_clusters",
+            "astrolift_list_project_resource_catalog",
+            "astrolift_list_project_resources",
+            "astrolift_provision_project_resource",
+        } and not _has_project_resource_target(request, meta):
             continue
         out.append(
             {
