@@ -5855,7 +5855,7 @@
   "clusterSettings": {
     "bootstrapPlan": {
       "title": "Bootstrap-Rezept",
-      "empty": "Für diesen Anbieter ist kein Treiberrezept verfügbar. Installieren Sie Voraussetzungen manuell oder verwenden Sie <command>astro cluster bootstrap</command>.",
+      "empty": "Für diesen Cluster wurden keine Rezeptkomponenten zurückgegeben. Verwalten Sie Voraussetzungen manuell oder verwenden Sie <command>astro cluster bootstrap</command>.",
       "description": "Rezept von <provider></provider>. Fordern Sie die Installation der ausgewählten Voraussetzungen an. Das Abwählen einer zuvor durch dieses Rezept installierten Komponente fordert die Entfernung ihres HelmRelease an.",
       "unknown": "unbekannt",
       "installed": "durch das Rezept installiert",

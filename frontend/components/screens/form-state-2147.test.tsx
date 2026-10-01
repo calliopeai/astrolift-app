@@ -139,7 +139,7 @@ describe("bootstrap recipe refresh", () => {
       <BootstrapPlanView {...PLAN} onInstall={onInstall} plan={structuredClone(PLAN.plan)} />
     );
     expect(screen.getByRole("combobox")).toHaveValue("letsencrypt-staging");
-    fireEvent.click(screen.getByRole("button", { name: /Install/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Request install / reconcile" }));
     expect(onInstall.mock.calls[0][1].cert_manager.issuer).toBe("letsencrypt-staging");
     expect(onInstall.mock.calls[0][0].aws_lb_controller).toBe(!wasChecked);
   });

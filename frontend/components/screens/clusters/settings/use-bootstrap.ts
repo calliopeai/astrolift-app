@@ -38,8 +38,13 @@ export function useBootstrapPlan(clusterId: string) {
     notifyOnNetworkStatusChange: true,
   });
   const plan = data?.astroliftClusterBootstrapPlan ?? null;
-  const unavailable = !!error || (!loading && data?.astroliftClusterBootstrapPlan === undefined);
-  const observed = !!plan && plan.clusterId === clusterId && !unavailable && !loading;
+  const unavailable = !!error || (!loading && !plan);
+  const observed =
+    !!plan &&
+    plan.clusterId === clusterId &&
+    plan.components.length > 0 &&
+    !unavailable &&
+    !loading;
   const fingerprint = JSON.stringify([clusterId, plan, observed, allowed]);
   const context = React.useMemo(() => ({ fingerprint }), [fingerprint]);
   const current = React.useRef<object | null>(context);

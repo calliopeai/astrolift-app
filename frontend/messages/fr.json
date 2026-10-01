@@ -5855,7 +5855,7 @@
   "clusterSettings": {
     "bootstrapPlan": {
       "title": "Recette de préparation",
-      "empty": "Aucune recette du pilote n’est disponible pour ce fournisseur. Installez les prérequis manuellement ou utilisez <command>astro cluster bootstrap</command>.",
+      "empty": "Aucun composant de recette n’a été renvoyé pour ce cluster. Gérez les prérequis manuellement ou utilisez <command>astro cluster bootstrap</command>.",
       "description": "Recette de <provider></provider>. Demandez l’installation des prérequis sélectionnés. Décocher un composant installé par cette recette demande la suppression de son HelmRelease.",
       "unknown": "inconnu",
       "installed": "installé par la recette",

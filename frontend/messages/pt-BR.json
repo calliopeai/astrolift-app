@@ -5852,7 +5852,7 @@
   "clusterSettings": {
     "bootstrapPlan": {
       "title": "Receita de preparação",
-      "empty": "Nenhuma receita do driver está disponível para este provedor. Instale os pré-requisitos manualmente ou use <command>astro cluster bootstrap</command>.",
+      "empty": "Nenhum componente da receita foi retornado para este cluster. Gerencie os pré-requisitos manualmente ou use <command>astro cluster bootstrap</command>.",
       "description": "Receita de <provider></provider>. Solicite a instalação dos pré-requisitos selecionados. Desmarcar um componente instalado por esta receita solicita a remoção de seu HelmRelease.",
       "unknown": "desconhecido",
       "installed": "instalado pela receita",

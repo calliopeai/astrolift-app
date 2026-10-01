@@ -5852,7 +5852,7 @@
   "clusterSettings": {
     "bootstrapPlan": {
       "title": "ブートストラップ手順",
-      "empty": "このプロバイダーのドライバー手順はありません。前提条件を手動でインストールするか、<command>astro cluster bootstrap</command> を使用してください。",
+      "empty": "このクラスターの手順のコンポーネントは返されませんでした。前提条件を手動で管理するか、<command>astro cluster bootstrap</command> を使用してください。",
       "description": "<provider></provider> の手順です。選択した前提条件のインストールを要求します。この手順で以前にインストールしたコンポーネントの選択を解除すると、その HelmRelease の削除を要求します。",
       "unknown": "不明",
       "installed": "この手順でインストール済み",

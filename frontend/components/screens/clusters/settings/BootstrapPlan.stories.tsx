@@ -14,8 +14,9 @@ export const Loading: Story = {
   render: () => <BootstrapPlanView {...PLAN} plan={null} loading />,
 };
 
-/** The driver ships no recipe. */
-export const Empty: Story = { render: () => <BootstrapPlanView {...PLAN} plan={null} /> };
+export const Empty: Story = {
+  render: () => <BootstrapPlanView {...PLAN} plan={{ ...PLAN.plan!, components: [] }} />,
+};
 
 export const Installing: Story = { render: () => <BootstrapPlanView {...PLAN} installing /> };
 

@@ -5932,7 +5932,7 @@
   "clusterSettings": {
     "bootstrapPlan": {
       "title": "Bootstrap recipe",
-      "empty": "No driver recipe is available for this provider. Install prerequisites manually or use <command>astro cluster bootstrap</command>.",
+      "empty": "No recipe components were returned for this cluster. Manage prerequisites manually or use <command>astro cluster bootstrap</command>.",
       "description": "Recipe from <provider></provider>. Request installation of the selected prerequisites. Unchecking a component previously installed by this recipe requests removal of its HelmRelease.",
       "unknown": "unknown",
       "installed": "installed by the recipe",

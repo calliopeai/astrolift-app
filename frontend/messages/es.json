@@ -5855,7 +5855,7 @@
   "clusterSettings": {
     "bootstrapPlan": {
       "title": "Receta de preparación",
-      "empty": "No hay una receta del controlador para este proveedor. Instala los requisitos manualmente o usa <command>astro cluster bootstrap</command>.",
+      "empty": "No se devolvieron componentes de la receta para este clúster. Administra los requisitos manualmente o usa <command>astro cluster bootstrap</command>.",
       "description": "Receta de <provider></provider>. Solicita la instalación de los requisitos seleccionados. Desmarcar un componente instalado por esta receta solicita eliminar su HelmRelease.",
       "unknown": "desconocido",
       "installed": "instalado por la receta",

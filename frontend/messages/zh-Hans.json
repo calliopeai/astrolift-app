@@ -5852,7 +5852,7 @@
   "clusterSettings": {
     "bootstrapPlan": {
       "title": "引导配置方案",
-      "empty": "此提供商没有可用的驱动方案。请手动安装前置组件，或使用 <command>astro cluster bootstrap</command>。",
+      "empty": "未返回此集群的方案组件。请手动管理前置组件，或使用 <command>astro cluster bootstrap</command>。",
       "description": "来自 <provider></provider> 的方案。请求安装选中的前置组件。取消选择此方案之前安装的组件，会请求删除其 HelmRelease。",
       "unknown": "未知",
       "installed": "由此方案安装",

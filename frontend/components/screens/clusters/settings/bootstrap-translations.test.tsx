@@ -56,6 +56,7 @@ type Mode =
   | "fallback"
   | "transport"
   | "empty"
+  | "no-components"
   | "unknown"
   | "read-failed"
   | "wrong-target"
@@ -94,6 +95,7 @@ function harness(locale: string, initial: Mode = "accepted", granted = ["cluster
                       : {
                           ...PLAN.plan,
                           clusterId: mode === "wrong-target" ? "FOREIGN_CLUSTER" : id,
+                          components: mode === "no-components" ? [] : PLAN.plan!.components,
                         },
               }
             : {
@@ -105,7 +107,7 @@ function harness(locale: string, initial: Mode = "accepted", granted = ["cluster
                       : {
                           id,
                           slug: mode === "wrong-target" ? "foreign-slug" : request.variables.slug,
-                          bootstrapRuns: HISTORY.runs,
+                          bootstrapRuns: mode === "no-components" ? [] : HISTORY.runs,
                         },
               }
           : {
@@ -245,7 +247,7 @@ describe.each(locales)("bootstrap source and feedback in %s", (locale) => {
     }
   );
 
-  it.each(["unknown", "read-failed", "wrong-target"] as const)(
+  it.each(["unknown", "read-failed", "wrong-target", "empty"] as const)(
     "keeps %s observation separate from an empty recipe and supports real retry",
     async (mode) => {
       const h = harness(locale, mode);
@@ -266,14 +268,22 @@ describe.each(locales)("bootstrap source and feedback in %s", (locale) => {
     }
   );
 
-  it("renders confirmed absence and the exact CLI command", async () => {
-    const h = harness(locale, "empty");
+  it("renders a returned empty component list and the exact CLI command", async () => {
+    const h = harness(locale, "no-components");
     function Card() {
       return <BootstrapPlanView {...useBootstrapPlan("LITERAL_CLUSTER")} />;
     }
     render(<Card />, { wrapper: h.Wrapper });
     await waitFor(() => expect(screen.getByText("astro cluster bootstrap")).toBeInTheDocument());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("renders a confirmed empty history subset without claiming missing source", async () => {
+    const h = harness(locale, "no-components");
+    const hook = renderHook(() => useBootstrapHistory("literal-slug"), { wrapper: h.Wrapper });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.runs).toEqual([]);
   });
 
   it("retains edited choices through a failed cached read and stays read-only until retry completes", async () => {
