@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- Retire the legacy direct-claims session relay with an explicit HTTP 410 and
+  backend login URL. Posted identity claims and the legacy static relay key no
+  longer mint or replace sessions. Existing verified OAuth login/callback,
+  CLI device approval and normal session/bearer admission remain supported;
+  legacy relay clients must migrate to backend login (#2224).
+
+- Localize the connected cluster sign-in user inventory and all seven existing
+  operations in eight locales. Preserve refused drafts, distinguish accepted
+  requests from confirmed delivery, and retain accepted writes through failed
+  reads. Retry actual source reads and invalidate stale cluster/user reviews;
+  provider inventory remains a bounded returned subset (#2145, #2225).
+
+- Localize the connected Cognito ingress-auth card and pool/client source states
+  in all eight locales. Distinguish saved configuration from reported Ingress
+  reconciliation and actual traffic protection. Keep refused drafts and exact
+  inputs, retain committed writes through later failures, and discard old-cluster
+  or withdrawn-source drafts (#2145).
+
+- Azure `queue/servicebus` preserves its permanent unsupported in-place update
+  contract without SDK reads or writes, including foreign/unavailable targets.
+  Supported lifecycle paths retain their actual ownership checks (#2032, #2098).
+
+- Azure `queue/servicebus` uses the full immutable managed-service UUID for new
+  names and preserves recorded queue paths. Actual source/platform metadata
+  and ARM target checks now gate lifecycle, readiness and workload bindings;
+  refused or inaccessible cleanup never becomes success from diagnostic text.
+  The Azure extra requires Service Bus SDK 10.0 for its real ARM metadata
+  field. Retained queues and unsupported snapshots remain truthful; sibling
+  topic/subscription drivers are outside this bounded repair (#2032, #2098).
+
 - Privacy review uses the server-confirmed anonymous-state flag and exact current
   user identity. All eight locales distinguish first cleanup, repeated attributed
   history cleanup and retained/unsupported records. Changed targets or withdrawn

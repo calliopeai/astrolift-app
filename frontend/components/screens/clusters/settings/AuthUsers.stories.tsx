@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { AuthUsersView } from "./AuthUsers";
 import { AUTH_USERS, LONG } from "./fixtures";
@@ -71,4 +72,40 @@ export const Width768: Story = {
       <AuthUsersView {...AUTH_USERS} view={{ ...view, users: MANY }} />
     </div>
   ),
+};
+
+export const ReadFailed: Story = {
+  render: () => <AuthUsersView {...AUTH_USERS} view={null} error="RAW_PROVIDER_READ_ERROR" />,
+};
+export const CachedReadFailed: Story = {
+  render: () => <AuthUsersView {...AUTH_USERS} error="RAW_PROVIDER_READ_ERROR" />,
+};
+export const UnknownSource: Story = { render: () => <AuthUsersView {...AUTH_USERS} view={null} /> };
+export const FutureMetadata: Story = {
+  render: () => (
+    <AuthUsersView
+      {...AUTH_USERS}
+      view={{
+        ...view,
+        provider: "FUTURE_PROVIDER_LITERAL",
+        reachNote: "RAW_FUTURE_REACH_NOTE",
+        users: view.users.map((user) => ({ ...user, status: "FUTURE_STATUS_LITERAL" })),
+      }}
+    />
+  ),
+};
+export const CreateRefused: Story = {
+  render: () => <AuthUsersView {...AUTH_USERS} onCreate={async () => false} />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(body.getByRole("button", { name: "Add user" }));
+    const dialog = within(await body.findByRole("dialog"));
+    await userEvent.type(dialog.getByLabelText("Email"), "reviewed@example.test");
+    await userEvent.type(dialog.getByLabelText("Password (optional)"), "TEST_ONLY_TYPED_PASSWORD");
+    await userEvent.click(dialog.getByRole("button", { name: "Add user" }));
+    await expect(dialog.getByLabelText("Password (optional)")).toHaveValue(
+      "TEST_ONLY_TYPED_PASSWORD"
+    );
+    await expect(body.getByRole("dialog")).toBeVisible();
+  },
 };

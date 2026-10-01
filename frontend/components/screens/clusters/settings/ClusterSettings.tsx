@@ -118,6 +118,8 @@ export function ClusterSettingsScreen({
   section,
 }: ClusterSettingsScreenProps) {
   const sourceT = useTranslations("clusterSettings.source");
+  const ingressAuthT = useTranslations("clusterSettings.ingressAuth");
+  const authUsersT = useTranslations("clusterSettings.authUsers");
   const fmt = useFormatters();
   const hideRestricted = useRestrictedMode(restrictedMode) === "hide";
 
@@ -290,7 +292,7 @@ export function ClusterSettingsScreen({
           },
           {
             id: "ingress-auth",
-            title: "Ingress auth",
+            title: ingressAuthT("genericLabel"),
             content: (
               <Restricted mode={restrictedMode} allowed={access.update} permission="cluster.update">
                 {cards.ingressAuth}
@@ -299,7 +301,7 @@ export function ClusterSettingsScreen({
           },
           {
             id: "users",
-            title: "Users",
+            title: authUsersT("title"),
             content: access.users ? (
               cards.authUsers
             ) : (

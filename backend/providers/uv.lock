@@ -176,7 +176,7 @@ requires-dist = [
     { name = "azure-mgmt-redisenterprise", marker = "extra == 'azure'", specifier = ">=3.1" },
     { name = "azure-mgmt-resource-locks", marker = "extra == 'azure'", specifier = ">=1.0.0b1" },
     { name = "azure-mgmt-search", marker = "extra == 'azure'", specifier = ">=9.1" },
-    { name = "azure-mgmt-servicebus", marker = "extra == 'azure'", specifier = ">=8.2" },
+    { name = "azure-mgmt-servicebus", marker = "extra == 'azure'", specifier = ">=10.0" },
     { name = "azure-mgmt-sql", marker = "extra == 'azure'", specifier = ">=4.0" },
     { name = "azure-mgmt-storage", marker = "extra == 'azure'", specifier = ">=25.1,<26" },
     { name = "azure-search-documents", marker = "extra == 'azure'", specifier = ">=11.6" },

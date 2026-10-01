@@ -251,49 +251,22 @@ class Auth1SessionWorkflow:
     )
 
     @classmethod
-    @transaction.atomic
     def session(cls, request: WSGIRequest):
-        """
-        Authentication Session Start Point
-
-        Expects a POST Method, and auth0 token authentication.
-
-        Registers the given token information and provides a session token
-        in a Header.
-        """
-        try:
-            if request.method != "POST":
-                logger.warning(
-                    f"[Auth0] Requested method {request.method} not support for session endpoint.",
-                    exc_info=True,
-                )
-                return HttpResponseNotAllowed(permitted_methods={"POST"})
-            auth0_token = json.loads(request.body)
-            cls._register_remote_user(request, auth0_token)
-            try:
-                from auth1.auto_join import maybe_auto_join_user
-
-                maybe_auto_join_user(getattr(request, "user", None))
-            except Exception:
-                logger.exception("[Auth0] auto_join hook failed — auth flow continues")
-            logger.debug(f"[Auth0] Session {request.session.session_key} registered.")
-            return HttpResponse(
-                status=HTTPStatus.ACCEPTED.ACCEPTED,
-                content=json.dumps(
-                    {
-                        "Authorization": f"Session {request.session.session_key}",
-                    }
-                ),
-                headers={
-                    "Content-Type": "application/json",
-                },
-            )
-        except EmailNotVerifiedException as e:
-            logger.warning(f"[Auth0] {e} redirecting to verify-email", exc_info=True)
-            return HttpResponseRedirect(request.build_absolute_uri("/verify-email"))
-        except Exception as e:
-            logger.exception(f"[Auth0] Unable to Start Sessions {e}")
-            raise e
+        if request.method != "POST":
+            return HttpResponseNotAllowed(permitted_methods={"POST"})
+        # A posted claims dictionary has no IdP proof. Keep the legacy URL
+        # explicit, but only the state-bound OAuth callback may mint SSO.
+        return HttpResponse(
+            status=HTTPStatus.GONE,
+            content=json.dumps(
+                {
+                    "code": "DIRECT_SESSION_RETIRED",
+                    "message": "Use the verified backend login flow.",
+                    "loginUrl": reverse("login"),
+                }
+            ),
+            headers={"Content-Type": "application/json", "Cache-Control": "no-store"},
+        )
 
     @classmethod
     def _fix_proxy_pass(cls, request: WSGIRequest, url):
@@ -452,7 +425,7 @@ class Auth1SessionWorkflow:
         - login: login entrypoint
         - logout: logout entrypoint
         - callback: tenant callback entrypoint
-        - session: start session entrypoint.=
+        - session: retired direct-claims endpoint (HTTP 410).
         """
         _rl_login = ratelimit(key="ip", rate="10/m", block=True)(cls.login)
         _rl_session = ratelimit(key="ip", rate="5/m", method="POST", block=True)(cls.session)

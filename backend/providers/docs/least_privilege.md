@@ -442,3 +442,65 @@ broader live-ownership acceptance audit remains open. Reconcile existing app
 workload identities to replace their previous inline grant policies. These
 checks cover the platform-issued policy, not separate administrator-supplied
 IAM/resource policies that already confer additional privileges.
+
+### Azure single Service Bus queue identity and ownership (#2032, #2098)
+
+This scope covers only `queue/servicebus` (`ServiceBusDriver`) in an existing
+operator-managed namespace. New queues use a cosmetic sanitized prefix plus
+all 32 hex digits of the persisted, canonical, nonzero managed-service UUID.
+Only the prefix is shortened to fit 260 characters. Repeated provisioning
+keeps a valid recorded `queue/<physical-path>` unchanged, including nested
+legacy paths; changing app/org/service names or the operator prefix does not
+move messages or create a second queue. Unknown/generated caller IDs and unsafe
+recorded paths refuse before HTTP. Existing queues without a complete,
+unambiguous ownership envelope require a separate authorized adoption/recovery
+process; this driver does not backfill an unlabelled queue from a slug or config.
+
+Provision/reprovision, status, workload binding, and destructive teardown
+read the actual queue first. They require the same
+managed-service UUID, platform marker, nonconflicting known identity aliases,
+and a returned ARM resource ID matching the configured subscription, resource
+group, namespace and exact recorded queue path (case-insensitive as ARM requires).
+A missing returned identity is unknown. Foreign, missing, duplicate or
+contradictory ownership metadata refuses. Binding still emits
+`SERVICEBUS_NAMESPACE`, `SERVICEBUS_QUEUE`, `SERVICEBUS_ENDPOINT` and the existing
+Data Sender/Data Receiver grants at that verified queue ARM ID; no namespace-wide
+grant or connection credential is added.
+
+In-place update remains permanently unsupported with
+`update_not_supported_in_place` and `retryable=False`. It performs no SDK read
+or write, even for a foreign, unavailable or malformed source; actual changes
+must use the ownership-checked reprovision path.
+
+The Azure extra now requires `azure-mgmt-servicebus>=10.0`. Stable 8.2 and 9.0
+queue models cannot serialize/read the required ARM `userMetadata` property.
+SDK 10.0 uses API `2026-01-01`, where the queue properties include it. The driver
+uses `SBQueue(properties=SBQueueProperties(...))`, ISO-duration typed values,
+and verifies the returned owner/target after PUT; tests assert the actual SDK
+request body and API-version, not a fake accepting misplaced dict keys. Metadata
+values containing a semicolon, ambiguous entries, or a serialized envelope over
+1024 characters refuse instead of truncating identity or injecting another key.
+Ordinary custom tag names remain safely namespaced by the existing ARM serializer.
+See Microsoft's [Service Bus naming rules](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftservicebus)
+and [queue API contract](https://learn.microsoft.com/en-us/rest/api/servicebus/controlplane/queues/create-or-update?view=rest-servicebus-controlplane-2026-01-01).
+
+Only the actual SDK `ResourceNotFoundError` permits already-gone convergence.
+Access/transport failures remain `ownership_unknown`, irrespective of diagnostic
+text; permanent refusals retain `external_resource_collision` and additionally
+return `ownership_refused`, preventing central diagnostic-based cleanup coercion.
+Every management operation has a 20-second call budget, at most five seconds for
+each connect/read phase, no SDK retries or redirects. There is no inventory or
+account-wide discovery. `force_destroy` cannot bypass any check or failed delete.
+`delete_data=False` refuses while retaining the queue; snapshot/restore remain
+unsupported, so the central retained-data path fails before any destructive
+call. Explicit `delete_data=True` deletes the currently verified owned queue.
+
+Limits remain explicit: ARM queue PUT/DELETE has no supported conditional
+incarnation precondition here, so an external actor replacing a resource between
+GET and PUT/DELETE is not atomically excluded. Recorded short handles do not
+reconstruct unknown historical subscription/provider placement, and this leaf
+does not introduce such provenance. The sibling `queue/azure_servicebus` and
+`topic/service_bus_topic` topic/subscription driver is unchanged and still needs
+its own actual SDK/lifecycle audit. The recording HTTP and PostgreSQL tests prove
+SDK serialization, dispatch, owner refusal and no destructive calls on retained
+paths; they do not certify Azure message delivery or live-service persistence.

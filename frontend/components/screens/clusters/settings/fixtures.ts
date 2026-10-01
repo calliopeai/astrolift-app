@@ -197,6 +197,11 @@ export const AGENT_ISSUED: ClusterAgentViewProps = {
 };
 
 export const INGRESS_AUTH: IngressAuthViewProps = {
+  sourceKey: "FIXTURE_CLUSTER_SOURCE",
+  poolsError: null,
+  onRetryPools: noop,
+  clientsError: null,
+  onRetryClients: noop,
   providerPluginSlug: "aws",
   ingressClass: "alb",
   existing: CLUSTER.albAuthConfig as IngressAuthViewProps["existing"],
@@ -257,19 +262,23 @@ const user = (
 });
 
 export const AUTH_USERS: AuthUsersViewProps = {
+  sourceKey: "FIXTURE_AUTH_USERS_SOURCE",
+  error: null,
+  onRetry: noop,
   loading: false,
   view: {
     supported: true,
     reason: "",
     provider: "Amazon Cognito",
-    reachNote: "A user of this pool can sign in to every app on the cluster.",
+    reachNote:
+      "A user of this pool can sign in to every app on the cluster that has no access rule of its own.",
     groups: ["platform", "finance"],
     users: [
       user("u1", "ada@example.com", { groups: ["platform"] }),
       user("u2", "grace@example.com", { enabled: false, status: "FORCE_CHANGE_PASSWORD" }),
     ],
   },
-  onSetGroups: noop,
+  onSetGroups: yes,
   onCreateGroup: yes,
   onToggleEnabled: noop,
   onCreate: yes,

@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type {
@@ -17,30 +19,41 @@ import {
   SET_CLUSTER_AUTH_USER_GROUPS,
   SET_CLUSTER_AUTH_USER_PASSWORD,
 } from "@/graphql/clusters/clusters.queries";
-
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 import type { NewAuthUser } from "./types";
 
 type Result = { ok: boolean; errors?: { message: string }[] | null };
 
-function firstError(r: Result | undefined, fallback: string): string {
-  return r?.errors?.[0]?.message ?? fallback;
-}
-
-/**
- * The users of the cluster's central auth (#2131): who can sign in to the
- * apps behind it. Passwords are sent once; nothing the server returns
- * carries one. The data half of AuthUsersView.
- */
 export function useAuthUsers(clusterId: string) {
-  const { data, loading, refetch } = useQuery<{
-    astroliftClusterAuthUsers: AstroliftClusterAuthUsers | null;
-  }>(CLUSTER_AUTH_USERS, { variables: { clusterId }, fetchPolicy: "cache-and-network" });
-  const refetchOpts = { onCompleted: () => void refetch() };
-
-  const [createUser] = useMutation<{ createClusterAuthUser: Result }>(
-    CREATE_CLUSTER_AUTH_USER,
-    refetchOpts
+  const t = useTranslations("clusterSettings.authUsers");
+  const {
+    data,
+    error: readError,
+    loading,
+    refetch,
+  } = useQuery<{ astroliftClusterAuthUsers: AstroliftClusterAuthUsers | null }>(
+    CLUSTER_AUTH_USERS,
+    { variables: { clusterId }, fetchPolicy: "cache-and-network" }
   );
+  const view = data?.astroliftClusterAuthUsers ?? null;
+  // A group creation changes available groups before the subsequent membership write.
+  const sourceKey = JSON.stringify([
+    clusterId,
+    view?.supported,
+    view?.provider,
+    view?.reason,
+    view?.reachNote,
+    view?.users,
+  ]);
+  const lease = React.useMemo(() => ({ sourceKey }), [sourceKey]);
+  const current = React.useRef<typeof lease | null>(lease);
+  React.useLayoutEffect(() => {
+    current.current = lease;
+    return () => {
+      current.current = null;
+    };
+  }, [lease]);
+  const [createUser] = useMutation<{ createClusterAuthUser: Result }>(CREATE_CLUSTER_AUTH_USER);
   const [setPassword] = useMutation<{ setClusterAuthUserPassword: Result }>(
     SET_CLUSTER_AUTH_USER_PASSWORD
   );
@@ -48,103 +61,150 @@ export function useAuthUsers(clusterId: string) {
     RESET_CLUSTER_AUTH_USER_PASSWORD
   );
   const [setEnabled] = useMutation<{ setClusterAuthUserEnabled: Result }>(
-    SET_CLUSTER_AUTH_USER_ENABLED,
-    refetchOpts
+    SET_CLUSTER_AUTH_USER_ENABLED
   );
-  const [deleteUser] = useMutation<{ deleteClusterAuthUser: Result }>(
-    DELETE_CLUSTER_AUTH_USER,
-    refetchOpts
-  );
+  const [deleteUser] = useMutation<{ deleteClusterAuthUser: Result }>(DELETE_CLUSTER_AUTH_USER);
   const [setGroups] = useMutation<{ setClusterAuthUserGroups: Result }>(
-    SET_CLUSTER_AUTH_USER_GROUPS,
-    refetchOpts
+    SET_CLUSTER_AUTH_USER_GROUPS
   );
-  const [createGroup] = useMutation<{ createClusterAuthGroup: Result }>(
-    CREATE_CLUSTER_AUTH_GROUP,
-    refetchOpts
-  );
+  const [createGroup] = useMutation<{ createClusterAuthGroup: Result }>(CREATE_CLUSTER_AUTH_GROUP);
 
-  async function onSetGroups(username: string, add: string[], remove: string[]) {
-    const { data } = await setGroups({
-      variables: { input: { clusterId, username, add, remove } },
-    });
-    if (!data?.setClusterAuthUserGroups.ok) {
-      toast.error(firstError(data?.setClusterAuthUserGroups, "Group change failed."));
-    }
-  }
-
-  async function onCreateGroup(name: string): Promise<boolean> {
-    const { data } = await createGroup({ variables: { input: { clusterId, name } } });
-    if (!data?.createClusterAuthGroup.ok) {
-      toast.error(firstError(data?.createClusterAuthGroup, "Couldn't create group."));
-      return false;
-    }
-    return true;
-  }
-
-  async function onToggleEnabled(user: AstroliftClusterAuthUser) {
-    const { data } = await setEnabled({
-      variables: { input: { clusterId, username: user.username, enabled: !user.enabled } },
-    });
-    if (data?.setClusterAuthUserEnabled.ok) {
-      toast.success(user.enabled ? "User disabled." : "User enabled.");
-    } else {
-      toast.error(firstError(data?.setClusterAuthUserEnabled, "Change failed."));
-    }
-  }
-
-  async function onCreate(input: NewAuthUser): Promise<boolean> {
-    const { data } = await createUser({ variables: { input: { clusterId, ...input } } });
-    if (!data?.createClusterAuthUser.ok) {
-      toast.error(firstError(data?.createClusterAuthUser, "Couldn't create the user."));
-      return false;
-    }
-    toast.success(
-      input.password
-        ? "User created with the password you set."
-        : "User created. They were emailed a temporary password."
-    );
-    return true;
-  }
-
-  async function onSetPassword(
-    username: string,
-    password: string,
-    permanent: boolean
+  async function write(
+    call: () => Promise<Result | undefined | null>,
+    fallback: string,
+    success: string,
+    refresh = false,
+    throwOnRefusal = false
   ): Promise<boolean> {
-    const { data } = await setPassword({
-      variables: { input: { clusterId, username, password, permanent } },
-    });
-    if (!data?.setClusterAuthUserPassword.ok) {
-      toast.error(firstError(data?.setClusterAuthUserPassword, "Couldn't set the password."));
+    function refused(reason: string) {
+      if (throwOnRefusal) throw new Error(reason);
+      toast.error(reason);
       return false;
     }
-    toast.success("Password set.");
+    if (current.current !== lease || view?.supported !== true) return refused(t("sourceChanged"));
+    let result;
+    try {
+      result = await call();
+    } catch (error) {
+      return refused(error instanceof Error && error.message ? error.message : fallback);
+    }
+    if (!result?.ok) return refused(result?.errors?.[0]?.message ?? fallback);
+    toast.success(success);
+    if (refresh) {
+      if (current.current === lease)
+        await refetchAfterMutation({ refetch: () => refetch({ clusterId }) }, t("refreshWarning"));
+      else toast.warning(t("refreshWarning"));
+    }
     return true;
   }
-
-  async function onResetPassword(username: string): Promise<boolean> {
-    const { data } = await resetPassword({ variables: { input: { clusterId, username } } });
-    if (!data?.resetClusterAuthUserPassword.ok) {
-      toast.error(firstError(data?.resetClusterAuthUserPassword, "Couldn't send the reset."));
+  function knownUser(username: string) {
+    return view?.users.some((user) => user.username === username) === true;
+  }
+  async function onSetGroups(username: string, add: string[], remove: string[]) {
+    if (!knownUser(username)) {
+      toast.error(t("sourceChanged"));
       return false;
     }
-    toast.success("Reset code sent to the user.");
-    return true;
+    return write(
+      async () =>
+        (await setGroups({ variables: { input: { clusterId, username, add, remove } } })).data
+          ?.setClusterAuthUserGroups,
+      t("groupsFailed"),
+      t("groupsAccepted"),
+      true
+    );
   }
-
-  /** Throws on failure, so the confirm dialog stays open with the error. */
+  async function onCreateGroup(name: string) {
+    return write(
+      async () =>
+        (await createGroup({ variables: { input: { clusterId, name } } })).data
+          ?.createClusterAuthGroup,
+      t("createGroupFailed"),
+      t("groupCreated"),
+      true
+    );
+  }
+  async function onToggleEnabled(user: AstroliftClusterAuthUser) {
+    if (!knownUser(user.username)) {
+      toast.error(t("sourceChanged"));
+      return;
+    }
+    await write(
+      async () =>
+        (
+          await setEnabled({
+            variables: { input: { clusterId, username: user.username, enabled: !user.enabled } },
+          })
+        ).data?.setClusterAuthUserEnabled,
+      t("enabledFailed"),
+      t(user.enabled ? "disabledAccepted" : "enabledAccepted"),
+      true
+    );
+  }
+  async function onCreate(input: NewAuthUser) {
+    return write(
+      async () =>
+        (await createUser({ variables: { input: { clusterId, ...input } } })).data
+          ?.createClusterAuthUser,
+      t("createFailed"),
+      t(input.password ? "createdPassword" : "createdInvitation"),
+      true
+    );
+  }
+  async function onSetPassword(username: string, password: string, permanent: boolean) {
+    if (!knownUser(username)) {
+      toast.error(t("sourceChanged"));
+      return false;
+    }
+    return write(
+      async () =>
+        (await setPassword({ variables: { input: { clusterId, username, password, permanent } } }))
+          .data?.setClusterAuthUserPassword,
+      t("passwordFailed"),
+      t("passwordAccepted")
+    );
+  }
+  async function onResetPassword(username: string) {
+    if (!knownUser(username)) {
+      toast.error(t("sourceChanged"));
+      return false;
+    }
+    return write(
+      async () =>
+        (await resetPassword({ variables: { input: { clusterId, username } } })).data
+          ?.resetClusterAuthUserPassword,
+      t("resetFailed"),
+      t("resetAccepted")
+    );
+  }
   async function onDelete(username: string) {
-    const { data } = await deleteUser({ variables: { input: { clusterId, username } } });
-    if (!data?.deleteClusterAuthUser.ok) {
-      throw new Error(firstError(data?.deleteClusterAuthUser, "Delete failed."));
-    }
-    toast.success("User deleted.");
+    if (!knownUser(username)) throw new Error(t("sourceChanged"));
+    await write(
+      async () =>
+        (await deleteUser({ variables: { input: { clusterId, username } } })).data
+          ?.deleteClusterAuthUser,
+      t("deleteFailed"),
+      t("deleteAccepted"),
+      true,
+      true
+    );
   }
-
+  async function onRetry() {
+    if (current.current !== lease) return;
+    try {
+      await refetch({ clusterId });
+    } catch {
+      /* Keep the query diagnostic visible. */
+    }
+  }
   return {
-    view: data?.astroliftClusterAuthUsers ?? null,
+    sourceKey,
+    view,
     loading,
+    error:
+      readError?.message ??
+      (!loading && data?.astroliftClusterAuthUsers === undefined ? t("unknownSource") : null),
+    onRetry,
     onSetGroups,
     onCreateGroup,
     onToggleEnabled,

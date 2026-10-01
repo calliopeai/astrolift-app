@@ -529,7 +529,7 @@ def _servicebus_queue_legacy() -> Live:
     client = servicebus_legacy_suite.FakeSBClient()
     driver = servicebus_legacy_suite.ServiceBusDriver(
         config=servicebus_legacy_suite.ServiceBusConfig(
-            subscription_id="sub-1",
+            subscription_id=servicebus_legacy_suite.SUBSCRIPTION,
             resource_group="rg",
             namespace_name="acme-prod-sb",
             client=client,
@@ -595,6 +595,12 @@ def live(request: pytest.FixtureRequest) -> Live:
     return CASES[request.param]()
 
 
+def _ownership_errors(live: Live) -> list[str]:
+    if isinstance(live.driver, servicebus_legacy_suite.ServiceBusDriver):
+        return [OWNERSHIP_ERROR_CODE, "ownership_refused"]
+    return [OWNERSHIP_ERROR_CODE]
+
+
 def test_provision_stamps_an_identity_its_own_read_can_recover(live: Live) -> None:
     """The write side and the read side have to name the same thing.
 
@@ -614,7 +620,7 @@ def test_foreign_owner_is_refused_on_delete(live: Live) -> None:
     )
 
     assert not refused.ok
-    assert refused.errors == [OWNERSHIP_ERROR_CODE]
+    assert refused.errors == _ownership_errors(live)
     assert not refused.retryable, "an ownership refusal is permanent; retrying burns the delete window"
     assert live.exists(), "refused the teardown but deleted the resource anyway"
 
@@ -629,7 +635,7 @@ def test_foreign_owner_is_refused_on_update(live: Live) -> None:
     )
 
     assert not refused.ok
-    assert refused.errors == [OWNERSHIP_ERROR_CODE]
+    assert refused.errors == _ownership_errors(live)
     assert not refused.retryable
 
 
@@ -645,7 +651,7 @@ def test_foreign_owner_is_refused_on_reprovision(live: Live) -> None:
     refused = live.reprovision()
 
     assert not refused.ok
-    assert refused.errors == [OWNERSHIP_ERROR_CODE]
+    assert refused.errors == _ownership_errors(live)
 
 
 def test_untagged_resource_is_refused_rather_than_adopted(live: Live) -> None:
@@ -662,7 +668,7 @@ def test_untagged_resource_is_refused_rather_than_adopted(live: Live) -> None:
     )
 
     assert not refused.ok
-    assert refused.errors == [OWNERSHIP_ERROR_CODE]
+    assert refused.errors == _ownership_errors(live)
     assert live.exists()
 
 
@@ -730,7 +736,7 @@ def test_the_caller_must_name_an_owner_before_a_destructive_call(live: Live) -> 
     refused = live.driver.deprovision(DeprovisionSpec(handle=live.handle), **live.deprovision_kwargs)
 
     assert not refused.ok
-    assert refused.errors == [OWNERSHIP_ERROR_CODE]
+    assert refused.errors == _ownership_errors(live)
     assert live.exists()
 
 
@@ -746,5 +752,5 @@ def test_a_sibling_binding_cannot_delete_our_resource(live: Live) -> None:
     )
 
     assert not refused.ok
-    assert refused.errors == [OWNERSHIP_ERROR_CODE]
+    assert refused.errors == _ownership_errors(live)
     assert live.exists()

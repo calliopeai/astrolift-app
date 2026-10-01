@@ -30,8 +30,12 @@ Four-corner deprovision matrix on ``AzureServiceBusDriver``:
 
 from __future__ import annotations
 
+import re
+import time
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
 from _sdk._telemetry import driver_op
 from _sdk.azure_ownership import (
@@ -41,6 +45,7 @@ from _sdk.azure_ownership import (
     owner_of,
     verify_azure_ownership,
 )
+from _sdk.azure_tags import AzureTagError
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -58,6 +63,7 @@ from _sdk.managed_service import (
     ValueRef,
     unsupported_update,
 )
+from _sdk.managed_service_tags import LEGACY_KEYS
 from azure.managed.tags import BINDING_TAG, MANAGED_BY_TAG, MANAGED_SERVICE_ID_TAG
 from azure.managed.tags import arm_tags_for as _tags_for
 
@@ -101,59 +107,36 @@ class ServiceBusDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        queue_name = self._queue_name(spec=spec)
         try:
-            existing = self._client.queues.get(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                queue_name=queue_name,
-            )
-        except Exception as exc:
-            if type(exc).__name__ != "ResourceNotFoundError":
-                return ProvisionResult(
-                    ok=False,
-                    handle="",
-                    message=f"get_queue: {exc}",
-                    errors=[str(exc)],
+            queue_name = self._queue_name(spec=spec)
+            metadata = _queue_metadata(spec)
+            budget = _QueueCallBudget()
+            existing = self._get_queue(queue_name, spec, budget)
+            from azure.mgmt.servicebus.models import SBQueue, SBQueueProperties
+
+            parameters = SBQueue(
+                properties=SBQueueProperties(
+                    max_size_in_megabytes=self._config.max_size_in_megabytes,
+                    enable_partitioning=self._config.enable_partitioning,
+                    default_message_time_to_live=timedelta(days=14),
+                    lock_duration=timedelta(seconds=30),
+                    max_delivery_count=10,
+                    dead_lettering_on_message_expiration=True,
+                    user_metadata=metadata,
                 )
-            existing = None
-        if existing is not None:
-            try:
-                _assert_owned(existing, spec, AzureOperation.PROVISION, f"queue {queue_name}")
-            except AzureOwnershipError as exc:
-                return ProvisionResult(
-                    ok=False,
-                    handle="",
-                    message=str(exc),
-                    errors=[OWNERSHIP_ERROR_CODE],
-                )
-        try:
-            self._client.queues.create_or_update(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                queue_name=queue_name,
-                parameters={
-                    "max_size_in_megabytes": (self._config.max_size_in_megabytes),
-                    "enable_partitioning": (self._config.enable_partitioning),
-                    "default_message_time_to_live": "P14D",
-                    "lock_duration": "PT30S",
-                    "max_delivery_count": 10,
-                    "dead_lettering_on_message_expiration": True,
-                    "userMetadata": _user_metadata(spec),
-                },
             )
+            # The SDK serializes typed models into properties, unlike a raw dict.
+            result = self._client.queues.create_or_update(
+                **self._target(queue_name),
+                parameters=parameters,
+                **budget.options(),
+            )
+            self._assert_queue_owned(result, queue_name, spec)
+            if existing is None:
+                self._get_queue(queue_name, spec, budget, required=True)
         except Exception as exc:
-            return ProvisionResult(
-                ok=False,
-                handle="",
-                message=f"create_queue: {exc}",
-                errors=[str(exc)],
-            )
-        return ProvisionResult(
-            ok=True,
-            handle=f"{KIND}/{queue_name}",
-            message=f"Service Bus queue {queue_name} provisioned",
-        )
+            return ProvisionResult(ok=False, handle="", message=_queue_error_message(exc), errors=_queue_errors(exc))
+        return ProvisionResult(ok=True, handle=f"{KIND}/{queue_name}", message="Service Bus queue provisioned")
 
     @driver_op(cloud="azure", driver="queue_servicebus")
     def update(self, spec: UpdateSpec) -> UpdateResult:
@@ -173,117 +156,47 @@ class ServiceBusDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del force_destroy
-        _, _, queue_name = spec.handle.partition("/")
-        if not delete_data:
-            try:
-                self._client.queues.get(
-                    resource_group_name=self._config.resource_group,
-                    namespace_name=self._config.namespace_name,
-                    queue_name=queue_name,
-                )
-            except Exception as exc:
-                if type(exc).__name__ == "ResourceNotFoundError":
-                    return DeprovisionResult(
-                        ok=True,
-                        handle=spec.handle,
-                        message="already gone",
-                    )
+        try:
+            queue_name = self._validated_target(spec)
+            budget = _QueueCallBudget()
+            queue = self._get_queue(queue_name, spec, budget)
+            if queue is None:
+                return DeprovisionResult(ok=True, handle=spec.handle, message="already gone")
+            if not delete_data:
                 return DeprovisionResult(
                     ok=False,
                     handle=spec.handle,
-                    message=str(exc),
-                    errors=[str(exc)],
+                    message="Service Bus cannot retain messages on deletion; explicitly authorize delete_data=True",
+                    errors=["delete_data_required"],
+                    retryable=False,
                 )
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=(
-                    f"queue {queue_name} cannot be deleted while retaining "
-                    "messages; drain it externally or pass delete_data=True"
-                ),
-                errors=["delete_data_required"],
-                retryable=False,
-            )
-        try:
-            queue = self._client.queues.get(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                queue_name=queue_name,
-            )
+            try:
+                self._client.queues.delete(**self._target(queue_name), **budget.options())
+            except Exception as exc:
+                if not _queue_absent(exc):
+                    raise
         except Exception as exc:
-            if type(exc).__name__ == "ResourceNotFoundError":
-                return DeprovisionResult(
-                    ok=True,
-                    handle=spec.handle,
-                    message="already gone",
-                )
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=str(exc),
-                errors=[str(exc)],
+                message=_queue_error_message(exc),
+                errors=_queue_errors(exc),
+                retryable=not isinstance(exc, (AzureOwnershipError, AzureTagError)),
             )
-        try:
-            _assert_owned(queue, spec, AzureOperation.DELETE, f"queue {queue_name}")
-        except AzureOwnershipError as exc:
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=str(exc),
-                errors=[OWNERSHIP_ERROR_CODE],
-                retryable=False,
-            )
-        try:
-            self._client.queues.delete(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                queue_name=queue_name,
-            )
-        except Exception as exc:
-            if type(exc).__name__ == "ResourceNotFoundError":
-                return DeprovisionResult(
-                    ok=True,
-                    handle=spec.handle,
-                    message="already gone",
-                )
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=str(exc),
-                errors=[str(exc)],
-            )
-        return DeprovisionResult(
-            ok=True,
-            handle=spec.handle,
-            message=f"queue {queue_name} deleted",
-        )
+        return DeprovisionResult(ok=True, handle=spec.handle, message="Service Bus queue deleted")
 
     @driver_op(cloud="azure", driver="queue_servicebus")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, _, queue_name = handle.handle.partition("/")
         try:
-            self._client.queues.get(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                queue_name=queue_name,
-            )
+            queue_name = self._validated_target(handle)
+            queue = self._get_queue(queue_name, handle, _QueueCallBudget())
+            if queue is None:
+                return ServiceStatus(handle=handle.handle, state="deprovisioned", message="queue does not exist")
+            observed = _field(queue, "status", default="Unknown")
+            state = _SB_STATUS_TO_PROTOCOL.get(str(getattr(observed, "value", observed)), "error")
+            return ServiceStatus(handle=handle.handle, state=state, message="current owned queue observed")
         except Exception as exc:
-            if type(exc).__name__ == "ResourceNotFoundError":
-                return ServiceStatus(
-                    handle=handle.handle,
-                    state="deprovisioned",
-                    message=f"queue {queue_name} does not exist",
-                )
-            return ServiceStatus(
-                handle=handle.handle,
-                state="error",
-                message=str(exc),
-            )
-        return ServiceStatus(
-            handle=handle.handle,
-            state="available",
-            message=f"queue {queue_name} reachable",
-        )
+            return ServiceStatus(handle=handle.handle, state="error", message=_queue_error_message(exc))
 
     @driver_op(cloud="azure", driver="queue_servicebus")
     def binding(
@@ -292,7 +205,8 @@ class ServiceBusDriver(ManagedServiceDriver):
         config: dict[str, Any] | None = None,
     ) -> Binding:
         del config
-        _, _, queue_name = handle.handle.partition("/")
+        queue_name = self._validated_target(handle)
+        self._get_queue(queue_name, handle, _QueueCallBudget(), required=True)
         endpoint = f"sb://{self._config.namespace_name}.servicebus.windows.net/"
         return Binding(
             env_vars={
@@ -367,20 +281,141 @@ class ServiceBusDriver(ManagedServiceDriver):
         return []
 
     def _queue_name(self, *, spec: ProvisionSpec) -> str:
-        # Queue names: 1-260 chars; alphanumeric + . - _ /
-        parts = [
-            self._config.queue_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        raw = "-".join(p for p in parts if p)
-        clean = "".join(c if (c.isalnum() or c in "-_./") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:260]
+        identity = _queue_identity(spec)
+        if spec.recorded_handle:
+            return self._validated_target(ServiceHandle(spec.recorded_handle, managed_service_id=identity))
+        prefix = re.sub(r"[^a-z0-9-]+", "-", self._config.queue_name_prefix.lower()).strip("-")[:227].rstrip("-")
+        name = f"{prefix}-{UUID(identity).hex}" if prefix else UUID(identity).hex
+        self._target(name)
+        return name
+
+    def _validated_target(self, source: object) -> str:
+        _queue_identity(source)
+        handle = str(getattr(source, "handle", ""))
+        kind, sep, name = handle.partition("/")
+        if kind != KIND or not sep:
+            raise AzureOwnershipError("Service Bus queue handle does not name a queue")
+        self._target(name)
+        return name
+
+    def _target(self, name: str) -> dict[str, str]:
+        if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,258}[A-Za-z0-9])?", name) or any(
+            part in {"", ".", ".."} for part in name.split("/")
+        ):
+            raise AzureOwnershipError("invalid recorded Service Bus queue name")
+        cfg = self._config
+        if (
+            not re.fullmatch(r"[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}", cfg.subscription_id)
+            or not UUID(cfg.subscription_id).int
+        ):
+            raise AzureOwnershipError("Service Bus subscription identity is invalid")
+        if (
+            not 1 <= len(cfg.resource_group) <= 90
+            or any(not (char.isalnum() or char in "_.()-") for char in cfg.resource_group)
+            or cfg.resource_group.endswith(".")
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]{4,48}[A-Za-z0-9]", cfg.namespace_name)
+        ):
+            raise AzureOwnershipError("Service Bus placement identity is invalid")
+        return dict(resource_group_name=cfg.resource_group, namespace_name=cfg.namespace_name, queue_name=name)
+
+    def _arm_id(self, name: str) -> str:
+        return (
+            f"/subscriptions/{self._config.subscription_id}/resourceGroups/{self._config.resource_group}"
+            f"/providers/Microsoft.ServiceBus/namespaces/{self._config.namespace_name}/queues/{name}"
+        )
+
+    def _assert_queue_owned(self, queue: Any, name: str, source: object) -> None:
+        _queue_identity(source)
+        actual_id = _field(queue, "id", default="")
+        if not isinstance(actual_id, str) or not actual_id:
+            raise _QueueOwnershipUnknown("Service Bus returned no immutable ARM target")
+        if actual_id.casefold() != self._arm_id(name).casefold():
+            raise AzureOwnershipError("Service Bus returned a different ARM target")
+        blob = _field(queue, "user_metadata", "userMetadata", default="")
+        if not isinstance(blob, str) or len(blob) > 1024:
+            raise AzureOwnershipError("invalid Service Bus queue ownership metadata")
+        envelope: dict[str, str] = {}
+        for entry in blob.split(";"):
+            key, sep, value = entry.partition("=")
+            if not sep or not key or key in envelope:
+                raise AzureOwnershipError("ambiguous Service Bus queue ownership metadata")
+            envelope[key] = value
+        expected = _queue_identity(source)
+        if any(key in envelope and envelope[key] != expected for key in LEGACY_KEYS["azure"]):
+            raise AzureOwnershipError("conflicting Service Bus queue ownership aliases")
+        verify_azure_ownership(envelope, owner_of(source), operation=AzureOperation.UPDATE, resource="queue")
+
+    def _get_queue(self, name: str, source: object, budget: _QueueCallBudget, *, required: bool = False) -> Any:
+        try:
+            queue = self._client.queues.get(**self._target(name), **budget.options())
+        except Exception as exc:
+            if not _queue_absent(exc):
+                raise
+            if required:
+                raise _QueueOwnershipUnknown("current Service Bus queue is absent") from exc
+            return None
+        self._assert_queue_owned(queue, name, source)
+        return queue
+
+
+class _QueueOwnershipUnknown(RuntimeError):
+    pass
+
+
+class _QueueCallBudget:
+    def __init__(self) -> None:
+        self.deadline = time.monotonic() + 20
+
+    def options(self) -> dict[str, Any]:
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise _QueueOwnershipUnknown("Service Bus queue operation deadline exhausted")
+        timeout = min(5.0, remaining / 2)
+        return dict(connection_timeout=timeout, read_timeout=timeout, retry_total=0, redirect_max=0)
+
+
+def _queue_uuid(value: str) -> str:
+    try:
+        parsed = UUID(value)
+    except (ValueError, TypeError, AttributeError):
+        raise AzureOwnershipError("Service Bus requires an immutable canonical nonzero UUID") from None
+    if parsed.int == 0 or str(parsed) != value:
+        raise AzureOwnershipError("Service Bus requires an immutable canonical nonzero UUID")
+    return value
+
+
+def _queue_identity(source: object) -> str:
+    return _queue_uuid(str(getattr(source, "managed_service_id", "") or ""))
+
+
+def _queue_metadata(spec: ProvisionSpec) -> str:
+    _queue_identity(spec)
+    tags = _tags_for(spec)
+    if any(";" in key or "=" in key or ";" in value for key, value in tags.items()):
+        raise AzureOwnershipError("Service Bus metadata tags cannot contain envelope delimiters")
+    blob = _user_metadata(spec)
+    # Reject instead of producing a partial final entry or losing descriptive tags.
+    if len(";".join(f"{key}={value}" for key, value in tags.items())) > 1024:
+        raise AzureOwnershipError("Service Bus ownership metadata exceeds 1024 characters")
+    return blob
+
+
+def _queue_absent(exc: Exception) -> bool:
+    from azure.core.exceptions import ResourceNotFoundError
+
+    return isinstance(exc, ResourceNotFoundError)
+
+
+def _queue_errors(exc: Exception) -> list[str]:
+    if isinstance(exc, (AzureOwnershipError, AzureTagError)):
+        return [OWNERSHIP_ERROR_CODE, "ownership_refused"]
+    return ["ownership_unknown"]
+
+
+def _queue_error_message(exc: Exception) -> str:
+    if isinstance(exc, (AzureOwnershipError, AzureTagError)):
+        return f"Service Bus queue ownership refused: {exc}"
+    return "Service Bus queue ownership or operation could not be confirmed"
 
 
 # ---- #364 cross-cloud-symmetry driver --------------------------------

@@ -1,8 +1,8 @@
 /**
  * Cluster › Settings › Sign-in users (spec 44 §5.1): the embedded list's
- * declaration and its client-side step. The provider's user list comes back
- * whole with no cursor, so search, the group and state filters, sort and
- * numbered pages run in the client (needsBackend: a Page field on
+ * declaration and its client-side step. The returned provider subset has
+ * no cursor here, so search, the group and state filters, sort and numbered
+ * pages run in the client (needsBackend: a Page field on
  * `astroliftClusterAuthUsers`). The users are the cluster's logins, not
  * platform accounts, so Mine is empty.
  */
@@ -47,3 +47,27 @@ export const AUTH_USERS_SELECT: SelectRowsSpec<AstroliftClusterAuthUser> = {
   },
   id: (u) => u.username,
 };
+
+export function localizedAuthUsersList(t: {
+  (key: string): string;
+  has: (key: string) => boolean;
+}): ListDefinition {
+  const copy = (key: string, fallback: string) => (t.has(key) ? t(key) : fallback);
+  return {
+    ...AUTH_USERS_LIST,
+    searchPlaceholder: t("search"),
+    fields: AUTH_USERS_LIST.fields.map((field) => ({
+      ...field,
+      label: copy(`filters.${field.key}`, field.label),
+      options: field.options?.map((option) => ({
+        ...option,
+        label: copy(`states.${option.value}`, option.label),
+      })),
+    })),
+    views: AUTH_USERS_LIST.views.map((view) => ({
+      ...view,
+      label: copy(`views.${view.key}`, view.label),
+      ...(view.note ? { note: t("mineNote") } : {}),
+    })),
+  };
+}
