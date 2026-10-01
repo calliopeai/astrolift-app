@@ -2,6 +2,8 @@
 
 import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import { UPDATE_TENANT_CLUSTER } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
@@ -23,8 +25,15 @@ function useUpdateCluster() {
  * type. The data half of CentralAuthView.
  */
 export function useCentralAuth(cluster: AstroliftTenantCluster) {
+  const t = useTranslations("clusterSettings.centralAuth");
   const view = oidcView(cluster);
-  const [update, { loading }] = useUpdateCluster();
+  const [update, { loading }] = useMutation<{
+    updateTenantCluster: MutationResult<AstroliftTenantCluster>;
+  }>(UPDATE_TENANT_CLUSTER, {
+    refetchQueries: (result) => (result.data?.updateTenantCluster.ok ? ["GetCluster"] : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
 
   /** Resolves true when saved (the view closes the form). */
   async function onSave(draft: CentralAuthDraft): Promise<boolean> {
@@ -44,18 +53,22 @@ export function useCentralAuth(cluster: AstroliftTenantCluster) {
     else delete config.jwks_uri;
     if (draft.clientSecret) config.client_secret = draft.clientSecret;
 
-    const { data } = await update({
-      variables: { input: { id: cluster.id, oidcAuthConfig: config } },
-    });
-    if (data?.updateTenantCluster.ok) {
-      toast.success("Central auth saved.");
-      return true;
+    try {
+      const { data } = await update({
+        variables: { input: { id: cluster.id, oidcAuthConfig: config } },
+      });
+      if (data?.updateTenantCluster.ok) {
+        toast.success(t("saved"));
+        return true;
+      }
+      toast.error(data?.updateTenantCluster.errors?.[0]?.message ?? t("saveFailed"));
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : t("saveFailed"));
     }
-    toast.error(data?.updateTenantCluster.errors?.[0]?.message ?? "Save failed.");
     return false;
   }
 
-  return { view, saving: loading, onSave };
+  return { clusterId: cluster.id, view, saving: loading, onSave };
 }
 
 /**

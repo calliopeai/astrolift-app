@@ -468,3 +468,60 @@ This is a bounded #2145 leaf. Other cluster header/tab/lifecycle/connection,
 bootstrap, central/ingress-auth and auth-user presentation and feedback remain
 separate concrete translation boundaries. Their source/card/query contracts are
 unchanged; this leaf adds no paging/capacity guarantee and does not close #2145.
+
+
+## Cluster settings central OIDC authentication
+
+The connected CentralAuthView/useCentralAuth form and actual CentralAuthCard
+now use genuine all-eight `clusterSettings.centralAuth` presentation: labels,
+write-only hints, secret-presence badges, setup/edit, provider callback guidance
+and save/fallback/refresh feedback. The existing shared SettingsSection supplies
+localized Save/Saving/Cancel. The callback template and issuer/JWKS paths remain
+literal technical values. Missing presence flags are visibly unconfirmed rather
+than fabricated unset. Existing real boolean flags preserve their meaning.
+
+The exact updateTenantCluster input and existing config preservation are
+unchanged: public issuer/logout/upstream metadata survives, the required fields
+are trimmed as before, optional blank JWKS is removed, `_set` flags are not sent,
+and a blank secret omits the secret key so the backend retains the stored value.
+Only newly typed secrets enter the write. The client does not retrieve stored
+secrets or persist its draft to browser storage. Cancel clears the typed secret
+and discards the current draft.
+
+Only accepted update envelopes refresh active GetCluster queries with their
+existing variables. Refusals retain the raw diagnostic and reviewed draft and
+trigger no refresh or successful-write warning. Transport errors are handled;
+a committed write still reports saved and clears the typed secret if its refresh
+fails, while the source banner exposes the raw read error and actual retry.
+
+Local form state belongs to its cluster GUID and confirmed OIDC source presence.
+A new cluster or confirmed source withdrawal clears the prior draft and secret;
+an old promise cannot close/clear a newer editor. A locale change and same-target
+failed/refused operation retain the current reviewed values. The actual existing
+Restricted wrapper still decides read-only/hide behavior; withdrawal remounts a
+read-only card, preventing reopening/writes without a new authority rule.
+
+The help accurately describes first-party parent-zone shared sign-in and
+independent custom-domain authentication, following central-auth-envoy.md.
+Saving metadata is not proof of an IdP registration, current edge rollout,
+provider capability or authentication readiness. This form does not enumerate
+provider resources or create a new paging/capacity promise. Existing backend
+permissions and mutation authority remain decisive; no backend/schema/input or
+policy gate changes are introduced.
+
+Focused current-source proof: 155 checks pass across real Apollo HttpLink
+ClusterSettingsClient journeys, all-eight ICU/rich/SSR hydration and portable
+central/settings stories, plus the existing central/ingress-class card regressions.
+It covers keyboard save, exact public/secret payloads, raw refusal/transport and
+fallback, accepted-write/failed-read recovery, source withdrawal/failed/null reads,
+Cancel/no-write, cached target changes, delayed actual prior-target HTTP replies,
+existing permission withdrawal, unknown secret flags and locale changes.
+TypeScript, scoped ESLint (zero warnings), source/catalogue formatting and diff
+checks pass. All pre-existing catalogue values exactly match the signed 4050b17a
+base; only the owned centralAuth subtree is added.
+
+This bounded central-auth form is complete, while #2145 remains open. The sibling
+ingress-class selector/hook, Cognito ingress-auth card/pickers, auth-user list,
+other cluster header/tab/connection/lifecycle/bootstrap copy and their outcomes
+remain concrete subsequent boundaries. Those forms and their capability limits
+are unchanged; this leaf does not enable unsupported provider authentication.

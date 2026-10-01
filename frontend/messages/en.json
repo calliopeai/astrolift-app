@@ -5800,6 +5800,32 @@
       "notFound": "No visible cluster with slug {slug}",
       "notFoundHelp": "The cluster does not exist or you do not have permission to view it.",
       "back": "Back to clusters"
+    },
+    "centralAuth": {
+      "title": "Central auth",
+      "description": "Shared sign-in for app hosts under the auth host’s parent zone. Register the exact callback <callback>{callbackUrl}</callback> with the identity provider. Envoy and nginx use this configuration; ALB uses its per-app Cognito gate instead. Custom domains require separate authentication configuration.",
+      "authHost": "Auth host",
+      "discoveryUrl": "Discovery URL",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "jwksOptional": "JWKS URI (optional)",
+      "jwksUri": "JWKS URI",
+      "secretKeep": "Set. Leave empty to keep it.",
+      "notSet": "Not set",
+      "secretUnknown": "Not confirmed",
+      "writeOnly": "Write-only. Never shown again once saved.",
+      "jwksHint": "Only for a provider that does not serve its keys at {jwksPath}.",
+      "notConfigured": "Not configured.",
+      "cookieSecret": "Cookie secret",
+      "gatewaySecret": "Gateway secret",
+      "secretSet": "set",
+      "secretBadge": "{label}: {state}",
+      "edit": "Edit",
+      "setup": "Set up central auth",
+      "saved": "Central auth saved.",
+      "saveFailed": "Could not save central auth.",
+      "refreshWarning": "Central auth was saved, but cluster details could not be refreshed. Refresh to see current state.",
+      "secretNotSet": "not set"
     }
   }
 }

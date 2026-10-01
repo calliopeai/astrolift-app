@@ -2,6 +2,8 @@
 
 import { KeyRoundIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
+import type { CentralAuthDraft } from "./types";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsSection } from "@/components/settings/SettingsPage";
@@ -32,124 +34,155 @@ import type { useCentralAuth, useIngressClass } from "./use-central-auth";
  */
 
 function SecretBadge({ label, set }: { label: string; set?: boolean }) {
+  const t = useTranslations("clusterSettings.centralAuth");
   return (
     <Badge variant={set ? "secondary" : "outline"} className="gap-1">
       <KeyRoundIcon className="size-3" />
-      {label}: {set ? "set" : "not set"}
+      {t("secretBadge", {
+        label,
+        state:
+          set === true ? t("secretSet") : set === false ? t("secretNotSet") : t("secretUnknown"),
+      })}
     </Badge>
   );
 }
 
 export type CentralAuthViewProps = ReturnType<typeof useCentralAuth>;
 
-export function CentralAuthView({ view, saving, onSave }: CentralAuthViewProps) {
-  const [editing, setEditing] = React.useState(false);
-  const [discoveryUrl, setDiscoveryUrl] = React.useState(view?.discovery_url ?? "");
-  const [clientId, setClientId] = React.useState(view?.client_id ?? "");
-  const [authHost, setAuthHost] = React.useState(view?.auth_proxy_host ?? "");
-  const [jwksUri, setJwksUri] = React.useState(view?.jwks_uri ?? "");
-  const [clientSecret, setClientSecret] = React.useState("");
-
-  function reset() {
-    setDiscoveryUrl(view?.discovery_url ?? "");
-    setClientId(view?.client_id ?? "");
-    setAuthHost(view?.auth_proxy_host ?? "");
-    setJwksUri(view?.jwks_uri ?? "");
-    setClientSecret("");
+export function CentralAuthView({ clusterId, view, saving, onSave }: CentralAuthViewProps) {
+  const t = useTranslations("clusterSettings.centralAuth");
+  function initialDraft(): CentralAuthDraft {
+    return {
+      discoveryUrl: view?.discovery_url ?? "",
+      clientId: view?.client_id ?? "",
+      authHost: view?.auth_proxy_host ?? "",
+      jwksUri: view?.jwks_uri ?? "",
+      clientSecret: "",
+    };
   }
-
+  const [form, setForm] = React.useState({
+    clusterId,
+    configured: view !== null,
+    epoch: 0,
+    editing: false,
+    draft: initialDraft(),
+  });
+  if (form.clusterId !== clusterId || form.configured !== (view !== null)) {
+    setForm({
+      clusterId,
+      configured: view !== null,
+      epoch: form.epoch + 1,
+      editing: false,
+      draft: initialDraft(),
+    });
+  }
+  const {
+    editing,
+    draft: { discoveryUrl, clientId, authHost, jwksUri, clientSecret },
+  } = form;
+  function setField(field: keyof CentralAuthDraft, value: string) {
+    setForm((current) => ({ ...current, draft: { ...current.draft, [field]: value } }));
+  }
+  function reset(editing: boolean) {
+    setForm((current) => ({ ...current, editing, draft: initialDraft() }));
+  }
   async function save() {
-    if (await onSave({ discoveryUrl, clientId, authHost, jwksUri, clientSecret })) {
-      setClientSecret("");
-      setEditing(false);
+    const epoch = form.epoch;
+    if (await onSave(form.draft)) {
+      setForm((current) =>
+        current.clusterId === clusterId && current.epoch === epoch
+          ? { ...current, editing: false, draft: { ...current.draft, clientSecret: "" } }
+          : current
+      );
     }
   }
-
-  const description = (
-    <>
-      One sign-in for every app on this cluster. The identity provider needs exactly one callback,{" "}
-      <code className="font-mono text-xs [overflow-wrap:anywhere]">
-        https://&lt;auth host&gt;/oauth2/callback
-      </code>
-      , and the session covers every host under the auth host&apos;s parent zone. Read by the Envoy
-      and nginx edges; on the ALB class the per-app Cognito gate applies instead.
-    </>
-  );
+  const description = t.rich("description", {
+    callbackUrl: "https://<auth host>/oauth2/callback",
+    callback: (chunks) => (
+      <code className="font-mono text-xs [overflow-wrap:anywhere]">{chunks}</code>
+    ),
+  });
 
   if (editing) {
     return (
       // An open edit counts as unsaved: Save and Cancel are live from the
       // start, and `required` holds back a save with a blank field.
       <SettingsSection
-        title="Central auth"
+        title={t("title")}
         description={description}
         dirty
         saving={saving}
         onSave={save}
-        onCancel={() => setEditing(false)}
+        onCancel={() => reset(false)}
       >
         <TextField
           id="oidc-auth-host"
-          label="Auth host"
+          label={t("authHost")}
           value={authHost}
-          onChange={setAuthHost}
+          onChange={(value) => setField("authHost", value)}
           placeholder="auth.apps.example.com"
           required
         />
         <TextField
           id="oidc-discovery"
-          label="Discovery URL"
+          label={t("discoveryUrl")}
           value={discoveryUrl}
-          onChange={setDiscoveryUrl}
+          onChange={(value) => setField("discoveryUrl", value)}
           placeholder="https://cognito-idp.us-west-2.amazonaws.com/us-west-2_abc/.well-known/openid-configuration"
           required
         />
         <TextField
           id="oidc-client-id"
-          label="Client ID"
+          label={t("clientId")}
           value={clientId}
-          onChange={setClientId}
+          onChange={(value) => setField("clientId", value)}
           required
         />
         <TextField
           id="oidc-client-secret"
-          label="Client secret"
+          label={t("clientSecret")}
           value={clientSecret}
-          onChange={setClientSecret}
+          onChange={(value) => setField("clientSecret", value)}
           type="password"
           autoComplete="new-password"
-          placeholder={view?.client_secret_set ? "Set. Leave empty to keep it." : "Not set"}
-          hint="Write-only. Never shown again once saved."
+          placeholder={
+            view?.client_secret_set === true
+              ? t("secretKeep")
+              : view?.client_secret_set === false
+                ? t("notSet")
+                : t("secretUnknown")
+          }
+          hint={t("writeOnly")}
         />
         <TextField
           id="oidc-jwks"
-          label="JWKS URI (optional)"
+          label={t("jwksOptional")}
           value={jwksUri}
-          onChange={setJwksUri}
-          hint="Only for a provider that does not serve its keys at <issuer>/.well-known/jwks.json."
+          onChange={(value) => setField("jwksUri", value)}
+          hint={t("jwksHint", { jwksPath: "<issuer>/.well-known/jwks.json" })}
         />
       </SettingsSection>
     );
   }
 
   return (
-    <Section title="Central auth" description={description} divided>
+    <Section title={t("title")} description={description} divided>
       <div className="flex min-w-0 flex-col gap-4">
         {view ? (
           <dl className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-            <ViewField label="Auth host" value={view.auth_proxy_host} />
-            <ViewField label="Client ID" value={view.client_id} />
-            <ViewField label="Discovery URL" value={view.discovery_url} />
-            {view.jwks_uri && <ViewField label="JWKS URI" value={view.jwks_uri} />}
+            <ViewField label={t("authHost")} value={view.auth_proxy_host} />
+            <ViewField label={t("clientId")} value={view.client_id} />
+            <ViewField label={t("discoveryUrl")} value={view.discovery_url} />
+            {view.jwks_uri && <ViewField label={t("jwksUri")} value={view.jwks_uri} />}
           </dl>
         ) : (
-          <p className="text-muted-foreground text-sm">Not configured.</p>
+          <p className="text-muted-foreground text-sm">{t("notConfigured")}</p>
         )}
         {view && (
           <div className="flex flex-wrap gap-1.5">
-            <SecretBadge label="Client secret" set={view.client_secret_set} />
-            <SecretBadge label="Cookie secret" set={view.cookie_secret_set} />
-            <SecretBadge label="Gateway secret" set={view.gateway_secret_set} />
+            <SecretBadge label={t("clientSecret")} set={view.client_secret_set} />
+            <SecretBadge label={t("cookieSecret")} set={view.cookie_secret_set} />
+            <SecretBadge label={t("gatewaySecret")} set={view.gateway_secret_set} />
           </div>
         )}
         <div>
@@ -157,11 +190,10 @@ export function CentralAuthView({ view, saving, onSave }: CentralAuthViewProps) 
             size="sm"
             variant="outline"
             onClick={() => {
-              reset();
-              setEditing(true);
+              reset(true);
             }}
           >
-            {view ? "Edit" : "Set up central auth"}
+            {view ? t("edit") : t("setup")}
           </Button>
         </div>
       </div>

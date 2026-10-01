@@ -5720,6 +5720,32 @@
       "notFound": "슬러그가 {slug}인 표시 가능한 클러스터가 없습니다",
       "notFoundHelp": "클러스터가 존재하지 않거나 볼 수 있는 권한이 없습니다.",
       "back": "클러스터 목록으로 돌아가기"
+    },
+    "centralAuth": {
+      "title": "중앙 인증",
+      "description": "인증 호스트의 상위 영역에 속한 앱 호스트에서 로그인을 공유합니다. ID 공급자에 정확한 콜백 URL <callback>{callbackUrl}</callback>을 등록하세요. Envoy와 nginx는 이 설정을 사용하며, ALB는 앱별 Cognito 인증을 사용합니다. 사용자 지정 도메인에는 별도의 인증 설정이 필요합니다.",
+      "authHost": "인증 호스트",
+      "discoveryUrl": "검색 URL",
+      "clientId": "클라이언트 ID",
+      "clientSecret": "클라이언트 시크릿",
+      "jwksOptional": "JWKS URI(선택 사항)",
+      "jwksUri": "JWKS 주소",
+      "secretKeep": "설정됨. 유지하려면 비워 두세요.",
+      "notSet": "설정되지 않음",
+      "secretUnknown": "확인되지 않음",
+      "writeOnly": "쓰기 전용입니다. 저장 후에는 다시 표시되지 않습니다.",
+      "jwksHint": "{jwksPath}에서 키를 제공하지 않는 공급자에만 지정하세요.",
+      "notConfigured": "구성되지 않았습니다.",
+      "cookieSecret": "쿠키 시크릿",
+      "gatewaySecret": "Gateway 시크릿",
+      "secretSet": "설정됨",
+      "secretBadge": "{label}: {state}",
+      "edit": "편집",
+      "setup": "중앙 인증 설정",
+      "saved": "중앙 인증을 저장했습니다.",
+      "saveFailed": "중앙 인증을 저장하지 못했습니다.",
+      "refreshWarning": "중앙 인증은 저장했지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
+      "secretNotSet": "설정되지 않음"
     }
   }
 }

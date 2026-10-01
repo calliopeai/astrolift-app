@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Translate the connected central OIDC authentication form and feedback in all
+  eight locales. Preserve write-only secret omission and literal provider
+  metadata, retain committed updates through failed refreshes, and clear
+  previous-cluster/source drafts without changing mutation authority (#2145).
+
+
 - Translate connected People mutation/CSV feedback and the anonymization dialog
   in all eight locales. Describe actual account/profile and membership effects;
   keep historical-audit and stored-binding limitations explicit (#2220).

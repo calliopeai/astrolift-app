@@ -198,3 +198,21 @@ their complete routing shape is supported; the edge does not silently
 serve an apex hostname or discard an existing rule set. Long exact
 hostnames keep their full value in route hostnames and an annotation, with
 a short ownership label that stays within Kubernetes' label limit.
+
+
+### Editing central authentication in the dashboard
+
+Cluster Settings → Central auth edits the existing public OIDC configuration.
+Client, cookie and gateway secret badges report only presence; a missing flag is
+unconfirmed. A blank client-secret field keeps the stored secret. A newly typed
+value is write-only, and Cancel or a confirmed cluster/source change clears the
+local draft. Issuer/client/host identifiers and backend refusal messages are
+shown unchanged.
+
+A saved reply means the configuration mutation was accepted. It does not verify
+IdP callback registration or prove a current edge rollout. If the follow-up
+cluster read fails, the accepted result stays saved and the dashboard warns;
+Retry executes that actual read. A refused save keeps the reviewed fields and
+its diagnostic instead of announcing success. The ingress-class change and
+independent custom-host callback/cookie requirements above remain separate
+operations and prerequisites.

@@ -5720,6 +5720,32 @@
       "notFound": "没有可见的集群使用标识 {slug}",
       "notFoundHelp": "集群不存在，或你没有查看权限。",
       "back": "返回集群列表"
+    },
+    "centralAuth": {
+      "title": "中央认证",
+      "description": "认证主机父域内的应用主机共享登录。请在身份提供商中注册完全一致的回调 URL <callback>{callbackUrl}</callback>。Envoy 和 nginx 使用此配置；ALB 则使用各应用的 Cognito 认证。自定义域名需要独立配置认证。",
+      "authHost": "认证主机",
+      "discoveryUrl": "发现 URL",
+      "clientId": "客户端 ID",
+      "clientSecret": "客户端密钥",
+      "jwksOptional": "JWKS URI（可选）",
+      "jwksUri": "JWKS 地址",
+      "secretKeep": "已设置。留空以保留现有值。",
+      "notSet": "未设置",
+      "secretUnknown": "未确认",
+      "writeOnly": "仅可写入。保存后无法再次查看。",
+      "jwksHint": "仅在提供商未通过 {jwksPath} 发布密钥时填写。",
+      "notConfigured": "尚未配置。",
+      "cookieSecret": "Cookie 密钥",
+      "gatewaySecret": "Gateway 密钥",
+      "secretSet": "已设置",
+      "secretBadge": "{label}：{state}",
+      "edit": "编辑",
+      "setup": "设置中央认证",
+      "saved": "中央认证已保存。",
+      "saveFailed": "无法保存中央认证。",
+      "refreshWarning": "中央认证已保存，但无法刷新集群详情。请刷新页面以查看当前状态。",
+      "secretNotSet": "未设置"
     }
   }
 }

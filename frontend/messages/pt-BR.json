@@ -5720,6 +5720,32 @@
       "notFound": "Nenhum cluster visível com o slug {slug}",
       "notFoundHelp": "O cluster não existe ou você não tem permissão para visualizá-lo.",
       "back": "Voltar aos clusters"
+    },
+    "centralAuth": {
+      "title": "Autenticação central",
+      "description": "Login compartilhado para hosts de aplicativos na zona superior do host de autenticação. Registre a URL de retorno exata <callback>{callbackUrl}</callback> no provedor de identidade. Envoy e nginx usam esta configuração; ALB usa sua autenticação Cognito por aplicativo. Domínios personalizados exigem uma configuração de autenticação independente.",
+      "authHost": "Host de autenticação",
+      "discoveryUrl": "URL de descoberta",
+      "clientId": "ID do cliente",
+      "clientSecret": "Segredo do cliente",
+      "jwksOptional": "URI de JWKS (opcional)",
+      "jwksUri": "URI de JWKS",
+      "secretKeep": "Definido. Deixe em branco para manter.",
+      "notSet": "Não definido",
+      "secretUnknown": "Não confirmado",
+      "writeOnly": "Somente gravação. Não será exibido novamente após salvar.",
+      "jwksHint": "Apenas para um provedor que não disponibiliza suas chaves em {jwksPath}.",
+      "notConfigured": "Não configurada.",
+      "cookieSecret": "Segredo do cookie",
+      "gatewaySecret": "Segredo do Gateway",
+      "secretSet": "Definido",
+      "secretBadge": "{label}: {state}",
+      "edit": "Editar",
+      "setup": "Configurar autenticação central",
+      "saved": "Autenticação central salva.",
+      "saveFailed": "Não foi possível salvar a autenticação central.",
+      "refreshWarning": "A autenticação central foi salva, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual.",
+      "secretNotSet": "Não definido"
     }
   }
 }

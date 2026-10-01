@@ -5720,6 +5720,32 @@
       "notFound": "スラッグ {slug} の表示可能なクラスターはありません",
       "notFoundHelp": "クラスターが存在しないか、表示する権限がありません。",
       "back": "クラスター一覧に戻る"
+    },
+    "centralAuth": {
+      "title": "中央認証",
+      "description": "認証ホストの親ゾーン内にあるアプリホストでログインを共有します。ID プロバイダーに正確なコールバック URL <callback>{callbackUrl}</callback> を登録してください。Envoy と nginx はこの設定を使い、ALB はアプリごとの Cognito 認証を使います。カスタムドメインには独立した認証設定が必要です。",
+      "authHost": "認証ホスト",
+      "discoveryUrl": "検出 URL",
+      "clientId": "クライアント ID",
+      "clientSecret": "クライアントシークレット",
+      "jwksOptional": "JWKS URI（任意）",
+      "jwksUri": "JWKS の URI",
+      "secretKeep": "設定済み。保持するには空欄にしてください。",
+      "notSet": "未設定",
+      "secretUnknown": "未確認",
+      "writeOnly": "書き込み専用です。保存後に再表示はできません。",
+      "jwksHint": "{jwksPath} で鍵を公開していないプロバイダーのみ指定します。",
+      "notConfigured": "未構成です。",
+      "cookieSecret": "Cookie シークレット",
+      "gatewaySecret": "Gateway シークレット",
+      "secretSet": "設定済み",
+      "secretBadge": "{label}：{state}",
+      "edit": "編集",
+      "setup": "中央認証を設定",
+      "saved": "中央認証を保存しました。",
+      "saveFailed": "中央認証を保存できませんでした。",
+      "refreshWarning": "中央認証は保存しましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。",
+      "secretNotSet": "未設定"
     }
   }
 }

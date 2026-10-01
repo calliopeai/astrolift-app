@@ -5723,6 +5723,32 @@
       "notFound": "Kein sichtbarer Cluster mit dem Slug {slug}",
       "notFoundHelp": "Der Cluster existiert nicht oder Sie haben keine Berechtigung, ihn anzuzeigen.",
       "back": "Zurück zu Clustern"
+    },
+    "centralAuth": {
+      "title": "Zentrale Authentifizierung",
+      "description": "Gemeinsame Anmeldung für App-Hosts unter der übergeordneten Zone des Authentifizierungshosts. Registrieren Sie die genaue Rückruf-URL <callback>{callbackUrl}</callback> beim Identitätsanbieter. Envoy und nginx verwenden diese Konfiguration; ALB verwendet stattdessen die Cognito-Zugangskontrolle pro App. Benutzerdefinierte Domains benötigen eine separate Authentifizierungskonfiguration.",
+      "authHost": "Authentifizierungshost",
+      "discoveryUrl": "Discovery-URL",
+      "clientId": "Client-ID",
+      "clientSecret": "Client-Geheimnis",
+      "jwksOptional": "JWKS-URI (optional)",
+      "jwksUri": "JWKS-URI",
+      "secretKeep": "Gesetzt. Zum Beibehalten leer lassen.",
+      "notSet": "Nicht gesetzt",
+      "secretUnknown": "Nicht bestätigt",
+      "writeOnly": "Nur zum Schreiben. Nach dem Speichern wird es nicht erneut angezeigt.",
+      "jwksHint": "Nur für Anbieter, die ihre Schlüssel nicht unter {jwksPath} bereitstellen.",
+      "notConfigured": "Nicht konfiguriert.",
+      "cookieSecret": "Cookie-Geheimnis",
+      "gatewaySecret": "Gateway-Geheimnis",
+      "secretSet": "Gesetzt",
+      "secretBadge": "{label}: {state}",
+      "edit": "Bearbeiten",
+      "setup": "Zentrale Authentifizierung einrichten",
+      "saved": "Zentrale Authentifizierung gespeichert.",
+      "saveFailed": "Zentrale Authentifizierung konnte nicht gespeichert werden.",
+      "refreshWarning": "Die zentrale Authentifizierung wurde gespeichert, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen.",
+      "secretNotSet": "Nicht gesetzt"
     }
   }
 }

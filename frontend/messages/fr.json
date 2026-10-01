@@ -5723,6 +5723,32 @@
       "notFound": "Aucun cluster visible avec le slug {slug}",
       "notFoundHelp": "Le cluster n’existe pas ou vous n’avez pas la permission de le consulter.",
       "back": "Retour aux clusters"
+    },
+    "centralAuth": {
+      "title": "Authentification centrale",
+      "description": "Connexion partagée pour les hôtes des applications dans la zone parente de l’hôte d’authentification. Enregistrez exactement l’URL de retour <callback>{callbackUrl}</callback> auprès du fournisseur d’identité. Envoy et nginx utilisent cette configuration ; ALB utilise la protection Cognito propre à chaque application. Les domaines personnalisés nécessitent une configuration d’authentification distincte.",
+      "authHost": "Hôte d’authentification",
+      "discoveryUrl": "URL de découverte",
+      "clientId": "Identifiant du client",
+      "clientSecret": "Secret du client",
+      "jwksOptional": "URI JWKS (facultative)",
+      "jwksUri": "URI JWKS",
+      "secretKeep": "Configuré. Laissez le champ vide pour le conserver.",
+      "notSet": "Non configuré",
+      "secretUnknown": "Non confirmé",
+      "writeOnly": "En écriture seule. Il ne sera plus affiché après enregistrement.",
+      "jwksHint": "Uniquement pour un fournisseur qui ne publie pas ses clés à l’adresse {jwksPath}.",
+      "notConfigured": "Non configurée.",
+      "cookieSecret": "Secret du cookie",
+      "gatewaySecret": "Secret du Gateway",
+      "secretSet": "Configuré",
+      "secretBadge": "{label} : {state}",
+      "edit": "Modifier",
+      "setup": "Configurer l’authentification centrale",
+      "saved": "Authentification centrale enregistrée.",
+      "saveFailed": "Impossible d’enregistrer l’authentification centrale.",
+      "refreshWarning": "L’authentification centrale a été enregistrée, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
+      "secretNotSet": "Non configuré"
     }
   }
 }

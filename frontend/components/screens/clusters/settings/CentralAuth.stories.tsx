@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { userEvent, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import es from "@/messages/es.json";
 
 import { CentralAuthView, IngressClassView } from "./CentralAuth";
 import { CENTRAL_AUTH, INGRESS_CLASS, LONG } from "./fixtures";
@@ -24,6 +27,37 @@ export const Saving: Story = {
   render: () => <CentralAuthView {...CENTRAL_AUTH} saving />,
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole("button", { name: "Edit" }));
+  },
+};
+
+export const GermanConfigured: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={de}>
+      <CentralAuthView {...CENTRAL_AUTH} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const SpanishEditing: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={es}>
+      <CentralAuthView {...CENTRAL_AUTH} />
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(
+      within(canvasElement).getByRole("button", { name: es.clusterSettings.centralAuth.edit })
+    );
+  },
+};
+
+export const WriteRefused: Story = {
+  render: () => <CentralAuthView {...CENTRAL_AUTH} onSave={async () => false} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: "Edit" }));
+    await userEvent.type(c.getByLabelText("Client secret"), "TEST_ONLY_DRAFT_SECRET");
+    await userEvent.click(c.getByRole("button", { name: "Save" }));
   },
 };
 
