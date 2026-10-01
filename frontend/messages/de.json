@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "Teammitglieder",
+      "description": "Mitglieder von {team}. Weise über diese Liste eine für dieses Team zulässige Rolle zu.",
+      "loadError": "Teammitglieder konnten nicht geladen werden.",
+      "emptyTitle": "Dieses Team hat noch keine Mitglieder",
+      "emptyDescription": "Gewähre eine Rolle im Geltungsbereich dieses Teams, um ein Mitglied hinzuzufügen.",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "Benutzer",
+        "lifecycle": "Lebenszyklus",
+        "joined": "Beigetreten"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "Alle Teammitglieder auswählen",
+      "selectRowLabel": "Mitglied {user} auswählen",
+      "selected": "{count, plural, =1 {1 Mitglied ausgewählt} other {# Mitglieder ausgewählt}}",
+      "clear": "Leeren",
+      "assignButton": "Rolle an {count} zuweisen",
+      "permissionHint": "Du darfst die Mitglieder dieses Teams nicht verwalten.",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {# Mitglied eine Rolle zuweisen} other {# Mitgliedern eine Rolle zuweisen}}",
+        "description": "Gewährt die Rolle für Team {team}. Mitglieder, die sie bereits haben, werden übersprungen; eine erneute Zuweisung derselben Rolle ändert nichts weiter.",
+        "roleLabel": "Für dieses Team zulässige Rolle",
+        "rolePlaceholder": "Rolle auswählen",
+        "noRoles": "Für dieses Team sind keine Rollen verfügbar.",
+        "cancel": "Abbrechen",
+        "confirmLabel": "Rolle zuweisen"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {# Mitglied wurde eine Rolle zugewiesen.} other {# Mitgliedern wurde eine Rolle zugewiesen.}}",
+        "mixedIdempotent": "{assigned} zugewiesen; {already} hatten die Rolle bereits.",
+        "partial": "{assigned} zugewiesen; {already} hatten die Rolle bereits; {failed} fehlgeschlagen.",
+        "allFailed": "Rollenzuweisung fehlgeschlagen: {message}"
       }
     },
     "invitationExpiry": {
@@ -5423,6 +5423,44 @@
       "taken": "In dieser Organisation bereits vergeben.",
       "unchanged": "Aktueller Slug — wird in URLs verwendet.",
       "empty": "Kleinbuchstaben, Zahlen und Bindestriche. Wird in URLs verwendet."
+    },
+    "detail": {
+      "grant": "Zugriff gewähren",
+      "notFound": "Team nicht gefunden",
+      "notFoundDescription": "Dieses Team existiert möglicherweise nicht, wurde gelöscht oder ist für dich nicht zugänglich.",
+      "back": "Zurück zu Teams",
+      "principal": "Teamnavigation",
+      "loadFailed": "Diese Seite konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "unavailable": "Die Teamliste konnte nicht bestätigt werden. Lade die aktuellen Daten erneut.",
+      "access": "Zugriff",
+      "members": "Mitglieder",
+      "admin": "Administration",
+      "people": "Personen",
+      "teams": "Teams",
+      "roles": "Rollen",
+      "policies": "Richtlinien",
+      "check": "Zugriff prüfen",
+      "organization": "Organisation",
+      "projects": "Projekte"
+    },
+    "members": {
+      "add": "Mitglied hinzufügen",
+      "label": "Mitglieder",
+      "emptyDescription": "Gewähre einer Person eine Rolle im Geltungsbereich dieses Teams, um sie aufzunehmen.",
+      "search": "Mitglieder suchen…",
+      "all": "Alle",
+      "status": "Status",
+      "active": "Aktiv",
+      "invited": "Eingeladen",
+      "suspended": "Gesperrt",
+      "unknownError": "Es wurde keine Fehlerbeschreibung übermittelt.",
+      "refreshWarning": "Die Zuweisung wurde angenommen, aber die Ansicht konnte nicht aktualisiert werden. Lade die aktuellen Daten erneut.",
+      "rolesLoading": "Verfügbare Rollen werden geladen…",
+      "rolesUnknown": "Die verfügbaren Rollen wurden noch nicht bestätigt.",
+      "rolesFailed": "Verfügbare Rollen konnten nicht geladen werden.",
+      "rolesRetry": "Rollen erneut laden",
+      "accepted": "Die Zuweisung wurde angenommen; ihre Zusammenfassung ist nicht verfügbar."
     }
   },
   "apiKeys": {

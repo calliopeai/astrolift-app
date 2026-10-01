@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
@@ -16,7 +17,7 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { selectTeamMembers, TEAM_MEMBERS_LIST } from "./teams-list";
+import { selectTeamMembers, localizedTeamMembersList } from "./teams-list";
 
 interface TeamMembersResp {
   astroliftTeamMembers: AstroliftMember[];
@@ -30,9 +31,10 @@ interface TeamMembersResp {
  */
 export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
   const t = useTranslations("lists.teamMembersBulk");
+  const mt = useTranslations("teams.members");
   const perms = useMyPermissions();
   const canManageTeamMembers = perms.can("team.manage_members");
-  const list = useListState(TEAM_MEMBERS_LIST);
+  const list = useListState(localizedTeamMembersList(mt));
   const { state } = list;
 
   const { data, loading, error, refetch } = useQuery<TeamMembersResp>(LIST_TEAM_MEMBERS, {
@@ -42,6 +44,7 @@ export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
   });
   const roles = useQuery<{ astroliftRoles: AstroliftRole[] }>(LIST_ROLES, {
     skip: !team || !canManageTeamMembers,
+    fetchPolicy: "cache-first",
   });
   // Team-grantable levels only, so the assign dialog never offers a
   // PROJECT or APP role the backend would reject.
@@ -60,7 +63,11 @@ export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
   const [bulkAssign, { loading: assigning }] = useMutation<{
     bulkAssignAstroliftTeamMemberRoles: MutationResult<AstroliftBulkAssignTeamMemberRolesPayload>;
   }>(BULK_ASSIGN_TEAM_MEMBER_ROLES, {
-    refetchQueries: team ? [{ query: LIST_TEAM_MEMBERS, variables: { teamId: team.id } }] : [],
+    refetchQueries: (result) =>
+      result.data?.bulkAssignAstroliftTeamMemberRoles.ok && team
+        ? [{ query: LIST_TEAM_MEMBERS, variables: { teamId: team.id } }]
+        : [],
+    onQueryUpdated: (query) => refetchAfterMutation(query, mt("refreshWarning")),
     awaitRefetchQueries: true,
   });
 
@@ -71,17 +78,31 @@ export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
    * the call went through, so the panel clears its selection.
    */
   async function onAssign(roleId: string, memberIds: string[]): Promise<boolean> {
-    if (!team || memberIds.length === 0 || !roleId) return false;
+    if (
+      !team ||
+      !canManageTeamMembers ||
+      memberIds.length === 0 ||
+      !roleId ||
+      roles.loading ||
+      roles.error ||
+      roles.data?.astroliftRoles == null ||
+      !grantableRoles.some((role) => role.id === roleId)
+    )
+      return false;
     try {
       const { data: res } = await bulkAssign({
         variables: { input: { teamId: team.id, roleId, memberIds } },
       });
       const env = res?.bulkAssignAstroliftTeamMemberRoles;
-      if (!env?.ok || !env.data) {
+      if (!env?.ok) {
         toast.error(
-          t("toasts.allFailed", { message: env?.errors?.[0]?.message ?? "unknown error" })
+          t("toasts.allFailed", { message: env?.errors?.[0]?.message ?? mt("unknownError") })
         );
         return false;
+      }
+      if (!env.data) {
+        toast.success(mt("accepted"));
+        return true;
       }
       const { assignedCount, alreadyAssignedCount, failedCount } = env.data;
       if (failedCount === 0 && alreadyAssignedCount === 0) {
@@ -102,7 +123,9 @@ export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
       return true;
     } catch (err) {
       toast.error(
-        t("toasts.allFailed", { message: err instanceof Error ? err.message : "unknown error" })
+        t("toasts.allFailed", {
+          message: err instanceof Error && err.message ? err.message : mt("unknownError"),
+        })
       );
       return false;
     }
@@ -113,11 +136,23 @@ export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
     rows: selected.rows,
     totalCount: selected.totalCount,
     loading: !team || (loading && !data),
-    error: error && !data ? { message: error.message } : null,
+    error: error
+      ? { message: error.message }
+      : team && !loading && data?.astroliftTeamMembers == null
+        ? { message: t("loadError") }
+        : null,
     onRetry: () => {
-      void refetch();
+      void refetch().catch(() => {});
     },
     roles: grantableRoles,
+    roleSource: {
+      known: roles.data?.astroliftRoles != null,
+      loading: roles.loading,
+      error: roles.error ? { message: roles.error.message } : null,
+      onRetry: () => {
+        void roles.refetch().catch(() => {});
+      },
+    },
     canManageTeamMembers,
     assigning,
     onAssign,

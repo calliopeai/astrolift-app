@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "团队成员",
+      "description": "{team} 的成员。可在此列表中分配能授予此团队的角色。",
+      "loadError": "无法加载团队成员。",
+      "emptyTitle": "此团队尚无成员",
+      "emptyDescription": "在团队范围内授予角色以添加成员。",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "用户",
+        "lifecycle": "生命周期",
+        "joined": "加入时间"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "选择所有团队成员",
+      "selectRowLabel": "选择成员 {user}",
+      "selected": "{count, plural, =1 {已选择 1 位成员} other {已选择 # 位成员}}",
+      "clear": "清除",
+      "assignButton": "向 {count} 位成员分配角色",
+      "permissionHint": "你没有管理此团队成员的权限。",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {向 # 位成员分配角色} other {向 # 位成员分配角色}}",
+        "description": "在团队 {team} 范围内授予角色。已拥有该角色的成员会被跳过；再次分配同一角色不会产生其他变化。",
+        "roleLabel": "可授予此团队的角色",
+        "rolePlaceholder": "选择角色",
+        "noRoles": "此团队没有可用角色。",
+        "cancel": "取消",
+        "confirmLabel": "分配角色"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {已向 # 位成员分配角色。} other {已向 # 位成员分配角色。}}",
+        "mixedIdempotent": "已分配 {assigned} 位；{already} 位已拥有。",
+        "partial": "已分配 {assigned} 位；{already} 位已拥有；{failed} 位失败。",
+        "allFailed": "角色分配失败：{message}"
       }
     },
     "invitationExpiry": {
@@ -5420,6 +5420,44 @@
       "taken": "此组织已在使用该标识符。",
       "unchanged": "当前标识符 — 用于URL。",
       "empty": "小写英文字母、数字和连字符。用于URL。"
+    },
+    "detail": {
+      "grant": "授予访问权限",
+      "notFound": "找不到团队",
+      "notFoundDescription": "此团队可能不存在、已被删除，或者你没有访问权限。",
+      "back": "返回团队列表",
+      "principal": "团队导航",
+      "loadFailed": "无法加载此页面",
+      "retry": "重试",
+      "unavailable": "无法确认团队列表。请重试以加载最新数据。",
+      "access": "访问权限",
+      "members": "成员",
+      "admin": "管理",
+      "people": "用户",
+      "teams": "团队",
+      "roles": "角色",
+      "policies": "策略",
+      "check": "检查访问权限",
+      "organization": "组织",
+      "projects": "项目"
+    },
+    "members": {
+      "add": "添加成员",
+      "label": "成员",
+      "emptyDescription": "在此团队范围内向用户授予角色，即可将其加入团队。",
+      "search": "搜索成员…",
+      "all": "全部",
+      "status": "状态",
+      "active": "有效",
+      "invited": "已邀请",
+      "suspended": "已停用",
+      "unknownError": "未提供诊断信息。",
+      "refreshWarning": "角色分配已接受，但无法刷新视图。请刷新以查看最新数据。",
+      "rolesLoading": "正在加载可用角色…",
+      "rolesUnknown": "尚未确认可用角色。",
+      "rolesFailed": "无法加载可用角色。",
+      "rolesRetry": "重新加载角色",
+      "accepted": "角色分配已接受，但无法获取结果摘要。"
     }
   },
   "apiKeys": {

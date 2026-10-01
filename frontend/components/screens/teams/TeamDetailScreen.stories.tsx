@@ -1,3 +1,5 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import fr from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { useLocalListState } from "@/components/list/use-list-state";
@@ -6,7 +8,7 @@ import { entityAccessProps } from "@/components/screens/administration/access/pr
 
 import { TeamAccessPanel } from "./TeamAccessPanel";
 import { TeamDetailScreen } from "./TeamDetailScreen";
-import { TEAM_MEMBERS_LIST } from "./teams-list";
+import { localizedTeamMembersList } from "./teams-list";
 import {
   MEMBERS_LONG,
   membersPanelProps,
@@ -37,7 +39,8 @@ function Access() {
 }
 
 function Members({ long = false }: { long?: boolean }) {
-  const list = useLocalListState(TEAM_MEMBERS_LIST);
+  const mt = useTranslations("teams.members");
+  const list = useLocalListState(localizedTeamMembersList(mt));
   return (
     <TeamMembersPanel
       list={list}
@@ -108,5 +111,32 @@ export const Width768: Story = {
         <Access />
       </TeamDetailScreen>
     </div>
+  ),
+};
+
+export const FrenchReadFailed: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={fr} timeZone="Europe/Paris">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <TeamDetailScreen
+      {...TEAM_DETAIL}
+      team={null}
+      error={{ message: "RAW_TEAM_READ_FAILURE" }}
+      tab="access"
+    >
+      <Access />
+    </TeamDetailScreen>
+  ),
+};
+export const CachedReadFailed: Story = {
+  render: () => (
+    <TeamDetailScreen {...TEAM_DETAIL} error={{ message: "RAW_REFRESH_FAILURE" }} tab="members">
+      <Members />
+    </TeamDetailScreen>
   ),
 };

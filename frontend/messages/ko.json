@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "팀 구성원",
+      "description": "{team}의 구성원입니다. 이 목록에서 팀에 부여할 수 있는 역할을 할당합니다.",
+      "loadError": "팀 구성원을 불러오지 못했습니다.",
+      "emptyTitle": "아직 팀 구성원이 없습니다",
+      "emptyDescription": "이 팀 범위에서 역할을 부여하여 구성원을 추가하세요.",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "사용자",
+        "lifecycle": "수명 주기",
+        "joined": "가입일"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "모든 팀 구성원 선택",
+      "selectRowLabel": "구성원 {user} 선택",
+      "selected": "{count, plural, =1 {구성원 1명 선택됨} other {구성원 #명 선택됨}}",
+      "clear": "선택 해제",
+      "assignButton": "{count}명에게 역할 할당",
+      "permissionHint": "이 팀의 구성원을 관리할 권한이 없습니다.",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {#명에게 역할 할당} other {#명에게 역할 할당}}",
+        "description": "팀 {team} 범위에서 역할을 부여합니다. 이미 역할을 가진 구성원은 건너뛰며 같은 역할을 다시 할당해도 추가 변경이 없습니다.",
+        "roleLabel": "이 팀에 부여할 수 있는 역할",
+        "rolePlaceholder": "역할 선택",
+        "noRoles": "이 팀에 사용할 수 있는 역할이 없습니다.",
+        "cancel": "취소",
+        "confirmLabel": "역할 할당"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {#명에게 역할을 할당했습니다.} other {#명에게 역할을 할당했습니다.}}",
+        "mixedIdempotent": "{assigned}명 할당, {already}명은 이미 보유했습니다.",
+        "partial": "{assigned}명 할당, {already}명은 이미 보유, {failed}명은 실패했습니다.",
+        "allFailed": "역할 할당 실패: {message}"
       }
     },
     "invitationExpiry": {
@@ -5420,6 +5420,44 @@
       "taken": "이 조직에서 이미 사용 중입니다.",
       "unchanged": "현재 슬러그 — URL에 사용됩니다.",
       "empty": "영문 소문자, 숫자, 하이픈을 사용하세요. URL에 사용됩니다."
+    },
+    "detail": {
+      "grant": "접근 권한 부여",
+      "notFound": "팀을 찾을 수 없음",
+      "notFoundDescription": "팀이 없거나 삭제되었거나 접근 권한이 없을 수 있습니다.",
+      "back": "팀 목록으로 돌아가기",
+      "principal": "팀 탐색",
+      "loadFailed": "이 페이지를 불러오지 못했습니다",
+      "retry": "다시 시도",
+      "unavailable": "팀 목록을 확인하지 못했습니다. 다시 시도하여 최신 데이터를 불러오세요.",
+      "access": "접근 권한",
+      "members": "구성원",
+      "admin": "관리",
+      "people": "사용자",
+      "teams": "팀",
+      "roles": "역할",
+      "policies": "정책",
+      "check": "접근 권한 확인",
+      "organization": "조직",
+      "projects": "프로젝트"
+    },
+    "members": {
+      "add": "구성원 추가",
+      "label": "구성원",
+      "emptyDescription": "이 팀 범위에서 사용자에게 역할을 부여하면 구성원이 됩니다.",
+      "search": "구성원 검색…",
+      "all": "전체",
+      "status": "상태",
+      "active": "활성",
+      "invited": "초대됨",
+      "suspended": "정지됨",
+      "unknownError": "진단 정보가 제공되지 않았습니다.",
+      "refreshWarning": "역할 할당은 수락되었지만 화면을 새로 고치지 못했습니다. 최신 데이터를 다시 불러오세요.",
+      "rolesLoading": "사용 가능한 역할을 불러오는 중…",
+      "rolesUnknown": "사용 가능한 역할을 아직 확인하지 못했습니다.",
+      "rolesFailed": "사용 가능한 역할을 불러오지 못했습니다.",
+      "rolesRetry": "역할 다시 불러오기",
+      "accepted": "역할 할당은 수락되었지만 결과 요약을 확인할 수 없습니다."
     }
   },
   "apiKeys": {

@@ -32,7 +32,7 @@ export function TeamMembersClient({ slug }: { slug: string }) {
   const members = useTeamMembers(detail.team);
   return (
     <TeamDetailScreen {...detail} tab="members">
-      {detail.team && <TeamMembersPanel {...members} team={detail.team} />}
+      {detail.team && <TeamMembersPanel key={detail.team.id} {...members} team={detail.team} />}
     </TeamDetailScreen>
   );
 }

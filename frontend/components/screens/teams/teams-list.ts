@@ -88,6 +88,27 @@ export const TEAM_MEMBERS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+export function localizedTeamMembersList(t: (key: string) => string): ListDefinition {
+  return {
+    ...TEAM_MEMBERS_LIST,
+    searchPlaceholder: t("search"),
+    views: TEAM_MEMBERS_LIST.views.map((view) => ({
+      ...view,
+      label: view.key === "all" ? t("all") : view.label,
+    })),
+    fields: TEAM_MEMBERS_LIST.fields.map((field) => ({
+      ...field,
+      label: field.key === "status" ? t("status") : field.label,
+      options: field.options?.map((option) => ({
+        ...option,
+        label: ["active", "invited", "suspended"].includes(option.value)
+          ? t(option.value)
+          : option.label,
+      })),
+    })),
+  };
+}
+
 const MEMBER_SORT: Record<string, (m: AstroliftMember) => string | number> = {
   user: (m) => m.user.username.toLowerCase(),
   joined: (m) => Date.parse(m.joinedAt ?? m.createdAt) || 0,

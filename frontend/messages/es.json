@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "Miembros del equipo",
+      "description": "Miembros de {team}. Asigna desde esta lista un rol que se pueda conceder a este equipo.",
+      "loadError": "No se pudieron cargar los miembros del equipo.",
+      "emptyTitle": "Este equipo aún no tiene miembros",
+      "emptyDescription": "Concede un rol en el ámbito de este equipo para añadir un miembro.",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "Usuario",
+        "lifecycle": "Ciclo de vida",
+        "joined": "Incorporación"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "Seleccionar todos los miembros del equipo",
+      "selectRowLabel": "Seleccionar al miembro {user}",
+      "selected": "{count, plural, =1 {1 miembro seleccionado} other {# miembros seleccionados}}",
+      "clear": "Limpiar",
+      "assignButton": "Asignar rol a {count}",
+      "permissionHint": "No tienes permiso para gestionar los miembros de este equipo.",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {Asignar un rol a # miembro} other {Asignar un rol a # miembros}}",
+        "description": "Concede el rol en el equipo {team}. Se omiten los miembros que ya lo tienen; volver a asignar el mismo rol no cambia nada más.",
+        "roleLabel": "Rol que se puede conceder a este equipo",
+        "rolePlaceholder": "Elige un rol",
+        "noRoles": "No hay roles disponibles para este equipo.",
+        "cancel": "Cancelar",
+        "confirmLabel": "Asignar rol"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {Rol asignado a # miembro.} other {Rol asignado a # miembros.}}",
+        "mixedIdempotent": "Asignado a {assigned}; {already} ya lo tenían.",
+        "partial": "Asignado a {assigned}; {already} ya lo tenían; {failed} fallaron.",
+        "allFailed": "La asignación del rol falló: {message}"
       }
     },
     "invitationExpiry": {
@@ -5423,6 +5423,44 @@
       "taken": "Ya está en uso en esta organización.",
       "unchanged": "Identificador actual: se usa en las URL.",
       "empty": "Letras minúsculas, números y guiones. Se usa en las URL."
+    },
+    "detail": {
+      "grant": "Conceder acceso",
+      "notFound": "Equipo no encontrado",
+      "notFoundDescription": "Puede que este equipo no exista, se haya eliminado o no tengas acceso a él.",
+      "back": "Volver a Equipos",
+      "principal": "Navegación del equipo",
+      "loadFailed": "No se pudo cargar esta página",
+      "retry": "Reintentar",
+      "unavailable": "No se pudo confirmar la lista de equipos. Reintenta para cargar los datos actuales.",
+      "access": "Acceso",
+      "members": "Miembros",
+      "admin": "Administración",
+      "people": "Personas",
+      "teams": "Equipos",
+      "roles": "Roles",
+      "policies": "Políticas",
+      "check": "Comprobar acceso",
+      "organization": "Organización",
+      "projects": "Proyectos"
+    },
+    "members": {
+      "add": "Añadir miembro",
+      "label": "Miembros",
+      "emptyDescription": "Concede a alguien un rol en el ámbito de este equipo para incorporarlo.",
+      "search": "Buscar miembros…",
+      "all": "Todos",
+      "status": "Estado",
+      "active": "Activo",
+      "invited": "Invitado",
+      "suspended": "Suspendido",
+      "unknownError": "No se proporcionó ningún diagnóstico.",
+      "refreshWarning": "La asignación se aceptó, pero no se pudo actualizar la vista. Actualiza para ver los datos actuales.",
+      "rolesLoading": "Cargando los roles disponibles…",
+      "rolesUnknown": "Los roles disponibles aún no se han confirmado.",
+      "rolesFailed": "No se pudieron cargar los roles disponibles.",
+      "rolesRetry": "Reintentar roles",
+      "accepted": "La asignación se aceptó; el resumen no está disponible."
     }
   },
   "apiKeys": {

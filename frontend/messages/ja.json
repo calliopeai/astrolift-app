@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "チームのメンバー",
+      "description": "{team} のメンバー。この一覧から、チームに付与できるロールを割り当てます。",
+      "loadError": "チームのメンバーを読み込めませんでした。",
+      "emptyTitle": "このチームにはまだメンバーがいません",
+      "emptyDescription": "チームのスコープでロールを付与してメンバーを追加します。",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "ユーザー",
+        "lifecycle": "ライフサイクル",
+        "joined": "参加日"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "チームの全メンバーを選択",
+      "selectRowLabel": "メンバー {user} を選択",
+      "selected": "{count, plural, =1 {1 人のメンバーを選択中} other {# 人のメンバーを選択中}}",
+      "clear": "解除",
+      "assignButton": "{count} 人にロールを割り当て",
+      "permissionHint": "このチームのメンバーを管理する権限がありません。",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {# 人にロールを割り当て} other {# 人にロールを割り当て}}",
+        "description": "チーム {team} のスコープでロールを付与します。すでに持っているメンバーはスキップされ、同じロールを再度割り当てても追加の変更はありません。",
+        "roleLabel": "このチームに付与できるロール",
+        "rolePlaceholder": "ロールを選択",
+        "noRoles": "このチームで利用できるロールはありません。",
+        "cancel": "キャンセル",
+        "confirmLabel": "ロールを割り当て"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {# 人にロールを割り当てました。} other {# 人にロールを割り当てました。}}",
+        "mixedIdempotent": "{assigned} 人に割り当て、{already} 人は付与済みでした。",
+        "partial": "{assigned} 人に割り当て、{already} 人は付与済み、{failed} 人は失敗しました。",
+        "allFailed": "ロールの割り当てに失敗しました: {message}"
       }
     },
     "invitationExpiry": {
@@ -5420,6 +5420,44 @@
       "taken": "この組織で既に使われています。",
       "unchanged": "現在のスラッグ — URLに使用されます。",
       "empty": "小文字の英字、数字、ハイフンを使います。URLに使用されます。"
+    },
+    "detail": {
+      "grant": "アクセスを付与",
+      "notFound": "チームが見つかりません",
+      "notFoundDescription": "このチームは存在しないか、削除されたか、アクセス権がない可能性があります。",
+      "back": "チーム一覧に戻る",
+      "principal": "チームのナビゲーション",
+      "loadFailed": "このページを読み込めませんでした",
+      "retry": "再試行",
+      "unavailable": "チーム一覧を確認できませんでした。再試行して最新のデータを読み込んでください。",
+      "access": "アクセス",
+      "members": "メンバー",
+      "admin": "管理",
+      "people": "ユーザー",
+      "teams": "チーム",
+      "roles": "ロール",
+      "policies": "ポリシー",
+      "check": "アクセスを確認",
+      "organization": "組織",
+      "projects": "プロジェクト"
+    },
+    "members": {
+      "add": "メンバーを追加",
+      "label": "メンバー",
+      "emptyDescription": "このチームのスコープでロールを付与すると、そのユーザーがメンバーになります。",
+      "search": "メンバーを検索…",
+      "all": "すべて",
+      "status": "状態",
+      "active": "有効",
+      "invited": "招待済み",
+      "suspended": "停止中",
+      "unknownError": "診断情報はありません。",
+      "refreshWarning": "割り当ては受け付けられましたが、表示を更新できませんでした。最新のデータを再読み込みしてください。",
+      "rolesLoading": "利用可能なロールを読み込み中…",
+      "rolesUnknown": "利用可能なロールをまだ確認できていません。",
+      "rolesFailed": "利用可能なロールを読み込めませんでした。",
+      "rolesRetry": "ロールを再読み込み",
+      "accepted": "割り当ては受け付けられましたが、結果の概要を取得できません。"
     }
   },
   "apiKeys": {

@@ -24,6 +24,11 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Translate connected Team detail/member navigation, role assignment and source
+  recovery in all eight locales. Preserve literal identities and request-timezone
+  dates; accepted assignments remain accepted if their read refresh fails, and
+  refused writes retain selection without refreshing (#2145).
+
 - Localize the connected legacy role-grant sheet and feedback in all eight locales,
   preserving literal role/scope identities and original backend refusals. Distinguish
   unknown, failed and unsupported target sources; accepted grants refresh the exact

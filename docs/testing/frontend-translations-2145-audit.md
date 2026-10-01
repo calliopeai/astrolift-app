@@ -327,3 +327,41 @@ sources, custom metadata, ICU arguments/tags and portable stories are included.
 The legacy flat scope sources are preserved; this leaf does not add pagination,
 a new member picker, APP support or claim complete #2145 coverage. Team detail,
 member and access presentation remains the next independently bounded audit.
+
+
+## Connected Team detail and members
+
+Team detail and members now use real all-eight `teams.detail`, `teams.members`
+copy and translated `lists.teamMembersBulk` instead of copied English. Human
+breadcrumb/tab/list labels derive from the existing definitions; hrefs, query
+keys, scope tokens, selected IDs, role metadata and unknown lifecycle values
+remain literal. Membership guidance follows the actual role-at-team contract,
+including organization-level roles the existing picker already permits; it
+makes no nonexistent `/roles` navigation promise.
+
+The actual detail/member hooks distinguish failed and unconfirmed reads from
+known missing/empty results, expose real retries, and preserve cached identities
+with visible read failure. Role loading, unknown, error and confirmed empty
+states stay distinct in the assignment dialog. The existing team-management
+check controls actions; withdrawing it disables an open assignment without
+silently discarding its draft. Backend scope/grant checks remain authoritative.
+A changed team identity remounts that team's member panel rather than carrying
+another team's selected-member draft into a new target.
+
+Bulk assignment retains exact typed input and existing partial/idempotent result
+semantics. Only accepted replies refresh the same team-member query. A refresh
+failure warns that data could not be refreshed while keeping the committed
+result; a refused or failed write keeps the selection and original diagnostic.
+An accepted reply without an aggregate summary is labeled accepted with no
+fabricated counts. Real HttpLink tests exercise these boundaries, unknown/read
+errors and actual retries, click/keyboard confirmation, current permissions,
+all-eight ICU shape and SSR/hydration with explicit request timezone dates.
+Portable Team detail/member stories include translated and failed-read states.
+
+This leaf retains the legacy capped 500-row member source and its existing
+client list operations; it does not claim a new server pagination contract or
+complete access translation. The shared EntityAccessPanel/removal hook and Team
+reach summary are the separate next leaf. Other principal-page callers retain
+existing presentation defaults; Team opts into translated recovery labels and
+cached-refresh error display. Root's frozen Members/anonymization source is
+untouched.

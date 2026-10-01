@@ -118,6 +118,7 @@ export function membersPanelProps(
     error: null,
     onRetry: noop,
     roles: ROLES,
+    roleSource: { known: true, loading: false, error: null, onRetry: noop },
     canManageTeamMembers: true,
     assigning: false,
     onAssign: async () => true,
