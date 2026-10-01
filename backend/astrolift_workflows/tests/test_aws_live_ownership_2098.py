@@ -12,7 +12,6 @@ from aws.managed.dynamodb import DynamoDBConfig, DynamoDBDriver
 from aws.managed.object_store_s3 import S3Config, S3Driver
 from aws.managed.queue_sqs import SQSConfig, SQSDriver
 from moto import mock_aws
-from tests.aws.test_managed_dynamodb import FakeDDB
 
 from astrolift_workflows.activities.managed_service_lifecycle import (
     _deprovision_sync,
@@ -21,6 +20,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     _update_sync,
 )
 from astrolift_workflows.tests.test_recorded_handle_exclusive_2086 import _service
+from providers.tests.aws.test_managed_dynamodb import FakeDDB
 
 pytestmark = pytest.mark.django_db
 

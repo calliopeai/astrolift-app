@@ -6,13 +6,13 @@ from fnmatch import fnmatchcase
 
 import pytest
 from aws.identity_irsa import IRSAConfig, IRSADriver
-from tests.aws.test_identity_irsa import _RecordingIam
 
 from astrolift_workflows.activities.managed_service_lifecycle import _managed_binding_for
 from astrolift_workflows.activities.workload_identity import _permissions_from_bindings
 from astrolift_workflows.tests.test_aws_live_ownership_2098 import (
     world,  # noqa: F401 - actual persisted/SDK fixture
 )
+from providers.tests.aws.test_identity_irsa import _RecordingIam
 
 pytestmark = pytest.mark.django_db
 
