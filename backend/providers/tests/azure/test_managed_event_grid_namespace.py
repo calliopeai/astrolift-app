@@ -11,11 +11,15 @@ import pytest
 
 from _sdk.azure_ownership import AzureOwnershipError
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
+from azure._event_grid_namespace_ownership import OwnershipUnknown
+from azure.core.exceptions import ResourceNotFoundError as SdkNotFound
+from azure.core.polling import NoPolling
 from azure.managed.event_grid_namespace import (
     AzureEventGridNamespaceConfig,
     AzureEventGridNamespaceDriver,
     AzureEventGridNamespaceError,
 )
+from azure.mgmt.eventgrid import models
 
 SUBSCRIPTION_ID = "00000000-1111-2222-3333-444444444444"
 RESOURCE_GROUP = "rg-platform"
@@ -34,8 +38,10 @@ STORAGE_ID = (
 )
 
 
-class ResourceNotFoundError(Exception):
-    pass
+class ResourceNotFoundError(SdkNotFound):
+    def __init__(self, message: str):
+        super().__init__(message=message)
+        self.status_code = 404
 
 
 class ResourceExistsError(Exception):
@@ -46,8 +52,36 @@ class Poller:
     def __init__(self, value: Any = None) -> None:
         self.value = value
 
-    def result(self) -> Any:
+    def result(self, **kwargs: Any) -> Any:
         return self.value
+
+    def polling_method(self) -> Any:
+        return NoPolling()
+
+
+class Pager:
+    def __init__(self, values, options):
+        self.values = values
+        self.options = options
+
+    def by_page(self):
+        self.options["raw_response_hook"](SimpleNamespace(http_response=SimpleNamespace(body=lambda: b'{"value":[]}')))
+        yield iter(self.values)
+
+
+class FakeMqtt:
+    def __init__(self, namespaces, path):
+        self.namespaces = namespaces
+        self.path = path
+
+    def get(self, group, namespace, name, **kwargs):
+        parent = self.namespaces.get(group, namespace)
+        return models.ClientGroup.deserialize({"id": parent.id + "/clientGroups/" + name, "name": name})
+
+    def list_by_namespace(self, group, namespace, **kwargs):
+        self.namespaces.get(group, namespace)
+        rows = [self.get(group, namespace, "$all")] if self.path == "clientGroups" else []
+        return Pager(rows, kwargs)
 
 
 @dataclass
@@ -58,36 +92,40 @@ class FakeNamespaces:
     delete_calls: list[str] = field(default_factory=list)
     key1: str = "namespace-primary-key"
 
-    def get(self, resource_group: str, name: str) -> SimpleNamespace:
+    def get(self, resource_group: str, name: str, **kwargs: Any) -> SimpleNamespace:
         assert resource_group == RESOURCE_GROUP
         try:
             return self.values[name]
         except KeyError as exc:
             raise ResourceNotFoundError(name) from exc
 
-    def begin_create_or_update(self, resource_group: str, name: str, parameters: Any) -> Poller:
+    def list_by_resource_group(self, resource_group: str, **kwargs: Any) -> Any:
+        return Pager(list(self.values.values()), kwargs)
+
+    def begin_create_or_update(self, resource_group: str, name: str, parameters: Any, **kwargs: Any) -> Poller:
         assert resource_group == RESOURCE_GROUP
         self.create_calls.append({"name": name, "parameters": parameters})
-        value = SimpleNamespace(
-            name=name,
-            id=(
-                f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}"
-                f"/providers/Microsoft.EventGrid/namespaces/{name}"
-            ),
-            tags=dict(parameters.tags or {}),
-            sku=parameters.sku,
-            identity=parameters.identity,
-            topics_configuration=SimpleNamespace(hostname=f"{name}.eastus2-1.eventgrid.azure.net"),
-            is_zone_redundant=parameters.is_zone_redundant,
-            public_network_access=parameters.public_network_access,
-            inbound_ip_rules=list(parameters.inbound_ip_rules or []),
-            minimum_tls_version_allowed=parameters.minimum_tls_version_allowed,
-            provisioning_state="Succeeded",
+        raw = parameters.serialize()
+        raw.update(
+            {
+                "id": (
+                    f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}"
+                    f"/providers/Microsoft.EventGrid/namespaces/{name}"
+                ),
+                "name": name,
+            }
         )
+        raw["properties"].update(
+            {
+                "provisioningState": "Succeeded",
+                "topicsConfiguration": {"hostname": f"{name}.eastus2-1.eventgrid.azure.net"},
+            }
+        )
+        value = models.Namespace.deserialize(raw)
         self.values[name] = value
         return Poller(value)
 
-    def begin_update(self, resource_group: str, name: str, parameters: Any) -> Poller:
+    def begin_update(self, resource_group: str, name: str, parameters: Any, **kwargs: Any) -> Poller:
         value = self.get(resource_group, name)
         self.update_calls.append({"name": name, "parameters": parameters})
         for field_name in ("sku", "identity", "public_network_access", "inbound_ip_rules"):
@@ -98,13 +136,13 @@ class FakeNamespaces:
             value.tags = dict(parameters.tags)
         return Poller(value)
 
-    def begin_delete(self, resource_group: str, name: str) -> Poller:
+    def begin_delete(self, resource_group: str, name: str, **kwargs: Any) -> Poller:
         self.get(resource_group, name)
         self.delete_calls.append(name)
         self.values.pop(name)
         return Poller()
 
-    def list_shared_access_keys(self, resource_group: str, name: str) -> SimpleNamespace:
+    def list_shared_access_keys(self, resource_group: str, name: str, **kwargs: Any) -> SimpleNamespace:
         self.get(resource_group, name)
         return SimpleNamespace(key1=self.key1, key2="secondary")
 
@@ -117,7 +155,7 @@ class FakeNamespaceTopics:
     update_calls: list[dict[str, Any]] = field(default_factory=list)
     delete_calls: list[tuple[str, str]] = field(default_factory=list)
 
-    def get(self, resource_group: str, namespace: str, topic: str) -> SimpleNamespace:
+    def get(self, resource_group: str, namespace: str, topic: str, **kwargs: Any) -> SimpleNamespace:
         assert resource_group == RESOURCE_GROUP
         try:
             return self.values[(namespace, topic)]
@@ -130,38 +168,40 @@ class FakeNamespaceTopics:
         namespace: str,
         topic: str,
         parameters: Any,
+        **kwargs: Any,
     ) -> Poller:
         self.namespaces.get(resource_group, namespace)
         self.create_calls.append({"namespace": namespace, "topic": topic, "parameters": parameters})
-        value = SimpleNamespace(
-            name=topic,
-            id=(
-                f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}"
-                f"/providers/Microsoft.EventGrid/namespaces/{namespace}/topics/{topic}"
-            ),
-            publisher_type=parameters.publisher_type,
-            input_schema=parameters.input_schema,
-            event_retention_in_days=parameters.event_retention_in_days,
-            provisioning_state="Succeeded",
+        raw = parameters.serialize()
+        raw.update(
+            {
+                "id": (
+                    f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}"
+                    f"/providers/Microsoft.EventGrid/namespaces/{namespace}/topics/{topic}"
+                ),
+                "name": topic,
+            }
         )
+        raw["properties"]["provisioningState"] = "Succeeded"
+        value = models.NamespaceTopic.deserialize(raw)
         self.values[(namespace, topic)] = value
         return Poller(value)
 
-    def begin_update(self, resource_group: str, namespace: str, topic: str, parameters: Any) -> Poller:
+    def begin_update(self, resource_group: str, namespace: str, topic: str, parameters: Any, **kwargs: Any) -> Poller:
         value = self.get(resource_group, namespace, topic)
         self.update_calls.append({"namespace": namespace, "topic": topic, "parameters": parameters})
         value.event_retention_in_days = parameters.event_retention_in_days
         return Poller(value)
 
-    def begin_delete(self, resource_group: str, namespace: str, topic: str) -> Poller:
+    def begin_delete(self, resource_group: str, namespace: str, topic: str, **kwargs: Any) -> Poller:
         self.get(resource_group, namespace, topic)
         self.delete_calls.append((namespace, topic))
         self.values.pop((namespace, topic))
         return Poller()
 
-    def list_by_namespace(self, resource_group: str, namespace: str) -> list[SimpleNamespace]:
+    def list_by_namespace(self, resource_group: str, namespace: str, **kwargs: Any) -> list[SimpleNamespace]:
         self.namespaces.get(resource_group, namespace)
-        return [value for (parent, _), value in self.values.items() if parent == namespace]
+        return Pager([value for (parent, _), value in self.values.items() if parent == namespace], kwargs)
 
 
 @dataclass
@@ -171,7 +211,7 @@ class FakeNamespaceSubscriptions:
     create_calls: list[dict[str, Any]] = field(default_factory=list)
     delete_calls: list[tuple[str, str, str]] = field(default_factory=list)
 
-    def get(self, resource_group: str, namespace: str, topic: str, name: str) -> SimpleNamespace:
+    def get(self, resource_group: str, namespace: str, topic: str, name: str, **kwargs: Any) -> SimpleNamespace:
         assert resource_group == RESOURCE_GROUP
         try:
             return self.values[(namespace, topic, name)]
@@ -185,34 +225,46 @@ class FakeNamespaceSubscriptions:
         topic: str,
         name: str,
         parameters: Any,
+        **kwargs: Any,
     ) -> Poller:
         self.topics.get(resource_group, namespace, topic)
         self.create_calls.append(
             {"namespace": namespace, "topic": topic, "name": name, "parameters": parameters},
         )
-        value = SimpleNamespace(
-            name=name,
-            delivery_configuration=parameters.delivery_configuration,
-            filters_configuration=parameters.filters_configuration,
-            event_delivery_schema=parameters.event_delivery_schema,
-            provisioning_state="Succeeded",
+        raw = parameters.serialize()
+        raw.update(
+            {
+                "id": (
+                    f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}"
+                    f"/providers/Microsoft.EventGrid/namespaces/{namespace}/topics/{topic}"
+                    f"/eventSubscriptions/{name}"
+                ),
+                "name": name,
+            }
         )
+        raw["properties"]["provisioningState"] = "Succeeded"
+        value = models.Subscription.deserialize(raw)
         self.values[(namespace, topic, name)] = value
         return Poller(value)
 
-    def begin_delete(self, resource_group: str, namespace: str, topic: str, name: str) -> Poller:
+    def begin_delete(self, resource_group: str, namespace: str, topic: str, name: str, **kwargs: Any) -> Poller:
         assert resource_group == RESOURCE_GROUP
         self.delete_calls.append((namespace, topic, name))
         self.values.pop((namespace, topic, name), None)
         return Poller()
 
-    def list_by_namespace_topic(self, resource_group: str, namespace: str, topic: str) -> list[SimpleNamespace]:
+    def list_by_namespace_topic(
+        self, resource_group: str, namespace: str, topic: str, **kwargs: Any
+    ) -> list[SimpleNamespace]:
         self.topics.get(resource_group, namespace, topic)
-        return [
-            value
-            for (parent_namespace, parent_topic, _), value in self.values.items()
-            if parent_namespace == namespace and parent_topic == topic
-        ]
+        return Pager(
+            [
+                value
+                for (parent_namespace, parent_topic, _), value in self.values.items()
+                if parent_namespace == namespace and parent_topic == topic
+            ],
+            kwargs,
+        )
 
 
 @dataclass
@@ -224,6 +276,10 @@ class FakeMgmt:
     def __post_init__(self) -> None:
         self.namespace_topics = FakeNamespaceTopics(self.namespaces)
         self.namespace_topic_event_subscriptions = FakeNamespaceSubscriptions(self.namespace_topics)
+        self.clients = FakeMqtt(self.namespaces, "clients")
+        self.client_groups = FakeMqtt(self.namespaces, "clientGroups")
+        self.topic_spaces = FakeMqtt(self.namespaces, "topicSpaces")
+        self.permission_bindings = FakeMqtt(self.namespaces, "permissionBindings")
 
 
 @dataclass
@@ -233,8 +289,13 @@ class FakeManagementLocks:
 
     def list_at_resource_level(self, **kwargs: Any) -> list[object]:
         assert kwargs["resource_provider_namespace"] == "Microsoft.EventGrid"
-        assert kwargs["resource_type"] == "namespaces"
-        return list(self.values)
+        return Pager(list(self.values), kwargs)
+
+    def list_at_subscription_level(self, **kwargs: Any) -> Any:
+        return Pager(list(self.values), kwargs)
+
+    def list_at_resource_group_level(self, **kwargs: Any) -> Any:
+        return Pager(list(self.values), kwargs)
 
     def delete_at_resource_level(self, **kwargs: Any) -> None:
         self.delete_calls.append(str(kwargs["lock_name"]))
@@ -252,20 +313,24 @@ class FakeSecrets:
     deleted: set[str] = field(default_factory=set)
     delete_calls: list[str] = field(default_factory=list)
     recover_calls: list[str] = field(default_factory=list)
+    tags: dict[str, dict[str, str]] = field(default_factory=dict)
 
-    def set_secret(self, name: str, value: str) -> SimpleNamespace:
+    def set_secret(self, name: str, value: str, **kwargs: Any) -> SimpleNamespace:
         if name in self.deleted:
             raise ResourceExistsError(name)
         self.values[name] = value
-        return SimpleNamespace(name=name, value=value)
+        self.tags[name] = dict(kwargs.get("tags") or {})
+        return SimpleNamespace(name=name, value=value, properties=SimpleNamespace(tags=self.tags[name]))
 
-    def get_secret(self, name: str) -> SimpleNamespace:
+    def get_secret(self, name: str, **kwargs: Any) -> SimpleNamespace:
         try:
-            return SimpleNamespace(name=name, value=self.values[name])
+            return SimpleNamespace(
+                name=name, value=self.values[name], properties=SimpleNamespace(tags=self.tags.get(name, {}))
+            )
         except KeyError as exc:
             raise ResourceNotFoundError(name) from exc
 
-    def begin_delete_secret(self, name: str) -> Poller:
+    def begin_delete_secret(self, name: str, **kwargs: Any) -> Poller:
         self.delete_calls.append(name)
         if name not in self.values:
             raise ResourceNotFoundError(name)
@@ -273,7 +338,7 @@ class FakeSecrets:
         self.deleted.add(name)
         return Poller()
 
-    def begin_recover_deleted_secret(self, name: str) -> Poller:
+    def begin_recover_deleted_secret(self, name: str, **kwargs: Any) -> Poller:
         self.recover_calls.append(name)
         self.deleted.discard(name)
         return Poller()
@@ -293,7 +358,7 @@ def _spec(**config: Any) -> ProvisionSpec:
         isolation="dedicated",
         config=config,
         binding_id="binding-id",
-        managed_service_id="service-id",
+        managed_service_id="018f42f0-4420-7000-8000-000000000001",
         tags={"cost-center": "engineering"},
     )
 
@@ -378,7 +443,7 @@ def test_a_namespace_update_cannot_attach_an_unlisted_identity() -> None:
         UpdateSpec(
             handle,
             config={"user_assigned_identity_resource_ids": [UAMI_ID, FOREIGN_UAMI_ID]},
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
 
@@ -432,7 +497,7 @@ def test_provisions_standard_namespace_topic_pull_and_push_subscriptions() -> No
             },
         ],
     )
-    _, namespace, topic = handle.split("/")
+    namespace, topic = driver._parse_handle(handle)
     created_namespace = mgmt.namespaces.values[namespace]
     assert created_namespace.sku.name == "Standard" and created_namespace.sku.capacity == 4
     assert created_namespace.is_zone_redundant is True
@@ -443,20 +508,27 @@ def test_provisions_standard_namespace_topic_pull_and_push_subscriptions() -> No
     assert created_topic.event_retention_in_days == 7
 
     calls = {call["name"]: call["parameters"] for call in mgmt.namespace_topic_event_subscriptions.create_calls}
-    pull = next(value for name, value in calls.items() if "workers" in name)
+    pull = calls[driver._subscription_name(_spec(), "workers")]
     assert pull.delivery_configuration.delivery_mode == "Queue"
     assert pull.delivery_configuration.queue.receive_lock_duration_in_seconds == 300
     assert pull.delivery_configuration.queue.event_time_to_live.days == 7
-    webhook = next(value for name, value in calls.items() if "webhook" in name)
+    webhook = calls[driver._subscription_name(_spec(), "webhook")]
     assert webhook.delivery_configuration.push.destination.endpoint_url == "https://example.com/events"
     assert webhook.delivery_configuration.push.destination.delivery_attribute_mappings[0].is_secret is False
-    hub = next(value for name, value in calls.items() if "event-hub" in name)
+    hub = calls[driver._subscription_name(_spec(), "event-hub")]
     assert hub.delivery_configuration.push.destination is None
     assert hub.delivery_configuration.push.delivery_with_resource_identity.identity.type == "UserAssigned"
 
     assert "namespace-primary-key" in secrets.values.values()
     registry = next(json.loads(value) for value in secrets.values.values() if value.startswith("{"))
-    assert sorted(registry.values()) == ["Push", "Push", "Queue"]
+    assert registry["owner"] == _spec().managed_service_id
+    children = [r for r in registry["resources"].values() if "/eventSubscriptions/" in r["id"]]
+    assert sorted(r["parameters"]["properties"]["deliveryConfiguration"]["deliveryMode"] for r in children) == [
+        "Push",
+        "Push",
+        "Queue",
+    ]
+    assert all(r["state"] == "observed" for r in registry["resources"].values())
 
 
 def test_push_only_does_not_copy_namespace_access_key() -> None:
@@ -498,11 +570,11 @@ def test_partial_update_uses_existing_retention_and_uami_context() -> None:
                     },
                 ],
             },
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
     assert updated.ok, updated
-    namespace = handle.split("/")[1]
+    namespace, _ = driver._parse_handle(handle)
     assert mgmt.namespaces.values[namespace].sku.capacity == 3
 
 
@@ -512,28 +584,38 @@ def test_bindings_are_keyless_for_publish_and_secret_backed_for_pull() -> None:
         driver,
         subscriptions=[{"name": "workers", "delivery_mode": "pull"}],
     )
-    publish = driver.binding(ServiceHandle(handle))
+    publish = driver.binding(ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"))
     assert publish.env_vars["EVENT_BUS_ENDPOINT"].literal.endswith(":publish")
     assert publish.iam_grants[0].actions == ["EventGrid Data Sender"]
     assert "ACCESS_KEY" not in publish.env_vars
 
-    pull = driver.binding(ServiceHandle(handle), {"access_mode": "pull", "subscription_name": "workers"})
+    pull = driver.binding(
+        ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"),
+        {"access_mode": "pull", "subscription_name": "workers"},
+    )
     assert pull.env_vars["EVENT_GRID_NAMESPACE_RECEIVE_ENDPOINT"].literal.endswith(":receive")
     assert pull.env_vars["EVENT_GRID_NAMESPACE_ACCESS_KEY"].secret_ref
     assert pull.iam_grants == []
 
     combined = driver.binding(
-        ServiceHandle(handle),
+        ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"),
         {"access_mode": "publish_pull", "subscription_name": "workers"},
     )
     assert combined.iam_grants[0].actions == ["EventGrid Data Sender"]
-    manage = driver.binding(ServiceHandle(handle), {"access_mode": "manage"})
+    manage = driver.binding(
+        ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), {"access_mode": "manage"}
+    )
     assert manage.iam_grants[0].actions == ["EventGrid Contributor"]
 
-    with pytest.raises(AzureEventGridNamespaceError, match="requires subscription_name"):
-        driver.binding(ServiceHandle(handle), {"access_mode": "pull"})
-    with pytest.raises(AzureEventGridNamespaceError, match="not recorded as platform-owned"):
-        driver.binding(ServiceHandle(handle), {"access_mode": "pull", "subscription_name": "missing"})
+    with pytest.raises(OwnershipUnknown, match="logical subscription names"):
+        driver.binding(
+            ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), {"access_mode": "pull"}
+        )
+    with pytest.raises(OwnershipUnknown):
+        driver.binding(
+            ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"),
+            {"access_mode": "pull", "subscription_name": "missing"},
+        )
 
 
 def test_pull_binding_requires_platform_ownership_registry_entry() -> None:
@@ -542,15 +624,18 @@ def test_pull_binding_requires_platform_ownership_registry_entry() -> None:
     registry_name = next(name for name, value in secrets.values.items() if value.startswith("{"))
     secrets.values[registry_name] = "{}"
 
-    with pytest.raises(AzureEventGridNamespaceError, match="not recorded as platform-owned"):
-        driver.binding(ServiceHandle(handle), {"access_mode": "pull", "subscription_name": "workers"})
+    with pytest.raises(OwnershipUnknown):
+        driver.binding(
+            ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"),
+            {"access_mode": "pull", "subscription_name": "workers"},
+        )
 
 
 def test_subscription_name_collision_is_not_adopted_or_overwritten() -> None:
     driver, mgmt, _, _ = _driver()
     handle = _provisioned(driver)
-    _, namespace, topic = handle.split("/")
-    external_name = driver._subscription_name(topic, "workers")
+    namespace, topic = driver._parse_handle(handle)
+    external_name = driver._subscription_name(_spec(), "workers")
     external = SimpleNamespace(
         name=external_name,
         delivery_configuration=SimpleNamespace(delivery_mode="Queue"),
@@ -561,16 +646,16 @@ def test_subscription_name_collision_is_not_adopted_or_overwritten() -> None:
         UpdateSpec(
             handle,
             config={"subscriptions": [{"name": "workers", "delivery_mode": "pull"}]},
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
 
-    assert not result.ok and "not recorded as platform-owned" in result.message
+    assert not result.ok and "missing receipt" in result.message
     assert mgmt.namespace_topic_event_subscriptions.values[(namespace, topic, external_name)] is external
     assert not mgmt.namespace_topic_event_subscriptions.create_calls
 
 
-def test_pruning_last_pull_subscription_deletes_and_later_recovers_access_key() -> None:
+def test_pruning_last_pull_subscription_never_recovers_a_soft_deleted_key_implicitly() -> None:
     driver, _, _, secrets = _driver()
     handle = _provisioned(driver, subscriptions=[{"name": "workers", "delivery_mode": "pull"}])
     access_key_name = next(name for name, value in secrets.values.items() if value == "namespace-primary-key")
@@ -589,7 +674,7 @@ def test_pruning_last_pull_subscription_deletes_and_later_recovers_access_key() 
                 "prune_subscriptions": True,
                 "confirm_message_loss": True,
             },
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
     assert push_only.ok, push_only
@@ -599,12 +684,12 @@ def test_pruning_last_pull_subscription_deletes_and_later_recovers_access_key() 
         UpdateSpec(
             handle,
             config={"subscriptions": [{"name": "workers-2", "delivery_mode": "pull"}]},
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
-    assert pull_again.ok, pull_again
-    assert secrets.values[access_key_name] == "namespace-primary-key"
-    assert access_key_name in secrets.recover_calls
+    assert not pull_again.ok
+    assert access_key_name not in secrets.values
+    assert secrets.recover_calls == []
 
 
 def test_key_vault_is_required_before_any_cloud_mutation() -> None:
@@ -719,7 +804,7 @@ def test_invalid_configs_fail_before_cloud_calls(config: dict[str, Any], message
     assert not mgmt.namespaces.create_calls
 
 
-def test_prune_only_removes_names_recorded_in_ownership_registry() -> None:
+def test_pruning_refuses_when_complete_inventory_contains_an_unowned_subscription() -> None:
     driver, mgmt, _, _ = _driver()
     handle = _provisioned(
         driver,
@@ -728,7 +813,7 @@ def test_prune_only_removes_names_recorded_in_ownership_registry() -> None:
             {"name": "remove", "delivery_mode": "pull"},
         ],
     )
-    _, namespace, topic = handle.split("/")
+    namespace, topic = driver._parse_handle(handle)
     external_name = "astrolift-external-looking"
     mgmt.namespace_topic_event_subscriptions.values[(namespace, topic, external_name)] = SimpleNamespace(
         name=external_name,
@@ -742,20 +827,18 @@ def test_prune_only_removes_names_recorded_in_ownership_registry() -> None:
                 "prune_subscriptions": True,
                 "confirm_message_loss": True,
             },
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
-    assert result.ok, result
-    deleted = {name for _, _, name in mgmt.namespace_topic_event_subscriptions.delete_calls}
-    assert external_name not in deleted
-    assert any("remove" in name for name in deleted)
+    assert not result.ok
+    assert mgmt.namespace_topic_event_subscriptions.delete_calls == []
 
 
 def test_deprovision_guards_data_external_resources_locks_and_cleans_secrets() -> None:
     driver, mgmt, locks, secrets = _driver()
     handle = _provisioned(driver, subscriptions=[{"name": "managed", "delivery_mode": "pull"}])
-    _, namespace, topic = handle.split("/")
-    retained = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"))
+    namespace, topic = driver._parse_handle(handle)
+    retained = driver.deprovision(DeprovisionSpec(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"))
     assert not retained.ok and retained.errors == ["delete_data_required"]
 
     external_name = "external"
@@ -763,29 +846,45 @@ def test_deprovision_guards_data_external_resources_locks_and_cleans_secrets() -
         name=external_name,
         delivery_configuration=SimpleNamespace(delivery_mode="Queue"),
     )
-    external = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
-    assert not external.ok and external.errors == ["external_resources_present"]
+    external = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), delete_data=True
+    )
+    assert not external.ok and external.errors == ["ownership_unknown"]
     mgmt.namespace_topic_event_subscriptions.values.pop((namespace, topic, external_name))
 
     mgmt.namespace_topics.values[(namespace, "external-topic")] = SimpleNamespace(name="external-topic")
-    external_topic = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
-    assert not external_topic.ok and external_topic.errors == ["external_resources_present"]
+    external_topic = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), delete_data=True
+    )
+    assert not external_topic.ok and external_topic.errors == ["ownership_unknown"]
     mgmt.namespace_topics.values.pop((namespace, "external-topic"))
 
     locks.management_locks.values.append(SimpleNamespace(name="protect"))
-    locked = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
-    assert not locked.ok and locked.errors == ["resource_lock_present"]
+    locked = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), delete_data=True
+    )
+    assert not locked.ok and locked.errors == ["ownership_unknown"]
     assert locks.management_locks.delete_calls == []
 
     deleted = driver.deprovision(
-        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+        DeprovisionSpec(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"),
+        delete_data=True,
+        force_destroy=True,
     )
-    assert deleted.ok
-    assert locks.management_locks.delete_calls == ["protect"]
+    assert not deleted.ok
+    assert locks.management_locks.delete_calls == []
+    assert mgmt.namespaces.delete_calls == []
+    locks.management_locks.values.clear()
+    deleted = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id=_spec().managed_service_id), delete_data=True
+    )
+    assert deleted.ok, deleted
     assert namespace in mgmt.namespaces.delete_calls
     assert not secrets.values
-    again = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
-    assert again.ok and "already gone" in again.message
+    again = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), delete_data=True
+    )
+    assert again.ok and "observed absent" in again.message
 
 
 def test_forged_handle_cannot_update_delete_or_bind_external_namespace() -> None:
@@ -794,6 +893,8 @@ def test_forged_handle_cannot_update_delete_or_bind_external_namespace() -> None
     topic = "external-topic"
     mgmt.namespaces.values[namespace] = SimpleNamespace(
         name=namespace,
+        id=f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.EventGrid/namespaces/{namespace}",
+        location="eastus2",
         tags={"owner": "outside"},
         sku=SimpleNamespace(name="Standard", capacity=1),
         topics_configuration=SimpleNamespace(hostname="external.example.com"),
@@ -806,21 +907,25 @@ def test_forged_handle_cannot_update_delete_or_bind_external_namespace() -> None
         event_retention_in_days=1,
         provisioning_state="Succeeded",
     )
-    handle = f"event_bus/{namespace}/{topic}"
-    update = driver.update(UpdateSpec(handle, config={"capacity": 2}, managed_service_id="service-id"))
-    assert not update.ok and "carries no Astrolift astrolift-managed-by=platform" in update.message
-    delete = driver.deprovision(
-        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+    handle = driver._handle(namespace, topic)
+    update = driver.update(
+        UpdateSpec(handle, config={"capacity": 2}, managed_service_id="018f42f0-4420-7000-8000-000000000001")
     )
-    assert not delete.ok and "carries no Astrolift astrolift-managed-by=platform" in delete.message
-    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift-managed-by=platform"):
-        driver.binding(ServiceHandle(handle))
+    assert not update.ok and "source identity is missing" in update.message
+    delete = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"),
+        delete_data=True,
+        force_destroy=True,
+    )
+    assert not delete.ok and "source identity is missing" in delete.message
+    with pytest.raises(AzureOwnershipError, match="source identity is missing"):
+        driver.binding(ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"))
 
 
 def test_immutable_drift_and_explicit_identity_removal() -> None:
     driver, mgmt, _, _ = _driver()
     handle = _provisioned(driver, user_assigned_identity_resource_ids=[UAMI_ID])
-    _, namespace, topic = handle.split("/")
+    namespace, topic = driver._parse_handle(handle)
     mgmt.namespace_topics.values[(namespace, topic)].input_schema = "EventGridSchema"
     drift = driver.provision(_spec())
     assert not drift.ok and "reprovision required" in drift.message
@@ -830,35 +935,41 @@ def test_immutable_drift_and_explicit_identity_removal() -> None:
         UpdateSpec(
             handle,
             config={"system_assigned_identity": False, "user_assigned_identity_resource_ids": []},
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
     assert removed.ok, removed
     assert mgmt.namespaces.values[namespace].identity.type == "None"
 
     mgmt.namespaces.values[namespace].sku.name = "Basic"
-    wrong_sku = driver.update(UpdateSpec(handle, config={"capacity": 2}, managed_service_id="service-id"))
+    wrong_sku = driver.update(
+        UpdateSpec(handle, config={"capacity": 2}, managed_service_id="018f42f0-4420-7000-8000-000000000001")
+    )
     assert not wrong_sku.ok and "Standard is required" in wrong_sku.message
 
 
 def test_status_missing_topic_updates_and_snapshot_contract() -> None:
     driver, mgmt, _, _ = _driver()
-    missing = driver.status(ServiceHandle("event_bus/missing/topic"))
+    missing = driver.status(
+        ServiceHandle(driver._handle("missing", "topic"), managed_service_id="018f42f0-4420-7000-8000-000000000001")
+    )
     assert missing.state == "deprovisioned"
-    invalid = driver.update(UpdateSpec("event_bus/missing", config={}, managed_service_id="service-id"))
-    assert not invalid.ok and invalid.errors == ["invalid_handle"]
+    invalid = driver.update(
+        UpdateSpec("event_bus/missing", config={}, managed_service_id="018f42f0-4420-7000-8000-000000000001")
+    )
+    assert not invalid.ok and invalid.errors == ["ownership_unknown"]
 
     handle = _provisioned(driver)
-    _, namespace, topic = handle.split("/")
+    namespace, topic = driver._parse_handle(handle)
     mgmt.namespace_topics.values[(namespace, topic)].provisioning_state = "Updating"
-    status = driver.status(ServiceHandle(handle))
+    status = driver.status(ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"))
     assert status.state == "updating"
     mgmt.namespace_topics.values.pop((namespace, topic))
-    missing_topic = driver.status(ServiceHandle(handle))
+    missing_topic = driver.status(ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"))
     assert missing_topic.state == "error"
 
     with pytest.raises(AzureEventGridNamespaceError, match="exact restorable"):
-        driver.snapshot(ServiceHandle(handle))
+        driver.snapshot(ServiceHandle(handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"))
     with pytest.raises(AzureEventGridNamespaceError, match="cannot be restored"):
         driver.restore(SnapshotHandle(handle, "snapshot", "now"), _spec())
 
@@ -879,22 +990,25 @@ def test_schema_constructor_names_registry_recovery_and_corruption_guards() -> N
     first = driver.provision(_spec())
     second = driver.provision(_spec())
     assert first.ok and second.ok and first.handle == second.handle
-    _, namespace, topic = first.handle.split("/")
+    namespace, topic = driver._parse_handle(first.handle)
     assert len(namespace) <= 50 and len(topic) <= 50
 
     registry_name = next(name for name, value in secrets.values.items() if value.startswith("{"))
-    secrets.values.pop(registry_name)
+    original_registry = secrets.values.pop(registry_name)
     secrets.deleted.add(registry_name)
     repaired = driver.provision(_spec())
-    assert repaired.ok, repaired
-    assert registry_name in secrets.recover_calls
+    assert not repaired.ok
+    assert secrets.recover_calls == []
+    assert registry_name not in secrets.values
+    secrets.deleted.remove(registry_name)
+    secrets.values[registry_name] = original_registry
 
     secrets.values[registry_name] = "not-json"
     corrupt = driver.update(
         UpdateSpec(
             first.handle,
             config={"subscriptions": [{"name": "pull", "delivery_mode": "pull"}]},
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
     assert not corrupt.ok and "registry" in corrupt.message
