@@ -24,6 +24,10 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Refresh Team list/picker reads only after an accepted create/edit/delete reply.
+  Rejected writes retain their original diagnostic and drafts without triggering
+  an unrelated failed-read warning (#2145).
+
 - Translate connected API key list/create/reveal/revoke/detail and reviewed stock
   scope guidance in all eight locales. Preserve literal identifiers, future server
   metadata, authority decisions and exact mutation inputs; distinguish metadata

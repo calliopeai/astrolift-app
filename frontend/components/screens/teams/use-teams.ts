@@ -37,7 +37,8 @@ export function useTeams() {
   }>(SOFT_DELETE_TEAM, {
     // LIST_TEAMS still backs the pickers on other surfaces; "ListTeamsPage"
     // is this list's own page.
-    refetchQueries: [{ query: LIST_TEAMS }, "ListTeamsPage"],
+    refetchQueries: (result) =>
+      result.data?.softDeleteTeam.ok ? [{ query: LIST_TEAMS }, "ListTeamsPage"] : [],
     onQueryUpdated: (query) => refetchAfterMutation(query, t("feedback.refreshWarning")),
     awaitRefetchQueries: true,
   });

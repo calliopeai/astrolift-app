@@ -62,7 +62,7 @@ export function useEditTeam({ open, team }: { open: boolean; team: AstroliftTeam
   const [updateTeam, { loading }] = useMutation<{ updateTeam: MutationResult<AstroliftTeam> }>(
     UPDATE_TEAM,
     {
-      refetchQueries: [{ query: LIST_TEAMS }],
+      refetchQueries: (result) => (result.data?.updateTeam.ok ? [{ query: LIST_TEAMS }] : []),
       onQueryUpdated: (query) => refetchAfterMutation(query, t("feedback.refreshWarning")),
       awaitRefetchQueries: true,
     }

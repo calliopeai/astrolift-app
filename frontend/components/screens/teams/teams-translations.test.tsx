@@ -55,7 +55,13 @@ beforeEach(() => {
   notifications.warning.mockClear();
 });
 const team = TEAMS[0];
-type Mode = "ok" | "refused" | "no-diagnostic" | "refresh-failed" | "transport-failed";
+type Mode =
+  | "ok"
+  | "refused"
+  | "no-diagnostic"
+  | "refresh-failed"
+  | "transport-failed"
+  | "refused-refresh-failed";
 type Request = { operationName: string; variables: Record<string, unknown> };
 
 function clientFor(locale: string, mode: Mode) {
@@ -67,10 +73,14 @@ function clientFor(locale: string, mode: Mode) {
     counts.set(request.operationName, (counts.get(request.operationName) ?? 0) + 1);
     let data;
     if (request.operationName === "ListTeams") {
-      if (mode === "refresh-failed") throw new Error("ACTUAL_REFRESH_UNAVAILABLE");
+      if (["refresh-failed", "refused-refresh-failed"].includes(mode))
+        throw new Error("ACTUAL_REFRESH_UNAVAILABLE");
       data = { astroliftTeams: [team] };
     } else if (request.operationName === "ListTeamsPage") {
-      if (mode === "refresh-failed" && counts.get(request.operationName)! > 1)
+      if (
+        ["refresh-failed", "refused-refresh-failed"].includes(mode) &&
+        counts.get(request.operationName)! > 1
+      )
         throw new Error("ACTUAL_REFRESH_UNAVAILABLE");
       data = { astroliftTeamsPage: { items: [team], totalCount: 1, nextCursor: null } };
     } else if (request.operationName === "TeamSlugAvailable") {
@@ -85,15 +95,15 @@ function clientFor(locale: string, mode: Mode) {
         } as Record<string, string>
       )[request.operationName];
       if (!field) throw new Error(`Unexpected operation ${request.operationName}`);
-      const refused = mode === "refused" || mode === "no-diagnostic";
+      const refused =
+        mode === "refused" || mode === "no-diagnostic" || mode === "refused-refresh-failed";
       const input = request.variables.input as Record<string, string>;
       data = {
         [field]: {
           ok: !refused,
-          errors:
-            mode === "refused"
-              ? [{ code: "DENIED", message: "RAW_POLICY_REFUSAL", field: null }]
-              : [],
+          errors: ["refused", "refused-refresh-failed"].includes(mode)
+            ? [{ code: "DENIED", message: "RAW_POLICY_REFUSAL", field: null }]
+            : [],
           data: refused
             ? null
             : field === "softDeleteTeam"
@@ -273,104 +283,116 @@ describe("Teams translations and connected outcomes", () => {
     });
   });
 
-  describe.each(["ok", "refused", "no-diagnostic", "refresh-failed", "transport-failed"] as const)(
-    "%s",
-    (mode) => {
-      it.each(locales)(
-        "%s submits exact create values and retains only failed drafts",
-        async (locale) => {
-          const context = clientFor(locale, mode),
-            t = tFor(locale),
-            view = render(<Create />, { wrapper: context.wrapper });
-          try {
-            fireEvent.change(screen.getByLabelText(t("displayName")), {
-              target: { value: " EXACT_USER_NAME " },
-            });
-            fireEvent.change(screen.getByLabelText(t("slug")), { target: { value: "exact-slug" } });
-            fireEvent.change(screen.getByLabelText(t("descriptionOptional")), {
-              target: { value: " RAW_DESCRIPTION " },
-            });
-            fireEvent.click(screen.getByRole("button", { name: t("create") }));
-            const committed = mode === "ok" || mode === "refresh-failed";
-            await waitFor(() =>
-              expect(committed ? notifications.success : notifications.error).toHaveBeenCalledOnce()
-            );
-            expect(
-              context.requests
-                .filter((request) => request.operationName === "CreateTeam")
-                .map((request) => request.variables)
-            ).toEqual([
-              {
-                input: {
-                  organizationId: "actual-org-id",
-                  name: "EXACT_USER_NAME",
-                  slug: "exact-slug",
-                  description: "RAW_DESCRIPTION",
-                },
+  describe.each([
+    "ok",
+    "refused",
+    "no-diagnostic",
+    "refresh-failed",
+    "transport-failed",
+    "refused-refresh-failed",
+  ] as const)("%s", (mode) => {
+    it.each(locales)(
+      "%s submits exact create values and retains only failed drafts",
+      async (locale) => {
+        const context = clientFor(locale, mode),
+          t = tFor(locale),
+          view = render(<Create />, { wrapper: context.wrapper });
+        try {
+          fireEvent.change(screen.getByLabelText(t("displayName")), {
+            target: { value: " EXACT_USER_NAME " },
+          });
+          fireEvent.change(screen.getByLabelText(t("slug")), { target: { value: "exact-slug" } });
+          fireEvent.change(screen.getByLabelText(t("descriptionOptional")), {
+            target: { value: " RAW_DESCRIPTION " },
+          });
+          fireEvent.click(screen.getByRole("button", { name: t("create") }));
+          const committed = mode === "ok" || mode === "refresh-failed";
+          await waitFor(() =>
+            expect(committed ? notifications.success : notifications.error).toHaveBeenCalledOnce()
+          );
+          expect(
+            context.requests
+              .filter((request) => request.operationName === "CreateTeam")
+              .map((request) => request.variables)
+          ).toEqual([
+            {
+              input: {
+                organizationId: "actual-org-id",
+                name: "EXACT_USER_NAME",
+                slug: "exact-slug",
+                description: "RAW_DESCRIPTION",
               },
-            ]);
-            expect(screen.getByTestId("open")).toHaveTextContent(String(!committed));
-            if (!committed) {
-              expect(screen.getByLabelText(t("displayName"))).toHaveValue(" EXACT_USER_NAME ");
-              expect(notifications.error).toHaveBeenCalledWith(
-                mode === "refused"
-                  ? "RAW_POLICY_REFUSAL"
-                  : mode === "transport-failed"
-                    ? "RAW_TRANSPORT_FAILURE"
-                    : t("feedback.createFailed")
-              );
-            } else {
-              expect(notifications.success).toHaveBeenCalledWith(
-                t("feedback.created", { slug: "exact-slug" })
-              );
-              expect(notifications.error).not.toHaveBeenCalled();
-            }
-            if (mode === "refresh-failed")
-              expect(notifications.warning).toHaveBeenCalledWith(t("feedback.refreshWarning"));
-            expect(context.errors).not.toHaveBeenCalled();
-          } finally {
-            view.unmount();
-            context.client.stop();
-          }
-        }
-      );
-
-      it.each(locales)(
-        "%s saves the actual team and preserves refused edit drafts",
-        async (locale) => {
-          const context = clientFor(locale, mode),
-            t = tFor(locale),
-            view = render(<Edit />, { wrapper: context.wrapper });
-          try {
-            fireEvent.change(screen.getByLabelText(t("displayName")), {
-              target: { value: " EXACT_EDIT " },
-            });
-            fireEvent.click(screen.getByRole("button", { name: t("save") }));
-            const committed = mode === "ok" || mode === "refresh-failed";
-            await waitFor(() =>
-              expect(committed ? notifications.success : notifications.error).toHaveBeenCalledOnce()
+            },
+          ]);
+          expect(screen.getByTestId("open")).toHaveTextContent(String(!committed));
+          if (!committed) {
+            expect(screen.getByLabelText(t("displayName"))).toHaveValue(" EXACT_USER_NAME ");
+            expect(notifications.error).toHaveBeenCalledWith(
+              ["refused", "refused-refresh-failed"].includes(mode)
+                ? "RAW_POLICY_REFUSAL"
+                : mode === "transport-failed"
+                  ? "RAW_TRANSPORT_FAILURE"
+                  : t("feedback.createFailed")
             );
-            expect(
-              context.requests
-                .filter((request) => request.operationName === "UpdateTeam")
-                .map((request) => request.variables)
-            ).toEqual([{ input: { id: team.id, name: "EXACT_EDIT", slug: team.slug } }]);
-            expect(screen.getByTestId("open")).toHaveTextContent(String(!committed));
-            if (!committed)
-              expect(screen.getByLabelText(t("displayName"))).toHaveValue(" EXACT_EDIT ");
-            if (mode === "refresh-failed") {
-              expect(notifications.warning).toHaveBeenCalledWith(t("feedback.refreshWarning"));
-              expect(notifications.error).not.toHaveBeenCalled();
-            }
-            expect(context.errors).not.toHaveBeenCalled();
-          } finally {
-            view.unmount();
-            context.client.stop();
+          } else {
+            expect(notifications.success).toHaveBeenCalledWith(
+              t("feedback.created", { slug: "exact-slug" })
+            );
+            expect(notifications.error).not.toHaveBeenCalled();
           }
+          if (mode === "refresh-failed")
+            expect(notifications.warning).toHaveBeenCalledWith(t("feedback.refreshWarning"));
+          if (mode === "refused-refresh-failed") {
+            expect(notifications.warning).not.toHaveBeenCalled();
+            expect(context.requests.filter((r) => r.operationName === "ListTeams")).toEqual([]);
+          }
+          expect(context.errors).not.toHaveBeenCalled();
+        } finally {
+          view.unmount();
+          context.client.stop();
         }
-      );
-    }
-  );
+      }
+    );
+
+    it.each(locales)(
+      "%s saves the actual team and preserves refused edit drafts",
+      async (locale) => {
+        const context = clientFor(locale, mode),
+          t = tFor(locale),
+          view = render(<Edit />, { wrapper: context.wrapper });
+        try {
+          fireEvent.change(screen.getByLabelText(t("displayName")), {
+            target: { value: " EXACT_EDIT " },
+          });
+          fireEvent.click(screen.getByRole("button", { name: t("save") }));
+          const committed = mode === "ok" || mode === "refresh-failed";
+          await waitFor(() =>
+            expect(committed ? notifications.success : notifications.error).toHaveBeenCalledOnce()
+          );
+          expect(
+            context.requests
+              .filter((request) => request.operationName === "UpdateTeam")
+              .map((request) => request.variables)
+          ).toEqual([{ input: { id: team.id, name: "EXACT_EDIT", slug: team.slug } }]);
+          expect(screen.getByTestId("open")).toHaveTextContent(String(!committed));
+          if (!committed)
+            expect(screen.getByLabelText(t("displayName"))).toHaveValue(" EXACT_EDIT ");
+          if (mode === "refresh-failed") {
+            expect(notifications.warning).toHaveBeenCalledWith(t("feedback.refreshWarning"));
+            expect(notifications.error).not.toHaveBeenCalled();
+          }
+          if (mode === "refused-refresh-failed") {
+            expect(notifications.warning).not.toHaveBeenCalled();
+            expect(context.requests.filter((r) => r.operationName === "ListTeams")).toEqual([]);
+          }
+          expect(context.errors).not.toHaveBeenCalled();
+        } finally {
+          view.unmount();
+          context.client.stop();
+        }
+      }
+    );
+  });
 
   it.each(locales)(
     "%s keeps accepted deletion after failed refresh with exact target and page variables",
@@ -412,6 +434,27 @@ describe("Teams translations and connected outcomes", () => {
           context.requests.filter((request) => request.operationName === "SoftDeleteTeam")
         ).toHaveLength(1);
         expect(notifications.success).not.toHaveBeenCalled();
+        expect(hook.result.current.rows[0].id).toBe(team.id);
+      } finally {
+        hook.unmount();
+        context.client.stop();
+      }
+    }
+  );
+  it.each(locales)(
+    "%s rejected retirement never refreshes an unavailable read or reports success",
+    async (locale) => {
+      const context = clientFor(locale, "refused-refresh-failed"),
+        hook = renderHook(() => useTeams(), { wrapper: context.wrapper });
+      try {
+        await waitFor(() => expect(hook.result.current.rows).toHaveLength(1));
+        await act(async () => {
+          await expect(hook.result.current.onDelete(team)).rejects.toThrow("RAW_POLICY_REFUSAL");
+        });
+        expect(notifications.success).not.toHaveBeenCalled();
+        expect(notifications.warning).not.toHaveBeenCalled();
+        expect(context.requests.filter((r) => r.operationName === "ListTeams")).toEqual([]);
+        expect(context.requests.filter((r) => r.operationName === "ListTeamsPage")).toHaveLength(1);
         expect(hook.result.current.rows[0].id).toBe(team.id);
       } finally {
         hook.unmount();

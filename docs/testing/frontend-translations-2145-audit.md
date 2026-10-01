@@ -287,3 +287,11 @@ French and Japanese states. Existing shared mutation-feedback and date regressio
 remain part of the affected gate. This leaf does not close other #2145 consumers,
 add a singular token API, change server permissions or broaden client-side list
 filtering beyond its disclosed current contract.
+
+### Team refusal and refresh refinement
+
+Create/edit/delete refetch requests now depend on the actual `ok` envelope. Real
+Apollo HTTP regressions combine a refused mutation with a read that would fail:
+no read refresh occurs, no refresh warning or success is shown, and the original
+refusal, edit/create draft or existing list row remains intact. Accepted-write
+refresh-failure behavior is preserved through the same shared helper.

@@ -25,7 +25,7 @@ export function useCreateTeam() {
   const [createTeamMutation, { loading }] = useMutation<{
     createTeam: MutationResult<AstroliftTeam>;
   }>(CREATE_TEAM, {
-    refetchQueries: [{ query: LIST_TEAMS }],
+    refetchQueries: (result) => (result.data?.createTeam.ok ? [{ query: LIST_TEAMS }] : []),
     onQueryUpdated: (query) => refetchAfterMutation(query, t("feedback.refreshWarning")),
     awaitRefetchQueries: true,
   });
