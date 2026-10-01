@@ -55,6 +55,11 @@
   and discard drafts after observed environment, app, source or permission changes
   without changing current-target API writes (#2145, bounded item 13 flow).
 
+- Localize secret-proposal read errors, known operation/status/decision labels
+  and fallback summaries in all eight locales. Preserve supplied summaries,
+  technical unknowns, diagnostics, masked diff content and action authority
+  without changing proposal mutations (#2145, bounded item 14 presentation).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

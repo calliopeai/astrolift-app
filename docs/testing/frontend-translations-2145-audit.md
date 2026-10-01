@@ -926,3 +926,36 @@ This completes the bounded environment override card. Archive/restore,
 app-frame delete, retention, API/backend/schema/generators, shared fixtures and
 other settings/member copy are untouched. #2145 remains open for its remaining
 surfaces; no production or cloud call ran.
+
+## Secret-proposal detail presentation
+
+The pure SecretProposalDetailScreen uses fifteen additive message leaves in all
+eight locales for its failed-read heading, fallback operation/environment summary,
+five known operations, six known proposal statuses and two known approval
+decisions. The enum sets match the backend proposal/approval models. Exact
+unknown technical strings, including prototype property names, remain literal;
+only own known map entries translate. The existing app-wide and loading title
+messages are reused. Supplied payloadDiff summaries, approver reasons, provider
+apply errors and diff keys/content remain unchanged. Server-provided masking is
+preserved; this label change introduces no browser redaction or reveal authority.
+
+The owned hook, query/mutation documents, input envelopes, permission checks,
+pending-only action gates, confirmations and mutation/refetch/navigation behavior
+are unchanged. The pre-existing mocked route test now expects the translated
+fallback path; the actual locale tests separately prove the rendered values.
+Shared QueryError Retry copy and its general recovery behavior remain a separate
+translation boundary, rather than a claim that all shared chrome is localized.
+
+On the ec1abcd6-based source, 182 focused cases pass in three files: 168 real
+locale presentation, actual-client schema-validated HttpLink, unknown-value,
+read-error/retry, open-confirmation locale-change and SSR hydration checks,
+eight portable stories and six existing route action/fallback regressions.
+TypeScript, scoped ESLint and source/catalogue formatting pass. The initial type
+check rejected unsupported test-only ByRole exact options; the corrected checks
+retain string-name matching and pass. Each locale adds exactly fifteen genuine
+leaves, preserving all existing values. No broad suite, API/backend/schema change,
+live request or publication is claimed by this isolated presentation leaf.
+
+The original item 14 PendingGates presentation was already translated on the
+deployed base. This leaf supplies the remaining specified detail labels, without
+claiming the later settings/lifecycle gaps or downstream secret application.

@@ -4016,6 +4016,29 @@
         "title": "Approvals",
         "empty": "No approvals recorded yet.",
         "unknownApprover": "unknown"
+      },
+      "presentation": {
+        "loadFailed": "Could not load secret proposal",
+        "summary": "{op} on {env}",
+        "operations": {
+          "set": "Set secret",
+          "delete": "Delete secret",
+          "attachBundle": "Attach bundle",
+          "detachBundle": "Detach bundle",
+          "setMetadata": "Update metadata"
+        },
+        "statuses": {
+          "pending": "Pending",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "applied": "Applied",
+          "expired": "Expired",
+          "withdrawn": "Withdrawn"
+        },
+        "decisions": {
+          "approved": "Approved",
+          "rejected": "Rejected"
+        }
       }
     },
     "pendingGates": {

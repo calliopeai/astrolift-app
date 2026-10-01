@@ -3936,6 +3936,29 @@
         "title": "Aprovações",
         "empty": "Nenhuma aprovação registrada ainda.",
         "unknownApprover": "desconhecido"
+      },
+      "presentation": {
+        "loadFailed": "Não foi possível carregar a proposta de segredo",
+        "summary": "{op} em {env}",
+        "operations": {
+          "set": "Definir segredo",
+          "delete": "Excluir segredo",
+          "attachBundle": "Associar pacote",
+          "detachBundle": "Desassociar pacote",
+          "setMetadata": "Atualizar metadados"
+        },
+        "statuses": {
+          "pending": "Pendente",
+          "approved": "Aprovada",
+          "rejected": "Rejeitada",
+          "applied": "Aplicada",
+          "expired": "Expirada",
+          "withdrawn": "Retirada"
+        },
+        "decisions": {
+          "approved": "Aprovado",
+          "rejected": "Rejeitado"
+        }
       }
     },
     "pendingGates": {

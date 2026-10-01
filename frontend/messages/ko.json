@@ -3936,6 +3936,29 @@
         "title": "승인",
         "empty": "아직 기록된 승인이 없습니다.",
         "unknownApprover": "알 수 없음"
+      },
+      "presentation": {
+        "loadFailed": "시크릿 변경 제안을 불러오지 못했습니다",
+        "summary": "{env}: {op}",
+        "operations": {
+          "set": "시크릿 설정",
+          "delete": "시크릿 삭제",
+          "attachBundle": "번들 연결",
+          "detachBundle": "번들 연결 해제",
+          "setMetadata": "메타데이터 업데이트"
+        },
+        "statuses": {
+          "pending": "대기 중",
+          "approved": "승인됨",
+          "rejected": "거부됨",
+          "applied": "적용됨",
+          "expired": "만료됨",
+          "withdrawn": "철회됨"
+        },
+        "decisions": {
+          "approved": "승인",
+          "rejected": "거부"
+        }
       }
     },
     "pendingGates": {

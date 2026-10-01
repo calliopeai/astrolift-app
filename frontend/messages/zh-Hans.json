@@ -3936,6 +3936,29 @@
         "title": "审批记录",
         "empty": "暂无审批记录。",
         "unknownApprover": "未知"
+      },
+      "presentation": {
+        "loadFailed": "无法加载密钥变更提案",
+        "summary": "在 {env} 中{op}",
+        "operations": {
+          "set": "设置密钥",
+          "delete": "删除密钥",
+          "attachBundle": "关联密钥包",
+          "detachBundle": "解除密钥包关联",
+          "setMetadata": "更新元数据"
+        },
+        "statuses": {
+          "pending": "待处理",
+          "approved": "已批准",
+          "rejected": "已拒绝",
+          "applied": "已应用",
+          "expired": "已过期",
+          "withdrawn": "已撤回"
+        },
+        "decisions": {
+          "approved": "批准",
+          "rejected": "拒绝"
+        }
       }
     },
     "pendingGates": {

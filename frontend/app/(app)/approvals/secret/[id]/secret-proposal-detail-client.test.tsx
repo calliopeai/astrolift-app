@@ -75,7 +75,7 @@ vi.mock("@/components/PageShell", () => ({
 }));
 
 function makeProposal(
-  overrides: Partial<AstroliftSecretChangeProposal> = {},
+  overrides: Partial<AstroliftSecretChangeProposal> = {}
 ): AstroliftSecretChangeProposal {
   return {
     id: "prop-1",
@@ -159,7 +159,7 @@ describe("SecretProposalDetailClient", () => {
       expect(screen.getByTestId("page-description")).toHaveTextContent("Rotate DATABASE_URL");
     });
 
-    it("falls back to `<op> on <env>` when payloadDiff carries no summary", () => {
+    it("uses the translated operation/environment summary when payloadDiff has no summary", () => {
       state.proposal = makeProposal({
         op: "set",
         environmentName: "prod",
@@ -167,7 +167,7 @@ describe("SecretProposalDetailClient", () => {
       });
       render(<SecretProposalDetailClient proposalId="prop-1" />);
 
-      expect(screen.getByTestId("page-description")).toHaveTextContent("set on prod");
+      expect(screen.getByTestId("page-description")).toHaveTextContent("summary");
     });
   });
 });

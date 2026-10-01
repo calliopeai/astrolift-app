@@ -3939,6 +3939,29 @@
         "title": "Aprobaciones",
         "empty": "Aún no se han registrado aprobaciones.",
         "unknownApprover": "desconocido"
+      },
+      "presentation": {
+        "loadFailed": "No se pudo cargar la propuesta de secreto",
+        "summary": "{op} en {env}",
+        "operations": {
+          "set": "Establecer secreto",
+          "delete": "Eliminar secreto",
+          "attachBundle": "Adjuntar paquete",
+          "detachBundle": "Desvincular paquete",
+          "setMetadata": "Actualizar metadatos"
+        },
+        "statuses": {
+          "pending": "Pendiente",
+          "approved": "Aprobada",
+          "rejected": "Rechazada",
+          "applied": "Aplicada",
+          "expired": "Caducada",
+          "withdrawn": "Retirada"
+        },
+        "decisions": {
+          "approved": "Aprobado",
+          "rejected": "Rechazado"
+        }
       }
     },
     "pendingGates": {

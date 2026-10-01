@@ -3936,6 +3936,29 @@
         "title": "承認",
         "empty": "まだ承認が記録されていません。",
         "unknownApprover": "不明"
+      },
+      "presentation": {
+        "loadFailed": "シークレット変更提案を読み込めませんでした",
+        "summary": "{env}：{op}",
+        "operations": {
+          "set": "シークレットを設定",
+          "delete": "シークレットを削除",
+          "attachBundle": "バンドルを関連付け",
+          "detachBundle": "バンドルの関連付けを解除",
+          "setMetadata": "メタデータを更新"
+        },
+        "statuses": {
+          "pending": "保留中",
+          "approved": "承認済み",
+          "rejected": "却下済み",
+          "applied": "適用済み",
+          "expired": "期限切れ",
+          "withdrawn": "取り下げ済み"
+        },
+        "decisions": {
+          "approved": "承認",
+          "rejected": "却下"
+        }
       }
     },
     "pendingGates": {

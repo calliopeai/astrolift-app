@@ -3939,6 +3939,29 @@
         "title": "Approbations",
         "empty": "Aucune approbation enregistrée pour l'instant.",
         "unknownApprover": "inconnu"
+      },
+      "presentation": {
+        "loadFailed": "Impossible de charger la proposition de secret",
+        "summary": "{op} dans {env}",
+        "operations": {
+          "set": "Définir le secret",
+          "delete": "Supprimer le secret",
+          "attachBundle": "Associer le lot",
+          "detachBundle": "Dissocier le lot",
+          "setMetadata": "Mettre à jour les métadonnées"
+        },
+        "statuses": {
+          "pending": "En attente",
+          "approved": "Approuvée",
+          "rejected": "Rejetée",
+          "applied": "Appliquée",
+          "expired": "Expirée",
+          "withdrawn": "Retirée"
+        },
+        "decisions": {
+          "approved": "Approuvé",
+          "rejected": "Rejeté"
+        }
       }
     },
     "pendingGates": {

@@ -3939,6 +3939,29 @@
         "title": "Genehmigungen",
         "empty": "Noch keine Genehmigungen erfasst.",
         "unknownApprover": "unbekannt"
+      },
+      "presentation": {
+        "loadFailed": "Änderungsvorschlag für Geheimnisse konnte nicht geladen werden",
+        "summary": "{op} in {env}",
+        "operations": {
+          "set": "Geheimnis festlegen",
+          "delete": "Geheimnis löschen",
+          "attachBundle": "Paket zuordnen",
+          "detachBundle": "Paket lösen",
+          "setMetadata": "Metadaten aktualisieren"
+        },
+        "statuses": {
+          "pending": "Ausstehend",
+          "approved": "Genehmigt",
+          "rejected": "Abgelehnt",
+          "applied": "Angewendet",
+          "expired": "Abgelaufen",
+          "withdrawn": "Zurückgezogen"
+        },
+        "decisions": {
+          "approved": "Genehmigt",
+          "rejected": "Abgelehnt"
+        }
       }
     },
     "pendingGates": {
