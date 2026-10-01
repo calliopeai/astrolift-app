@@ -33,6 +33,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from django.db import transaction
+
 from astrolift_lifecycle.preview_managed_services import (
     PreviewPolicy,
     resolve_policy,
@@ -91,6 +93,7 @@ class PreviewTeardownOutcome:
     errors: dict[str, str] = field(default_factory=dict)
 
 
+@transaction.atomic
 def provision_preview_managed_services(preview_env: Any) -> PreviewServiceOutcome:
     """Attach and slice the primary environment's services onto a preview.
 
@@ -186,46 +189,28 @@ def _slice_for(*, service: Any, preview_env: Any) -> Any | None:
     equivalent of a logical database, and a driver made to pretend would
     hand back the parent instance under a different name.
     """
-    from astrolift_drivers.managed_resolution import resolve_managed_driver
-    from providers._sdk.managed_service import ServiceHandle, SliceSpec
-
-    cluster = getattr(preview_env, "tenant_cluster", None)
-    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
-    if not plugin_slug:
-        raise RuntimeError("preview environment's cluster has no provider plugin")
-
-    resolved = resolve_managed_driver(
-        cluster_plugin_slug=plugin_slug,
-        kind=service.kind,
-        variant=getattr(service, "variant", "") or "",
+    from astrolift_lifecycle.services.preview_slice_bindings import (
+        configured_slice_driver,
+        live_slice_source,
+        slice_driver_registration,
+        validate_attachment,
     )
-    driver = resolved.driver_cls()
 
-    # `supports_slicing()` requires *both* verbs, so a driver that can
-    # create a slice and not remove one is treated as unable -- otherwise
-    # every teardown leaks a database into the parent instance.
+    current, preview, cluster, spec = live_slice_source(service, preview_env)
+    if (
+        resolve_policy(kind=current.kind, manifest_override=(current.config or {}).get("preview_policy"))
+        is not PreviewPolicy.SHARED_WITH_MAIN
+    ):
+        raise ValueError("preview managed-service policy changed before slice admission")
+    driver = slice_driver_registration(current, cluster).driver_cls()
     if not getattr(driver, "supports_slicing", lambda: False)():
         return None
-
-    # `backend_ref`, not `handle`: the provider-side resource handle the
-    # driver's provision() returned. Empty until provisioning finalizes, and
-    # a slice of an unprovisioned parent has nothing to carve out of.
-    backend_ref = getattr(service, "backend_ref", "") or ""
-    if not backend_ref:
-        raise RuntimeError(
-            f"managed service {service.pk} has no backend_ref yet; it is not "
-            "finished provisioning, so there is nothing to slice"
-        )
-
-    return driver.provision_slice(
-        SliceSpec(
-            slice_id=preview_env.name,
-            parent=ServiceHandle(handle=backend_ref),
-            labels={"ai.astrolift.preview-env": str(preview_env.name)},
-        )
-    )
+    validate_attachment(current, preview, driver, spec)
+    driver = configured_slice_driver(current, cluster, credentials=True)
+    return driver.provision_slice(spec)
 
 
+@transaction.atomic
 def deprovision_preview_managed_services(preview_env: Any) -> PreviewTeardownOutcome:
     """Drop the slices a preview owns, leaving every parent instance alone.
 
@@ -294,36 +279,17 @@ def _drop_slice(*, service: Any, attachment: Any, preview_env: Any) -> bool:
     check: a driver that has lost its slice verbs between provision and
     teardown must not be called with a handle it can no longer interpret.
     """
-    from astrolift_drivers.managed_resolution import resolve_managed_driver
-    from providers._sdk.managed_service import ServiceHandle, SliceSpec
-
-    cluster = getattr(preview_env, "tenant_cluster", None)
-    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
-    if not plugin_slug:
-        raise RuntimeError("preview environment's cluster has no provider plugin")
-
-    resolved = resolve_managed_driver(
-        cluster_plugin_slug=plugin_slug,
-        kind=service.kind,
-        variant=getattr(service, "variant", "") or "",
+    from astrolift_lifecycle.services.preview_slice_bindings import (
+        configured_slice_driver,
+        live_slice_source,
+        slice_driver_registration,
+        validate_attachment,
     )
-    driver = resolved.driver_cls()
 
+    current, preview, cluster, spec = live_slice_source(service, preview_env)
+    driver = slice_driver_registration(current, cluster).driver_cls()
     if not getattr(driver, "supports_slicing", lambda: False)():
-        raise RuntimeError(
-            f"driver for {service.kind} no longer supports slicing, so the "
-            f"slice recorded on attachment {attachment.pk} cannot be dropped"
-        )
-
-    # The parent is passed and must never be deprovisioned; that asymmetry
-    # is the contract's whole point. The handle names the slice.
-    return bool(
-        driver.deprovision_slice(
-            SliceSpec(
-                slice_id=preview_env.name,
-                parent=ServiceHandle(handle=getattr(service, "backend_ref", "") or ""),
-                labels={"ai.astrolift.preview-env": str(preview_env.name)},
-            ),
-            attachment.slice_handle,
-        )
-    )
+        raise ValueError("persisted preview slice driver cannot remove its slice")
+    validate_attachment(current, preview, driver, spec)
+    driver = configured_slice_driver(current, cluster)
+    return bool(driver.deprovision_slice(spec, attachment.slice_handle))

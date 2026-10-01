@@ -23,7 +23,7 @@ inspected, including aliases, controller status endpoints and volume bindings.
 
 | Registered kind / variant | Endpoint authority |
 |---|---|
-| postgres / cnpg | Handle namespace: RW host aliases; operator `fqdn-uri` URL. Preview slice lifecycle requires separate repair. |
+| postgres / cnpg | Handle namespace: RW host aliases; operator `fqdn-uri` URL. Preview slices use independent durable credential envelopes and the same parent namespace. |
 | redis / operator | Handle namespace: `REDIS_HOST` and `REDIS_URL`. |
 | mysql / operator | Handle namespace: `MYSQL_HOST`. |
 | document_db / mongodb_operator | Handle namespace: MongoDB SRV URI. |
@@ -66,4 +66,76 @@ all seven corresponding short names reaching the deliberately wrong consumer
 namespace. The disposable `astrolift-binding-dns-2092` cluster was then removed.
 Run the proof with `ASTROLIFT_BINDING_DNS_KUBECONFIG` naming that explicitly owned
 cluster's private kubeconfig; it skips by default. Provider and backend changed-file
-Ruff checks pass. This leaf does not close the preview slice limitation above.
+Ruff checks pass. The ordinary-host proof does not certify CNPG operator reconciliation.
+
+
+## CNPG preview slices
+
+The advertised shared-with-main preview path now configures the selected source
+cluster driver, creates an independent login credential, and persists its
+`slice_handle` on the consumer attachment. A later deployment reconstructs all
+Postgres/DATABASE aliases from that durable identity before resolving credentials.
+It never needs the activity's in-memory `env_overrides`, and it never reads the
+parent application's credential Secret to fill a preview binding.
+
+Names include both immutable managed-service and consumer-environment GUIDs, so
+multiple Postgres services in one namespace do not share a slice Secret or
+Database object. Credentials are stored under
+`services/<org-guid>/<app-guid>/cnpg-slices/<service-guid>/<environment-guid>`.
+The envelope contains username, password, database, namespace-qualified host,
+port and a percent-encoded TLS URI; the operator's owned basic-auth Secret contains
+only the corresponding username/password. No operator-generated `uri` field is
+assumed on that Secret. Retrying a partial role/Database operation reuses the
+issued envelope and Secret; it does not replace the password.
+
+The server locks and rechecks current organization/app/team/project, primary and
+preview environment, source cluster, service and attachment identities before
+provider or secret-store effects. Retired ancestry, another app/cluster, changed
+preview policy, malformed/legacy handles and mismatched persisted slice identities
+are refused. The final deployment uses the current consumer namespace admitted
+under those locks. Native slices cannot be copied to another migration target
+cluster. Unrelated binding keys remain available.
+
+The driver verifies parent platform ownership and locator metadata, retained
+Secret ownership and the Database's exact parent/name/owner before touching the
+credential store. New Secrets and Database objects use atomic create operations,
+so an intervening foreign object is refused rather than adopted. Parent role
+updates retain the complete Cluster specification and observed UID/resourceVersion;
+server activity row locks serialize previews sharing the parent. CNPG still
+reconciles asynchronously: accepted manifests and attached bindings do not certify
+that a database or login is ready.
+
+New owned preview Databases request `databaseReclaimPolicy: delete`. Cleanup only
+removes the exact owned consumer slice, preserves UID/resourceVersion delete
+preconditions, and reports an incomplete deletion while its Database finalizer
+remains. The credential Secret stays until the Database object is gone. The
+portable credential envelope and parent role entry are retained for retry/audit;
+this is not a claim of role or portable-credential revocation. See
+[CNPG Database lifecycle and reconciliation status](https://cloudnative-pg.io/docs/1.28/declarative_database_management/).
+
+Pre-existing slug-named slices, username-only Secrets, retain-policy Database
+objects, and inherited app-private preview attachments without a durable slice
+handle require operator reconciliation. The platform does not adopt them, silently move them to a new
+parent, or fall back to parent credentials. Explicit unsliced project-shared attachments
+keep their existing bindings. Retired owner/source rows also refuse
+automatic cleanup; an operator must reconcile their orphaned slice explicitly.
+
+The focused PostgreSQL checks invoke the actual Temporal activity function,
+persist the attachment, and make a fresh deployment resolve its exact consumer
+Secret. They cover all aliases and URI encoding, one-time credential issuance,
+partial create failure/retry, current target/namespace changes, retired/reassigned
+ancestry, foreign/legacy slice refusal and two real concurrent database-backed
+preview provisions without losing either role. Recording provider clients also
+cover atomic-create collisions, ownership refusals before store reads, complete
+parent specification preservation and pending-finalizer cleanup. These checks do
+not run a real CNPG operator or certify PostgreSQL authentication/role privileges;
+the separate disposable kind proof establishes cross-namespace Service DNS and
+connection routing only. Release composition and authenticated operator checks
+remain separate acceptance evidence for #2092.
+
+Slice-leaf validation: 80 focused provider/SDK checks passed; the full focused
+PostgreSQL batch passed 51 checks, followed by 14 current-admission/project-sharing
+checks and five final consumer/cleanup recording checks after fixture refinement.
+The explicitly owned `test_astrolift_slice_bindings_2092` database was removed.
+Changed-file Ruff checks and formatting pass. No production operator or tenant
+resource is provisioned by these checks.

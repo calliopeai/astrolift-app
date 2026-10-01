@@ -497,3 +497,26 @@ def test_creation_conflict_never_adopts_a_foreign_object_on_retry(kind):
     assert not store.reads and len(store.writes) == writes
     assert not fake.applied
     assert fake.objects[conflict[0]] == preserved
+
+
+def test_actual_secret_api_data_recovers_issued_credentials_without_rotation(monkeypatch):
+    import base64
+
+    driver, fake = _driver(parent=_parent_object())
+    first = driver.provision_slice(_spec())
+    key = next(key for key in fake.objects if key[0] == "Secret")
+    obj = fake.objects[key]
+    values = obj.pop("stringData")
+    obj["data"] = {name: base64.b64encode(value.encode()).decode() for name, value in values.items()}
+    store = driver._config.secrets_backend
+    issued = deepcopy(store.values)
+    store.values.clear()
+
+    def refuse_mint(size):
+        raise AssertionError("a retained issued credential must not rotate")
+
+    monkeypatch.setattr("k8s_native.managed._cnpg_slices.secrets.token_urlsafe", refuse_mint)
+    second = driver.provision_slice(_spec())
+    assert first.slice_handle == second.slice_handle
+    assert store.values == issued
+    assert len(_of_kind(fake.applied, "Secret")) == 1

@@ -51,6 +51,11 @@
   config. Verify Pub/Sub source and child ownership before writes or binding,
   preserve ownership labels during updates and retain recorded topic names.
   Audit AWS/Azure custom-tag namespace isolation (#2098).
+- Materialize CNPG preview bindings from durable slice identities with independent
+  retained credentials and namespace-qualified URLs. Recheck current owner/source
+  ancestry before effects, refuse legacy or foreign slice adoption, preserve
+  unrelated binding values, and report pending slice cleanup honestly (Refs #2092).
+
 - Qualify generated native managed-service binding hosts with their recorded
   namespace, including connection URI aliases. CNPG URLs retain rotating
   operator credentials through `fqdn-uri`; legacy handles without a namespace
