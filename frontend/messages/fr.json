@@ -5130,6 +5130,12 @@
       "timedOutAt": "Délai dépassé à {stage}.",
       "requestRate": "{value} req/s",
       "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Choisissez les panneaux affichés sur l’accueil et leur ordre. Les modifications sont synchronisées avec votre compte lorsque l’enregistrement réussit ; une copie reste disponible hors ligne dans le navigateur.",
+      "noAccess": "Votre rôle ne donne accès ni aux applications ni aux agents ; aucune disposition ne peut donc être choisie.",
+      "resetDefault": "Utiliser la disposition par défaut pour mes accès ({layout})",
+      "saveFailed": "La disposition de l’accueil n’a pas été enregistrée"
     }
   }
 }

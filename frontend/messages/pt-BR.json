@@ -5127,6 +5127,12 @@
       "timedOutAt": "Tempo esgotado em {stage}.",
       "requestRate": "{value} solic./s",
       "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Escolha os painéis exibidos no início e sua ordem. As alterações são sincronizadas com sua conta quando o salvamento é concluído; uma cópia no navegador continua disponível offline.",
+      "noAccess": "Sua função não tem acesso a aplicativos nem a agentes, portanto não há layout para escolher.",
+      "resetDefault": "Usar o layout padrão para meu acesso ({layout})",
+      "saveFailed": "O layout do início não foi salvo"
     }
   }
 }

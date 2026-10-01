@@ -2,6 +2,8 @@
 
 import { HomeLayoutPicker } from "@/components/home/HomeLayoutPicker";
 import type { HomeLayoutDef, HomeLayoutKey } from "@/components/home/registry";
+import { localizedHomeLayout } from "@/components/home/registry";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,7 +24,7 @@ export interface HomeLayoutSettingsProps {
 /**
  * Settings › Home: the Home layout (spec 44 §4.3), the same question as the
  * first sign-in. A choice saves as it is made, like Visualizations. Stored in
- * this browser until the profile carries `home_layout` (#2154). Pure: the
+ * the person's account with a browser copy (#2154). Pure: the
  * layouts and the save come from useHome.
  */
 export function HomeLayoutSettings({
@@ -34,14 +36,14 @@ export function HomeLayoutSettings({
   onLayoutChange,
   onResetLayout,
 }: HomeLayoutSettingsProps) {
+  const t = useTranslations("home");
+  layouts = layouts.map((value) => localizedHomeLayout(value, t));
   const defaultTitle = layouts.find((l) => l.key === defaultLayout)?.title;
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Home layout</CardTitle>
-        <CardDescription>
-          Which panels Home shows, and in what order. Saved in this browser.
-        </CardDescription>
+        <CardTitle className="text-base">{t("layoutLegend")}</CardTitle>
+        <CardDescription>{t("layoutSettings.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (
@@ -50,13 +52,11 @@ export function HomeLayoutSettings({
             <Skeleton className="h-20 w-full" />
           </div>
         ) : layouts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Your role has no access to Apps or Agents, so there is no layout to choose.
-          </p>
+          <p className="text-muted-foreground text-sm">{t("layoutSettings.noAccess")}</p>
         ) : (
           <>
             <HomeLayoutPicker
-              legend="Home layout"
+              legend={t("layoutLegend")}
               layouts={layouts}
               value={layout?.key ?? null}
               onChange={onLayoutChange}
@@ -64,7 +64,7 @@ export function HomeLayoutSettings({
             />
             {savedLayout && defaultTitle && savedLayout !== defaultLayout && (
               <Button size="sm" variant="outline" onClick={onResetLayout}>
-                Use the default for my access ({defaultTitle})
+                {t("layoutSettings.resetDefault", { layout: defaultTitle })}
               </Button>
             )}
           </>

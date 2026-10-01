@@ -5127,6 +5127,12 @@
       "timedOutAt": "在 {stage} 超时。",
       "requestRate": "{value} 请求/秒",
       "milliseconds": "{value} 毫秒"
+    },
+    "layoutSettings": {
+      "description": "选择首页显示的面板及其顺序。保存成功后，更改会同步到你的账户；浏览器中的副本在离线时仍可使用。",
+      "noAccess": "你的角色无权访问应用或代理，因此没有可供选择的布局。",
+      "resetDefault": "使用与我的访问权限对应的默认布局（{layout}）",
+      "saveFailed": "未能保存首页布局"
     }
   }
 }

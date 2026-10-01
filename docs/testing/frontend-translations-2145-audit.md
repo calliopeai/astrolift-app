@@ -139,8 +139,8 @@ operator layout.
 
 ## Home panels
 
-Home has 199 message keys per locale, covering its four layouts and seventeen
-registered panel presentations. Home-owned titles, default states, actions,
+Home's message tree covers its four layouts and seventeen registered panel
+presentations. Home-owned titles, default states, actions,
 approval sentences and feedback, known status/severity/health labels, chart
 legends and accessible summaries use those translations. Numbers, money,
 percentages, metric units, durations and relative timestamps use real locale
@@ -176,6 +176,22 @@ Retry callback appears when there is no older page. Clock ticks do not fetch.
 All-eight-locale tests cover loading, empty, paging and original error states,
 fixed-clock server rendering and hydration, and locale/time-zone changes.
 
-The connected HomeLayoutSettings consumer and FleetView's shared visualization
-chrome remain separate follow-up boundaries; this bounded port does not claim
-that issue #2145 is closed.
+FleetView's shared visualization chrome remains a separate follow-up boundary;
+this bounded port does not claim that issue #2145 is closed.
+
+## Home layout settings
+
+The connected Settings › Home consumer translates its heading, available layout
+presentation, access-empty state and reset action in all eight locales. Explicit
+caller layout labels and actual saved/default keys remain data. The description
+reflects account synchronization with an offline browser copy, rather than
+claiming browser-only persistence. Choosing a layout still saves immediately;
+reset still sends an explicit null with the answered flag.
+
+The preferences bridge translates the missing-message refusal fallback only for
+Home layout writes. Original server diagnostics and unrelated preference behavior
+remain unchanged. Actual Apollo/consumer tests verify successful saves and resets,
+server refusals restoring the last account answer, transport failures retaining
+the browser choice, first-read loading and offline fallback, locale changes without
+resubmission, and narrowed access without automatic preference rewrites. German
+768px and Japanese access-empty portable stories exercise the same consumer.

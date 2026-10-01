@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import ja from "@/messages/ja.json";
 
 import { BOTH, homeProps, NO_ACCESS, ONLY_APPS, OPERATOR } from "@/components/home/fixtures";
 import type { HomeAccess, HomeLayoutKey } from "@/components/home/registry";
@@ -56,4 +59,30 @@ export const Width768: Story = {
       <Live access={OPERATOR} saved="agents" />
     </div>
   ),
+};
+
+export const GermanSavedChoice768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Live access={OPERATOR} saved="agents" />
+    </div>
+  ),
+};
+
+export const JapaneseNoAccess: Story = {
+  ...NoAccess,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

@@ -5130,6 +5130,12 @@
       "timedOutAt": "Tiempo agotado en {stage}.",
       "requestRate": "{value} solic./s",
       "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Elige los paneles que muestra Inicio y su orden. Los cambios se sincronizan con tu cuenta cuando se guardan correctamente; una copia en el navegador sigue disponible sin conexión.",
+      "noAccess": "Tu rol no tiene acceso a aplicaciones ni agentes, por lo que no hay ningún diseño que elegir.",
+      "resetDefault": "Usar el diseño predeterminado para mi acceso ({layout})",
+      "saveFailed": "No se guardó el diseño de Inicio"
     }
   }
 }

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -46,6 +47,7 @@ interface UpdateMyUiPreferencesData {
  * Renders nothing.
  */
 export function UiPreferencesBridge() {
+  const homeT = useTranslations("home.layoutSettings");
   const { org, loading: orgLoading } = useActiveOrg();
   const { data, error } = useQuery<MyUiPreferencesData>(MY_UI_PREFERENCES, {
     fetchPolicy: "cache-and-network",
@@ -106,7 +108,11 @@ export function UiPreferencesBridge() {
           .then(({ data: result }) => {
             const res = result?.updateMyUiPreferences;
             if (res?.ok && res.data) serverRef.current = res.data;
-            else if (res) toast.error(res.errors[0]?.message ?? "Preference not saved");
+            else if (res)
+              toast.error(
+                res.errors[0]?.message ??
+                  ("homeLayout" in patch ? homeT("saveFailed") : "Preference not saved")
+              );
           })
           .catch(() => {
             // Offline or the server is down: the browser copy keeps the
@@ -118,7 +124,7 @@ export function UiPreferencesBridge() {
             if (reached && pending.current === 0 && serverRef.current) apply(serverRef.current);
           });
       }),
-    [update, apply]
+    [update, apply, homeT]
   );
 
   return null;

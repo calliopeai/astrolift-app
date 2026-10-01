@@ -5207,6 +5207,12 @@
       "timedOutAt": "Timed out at {stage}.",
       "requestRate": "{value} req/s",
       "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Choose which panels Home shows and their order. Changes sync to your account when saving succeeds; a browser copy remains available offline.",
+      "noAccess": "Your role has no access to Apps or Agents, so there is no layout to choose.",
+      "resetDefault": "Use the default for my access ({layout})",
+      "saveFailed": "Home layout was not saved"
     }
   }
 }

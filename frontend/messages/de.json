@@ -5130,6 +5130,12 @@
       "timedOutAt": "Zeitüberschreitung bei {stage}.",
       "requestRate": "{value} Anf./s",
       "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Wähle die Bereiche auf der Startseite und ihre Reihenfolge. Änderungen werden nach erfolgreichem Speichern mit deinem Konto synchronisiert; eine Kopie im Browser bleibt offline verfügbar.",
+      "noAccess": "Deine Rolle hat keinen Zugriff auf Apps oder Agenten, daher steht kein Layout zur Auswahl.",
+      "resetDefault": "Standardlayout für meinen Zugriff verwenden ({layout})",
+      "saveFailed": "Das Layout der Startseite wurde nicht gespeichert"
     }
   }
 }

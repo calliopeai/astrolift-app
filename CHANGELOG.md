@@ -5,6 +5,10 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Localize connected Home layout settings and Home-specific persistence feedback
+  in all eight locales. Copy reflects account synchronization and offline browser
+  fallback; original refusal diagnostics and exact preference patches remain intact
+  (#2145).
 - Translate Home layouts, panel states, approvals and observed metric presentation
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
