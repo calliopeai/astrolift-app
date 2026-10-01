@@ -4488,6 +4488,36 @@
           "policies": "정책",
           "check": "접근 확인"
         }
+      },
+      "legacyGrantRole": {
+        "title": "역할 부여",
+        "description": "선택한 범위에서 조직의 기존 구성원에게 역할을 부여하세요.",
+        "userId": "사용자 ID",
+        "targetUser": "{name}에게 역할을 부여합니다.",
+        "userGuidance": "이 조직의 기존 구성원에 대한 숫자 ID를 입력하세요. 이 양식은 사용자를 만들거나 초대하지 않습니다.",
+        "role": "역할",
+        "selectRole": "역할 선택",
+        "scope": "범위",
+        "noScope": "{scopeKind}에 사용할 수 있는 범위 없음",
+        "selectScope": "범위 선택",
+        "scopeGuidance": "역할의 범위 수준으로 고정됨: <scope></scope>",
+        "cancel": "취소",
+        "granting": "부여 중…",
+        "granted": "역할 부여됨",
+        "failed": "역할을 부여하지 못했습니다",
+        "refreshWarning": "화면을 새로 고치지 못했습니다. 최신 데이터를 보려면 새로 고침하세요.",
+        "orgReadFailed": "현재 조직을 확인하지 못했습니다. 페이지를 새로 고침하세요.",
+        "loadingOrg": "현재 조직 확인 중…",
+        "noOrg": "이 역할을 부여할 현재 조직이 없습니다.",
+        "unsupportedApp": "이 선택기에는 APP 대상이 없습니다. 접근 권한 부여에서 앱을 선택하세요.",
+        "scopeReadFailed": "범위 대상을 불러오지 못했습니다.",
+        "retry": "다시 시도",
+        "loadingScopes": "범위 대상 불러오는 중…",
+        "unknownScopes": "범위 대상이 아직 확인되지 않았습니다.",
+        "rolesReadFailed": "역할을 불러오지 못했습니다.",
+        "loadingRoles": "역할 불러오는 중…",
+        "unknownRoles": "역할이 아직 확인되지 않았습니다.",
+        "emptyRoles": "이 목록에 사용할 수 있는 역할이 없습니다."
       }
     },
     "settings": {

@@ -132,6 +132,15 @@ export function useAssignments() {
     canManage,
     roles: roles.data?.astroliftRoles ?? [],
     rolesLoading: roles.loading,
+    rolesKnown: roles.data?.astroliftRoles != null,
+    rolesError: roles.error,
+    onRetryRoles: async () => {
+      try {
+        await roles.refetch();
+      } catch {
+        /* The query preserves its read error. */
+      }
+    },
     revoking,
     bulkRevoking,
     onRevoke,

@@ -4491,6 +4491,36 @@
           "policies": "Políticas",
           "check": "Comprobar acceso"
         }
+      },
+      "legacyGrantRole": {
+        "title": "Conceder rol",
+        "description": "Asigna un rol a un miembro existente de la organización en el ámbito elegido.",
+        "userId": "ID de usuario",
+        "targetUser": "Se concederá un rol a {name}.",
+        "userGuidance": "Introduce el ID numérico de un miembro existente de esta organización. Este formulario no crea ni invita usuarios.",
+        "role": "Rol",
+        "selectRole": "Seleccionar un rol",
+        "scope": "Ámbito",
+        "noScope": "No hay ámbitos disponibles para {scopeKind}",
+        "selectScope": "Seleccionar un ámbito",
+        "scopeGuidance": "Fijado al nivel de ámbito del rol: <scope></scope>",
+        "cancel": "Cancelar",
+        "granting": "Concediendo…",
+        "granted": "Rol concedido",
+        "failed": "No se pudo conceder el rol",
+        "refreshWarning": "No se pudo actualizar la vista. Actualiza para ver los datos actuales.",
+        "orgReadFailed": "No se pudo confirmar la organización activa. Recarga la página para reintentar.",
+        "loadingOrg": "Confirmando la organización activa…",
+        "noOrg": "No hay una organización activa para conceder este rol.",
+        "unsupportedApp": "Este selector no ofrece destinos APP. Usa Conceder acceso para elegir una aplicación.",
+        "scopeReadFailed": "No se pudieron cargar los destinos de ámbito.",
+        "retry": "Reintentar",
+        "loadingScopes": "Cargando destinos de ámbito…",
+        "unknownScopes": "Todavía no se han confirmado los destinos de ámbito.",
+        "rolesReadFailed": "No se pudieron cargar los roles.",
+        "loadingRoles": "Cargando roles…",
+        "unknownRoles": "Todavía no se han confirmado los roles.",
+        "emptyRoles": "No hay roles disponibles en esta lista."
       }
     },
     "settings": {

@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { GrantRoleSheet } from "./GrantRoleDialog";
@@ -20,13 +23,17 @@ export const DeepLink: Story = {
   ),
 };
 
-/**
- * The sheet has no loading state of its own; the closest is the org and
- * scope lists not having arrived yet, so the scope picker is disabled.
- */
+/** Organization and target lists are still loading. */
 export const Loading: Story = {
   render: () => (
-    <GrantRoleSheet {...grantRoleProps({ org: null, teams: undefined, projects: undefined })} />
+    <GrantRoleSheet
+      {...grantRoleProps({
+        org: null,
+        teams: undefined,
+        projects: undefined,
+        organizationState: { loading: true, error: undefined },
+      })}
+    />
   ),
 };
 
@@ -64,4 +71,46 @@ export const LongStrings: Story = {
       })}
     />
   ),
+};
+
+export const GermanWidth768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <div style={{ width: 768 }}>
+      <GrantRoleSheet
+        {...grantRoleProps({ initialUserId: "2", initialUserLabel: "RAW_USER_NAME" })}
+      />
+    </div>
+  ),
+};
+export const JapaneseNoOrg: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja} timeZone="Asia/Tokyo">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => <GrantRoleSheet {...grantRoleProps({ org: null, teams: [], projects: [] })} />,
+};
+
+export const RoleReadFailed: Story = {
+  render: () => (
+    <GrantRoleSheet
+      {...grantRoleProps({
+        rolesError: { message: "RAW_ROLE_READ_FAILURE" },
+        rolesKnown: false,
+        onRetryRoles: async () => {},
+      })}
+    />
+  ),
+};
+export const RolesUnknown: Story = {
+  render: () => <GrantRoleSheet {...grantRoleProps({ roles: [], rolesKnown: false })} />,
 };

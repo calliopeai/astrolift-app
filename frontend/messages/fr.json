@@ -4491,6 +4491,36 @@
           "policies": "Politiques",
           "check": "Vérifier l’accès"
         }
+      },
+      "legacyGrantRole": {
+        "title": "Accorder un rôle",
+        "description": "Attribuez un rôle à un membre existant de l'organisation sur la portée choisie.",
+        "userId": "ID utilisateur",
+        "targetUser": "Attribution d'un rôle à {name}.",
+        "userGuidance": "Saisissez l'ID numérique d'un membre existant de cette organisation. Ce formulaire ne crée ni n'invite d'utilisateurs.",
+        "role": "Rôle",
+        "selectRole": "Choisir un rôle",
+        "scope": "Portée",
+        "noScope": "Aucune portée disponible pour {scopeKind}",
+        "selectScope": "Choisir une portée",
+        "scopeGuidance": "Fixé au niveau de portée du rôle : <scope></scope>",
+        "cancel": "Annuler",
+        "granting": "Attribution…",
+        "granted": "Rôle accordé",
+        "failed": "Impossible d'accorder le rôle",
+        "refreshWarning": "Impossible d'actualiser la vue. Actualisez pour voir les données actuelles.",
+        "orgReadFailed": "Impossible de confirmer l'organisation active. Rechargez la page pour réessayer.",
+        "loadingOrg": "Confirmation de l'organisation active…",
+        "noOrg": "Aucune organisation active n'est disponible pour cette attribution.",
+        "unsupportedApp": "Ce sélecteur ne propose pas de cibles APP. Utilisez Accorder l'accès pour choisir une application.",
+        "scopeReadFailed": "Impossible de charger les cibles de portée.",
+        "retry": "Réessayer",
+        "loadingScopes": "Chargement des cibles de portée…",
+        "unknownScopes": "Les cibles de portée n'ont pas encore été confirmées.",
+        "rolesReadFailed": "Impossible de charger les rôles.",
+        "loadingRoles": "Chargement des rôles…",
+        "unknownRoles": "Les rôles n'ont pas encore été confirmés.",
+        "emptyRoles": "Aucun rôle n'est disponible dans cette liste."
       }
     },
     "settings": {

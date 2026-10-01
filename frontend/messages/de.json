@@ -4491,6 +4491,36 @@
           "policies": "Richtlinien",
           "check": "Zugriff prüfen"
         }
+      },
+      "legacyGrantRole": {
+        "title": "Rolle gewähren",
+        "description": "Einem bestehenden Organisationsmitglied eine Rolle im ausgewählten Bereich zuweisen.",
+        "userId": "Benutzer-ID",
+        "targetUser": "Rolle für {name} gewähren.",
+        "userGuidance": "Numerische ID eines bestehenden Mitglieds dieser Organisation eingeben. Dieses Formular erstellt keine Benutzer und lädt niemanden ein.",
+        "role": "Rolle",
+        "selectRole": "Rolle auswählen",
+        "scope": "Bereich",
+        "noScope": "Keine Bereiche für {scopeKind} verfügbar",
+        "selectScope": "Bereich auswählen",
+        "scopeGuidance": "Auf die Bereichsebene der Rolle festgelegt: <scope></scope>",
+        "cancel": "Abbrechen",
+        "granting": "Wird gewährt…",
+        "granted": "Rolle gewährt",
+        "failed": "Rolle konnte nicht gewährt werden",
+        "refreshWarning": "Die Ansicht konnte nicht aktualisiert werden. Zum Anzeigen aktueller Daten erneut laden.",
+        "orgReadFailed": "Die aktive Organisation konnte nicht bestätigt werden. Seite erneut laden.",
+        "loadingOrg": "Aktive Organisation wird bestätigt…",
+        "noOrg": "Für diese Zuweisung ist keine aktive Organisation verfügbar.",
+        "unsupportedApp": "Diese Auswahl bietet keine APP-Ziele. Über Zugriff gewähren eine Anwendung auswählen.",
+        "scopeReadFailed": "Bereichsziele konnten nicht geladen werden.",
+        "retry": "Erneut versuchen",
+        "loadingScopes": "Bereichsziele werden geladen…",
+        "unknownScopes": "Bereichsziele sind noch nicht bestätigt.",
+        "rolesReadFailed": "Rollen konnten nicht geladen werden.",
+        "loadingRoles": "Rollen werden geladen…",
+        "unknownRoles": "Rollen sind noch nicht bestätigt.",
+        "emptyRoles": "In dieser Liste sind keine Rollen verfügbar."
       }
     },
     "settings": {

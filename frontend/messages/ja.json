@@ -4488,6 +4488,36 @@
           "policies": "ポリシー",
           "check": "アクセスを確認"
         }
+      },
+      "legacyGrantRole": {
+        "title": "ロールを付与",
+        "description": "選択したスコープで、組織の既存メンバーにロールを付与します。",
+        "userId": "ユーザー ID",
+        "targetUser": "{name} にロールを付与します。",
+        "userGuidance": "この組織の既存メンバーの数値 ID を入力してください。このフォームではユーザーの作成や招待は行いません。",
+        "role": "ロール",
+        "selectRole": "ロールを選択",
+        "scope": "スコープ",
+        "noScope": "{scopeKind} のスコープがありません",
+        "selectScope": "スコープを選択",
+        "scopeGuidance": "ロールのスコープレベルに固定されています：<scope></scope>",
+        "cancel": "キャンセル",
+        "granting": "付与中…",
+        "granted": "ロールを付与しました",
+        "failed": "ロールを付与できませんでした",
+        "refreshWarning": "表示を更新できませんでした。現在のデータを確認するには再読み込みしてください。",
+        "orgReadFailed": "アクティブな組織を確認できませんでした。ページを再読み込みしてください。",
+        "loadingOrg": "アクティブな組織を確認中…",
+        "noOrg": "この付与操作に使用できるアクティブな組織がありません。",
+        "unsupportedApp": "この選択画面では APP の対象を選べません。「アクセスを付与」でアプリを選択してください。",
+        "scopeReadFailed": "スコープの対象を読み込めませんでした。",
+        "retry": "再試行",
+        "loadingScopes": "スコープの対象を読み込み中…",
+        "unknownScopes": "スコープの対象はまだ確認されていません。",
+        "rolesReadFailed": "ロールを読み込めませんでした。",
+        "loadingRoles": "ロールを読み込み中…",
+        "unknownRoles": "ロールはまだ確認されていません。",
+        "emptyRoles": "この一覧にロールはありません。"
       }
     },
     "settings": {

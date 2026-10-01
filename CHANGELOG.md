@@ -24,6 +24,11 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Localize the connected legacy role-grant sheet and feedback in all eight locales,
+  preserving literal role/scope identities and original backend refusals. Distinguish
+  unknown, failed and unsupported target sources; accepted grants refresh the exact
+  active page once, while cancel and rejected writes trigger no refresh (#2145).
+
 - Refresh Team list/picker reads only after an accepted create/edit/delete reply.
   Rejected writes retain their original diagnostic and drafts without triggering
   an unrelated failed-read warning (#2145).

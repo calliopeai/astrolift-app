@@ -392,6 +392,12 @@ export function membersProps(
 
 export function grantRoleProps(overrides: Partial<GrantRoleSheetProps> = {}): GrantRoleSheetProps {
   return {
+    organizationState: { loading: false, error: undefined },
+    scopeReads: {
+      TEAM: { loading: false, error: undefined, known: true },
+      PROJECT: { loading: false, error: undefined, known: true },
+    },
+    onRetryScope: async () => {},
     open: true,
     onOpenChange: noop,
     roles: ROLES,

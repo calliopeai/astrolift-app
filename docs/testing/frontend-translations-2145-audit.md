@@ -295,3 +295,35 @@ Apollo HTTP regressions combine a refused mutation with a read that would fail:
 no read refresh occurs, no refresh warning or success is shown, and the original
 refusal, edit/create draft or existing list row remains intact. Accepted-write
 refresh-failure behavior is preserved through the same shared helper.
+
+## Connected legacy role-grant sheet
+
+The `GrantRoleDialog`/`GrantRoleSheet` and `useGrantRole` used by the actual
+administration assignments tab now use additive `shared.access.legacyGrantRole`
+copy in all eight locales. The copy asks for the numeric ID of an existing member
+of the active organization, matching the real backend membership contract; it
+makes no future SCIM/search promise. Custom/system role names, scope tokens,
+resource identifiers, member labels and backend diagnostics remain literal.
+
+Role and organization/team/project target reads distinguish loading, unconfirmed
+and failed results from a known empty list. The actual assignments caller forwards
+role read state and retry; a failed role read retains its original diagnostic,
+blocks cached selections, and refreshes the real role query on retry. Known empty
+roles remain distinct from unknown roles. Failed scope reads offer an actual retry;
+unknown organization facts and withdrawn current selections remain disabled.
+This legacy picker has no APP source, which it discloses explicitly rather than
+inventing a target or default. Existing parent permission gating is unchanged;
+backend destination-scope `org.manage_members`, grant ceilings and current actor
+checks remain authoritative. The sheet makes no new client permission assertion.
+
+Real HttpLink tests cover all-eight grants/refusals/no-diagnostic/transport/read
+refresh failures with exact IDs and existing active page variables. Accepted
+writes retain success if their read refresh fails; refusals keep drafts and issue
+no refresh or warning. The actual assignments consumer proves Cancel does no read
+and a committed grant refreshes its active page exactly once. Its former
+unconditional close refetch was redundant and could leave an unhandled read
+failure after commit. Locale/context changes and unsupported/unknown/read-error
+sources, custom metadata, ICU arguments/tags and portable stories are included.
+The legacy flat scope sources are preserved; this leaf does not add pagination,
+a new member picker, APP support or claim complete #2145 coverage. Team detail,
+member and access presentation remains the next independently bounded audit.

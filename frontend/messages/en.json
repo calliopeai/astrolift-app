@@ -4568,6 +4568,36 @@
           "policies": "Policies",
           "check": "Check access"
         }
+      },
+      "legacyGrantRole": {
+        "title": "Grant role",
+        "description": "Assign a role to an existing organization member on the chosen scope.",
+        "userId": "User ID",
+        "targetUser": "Granting a role to {name}.",
+        "userGuidance": "Enter the numeric ID of an existing member of this organization. This form does not create or invite users.",
+        "role": "Role",
+        "selectRole": "Select a role",
+        "scope": "Scope",
+        "noScope": "No scopes available for {scopeKind}",
+        "selectScope": "Select a scope",
+        "scopeGuidance": "Fixed to the role's scope level: <scope></scope>",
+        "cancel": "Cancel",
+        "granting": "Granting…",
+        "granted": "Role granted",
+        "failed": "Could not grant the role",
+        "refreshWarning": "Could not refresh the view. Refresh to see current data.",
+        "orgReadFailed": "Could not confirm the active organization. Reload the page to try again.",
+        "loadingOrg": "Confirming the active organization…",
+        "noOrg": "No active organization is available for this grant.",
+        "unsupportedApp": "This picker does not offer APP targets. Use Grant access to choose an application.",
+        "scopeReadFailed": "Could not load scope targets.",
+        "retry": "Retry",
+        "loadingScopes": "Loading scope targets…",
+        "unknownScopes": "Scope targets have not been confirmed yet.",
+        "rolesReadFailed": "Could not load roles.",
+        "loadingRoles": "Loading roles…",
+        "unknownRoles": "Roles have not been confirmed yet.",
+        "emptyRoles": "No roles are available in this list."
       }
     },
     "settings": {

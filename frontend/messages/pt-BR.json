@@ -4488,6 +4488,36 @@
           "policies": "Políticas",
           "check": "Verificar acesso"
         }
+      },
+      "legacyGrantRole": {
+        "title": "Conceder papel",
+        "description": "Atribua um papel a um membro existente da organização no escopo escolhido.",
+        "userId": "ID do usuário",
+        "targetUser": "Concedendo um papel a {name}.",
+        "userGuidance": "Informe o ID numérico de um membro existente desta organização. Este formulário não cria nem convida usuários.",
+        "role": "Papel",
+        "selectRole": "Selecionar um papel",
+        "scope": "Escopo",
+        "noScope": "Nenhum escopo disponível para {scopeKind}",
+        "selectScope": "Selecionar um escopo",
+        "scopeGuidance": "Fixado no nível de escopo do papel: <scope></scope>",
+        "cancel": "Cancelar",
+        "granting": "Concedendo…",
+        "granted": "Papel concedido",
+        "failed": "Não foi possível conceder o papel",
+        "refreshWarning": "Não foi possível atualizar a tela. Atualize para ver os dados atuais.",
+        "orgReadFailed": "Não foi possível confirmar a organização ativa. Recarregue a página para tentar novamente.",
+        "loadingOrg": "Confirmando a organização ativa…",
+        "noOrg": "Nenhuma organização ativa está disponível para esta concessão.",
+        "unsupportedApp": "Este seletor não oferece destinos APP. Use Conceder acesso para escolher um aplicativo.",
+        "scopeReadFailed": "Não foi possível carregar os destinos do escopo.",
+        "retry": "Tentar novamente",
+        "loadingScopes": "Carregando destinos do escopo…",
+        "unknownScopes": "Os destinos do escopo ainda não foram confirmados.",
+        "rolesReadFailed": "Não foi possível carregar os papéis.",
+        "loadingRoles": "Carregando papéis…",
+        "unknownRoles": "Os papéis ainda não foram confirmados.",
+        "emptyRoles": "Nenhum papel está disponível nesta lista."
       }
     },
     "settings": {

@@ -4488,6 +4488,36 @@
           "policies": "策略",
           "check": "检查访问"
         }
+      },
+      "legacyGrantRole": {
+        "title": "授予角色",
+        "description": "在所选权限范围内，为组织的现有成员分配角色。",
+        "userId": "用户 ID",
+        "targetUser": "向 {name} 授予角色。",
+        "userGuidance": "请输入此组织现有成员的数字 ID。此表单不会创建或邀请用户。",
+        "role": "角色",
+        "selectRole": "选择角色",
+        "scope": "权限范围",
+        "noScope": "没有适用于 {scopeKind} 的权限范围",
+        "selectScope": "选择权限范围",
+        "scopeGuidance": "固定为角色的权限范围级别：<scope></scope>",
+        "cancel": "取消",
+        "granting": "正在授予…",
+        "granted": "已授予角色",
+        "failed": "无法授予角色",
+        "refreshWarning": "无法刷新视图。请刷新以查看当前数据。",
+        "orgReadFailed": "无法确认当前组织。请重新加载页面后重试。",
+        "loadingOrg": "正在确认当前组织…",
+        "noOrg": "没有可用于此次授予的当前组织。",
+        "unsupportedApp": "此选择器不提供 APP 目标。请使用“授予访问权限”选择应用。",
+        "scopeReadFailed": "无法加载权限范围目标。",
+        "retry": "重试",
+        "loadingScopes": "正在加载权限范围目标…",
+        "unknownScopes": "权限范围目标尚未确认。",
+        "rolesReadFailed": "无法加载角色。",
+        "loadingRoles": "正在加载角色…",
+        "unknownRoles": "角色尚未确认。",
+        "emptyRoles": "此列表中没有可用角色。"
       }
     },
     "settings": {
