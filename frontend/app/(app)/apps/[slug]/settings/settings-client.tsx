@@ -248,7 +248,7 @@ export function RetentionPolicyCard({ app }: { app: AstroliftRegisteredApp }) {
   );
 }
 
-function EnvironmentSettingsCard({ appSlug }: { appSlug: string }) {
+export function EnvironmentSettingsCard({ appSlug }: { appSlug: string }) {
   return <EnvironmentSettingsView {...useEnvironmentSettings(appSlug)} />;
 }
 

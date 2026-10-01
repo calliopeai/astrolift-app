@@ -2665,6 +2665,39 @@
       "unavailable": "Current workload permissions or version are unavailable. Refresh the page.",
       "selectedEnvironmentUnsupported": "This action targets the primary environment. It cannot target a selected environment.",
       "permissionDenied": "Permission denied"
+    },
+    "environmentOverrides": {
+      "title": "Environment overrides",
+      "description": "Per-environment key/value settings that supplement the app's base configuration.",
+      "environment": "Environment",
+      "selectEnvironment": "Select environment",
+      "empty": "No overrides set for <name>{environment}</name>. Add one below or pick a suggested key.",
+      "emptyValue": "(empty)",
+      "clearTitle": "Clear override",
+      "clearLabel": "Clear {key} override",
+      "suggested": "Suggested:",
+      "alreadySet": "{hint} (already set)",
+      "keyPlaceholder": "KEY",
+      "keyLabel": "Override key",
+      "valuePlaceholder": "value",
+      "valueLabel": "Override value",
+      "add": "Add override",
+      "loading": "Loading environment overrides…",
+      "readFailed": "Environment overrides could not be loaded.",
+      "retry": "Retry",
+      "keyRequired": "Key is required.",
+      "saveFailed": "Failed to save.",
+      "clearFailed": "Failed to clear.",
+      "saved": "Set {key}",
+      "cleared": "Cleared {key}",
+      "refreshWarning": "The change was saved, but environment overrides could not be refreshed. Retry to see current data.",
+      "hints": {
+        "replicas": "Workload replica count",
+        "cpu_request": "Per-pod CPU request",
+        "cpu_limit": "Per-pod CPU limit",
+        "memory_request": "Per-pod memory request",
+        "memory_limit": "Per-pod memory limit"
+      }
     }
   },
   "lists": {

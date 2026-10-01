@@ -2646,6 +2646,39 @@
         "save": "Enregistrer"
       },
       "empty": "Aucun contenu ici pour cette application."
+    },
+    "environmentOverrides": {
+      "title": "Paramètres par environnement",
+      "description": "Paramètres clé/valeur par environnement qui complètent la configuration de base de l’application.",
+      "environment": "Environnement",
+      "selectEnvironment": "Sélectionner un environnement",
+      "empty": "Aucun paramètre pour <name>{environment}</name>. Ajoutez-en un ci-dessous ou choisissez une clé suggérée.",
+      "emptyValue": "(vide)",
+      "clearTitle": "Supprimer le paramètre",
+      "clearLabel": "Supprimer le paramètre {key}",
+      "suggested": "Suggestions :",
+      "alreadySet": "{hint} (déjà défini)",
+      "keyPlaceholder": "CLÉ",
+      "keyLabel": "Clé du paramètre",
+      "valuePlaceholder": "valeur",
+      "valueLabel": "Valeur du paramètre",
+      "add": "Ajouter un paramètre",
+      "loading": "Chargement des paramètres par environnement…",
+      "readFailed": "Impossible de charger les paramètres par environnement.",
+      "retry": "Réessayer",
+      "keyRequired": "La clé est obligatoire.",
+      "saveFailed": "Échec de l’enregistrement.",
+      "clearFailed": "Échec de la suppression.",
+      "saved": "{key} défini",
+      "cleared": "{key} supprimé",
+      "refreshWarning": "La modification a été enregistrée, mais les paramètres par environnement n’ont pas pu être actualisés. Réessayez pour voir les données actuelles.",
+      "hints": {
+        "replicas": "Nombre de réplicas de la charge de travail",
+        "cpu_request": "Demande de CPU par pod",
+        "cpu_limit": "Limite de CPU par pod",
+        "memory_request": "Demande de mémoire par pod",
+        "memory_limit": "Limite de mémoire par pod"
+      }
     }
   },
   "settingsIndex": {

@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import spanish from "@/messages/es.json";
 
 import { ENV_SETTINGS, ENVIRONMENTS, LONG } from "./app-settings-members.fixtures";
 import { EnvironmentSettingsView } from "./EnvironmentSettings";
@@ -15,13 +17,13 @@ type Story = StoryObj<typeof EnvironmentSettingsView>;
 
 export const Full: Story = {};
 
-/** An add in flight. The section has no loading skeleton; it hides until envs land. */
+/** An add in flight; its submit action stays disabled. */
 export const Loading: Story = { args: { adding: true } };
 
 /** One environment with no overrides (no environment picker). */
 export const Empty: Story = { args: { envs: [ENVIRONMENTS[1]] } };
 
-/** No error state; a failed save is a toast. Shown: no environments, so nothing renders. */
+/** A confirmed empty environment list hides the section. */
 export const NoEnvironments: Story = { args: { envs: [] } };
 
 export const LongStrings: Story = {
@@ -50,4 +52,21 @@ export const Clearing: Story = {
       canvas.getByRole("button", { name: `Clear ${ENVIRONMENTS[0].settings[1].key} override` })
     ).toBeEnabled();
   },
+};
+
+export const Reading: Story = { args: { envs: [], loading: true } };
+export const ReadError: Story = {
+  args: { envs: [], error: "RAW_ENV_READ_DIAGNOSTIC", onRetry: () => {} },
+};
+export const CachedReadError: Story = {
+  args: { error: "RAW_ENV_READ_DIAGNOSTIC", onRetry: () => {} },
+};
+export const SpanishWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }}>
+        <EnvironmentSettingsView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

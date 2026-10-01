@@ -2646,6 +2646,39 @@
         "save": "保存"
       },
       "empty": "此应用暂无内容。"
+    },
+    "environmentOverrides": {
+      "title": "环境专属设置",
+      "description": "按环境配置的键值设置，用于补充应用的基础配置。",
+      "environment": "环境",
+      "selectEnvironment": "选择环境",
+      "empty": "<name>{environment}</name>尚无专属设置。在下方添加设置或选择建议的键。",
+      "emptyValue": "（空）",
+      "clearTitle": "移除设置",
+      "clearLabel": "移除 {key} 设置",
+      "suggested": "建议：",
+      "alreadySet": "{hint}（已设置）",
+      "keyPlaceholder": "键",
+      "keyLabel": "设置键",
+      "valuePlaceholder": "值",
+      "valueLabel": "设置值",
+      "add": "添加设置",
+      "loading": "正在加载环境专属设置…",
+      "readFailed": "无法加载环境专属设置。",
+      "retry": "重试",
+      "keyRequired": "键不能为空。",
+      "saveFailed": "保存失败。",
+      "clearFailed": "移除失败。",
+      "saved": "已设置 {key}",
+      "cleared": "已移除 {key}",
+      "refreshWarning": "更改已保存，但无法刷新环境专属设置。请重试以查看当前数据。",
+      "hints": {
+        "replicas": "工作负载副本数",
+        "cpu_request": "每个 Pod 的 CPU 请求量",
+        "cpu_limit": "每个 Pod 的 CPU 上限",
+        "memory_request": "每个 Pod 的内存请求量",
+        "memory_limit": "每个 Pod 的内存上限"
+      }
     }
   },
   "settingsIndex": {

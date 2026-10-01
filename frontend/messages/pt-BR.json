@@ -2646,6 +2646,39 @@
         "save": "Salvar"
       },
       "empty": "Não há conteúdo aqui para este aplicativo."
+    },
+    "environmentOverrides": {
+      "title": "Configurações por ambiente",
+      "description": "Configurações de chave e valor por ambiente que complementam a configuração base do aplicativo.",
+      "environment": "Ambiente",
+      "selectEnvironment": "Selecionar ambiente",
+      "empty": "Nenhuma configuração para <name>{environment}</name>. Adicione uma abaixo ou escolha uma chave sugerida.",
+      "emptyValue": "(vazio)",
+      "clearTitle": "Remover configuração",
+      "clearLabel": "Remover configuração {key}",
+      "suggested": "Sugestões:",
+      "alreadySet": "{hint} (já definido)",
+      "keyPlaceholder": "CHAVE",
+      "keyLabel": "Chave da configuração",
+      "valuePlaceholder": "valor",
+      "valueLabel": "Valor da configuração",
+      "add": "Adicionar configuração",
+      "loading": "Carregando configurações por ambiente…",
+      "readFailed": "Não foi possível carregar as configurações por ambiente.",
+      "retry": "Tentar novamente",
+      "keyRequired": "A chave é obrigatória.",
+      "saveFailed": "Não foi possível salvar.",
+      "clearFailed": "Não foi possível remover.",
+      "saved": "{key} definido",
+      "cleared": "{key} removido",
+      "refreshWarning": "A alteração foi salva, mas não foi possível atualizar as configurações por ambiente. Tente novamente para ver os dados atuais.",
+      "hints": {
+        "replicas": "Número de réplicas da carga de trabalho",
+        "cpu_request": "Solicitação de CPU por pod",
+        "cpu_limit": "Limite de CPU por pod",
+        "memory_request": "Solicitação de memória por pod",
+        "memory_limit": "Limite de memória por pod"
+      }
     }
   },
   "settingsIndex": {

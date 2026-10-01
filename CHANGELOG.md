@@ -50,6 +50,11 @@
   pending indicators to the observed app/source without promising data deletion
   or backend version preconditions (#2145).
 
+- Localize the connected environment override card in all eight locales. Keep
+  refused drafts and accepted settings through failed reads, show real read retry,
+  and discard drafts after observed environment, app, source or permission changes
+  without changing current-target API writes (#2145, bounded item 13 flow).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

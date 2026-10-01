@@ -2646,6 +2646,39 @@
         "save": "Speichern"
       },
       "empty": "Hier gibt es nichts für diese App."
+    },
+    "environmentOverrides": {
+      "title": "Umgebungsspezifische Einstellungen",
+      "description": "Schlüssel-Wert-Einstellungen pro Umgebung, die die Basiskonfiguration der App ergänzen.",
+      "environment": "Umgebung",
+      "selectEnvironment": "Umgebung auswählen",
+      "empty": "Keine Einstellungen für <name>{environment}</name>. Füge unten eine hinzu oder wähle einen vorgeschlagenen Schlüssel.",
+      "emptyValue": "(leer)",
+      "clearTitle": "Einstellung entfernen",
+      "clearLabel": "Einstellung {key} entfernen",
+      "suggested": "Vorschläge:",
+      "alreadySet": "{hint} (bereits festgelegt)",
+      "keyPlaceholder": "SCHLÜSSEL",
+      "keyLabel": "Einstellungsschlüssel",
+      "valuePlaceholder": "Wert",
+      "valueLabel": "Einstellungswert",
+      "add": "Einstellung hinzufügen",
+      "loading": "Umgebungseinstellungen werden geladen…",
+      "readFailed": "Umgebungseinstellungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "keyRequired": "Ein Schlüssel ist erforderlich.",
+      "saveFailed": "Speichern fehlgeschlagen.",
+      "clearFailed": "Entfernen fehlgeschlagen.",
+      "saved": "{key} festgelegt",
+      "cleared": "{key} entfernt",
+      "refreshWarning": "Die Änderung wurde gespeichert, aber die Umgebungseinstellungen konnten nicht aktualisiert werden. Versuche es erneut, um aktuelle Daten zu sehen.",
+      "hints": {
+        "replicas": "Anzahl der Workload-Replikate",
+        "cpu_request": "CPU-Anforderung pro Pod",
+        "cpu_limit": "CPU-Limit pro Pod",
+        "memory_request": "Speicheranforderung pro Pod",
+        "memory_limit": "Speicherlimit pro Pod"
+      }
     }
   },
   "settingsIndex": {

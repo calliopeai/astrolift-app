@@ -869,3 +869,60 @@ This completes this retention card within original item 13, not the whole item.
 The independently frozen Archive/restore leaf is unchanged. Environment
 settings/overrides, managed-service administration, agent-mode resync and other
 operational-hook feedback remain separate connected translation boundaries.
+
+## Connected environment override settings
+
+The existing `EnvironmentSettingsCard` route container, its pure view and owned
+hook use 29 additive `apps.environmentOverrides` messages in all eight locales.
+Human controls, read states, suggested-key hints, empty values, accessibility
+labels and feedback are translated. The five suggested technical keys, unknown
+keys/values, environment/app/cluster/provider identifiers and diagnostics remain
+literal. The existing card is exported for connected tests; its route composition
+is unchanged. Pure callers retain compatible optional read-state props.
+
+The actual `LIST_ENVIRONMENTS`, `SET_ENVIRONMENT_SETTING` and
+`CLEAR_ENVIRONMENT_SETTING` documents remain unchanged. Set still trims only the
+key and sends `{ environmentId, key, value }`; clear still sends
+`{ environmentId, key }`. APP_UPDATE, environment/application/org and ABAC
+admission remain server-owned. The card retains its existing `app.update`
+visibility and optimistic permission-loading behavior. No new review modal,
+lifecycle or provider operation is introduced; keyboard submission uses the same
+add action and input.
+
+A refused/failed write keeps its draft or row, shows the original diagnostic
+(or localized empty-message fallback), releases pending admission and performs
+no refresh. An accepted write reports success and awaits an explicit refetch of
+the same environment list; failure warns separately and retains acceptance.
+Add inputs clear only if that same source and draft are still current. Concurrent
+edits, changed targets and late replies cannot clear a newer draft. Clear remains
+pending per environment/key until its follow-up settles, and duplicate adds are
+admitted once before React rerenders. Target epochs isolate old app callbacks and
+pending state; obsolete accepted replies skip their old target's refresh.
+
+Failed initial reads and invalid null inventories show unavailable/retry rather
+than a healthy empty list. Failed cached reads retain observations and drafts,
+with writes disabled until a successful actual retry. A confirmed empty list
+retains the existing hidden-card behavior. Observed selected-environment,
+app-target, cluster/provider source, environment creation marker or permission
+changes discard old drafts, including observed A→B→A transitions and withdrawal.
+A language change alone retains a draft. These are local observations, not a
+conditional-write protocol: the API upserts or clears the current row by
+immutable environment ID and key, with no expected setting ID/version. Unseen
+external changes, same-key setting replacement and unobserved ABA remain outside
+this proof; saving an override does not establish reconciliation of live pods.
+
+Four focused files pass 203 checks: 168 actual exported-card/schema-validated
+HttpLink cases across all eight locales, eight ICU/rich-tag contracts, 13
+portable declared-story/behavior cases and 14 existing pending-action regressions.
+Portable components use actual project decorators and RTL-owned cleanup. Tests
+cover exact literal inputs, keyboard submission, refusal/transport/fallback
+retry, accepted-refresh failure, unknown/failed/cached reads, per-row pending,
+concurrent edits, observed source/selection/permission ABA, withdrawal, changed
+app callbacks and language changes. Catalogue comparison to `ec1abcd6` confirms
+exactly 29 owned additive leaves per locale with all other values unchanged.
+TypeScript, scoped ESLint and formatting pass.
+
+This completes the bounded environment override card. Archive/restore,
+app-frame delete, retention, API/backend/schema/generators, shared fixtures and
+other settings/member copy are untouched. #2145 remains open for its remaining
+surfaces; no production or cloud call ran.

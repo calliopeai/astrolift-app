@@ -2646,6 +2646,39 @@
         "save": "保存"
       },
       "empty": "このアプリの内容はありません。"
+    },
+    "environmentOverrides": {
+      "title": "環境別の設定",
+      "description": "アプリの基本設定を補う、環境ごとのキーと値の設定です。",
+      "environment": "環境",
+      "selectEnvironment": "環境を選択",
+      "empty": "<name>{environment}</name>には設定がありません。下で追加するか、推奨キーを選択してください。",
+      "emptyValue": "（空）",
+      "clearTitle": "設定を削除",
+      "clearLabel": "{key}の設定を削除",
+      "suggested": "推奨キー：",
+      "alreadySet": "{hint}（設定済み）",
+      "keyPlaceholder": "キー",
+      "keyLabel": "設定のキー",
+      "valuePlaceholder": "値",
+      "valueLabel": "設定の値",
+      "add": "設定を追加",
+      "loading": "環境別の設定を読み込み中…",
+      "readFailed": "環境別の設定を読み込めませんでした。",
+      "retry": "再試行",
+      "keyRequired": "キーは必須です。",
+      "saveFailed": "保存できませんでした。",
+      "clearFailed": "削除できませんでした。",
+      "saved": "{key}を設定しました",
+      "cleared": "{key}を削除しました",
+      "refreshWarning": "変更は保存されましたが、環境別の設定を更新できませんでした。再試行して最新のデータを確認してください。",
+      "hints": {
+        "replicas": "ワークロードのレプリカ数",
+        "cpu_request": "PodごとのCPU要求",
+        "cpu_limit": "PodごとのCPU上限",
+        "memory_request": "Podごとのメモリ要求",
+        "memory_limit": "Podごとのメモリ上限"
+      }
     }
   },
   "settingsIndex": {

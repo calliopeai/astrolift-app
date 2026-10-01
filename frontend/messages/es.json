@@ -2646,6 +2646,39 @@
         "save": "Guardar"
       },
       "empty": "No hay contenido aquí para esta aplicación."
+    },
+    "environmentOverrides": {
+      "title": "Ajustes por entorno",
+      "description": "Ajustes de clave y valor por entorno que complementan la configuración base de la aplicación.",
+      "environment": "Entorno",
+      "selectEnvironment": "Seleccionar entorno",
+      "empty": "No hay ajustes para <name>{environment}</name>. Añade uno abajo o elige una clave sugerida.",
+      "emptyValue": "(vacío)",
+      "clearTitle": "Quitar ajuste",
+      "clearLabel": "Quitar ajuste {key}",
+      "suggested": "Sugerencias:",
+      "alreadySet": "{hint} (ya configurado)",
+      "keyPlaceholder": "CLAVE",
+      "keyLabel": "Clave del ajuste",
+      "valuePlaceholder": "valor",
+      "valueLabel": "Valor del ajuste",
+      "add": "Añadir ajuste",
+      "loading": "Cargando ajustes por entorno…",
+      "readFailed": "No se pudieron cargar los ajustes por entorno.",
+      "retry": "Reintentar",
+      "keyRequired": "La clave es obligatoria.",
+      "saveFailed": "No se pudo guardar.",
+      "clearFailed": "No se pudo quitar.",
+      "saved": "Se configuró {key}",
+      "cleared": "Se quitó {key}",
+      "refreshWarning": "El cambio se guardó, pero no se pudieron actualizar los ajustes por entorno. Reintenta para ver los datos actuales.",
+      "hints": {
+        "replicas": "Número de réplicas de la carga de trabajo",
+        "cpu_request": "Solicitud de CPU por pod",
+        "cpu_limit": "Límite de CPU por pod",
+        "memory_request": "Solicitud de memoria por pod",
+        "memory_limit": "Límite de memoria por pod"
+      }
     }
   },
   "settingsIndex": {
