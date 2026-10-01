@@ -31,7 +31,16 @@ def test_private_vpc_addresses_are_not_blanket_blocked(address):
 
 @pytest.mark.parametrize(
     "address",
-    ["127.0.0.1", "::1", "::ffff:127.0.0.1", "169.254.169.254", "100.100.100.200", "0.0.0.0", "ff02::1"],
+    [
+        "127.0.0.1",
+        "::1",
+        "::ffff:127.0.0.1",
+        "169.254.169.254",
+        "100.100.100.200",
+        "fd00:ec2::254",
+        "0.0.0.0",
+        "ff02::1",
+    ],
 )
 def test_local_and_metadata_addresses_are_blocked(address):
     assert blocked_address(address)

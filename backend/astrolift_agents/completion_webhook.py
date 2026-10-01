@@ -77,6 +77,7 @@ def blocked_address(value: str) -> bool:
         or address.is_multicast
         or address.is_unspecified
         or address == ipaddress.ip_address("100.100.100.200")
+        or address == ipaddress.ip_address("fd00:ec2::254")
     )
 
 
@@ -120,7 +121,9 @@ def validate_destination(url: str, allowed_hosts: object) -> str:
 
 
 def encoded_body(payload: dict) -> bytes:
-    return json.dumps(payload, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        payload, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
 
 
 def signature(secret: bytes, timestamp: str, body: bytes) -> str:
