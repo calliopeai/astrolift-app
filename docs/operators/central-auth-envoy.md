@@ -199,7 +199,6 @@ serve an apex hostname or discard an existing rule set. Long exact
 hostnames keep their full value in route hostnames and an annotation, with
 a short ownership label that stays within Kubernetes' label limit.
 
-
 ### Editing central authentication in the dashboard
 
 Cluster Settings → Central auth edits the existing public OIDC configuration.
@@ -216,7 +215,6 @@ Retry executes that actual read. A refused save keeps the reviewed fields and
 its diagnostic instead of announcing success. The ingress-class change and
 independent custom-host callback/cookie requirements above remain separate
 operations and prerequisites.
-
 
 ### Reviewing an ingress-class change in the dashboard
 
@@ -241,3 +239,24 @@ writes retain their accepted outcome if the follow-up read fails, with the
 existing current-target Retry control. Changing the language preserves the
 reviewed technical class and opt-in. Existing cluster permissions and provider
 refusals remain authoritative, including the unsupported fronts above.
+
+## Cognito ALB settings feedback
+
+The separate Cognito ingress-auth card remains an AWS/ALB configuration path.
+Its **Configured** label describes persisted `albAuthConfig`, not proven traffic
+protection. Save and reconcile still invokes `updateTenantCluster` followed by
+`reconcileClusterIngresses`; other providers/classes remain unsupported here.
+A rejected config write preserves the edit and runs no reconciliation. After a
+confirmed save, read or reconciliation failure is reported as saved configuration
+with unconfirmed gateway rollout. Reported applied/skipped/failure counts do not
+prove controller convergence or actual protected access; verify both separately.
+Clearing this configuration likewise does not establish that every app is public.
+
+The pool/client pickers show only returned cloud metadata. Empty results can
+also reflect limited or unavailable enumeration, including the backend's
+empty-list fallback. Manual ARN/client/domain entry remains available; choosing
+or entering identifiers grants no authority. Source failures preserve cached
+observations, show raw diagnostics and offer actual query retry. Changed cluster
+or source context discards old drafts; a same-target failed refresh retains them.
+This localization does not enumerate additional resources, change cloud recipes,
+read write-only central credentials or perform any live gateway change.

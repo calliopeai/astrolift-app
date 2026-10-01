@@ -10,7 +10,7 @@ type Story = StoryObj;
 
 export const Enabled: Story = { render: () => <IngressAuthView {...INGRESS_AUTH} /> };
 
-/** No gate: every app on the cluster is public. */
+/** No saved Cognito configuration does not establish whether traffic is protected. */
 export const Empty: Story = {
   render: () => <IngressAuthView {...INGRESS_AUTH} existing={null} />,
 };
@@ -26,7 +26,15 @@ export const PoolsLoading: Story = {
 /** The cluster's role cannot list pools; paste mode is the way out. */
 export const PoolsError: Story = {
   render: () => (
-    <IngressAuthView {...INGRESS_AUTH} existing={null} editing poolId="" pools={[]} poolsErrored />
+    <IngressAuthView
+      {...INGRESS_AUTH}
+      existing={null}
+      editing
+      poolId=""
+      pools={[]}
+      poolsErrored
+      poolsError="RAW_POOL_READ_ERROR"
+    />
   ),
 };
 
@@ -56,5 +64,16 @@ export const LongStrings: Story = {
         user_pool_domain: LONG,
       }}
     />
+  ),
+};
+
+export const ClientsUnavailable: Story = {
+  render: () => (
+    <IngressAuthView {...INGRESS_AUTH} editing clients={[]} clientsError="RAW_CLIENT_READ_ERROR" />
+  ),
+};
+export const FutureProvider: Story = {
+  render: () => (
+    <IngressAuthView {...INGRESS_AUTH} providerPluginSlug="FUTURE_PROVIDER_LITERAL" isAws={false} />
   ),
 };

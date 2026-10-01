@@ -590,3 +590,44 @@ acknowledgement after target changes. ICU argument parity, locale changes,
 closed-server-review hydration and six portable dialog stories cover presentation.
 This is the bounded #2220 UI contract; unrelated #2145 cluster/AWS/Cognito and
 other untranslated settings boundaries remain open.
+
+## Connected Cognito ingress-auth settings
+
+IngressAuthView/useIngressAuth and the exact ingress-auth navigation label use
+54 genuine `clusterSettings.ingressAuth` messages in all eight locales. Known
+cloud product names, ARN/client/domain identifiers, raw diagnostics, exact
+mutation inputs and the existing parent `access.update` fence remain literal
+and unchanged. This card edits public Cognito metadata; the already-localized
+central OIDC write-only secret fields remain untouched.
+
+A saved config is labelled configured, never proof of active traffic protection.
+The two-stage write still updates `albAuthConfig` before reconciling cluster
+Ingresses. Refused saves retain drafts and cause no read or reconciliation;
+accepted saves survive later refresh/reconciliation failure with separate
+saved-but-unconfirmed recovery feedback. Reconciliation reports actual counts,
+partial failures and skipped Ingresses without claiming gateway readiness.
+Disabled configuration never claims all apps are public.
+
+Exact cluster/provider/region/class/source context changes reset drafts and
+picker state. Source withdrawal/restoration cannot revive a pending old review;
+a late accepted old-cluster reply cannot reconcile or close a new-cluster edit.
+Same-target cached read failure retains the current draft. A newly selected pool
+without a known domain clears the previous domain instead of inheriting it.
+Pool/client errors show raw diagnostics and retry their actual queries. Returned
+choices and empty lists do not prove complete cloud inventory or permissions;
+the existing backend may return an empty list for unavailable driver enumeration.
+No paging/full-coverage contract, cloud operation or new admission gate is added.
+
+Focused proof covers schema-validated actual ClusterSettingsClient HttpLink
+writes/reads in every locale, accepted/rejected/transport/two-stage failures,
+refused-write retry preserving exact draft inputs, keyboard submission, partial
+and skipped reports, disable outcomes, source read retry/withdrawal, failed
+picker retry, actual pool selection with missing domain, stale target/source
+replies, current permission fencing, locale changes, ICU parity and hydration.
+Twelve portable ingress-auth stories and the prior central OIDC regression suite
+also pass. All pre-existing catalogue values outside the additive owned subtree
+and the prior central/ingress-class source remain preserved.
+
+This bounded card is complete; #2145 remains open. Auth-user lists, remaining
+cluster header/tab/lifecycle/bootstrap copy and other untranslated settings
+are separate boundaries. Unsupported provider-specific paths remain unsupported.

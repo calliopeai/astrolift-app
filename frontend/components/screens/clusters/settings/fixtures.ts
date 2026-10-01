@@ -197,6 +197,11 @@ export const AGENT_ISSUED: ClusterAgentViewProps = {
 };
 
 export const INGRESS_AUTH: IngressAuthViewProps = {
+  sourceKey: "FIXTURE_CLUSTER_SOURCE",
+  poolsError: null,
+  onRetryPools: noop,
+  clientsError: null,
+  onRetryClients: noop,
   providerPluginSlug: "aws",
   ingressClass: "alb",
   existing: CLUSTER.albAuthConfig as IngressAuthViewProps["existing"],

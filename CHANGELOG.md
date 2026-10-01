@@ -8,6 +8,12 @@
   CLI device approval and normal session/bearer admission remain supported;
   legacy relay clients must migrate to backend login (#2224).
 
+- Localize the connected Cognito ingress-auth card and pool/client source states
+  in all eight locales. Distinguish saved configuration from reported Ingress
+  reconciliation and actual traffic protection. Keep refused drafts and exact
+  inputs, retain committed writes through later failures, and discard old-cluster
+  or withdrawn-source drafts (#2145).
+
 - Privacy review uses the server-confirmed anonymous-state flag and exact current
   user identity. All eight locales distinguish first cleanup, repeated attributed
   history cleanup and retained/unsupported records. Changed targets or withdrawn

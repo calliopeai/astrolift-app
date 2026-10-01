@@ -9,6 +9,7 @@ import {
   ShieldIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -79,6 +80,7 @@ function AuthGateToggle({
 
 /** Ingress auth gate card (#851) with the Cognito pickers (#859). */
 export function IngressAuthView({
+  sourceKey,
   providerPluginSlug,
   ingressClass,
   existing,
@@ -89,8 +91,12 @@ export function IngressAuthView({
   pools,
   poolsLoading,
   poolsErrored,
+  poolsError,
+  onRetryPools,
   clients,
   clientsLoading,
+  clientsError,
+  onRetryClients,
   busy,
   onOpenForm,
   onCancelEdit,
@@ -98,7 +104,9 @@ export function IngressAuthView({
   onApply,
   onSaveAndApply,
 }: IngressAuthViewProps) {
+  const t = useTranslations("clusterSettings.ingressAuth");
   const enabled = existing !== null;
+  const [reviewedSource, setReviewedSource] = React.useState(sourceKey);
 
   const [poolArn, setPoolArn] = React.useState(existing?.user_pool_arn ?? "");
   const [clientId, setClientId] = React.useState(existing?.user_pool_client_id ?? "");
@@ -108,6 +116,13 @@ export function IngressAuthView({
   // cross-account pool the cluster's IAM role can't enumerate, or when
   // the Cognito list query errors.
   const [useAdvanced, setUseAdvanced] = React.useState(false);
+  if (reviewedSource !== sourceKey) {
+    setReviewedSource(sourceKey);
+    setPoolArn(existing?.user_pool_arn ?? "");
+    setClientId(existing?.user_pool_client_id ?? "");
+    setDomain(existing?.user_pool_domain ?? "");
+    setUseAdvanced(false);
+  }
 
   function configFromFields(): IngressAuthConfig | null {
     if (poolArn && clientId && domain) {
@@ -131,9 +146,7 @@ export function IngressAuthView({
   function pickPool(pool: CognitoUserPool) {
     setPoolArn(pool.poolArn);
     onPoolIdChange(pool.poolId);
-    if (pool.domain) {
-      setDomain(pool.domain);
-    }
+    setDomain(pool.domain ?? "");
     setClientId("");
   }
 
@@ -157,46 +170,40 @@ export function IngressAuthView({
     await onSaveAndApply(configFromFields());
   }
 
-  // Per-provider auth metadata. AWS+ALB is the only fully-supported path
-  // today; other providers show a "coming soon" state so the card is honest
-  // rather than showing AWS-specific copy on a GKE or AKS cluster.
   const providerAuthMeta: Record<
     string,
     { supported: boolean; label: string; description: string; comingSoon?: string }
   > = {
     aws: {
       supported: ingressClass === "alb",
-      label: "Cognito auth gate",
-      description:
-        "AWS ALB authenticate-cognito — applied to every managed-subdomain Ingress on this cluster.",
-      comingSoon:
-        ingressClass !== "alb" ? "ALB Cognito auth requires ingressClass = alb." : undefined,
+      label: t("awsLabel"),
+      description: t("awsDescription"),
+      comingSoon: ingressClass !== "alb" ? t("requiresAlb") : undefined,
     },
     gcp: {
       supported: false,
       label: "Google IAP",
-      description: "Google Identity-Aware Proxy — per-app OAuth gate on GKE Ingress rules.",
-      comingSoon: "Google IAP auth gate is not yet supported.",
+      description: t("gcpDescription"),
+      comingSoon: t("gcpUnsupported"),
     },
     azure: {
       supported: false,
       label: "Azure AD",
-      description: "Azure Active Directory — per-app auth gate on AKS Application Gateway Ingress.",
-      comingSoon: "Azure AD auth gate is not yet supported.",
+      description: t("azureDescription"),
+      comingSoon: t("azureUnsupported"),
     },
     k8s_native: {
       supported: false,
       label: "OIDC (oauth2-proxy)",
-      description: "Generic OIDC via oauth2-proxy — Dex or any OIDC-compliant IdP.",
-      comingSoon: "OIDC auth gate for raw k8s clusters is tracked in #852.",
+      description: t("nativeDescription"),
+      comingSoon: t("nativeUnsupported"),
     },
   };
-
   const authMeta = providerAuthMeta[providerPluginSlug] ?? {
     supported: false,
-    label: "Auth gate",
-    description: "Ingress-level auth gate.",
-    comingSoon: `Auth gate is not yet supported for provider ${providerPluginSlug}.`,
+    label: t("genericLabel"),
+    description: t("genericDescription"),
+    comingSoon: t("providerUnsupported", { provider: providerPluginSlug }),
   };
 
   if (!authMeta.supported) {
@@ -228,7 +235,7 @@ export function IngressAuthView({
             checked={enabled}
             onChange={handleToggle}
             disabled={busy}
-            label={enabled ? "Disable auth gate" : "Enable auth gate"}
+            label={t(enabled ? "disable" : "enable")}
           />
           <span
             className={cn(
@@ -236,23 +243,27 @@ export function IngressAuthView({
               enabled ? "text-success-fg" : "text-muted-foreground"
             )}
           >
-            {enabled ? "Enabled" : "Disabled"}
+            {t(enabled ? "configured" : "unconfigured")}
           </span>
         </div>
       }
       divided
     >
       <div className="min-w-0">
+        <p className="text-muted-foreground mb-3 text-xs">{t("rolloutNotice")}</p>
         {editing ? (
           <div className="space-y-3">
+            <p className="text-muted-foreground text-xs">{t("sourceLimit")}</p>
             {isAws && !useAdvanced ? (
               <>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium">User pool</label>
+                  <label className="text-xs font-medium">{t("pool")}</label>
                   <CognitoPoolCombobox
                     pools={pools}
                     loading={poolsLoading}
                     errored={poolsErrored}
+                    error={poolsError}
+                    onRetry={onRetryPools}
                     poolArn={poolArn}
                     onPick={pickPool}
                     onFreeText={(v) => {
@@ -262,39 +273,54 @@ export function IngressAuthView({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium">App client</label>
+                  <label className="text-xs font-medium">{t("client")}</label>
                   <CognitoClientCombobox
                     clients={clients}
                     loading={clientsLoading}
+                    unavailable={!!clientsError}
                     disabled={!poolId}
                     clientId={clientId}
                     onPick={setClientId}
                     onFreeText={setClientId}
                   />
-                  {!poolId && (
-                    <p className="text-muted-foreground text-xs">Pick a user pool first.</p>
+                  {clientsError && (
+                    <div role="alert" className="text-muted-foreground text-xs">
+                      <p>{t("clientsUnavailable")}</p>
+                      <p className="font-mono [overflow-wrap:anywhere]">{clientsError}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={onRetryClients}
+                        disabled={clientsLoading || busy}
+                      >
+                        {t("retry")}
+                      </Button>
+                    </div>
                   )}
+                  {!poolId && <p className="text-muted-foreground text-xs">{t("poolFirst")}</p>}
                 </div>
               </>
             ) : (
               <>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium">User pool ARN</label>
+                  <label className="text-xs font-medium">{t("poolArn")}</label>
                   <Input
                     value={poolArn}
                     onChange={(e) => {
                       setPoolArn(e.target.value);
                       onPoolIdChange(poolIdFromArn(e.target.value));
                     }}
-                    placeholder="arn:aws:cognito-idp:us-west-2:…"
+                    aria-label={t("poolArn")}
+                    placeholder="arn:aws:cognito-idp:REGION:ACCOUNT:userpool/POOL"
                     className="font-mono text-xs"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium">App client ID</label>
+                  <label className="text-xs font-medium">{t("clientId")}</label>
                   <Input
                     value={clientId}
                     onChange={(e) => setClientId(e.target.value)}
+                    aria-label={t("clientId")}
                     placeholder="abc123…"
                     className="font-mono text-xs"
                   />
@@ -302,17 +328,16 @@ export function IngressAuthView({
               </>
             )}
             <div className="space-y-1">
-              <label className="text-xs font-medium">User pool domain</label>
+              <label className="text-xs font-medium">{t("poolDomain")}</label>
               <Input
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="my-domain (without .auth.region.amazoncognito.com)"
+                aria-label={t("poolDomain")}
+                placeholder={t("domainPlaceholder")}
                 className="font-mono text-xs"
               />
               {isAws && !useAdvanced && (
-                <p className="text-muted-foreground text-xs">
-                  Auto-filled from the selected pool; edit to override.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("domainHint")}</p>
               )}
             </div>
             {isAws && (
@@ -321,33 +346,31 @@ export function IngressAuthView({
                 onClick={() => setUseAdvanced((v) => !v)}
                 className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
               >
-                {useAdvanced
-                  ? "Use the pool picker"
-                  : "Advanced: paste ARN / client ID directly (cross-account pools)"}
+                {useAdvanced ? t("picker") : t("advanced")}
               </button>
             )}
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" onClick={handleSaveAndApply} disabled={busy} className="gap-1.5">
                 {busy && <Loader2Icon className="size-3.5 animate-spin" />}
-                Save &amp; Apply
+                {t("saveApply")}
               </Button>
               <Button size="sm" variant="ghost" onClick={onCancelEdit} disabled={busy}>
-                Cancel
+                {t("cancel")}
               </Button>
             </div>
           </div>
         ) : enabled ? (
           <div className="space-y-3">
             <dl className="min-w-0 space-y-2 text-sm">
-              <Field label="User pool ARN" mono value={existing.user_pool_arn} />
-              <Field label="App client ID" mono value={existing.user_pool_client_id} />
-              <Field label="Domain" mono value={existing.user_pool_domain} />
+              <Field label={t("poolArn")} mono value={existing.user_pool_arn} />
+              <Field label={t("clientId")} mono value={existing.user_pool_client_id} />
+              <Field label={t("domain")} mono value={existing.user_pool_domain} />
             </dl>
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" onClick={handleApply} disabled={busy} className="gap-1.5">
                 {busy && <Loader2Icon className="size-3.5 animate-spin" />}
                 <RocketIcon className="size-3.5" />
-                Apply to cluster
+                {t("apply")}
               </Button>
               <Button
                 size="sm"
@@ -357,7 +380,7 @@ export function IngressAuthView({
                 className="gap-1.5"
               >
                 <PencilIcon className="size-3.5" />
-                Edit
+                {t("edit")}
               </Button>
             </div>
           </div>
@@ -365,14 +388,11 @@ export function IngressAuthView({
           <div className="space-y-3">
             <div className="border-warning-border bg-warning/10 flex items-start gap-2 rounded-md border p-3">
               <AlertTriangleIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
-              <p className="text-warning-fg text-sm">
-                All apps on this cluster are publicly accessible. Enable the auth gate to put every
-                managed-subdomain Ingress behind {authMeta.label}.
-              </p>
+              <p className="text-warning-fg text-sm">{t("noConfig")}</p>
             </div>
             <Button size="sm" onClick={openForm} disabled={busy} className="gap-1.5">
               <ShieldIcon className="size-3.5" />
-              Enable
+              {t("enable")}
             </Button>
           </div>
         )}
@@ -390,6 +410,8 @@ function CognitoPoolCombobox({
   pools,
   loading,
   errored,
+  error,
+  onRetry,
   poolArn,
   onPick,
   onFreeText,
@@ -397,10 +419,13 @@ function CognitoPoolCombobox({
   pools: CognitoUserPool[];
   loading: boolean;
   errored: boolean;
+  error: string | null;
+  onRetry: () => Promise<void>;
   poolArn: string;
   onPick: (pool: CognitoUserPool) => void;
   onFreeText: (v: string) => void;
 }) {
+  const t = useTranslations("clusterSettings.ingressAuth");
   const selected = pools.find((p) => p.poolArn === poolArn) ?? null;
   return (
     <>
@@ -417,12 +442,17 @@ function CognitoPoolCombobox({
         onInputValueChange={(v) => onFreeText(v ?? "")}
       >
         <ComboboxInput
-          placeholder={loading ? "Loading pools…" : "arn:aws:cognito-idp:us-west-2:…"}
+          aria-label={t("poolArn")}
+          placeholder={
+            loading ? t("loadingPools") : "arn:aws:cognito-idp:REGION:ACCOUNT:userpool/POOL"
+          }
           className="font-mono text-xs"
         />
         <ComboboxContent>
           <ComboboxEmpty>
-            {poolArn ? `Use "${poolArn}" (paste ARN directly)` : "No pools found — paste an ARN."}
+            {poolArn
+              ? t("pastePool", { value: poolArn })
+              : t(errored ? "poolsUnavailable" : loading ? "loadingPools" : "noPools")}
           </ComboboxEmpty>
           <ComboboxList>
             {(item: CognitoUserPool) => (
@@ -440,10 +470,13 @@ function CognitoPoolCombobox({
         </ComboboxContent>
       </Combobox>
       {errored && (
-        <p className="text-muted-foreground text-xs">
-          Couldn&apos;t list pools (the cluster&apos;s role may lack cognito-idp:ListUserPools).
-          Paste the ARN directly.
-        </p>
+        <div role="alert" className="text-muted-foreground text-xs">
+          <p>{t("poolsUnavailable")}</p>
+          {error && <p className="font-mono [overflow-wrap:anywhere]">{error}</p>}
+          <Button size="sm" variant="ghost" onClick={onRetry} disabled={loading}>
+            {t("retry")}
+          </Button>
+        </div>
       )}
     </>
   );
@@ -455,6 +488,7 @@ function CognitoClientCombobox({
   clients,
   loading,
   disabled,
+  unavailable,
   clientId,
   onPick,
   onFreeText,
@@ -462,10 +496,12 @@ function CognitoClientCombobox({
   clients: CognitoUserPoolClient[];
   loading: boolean;
   disabled: boolean;
+  unavailable: boolean;
   clientId: string;
   onPick: (v: string) => void;
   onFreeText: (v: string) => void;
 }) {
+  const t = useTranslations("clusterSettings.ingressAuth");
   const selected = clients.find((c) => c.clientId === clientId) ?? null;
   return (
     <Combobox<CognitoUserPoolClient>
@@ -482,15 +518,16 @@ function CognitoClientCombobox({
       disabled={disabled}
     >
       <ComboboxInput
-        placeholder={loading ? "Loading clients…" : "abc123…"}
+        aria-label={t("clientId")}
+        placeholder={loading ? t("loadingClients") : "abc123…"}
         className="font-mono text-xs"
         disabled={disabled}
       />
       <ComboboxContent>
         <ComboboxEmpty>
           {clientId
-            ? `Use "${clientId}" (paste client ID directly)`
-            : "No app clients in this pool."}
+            ? t("pasteClient", { value: clientId })
+            : t(unavailable ? "clientsUnavailable" : loading ? "loadingClients" : "noClients")}
         </ComboboxEmpty>
         <ComboboxList>
           {(item: CognitoUserPoolClient) => (
