@@ -3758,6 +3758,40 @@
         "groups": "Known IdP groups from sign-ins, grants and mappings. Group access applies to everyone assigned by the identity provider."
       },
       "searchPlaceholder": "Search people, emails, groups…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "The export returned no file",
+      "noGroups": "The export returned no groups",
+      "groupsChanged": "The group list changed during export; retry the export",
+      "exportFailed": "The export failed",
+      "refreshWarning": "The change was saved, but the list could not refresh. Refresh the view; do not repeat the successful action.",
+      "revoked": "Invitation revoked",
+      "revokeFailed": "Revoke failed",
+      "resendFailed": "Resend failed",
+      "resent": "Invitation re-sent to {email}",
+      "resendDescription": "The previous link is now invalid. Copy the fresh link as a backup channel.",
+      "copyLink": "Copy link",
+      "linkCopied": "Accept link copied",
+      "copyFailed": "Copy failed",
+      "deleted": "Invitation deleted",
+      "deleteFailed": "Delete failed",
+      "anonymizeFailed": "Anonymization failed",
+      "anonymized": "User data anonymized."
+    },
+    "anonymization": {
+      "title": "Anonymize {name}?",
+      "changes": "This changes",
+      "identity": "Account names and email are replaced with an anonymous identity.",
+      "profile": "Personal profile fields, phone, avatar, address and signature are cleared or replaced.",
+      "account": "Sign-in is disabled and authentication group memberships are cleared.",
+      "memberships": "Memberships across the platform are deactivated.",
+      "preserves": "This preserves",
+      "records": "The account row and links from historical actions remain.",
+      "history": "This action does not erase historical audit content or delete stored role-binding records.",
+      "irreversible": "This action is irreversible. The original personal data cannot be restored. Repeating it on an already anonymized account makes no further changes.",
+      "acknowledge": "I understand this is irreversible.",
+      "working": "Anonymizing…",
+      "confirm": "Anonymize user data"
     }
   },
   "securitySessions": {

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Translate connected People mutation/CSV feedback and the anonymization dialog
+  in all eight locales. Describe actual account/profile and membership effects;
+  keep historical-audit and stored-binding limitations explicit (#2220).
+  Preserve accepted writes across failed reads, skip refused-write refreshes,
+  await clipboard success, honor required self-logout, and bind irreversible
+  acknowledgement to the selected account (#2145).
+
 - Translate People list headings, filters, views, group counts, export actions
   and invitation confirmations in all eight locales. Last-active ages use the
   request clock and selected locale; identities, role slugs, server query tokens,

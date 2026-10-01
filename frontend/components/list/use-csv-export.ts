@@ -11,7 +11,10 @@ export interface CsvDownload {
 }
 
 /** Download only after the entire matching list succeeds; coalesce repeated clicks. */
-export function useCsvExport(load: () => Promise<CsvDownload>) {
+export function useCsvExport(
+  load: () => Promise<CsvDownload>,
+  failureMessage = "The export failed"
+) {
   const running = React.useRef(false);
   const [exportingCsv, setExportingCsv] = React.useState(false);
   async function onExportCsv() {
@@ -22,7 +25,7 @@ export function useCsvExport(load: () => Promise<CsvDownload>) {
       const csv = await load();
       downloadCsvContent(csv.filename, csv.content);
     } catch (error) {
-      toast.error(error instanceof Error && error.message ? error.message : "The export failed");
+      toast.error(error instanceof Error && error.message ? error.message : failureMessage);
     } finally {
       running.current = false;
       setExportingCsv(false);

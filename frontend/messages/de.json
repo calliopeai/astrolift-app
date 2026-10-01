@@ -3739,6 +3739,40 @@
         "groups": "Bekannte Gruppen des Identitätsanbieters aus Anmeldungen, Zuweisungen und Zuordnungen. Der Gruppenzugriff gilt für alle vom Anbieter zugeordneten Personen."
       },
       "searchPlaceholder": "Personen, E-Mails, Gruppen suchen…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "Der Export hat keine Datei geliefert",
+      "noGroups": "Der Export hat keine Gruppen geliefert",
+      "groupsChanged": "Die Gruppenliste wurde während des Exports geändert; exportieren Sie erneut",
+      "exportFailed": "Der Export ist fehlgeschlagen",
+      "refreshWarning": "Die Änderung wurde gespeichert, aber die Liste konnte nicht aktualisiert werden. Aktualisieren Sie die Ansicht, ohne die erfolgreiche Aktion zu wiederholen.",
+      "revoked": "Einladung widerrufen",
+      "revokeFailed": "Widerruf fehlgeschlagen",
+      "resendFailed": "Erneutes Senden fehlgeschlagen",
+      "resent": "Einladung erneut an {email} gesendet",
+      "resendDescription": "Der vorherige Link ist ungültig. Kopieren Sie den neuen Link als Alternative.",
+      "copyLink": "Link kopieren",
+      "linkCopied": "Annahmelink kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen",
+      "deleted": "Einladung gelöscht",
+      "deleteFailed": "Löschen fehlgeschlagen",
+      "anonymizeFailed": "Anonymisierung fehlgeschlagen",
+      "anonymized": "Benutzerdaten anonymisiert."
+    },
+    "anonymization": {
+      "title": "{name} anonymisieren?",
+      "changes": "Diese Änderungen erfolgen",
+      "identity": "Kontonamen und E-Mail werden durch eine anonyme Identität ersetzt.",
+      "profile": "Persönliche Profilfelder, Telefon, Avatar, Adresse und Signatur werden gelöscht oder ersetzt.",
+      "account": "Die Anmeldung wird deaktiviert und Mitgliedschaften in Authentifizierungsgruppen werden entfernt.",
+      "memberships": "Mitgliedschaften auf der gesamten Plattform werden deaktiviert.",
+      "preserves": "Diese Daten bleiben erhalten",
+      "records": "Der Kontodatensatz und Verknüpfungen aus früheren Aktionen bleiben erhalten.",
+      "history": "Diese Aktion löscht weder historische Audit-Inhalte noch gespeicherte Rollenzuweisungen.",
+      "irreversible": "Diese Aktion ist unumkehrbar. Die ursprünglichen personenbezogenen Daten können nicht wiederhergestellt werden. Eine Wiederholung bei einem bereits anonymisierten Konto bewirkt keine weiteren Änderungen.",
+      "acknowledge": "Ich verstehe, dass dies unumkehrbar ist.",
+      "working": "Wird anonymisiert…",
+      "confirm": "Benutzerdaten anonymisieren"
     }
   },
   "stepUp": {

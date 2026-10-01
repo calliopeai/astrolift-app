@@ -53,8 +53,26 @@ Invalid last-active timestamps remain literal instead of breaking the list.
 current permission gates, exact identity/destination preservation, CSV callbacks,
 refusal retention and hydration. Existing People model tests retain the server
 query contracts; portable stories exercise all declared list states. The wider
-Members item remains incomplete until connected mutation feedback and the
-anonymization/grant dialog bodies are translated and verified.
+Members item remains incomplete until the connected legacy grant dialog body and
+feedback are translated and verified.
+
+Connected People invitation/anonymization mutations and CSV failures now have
+all-eight-locale feedback. Successful writes retain their accepted result through
+failed list reads; a rejected envelope does not trigger the post-write refresh.
+Original diagnostics stay literal, clipboard success awaits the browser API, and
+self-anonymization honors the actual `requiresLogout` signal. The CSV helper's
+optional fallback preserves other callers' behavior.
+
+The anonymization dialog now states the connected mutation's actual effects:
+account/profile identity replacement, sign-in disabling and membership
+deactivation. It explicitly retains the historical-audit/stored-binding
+limitations tracked in [#2220](https://github.com/calliopeai/astrolift-app/issues/2220).
+Its irreversible acknowledgement belongs to the current account, so switching
+targets disables confirmation again. Real HttpLink tests validate current SDL,
+exact mutation inputs, accepted/refused/missing/transport outcomes, failed refresh,
+logout and clipboard completion in every locale. Dialog/ICU tests and all declared
+anonymization stories pass. This does not establish historical production PII
+scrubbing or role-binding deletion; no live user mutation was run.
 
 ## Shared list and table chrome
 

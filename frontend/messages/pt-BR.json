@@ -3739,6 +3739,40 @@
         "groups": "Grupos conhecidos do provedor de identidade a partir de acessos, concessões e mapeamentos. O acesso do grupo vale para todas as pessoas atribuídas pelo provedor."
       },
       "searchPlaceholder": "Buscar pessoas, e-mails, grupos…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "A exportação não retornou nenhum arquivo",
+      "noGroups": "A exportação não retornou nenhum grupo",
+      "groupsChanged": "A lista de grupos mudou durante a exportação; tente novamente",
+      "exportFailed": "A exportação falhou",
+      "refreshWarning": "A alteração foi salva, mas a lista não pôde ser atualizada. Atualize a tela sem repetir a ação bem-sucedida.",
+      "revoked": "Convite revogado",
+      "revokeFailed": "Falha ao revogar",
+      "resendFailed": "Falha ao reenviar",
+      "resent": "Convite reenviado para {email}",
+      "resendDescription": "O link anterior está inválido. Copie o novo link como alternativa.",
+      "copyLink": "Copiar link",
+      "linkCopied": "Link de aceitação copiado",
+      "copyFailed": "Falha ao copiar",
+      "deleted": "Convite excluído",
+      "deleteFailed": "Falha ao excluir",
+      "anonymizeFailed": "A anonimização falhou",
+      "anonymized": "Dados do usuário anonimizados."
+    },
+    "anonymization": {
+      "title": "Anonimizar {name}?",
+      "changes": "O que será alterado",
+      "identity": "Os nomes e o e-mail da conta são substituídos por uma identidade anônima.",
+      "profile": "Os campos pessoais do perfil, telefone, avatar, endereço e assinatura são apagados ou substituídos.",
+      "account": "O acesso à conta é desativado e as associações a grupos de autenticação são removidas.",
+      "memberships": "As associações em toda a plataforma são desativadas.",
+      "preserves": "O que será preservado",
+      "records": "O registro da conta e os vínculos de ações anteriores são preservados.",
+      "history": "Esta ação não apaga o conteúdo histórico de auditoria nem exclui os registros de atribuição de papéis.",
+      "irreversible": "Esta ação é irreversível. Os dados pessoais originais não podem ser restaurados. Repeti-la em uma conta já anonimizada não produz outras alterações.",
+      "acknowledge": "Entendo que esta ação é irreversível.",
+      "working": "Anonimizando…",
+      "confirm": "Anonimizar dados do usuário"
     }
   },
   "stepUp": {

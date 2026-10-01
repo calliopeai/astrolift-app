@@ -3739,6 +3739,40 @@
         "groups": "从登录、授权和映射中已知的身份提供方群组。群组访问权限适用于身份提供方分配的所有用户。"
       },
       "searchPlaceholder": "搜索人员、邮箱、群组…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "导出未返回文件",
+      "noGroups": "导出未返回群组",
+      "groupsChanged": "导出期间群组列表发生变化，请重试",
+      "exportFailed": "导出失败",
+      "refreshWarning": "更改已保存，但列表刷新失败。请刷新视图，不要重复已成功的操作。",
+      "revoked": "邀请已撤销",
+      "revokeFailed": "撤销失败",
+      "resendFailed": "重新发送失败",
+      "resent": "已重新向 {email} 发送邀请",
+      "resendDescription": "旧链接已失效。请复制新链接作为备用发送方式。",
+      "copyLink": "复制链接",
+      "linkCopied": "接受邀请链接已复制",
+      "copyFailed": "复制失败",
+      "deleted": "邀请已删除",
+      "deleteFailed": "删除失败",
+      "anonymizeFailed": "匿名化失败",
+      "anonymized": "用户数据已匿名化。"
+    },
+    "anonymization": {
+      "title": "匿名化 {name}？",
+      "changes": "将更改的内容",
+      "identity": "账户姓名和邮箱将替换为匿名身份信息。",
+      "profile": "个人资料字段、电话、头像、地址和签名将清除或替换。",
+      "account": "登录将禁用，认证群组成员关系将清除。",
+      "memberships": "平台中的成员资格将停用。",
+      "preserves": "将保留的内容",
+      "records": "账户记录以及历史操作中的关联将保留。",
+      "history": "此操作不会清除历史审计内容，也不会删除已存储的角色绑定记录。",
+      "irreversible": "此操作不可撤销，原始个人数据无法恢复。对已匿名化的账户重复执行不会产生进一步更改。",
+      "acknowledge": "我理解此操作不可撤销。",
+      "working": "正在匿名化…",
+      "confirm": "匿名化用户数据"
     }
   },
   "stepUp": {

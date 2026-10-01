@@ -3739,6 +3739,40 @@
         "groups": "Grupos conocidos del proveedor de identidad a partir de inicios de sesión, concesiones y asignaciones. El acceso del grupo se aplica a todas las personas asignadas por el proveedor."
       },
       "searchPlaceholder": "Buscar personas, correos, grupos…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "La exportación no devolvió ningún archivo",
+      "noGroups": "La exportación no devolvió ningún grupo",
+      "groupsChanged": "La lista de grupos cambió durante la exportación; vuelve a intentarlo",
+      "exportFailed": "La exportación falló",
+      "refreshWarning": "El cambio se guardó, pero la lista no pudo actualizarse. Actualiza la vista; no repitas la acción que tuvo éxito.",
+      "revoked": "Invitación revocada",
+      "revokeFailed": "No se pudo revocar",
+      "resendFailed": "No se pudo reenviar",
+      "resent": "Invitación reenviada a {email}",
+      "resendDescription": "El enlace anterior ya no es válido. Copia el nuevo como alternativa.",
+      "copyLink": "Copiar enlace",
+      "linkCopied": "Enlace de aceptación copiado",
+      "copyFailed": "No se pudo copiar",
+      "deleted": "Invitación eliminada",
+      "deleteFailed": "No se pudo eliminar",
+      "anonymizeFailed": "La anonimización falló",
+      "anonymized": "Datos del usuario anonimizados."
+    },
+    "anonymization": {
+      "title": "¿Anonimizar a {name}?",
+      "changes": "Esto cambia",
+      "identity": "Los nombres y el correo de la cuenta se reemplazan por una identidad anónima.",
+      "profile": "Los campos personales del perfil, el teléfono, el avatar, la dirección y la firma se borran o reemplazan.",
+      "account": "Se desactiva el inicio de sesión y se eliminan las membresías de grupos de autenticación.",
+      "memberships": "Se desactivan las membresías en toda la plataforma.",
+      "preserves": "Esto se conserva",
+      "records": "Se conservan el registro de la cuenta y los vínculos de las acciones históricas.",
+      "history": "Esta acción no borra el contenido histórico de auditoría ni elimina los registros de asignación de roles.",
+      "irreversible": "Esta acción es irreversible. Los datos personales originales no se pueden restaurar. Repetirla en una cuenta ya anonimizada no produce más cambios.",
+      "acknowledge": "Entiendo que esto es irreversible.",
+      "working": "Anonimizando…",
+      "confirm": "Anonimizar datos del usuario"
     }
   },
   "stepUp": {

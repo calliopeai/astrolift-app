@@ -3739,6 +3739,40 @@
         "groups": "Groupes connus du fournisseur d’identité issus des connexions, autorisations et correspondances. L’accès du groupe s’applique à chaque personne affectée par le fournisseur."
       },
       "searchPlaceholder": "Rechercher des personnes, e-mails, groupes…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "L’export n’a renvoyé aucun fichier",
+      "noGroups": "L’export n’a renvoyé aucun groupe",
+      "groupsChanged": "La liste des groupes a changé pendant l’export ; réessayez",
+      "exportFailed": "L’export a échoué",
+      "refreshWarning": "La modification a été enregistrée, mais la liste n’a pas pu être actualisée. Actualisez la vue sans répéter l’action réussie.",
+      "revoked": "Invitation révoquée",
+      "revokeFailed": "La révocation a échoué",
+      "resendFailed": "Le renvoi a échoué",
+      "resent": "Invitation renvoyée à {email}",
+      "resendDescription": "L’ancien lien n’est plus valide. Copiez le nouveau lien comme solution de secours.",
+      "copyLink": "Copier le lien",
+      "linkCopied": "Lien d’acceptation copié",
+      "copyFailed": "La copie a échoué",
+      "deleted": "Invitation supprimée",
+      "deleteFailed": "La suppression a échoué",
+      "anonymizeFailed": "L’anonymisation a échoué",
+      "anonymized": "Données de l’utilisateur anonymisées."
+    },
+    "anonymization": {
+      "title": "Anonymiser {name} ?",
+      "changes": "Ce qui change",
+      "identity": "Les noms et l’e-mail du compte sont remplacés par une identité anonyme.",
+      "profile": "Les données personnelles du profil, le téléphone, l’avatar, l’adresse et la signature sont effacés ou remplacés.",
+      "account": "La connexion est désactivée et les appartenances aux groupes d’authentification sont supprimées.",
+      "memberships": "Les appartenances sur toute la plateforme sont désactivées.",
+      "preserves": "Ce qui est conservé",
+      "records": "L’enregistrement du compte et les liens des actions passées sont conservés.",
+      "history": "Cette action n’efface pas le contenu historique de l’audit et ne supprime pas les enregistrements d’attribution de rôles.",
+      "irreversible": "Cette action est irréversible. Les données personnelles d’origine ne peuvent pas être restaurées. La répéter sur un compte déjà anonymisé n’apporte aucune modification supplémentaire.",
+      "acknowledge": "Je comprends que cette action est irréversible.",
+      "working": "Anonymisation en cours…",
+      "confirm": "Anonymiser les données de l’utilisateur"
     }
   },
   "stepUp": {

@@ -3,6 +3,8 @@
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 
 import type { CursorPage } from "@/components/data-table";
 import { buildCsv } from "@/components/list/exportCsv";
@@ -31,6 +33,7 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import {
   type GroupPrincipal,
@@ -74,6 +77,8 @@ const EXPORT_PAGE = 200;
  * page and the principal pages' Access tab.
  */
 export function useMembers() {
+  const t = useTranslations("orgMembers.feedback");
+  const router = useRouter();
   const client = useApolloClient();
   const perms = useMyPermissions();
   const canManageMembers = perms.can("org.manage_members");
@@ -165,7 +170,7 @@ export function useMembers() {
           }
         | undefined;
       const csv = source === "members" ? data?.astroliftMembersCsv : data?.astroliftInvitationsCsv;
-      if (!csv) throw new Error("The export returned no file");
+      if (!csv) throw new Error(t("noExport"));
       return csv;
     }
     const out: PeopleRow[] = [];
@@ -176,40 +181,59 @@ export function useMembers() {
         fetchPolicy: "network-only",
       });
       const batch = result.data?.astroliftPrincipalSearch;
-      if (!batch) throw new Error("The export returned no groups");
+      if (!batch) throw new Error(t("noGroups"));
       out.push(...batch.items.map(groupRow));
       if (
         batch.totalCount != null ? out.length >= batch.totalCount : batch.items.length < EXPORT_PAGE
       )
         break;
-      if (!batch.items.length)
-        throw new Error("The group list changed during export; retry the export");
+      if (!batch.items.length) throw new Error(t("groupsChanged"));
     }
     return { filename: "people.csv", content: buildCsv(out, PEOPLE_CSV) };
-  });
+  }, t("exportFailed"));
 
   const [revokeInvite, { loading: revokingInvite }] = useMutation<{
     revokeInvitation: MutationResult<AstroliftInvitation>;
-  }>(REVOKE_INVITATION, { refetchQueries: ["ListInvitationsPage"], awaitRefetchQueries: true });
+  }>(REVOKE_INVITATION, {
+    refetchQueries: (response) =>
+      response.data?.revokeInvitation?.ok ? ["ListInvitationsPage"] : [],
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
   const [deleteInvite, { loading: deletingInvite }] = useMutation<{
     deleteInvitation: MutationResult<AstroliftInvitation>;
-  }>(DELETE_INVITATION, { refetchQueries: ["ListInvitationsPage"], awaitRefetchQueries: true });
+  }>(DELETE_INVITATION, {
+    refetchQueries: (response) =>
+      response.data?.deleteInvitation?.ok ? ["ListInvitationsPage"] : [],
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
   const [resendInvite, { loading: resendingInvite }] = useMutation<{
     resendInvitation: MutationResult<{
       invitation: AstroliftInvitation;
       plaintextToken: string;
       acceptUrlPath: string;
     }>;
-  }>(RESEND_INVITATION, { refetchQueries: ["ListInvitationsPage"], awaitRefetchQueries: true });
+  }>(RESEND_INVITATION, {
+    refetchQueries: (response) =>
+      response.data?.resendInvitation?.ok ? ["ListInvitationsPage"] : [],
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
   const [anonymizeUser] = useMutation<{
-    astroliftAnonymizeUser: MutationResult<{ anonymizedUserId: string }>;
-  }>(ANONYMIZE_USER, { refetchQueries: ["ListMembersPage"], awaitRefetchQueries: true });
+    astroliftAnonymizeUser: MutationResult<{ anonymizedUserId: string; requiresLogout: boolean }>;
+  }>(ANONYMIZE_USER, {
+    refetchQueries: (response) =>
+      response.data?.astroliftAnonymizeUser?.ok ? ["ListMembersPage"] : [],
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
 
   /** Throws on failure, so the confirm dialog stays open and shows why. */
   async function onRevokeInvite(inv: AstroliftInvitation): Promise<void> {
     const { data } = await revokeInvite({ variables: { input: { id: inv.id } } });
-    if (data?.revokeInvitation.ok) toast.success("Invitation revoked");
-    else throw new Error(data?.revokeInvitation.errors?.[0]?.message ?? "Revoke failed");
+    if (data?.revokeInvitation?.ok) toast.success(t("revoked"));
+    else throw new Error(data?.revokeInvitation?.errors?.[0]?.message || t("revokeFailed"));
   }
 
   /** Throws on failure, so the confirm dialog stays open and shows why. */
@@ -217,21 +241,23 @@ export function useMembers() {
     const { data } = await resendInvite({ variables: { input: { id: inv.id } } });
     const result = data?.resendInvitation;
     if (!result?.ok || !result.data) {
-      throw new Error(result?.errors?.[0]?.message ?? "Resend failed");
+      throw new Error(result?.errors?.[0]?.message || t("resendFailed"));
     }
     // The token was rotated, so any link already handed out is dead. A fresh
     // one was emailed (best effort); Copy link keeps the durable hand-off.
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const url = `${origin}${result.data.acceptUrlPath}`;
-    toast.success(`Invitation re-sent to ${inv.email}`, {
-      description: "The previous link is now invalid. Copy the fresh link as a backup channel.",
+    toast.success(t("resent", { email: inv.email }), {
+      description: t("resendDescription"),
       action: {
-        label: "Copy link",
-        onClick: () => {
-          navigator.clipboard
-            .writeText(url)
-            .then(() => toast.success("Accept link copied"))
-            .catch(() => toast.error("Copy failed"));
+        label: t("copyLink"),
+        onClick: async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            toast.success(t("linkCopied"));
+          } catch {
+            toast.error(t("copyFailed"));
+          }
         },
       },
     });
@@ -240,21 +266,22 @@ export function useMembers() {
   /** Throws on failure, so the confirm dialog stays open and shows why. */
   async function onDeleteInvite(inv: AstroliftInvitation): Promise<void> {
     const { data } = await deleteInvite({ variables: { input: { id: inv.id } } });
-    if (data?.deleteInvitation.ok) toast.success("Invitation deleted");
-    else throw new Error(data?.deleteInvitation.errors?.[0]?.message ?? "Delete failed");
+    if (data?.deleteInvitation?.ok) toast.success(t("deleted"));
+    else throw new Error(data?.deleteInvitation?.errors?.[0]?.message || t("deleteFailed"));
   }
 
   /** Right to delete (GDPR): resolves true when the user was anonymized; toasts why not. */
   async function onAnonymize(userId: string): Promise<boolean> {
     try {
       const { data } = await anonymizeUser({ variables: { input: { userGid: userId } } });
-      if (!data?.astroliftAnonymizeUser.ok) {
-        throw new Error(data?.astroliftAnonymizeUser.errors?.[0]?.message ?? "Anonymize failed");
+      if (!data?.astroliftAnonymizeUser?.ok || !data.astroliftAnonymizeUser.data) {
+        throw new Error(data?.astroliftAnonymizeUser?.errors?.[0]?.message || t("anonymizeFailed"));
       }
-      toast.success("User data anonymized.");
+      toast.success(t("anonymized"));
+      if (data.astroliftAnonymizeUser.data.requiresLogout) router.replace("/auth/logout");
       return true;
     } catch (err) {
-      toast.error(err instanceof Error && err.message ? err.message : "Anonymize failed");
+      toast.error(err instanceof Error && err.message ? err.message : t("anonymizeFailed"));
       return false;
     }
   }
@@ -268,7 +295,7 @@ export function useMembers() {
     stale: active.loading && !active.data && Boolean(data),
     error: active.error ? { message: active.error.message } : null,
     onRetry: () => {
-      void active.refetch();
+      void active.refetch().catch(() => undefined);
     },
     exportingCsv,
     onExportCsv,

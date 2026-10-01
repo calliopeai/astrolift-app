@@ -3,6 +3,8 @@ import type { MockedResponse } from "@apollo/client/testing";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { GraphQLError } from "graphql";
 import type { ReactNode } from "react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -35,7 +37,11 @@ vi.mock("@/components/list/exportCsv", async (importOriginal) => ({
 }));
 function wrapper(mocks: MockedResponse[]) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <MockedProvider mocks={mocks}>{children}</MockedProvider>;
+    return (
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+        <MockedProvider mocks={mocks}>{children}</MockedProvider>
+      </NextIntlClientProvider>
+    );
   };
 }
 const roles: MockedResponse = {
