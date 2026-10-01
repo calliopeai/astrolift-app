@@ -24,6 +24,10 @@
   config. Verify Pub/Sub source and child ownership before writes or binding,
   preserve ownership labels during updates and retain recorded topic names.
   Audit AWS/Azure custom-tag namespace isolation (#2098).
+- Qualify generated native managed-service binding hosts with their recorded
+  namespace, including connection URI aliases. CNPG URLs retain rotating
+  operator credentials through `fqdn-uri`; legacy handles without a namespace
+  refuse refresh instead of guessing a tenant destination (Refs #2092).
 
 - Shared model by-ID reads and locks include current organization constraints
   directly, including exact cluster-scoped provider locks. Install-shared

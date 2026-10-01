@@ -86,7 +86,7 @@ def test_mysql_binding_envs() -> None:
     driver = MySQLOperatorDriver(
         config=MySQLOperatorConfig(),
     )
-    binding = driver.binding(ServiceHandle(handle="mysql/api-prod"))
+    binding = driver.binding(ServiceHandle(handle="mysql/cluster-1/acme-api/api-prod"))
     assert "MYSQL_HOST" in binding.env_vars
     assert "MYSQL_DB" in binding.env_vars
     assert binding.env_vars["MYSQL_USER"].secret_ref == ("api-prod-app-secret#username")
@@ -137,7 +137,7 @@ def test_mongodb_binding_uses_replica_set_uri() -> None:
         config=MongoDBOperatorConfig(),
     )
     binding = driver.binding(
-        ServiceHandle(handle="document_db/api-prod"),
+        ServiceHandle(handle="document_db/cluster-1/acme-api/api-prod"),
     )
     assert binding.env_vars["DOCDB_URI"].literal.startswith("mongodb+srv://")
     assert "replicaSet=api-prod-rs0" in binding.env_vars["DOCDB_URI"].literal
@@ -171,7 +171,7 @@ def test_kafka_provision_emits_kraft_kafka() -> None:
 def test_kafka_binding_emits_bootstrap() -> None:
     driver = StrimziKafkaDriver(config=StrimziKafkaConfig())
     binding = driver.binding(
-        ServiceHandle(handle="event_stream/api-prod"),
+        ServiceHandle(handle="event_stream/cluster-1/acme-api/api-prod"),
     )
     bootstrap = binding.env_vars["EVENT_STREAM_BROKERS"].literal
     assert "api-prod-kafka-bootstrap" in bootstrap
@@ -222,7 +222,7 @@ def test_rabbitmq_provision_emits_cluster_crd() -> None:
 def test_rabbitmq_binding_uses_default_user_secret() -> None:
     driver = RabbitMQOperatorDriver(config=RabbitMQOperatorConfig())
     binding = driver.binding(
-        ServiceHandle(handle="queue/api-prod"),
+        ServiceHandle(handle="queue/cluster-1/acme-api/api-prod"),
     )
     assert binding.env_vars["RABBITMQ_USER"].secret_ref == ("api-prod-default-user#username")
 

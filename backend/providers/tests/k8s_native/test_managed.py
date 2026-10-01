@@ -110,7 +110,7 @@ def test_cnpg_storage_class_config_threaded() -> None:
 
 def test_cnpg_binding_emits_db_env_vars() -> None:
     driver = CNPGPostgresDriver()
-    handle = ServiceHandle(handle="postgres/api-prod-db")
+    handle = ServiceHandle(handle="postgres/cluster-1/acme-api/api-prod-db")
     binding = driver.binding(handle)
     assert "DATABASE_HOST" in binding.env_vars
     assert "DATABASE_URL" in binding.env_vars
@@ -120,7 +120,7 @@ def test_cnpg_binding_emits_db_env_vars() -> None:
 def test_cnpg_binding_emits_the_canonical_postgres_envelope() -> None:
     """#1402 -- this driver only had the pre-#1003 DATABASE_* names, so an app
     that moved from RDS to CNPG lost every POSTGRES_* variable it read."""
-    binding = CNPGPostgresDriver().binding(ServiceHandle(handle="postgres/api-prod-db"))
+    binding = CNPGPostgresDriver().binding(ServiceHandle(handle="postgres/cluster-1/acme-api/api-prod-db"))
 
     assert {
         "POSTGRES_HOST",
@@ -140,7 +140,7 @@ def test_cnpg_binding_emits_the_canonical_postgres_envelope() -> None:
         ("POSTGRES_USER", "DATABASE_USER"),
         ("POSTGRES_PASSWORD", "DATABASE_PASSWORD"),
     ):
-        assert binding.env_vars[canonical].secret_ref == binding.env_vars[legacy].secret_ref
+        assert binding.env_vars[canonical] == binding.env_vars[legacy]
     assert binding.env_vars["POSTGRES_SSL_MODE"].literal == "require"
 
 
@@ -246,7 +246,7 @@ def test_redis_cache_mode_no_storage() -> None:
 
 def test_redis_binding_emits_url() -> None:
     driver = RedisOperatorDriver()
-    binding = driver.binding(ServiceHandle(handle="redis/api-prod-cache"))
+    binding = driver.binding(ServiceHandle(handle="redis/cluster-1/acme-api/api-prod-cache"))
     assert "REDIS_URL" in binding.env_vars
     assert "REDIS_HOST" in binding.env_vars
     assert "REDIS_PASSWORD" in binding.env_vars

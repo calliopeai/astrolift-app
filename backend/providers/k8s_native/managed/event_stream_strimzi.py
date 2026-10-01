@@ -32,6 +32,7 @@ from _sdk.managed_service import (
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._secret_refs import shared_namespace_owner_refusal
+from k8s_native.managed._service_dns import service_host
 
 KIND = "event_stream"
 
@@ -235,8 +236,7 @@ class StrimziKafkaDriver(ManagedServiceDriver):
     def binding(self, handle: ServiceHandle) -> Binding:
         parsed = _unpack_handle(handle.handle)
         name = parsed.name
-        ns = parsed.namespace or self._fallback_ns(name=name)
-        bootstrap = f"{name}-kafka-bootstrap.{ns}.svc:9092"
+        bootstrap = f"{service_host(parsed, name=f'{name}-kafka-bootstrap')}:9092"
         return Binding(
             env_vars={
                 "EVENT_STREAM_BROKERS": ValueRef(literal=bootstrap),

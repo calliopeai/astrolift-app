@@ -41,6 +41,7 @@ from _sdk.managed_service import (
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._service_dns import service_host
 
 KIND = "postgres"
 
@@ -480,19 +481,19 @@ class CNPGPostgresDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="postgres_cnpg")
     def binding(self, handle: ServiceHandle) -> Binding:
-        cluster_name = _unpack_handle(handle.handle).name
+        parsed = _unpack_handle(handle.handle)
+        cluster_name = parsed.name
+        host = service_host(parsed, name=f"{cluster_name}-rw")
         # CNPG operator generates a Secret named
         # <cluster>-app with host/port/user/password/dbname.
         secret_name = f"{cluster_name}-app"
         return Binding(
             env_vars={
                 # Canonical postgres envelope (#1003, backfilled in #1402).
-                # Every value is a reference into the operator-generated
-                # Secret rather than a literal: CNPG owns and rotates it, so
-                # a snapshot taken here would be stale after the next
-                # rotation (see #1410).
+                # Credentials stay references to the rotating operator Secret.
+                # The RW Service identity is stable across primary failover.
                 "POSTGRES_HOST": ValueRef(
-                    secret_ref=f"{secret_name}#host",
+                    literal=host,
                 ),
                 "POSTGRES_PORT": ValueRef(
                     secret_ref=f"{secret_name}#port",
@@ -514,7 +515,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 # Pre-#1003 names, kept as aliases so workloads already bound
                 # to this driver keep the variables they read (#1401).
                 "DATABASE_HOST": ValueRef(
-                    secret_ref=f"{secret_name}#host",
+                    literal=host,
                 ),
                 "DATABASE_PORT": ValueRef(
                     secret_ref=f"{secret_name}#port",
@@ -529,7 +530,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                     secret_ref=f"{secret_name}#dbname",
                 ),
                 "DATABASE_URL": ValueRef(
-                    secret_ref=f"{secret_name}#uri",
+                    secret_ref=f"{secret_name}#fqdn-uri",
                 ),
             },
             iam_grants=[],
