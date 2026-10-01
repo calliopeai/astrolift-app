@@ -486,350 +486,212 @@ class AzureServiceBusDriver(ManagedServiceDriver):
                 subscription_id=config.subscription_id,
             )
 
-    # ---- lifecycle ----------------------------------------------------
-
-    @driver_op(
-        cloud="azure",
-        driver="queue_servicebus_v2",
-        audit=True,
-        sensitive_kind="managed_service_provision",
-    )
+    @driver_op(cloud="azure", driver="queue_servicebus_v2", audit=True, sensitive_kind="managed_service_provision")
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        topic_name = self._topic_name(spec=spec)
-        sub_name = self._default_sub_name(topic_name=topic_name)
-        cfg = spec.config or {}
-        existing = self._topic_state(topic_name)
-        if existing is not None:
-            try:
-                _assert_owned(existing, spec, AzureOperation.PROVISION, f"topic {topic_name}")
-            except AzureOwnershipError as exc:
-                return ProvisionResult(
-                    ok=False,
-                    handle="",
-                    message=str(exc),
-                    errors=[OWNERSHIP_ERROR_CODE],
-                )
         try:
-            self._client.topics.create_or_update(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                topic_name=topic_name,
-                parameters={
-                    "max_size_in_megabytes": int(
-                        cfg.get(
-                            "max_size_in_megabytes",
-                            self._config.max_size_in_megabytes,
-                        ),
-                    ),
-                    "enable_partitioning": bool(
-                        cfg.get(
-                            "enable_partitioning",
-                            self._config.enable_partitioning,
-                        ),
-                    ),
-                    "default_message_time_to_live": (
-                        cfg.get("default_message_ttl") or self._config.default_message_ttl
-                    ),
-                    "support_ordering": True,
-                    "userMetadata": _user_metadata(spec),
-                },
+            metadata = _topic_metadata(spec)
+            topic_parameters, child_parameters = self._parameters(spec.config, metadata)
+            if spec.recorded_handle:
+                target = self._saved_target(spec.recorded_handle, spec)
+            else:
+                identity = UUID(_topic_identity(spec)).hex
+                prefix = re.sub(r"[^a-z0-9-]+", "-", self._config.topic_name_prefix.lower()).strip("-")[:9].rstrip("-")
+                name = f"{prefix}-{identity}" if prefix else identity
+                target = self._coordinates(name, name + "-default")
+            budget = _TopicCallBudget()
+            topic, child = self._pair(target, spec, budget)
+            if spec.recorded_handle and (topic is None or child is None):
+                raise _TopicOwnershipUnknown("recorded topic or subscription is absent; refusing recreation")
+            if topic is None and child is not None:
+                raise _TopicOwnershipUnknown("subscription remains without the recorded topic")
+            if topic is not None:
+                self._inventory(target, spec, budget, child_present=child is not None)
+            topic = self._client.topics.create_or_update(
+                **target.topic_args(), parameters=topic_parameters, **budget.options()
             )
+            self._assert_owned(topic, target.topic_id, spec)
+            child = self._client.subscriptions.create_or_update(
+                **target.child_args(), parameters=child_parameters, **budget.options()
+            )
+            self._assert_owned(child, target.child_id, spec)
         except Exception as exc:
-            return ProvisionResult(
-                ok=False,
-                handle="",
-                message=f"create_topic: {exc}",
-                errors=[str(exc)],
-            )
-        try:
-            self._client.subscriptions.create_or_update(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                topic_name=topic_name,
-                subscription_name=sub_name,
-                parameters={
-                    "lock_duration": (cfg.get("lock_duration") or self._config.lock_duration),
-                    "max_delivery_count": int(
-                        cfg.get(
-                            "max_delivery_count",
-                            self._config.max_delivery_count,
-                        ),
-                    ),
-                    "dead_lettering_on_message_expiration": bool(
-                        cfg.get(
-                            "dead_lettering_on_message_expiration",
-                            self._config.dead_lettering_on_message_expiration,
-                        ),
-                    ),
-                    "default_message_time_to_live": (
-                        cfg.get("default_message_ttl") or self._config.default_message_ttl
-                    ),
-                },
-            )
-        except Exception as exc:
-            return ProvisionResult(
-                ok=False,
-                handle="",
-                message=f"create_subscription: {exc}",
-                errors=[str(exc)],
-            )
+            return ProvisionResult(ok=False, handle="", message=_topic_error_message(exc), errors=_topic_errors(exc))
         return ProvisionResult(
-            ok=True,
-            handle=self._handle_for(topic_name=topic_name),
-            message=(f"Service Bus topic {topic_name} + subscription {sub_name} provisioned"),
+            ok=True, handle=target.handle(self._config.handle_kind), message="owned topic and subscription provisioned"
         )
+
+    def editable_fields(self) -> list[str]:
+        return ["max_size_in_megabytes", "default_message_ttl"]
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        topic_name = self._topic_name_from_handle(spec.handle)
         cfg = spec.config or {}
-
-        existing = self._topic_state(topic_name)
-        if existing is None:
-            return UpdateResult(
-                ok=False,
-                handle=spec.handle,
-                message=f"topic {topic_name} does not exist",
-                errors=["not_found"],
-                retryable=False,
-            )
+        if not any(key in cfg for key in self.editable_fields()) or spec.size is not None:
+            return unsupported_update(spec.handle, "Only topic capacity and TTL can update in place")
         try:
-            _assert_owned(existing, spec, AzureOperation.UPDATE, f"topic {topic_name}")
-        except AzureOwnershipError as exc:
-            return UpdateResult(
-                ok=False,
-                handle=spec.handle,
-                message=str(exc),
-                errors=[OWNERSHIP_ERROR_CODE],
-                retryable=False,
-            )
+            target = self._saved_target(spec.handle, spec)
+            budget = _TopicCallBudget()
+            topic, child = self._pair(target, spec, budget, required=True)
+            self._inventory(target, spec, budget, child_present=True)
+            # Full desired config reaches the driver. Noneditable values must already match.
+            immutable = {
+                "enable_partitioning": (_field(topic, "enable_partitioning"), cfg.get("enable_partitioning")),
+                "lock_duration": (
+                    _field(child, "lock_duration"),
+                    _topic_duration(cfg["lock_duration"]) if "lock_duration" in cfg else None,
+                ),
+                "max_delivery_count": (_field(child, "max_delivery_count"), cfg.get("max_delivery_count")),
+                "dead_lettering_on_message_expiration": (
+                    _field(child, "dead_lettering_on_message_expiration"),
+                    cfg.get("dead_lettering_on_message_expiration"),
+                ),
+            }
+            allowed = set(self.editable_fields()) | set(immutable)
+            if set(cfg) - allowed or any(
+                key in cfg and current != desired for key, (current, desired) in immutable.items()
+            ):
+                return unsupported_update(spec.handle, "Subscription and immutable topic settings require reprovision")
+            self._parameters(cfg, _field(topic, "user_metadata"))
+            from azure.mgmt.servicebus.models import SBTopic, SBTopicProperties
 
-        topic_body: dict[str, Any] = {}
-        if "max_size_in_megabytes" in cfg:
-            topic_body["max_size_in_megabytes"] = int(cfg["max_size_in_megabytes"])
-        if "enable_partitioning" in cfg:
-            topic_body["enable_partitioning"] = bool(cfg["enable_partitioning"])
-        if cfg.get("default_message_ttl"):
-            topic_body["default_message_time_to_live"] = cfg["default_message_ttl"]
-        if not topic_body:
-            return UpdateResult(
-                ok=True,
-                handle=spec.handle,
-                message="no modifiable attributes provided -- no-op",
+            values: dict[str, Any] = {"user_metadata": _field(topic, "user_metadata")}
+            if "max_size_in_megabytes" in cfg:
+                values["max_size_in_megabytes"] = _topic_capacity(cfg["max_size_in_megabytes"])
+            if "default_message_ttl" in cfg:
+                values["default_message_time_to_live"] = _topic_duration(cfg["default_message_ttl"])
+            parameters = SBTopic(properties=SBTopicProperties(**values))
+            observed = self._client.topics.create_or_update(
+                **target.topic_args(), parameters=parameters, **budget.options()
             )
-        try:
-            self._client.topics.create_or_update(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                topic_name=topic_name,
-                parameters=topic_body,
-            )
+            self._assert_owned(observed, target.topic_id, spec)
+            for key, value in values.items():
+                if _field(observed, key) != value:
+                    raise _TopicOwnershipUnknown("provider did not confirm requested topic settings")
         except Exception as exc:
             return UpdateResult(
                 ok=False,
                 handle=spec.handle,
-                message=f"create_or_update: {exc}",
-                errors=[str(exc)],
+                message=_topic_error_message(exc),
+                errors=_topic_errors(exc),
+                retryable=not isinstance(exc, (AzureOwnershipError, AzureTagError)),
             )
-        return UpdateResult(
-            ok=True,
-            handle=spec.handle,
-            message=f"topic {topic_name} update queued",
-        )
+        return UpdateResult(ok=True, handle=spec.handle, message="requested owned topic settings observed")
 
-    @driver_op(
-        cloud="azure",
-        driver="queue_servicebus_v2",
-        audit=True,
-        sensitive_kind="managed_service_deprovision",
-    )
+    @driver_op(cloud="azure", driver="queue_servicebus_v2", audit=True, sensitive_kind="managed_service_deprovision")
     def deprovision(
-        self,
-        spec: DeprovisionSpec,
-        *,
-        delete_data: bool = False,
-        force_destroy: bool = False,
+        self, spec: DeprovisionSpec, *, delete_data: bool = False, force_destroy: bool = False
     ) -> DeprovisionResult:
-        topic_name = self._topic_name_from_handle(spec.handle)
-        sub_name = self._default_sub_name(topic_name=topic_name)
-
-        # Probe topic existence first; idempotent gone path.
-        topic_state = self._topic_state(topic_name)
-        if topic_state is None:
-            return DeprovisionResult(
-                ok=True,
-                handle=spec.handle,
-                message=f"topic {topic_name} already gone",
-            )
-
         try:
-            _assert_owned(topic_state, spec, AzureOperation.DELETE, f"topic {topic_name}")
-        except AzureOwnershipError as exc:
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=str(exc),
-                errors=[OWNERSHIP_ERROR_CODE],
-                retryable=False,
-            )
-
-        if not delete_data:
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=(
-                    f"topic {topic_name} cannot be deleted while retaining "
-                    "messages; drain every subscription externally or pass "
-                    "delete_data=True"
-                ),
-                errors=["delete_data_required"],
-                retryable=False,
-            )
-
-        # Lock check: namespace + topic-level locks. If the topic has
-        # an active lock-state and force_destroy=False, refuse.
-        if _is_locked(topic_state) and not force_destroy:
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=(
-                    f"topic {topic_name} is locked (status="
-                    f"{_status_of(topic_state)}) -- pass "
-                    f"force_destroy=True to bypass"
-                ),
-                errors=["topic_locked"],
-            )
-
-        # Subscription delete first; topic delete refuses while
-        # subscriptions are attached (similar to the SNS/Pub-Sub
-        # pattern).
-        try:
-            self._client.subscriptions.delete(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                topic_name=topic_name,
-                subscription_name=sub_name,
-            )
-        except Exception as exc:
-            if type(exc).__name__ != "ResourceNotFoundError":
+            target = self._saved_target(spec.handle, spec)
+            budget = _TopicCallBudget()
+            topic, child = self._pair(target, spec, budget)
+            if topic is None:
+                if child is not None:
+                    raise _TopicOwnershipUnknown("recorded subscription remains without its topic")
+                return DeprovisionResult(
+                    ok=True, handle=spec.handle, message="recorded topic and subscription both absent"
+                )
+            self._inventory(target, spec, budget, child_present=child is not None)
+            if not delete_data:
                 return DeprovisionResult(
                     ok=False,
                     handle=spec.handle,
-                    message=f"delete_subscription: {exc}",
-                    errors=[str(exc)],
+                    message="Service Bus cannot retain messages on deletion; explicitly authorize delete_data=True",
+                    errors=["delete_data_required"],
+                    retryable=False,
                 )
-
-        try:
-            self._client.topics.delete(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                topic_name=topic_name,
-            )
-        except Exception as exc:
-            if type(exc).__name__ == "ResourceNotFoundError":
+            status = _topic_status(topic)
+            if status not in {"Active", "Disabled", "SendDisabled", "ReceiveDisabled"}:
+                raise _TopicOwnershipUnknown("topic is not in a confirmed deletable state")
+            if status != "Active" and not force_destroy:
                 return DeprovisionResult(
-                    ok=True,
+                    ok=False,
                     handle=spec.handle,
-                    message=f"topic {topic_name} already gone",
+                    message="topic locked; explicitly authorize force_destroy=True",
+                    errors=["topic_locked"],
+                    retryable=False,
                 )
+            if child is not None:
+                self._delete(self._client.subscriptions, target.child_args(), budget)
+            self._delete(self._client.topics, target.topic_args(), budget)
+            topic, child = self._pair(target, spec, budget)
+            if topic is not None or child is not None:
+                raise _TopicOwnershipUnknown("deletion absence could not be confirmed")
+        except Exception as exc:
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=f"delete_topic: {exc}",
-                errors=[str(exc)],
+                message=_topic_error_message(exc),
+                errors=_topic_errors(exc),
+                retryable=not isinstance(exc, (AzureOwnershipError, AzureTagError)),
             )
         return DeprovisionResult(
-            ok=True,
-            handle=spec.handle,
-            message=(
-                f"topic {topic_name} + subscription {sub_name} deleted (messages purged, force_destroy={force_destroy})"
-            ),
+            ok=True, handle=spec.handle, message="recorded topic and subscription deleted; messages purged"
         )
-
-    # ---- read-only ops ------------------------------------------------
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        topic_name = self._topic_name_from_handle(handle.handle)
-        topic = self._topic_state(topic_name)
-        if topic is None:
+        try:
+            target = self._saved_target(handle.handle, handle)
+            topic, child = self._pair(target, handle, _TopicCallBudget())
+            if topic is None and child is None:
+                return ServiceStatus(
+                    handle=handle.handle, state="deprovisioned", message="recorded topic and subscription both absent"
+                )
+            if topic is None or child is None:
+                raise _TopicOwnershipUnknown("recorded topic/subscription pair is incomplete")
+            statuses = [_topic_status(row) for row in (topic, child)]
+            states = {
+                "Active": "available",
+                "Creating": "provisioning",
+                "Deleting": "deprovisioning",
+                "Renaming": "updating",
+                "Restoring": "updating",
+            }
+            state = next((states.get(value, "error") for value in statuses if value != "Active"), "available")
             return ServiceStatus(
-                handle=handle.handle,
-                state="deprovisioned",
-                message=f"topic {topic_name} does not exist",
+                handle=handle.handle, state=state, message="current owned topic and subscription observed"
             )
-        sb_status = _status_of(topic)
-        return ServiceStatus(
-            handle=handle.handle,
-            state=_SB_STATUS_TO_PROTOCOL.get(sb_status, "available"),
-            message=f"azure reports {sb_status}",
-        )
+        except Exception as exc:
+            return ServiceStatus(handle=handle.handle, state="error", message=_topic_error_message(exc))
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2")
-    def binding(
-        self,
-        handle: ServiceHandle,
-        config: dict[str, Any] | None = None,
-    ) -> Binding:
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         del config
-        topic_name = self._topic_name_from_handle(handle.handle)
-        sub_name = self._default_sub_name(topic_name=topic_name)
-        endpoint = f"sb://{self._config.namespace_name}.servicebus.windows.net/"
-        topic_resource = (
-            f"/subscriptions/{self._config.subscription_id}"
-            f"/resourceGroups/{self._config.resource_group}"
-            f"/providers/Microsoft.ServiceBus/namespaces"
-            f"/{self._config.namespace_name}/topics/{topic_name}"
-        )
-        subscription_resource = f"{topic_resource}/subscriptions/{sub_name}"
-        env_vars = {
-            "SERVICEBUS_NAMESPACE": ValueRef(
-                literal=self._config.namespace_name,
-            ),
-            "SERVICEBUS_TOPIC": ValueRef(literal=topic_name),
-            "SERVICEBUS_SUBSCRIPTION": ValueRef(literal=sub_name),
-            "SERVICEBUS_ENDPOINT": ValueRef(literal=endpoint),
+        target = self._saved_target(handle.handle, handle)
+        budget = _TopicCallBudget()
+        topic, child = self._pair(target, handle, budget, required=True)
+        self._inventory(target, handle, budget, child_present=True)
+        if any(_topic_status(row) != "Active" for row in (topic, child)):
+            raise _TopicOwnershipUnknown("topic/subscription is not active for binding")
+        env = {
+            "SERVICEBUS_NAMESPACE": ValueRef(literal=target.namespace),
+            "SERVICEBUS_TOPIC": ValueRef(literal=target.topic),
+            "SERVICEBUS_SUBSCRIPTION": ValueRef(literal=target.child),
+            "SERVICEBUS_ENDPOINT": ValueRef(literal=f"sb://{target.namespace}.servicebus.windows.net/"),
         }
         if self._config.handle_kind == "topic":
-            env_vars.update(
-                TOPIC_ARN_OR_ID=ValueRef(literal=topic_resource),
-                TOPIC_NAME=ValueRef(literal=topic_name),
+            env.update(
+                TOPIC_ARN_OR_ID=ValueRef(literal=target.topic_id),
+                TOPIC_NAME=ValueRef(literal=target.topic),
                 TOPIC_REGION=ValueRef(literal=self._config.location),
             )
         return Binding(
-            env_vars=env_vars,
+            env_vars=env,
             iam_grants=[
-                Grant(
-                    resource=topic_resource,
-                    actions=["Azure Service Bus Data Sender"],
-                ),
-                Grant(
-                    resource=subscription_resource,
-                    actions=["Azure Service Bus Data Receiver"],
-                ),
+                Grant(resource=target.topic_id, actions=["Azure Service Bus Data Sender"]),
+                Grant(resource=target.child_id, actions=["Azure Service Bus Data Receiver"]),
             ],
-            notes=(
-                "Sender role on the topic + receiver role on the "
-                "default subscription, via Workload Identity + "
-                "Microsoft.Authorization/roleAssignments."
-            ),
+            notes="Workload Identity sender on exact topic; receiver on exact saved subscription",
         )
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
-        raise AzureServiceBusError(
-            "Service Bus messages are ephemeral; no snapshot support",
-        )
+        raise AzureServiceBusError("Service Bus messages are ephemeral; no snapshot support")
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2")
-    def restore(
-        self,
-        snapshot: SnapshotHandle,
-        target: ProvisionSpec,
-    ) -> ProvisionResult:
-        raise AzureServiceBusError(
-            "Service Bus has no restore counterpart -- in-flight messages have no recovery value",
-        )
+    def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
+        raise AzureServiceBusError("Service Bus has no supported restore counterpart")
 
     @driver_op(cloud="azure", driver="queue_servicebus_v2", heartbeat=False)
     def config_schema(self) -> dict[str, Any]:
@@ -874,61 +736,283 @@ class AzureServiceBusDriver(ManagedServiceDriver):
             )
         return BindingSchema(env_vars=env_vars)
 
-    # ---- internals ----------------------------------------------------
-
-    def _topic_state(self, topic_name: str) -> Any | None:
+    def _coordinates(self, topic: str, child: str) -> _TopicTarget:
+        cfg = self._config
         try:
-            return self._client.topics.get(
-                resource_group_name=self._config.resource_group,
-                namespace_name=self._config.namespace_name,
-                topic_name=topic_name,
+            subscription = str(UUID(cfg.subscription_id))
+        except (ValueError, TypeError, AttributeError):
+            raise AzureOwnershipError("invalid Azure subscription identity") from None
+        if not UUID(subscription).int or cfg.subscription_id.casefold() != subscription:
+            raise AzureOwnershipError("invalid Azure subscription identity")
+        if (
+            not 1 <= len(cfg.resource_group) <= 90
+            or any(not (c.isalnum() or c in "_.()-") for c in cfg.resource_group)
+            or cfg.resource_group.endswith(".")
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]{4,48}[A-Za-z0-9]", cfg.namespace_name)
+            or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,258}[A-Za-z0-9])?", topic)
+            or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,48}[A-Za-z0-9])?", child)
+        ):
+            raise AzureOwnershipError("invalid Service Bus saved placement/entity coordinates")
+        target = _TopicTarget(subscription, cfg.resource_group, cfg.namespace_name, topic, child)
+        if len(target.handle(cfg.handle_kind)) > 512:
+            raise AzureOwnershipError("Service Bus saved target exceeds handle storage limit")
+        return target
+
+    def _saved_target(self, handle: str, source: object) -> _TopicTarget:
+        _topic_identity(source)
+        parts = handle.split("/")
+        if len(parts) != 7 or parts[0] != self._config.handle_kind or parts[1] != "arm-v1":
+            raise _TopicOwnershipUnknown("saved Service Bus placement and child provenance are unavailable")
+        target = self._coordinates(parts[5], parts[6])
+        if tuple(parts[2:5]) != (target.subscription, target.group, target.namespace):
+            raise AzureOwnershipError("saved Service Bus placement differs from current provider coordinates")
+        return target
+
+    def _assert_owned(self, row: Any, arm_id: str, source: object) -> None:
+        expected = _topic_identity(source)
+        actual = _field(row, "id", default="")
+        if not isinstance(actual, str) or not actual:
+            raise _TopicOwnershipUnknown("provider returned no ARM identity")
+        if _topic_arm_key(actual) != _topic_arm_key(arm_id):
+            raise AzureOwnershipError("provider returned a different ARM identity")
+        blob = _field(row, "user_metadata", "userMetadata", default="")
+        if not isinstance(blob, str) or not blob or len(blob) > 1024:
+            raise _TopicOwnershipUnknown("current entity ownership metadata is unavailable")
+        envelope: dict[str, str] = {}
+        for entry in blob.split(";"):
+            key, sep, value = entry.partition("=")
+            if not sep or not key or key in envelope:
+                raise AzureOwnershipError("ambiguous Service Bus ownership metadata")
+            envelope[key] = value
+        if any(key in envelope and envelope[key] != expected for key in LEGACY_KEYS["azure"]):
+            raise AzureOwnershipError("conflicting Service Bus ownership aliases")
+        verify_azure_ownership(
+            envelope, owner_of(source), operation=AzureOperation.UPDATE, resource="topic/subscription"
+        )
+
+    def _get(self, operations: Any, args: dict[str, str], arm_id: str, source: object, budget: _TopicCallBudget) -> Any:
+        from azure.core.exceptions import ResourceNotFoundError
+
+        try:
+            row = operations.get(**args, **budget.options())
+        except ResourceNotFoundError:
+            return None
+        self._assert_owned(row, arm_id, source)
+        return row
+
+    def _pair(
+        self, target: _TopicTarget, source: object, budget: _TopicCallBudget, *, required: bool = False
+    ) -> tuple[Any, Any]:
+        topic = self._get(self._client.topics, target.topic_args(), target.topic_id, source, budget)
+        child = self._get(self._client.subscriptions, target.child_args(), target.child_id, source, budget)
+        if required and (topic is None or child is None):
+            raise _TopicOwnershipUnknown("recorded topic/subscription is absent")
+        return topic, child
+
+    def _inventory(
+        self, target: _TopicTarget, source: object, budget: _TopicCallBudget, *, child_present: bool
+    ) -> None:
+        from urllib.parse import unquote, urlsplit
+
+        token = None
+        tokens: set[str] = set()
+        seen: set[str] = set()
+        for _ in range(4):
+            pages = self._client.subscriptions.list_by_topic(**target.topic_args(), top=65, **budget.options()).by_page(
+                continuation_token=token
             )
-        except Exception as exc:
-            if type(exc).__name__ == "ResourceNotFoundError":
-                return None
-            if "ResourceNotFound" in str(exc):
-                return None
-            raise
+            page = next(pages)
+            for row in page:
+                if len(seen) >= 64:
+                    raise _TopicOwnershipUnknown("subscription inventory exceeds item budget")
+                arm_id = _field(row, "id", default="")
+                if (
+                    not isinstance(arm_id, str)
+                    or _topic_arm_key(arm_id) != _topic_arm_key(target.child_id)
+                    or _topic_arm_key(arm_id) in seen
+                ):
+                    raise AzureOwnershipError("topic contains an unrecorded or ambiguous subscription")
+                self._assert_owned(row, target.child_id, source)
+                seen.add(_topic_arm_key(arm_id))
+            token = pages.continuation_token
+            if not token:
+                if bool(seen) != child_present:
+                    raise _TopicOwnershipUnknown("subscription inventory disagrees with exact lookup")
+                return
+            parsed = urlsplit(token)
+            if (
+                token in tokens
+                or parsed.scheme != "https"
+                or parsed.netloc != "management.azure.com"
+                or _topic_arm_key(unquote(parsed.path)) != _topic_arm_key(target.topic_id + "/subscriptions")
+                or parsed.fragment
+            ):
+                raise _TopicOwnershipUnknown("invalid subscription inventory continuation target")
+            tokens.add(token)
+        raise _TopicOwnershipUnknown("subscription inventory exceeds page budget")
 
-    def _topic_name(self, *, spec: ProvisionSpec) -> str:
-        # Service Bus topic names: 1-260 chars; alphanumeric +
-        # . - _ /. We use the same safe subset as the queue driver.
-        parts = [
-            self._config.topic_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        raw = "-".join(p for p in parts if p)
-        clean = "".join(c if (c.isalnum() or c in "-_./") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:260]
+    def _delete(self, operations: Any, args: dict[str, str], budget: _TopicCallBudget) -> None:
+        from contextlib import suppress
 
-    def _default_sub_name(self, *, topic_name: str) -> str:
-        # Subscription names: 1-50 chars; alphanumeric + . - _.
-        # The "<topic>-default" suffix per the issue spec; if that
-        # would exceed 50 chars we shorten the topic-derived prefix.
-        suffix = "-default"
-        max_topic = 50 - len(suffix)
-        return f"{topic_name[:max_topic]}{suffix}"
+        from azure.core.exceptions import ResourceNotFoundError
 
-    def _handle_for(self, *, topic_name: str) -> str:
-        return f"{self._config.handle_kind}/{topic_name}"
+        with suppress(ResourceNotFoundError):
+            operations.delete(**args, **budget.options())
 
-    def _topic_name_from_handle(self, handle: str) -> str:
-        if "/" not in handle:
-            raise AzureServiceBusError(
-                f"handle {handle!r} must be '<kind>/<topic>'",
-            )
-        kind, _, topic_name = handle.partition("/")
-        if kind != self._config.handle_kind or not topic_name:
-            raise AzureServiceBusError(
-                f"handle {handle!r} must use kind {self._config.handle_kind!r}",
-            )
-        return topic_name
+    def _parameters(self, cfg: dict[str, Any], metadata: str) -> tuple[Any, Any]:
+        from azure.mgmt.servicebus.models import SBSubscription, SBSubscriptionProperties, SBTopic, SBTopicProperties
+
+        if set(cfg) - set(self.config_schema()["properties"]):
+            raise AzureOwnershipError("unsupported Service Bus configuration key")
+        delivery = cfg.get("max_delivery_count", self._config.max_delivery_count)
+        if type(delivery) is not int or not 1 <= delivery <= 100:
+            raise AzureOwnershipError("invalid subscription maximum delivery count")
+        partitioned = cfg.get("enable_partitioning", self._config.enable_partitioning)
+        dead_letter = cfg.get("dead_lettering_on_message_expiration", self._config.dead_lettering_on_message_expiration)
+        if type(partitioned) is not bool or type(dead_letter) is not bool:
+            raise AzureOwnershipError("invalid Service Bus boolean configuration")
+        ttl = _topic_duration(cfg.get("default_message_ttl", self._config.default_message_ttl))
+        lock = _topic_duration(cfg.get("lock_duration", self._config.lock_duration))
+        if lock > timedelta(minutes=5):
+            raise AzureOwnershipError("subscription lock duration exceeds five minutes")
+        return (
+            SBTopic(
+                properties=SBTopicProperties(
+                    max_size_in_megabytes=_topic_capacity(
+                        cfg.get("max_size_in_megabytes", self._config.max_size_in_megabytes)
+                    ),
+                    enable_partitioning=partitioned,
+                    support_ordering=True,
+                    default_message_time_to_live=ttl,
+                    user_metadata=metadata,
+                )
+            ),
+            SBSubscription(
+                properties=SBSubscriptionProperties(
+                    lock_duration=lock,
+                    max_delivery_count=delivery,
+                    dead_lettering_on_message_expiration=dead_letter,
+                    default_message_time_to_live=ttl,
+                    user_metadata=metadata,
+                )
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class _TopicTarget:
+    subscription: str
+    group: str
+    namespace: str
+    topic: str
+    child: str
+
+    @property
+    def topic_id(self) -> str:
+        return (
+            f"/subscriptions/{self.subscription}/resourceGroups/{self.group}"
+            f"/providers/Microsoft.ServiceBus/namespaces/{self.namespace}/topics/{self.topic}"
+        )
+
+    @property
+    def child_id(self) -> str:
+        return self.topic_id + "/subscriptions/" + self.child
+
+    def topic_args(self) -> dict[str, str]:
+        return dict(resource_group_name=self.group, namespace_name=self.namespace, topic_name=self.topic)
+
+    def child_args(self) -> dict[str, str]:
+        return dict(**self.topic_args(), subscription_name=self.child)
+
+    def handle(self, kind: str) -> str:
+        return "/".join((kind, "arm-v1", self.subscription, self.group, self.namespace, self.topic, self.child))
+
+
+class _TopicOwnershipUnknown(RuntimeError):
+    pass
+
+
+class _TopicCallBudget:
+    def __init__(self) -> None:
+        self.deadline = time.monotonic() + 20
+
+    def options(self) -> dict[str, Any]:
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise _TopicOwnershipUnknown("Service Bus topic operation deadline exhausted")
+        timeout = min(5.0, remaining / 2)
+        return dict(connection_timeout=timeout, read_timeout=timeout, retry_total=0, redirect_max=0)
+
+
+def _topic_identity(source: object) -> str:
+    value = str(getattr(source, "managed_service_id", "") or "")
+    try:
+        identity = UUID(value)
+    except (ValueError, AttributeError):
+        raise AzureOwnershipError("immutable Service Bus source UUID is required") from None
+    if not identity.int or str(identity) != value:
+        raise AzureOwnershipError("immutable canonical nonzero Service Bus source UUID is required")
+    return value
+
+
+def _topic_metadata(spec: ProvisionSpec) -> str:
+    _topic_identity(spec)
+    tags = _tags_for(spec)
+    if any(";" in key or "=" in key or ";" in value for key, value in tags.items()):
+        raise AzureOwnershipError("Service Bus metadata cannot contain envelope delimiters")
+    blob = ";".join(f"{key}={value}" for key, value in sorted(tags.items()))
+    if len(blob) > 1024:
+        raise AzureOwnershipError("Service Bus ownership metadata exceeds 1024 characters")
+    return blob
+
+
+def _topic_duration(value: Any) -> timedelta:
+    if not isinstance(value, str) or not value:
+        raise AzureOwnershipError("invalid Service Bus duration")
+    match = re.fullmatch(r"P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?", value)
+    if match is None or not any(match.groups()):
+        raise AzureOwnershipError("unsupported Service Bus duration; use integer days/hours/minutes/seconds")
+    try:
+        result = timedelta(
+            days=int(match[1] or 0), hours=int(match[2] or 0), minutes=int(match[3] or 0), seconds=int(match[4] or 0)
+        )
+    except OverflowError:
+        raise AzureOwnershipError("Service Bus duration exceeds supported range") from None
+    if result <= timedelta(0):
+        raise AzureOwnershipError("Service Bus duration must be positive")
+    return result
+
+
+def _topic_capacity(value: Any) -> int:
+    if type(value) is not int or value not in {1024, 2048, 5120, 10240, 20480, 40960, 81920}:
+        raise AzureOwnershipError("invalid Service Bus topic capacity")
+    return int(value)
+
+
+def _topic_arm_key(value: str) -> str:
+    # ARM ASCII case variants cannot collapse distinct Unicode resource groups.
+    return value.translate(str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"))
+
+
+def _topic_status(row: Any) -> str:
+    value = _field(row, "status", default="Unknown")
+    return str(getattr(value, "value", value))
+
+
+def _topic_errors(exc: Exception) -> list[str]:
+    return (
+        [OWNERSHIP_ERROR_CODE, "ownership_refused"]
+        if isinstance(exc, (AzureOwnershipError, AzureTagError))
+        else ["ownership_unknown"]
+    )
+
+
+def _topic_error_message(exc: Exception) -> str:
+    return (
+        f"Service Bus topic ownership/configuration refused: {exc}"
+        if isinstance(exc, (AzureOwnershipError, AzureTagError))
+        else "Service Bus topic ownership or operation could not be confirmed"
+    )
 
 
 # ----- module-level helpers --------------------------------------------

@@ -7,6 +7,13 @@
   and caller-owned source titles/actions; lifecycle and bootstrap operations
   remain separate translation boundaries (#2145).
 
+- Azure topic/default-subscription aliases use full immutable service UUID names
+  and save exact ARM placement/child coordinates. Typed SDK 10 writes, current
+  parent/child ownership and complete bounded inventory gate supported effects
+  and sender bindings. Unknown legacy provenance stays refused; denied cleanup
+  never becomes success. Only actual topic capacity/TTL updates are editable;
+  retention and backup limits remain explicit (#2032, #2098).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

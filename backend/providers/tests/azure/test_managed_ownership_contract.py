@@ -500,27 +500,32 @@ def _servicebus_set_owner(entity: Any, value: str) -> None:
 
 
 def _servicebus_topic() -> Live:
-    client = servicebus_suite.FakeSBClient()
-    driver = servicebus_suite.AzureServiceBusDriver(
-        config=servicebus_suite.AzureServiceBusConfig(
-            subscription_id="sub-1",
-            resource_group="rg-test",
-            namespace_name="acme-prod-sb",
-            client=client,
-        ),
-    )
-    result = driver.provision(servicebus_suite._spec())
+    from .test_servicebus_queue_wire_2032 import OWNER, spec
+    from .test_servicebus_topic_wire_2032 import RecordingTopics, recording_config
+
+    api = RecordingTopics()
+    driver = servicebus_suite.AzureServiceBusDriver(config=recording_config(api))
+    result = driver.provision(spec())
     assert result.ok, result.message
-    name = result.handle.split("/", 1)[1]
-    topics = client.topics_obj.topics
+    target = driver._saved_target(result.handle, spec())
+    properties = api.rows[target.topic_id]["properties"]
+
+    def write(value: str) -> None:
+        kept = [part for part in properties["userMetadata"].split(";") if not part.startswith(f"{ARM_ID_KEY}=")]
+        properties["userMetadata"] = ";".join([*kept, f"{ARM_ID_KEY}={value}"])
+
     return Live(
         driver=driver,
         handle=result.handle,
-        owner=servicebus_suite.OWNER,
-        read_owner=lambda: _servicebus_owner(topics[name]),
-        write_owner=lambda value: _servicebus_set_owner(topics[name], value),
-        exists=lambda: name in topics,
-        reprovision=lambda: driver.provision(servicebus_suite._spec()),
+        owner=OWNER,
+        read_owner=lambda: next(
+            part.partition("=")[2]
+            for part in properties["userMetadata"].split(";")
+            if part.startswith(f"{ARM_ID_KEY}=")
+        ),
+        write_owner=write,
+        exists=lambda: target.topic_id in api.rows,
+        reprovision=lambda: driver.provision(spec(recorded_handle=result.handle)),
         update_kwargs={"config": {"max_size_in_megabytes": 2048}},
     )
 
@@ -596,7 +601,7 @@ def live(request: pytest.FixtureRequest) -> Live:
 
 
 def _ownership_errors(live: Live) -> list[str]:
-    if isinstance(live.driver, servicebus_legacy_suite.ServiceBusDriver):
+    if isinstance(live.driver, (servicebus_legacy_suite.ServiceBusDriver, servicebus_suite.AzureServiceBusDriver)):
         return [OWNERSHIP_ERROR_CODE, "ownership_refused"]
     return [OWNERSHIP_ERROR_CODE]
 

@@ -500,7 +500,91 @@ incarnation precondition here, so an external actor replacing a resource between
 GET and PUT/DELETE is not atomically excluded. Recorded short handles do not
 reconstruct unknown historical subscription/provider placement, and this leaf
 does not introduce such provenance. The sibling `queue/azure_servicebus` and
-`topic/service_bus_topic` topic/subscription driver is unchanged and still needs
-its own actual SDK/lifecycle audit. The recording HTTP and PostgreSQL tests prove
+`topic/service_bus_topic` has a separate, stricter saved-placement contract below;
+these single-queue checks do not supply its historical provenance. The recording HTTP and PostgreSQL tests prove
 SDK serialization, dispatch, owner refusal and no destructive calls on retained
 paths; they do not certify Azure message delivery or live-service persistence.
+
+### Azure topic/default subscription: exact saved placement (#2032, #2098)
+
+This separate scope covers only `AzureServiceBusDriver`, registered as
+`queue/azure_servicebus` and `topic/service_bus_topic`; it does not change the
+single-queue driver above. New topic names retain all 32 hex digits of the
+persisted canonical nonzero managed-service UUID, with at most nine cosmetic
+prefix characters. Topics are at most 42 characters and their default child is
+`<topic>-default`, at most 50; tenant/app/environment slugs are not identity.
+Only the prefix is shortened, never the UUID. Retries retain deterministic names.
+
+Successful handles save the complete target:
+`<kind>/arm-v1/<subscription UUID>/<resource group>/<namespace>/<topic>/<child>`.
+Every encoded coordinate is validated before any SDK request and must agree
+with current operator placement; the stored handle fits the existing 512-character
+column. Reads, binding, updates and cleanup use the saved child exactly rather
+than deriving it again. Valid complete handles retain exact physical names and
+messages across descriptive renames and prefix changes. Unknown/malformed source
+UUIDs, encoded delimiters, unsafe entity coordinates or incompatible placement
+refuse. Existing server-owned `provider_placement_identity`, when present, still
+passes through the central lifecycle's provenance verifier before dispatch.
+
+Historical short handles remain stored unchanged. They lack saved namespace,
+subscription and child provenance and return structured `ownership_unknown`;
+this release does not backfill them from current config, labels, slug guesses or
+GCP's recorded-handle exclusivity flag. Historical unlabelled children and ambiguous
+metadata cannot be adopted. A saved complete handle whose parent/child is absent
+cannot reprovision into a recreated pair. Operator recovery needs separately
+verified historical provenance; no automatic migration or handle rewrite occurs.
+
+Each supported operation requires the actual source UUID/platform marker and
+exact returned parent/child ARM identities. Parent-changing provision/update,
+sender binding and cleanup additionally require a complete attached-subscription
+inventory containing only the saved owned child (or its confirmed absence during
+cleanup/initial creation). Inventory is bounded to four pages and 64 items, with
+validated fixed-host/exact-parent continuation targets; incomplete, denied,
+repeated, foreign or excessive pages refuse before these effects. An unexpected
+child refuses even if its labels name the same service. Each SDK request has
+bounded connect/read timeouts (at most five seconds each), retries/redirects
+disabled, and shares a 20-second operation deadline checked before calls. This
+bounds provider requests, not arbitrary SDK response-body allocation.
+
+SDK 10/API `2026-01-01` typed `SBTopic(properties=SBTopicProperties(...))` and
+`SBSubscription(properties=SBSubscriptionProperties(...))` serialize owner metadata
+and settings under the actual `properties` object. Metadata delimiter injection,
+duplicate/conflicting aliases and envelopes exceeding 1024 characters refuse;
+identity is never truncated. Duration inputs support positive integer ISO day,
+hour, minute and second components; malformed, calendar-month/year, fractional or
+nonpositive durations refuse instead of guessing. SDK enum `.value` determines
+status: missing/unknown/disabled states never imply availability, and binding
+requires both entities active. Only `max_size_in_megabytes` and
+`default_message_ttl` are declared editable. Updates preserve unchanged
+noneditable settings in the full desired snapshot but refuse partitioning or
+child-setting changes; unsupported-only updates perform no SDK calls. Supported
+updates write typed topic properties and require returned setting confirmation.
+
+Workload identity retains Data Sender on the exact topic and Data Receiver on
+the exact saved subscription. Snapshot/restore remain unsupported. Retaining
+messages (`delete_data=False`) refuses with no seek/drain/snapshot fiction.
+Explicit destructive cleanup deletes the verified child, then parent, and checks
+both are actually absent. Only SDK-typed `ResourceNotFoundError` proves relevant
+absence; access/transport/delete failures retain `ownership_unknown` irrespective
+of diagnostic text. Permanent ownership refusals return
+`external_resource_collision` plus `ownership_refused`. Force permits an explicitly
+disabled topic to be removed, never bypassing source/placement/child proof, retained
+data refusal, incomplete inventory or a failed delete. This sequence is not atomic.
+
+Rollback requires care: the older sibling driver cannot safely interpret new
+`arm-v1` handles and must not resume workflows for their targets. Prefer a forward
+repair or independently verified compatible build; do not strip the saved context
+or rewrite handles for rollback. ARM logical IDs/owner markers are not a conditional
+resource-incarnation precondition: external replacement or subscription creation
+between completed reads and PUT/DELETE remains a race. No historical provider
+provenance or atomic incarnation enforcement is claimed. Failed creation before a
+successful saved handle can leave an owned partial pair; retry uses the same
+immutable-ID names in unchanged placement, and cannot adopt an unlabelled/foreign
+child. Changing placement during such an unrecorded failure needs operator review.
+
+Recording transport and real PostgreSQL lifecycle checks prove actual SDK wire
+serialization, enum/errors/paging, owner denial, opaque handle persistence and
+binding dispatch. They do not certify Azure message delivery, live-service data
+persistence or external-race exclusion. The broader #2032/#2098 audits remain open.
+See the actual [topic properties contract](https://learn.microsoft.com/en-us/rest/api/servicebus/controlplane/topics/create-or-update?view=rest-servicebus-controlplane-2026-01-01)
+and [subscription properties contract](https://learn.microsoft.com/en-us/rest/api/servicebus/controlplane/subscriptions/create-or-update?view=rest-servicebus-controlplane-2026-01-01).
