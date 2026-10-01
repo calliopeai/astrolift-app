@@ -357,6 +357,10 @@ class SliceSpec:
 
     labels: dict[str, str] = field(default_factory=dict)
     """Provider tags/labels to stamp, so an orphaned slice is attributable."""
+    organization_id: str = ""
+    app_id: str = ""
+    environment_id: str = ""
+    """Immutable consumer ownership for independent credential namespaces."""
 
     def __post_init__(self) -> None:
         if not (self.slice_id or "").strip():
