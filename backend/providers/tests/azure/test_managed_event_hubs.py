@@ -8,6 +8,7 @@ import pytest
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from _sdk.managed_service_tags import canonical_key
+from azure.core.exceptions import ResourceNotFoundError
 from azure.managed.event_hubs import (
     AzureEventHubsConfig,
     AzureEventHubsDriver,
@@ -15,8 +16,23 @@ from azure.managed.event_hubs import (
 )
 
 
-class ResourceNotFoundError(Exception):
-    status_code = 404
+class _Pager:
+    def __init__(self, values):
+        self.values = values
+        self.continuation_token = None
+
+    def by_page(self, continuation_token=None):
+        return self
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.values is None:
+            raise StopIteration
+        result = iter(self.values)
+        self.values = None
+        return result
 
 
 @dataclass
@@ -42,7 +58,7 @@ class FakeNamespaces:
     get_error: Exception | None = None
     delete_error: Exception | None = None
 
-    def get(self, *, resource_group_name: str, namespace_name: str) -> Any:
+    def get(self, *, resource_group_name: str, namespace_name: str, **_options: Any) -> Any:
         if self.get_error:
             raise self.get_error
         if namespace_name not in self.values:
@@ -55,16 +71,19 @@ class FakeNamespaces:
         resource_group_name: str,
         namespace_name: str,
         parameters: Any,
+        **_options: Any,
     ) -> FakePoller:
         self.create_calls.append({"namespace_name": namespace_name, "parameters": parameters})
         payload = parameters.as_dict()
         properties = payload.get("properties", {})
         namespace = SimpleNamespace(
+            id=f"/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/{resource_group_name}/providers/Microsoft.EventHub/namespaces/{namespace_name}",
             name=namespace_name,
             tags=dict(payload.get("tags", {})),
             sku=SimpleNamespace(**payload["sku"]),
             properties=SimpleNamespace(
                 status="Active",
+                provisioning_state="Succeeded",
                 kafka_enabled=properties.get("kafkaEnabled", False),
                 zone_redundant=properties.get("zoneRedundant", False),
                 disable_local_auth=properties.get("disableLocalAuth", False),
@@ -79,6 +98,7 @@ class FakeNamespaces:
         resource_group_name: str,
         namespace_name: str,
         parameters: Any,
+        **_options: Any,
     ) -> Any:
         self.update_calls.append({"namespace_name": namespace_name, "parameters": parameters})
         namespace = self.values[namespace_name]
@@ -95,11 +115,12 @@ class FakeNamespaces:
         resource_group_name: str,
         namespace_name: str,
         parameters: Any,
+        **_options: Any,
     ) -> Any:
         self.network_calls.append({"namespace_name": namespace_name, "parameters": parameters})
         return parameters
 
-    def begin_delete(self, *, resource_group_name: str, namespace_name: str) -> FakePoller:
+    def begin_delete(self, *, resource_group_name: str, namespace_name: str, **_options: Any) -> FakePoller:
         self.delete_calls.append(namespace_name)
         if self.delete_error:
             return FakePoller(error=self.delete_error)
@@ -119,6 +140,7 @@ class FakeEventHubs:
         resource_group_name: str,
         namespace_name: str,
         event_hub_name: str,
+        **_options: Any,
     ) -> Any:
         if self.get_error:
             raise self.get_error
@@ -134,6 +156,7 @@ class FakeEventHubs:
         namespace_name: str,
         event_hub_name: str,
         parameters: Any,
+        **_options: Any,
     ) -> Any:
         self.create_calls.append(
             {
@@ -146,6 +169,7 @@ class FakeEventHubs:
         retention = payload.get("retentionDescription", {})
         capture = payload.get("captureDescription")
         value = SimpleNamespace(
+            id=f"/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/{resource_group_name}/providers/Microsoft.EventHub/namespaces/{namespace_name}/eventhubs/{event_hub_name}",
             name=event_hub_name,
             properties=SimpleNamespace(
                 partition_count=payload.get("partitionCount", 2),
@@ -163,14 +187,45 @@ class FakeEventHubs:
         self.values[(namespace_name, event_hub_name)] = value
         return value
 
+    def list_by_namespace(self, *, namespace_name, **kwargs):
+        return _Pager([v for (ns, _), v in self.values.items() if ns == namespace_name])
+
 
 @dataclass
 class FakeConsumerGroups:
     calls: list[dict[str, Any]] = field(default_factory=list)
+    values: dict[tuple[str, str, str], Any] = field(default_factory=dict)
+
+    def _default(self, resource_group_name, namespace_name, event_hub_name):
+        return SimpleNamespace(
+            name="$Default",
+            id=f"/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/{resource_group_name}/providers/Microsoft.EventHub/namespaces/{namespace_name}/eventhubs/{event_hub_name}/consumergroups/$Default",
+            properties=SimpleNamespace(),
+        )
+
+    def get(self, *, resource_group_name, namespace_name, event_hub_name, consumer_group_name, **kwargs):
+        if consumer_group_name == "$Default":
+            return self._default(resource_group_name, namespace_name, event_hub_name)
+        try:
+            return self.values[namespace_name, event_hub_name, consumer_group_name]
+        except KeyError:
+            raise ResourceNotFoundError(consumer_group_name) from None
+
+    def list_by_event_hub(self, *, resource_group_name, namespace_name, event_hub_name, **kwargs):
+        return _Pager(
+            [self._default(resource_group_name, namespace_name, event_hub_name)]
+            + [v for (ns, hub, _), v in self.values.items() if ns == namespace_name and hub == event_hub_name]
+        )
 
     def create_or_update(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
-        return kwargs["parameters"]
+        name = kwargs["consumer_group_name"]
+        value = self._default(kwargs["resource_group_name"], kwargs["namespace_name"], kwargs["event_hub_name"])
+        value.name = name
+        value.id = value.id.removesuffix("$Default") + name
+        value.properties = SimpleNamespace(user_metadata=kwargs["parameters"].as_dict()["properties"]["userMetadata"])
+        self.values[kwargs["namespace_name"], kwargs["event_hub_name"], name] = value
+        return value
 
 
 @dataclass
@@ -191,10 +246,27 @@ class FakeManagementLocks:
     deleted: list[str] = field(default_factory=list)
     list_error: Exception | None = None
 
+    def list_at_subscription_level(self, **kwargs: Any):
+        if self.list_error:
+            raise self.list_error
+        return _Pager([])
+
+    def list_at_resource_group_level(self, **kwargs: Any):
+        return self.list_at_subscription_level(**kwargs)
+
     def list_at_resource_level(self, **kwargs: Any) -> list[FakeLock]:
         if self.list_error:
             raise self.list_error
-        return list(self.locks)
+        return _Pager(
+            [
+                SimpleNamespace(
+                    name=lock.name,
+                    id=f"/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/{kwargs['resource_group_name']}/providers/Microsoft.EventHub/namespaces/{kwargs['resource_name']}/providers/Microsoft.Authorization/locks/{lock.name}",
+                    properties=SimpleNamespace(level="CanNotDelete"),
+                )
+                for lock in self.locks
+            ]
+        )
 
     def delete_at_resource_level(self, *, lock_name: str, **kwargs: Any) -> None:
         self.deleted.append(lock_name)
@@ -218,7 +290,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "service_handle_hint": "events",
         "size": "small",
         "binding_id": "binding-id",
-        "managed_service_id": "service-id",
+        "managed_service_id": "018f42f0-4420-7000-8000-000000000001",
         "config": {},
     }
     values.update(overrides)
@@ -276,7 +348,7 @@ def test_provision_and_binding_match_portable_profile(
 ) -> None:
     driver, mgmt, _ = _driver(variant)
     result = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(result.handle))
+    binding = driver.binding(ServiceHandle(result.handle, managed_service_id=_spec().managed_service_id))
 
     assert result.ok and result.ready and result.handle.startswith(f"{kind}/")
     assert binding_keys <= set(binding.env_vars)
@@ -289,7 +361,7 @@ def test_provision_and_binding_match_portable_profile(
     payload = mgmt.namespaces.create_calls[0]["parameters"].as_dict()
     assert payload["properties"]["kafkaEnabled"] is (variant == "event_hubs_kafka")
     assert payload["properties"]["disableLocalAuth"] is True
-    assert payload["tags"][canonical_key("azure")] == "service-id"
+    assert payload["tags"][canonical_key("azure")] == "018f42f0-4420-7000-8000-000000000001"
 
 
 def test_reconcile_is_idempotent_partial_and_ownership_safe() -> None:
@@ -299,15 +371,13 @@ def test_reconcile_is_idempotent_partial_and_ownership_safe() -> None:
     assert first.ok and second.ok and first.handle == second.handle
     assert len(mgmt.namespaces.create_calls) == 1
     assert len(mgmt.event_hubs.create_calls) == 1
-    update = mgmt.namespaces.update_calls[-1]["parameters"].as_dict()
-    assert update["tags"][canonical_key("azure")] == "service-id"
-    assert update.get("properties", {}) == {}
+    assert not mgmt.namespaces.update_calls
 
-    namespace_name = first.handle.split("/")[1]
+    namespace_name = driver._saved_target(first.handle, _spec()).namespace
     mgmt.namespaces.values[namespace_name].tags[canonical_key("azure")] = "other"
     before = len(mgmt.namespaces.update_calls)
     rejected = driver.provision(_spec())
-    assert not rejected.ok and "belongs to managed service other, not service-id" in rejected.message
+    assert not rejected.ok and "belongs to managed service other" in rejected.message
     assert len(mgmt.namespaces.update_calls) == before
 
 
@@ -396,7 +466,7 @@ def test_provision_exposes_scaling_retention_compaction_capture_network_and_cmk(
                 "ip_rules": ["203.0.113.0/24"],
                 "virtual_network_rule_ids": [subnet],
                 "partition_count": 40,
-                "cleanup_policy": "DeleteOrCompact",
+                "cleanup_policy": "Compact",
                 "retention_time_in_hours": 720,
                 "min_compaction_lag_time_in_minutes": 5,
                 "tombstone_retention_time_in_hours": 24,
@@ -424,10 +494,10 @@ def test_provision_exposes_scaling_retention_compaction_capture_network_and_cmk(
     assert network["ipRules"] == [{"ipMask": "203.0.113.0/24", "action": "Allow"}]
     hub = mgmt.event_hubs.create_calls[0]["parameters"].as_dict()["properties"]
     assert hub["partitionCount"] == 40
-    assert hub["retentionDescription"]["cleanupPolicy"] == "DeleteOrCompact"
+    assert hub["retentionDescription"]["cleanupPolicy"] == "Compact"
     assert hub["captureDescription"]["destination"]["properties"]["blobContainer"] == "events"
     groups = {call["consumer_group_name"] for call in mgmt.consumer_groups.calls}
-    assert groups == {"astrolift", "analytics", "billing"}
+    assert groups == {driver._saved_target(result.handle, _spec()).group, "analytics", "billing"}
 
 
 @pytest.mark.parametrize(
@@ -492,9 +562,11 @@ def test_update_is_partial_and_standard_partition_change_fails_closed() -> None:
     driver, mgmt, _ = _driver("event_hubs")
     provisioned = driver.provision(_spec())
     partition = driver.update(
-        UpdateSpec(provisioned.handle, config={"partition_count": 3}, managed_service_id="service-id")
+        UpdateSpec(
+            provisioned.handle, config={"partition_count": 3}, managed_service_id="018f42f0-4420-7000-8000-000000000001"
+        )
     )
-    assert not partition.ok and "Premium" in partition.message
+    assert not partition.ok and "reprovision" in partition.message
 
     updated = driver.update(
         UpdateSpec(
@@ -506,7 +578,7 @@ def test_update_is_partial_and_standard_partition_change_fails_closed() -> None:
                 "retention_time_in_hours": 48,
                 "consumer_groups": ["extra"],
             },
-            managed_service_id="service-id",
+            managed_service_id="018f42f0-4420-7000-8000-000000000001",
         ),
     )
     assert updated.ok
@@ -523,7 +595,9 @@ def test_size_update_scales_namespace_without_repartitioning_stream() -> None:
     provisioned = driver.provision(_spec())
     hub_calls = len(mgmt.event_hubs.create_calls)
 
-    updated = driver.update(UpdateSpec(provisioned.handle, size="large", managed_service_id="service-id"))
+    updated = driver.update(
+        UpdateSpec(provisioned.handle, size="large", managed_service_id="018f42f0-4420-7000-8000-000000000001")
+    )
 
     assert updated.ok
     namespace_update = mgmt.namespaces.update_calls[-1]["parameters"].as_dict()
@@ -535,20 +609,28 @@ def test_capacity_update_preserves_existing_premium_tier() -> None:
     driver, mgmt, _ = _driver("event_hubs")
     provisioned = driver.provision(_spec(config={"sku": "Premium", "capacity": 2}))
 
-    updated = driver.update(UpdateSpec(provisioned.handle, config={"capacity": 3}, managed_service_id="service-id"))
+    updated = driver.update(
+        UpdateSpec(
+            provisioned.handle, config={"capacity": 3}, managed_service_id="018f42f0-4420-7000-8000-000000000001"
+        )
+    )
 
     assert updated.ok
     payload = mgmt.namespaces.update_calls[-1]["parameters"].as_dict()
     assert payload["sku"] == {"name": "Premium", "tier": "Premium", "capacity": 3}
 
-    rejected = driver.update(UpdateSpec(provisioned.handle, config={"capacity": 20}, managed_service_id="service-id"))
+    rejected = driver.update(
+        UpdateSpec(
+            provisioned.handle, config={"capacity": 20}, managed_service_id="018f42f0-4420-7000-8000-000000000001"
+        )
+    )
     assert not rejected.ok and "between 1 and 16" in rejected.message
 
 
 def test_basic_uses_builtin_consumer_group_without_creating_another() -> None:
     driver, mgmt, _ = _driver("event_hubs")
     provisioned = driver.provision(_spec(config={"sku": "Basic"}))
-    binding = driver.binding(ServiceHandle(provisioned.handle))
+    binding = driver.binding(ServiceHandle(provisioned.handle, managed_service_id=_spec().managed_service_id))
 
     assert provisioned.ok
     assert not mgmt.consumer_groups.calls
@@ -558,52 +640,68 @@ def test_basic_uses_builtin_consumer_group_without_creating_another() -> None:
 def test_kafka_reconcile_refuses_namespace_without_kafka_capability() -> None:
     driver, mgmt, _ = _driver("event_hubs_kafka")
     provisioned = driver.provision(_spec())
-    namespace_name = provisioned.handle.split("/")[1]
+    namespace_name = driver._saved_target(provisioned.handle, _spec()).namespace
     mgmt.namespaces.values[namespace_name].properties.kafka_enabled = False
 
     result = driver.provision(_spec())
 
-    assert not result.ok and "does not expose Kafka" in result.message
+    assert not result.ok and "does not enable the Kafka" in result.message
 
 
 def test_deprovision_requires_explicit_data_loss_and_respects_locks() -> None:
     driver, mgmt, locks = _driver("event_hubs")
     provisioned = driver.provision(_spec())
-    refused = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"))
+    refused = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, managed_service_id="018f42f0-4420-7000-8000-000000000001")
+    )
     assert not refused.ok and refused.retryable is False
     assert not mgmt.namespaces.delete_calls
 
     locks.management_locks.locks = [FakeLock("protect-stream")]
-    locked = driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True)
-    assert not locked.ok and "protect-stream" in locked.message
+    locked = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), delete_data=True
+    )
+    assert not locked.ok and locked.errors == ["resource_lock_present"]
     deleted = driver.deprovision(
-        DeprovisionSpec(provisioned.handle, managed_service_id="service-id"),
+        DeprovisionSpec(provisioned.handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"),
         delete_data=True,
         force_destroy=True,
     )
+    assert not deleted.ok and deleted.errors == ["resource_lock_present"]
+    assert not locks.management_locks.deleted and not mgmt.namespaces.delete_calls
+    locks.management_locks.locks.clear()
+    deleted = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, managed_service_id=_spec().managed_service_id), delete_data=True
+    )
     assert deleted.ok
-    assert locks.management_locks.deleted == ["protect-stream"]
     assert mgmt.namespaces.delete_calls
-    assert driver.deprovision(DeprovisionSpec(provisioned.handle, managed_service_id="service-id"), delete_data=True).ok
+    assert driver.deprovision(
+        DeprovisionSpec(provisioned.handle, managed_service_id="018f42f0-4420-7000-8000-000000000001"), delete_data=True
+    ).ok
 
 
 def test_status_distinguishes_namespace_hub_and_provider_state() -> None:
     driver, mgmt, _ = _driver("event_hubs")
-    assert driver.status(ServiceHandle("stream/missing/hub")).state == "deprovisioned"
+    assert driver.status(ServiceHandle("stream/missing/hub")).state == "error"
     provisioned = driver.provision(_spec())
-    namespace_name, event_hub_name = provisioned.handle.split("/")[1:]
+    target = driver._saved_target(provisioned.handle, _spec())
+    namespace_name, event_hub_name = target.namespace, target.hub
     mgmt.event_hubs.values.pop((namespace_name, event_hub_name))
-    assert driver.status(ServiceHandle(provisioned.handle)).state == "error"
+    assert (
+        driver.status(ServiceHandle(provisioned.handle, managed_service_id=_spec().managed_service_id)).state == "error"
+    )
     driver.provision(_spec())
     mgmt.event_hubs.values[(namespace_name, event_hub_name)].properties.status = "Deleting"
-    assert driver.status(ServiceHandle(provisioned.handle)).state == "deprovisioning"
+    assert (
+        driver.status(ServiceHandle(provisioned.handle, managed_service_id=_spec().managed_service_id)).state
+        == "deprovisioning"
+    )
 
 
 def test_non_404_provider_error_is_not_misreported_as_missing() -> None:
     driver, mgmt, _ = _driver("event_hubs")
     mgmt.namespaces.get_error = RuntimeError("control plane unavailable")
-    with pytest.raises(RuntimeError, match="control plane unavailable"):
-        driver.status(ServiceHandle("stream/ns/hub"))
+    assert driver.status(ServiceHandle("stream/ns/hub")).state == "error"
 
 
 @pytest.mark.parametrize("variant", ["event_hubs", "event_hubs_kafka"])
@@ -647,10 +745,10 @@ def test_install_config_rejects_invalid_defaults(field: str, value: Any) -> None
 
 def test_names_are_bounded_collision_resistant_and_handles_are_strict() -> None:
     driver, _, _ = _driver("event_hubs", namespace_name_prefix="X" * 100)
-    first = driver.provision(_spec(managed_service_id="one"))
-    second = driver.provision(_spec(managed_service_id="two"))
-    first_namespace = first.handle.split("/")[1]
-    second_namespace = second.handle.split("/")[1]
+    first = driver.provision(_spec(managed_service_id="018f42f0-4420-7000-8000-000000000001"))
+    second = driver.provision(_spec(managed_service_id="018f42f0-4420-7000-8000-000000000002"))
+    first_namespace = driver._saved_target(first.handle, _spec()).namespace
+    second_namespace = driver._saved_target(second.handle, _spec()).namespace
     assert len(first_namespace) <= 50 and first_namespace != second_namespace
-    with pytest.raises(AzureEventHubsError, match="invalid event_hubs handle"):
+    with pytest.raises(AzureEventHubsError, match=r"UUID|incomplete"):
         driver.binding(ServiceHandle("event_stream/wrong/hub"))

@@ -1512,6 +1512,40 @@
           "close": "Schließen"
         },
         "loadFailed": "Verwaltete Dienste konnten nicht geladen werden"
+      },
+      "archiveFlow": {
+        "title": "App archivieren",
+        "archived": "Archiviert",
+        "archivedAt": "{at} archiviert. Gespeicherte Replikazahlen sind null; Bereitstellungen sind ausgesetzt.",
+        "archivedWithoutTime": "Die App ist archiviert. Gespeicherte Replikazahlen sind null.",
+        "description": "Archivieren speichert null Replikas und setzt Bereitstellungen aus. Wiederherstellen speichert die vorherigen Zahlen. Das bestätigt keinen tatsächlichen Rollout.",
+        "archive": "Archivieren",
+        "restore": "Wiederherstellen",
+        "archiveAccepted": "Archivierung für {slug} angenommen. Gespeicherte Replikazahlen sind null.",
+        "restoreAccepted": "Wiederherstellung für {slug} angenommen. Gespeicherte Replikazahlen entsprechen wieder den Werten vor der Archivierung.",
+        "archiveFailed": "Archivierung fehlgeschlagen.",
+        "restoreFailed": "Wiederherstellung fehlgeschlagen.",
+        "refreshWarning": "Die Änderung wurde angenommen, aber die Ansicht konnte nicht aktualisiert werden. Aktualisieren Sie sie, um den aktuellen Zustand zu prüfen.",
+        "navigationWarning": "Die Archivierung wurde angenommen, aber die Navigation ist fehlgeschlagen. Öffnen Sie Apps, um fortzufahren.",
+        "sourceChanged": "Die beobachtete App oder der Zugriff hat sich geändert. Prüfen Sie die aktuelle App vor einem erneuten Versuch."
+      },
+      "retentionFlow": {
+        "title": "Datenaufbewahrung",
+        "description": "Wählen Sie gespeicherte Aufbewahrungszeiten je Signal. Ohne gespeicherte Richtlinie zeigt diese Karte den Plattformstandard von {days, plural, one {# Tag} other {# Tagen}}. Das Speichern bestätigt nicht, dass vorhandene Daten gelöscht wurden.",
+        "platformDefault": "Plattformstandard",
+        "days": "{days, plural, one {# Tag} other {# Tage}}",
+        "selectorLabel": "Aufbewahrung: {signal}",
+        "saveAccepted": "Aufbewahrung für {signal} in {slug} gespeichert: {days, plural, one {# Tag} other {# Tage}}.",
+        "noResponse": "Keine Antwort vom Server.",
+        "saveFailed": "Die Aufbewahrungsrichtlinie konnte nicht gespeichert werden.",
+        "refreshWarning": "Die Änderung wurde angenommen, aber die Ansicht konnte nicht aktualisiert werden. Aktualisieren Sie sie, um die gespeicherte Richtlinie zu prüfen.",
+        "sourceChanged": "Die beobachtete App, Richtlinie oder der Zugriff hat sich geändert. Prüfen Sie die aktuelle App vor einem erneuten Versuch.",
+        "signals": {
+          "logs": "Protokolle",
+          "metrics": "Metriken",
+          "traces": "Traces",
+          "auditEvents": "Audit-Ereignisse"
+        }
       }
     },
     "common": {
@@ -2580,6 +2614,12 @@
         "environments": "Umgebungen",
         "domains": "Domains",
         "dangerZone": "Gefahrenbereich"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} wurde gelöscht",
+        "failed": "Löschen fehlgeschlagen",
+        "refreshWarning": "{slug} wurde gelöscht, aber die App-Liste konnte nicht aktualisiert werden. Aktualisiere sie, um die aktuellen Daten zu sehen.",
+        "navigationWarning": "{slug} wurde gelöscht, aber die Navigation ist fehlgeschlagen. Öffne Apps, um fortzufahren."
       }
     },
     "settingsTab": {
@@ -2606,6 +2646,39 @@
         "save": "Speichern"
       },
       "empty": "Hier gibt es nichts für diese App."
+    },
+    "environmentOverrides": {
+      "title": "Umgebungsspezifische Einstellungen",
+      "description": "Schlüssel-Wert-Einstellungen pro Umgebung, die die Basiskonfiguration der App ergänzen.",
+      "environment": "Umgebung",
+      "selectEnvironment": "Umgebung auswählen",
+      "empty": "Keine Einstellungen für <name>{environment}</name>. Füge unten eine hinzu oder wähle einen vorgeschlagenen Schlüssel.",
+      "emptyValue": "(leer)",
+      "clearTitle": "Einstellung entfernen",
+      "clearLabel": "Einstellung {key} entfernen",
+      "suggested": "Vorschläge:",
+      "alreadySet": "{hint} (bereits festgelegt)",
+      "keyPlaceholder": "SCHLÜSSEL",
+      "keyLabel": "Einstellungsschlüssel",
+      "valuePlaceholder": "Wert",
+      "valueLabel": "Einstellungswert",
+      "add": "Einstellung hinzufügen",
+      "loading": "Umgebungseinstellungen werden geladen…",
+      "readFailed": "Umgebungseinstellungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "keyRequired": "Ein Schlüssel ist erforderlich.",
+      "saveFailed": "Speichern fehlgeschlagen.",
+      "clearFailed": "Entfernen fehlgeschlagen.",
+      "saved": "{key} festgelegt",
+      "cleared": "{key} entfernt",
+      "refreshWarning": "Die Änderung wurde gespeichert, aber die Umgebungseinstellungen konnten nicht aktualisiert werden. Versuche es erneut, um aktuelle Daten zu sehen.",
+      "hints": {
+        "replicas": "Anzahl der Workload-Replikate",
+        "cpu_request": "CPU-Anforderung pro Pod",
+        "cpu_limit": "CPU-Limit pro Pod",
+        "memory_request": "Speicheranforderung pro Pod",
+        "memory_limit": "Speicherlimit pro Pod"
+      }
     }
   },
   "settingsIndex": {
@@ -3866,6 +3939,29 @@
         "title": "Genehmigungen",
         "empty": "Noch keine Genehmigungen erfasst.",
         "unknownApprover": "unbekannt"
+      },
+      "presentation": {
+        "loadFailed": "Änderungsvorschlag für Geheimnisse konnte nicht geladen werden",
+        "summary": "{op} in {env}",
+        "operations": {
+          "set": "Geheimnis festlegen",
+          "delete": "Geheimnis löschen",
+          "attachBundle": "Paket zuordnen",
+          "detachBundle": "Paket lösen",
+          "setMetadata": "Metadaten aktualisieren"
+        },
+        "statuses": {
+          "pending": "Ausstehend",
+          "approved": "Genehmigt",
+          "rejected": "Abgelehnt",
+          "applied": "Angewendet",
+          "expired": "Abgelaufen",
+          "withdrawn": "Zurückgezogen"
+        },
+        "decisions": {
+          "approved": "Genehmigt",
+          "rejected": "Abgelehnt"
+        }
       }
     },
     "pendingGates": {

@@ -7,16 +7,22 @@ semantics and are tracked as a separate variant in #1355.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import ipaddress
 import re
+import time
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
-from urllib.parse import parse_qsl, urlparse
+from functools import wraps
+from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qsl, unquote, urlparse, urlsplit
+from uuid import UUID
 
 from _sdk._telemetry import driver_op
 from _sdk.azure_ownership import (
-    OWNERSHIP_ERROR_CODE,
+    ARM_TAG_KEYS,
+    PLATFORM_MANAGED_BY,
     AzureOperation,
     AzureOwnershipError,
     owner_of,
@@ -39,7 +45,11 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from azure._managed_identities import unlisted_identity
+from azure.core.exceptions import ResourceNotFoundError
 from azure.managed.tags import arm_tags_for as tags_for
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 KIND = "event_bus"
 VARIANT = "event_grid"
@@ -115,6 +125,21 @@ _ALLOWED_TOP_LEVEL = {
 }
 
 
+_DEADLINE: ContextVar[float | None] = ContextVar("eventgrid_basic_deadline", default=None)
+
+
+def _bounded[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    @wraps(function)
+    def bounded(*args: P.args, **kwargs: P.kwargs) -> R:
+        token = _DEADLINE.set(time.monotonic() + 20)
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _DEADLINE.reset(token)
+
+    return bounded
+
+
 class AzureEventGridError(Exception):
     """An operator-actionable Event Grid lifecycle error."""
 
@@ -169,103 +194,99 @@ class AzureEventGridDriver(ManagedServiceDriver):
                 subscription_id=config.subscription_id,
             )
 
-    @driver_op(
-        cloud="azure",
-        driver="event_grid",
-        audit=True,
-        sensitive_kind="managed_service_provision",
-    )
+    @_bounded
+    @driver_op(cloud="azure", driver="event_grid", audit=True, sensitive_kind="managed_service_provision")
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        cfg = spec.config or {}
-        error = self._validate(cfg)
-        if error:
-            return ProvisionResult(False, "", error, ["invalid_event_grid_config"])
-        topic_name = self._topic_name(spec)
-        handle = f"{KIND}/{topic_name}"
+        handle = spec.recorded_handle
         try:
-            existing = self._topic(topic_name)
-            if existing is not None:
-                self._assert_owned(existing, spec, AzureOperation.PROVISION, topic_name)
-                self._assert_immutable_compatible(existing, cfg, apply_default=True)
-                self._wait(
-                    self._mgmt.topics.begin_update(
-                        self._config.resource_group,
-                        topic_name,
-                        self._topic_update_parameters(
-                            cfg,
-                            tags=tags_for(spec),
-                            apply_defaults=True,
-                        ),
-                    ),
+            cfg = spec.config or {}
+            error = self._validate(cfg)
+            if error:
+                return ProvisionResult(False, handle, error, ["invalid_event_grid_config"])
+            target = self._provision_target(spec)
+            handle = target.handle
+            desired = self._desired_children(cfg, spec)
+            topic = self._topic(target.topic)
+            if topic is not None:
+                self._assert_owned(topic, spec, AzureOperation.PROVISION, target.topic)
+            self._assert_unlocked(target, exists=topic is not None)
+            if topic is None:
+                if spec.recorded_handle:
+                    raise _Ownership("ownership_unknown", "recorded Event Grid topic is missing; recreation refused")
+                if self._missing_parent_children(target):
+                    raise _Ownership("ownership_unknown", "new parent has remaining subscription observations")
+                self._rpc(
+                    self._mgmt.topics.begin_create_or_update,
+                    self._config.resource_group,
+                    target.topic,
+                    self._topic_create_parameters(spec),
+                    polling=False,
+                ).result()
+                topic = self._topic(target.topic)
+                if topic is None:
+                    return ProvisionResult(False, handle, "topic creation is not yet observed", ["provision_pending"])
+            self._assert_owned(topic, spec, AzureOperation.PROVISION, target.topic)
+            children = self._inventory(target, spec)
+            self._immutable_settings(topic, target, cfg)
+            if _enum(_field(topic, "provisioning_state")) != "Succeeded":
+                return ProvisionResult(False, handle, "topic is not in a stable observed state", ["provision_pending"])
+            self._assert_unlocked(target, exists=True)
+            self._update_topic(target, cfg, spec, apply_defaults=True)
+            self._reconcile_subscriptions(target, desired, children, cfg, spec)
+            if not self._observed(target, cfg, spec, apply_defaults=True):
+                return ProvisionResult(
+                    False, handle, "topic or subscriptions are not yet reconciled", ["provision_pending"]
                 )
-            else:
-                self._wait(
-                    self._mgmt.topics.begin_create_or_update(
-                        self._config.resource_group,
-                        topic_name,
-                        self._topic_create_parameters(spec),
-                    ),
-                )
-            self._reconcile_subscriptions(topic_name, cfg)
-        except AzureOwnershipError as exc:
-            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
+            return ProvisionResult(True, handle, "owned Event Grid target observed reconciled", ready=True)
         except Exception as exc:
-            return ProvisionResult(False, handle, f"reconcile Event Grid topic: {exc}", [str(exc)])
-        return ProvisionResult(True, handle, f"Event Grid topic {topic_name} available", ready=True)
+            return ProvisionResult(False, handle, _error_message(exc), [_error_code(exc)])
 
+    @_bounded
     @driver_op(cloud="azure", driver="event_grid")
     def update(self, spec: UpdateSpec) -> UpdateResult:
         try:
-            topic_name = self._parse_handle(spec.handle)
-        except AzureEventGridError as exc:
-            return UpdateResult(False, spec.handle, str(exc), ["invalid_handle"])
-        cfg = spec.config or {}
-        error = self._validate(cfg, partial=True)
-        if error:
-            return UpdateResult(False, spec.handle, error, ["invalid_event_grid_config"])
-        try:
-            topic = self._topic(topic_name)
-            if topic is None:
-                return UpdateResult(False, spec.handle, f"Event Grid topic {topic_name} not found", ["not_found"])
-            self._assert_owned(topic, spec, AzureOperation.UPDATE, topic_name)
-            self._assert_immutable_compatible(topic, cfg, apply_default=False)
-            self._wait(
-                self._mgmt.topics.begin_update(
-                    self._config.resource_group,
-                    topic_name,
-                    self._topic_update_parameters(cfg),
-                ),
-            )
+            target = self._saved_target(spec.handle, spec)
+            cfg = spec.config or {}
+            error = self._validate(cfg, partial=True)
+            if error:
+                return UpdateResult(False, spec.handle, error, ["invalid_event_grid_config"], retryable=False)
+            desired = self._desired_children(cfg, spec)
+            topic = self._required_topic(target, spec, AzureOperation.UPDATE)
+            children = self._inventory(target, spec)
+            self._immutable_settings(topic, target, cfg)
+            self._assert_unlocked(target, exists=True)
+            if _enum(_field(topic, "provisioning_state")) != "Succeeded":
+                return UpdateResult(False, spec.handle, "topic update is pending", ["update_pending"])
+            self._update_topic(target, cfg, spec)
             if "subscriptions" in cfg or cfg.get("prune_subscriptions"):
-                self._reconcile_subscriptions(topic_name, cfg)
-        except AzureOwnershipError as exc:
-            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
+                self._reconcile_subscriptions(target, desired, children, cfg, spec)
+            if not self._observed(target, cfg, spec):
+                return UpdateResult(False, spec.handle, "update is not yet observed reconciled", ["update_pending"])
+            return UpdateResult(True, spec.handle, "owned Event Grid update observed reconciled")
         except Exception as exc:
-            return UpdateResult(False, spec.handle, f"update Event Grid topic: {exc}", [str(exc)])
-        return UpdateResult(True, spec.handle, f"Event Grid topic {topic_name} reconciled")
+            return UpdateResult(
+                False,
+                spec.handle,
+                _error_message(exc),
+                [_error_code(exc)],
+                retryable=not isinstance(exc, (AzureOwnershipError, AzureEventGridError)),
+            )
 
-    @driver_op(
-        cloud="azure",
-        driver="event_grid",
-        audit=True,
-        sensitive_kind="managed_service_deprovision",
-    )
+    @_bounded
+    @driver_op(cloud="azure", driver="event_grid", audit=True, sensitive_kind="managed_service_deprovision")
     def deprovision(
-        self,
-        spec: DeprovisionSpec,
-        *,
-        delete_data: bool = False,
-        force_destroy: bool = False,
+        self, spec: DeprovisionSpec, *, delete_data: bool = False, force_destroy: bool = False
     ) -> DeprovisionResult:
+        del force_destroy
         try:
-            topic_name = self._parse_handle(spec.handle)
-        except AzureEventGridError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), ["invalid_handle"], retryable=False)
-        try:
-            topic = self._topic(topic_name)
+            target = self._saved_target(spec.handle, spec)
+            topic = self._topic(target.topic)
             if topic is None:
-                return DeprovisionResult(True, spec.handle, f"Event Grid topic {topic_name} already gone")
-            self._assert_owned(topic, spec, AzureOperation.DELETE, topic_name)
+                # A deleted parent does not prove its independent subscription inventory is empty.
+                if self._missing_parent_children(target):
+                    raise _Ownership("ownership_unknown", "missing parent has remaining subscription observations")
+                return DeprovisionResult(True, spec.handle, "exact recorded topic and subscription collection absent")
+            self._assert_owned(topic, spec, AzureOperation.DELETE, target.topic)
             if not delete_data:
                 return DeprovisionResult(
                     False,
@@ -274,95 +295,124 @@ class AzureEventGridDriver(ManagedServiceDriver):
                     ["delete_data_required"],
                     retryable=False,
                 )
-            subscriptions = self._subscriptions(topic_name)
-            external = [item for item in subscriptions if not self._is_managed_subscription(item)]
-            if external and not force_destroy:
-                return DeprovisionResult(
-                    False,
-                    spec.handle,
-                    f"Event Grid topic has {len(external)} subscription(s) outside this declaration",
-                    ["external_subscriptions_present"],
-                    retryable=False,
-                )
-            locks = self._resource_locks(topic_name)
-            if locks and not force_destroy:
-                return DeprovisionResult(
-                    False,
-                    spec.handle,
-                    f"Event Grid topic {topic_name} is protected by an Azure resource lock",
-                    ["resource_lock_present"],
-                    retryable=False,
-                )
-            if locks and force_destroy:
-                self._delete_locks(topic_name, locks)
-            for item in subscriptions:
-                if force_destroy or self._is_managed_subscription(item):
-                    name = str(_field(item, "name", default=""))
-                    self._wait(
-                        self._mgmt.topic_event_subscriptions.begin_delete(
-                            self._config.resource_group,
-                            topic_name,
-                            name,
-                        ),
-                    )
-            self._wait(self._mgmt.topics.begin_delete(self._config.resource_group, topic_name))
-        except AzureOwnershipError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
+            children = self._inventory(target, spec)
+            self._assert_unlocked(target, exists=True)
+            for child in children:
+                with contextlib.suppress(ResourceNotFoundError):
+                    self._rpc(
+                        self._mgmt.topic_event_subscriptions.begin_delete,
+                        target.resource_group,
+                        target.topic,
+                        str(_field(child, "name")),
+                        polling=False,
+                    ).result()
+            if self._inventory(target, spec):
+                return DeprovisionResult(False, spec.handle, "child deletion remains pending", ["delete_pending"])
+            topic = self._topic(target.topic)
+            if topic is not None:
+                self._assert_owned(topic, spec, AzureOperation.DELETE, target.topic)
+                self._assert_unlocked(target, exists=True)
+                with contextlib.suppress(ResourceNotFoundError):
+                    self._rpc(
+                        self._mgmt.topics.begin_delete, target.resource_group, target.topic, polling=False
+                    ).result()
+            if self._topic(target.topic) is not None:
+                return DeprovisionResult(False, spec.handle, "topic deletion remains pending", ["delete_pending"])
+            if self._missing_parent_children(target):
+                raise _Ownership("ownership_unknown", "deleted parent still has subscription observations")
+            return DeprovisionResult(True, spec.handle, "exact owned Event Grid target observed absent")
         except Exception as exc:
-            return DeprovisionResult(False, spec.handle, f"delete Event Grid topic: {exc}", [str(exc)])
-        return DeprovisionResult(
-            True,
-            spec.handle,
-            f"Event Grid topic {topic_name} deleted (force_destroy={force_destroy})",
-        )
+            return DeprovisionResult(
+                False,
+                spec.handle,
+                _error_message(exc),
+                [_error_code(exc)],
+                retryable=not isinstance(exc, (AzureOwnershipError, AzureEventGridError)),
+            )
 
+    @_bounded
     @driver_op(cloud="azure", driver="event_grid")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         try:
-            topic_name = self._parse_handle(handle.handle)
-            topic = self._topic(topic_name)
+            target = self._saved_target(handle.handle, handle)
+            topic = self._topic(target.topic)
             if topic is None:
-                return ServiceStatus(handle.handle, "deprovisioned", "Event Grid topic not found")
-            state = str(_field(topic, "provisioning_state", default="Succeeded"))
-            subscriptions = self._subscriptions(topic_name)
+                if self._missing_parent_children(target):
+                    raise _Ownership("ownership_unknown", "missing parent has remaining subscription observations")
+                return ServiceStatus(handle.handle, "deprovisioned", "exact recorded topic absent")
+            self._assert_owned(topic, handle, AzureOperation.INSPECT, target.topic)
+            children = self._inventory(target, handle)
+            state = _enum(_field(topic, "provisioning_state"))
+            child_states = [_enum(_field(item, "provisioning_state")) for item in children]
+            available = state == "Succeeded" and all(value == "Succeeded" for value in child_states)
+            observed = "available" if available else _STATE_MAP.get(state, "error")
+            if not available and observed == "available":
+                pending = {
+                    "Creating",
+                    "Updating",
+                    "Deleting",
+                    "AwaitingManualAction",
+                    "AwaitingIdentityOperation",
+                    "Succeeded",
+                }
+                observed = "error" if any(value not in pending for value in child_states) else "updating"
+            return ServiceStatus(handle.handle, observed, "current owned topic and subscriptions observed")
         except Exception as exc:
-            return ServiceStatus(handle.handle, "error", f"describe Event Grid topic: {exc}")
-        return ServiceStatus(
-            handle.handle,
-            _STATE_MAP.get(state, "updating"),
-            f"Azure reports {state}; {len(subscriptions)} event subscription(s)",
-        )
+            return ServiceStatus(handle.handle, "error", _error_message(exc))
 
+    @_bounded
     @driver_op(cloud="azure", driver="event_grid")
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
-        topic_name = self._parse_handle(handle.handle)
-        topic = self._topic(topic_name)
-        if topic is None:
-            raise AzureEventGridError(f"binding requested for missing Event Grid topic {topic_name}")
-        self._assert_owned(topic, handle, AzureOperation.INSPECT, topic_name)
-        resource_id = str(_field(topic, "id", default=self._topic_resource_id(topic_name)))
-        endpoint = str(_field(topic, "endpoint", default=""))
-        if not endpoint:
-            raise AzureEventGridError(f"Event Grid topic {topic_name} has no data-plane endpoint")
-        input_schema = str(_field(topic, "input_schema", default=self._config.default_input_schema))
-        access_mode = str((config or {}).get("access_mode", "publish"))
-        roles = ["EventGrid Data Sender"]
-        if access_mode == "manage":
-            roles.append("EventGrid EventSubscription Contributor")
-        return Binding(
-            env_vars={
-                "EVENT_BUS_NAME": ValueRef(literal=topic_name),
-                "EVENT_BUS_ARN": ValueRef(literal=resource_id),
-                "EVENT_BUS_REGION": ValueRef(literal=self._config.location),
-                "EVENT_BUS_ENDPOINT": ValueRef(literal=endpoint),
-                "EVENT_GRID_TOPIC_NAME": ValueRef(literal=topic_name),
-                "EVENT_GRID_TOPIC_ENDPOINT": ValueRef(literal=endpoint),
-                "EVENT_GRID_TOPIC_RESOURCE_ID": ValueRef(literal=resource_id),
-                "EVENT_GRID_INPUT_SCHEMA": ValueRef(literal=input_schema),
-            },
-            iam_grants=[Grant(resource=resource_id, actions=roles)],
-            notes="Microsoft Entra workload identity binding; no topic key or SAS token is emitted.",
-        )
+        try:
+            target = self._saved_target(handle.handle, handle)
+            topic = self._required_topic(target, handle, AzureOperation.INSPECT)
+            self._inventory(target, handle)
+            resource_id = target.topic_id
+            endpoint = str(_field(topic, "endpoint", default=""))
+            parsed = urlsplit(endpoint)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or not parsed.hostname.endswith(".eventgrid.azure.net")
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+                or parsed.port not in {None, 443}
+                or parsed.path != "/api/events"
+                or len(endpoint) > 512
+            ):
+                raise _Ownership("ownership_unknown", "topic publishing endpoint is not a bounded Azure endpoint")
+            input_schema = _enum(_field(topic, "input_schema"))
+            if input_schema not in {"CloudEventSchemaV1_0", "EventGridSchema"}:
+                raise _Ownership("ownership_unknown", "topic input schema is not observed")
+            location = _field(topic, "location", default=None)
+            if not isinstance(location, str) or not location or len(location) > 512:
+                raise _Ownership("ownership_unknown", "topic region is not observed within binding limits")
+            access_mode = str((config or {}).get("access_mode", "publish"))
+            if access_mode not in {"publish", "manage"}:
+                raise AzureEventGridError("unsupported binding access mode")
+            roles = ["EventGrid Data Sender"]
+            if access_mode == "manage":
+                roles.append("EventGrid EventSubscription Contributor")
+            return Binding(
+                env_vars={
+                    "EVENT_BUS_NAME": ValueRef(literal=target.topic),
+                    "EVENT_BUS_ARN": ValueRef(literal=resource_id),
+                    "EVENT_BUS_REGION": ValueRef(literal=location),
+                    "EVENT_BUS_ENDPOINT": ValueRef(literal=endpoint),
+                    "EVENT_GRID_TOPIC_NAME": ValueRef(literal=target.topic),
+                    "EVENT_GRID_TOPIC_ENDPOINT": ValueRef(literal=endpoint),
+                    "EVENT_GRID_TOPIC_RESOURCE_ID": ValueRef(literal=resource_id),
+                    "EVENT_GRID_INPUT_SCHEMA": ValueRef(literal=input_schema),
+                },
+                iam_grants=[Grant(resource=resource_id, actions=roles)],
+                notes="Microsoft Entra workload identity binding; no topic key or SAS token is emitted.",
+            )
+        except AzureEventGridError:
+            raise
+        except Exception as exc:
+            raise _Ownership("ownership_unknown", "Event Grid binding observation failed") from exc
 
     @driver_op(cloud="azure", driver="event_grid")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
@@ -515,7 +565,7 @@ class AzureEventGridDriver(ManagedServiceDriver):
                 },
                 "subscriptions": {
                     "type": "array",
-                    "maxItems": 500,
+                    "maxItems": 128,
                     "items": subscription_schema,
                 },
                 "prune_subscriptions": {"type": "boolean", "default": False},
@@ -563,8 +613,9 @@ class AzureEventGridDriver(ManagedServiceDriver):
                 _validate_resource_name(str(cfg["topic_name"]), "topic_name")
             except AzureEventGridError as exc:
                 return str(exc)
-            if partial:
-                return "Event Grid topic_name is immutable"
+        for flag in ("confirm_message_loss", "prune_subscriptions", "disable_local_auth", "system_assigned_identity"):
+            if flag in cfg and type(cfg[flag]) is not bool:
+                return f"Event Grid {flag} must be boolean"
         input_schema = str(cfg.get("input_schema", self._config.default_input_schema))
         if input_schema not in {"CloudEventSchemaV1_0", "EventGridSchema"}:
             return "Event Grid supports CloudEventSchemaV1_0 or EventGridSchema; custom mapping is not implemented"
@@ -600,15 +651,15 @@ class AzureEventGridDriver(ManagedServiceDriver):
         subscriptions = cfg.get("subscriptions", []) or []
         if not isinstance(subscriptions, list):
             return "Event Grid subscriptions must be a list"
-        if len(subscriptions) > 500:
-            return "Event Grid custom topics support at most 500 declared subscriptions"
+        if len(subscriptions) > 128:
+            return "Event Grid bounded reconciliation supports at most 128 declared subscriptions"
         names: list[str] = []
         for subscription in subscriptions:
             error = self._validate_subscription(subscription, cfg)
             if error:
                 return error
             names.append(str(subscription["name"]))
-        if len(names) != len(set(names)):
+        if len(names) != len({name.casefold() for name in names}):
             return "Event Grid subscription names must be unique"
         return ""
 
@@ -657,10 +708,10 @@ class AzureEventGridDriver(ManagedServiceDriver):
         if len(included_types) != len(set(included_types)):
             return "Event Grid included_event_types must be unique"
         labels = sub.get("labels", []) or []
-        if not isinstance(labels, list) or len(labels) > 9 or any(not isinstance(value, str) for value in labels):
-            return "Event Grid labels must be a list of at most 9 strings (one label is reserved for ownership)"
-        if _MANAGED_SUBSCRIPTION_LABEL in labels:
-            return f"Event Grid label {_MANAGED_SUBSCRIPTION_LABEL!r} is reserved for platform ownership"
+        if not isinstance(labels, list) or len(labels) > 8 or any(not isinstance(value, str) for value in labels):
+            return "Event Grid labels must be a list of at most 8 strings (two labels are reserved for ownership)"
+        if any(re.sub(r"[^a-z0-9]", "", label.lower()).startswith(("astrolift", "xastrolift")) for label in labels):
+            return "Event Grid astrolift subscription labels are reserved for platform ownership"
         for field_name in ("subject_begins_with", "subject_ends_with"):
             if field_name in sub and not isinstance(sub[field_name], str):
                 return f"Event Grid {field_name} must be a string"
@@ -796,7 +847,7 @@ class AzureEventGridDriver(ManagedServiceDriver):
             if error:
                 return error
             names.append(str(mapping["name"]))
-        if len(names) != len(set(names)):
+        if len(names) != len({name.casefold() for name in names}):
             return "delivery attribute names must be unique"
         return ""
 
@@ -911,33 +962,54 @@ class AzureEventGridDriver(ManagedServiceDriver):
 
         return [models.InboundIpRule(ip_mask=str(value), action="Allow") for value in cfg.get("inbound_ip_rules", [])]
 
-    def _reconcile_subscriptions(self, topic_name: str, cfg: dict[str, Any]) -> None:
-        desired_names: set[str] = set()
+    def _desired_children(self, cfg: dict[str, Any], source: object) -> dict[str, dict[str, Any]]:
+        desired: dict[str, dict[str, Any]] = {}
         for sub in cfg.get("subscriptions", []) or []:
-            name = self._subscription_name(topic_name, str(sub["name"]))
-            desired_names.add(name)
-            self._wait(
-                self._mgmt.topic_event_subscriptions.begin_create_or_update(
-                    self._config.resource_group,
-                    topic_name,
-                    name,
-                    self._subscription_parameters(sub),
-                ),
-            )
-        if not cfg.get("prune_subscriptions"):
-            return
-        for existing in self._subscriptions(topic_name):
-            name = str(_field(existing, "name", default=""))
-            if self._is_managed_subscription(existing) and name not in desired_names:
-                self._wait(
-                    self._mgmt.topic_event_subscriptions.begin_delete(
-                        self._config.resource_group,
-                        topic_name,
-                        name,
-                    ),
-                )
+            name = self._subscription_name(_owner_uuid(source).hex, str(sub["name"]))
+            if name.casefold() in {key.casefold() for key in desired}:
+                raise AzureEventGridError("declared physical subscription names collide")
+            desired[name] = sub
+        return desired
 
-    def _subscription_parameters(self, sub: dict[str, Any]) -> Any:
+    def _reconcile_subscriptions(
+        self,
+        target: _Target,
+        desired: dict[str, dict[str, Any]],
+        existing: list[Any],
+        cfg: dict[str, Any],
+        source: object,
+    ) -> None:
+        for name, sub in desired.items():
+            current = self._subscription(target.topic, name)
+            if current is not None:
+                self._assert_child_owned(current, target, source)
+            parameters = self._subscription_parameters(sub, source)
+            if current is None or not _contains(current.serialize(), parameters.serialize()):
+                self._rpc(
+                    self._mgmt.topic_event_subscriptions.begin_create_or_update,
+                    target.resource_group,
+                    target.topic,
+                    name,
+                    parameters,
+                    polling=False,
+                ).result()
+        if cfg.get("prune_subscriptions"):
+            for item in existing:
+                name = str(_field(item, "name"))
+                if name not in desired:
+                    current = self._subscription(target.topic, name)
+                    if current is not None:
+                        self._assert_child_owned(current, target, source)
+                        with contextlib.suppress(ResourceNotFoundError):
+                            self._rpc(
+                                self._mgmt.topic_event_subscriptions.begin_delete,
+                                target.resource_group,
+                                target.topic,
+                                name,
+                                polling=False,
+                            ).result()
+
+    def _subscription_parameters(self, sub: dict[str, Any], source: object | None = None) -> Any:
         from azure.mgmt.eventgrid import models
 
         destination = self._destination(sub["destination"])
@@ -976,7 +1048,11 @@ class AzureEventGridDriver(ManagedServiceDriver):
                 enable_advanced_filtering_on_arrays=bool(sub.get("advanced_filtering_on_arrays", False)),
                 advanced_filters=[self._advanced_filter(item) for item in sub.get("advanced_filters", [])],
             ),
-            labels=[_MANAGED_SUBSCRIPTION_LABEL, *[str(value) for value in sub.get("labels", [])]],
+            labels=[
+                _MANAGED_SUBSCRIPTION_LABEL,
+                *([f"astrolift-owner-{_owner_uuid(source).hex}"] if source is not None else []),
+                *[str(value) for value in sub.get("labels", [])],
+            ],
             event_delivery_schema=str(sub.get("event_delivery_schema", "CloudEventSchemaV1_0")),
             retry_policy=models.RetryPolicy(
                 max_delivery_attempts=int(retry.get("max_delivery_attempts", 30)),
@@ -1071,115 +1147,413 @@ class AzureEventGridDriver(ManagedServiceDriver):
             user_assigned_identity=identity.get("user_assigned_identity_resource_id"),
         )
 
-    def _topic_name(self, spec: ProvisionSpec) -> str:
-        explicit = str((spec.config or {}).get("topic_name") or "")
-        if explicit:
-            return explicit
-        hint = spec.service_handle_hint or f"{spec.app_slug}-{spec.environment_name}"
-        seed = "/".join(
-            [
-                self._config.subscription_id,
-                self._config.resource_group,
-                spec.organization_id,
-                spec.app_id,
-                spec.environment_id,
-                hint,
-            ],
-        )
-        return _generated_name(self._config.topic_name_prefix, hint, seed, max_length=50)
+    def _provision_target(self, spec: ProvisionSpec) -> _Target:
+        if spec.recorded_handle:
+            return self._saved_target(spec.recorded_handle, spec)
+        identity = _owner_uuid(spec)
+        if "topic_name" in (spec.config or {}):
+            name = spec.config["topic_name"]
+            if not isinstance(name, str) or identity.hex not in name.casefold():
+                raise _Ownership("ownership_refused", "new topic_name must retain the full canonical service UUID hex")
+        else:
+            prefix = self._config.topic_name_prefix
+            _validate_resource_name(prefix, "topic_name_prefix", max_length=17)
+            name = f"{prefix}-{identity.hex}"
+        return self._target(name)
 
-    def _subscription_name(self, topic_name: str, requested: str) -> str:
-        return _generated_name(_MANAGED_SUBSCRIPTION_PREFIX.rstrip("-"), requested, f"{topic_name}/{requested}", 64)
+    def _topic_name(self, spec: ProvisionSpec) -> str:
+        return self._provision_target(spec).topic
+
+    def _target(self, name: str) -> _Target:
+        _validate_resource_name(name, "topic name")
+        subscription = _uuid(self._config.subscription_id)
+        group = self._config.resource_group
+        if not isinstance(group, str) or not re.fullmatch(r"[\w.()\-]{1,90}", group) or group.endswith("."):
+            raise _Ownership("ownership_unknown", "provider resource group cannot be represented safely")
+        target = _Target(str(subscription), group, name)
+        if len(target.handle) > 512 or len(target.topic_id) > 512:
+            raise _Ownership("ownership_unknown", "recorded target or binding exceeds storage limits")
+        return target
+
+    def _saved_target(self, handle: str, source: object) -> _Target:
+        _owner_uuid(source)
+        parts = handle.split("/")
+        if len(parts) != 5 or parts[:2] != [KIND, "arm-v1"]:
+            raise _Ownership("ownership_unknown", "historical Event Grid placement is not recorded unambiguously")
+        target = self._target(parts[4])
+        if handle != target.handle or parts[2] != target.subscription or parts[3] != target.resource_group:
+            raise _Ownership("ownership_refused", "saved Event Grid coordinates differ from the current provider")
+        return target
+
+    def _parse_handle(self, handle: str) -> str:
+        parts = handle.split("/")
+        if len(parts) != 5 or parts[:2] != [KIND, "arm-v1"]:
+            raise _Ownership("ownership_unknown", "historical Event Grid placement is not recorded unambiguously")
+        target = self._target(parts[4])
+        if target.handle != handle:
+            raise _Ownership("ownership_refused", "saved Event Grid coordinates differ from the current provider")
+        return target.topic
+
+    def _subscription_name(self, identity: str, requested: str) -> str:
+        return f"astrolift-{identity}-{hashlib.sha256(requested.encode()).hexdigest()[:16]}"
+
+    def _rpc(self, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        deadline = _DEADLINE.get()
+        remaining = (deadline - time.monotonic()) if deadline is not None else 0
+        if remaining <= 0:
+            raise _Ownership("ownership_unknown", "bounded Event Grid observation budget exhausted")
+        return function(
+            *args,
+            connection_timeout=min(5, remaining),
+            read_timeout=min(5, remaining),
+            retry_total=0,
+            redirect_max=0,
+            **kwargs,
+        )
+
+    def _paged(self, function: Callable[..., Any], collection: str, *args: Any, **kwargs: Any) -> list[Any]:
+        page_count = 0
+
+        def check_next(response: Any) -> None:
+            nonlocal page_count
+            import json
+
+            page_count += 1
+
+            raw = response.http_response.body()
+            if len(raw) > 2 * 1024 * 1024:
+                raise _Ownership("ownership_unknown", "inventory response exceeds observation limit")
+            payload = json.loads(raw)
+            following = payload.get("nextLink")
+            if following:
+                if page_count >= 4:
+                    raise _Ownership("ownership_unknown", "inventory exceeds four page observation budget")
+                parsed = urlsplit(following)
+                if (
+                    parsed.scheme != "https"
+                    or parsed.hostname != "management.azure.com"
+                    or parsed.port not in {None, 443}
+                    or parsed.username
+                    or parsed.password
+                    or parsed.fragment
+                    or unquote(parsed.path).casefold() != collection.casefold()
+                ):
+                    raise _Ownership("ownership_unknown", "inventory continuation leaves the exact trusted collection")
+
+        pager = self._rpc(function, *args, raw_response_hook=check_next, **kwargs)
+        result: list[Any] = []
+        if not hasattr(pager, "by_page"):
+            raise _Ownership("ownership_unknown", "complete paged SDK inventory is unavailable")
+        pages = pager.by_page()
+        for page_number, page in enumerate(pages):
+            if page_number >= 4:
+                raise _Ownership("ownership_unknown", "inventory exceeds four page observation budget")
+            for item in page:
+                if len(result) >= 128:
+                    raise _Ownership("ownership_unknown", "inventory exceeds 128 item observation budget")
+                if _DEADLINE.get() is None or time.monotonic() >= (_DEADLINE.get() or 0):
+                    raise _Ownership("ownership_unknown", "inventory observation budget exhausted")
+                result.append(item)
+        return result
 
     def _topic(self, topic_name: str) -> Any | None:
         try:
-            return self._mgmt.topics.get(self._config.resource_group, topic_name)
-        except Exception as exc:
-            if _not_found(exc):
-                return None
-            raise
+            return self._rpc(self._mgmt.topics.get, self._config.resource_group, topic_name)
+        except ResourceNotFoundError:
+            return None
+
+    def _subscription(self, topic_name: str, child: str) -> Any | None:
+        try:
+            return self._rpc(self._mgmt.topic_event_subscriptions.get, self._config.resource_group, topic_name, child)
+        except ResourceNotFoundError:
+            return None
 
     def _subscriptions(self, topic_name: str) -> list[Any]:
-        return list(self._mgmt.topic_event_subscriptions.list(self._config.resource_group, topic_name))
-
-    @staticmethod
-    def _assert_owned(topic: Any, source: object, operation: AzureOperation, topic_name: str) -> None:
-        verify_azure_ownership(
-            dict(_field(topic, "tags", default={}) or {}),
-            owner_of(source),
-            operation=operation,
-            resource=f"Event Grid topic {topic_name}",
+        collection = self._target(topic_name).topic_id + "/eventSubscriptions"
+        return self._paged(
+            self._mgmt.topic_event_subscriptions.list, collection, self._config.resource_group, topic_name
         )
 
-    def _assert_immutable_compatible(
-        self,
-        topic: Any,
-        cfg: dict[str, Any],
-        *,
-        apply_default: bool,
-    ) -> None:
-        if not apply_default and "input_schema" not in cfg:
-            return
-        desired_schema = str(cfg.get("input_schema", self._config.default_input_schema))
-        actual_schema = str(_field(topic, "input_schema", default=desired_schema))
-        if desired_schema != actual_schema:
-            raise AzureEventGridError(
-                f"Event Grid input_schema differs from existing topic ({actual_schema}); reprovision required",
-            )
+    def _missing_parent_children(self, target: _Target) -> list[Any]:
+        try:
+            return self._subscriptions(target.topic)
+        except ResourceNotFoundError:
+            if self._topic(target.topic) is not None:
+                raise _Ownership("ownership_unknown", "parent changed during absent collection observation") from None
+            return []
 
-    def _is_managed_subscription(self, item: Any) -> bool:
-        parameters = _field(item, "parameters")
-        labels = list(_field(item, "labels", default=_field(parameters, "labels", default=[])) or [])
-        return (
-            str(_field(item, "name", default="")).startswith(
-                _MANAGED_SUBSCRIPTION_PREFIX,
+    def _assert_owned(self, topic: Any, source: object, operation: AzureOperation, topic_name: str) -> None:
+        _owner_uuid(source)
+        expected = self._target(topic_name).topic_id
+        if (
+            not _same_arm(_field(topic, "id"), expected)
+            or str(_field(topic, "name", default="")).casefold() != topic_name.casefold()
+        ):
+            raise _Ownership("ownership_unknown", "actual topic ARM identity does not match recorded coordinates")
+        tags = dict(_field(topic, "tags", default={}) or {})
+        wanted = str(_owner_uuid(source))
+        source_observed = False
+        for key, value in tags.items():
+            normalized = re.sub(r"[^a-z0-9]", "", key.lower())
+            if normalized in {"astroliftmanagedserviceid", "astroliftiomanagedserviceid", "xastroliftmanagedserviceid"}:
+                source_observed = True
+                if value != wanted:
+                    raise _Ownership("ownership_refused", "conflicting source identity tag spelling")
+            if (
+                normalized in {"astroliftmanagedby", "astroliftiomanagedby", "xastroliftmanagedby"}
+                and value != "platform"
+            ):
+                raise _Ownership("ownership_refused", "conflicting platform identity tag spelling")
+        if not source_observed:
+            raise _Ownership("ownership_refused", "current topic source identity is not observed")
+        try:
+            verify_azure_ownership(
+                dict(_field(topic, "tags", default={}) or {}),
+                owner_of(source),
+                operation=operation,
+                resource="recorded Event Grid topic",
             )
-            and _MANAGED_SUBSCRIPTION_LABEL in labels
-        )
+        except AzureOwnershipError as exc:
+            raise _Ownership("ownership_refused", "topic platform/source ownership does not match") from exc
 
-    def _resource_locks(self, topic_name: str) -> list[Any]:
-        return list(
-            self._locks.management_locks.list_at_resource_level(
-                resource_group_name=self._config.resource_group,
-                resource_provider_namespace="Microsoft.EventGrid",
-                parent_resource_path="",
-                resource_type="topics",
-                resource_name=topic_name,
+    def _assert_child_owned(self, item: Any, target: _Target, source: object) -> None:
+        name = str(_field(item, "name", default=""))
+        identity = _owner_uuid(source).hex
+        if not re.fullmatch(r"astrolift-" + identity + r"-[a-f0-9]{16}", name):
+            raise _Ownership("ownership_refused", "subscription name does not carry the current source UUID")
+        expected = target.topic_id + "/eventSubscriptions/" + name
+        if not _same_arm(_field(item, "id"), expected) or not _same_arm(_field(item, "topic"), target.topic_id):
+            raise _Ownership("ownership_unknown", "subscription ARM parent/identity is not observed coherently")
+        labels = _field(item, "labels", default=None)
+        observed_labels = labels if isinstance(labels, list) else []
+        observed_owners = [
+            value.removeprefix("astrolift-owner-")
+            for value in observed_labels
+            if isinstance(value, str) and re.fullmatch(r"astrolift-owner-[a-f0-9]{32}", value)
+        ]
+        # Subscription labels are the real child envelope; the shared rule still decides its authority.
+        try:
+            verify_azure_ownership(
+                {
+                    ARM_TAG_KEYS.managed_by: (
+                        PLATFORM_MANAGED_BY if observed_labels.count(_MANAGED_SUBSCRIPTION_LABEL) == 1 else ""
+                    ),
+                    ARM_TAG_KEYS.managed_service_id: (
+                        str(UUID(observed_owners[0])) if len(observed_owners) == 1 else ""
+                    ),
+                },
+                owner_of(source),
+                operation=AzureOperation.UPDATE,
+                resource="recorded Event Grid subscription",
+            )
+        except AzureOwnershipError as exc:
+            raise _Ownership("ownership_refused", "subscription platform/source labels do not match") from exc
+        platform = [_MANAGED_SUBSCRIPTION_LABEL, f"astrolift-owner-{identity}"]
+        if (
+            not isinstance(labels, list)
+            or any(labels.count(value) != 1 for value in platform)
+            or any(not isinstance(value, str) for value in labels)
+            or any(
+                re.sub(r"[^a-z0-9]", "", value.lower()).startswith(("astrolift", "xastrolift"))
+                and value not in platform
+                for value in labels
+            )
+        ):
+            raise _Ownership("ownership_refused", "subscription platform/source labels do not match")
+
+    def _inventory(self, target: _Target, source: object) -> list[Any]:
+        rows = self._subscriptions(target.topic)
+        names: set[str] = set()
+        for row in rows:
+            self._assert_child_owned(row, target, source)
+            name = str(_field(row, "name")).casefold()
+            if name in names:
+                raise _Ownership("ownership_unknown", "duplicate subscription inventory identity")
+            names.add(name)
+            current = self._subscription(target.topic, str(_field(row, "name")))
+            if current is None:
+                raise _Ownership("ownership_unknown", "subscription inventory changed during observation")
+            self._assert_child_owned(current, target, source)
+        return rows
+
+    def _assert_unlocked(self, target: _Target, *, exists: bool) -> None:
+        scopes = [
+            f"/subscriptions/{target.subscription}",
+            f"/subscriptions/{target.subscription}/resourceGroups/{target.resource_group}",
+        ]
+        calls = [
+            (self._locks.management_locks.list_at_subscription_level, scopes[0], {}),
+            (
+                self._locks.management_locks.list_at_resource_group_level,
+                scopes[1],
+                {"resource_group_name": target.resource_group},
             ),
-        )
-
-    def _delete_locks(self, topic_name: str, locks: list[Any]) -> None:
-        for lock in locks:
-            lock_name = str(_field(lock, "name", default=""))
-            if not lock_name:
-                raise AzureEventGridError("Event Grid resource lock has no name and cannot be removed safely")
-            self._locks.management_locks.delete_at_resource_level(
-                resource_group_name=self._config.resource_group,
-                resource_provider_namespace="Microsoft.EventGrid",
-                parent_resource_path="",
-                resource_type="topics",
-                resource_name=topic_name,
-                lock_name=lock_name,
+        ]
+        if exists:
+            calls.append(
+                (
+                    self._locks.management_locks.list_at_resource_level,
+                    target.topic_id,
+                    {
+                        "resource_group_name": target.resource_group,
+                        "resource_provider_namespace": "Microsoft.EventGrid",
+                        "parent_resource_path": "",
+                        "resource_type": "topics",
+                        "resource_name": target.topic,
+                    },
+                )
             )
+        for function, scope, options in calls:
+            rows = self._paged(function, scope + "/providers/Microsoft.Authorization/locks", **options)
+            for row in rows:
+                identity = str(_field(row, "id", default=""))
+                if (
+                    not identity.startswith("/")
+                    or "/providers/microsoft.authorization/locks/" not in identity.casefold()
+                ):
+                    raise _Ownership("ownership_unknown", "lock scope is not observed unambiguously")
+                lock_scope, _, lock_name = identity.casefold().partition("/providers/microsoft.authorization/locks/")
+                if (
+                    not lock_name
+                    or "/" in lock_name
+                    or not (lock_scope == scope.casefold() or lock_scope.startswith(scope.casefold() + "/"))
+                ):
+                    raise _Ownership(
+                        "ownership_unknown", "lock inventory returned an unrelated or malformed ARM identity"
+                    )
+                if (
+                    lock_scope in {value.casefold() for value in scopes}
+                    or lock_scope == target.topic_id.casefold()
+                    or lock_scope.startswith(target.topic_id.casefold() + "/")
+                ):
+                    raise _Ownership(
+                        "resource_lock_present",
+                        "an inherited or target resource lock requires separate operator resolution",
+                    )
 
-    def _topic_resource_id(self, topic_name: str) -> str:
+    def _required_topic(self, target: _Target, source: object, operation: AzureOperation) -> Any:
+        topic = self._topic(target.topic)
+        if topic is None:
+            raise _Ownership("ownership_unknown", "recorded Event Grid topic is missing")
+        self._assert_owned(topic, source, operation, target.topic)
+        return topic
+
+    def _immutable_settings(self, topic: Any, target: _Target, cfg: dict[str, Any]) -> None:
+        if "topic_name" in cfg and cfg["topic_name"] != target.topic:
+            raise AzureEventGridError("topic_name change requires reprovision")
+        if "input_schema" in cfg and _enum(_field(topic, "input_schema")) != cfg["input_schema"]:
+            raise AzureEventGridError("input_schema change requires reprovision")
+
+    def _update_topic(
+        self, target: _Target, cfg: dict[str, Any], source: object, *, apply_defaults: bool = False
+    ) -> None:
+        desired = self._topic_update_parameters(cfg, apply_defaults=apply_defaults)
+        if not desired.serialize():
+            return
+        current = self._topic(target.topic)
+        if current is None:
+            raise _Ownership("ownership_unknown", "topic disappeared before update")
+        self._assert_owned(current, source, AzureOperation.UPDATE, target.topic)
+        if _contains(current.serialize(), desired.serialize()):
+            return
+        self._rpc(self._mgmt.topics.begin_update, target.resource_group, target.topic, desired, polling=False).result()
+
+    def _observed(self, target: _Target, cfg: dict[str, Any], source: object, *, apply_defaults: bool = False) -> bool:
+        topic = self._required_topic(target, source, AzureOperation.INSPECT)
+        if _enum(_field(topic, "provisioning_state")) != "Succeeded":
+            return False
+        if not _contains(
+            topic.serialize(), self._topic_update_parameters(cfg, apply_defaults=apply_defaults).serialize()
+        ):
+            return False
+        children = self._inventory(target, source)
+        by_name = {str(_field(row, "name")): row for row in children}
+        desired = self._desired_children(cfg, source)
+        for name, sub in desired.items():
+            current = by_name.get(name)
+            if current is None or _enum(_field(current, "provisioning_state")) != "Succeeded":
+                return False
+            if not _contains(current.serialize(), self._subscription_parameters(sub, source).serialize()):
+                return False
+        if cfg.get("prune_subscriptions") and set(by_name) != set(desired):
+            return False
+        return all(_enum(_field(row, "provisioning_state")) == "Succeeded" for row in children)
+
+
+@dataclass(frozen=True)
+class _Target:
+    subscription: str
+    resource_group: str
+    topic: str
+
+    @property
+    def handle(self) -> str:
+        return f"{KIND}/arm-v1/{self.subscription}/{self.resource_group}/{self.topic}"
+
+    @property
+    def topic_id(self) -> str:
         return (
-            f"/subscriptions/{self._config.subscription_id}/resourceGroups/{self._config.resource_group}"
-            f"/providers/Microsoft.EventGrid/topics/{topic_name}"
+            f"/subscriptions/{self.subscription}/resourceGroups/{self.resource_group}"
+            f"/providers/Microsoft.EventGrid/topics/{self.topic}"
         )
 
-    @staticmethod
-    def _parse_handle(handle: str) -> str:
-        prefix = f"{KIND}/"
-        if not handle.startswith(prefix):
-            raise AzureEventGridError(f"invalid Event Grid handle {handle!r}")
-        name = handle[len(prefix) :]
-        _validate_resource_name(name, "Event Grid handle topic")
-        return name
 
-    @staticmethod
-    def _wait(poller: Any) -> Any:
-        return poller.result() if hasattr(poller, "result") else poller
+class _Ownership(AzureEventGridError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _uuid(value: str) -> UUID:
+    try:
+        parsed = UUID(value)
+        if not parsed.int or str(parsed) != value:
+            raise ValueError
+        return parsed
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise _Ownership("ownership_unknown", "canonical nonzero immutable UUID is required") from exc
+
+
+def _owner_uuid(source: object) -> UUID:
+    return _uuid(getattr(source, "managed_service_id", ""))
+
+
+def _same_arm(value: Any, expected: str) -> bool:
+    return isinstance(value, str) and value.startswith("/") and value.casefold() == expected.casefold()
+
+
+def _enum(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _contains(actual: dict[str, Any], desired: dict[str, Any]) -> bool:
+    for key, value in desired.items():
+        if key == "identity" and value == {"type": "None"} and actual.get(key) in (None, {"type": "None"}):
+            continue
+        if key not in actual:
+            return False
+        if isinstance(value, dict):
+            if not isinstance(actual[key], dict) or not _contains(actual[key], value):
+                return False
+        elif actual[key] != value:
+            return False
+    return True
+
+
+def _error_code(exc: Exception) -> str:
+    if isinstance(exc, _Ownership):
+        return exc.code
+    if isinstance(exc, AzureEventGridError):
+        return "invalid_event_grid_config"
+    return "ownership_unknown"
+
+
+def _error_message(exc: Exception) -> str:
+    if isinstance(exc, _Ownership):
+        return str(exc)
+    if isinstance(exc, AzureEventGridError):
+        return "Event Grid configuration cannot be applied in place"
+    return "Event Grid observation failed; current ownership or completion is unknown"
 
 
 def _generated_name(prefix: str, hint: str, seed: str, max_length: int) -> str:

@@ -1,6 +1,7 @@
 "use client";
 
 import { DatabaseIcon, Loader2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -20,15 +21,25 @@ import {
   RETENTION_DAY_OPTIONS,
   RETENTION_DEFAULT_DAYS,
   RETENTION_SIGNALS,
+  retentionSignalLabel,
   type useRetentionPolicy,
 } from "./use-retention-policy";
 
 export type RetentionPolicyViewProps = ReturnType<typeof useRetentionPolicy> & {
   policies: AstroliftRetentionPolicy[];
+  appId?: string;
+  sourceVersion?: number | null;
 };
 
 /** How long observability data is kept per signal type. */
-export function RetentionPolicyView({ saving, onChange, policies }: RetentionPolicyViewProps) {
+export function RetentionPolicyView({
+  saving,
+  onChange,
+  policies,
+  appId,
+  sourceVersion,
+}: RetentionPolicyViewProps) {
+  const t = useTranslations("apps.settings.retentionFlow");
   const policyMap = React.useMemo(
     () => Object.fromEntries(policies.map((p) => [p.signal, p.retentionDays])),
     [policies]
@@ -39,18 +50,14 @@ export function RetentionPolicyView({ saving, onChange, policies }: RetentionPol
       title={
         <span className="flex items-center gap-2">
           <DatabaseIcon className="text-muted-foreground size-4 shrink-0" />
-          Data retention
+          {t("title")}
         </span>
       }
-      description={
-        <>
-          How long observability data is kept per signal type. Defaults to {RETENTION_DEFAULT_DAYS}{" "}
-          days when no policy is set.
-        </>
-      }
+      description={t("description", { days: RETENTION_DEFAULT_DAYS })}
     >
       <div className="flex flex-col gap-2">
-        {RETENTION_SIGNALS.map(({ signal, label }) => {
+        {RETENTION_SIGNALS.map(({ signal }) => {
+          const label = retentionSignalLabel(signal, t);
           const current = policyMap[signal] ?? RETENTION_DEFAULT_DAYS;
           const isDefault = policyMap[signal] === undefined;
           const isSaving = !!saving[signal];
@@ -63,7 +70,7 @@ export function RetentionPolicyView({ saving, onChange, policies }: RetentionPol
                 <Label className="w-28 shrink-0 text-sm font-medium">{label}</Label>
                 {isDefault ? (
                   <Badge variant="secondary" className="text-2xs">
-                    Platform default
+                    {t("platformDefault")}
                   </Badge>
                 ) : null}
               </div>
@@ -73,17 +80,21 @@ export function RetentionPolicyView({ saving, onChange, policies }: RetentionPol
                 ) : null}
                 <Can permission="app.update">
                   <Select
+                    key={JSON.stringify([appId, sourceVersion, policies, signal])}
                     value={String(current)}
                     onValueChange={(v) => void onChange(signal, v)}
                     disabled={isSaving}
                   >
-                    <SelectTrigger className="w-36">
-                      <SelectValue />
+                    <SelectTrigger
+                      className="w-36"
+                      aria-label={t("selectorLabel", { signal: label })}
+                    >
+                      <SelectValue>{t("days", { days: current })}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {RETENTION_DAY_OPTIONS.map((d) => (
                         <SelectItem key={d} value={String(d)}>
-                          {d} days
+                          {t("days", { days: d })}
                         </SelectItem>
                       ))}
                     </SelectContent>

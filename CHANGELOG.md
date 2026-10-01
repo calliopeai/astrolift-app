@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Keep Event Grid Basic child ownership under the shared Azure verifier and
+  expose its unchanged binding envelope directly to the cross-driver contract
+  checks. Actual observed labels, exact ARM identity and strict source checks
+  remain required (#2032, #2098).
+
+- Azure Event Hubs rejects conflicting source-ID ownership aliases and checks
+  bounded subscription/resource-group inherited locks before effects, including
+  initial namespace creation. Requires ancestor `Microsoft.Authorization/locks/read`;
+  no independent lock is deleted and other Azure families remain unchanged
+  (Refs #2032, #2098).
+
 - Localize list/detail cluster-unregistration reviews and feedback in all eight
   locales. Preserve refused reviews without refreshing, retain accepted writes
   through failed reads/navigation, and invalidate stale visible-target reviews.
@@ -26,6 +37,48 @@
   legacy caller semantics, and make unknown review proof read-only in the web UI.
   Persist existing tracking markers on partial cluster/provider source saves;
   Cognito get-to-write races and partial multi-call effects remain explicit (#2225).
+
+- Localize the connected app archive/restore settings card in all eight locales.
+  Preserve refused reviews without reads or navigation, retain accepted writes
+  through refresh/navigation failure, and invalidate stale observed app reviews.
+  Explain saved replica counts without promising a live rollout (#2145).
+
+- Azure native/Kafka Event Hubs uses complete immutable UUID names for new
+  targets and exact saved ARM placement for lifecycle and bindings. Current
+  source/platform/child identities, bounded complete inventories and operator
+  lock refusal gate effects; unknown observations never become cleanup success.
+  Actual SDK12 enum/wire values and NoPolling preserve pending versus observed
+  readiness. Legacy ambiguous handles refuse unchanged; retained-data/Capture
+  limits and exact hub-scoped Sender/Receiver grants remain explicit (#2032, #2098).
+
+- Localize app-frame delete feedback in all eight locales. Preserve accepted
+  soft deletion through failed Apps refresh or navigation; refused writes retain
+  their confirmation and exact diagnostics (#2145, bounded item 5 flow).
+
+- Localize the connected app retention-policy settings card and feedback in all
+  eight locales. Preserve signal IDs/day presets and raw refusals, refresh only
+  accepted writes, and retain acceptance after read failure. Bind selectors and
+  pending indicators to the observed app/source without promising data deletion
+  or backend version preconditions (#2145).
+
+- Localize the connected environment override card in all eight locales. Keep
+  refused drafts and accepted settings through failed reads, show real read retry,
+  and discard drafts after observed environment, app, source or permission changes
+  without changing current-target API writes (#2145, bounded item 13 flow).
+
+- Localize secret-proposal read errors, known operation/status/decision labels
+  and fallback summaries in all eight locales. Preserve supplied summaries,
+  technical unknowns, diagnostics, masked diff content and action authority
+  without changing proposal mutations (#2145, bounded item 14 presentation).
+
+- Azure Event Grid Basic retains the full immutable service UUID in new topic
+  and child names, and preserves complete recorded ARM targets. Current topic,
+  child and inherited-lock observations gate supported lifecycle and bindings;
+  unknown/foreign sources and retained data refuse even under force. SDK
+  NoPolling keeps accepted work pending until actual observations confirm it.
+  Historical ambiguous targets require separate recovery; Standard namespaces
+  and the writable-label/incarnation residual remain outside this repair
+  (#2032, #2098).
 
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no

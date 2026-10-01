@@ -237,20 +237,27 @@ function ManagedServicesAdminCard({ appSlug }: { appSlug: string }) {
   return <ManagedServicesAdminView {...useManagedServicesAdmin(appSlug)} />;
 }
 
-function RetentionPolicyCard({ app }: { app: AstroliftRegisteredApp }) {
+export function RetentionPolicyCard({ app }: { app: AstroliftRegisteredApp }) {
   return (
-    <RetentionPolicyView {...useRetentionPolicy(app.slug)} policies={app.retentionPolicies ?? []} />
+    <RetentionPolicyView
+      {...useRetentionPolicy(app.slug, app)}
+      appId={app.id}
+      sourceVersion={app.version}
+      policies={app.retentionPolicies ?? []}
+    />
   );
 }
 
-function EnvironmentSettingsCard({ appSlug }: { appSlug: string }) {
+export function EnvironmentSettingsCard({ appSlug }: { appSlug: string }) {
   return <EnvironmentSettingsView {...useEnvironmentSettings(appSlug)} />;
 }
 
 export function ArchiveAppCard({ app }: { app: AstroliftRegisteredApp }) {
   return (
     <ArchiveAppView
-      {...useArchiveApp(app.slug)}
+      {...useArchiveApp(app.slug, app)}
+      appId={app.id}
+      sourceVersion={app.version}
       appName={app.name}
       isArchived={app.isArchived}
       archivedAt={app.archivedAt ?? null}

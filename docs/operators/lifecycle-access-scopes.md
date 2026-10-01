@@ -63,3 +63,21 @@ whole seconds rather than rounding a configured window. This read is a snapshot:
 configuration may change before confirmation. Rotation retains its existing
 `app.update` and elevation checks, rereads the current setting when issuing the
 secret, and returns the actual applied window in its one-time reveal.
+
+The web archive/restore settings card preserves the existing `app.update` fence
+and sends the existing app slug. Its current GUID/version/archive observations
+only invalidate stale local reviews; they do not add a backend incarnation or
+version precondition. Archive/restore acceptance reflects persisted workload
+replica settings and deployment suppression, not proof of a live rollout.
+Rejected writes do not refresh or navigate. An accepted write survives a failed
+view refresh or navigation, with recovery feedback rather than a false write
+failure. The backend's current owner and permission checks remain authoritative.
+
+The retention settings card keeps the existing `app.update` decision and sends
+only the app slug, technical signal and integer day count. Saving records a
+retention policy; it does not confirm deletion of existing data. Refused writes
+leave the recorded observation intact and trigger no refresh. Accepted changes
+remain accepted through a failed view refresh, with separate recovery feedback.
+Observed GUID/version/policy changes invalidate local selectors and callbacks,
+but the API has no immutable target or version precondition. The backend's
+current owner, permission and signal/day validation remain authoritative.

@@ -1512,6 +1512,40 @@
           "close": "Fermer"
         },
         "loadFailed": "Impossible de charger les services gérés"
+      },
+      "archiveFlow": {
+        "title": "Archivage de l’application",
+        "archived": "Archivée",
+        "archivedAt": "Archivée {at}. Les nombres de réplicas enregistrés sont à zéro ; les déploiements sont suspendus.",
+        "archivedWithoutTime": "L’application est archivée. Les nombres de réplicas enregistrés sont à zéro.",
+        "description": "Archiver enregistre zéro réplica et suspend les déploiements. Restaurer rétablit les nombres précédents. Cela ne confirme pas un déploiement effectif.",
+        "archive": "Archiver",
+        "restore": "Restaurer",
+        "archiveAccepted": "Archivage accepté pour {slug}. Les nombres de réplicas enregistrés sont à zéro.",
+        "restoreAccepted": "Restauration acceptée pour {slug}. Les nombres de réplicas enregistrés retrouvent leurs valeurs avant archivage.",
+        "archiveFailed": "Échec de l’archivage.",
+        "restoreFailed": "Échec de la restauration.",
+        "refreshWarning": "Le changement a été accepté, mais la vue n’a pas pu être actualisée. Actualisez-la pour vérifier l’état actuel.",
+        "navigationWarning": "L’archivage a été accepté, mais la navigation a échoué. Ouvrez Applications pour continuer.",
+        "sourceChanged": "L’application observée ou les droits ont changé. Vérifiez l’application actuelle avant de réessayer."
+      },
+      "retentionFlow": {
+        "title": "Conservation des données",
+        "description": "Choisissez les durées de conservation enregistrées pour chaque signal. Sans politique enregistrée, cette carte affiche la valeur par défaut de {days, plural, one {# jour} other {# jours}}. Enregistrer une politique ne confirme pas la suppression des données existantes.",
+        "platformDefault": "Valeur par défaut",
+        "days": "{days, plural, one {# jour} other {# jours}}",
+        "selectorLabel": "Conservation des {signal}",
+        "saveAccepted": "Conservation des {signal} enregistrée pour {slug} : {days, plural, one {# jour} other {# jours}}.",
+        "noResponse": "Aucune réponse du serveur.",
+        "saveFailed": "Impossible d’enregistrer la politique de conservation.",
+        "refreshWarning": "Le changement de conservation a été accepté, mais la vue n’a pas pu être actualisée. Actualisez-la pour vérifier la politique enregistrée.",
+        "sourceChanged": "L’application, la politique observée ou les droits ont changé. Vérifiez l’application actuelle avant de réessayer.",
+        "signals": {
+          "logs": "Journaux",
+          "metrics": "Métriques",
+          "traces": "Traces",
+          "auditEvents": "Événements d’audit"
+        }
       }
     },
     "common": {
@@ -2580,6 +2614,12 @@
         "environments": "Environnements",
         "domains": "Domaines",
         "dangerZone": "Zone de danger"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} a été supprimée",
+        "failed": "La suppression a échoué",
+        "refreshWarning": "{slug} a été supprimée, mais la liste des applications n’a pas pu être actualisée. Actualisez-la pour voir les données actuelles.",
+        "navigationWarning": "{slug} a été supprimée, mais la navigation a échoué. Ouvrez Applications pour continuer."
       }
     },
     "settingsTab": {
@@ -2606,6 +2646,39 @@
         "save": "Enregistrer"
       },
       "empty": "Aucun contenu ici pour cette application."
+    },
+    "environmentOverrides": {
+      "title": "Paramètres par environnement",
+      "description": "Paramètres clé/valeur par environnement qui complètent la configuration de base de l’application.",
+      "environment": "Environnement",
+      "selectEnvironment": "Sélectionner un environnement",
+      "empty": "Aucun paramètre pour <name>{environment}</name>. Ajoutez-en un ci-dessous ou choisissez une clé suggérée.",
+      "emptyValue": "(vide)",
+      "clearTitle": "Supprimer le paramètre",
+      "clearLabel": "Supprimer le paramètre {key}",
+      "suggested": "Suggestions :",
+      "alreadySet": "{hint} (déjà défini)",
+      "keyPlaceholder": "CLÉ",
+      "keyLabel": "Clé du paramètre",
+      "valuePlaceholder": "valeur",
+      "valueLabel": "Valeur du paramètre",
+      "add": "Ajouter un paramètre",
+      "loading": "Chargement des paramètres par environnement…",
+      "readFailed": "Impossible de charger les paramètres par environnement.",
+      "retry": "Réessayer",
+      "keyRequired": "La clé est obligatoire.",
+      "saveFailed": "Échec de l’enregistrement.",
+      "clearFailed": "Échec de la suppression.",
+      "saved": "{key} défini",
+      "cleared": "{key} supprimé",
+      "refreshWarning": "La modification a été enregistrée, mais les paramètres par environnement n’ont pas pu être actualisés. Réessayez pour voir les données actuelles.",
+      "hints": {
+        "replicas": "Nombre de réplicas de la charge de travail",
+        "cpu_request": "Demande de CPU par pod",
+        "cpu_limit": "Limite de CPU par pod",
+        "memory_request": "Demande de mémoire par pod",
+        "memory_limit": "Limite de mémoire par pod"
+      }
     }
   },
   "settingsIndex": {
@@ -3866,6 +3939,29 @@
         "title": "Approbations",
         "empty": "Aucune approbation enregistrée pour l'instant.",
         "unknownApprover": "inconnu"
+      },
+      "presentation": {
+        "loadFailed": "Impossible de charger la proposition de secret",
+        "summary": "{op} dans {env}",
+        "operations": {
+          "set": "Définir le secret",
+          "delete": "Supprimer le secret",
+          "attachBundle": "Associer le lot",
+          "detachBundle": "Dissocier le lot",
+          "setMetadata": "Mettre à jour les métadonnées"
+        },
+        "statuses": {
+          "pending": "En attente",
+          "approved": "Approuvée",
+          "rejected": "Rejetée",
+          "applied": "Appliquée",
+          "expired": "Expirée",
+          "withdrawn": "Retirée"
+        },
+        "decisions": {
+          "approved": "Approuvé",
+          "rejected": "Rejeté"
+        }
       }
     },
     "pendingGates": {

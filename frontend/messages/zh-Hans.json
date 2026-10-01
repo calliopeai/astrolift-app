@@ -1512,6 +1512,40 @@
           "close": "关闭"
         },
         "loadFailed": "无法加载托管服务"
+      },
+      "archiveFlow": {
+        "title": "应用归档",
+        "archived": "已归档",
+        "archivedAt": "于 {at} 归档。保存的副本数为零，部署已暂停。",
+        "archivedWithoutTime": "应用已归档。保存的副本数为零。",
+        "description": "归档会将副本数保存为零并暂停部署。恢复会保存归档前的副本数。这并不确认实际发布已完成。",
+        "archive": "归档",
+        "restore": "恢复",
+        "archiveAccepted": "{slug} 的归档请求已接受。保存的副本数为零。",
+        "restoreAccepted": "{slug} 的恢复请求已接受。保存的副本数恢复为归档前的值。",
+        "archiveFailed": "归档失败。",
+        "restoreFailed": "恢复失败。",
+        "refreshWarning": "变更已接受，但视图无法刷新。请刷新以检查当前状态。",
+        "navigationWarning": "归档已接受，但页面跳转失败。请打开应用列表继续。",
+        "sourceChanged": "已观察的应用或访问权限发生变化。请检查当前应用后再重试。"
+      },
+      "retentionFlow": {
+        "title": "数据保留",
+        "description": "为每种信号选择要保存的保留期限。没有已记录的策略时，此卡片显示平台默认值 {days, plural, one {# 天} other {# 天}}。保存策略并不确认现有数据已删除。",
+        "platformDefault": "平台默认值",
+        "days": "{days, plural, one {# 天} other {# 天}}",
+        "selectorLabel": "{signal}保留期限",
+        "saveAccepted": "已为 {slug} 保存{signal}保留期限：{days, plural, one {# 天} other {# 天}}。",
+        "noResponse": "服务器未响应。",
+        "saveFailed": "无法保存保留策略。",
+        "refreshWarning": "保留期限变更已接受，但视图无法刷新。请刷新以检查已保存的策略。",
+        "sourceChanged": "已观察的应用、策略或访问权限发生变化。请检查当前应用后再重试。",
+        "signals": {
+          "logs": "日志",
+          "metrics": "指标",
+          "traces": "追踪",
+          "auditEvents": "审计事件"
+        }
       }
     },
     "common": {
@@ -2580,6 +2614,12 @@
         "environments": "环境",
         "domains": "域名",
         "dangerZone": "危险操作"
+      },
+      "deleteFeedback": {
+        "deleted": "已删除 {slug}",
+        "failed": "删除应用失败",
+        "refreshWarning": "已删除 {slug}，但无法刷新应用列表。请刷新以查看最新数据。",
+        "navigationWarning": "已删除 {slug}，但页面跳转失败。请打开应用列表以继续。"
       }
     },
     "settingsTab": {
@@ -2606,6 +2646,39 @@
         "save": "保存"
       },
       "empty": "此应用暂无内容。"
+    },
+    "environmentOverrides": {
+      "title": "环境专属设置",
+      "description": "按环境配置的键值设置，用于补充应用的基础配置。",
+      "environment": "环境",
+      "selectEnvironment": "选择环境",
+      "empty": "<name>{environment}</name>尚无专属设置。在下方添加设置或选择建议的键。",
+      "emptyValue": "（空）",
+      "clearTitle": "移除设置",
+      "clearLabel": "移除 {key} 设置",
+      "suggested": "建议：",
+      "alreadySet": "{hint}（已设置）",
+      "keyPlaceholder": "键",
+      "keyLabel": "设置键",
+      "valuePlaceholder": "值",
+      "valueLabel": "设置值",
+      "add": "添加设置",
+      "loading": "正在加载环境专属设置…",
+      "readFailed": "无法加载环境专属设置。",
+      "retry": "重试",
+      "keyRequired": "键不能为空。",
+      "saveFailed": "保存失败。",
+      "clearFailed": "移除失败。",
+      "saved": "已设置 {key}",
+      "cleared": "已移除 {key}",
+      "refreshWarning": "更改已保存，但无法刷新环境专属设置。请重试以查看当前数据。",
+      "hints": {
+        "replicas": "工作负载副本数",
+        "cpu_request": "每个 Pod 的 CPU 请求量",
+        "cpu_limit": "每个 Pod 的 CPU 上限",
+        "memory_request": "每个 Pod 的内存请求量",
+        "memory_limit": "每个 Pod 的内存上限"
+      }
     }
   },
   "settingsIndex": {
@@ -3863,6 +3936,29 @@
         "title": "审批记录",
         "empty": "暂无审批记录。",
         "unknownApprover": "未知"
+      },
+      "presentation": {
+        "loadFailed": "无法加载密钥变更提案",
+        "summary": "在 {env} 中{op}",
+        "operations": {
+          "set": "设置密钥",
+          "delete": "删除密钥",
+          "attachBundle": "关联密钥包",
+          "detachBundle": "解除密钥包关联",
+          "setMetadata": "更新元数据"
+        },
+        "statuses": {
+          "pending": "待处理",
+          "approved": "已批准",
+          "rejected": "已拒绝",
+          "applied": "已应用",
+          "expired": "已过期",
+          "withdrawn": "已撤回"
+        },
+        "decisions": {
+          "approved": "批准",
+          "rejected": "拒绝"
+        }
       }
     },
     "pendingGates": {

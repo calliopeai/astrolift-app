@@ -748,3 +748,214 @@ The extended schema-validated HttpLink/portable/card proof includes unknown
 source/user identity and exact expected-source/subject envelopes in every locale.
 Provider-side conditional CAS remains unsupported; see
 [reviewed-target operator contract](../operators/cluster-auth-user-preconditions.md).
+
+## Connected app settings archive and restore
+
+`ArchiveAppView`, `useArchiveApp` and the actual `ArchiveAppCard` use 14 genuine
+`apps.settings.archiveFlow` messages in every locale. The existing translated
+confirmation title retains the literal app name, and accepted feedback identifies
+the exact requested slug. Relative archival time uses the configured locale,
+request clock and timezone. Copy describes saved replica counts and deployment
+suppression, without claiming an observed live rollout or infrastructure removal.
+
+The exact existing `archiveApp`/`restoreApp` inputs remain `{ appSlug }`; the
+existing `app.update`/optimistic-loading fence and backend checks are unchanged.
+Only accepted envelopes collect the existing active GetApp refresh with its
+original variables. Reads run after acceptance/navigation handling, and the
+shared refresh helper warns without changing a committed result into a write
+failure. Refusals keep the review and raw diagnostic, with no refresh/navigation.
+An accepted archive remains accepted when navigation throws. Mutation replies
+are not normalized into a different review before acceptance is handled.
+
+The actual card passes its observed app GUID/version/archive facts. Target/source
+and permission withdrawal, replacement and ABA transitions invalidate stored
+callbacks and reviews; an old accepted response cannot navigate or close a
+newer review. A language change preserves an otherwise unchanged review. Same-
+target cached observations survive failed reads as before. These are local
+observation safeguards, not server immutable identity/version preconditions:
+the current backend still resolves the slug and remains authoritative.
+
+Focused proof on the ec1abcd6-based leaf: 168 checks pass in four files, including
+130 actual-card/schema-validated Apollo HttpLink/locale/context/review checks,
+10 portable stories and 28 existing operational/recovery regressions. Both
+operations cover every locale and actual payloads, raw refusal/transport/fallback,
+accepted-refresh/navigation failures, keyboard retry, current permission and
+source withdrawal, stale callbacks, late replies, ICU argument parity and
+recoverable-error-free hydration. TypeScript, scoped ESLint (zero warnings),
+source/catalogue formatting and diff checks pass. All existing catalogue trees
+are exact outside the new subtree. No broad suite, backend/schema/cloud change,
+installation or live request was performed.
+
+This completes this card within original item 13, not the whole item. Retention,
+environment overrides, managed-service administration, agent-mode resync and
+remaining operational-hook feedback are separate connected translation gaps.
+
+## Connected app-frame delete feedback
+
+The remaining `useAppFrame` delete success/fallback strings use four additive
+`apps.frame.deleteFeedback` keys in all eight locales. Slugs, IDs and provider,
+transport, refresh and navigation diagnostics remain literal. The existing
+`SOFT_DELETE_APP` document, `{ input: { id } }` payload, `app.delete` visibility
+gate, confirmation and `/apps` navigation request remain intact.
+
+A refused or failed mutation keeps confirmation open, retains its diagnostic and
+runs no Apps-list refresh or navigation. An `ok: true` response reports the
+accepted soft deletion, then reads the same `LIST_APPS` query over the network.
+Refresh failure produces a localized warning and still requests navigation;
+synchronous navigation failure produces its own localized warning. Both retain
+the accepted write and close confirmation, without issuing a second delete. The
+warning description keeps any actual diagnostic. The pending confirmation
+remains disabled until the write and its follow-up settle.
+
+The six focused files pass 149 checks: 72 real schema-validated HttpLink/frame
+cases across all eight locales, eight ICU/key-contract cases, 23 portable
+AppFrame story checks and 46 existing detail/chrome/polling regressions. Portable
+components use the actual project decorators and RTL-owned cleanup. Catalogue
+comparison to `ec1abcd6` confirms exactly four new leaves per locale and no
+changes outside this subtree. TypeScript, scoped ESLint and formatting pass.
+
+This proves the displayed API acceptance and local follow-up boundaries. It
+does not establish downstream workload teardown, completed browser navigation,
+provider deletion or new lifecycle authority. Archive/restore, other app-frame
+feedback, API/backend/schema and other catalogue subtrees are outside this leaf;
+#2145 remains open for its remaining surfaces. No production or cloud call ran.
+
+## Connected app settings retention policies
+
+`RetentionPolicyView`, its owned `useRetentionPolicy` and the actual settings
+`RetentionPolicyCard` use 14 genuine `apps.settings.retentionFlow` message leaves
+in all eight locales. Signal labels, default guidance, accessible picker names,
+day units and accepted/refused/refresh feedback are translated. ICU plural
+arguments and branches remain equivalent while permitting each language's word
+order. Recorded positive periods outside the card's fixed presets stay visible;
+this adds no new preset. Known human signal labels use an exact mapping; unknown
+technical signal identifiers remain literal in the presentation helper.
+
+The existing technical signals, presets `[7,14,30,60,90,180,365]`, default of 30,
+GetApp query and `{ appSlug, signal, retentionDays }` mutation input are unchanged.
+The existing `app.update` and optimistic-loading fence is preserved, with backend
+owner/permission/validation checks remaining authoritative. No backend, schema,
+generated contract or new authority/pagination behavior is introduced. Copy
+explains that a saved retention policy is not proof that old data was deleted.
+
+Refused, missing and failed writes cause no refresh or accepted-write warning;
+raw diagnostics remain literal and the recorded selected period stays visible.
+Accepted writes refresh the original active GetApp variables through the shared
+safe feedback helper, preserving acceptance if the read fails. A failed same-
+target cached read retains the observed controls. A missing/unavailable initial
+app read does not render a healthy default-retention card. The outer settings
+read/retry presentation remains unchanged and outside this leaf.
+
+The actual card passes observed GUID/version/policies. Changed source facts or
+permissions close old pickers and invalidate stored callbacks, including source
+ABA; language changes alone preserve an open selector. Pending state is tracked
+by app observation and operation identity, so a late app A completion cannot
+clear app B's current save, and one signal's successful refresh cannot clear
+another pending signal on the same app. These are local observed-source
+safeguards, not server immutable-incarnation or compare-and-swap guarantees.
+
+Focused proof on the ec1abcd6-based source: 275 checks pass in two dedicated
+files (267 actual-card/schema-validated Apollo HttpLink/locale/context checks and
+8 portable stories). Every locale and all four signals cover exact inputs,
+accepted/refused/missing/transport/failed-read outcomes, refusal-plus-read-failure
+without a read, keyboard retry, source/permission withdrawal and replacement,
+stored callbacks, concurrent pending ownership, known/unknown literal metadata,
+ICU parity, genuine translations and recoverable-error-free hydration.
+TypeScript, scoped ESLint (zero warnings), source/catalogue formatting and diff
+checks pass. Existing eight catalogue trees are exact outside the owned subtree.
+No broad suite, installation, live call, cloud or publication was performed.
+
+This completes this retention card within original item 13, not the whole item.
+The independently frozen Archive/restore leaf is unchanged. Environment
+settings/overrides, managed-service administration, agent-mode resync and other
+operational-hook feedback remain separate connected translation boundaries.
+
+## Connected environment override settings
+
+The existing `EnvironmentSettingsCard` route container, its pure view and owned
+hook use 29 additive `apps.environmentOverrides` messages in all eight locales.
+Human controls, read states, suggested-key hints, empty values, accessibility
+labels and feedback are translated. The five suggested technical keys, unknown
+keys/values, environment/app/cluster/provider identifiers and diagnostics remain
+literal. The existing card is exported for connected tests; its route composition
+is unchanged. Pure callers retain compatible optional read-state props.
+
+The actual `LIST_ENVIRONMENTS`, `SET_ENVIRONMENT_SETTING` and
+`CLEAR_ENVIRONMENT_SETTING` documents remain unchanged. Set still trims only the
+key and sends `{ environmentId, key, value }`; clear still sends
+`{ environmentId, key }`. APP_UPDATE, environment/application/org and ABAC
+admission remain server-owned. The card retains its existing `app.update`
+visibility and optimistic permission-loading behavior. No new review modal,
+lifecycle or provider operation is introduced; keyboard submission uses the same
+add action and input.
+
+A refused/failed write keeps its draft or row, shows the original diagnostic
+(or localized empty-message fallback), releases pending admission and performs
+no refresh. An accepted write reports success and awaits an explicit refetch of
+the same environment list; failure warns separately and retains acceptance.
+Add inputs clear only if that same source and draft are still current. Concurrent
+edits, changed targets and late replies cannot clear a newer draft. Clear remains
+pending per environment/key until its follow-up settles, and duplicate adds are
+admitted once before React rerenders. Target epochs isolate old app callbacks and
+pending state; obsolete accepted replies skip their old target's refresh.
+
+Failed initial reads and invalid null inventories show unavailable/retry rather
+than a healthy empty list. Failed cached reads retain observations and drafts,
+with writes disabled until a successful actual retry. A confirmed empty list
+retains the existing hidden-card behavior. Observed selected-environment,
+app-target, cluster/provider source, environment creation marker or permission
+changes discard old drafts, including observed A→B→A transitions and withdrawal.
+A language change alone retains a draft. These are local observations, not a
+conditional-write protocol: the API upserts or clears the current row by
+immutable environment ID and key, with no expected setting ID/version. Unseen
+external changes, same-key setting replacement and unobserved ABA remain outside
+this proof; saving an override does not establish reconciliation of live pods.
+
+Four focused files pass 203 checks: 168 actual exported-card/schema-validated
+HttpLink cases across all eight locales, eight ICU/rich-tag contracts, 13
+portable declared-story/behavior cases and 14 existing pending-action regressions.
+Portable components use actual project decorators and RTL-owned cleanup. Tests
+cover exact literal inputs, keyboard submission, refusal/transport/fallback
+retry, accepted-refresh failure, unknown/failed/cached reads, per-row pending,
+concurrent edits, observed source/selection/permission ABA, withdrawal, changed
+app callbacks and language changes. Catalogue comparison to `ec1abcd6` confirms
+exactly 29 owned additive leaves per locale with all other values unchanged.
+TypeScript, scoped ESLint and formatting pass.
+
+This completes the bounded environment override card. Archive/restore,
+app-frame delete, retention, API/backend/schema/generators, shared fixtures and
+other settings/member copy are untouched. #2145 remains open for its remaining
+surfaces; no production or cloud call ran.
+
+## Secret-proposal detail presentation
+
+The pure SecretProposalDetailScreen uses fifteen additive message leaves in all
+eight locales for its failed-read heading, fallback operation/environment summary,
+five known operations, six known proposal statuses and two known approval
+decisions. The enum sets match the backend proposal/approval models. Exact
+unknown technical strings, including prototype property names, remain literal;
+only own known map entries translate. The existing app-wide and loading title
+messages are reused. Supplied payloadDiff summaries, approver reasons, provider
+apply errors and diff keys/content remain unchanged. Server-provided masking is
+preserved; this label change introduces no browser redaction or reveal authority.
+
+The owned hook, query/mutation documents, input envelopes, permission checks,
+pending-only action gates, confirmations and mutation/refetch/navigation behavior
+are unchanged. The pre-existing mocked route test now expects the translated
+fallback path; the actual locale tests separately prove the rendered values.
+Shared QueryError Retry copy and its general recovery behavior remain a separate
+translation boundary, rather than a claim that all shared chrome is localized.
+
+On the ec1abcd6-based source, 182 focused cases pass in three files: 168 real
+locale presentation, actual-client schema-validated HttpLink, unknown-value,
+read-error/retry, open-confirmation locale-change and SSR hydration checks,
+eight portable stories and six existing route action/fallback regressions.
+TypeScript, scoped ESLint and source/catalogue formatting pass. The initial type
+check rejected unsupported test-only ByRole exact options; the corrected checks
+retain string-name matching and pass. Each locale adds exactly fifteen genuine
+leaves, preserving all existing values. No broad suite, API/backend/schema change,
+live request or publication is claimed by this isolated presentation leaf.
+
+The original item 14 PendingGates presentation was already translated on the
+deployed base. This leaf supplies the remaining specified detail labels, without
+claiming the later settings/lifecycle gaps or downstream secret application.

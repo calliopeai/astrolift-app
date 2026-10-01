@@ -1512,6 +1512,40 @@
           "close": "閉じる"
         },
         "loadFailed": "マネージドサービスを読み込めませんでした"
+      },
+      "archiveFlow": {
+        "title": "アプリのアーカイブ",
+        "archived": "アーカイブ済み",
+        "archivedAt": "{at}にアーカイブ。保存されたレプリカ数はゼロで、デプロイは抑止されています。",
+        "archivedWithoutTime": "アプリはアーカイブ済みです。保存されたレプリカ数はゼロです。",
+        "description": "アーカイブするとレプリカ数をゼロとして保存し、デプロイを抑止します。復元すると以前の数を保存します。実際のロールアウト完了を示すものではありません。",
+        "archive": "アーカイブ",
+        "restore": "復元",
+        "archiveAccepted": "{slug} のアーカイブ要求が受理されました。保存されたレプリカ数はゼロです。",
+        "restoreAccepted": "{slug} の復元要求が受理されました。保存されたレプリカ数はアーカイブ前の値に戻ります。",
+        "archiveFailed": "アーカイブに失敗しました。",
+        "restoreFailed": "復元に失敗しました。",
+        "refreshWarning": "変更は受理されましたが、表示を更新できませんでした。再読み込みして現在の状態を確認してください。",
+        "navigationWarning": "アーカイブは受理されましたが、画面を移動できませんでした。アプリ一覧を開いて続行してください。",
+        "sourceChanged": "確認したアプリまたはアクセス権が変わりました。現在のアプリを確認してから再試行してください。"
+      },
+      "retentionFlow": {
+        "title": "データ保持",
+        "description": "各シグナルの保持期間を保存します。ポリシーが記録されていない場合、このカードには既定値の {days, plural, one {# 日} other {# 日}} が表示されます。ポリシーの保存は、既存データの削除完了を示すものではありません。",
+        "platformDefault": "プラットフォームの既定値",
+        "days": "{days, plural, one {# 日} other {# 日}}",
+        "selectorLabel": "{signal}の保持期間",
+        "saveAccepted": "{slug} の{signal}保持期間を保存しました：{days, plural, one {# 日} other {# 日}}。",
+        "noResponse": "サーバーから応答がありません。",
+        "saveFailed": "保持ポリシーを保存できませんでした。",
+        "refreshWarning": "保持期間の変更は受理されましたが、表示を更新できませんでした。再読み込みして保存されたポリシーを確認してください。",
+        "sourceChanged": "確認したアプリ、ポリシーまたはアクセス権が変わりました。現在のアプリを確認してから再試行してください。",
+        "signals": {
+          "logs": "ログ",
+          "metrics": "メトリクス",
+          "traces": "トレース",
+          "auditEvents": "監査イベント"
+        }
       }
     },
     "common": {
@@ -2580,6 +2614,12 @@
         "environments": "環境",
         "domains": "ドメイン",
         "dangerZone": "危険な操作"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} を削除しました",
+        "failed": "アプリを削除できませんでした",
+        "refreshWarning": "{slug} を削除しましたが、アプリ一覧を更新できませんでした。最新のデータを表示するには更新してください。",
+        "navigationWarning": "{slug} を削除しましたが、ページを移動できませんでした。続行するにはアプリ一覧を開いてください。"
       }
     },
     "settingsTab": {
@@ -2606,6 +2646,39 @@
         "save": "保存"
       },
       "empty": "このアプリの内容はありません。"
+    },
+    "environmentOverrides": {
+      "title": "環境別の設定",
+      "description": "アプリの基本設定を補う、環境ごとのキーと値の設定です。",
+      "environment": "環境",
+      "selectEnvironment": "環境を選択",
+      "empty": "<name>{environment}</name>には設定がありません。下で追加するか、推奨キーを選択してください。",
+      "emptyValue": "（空）",
+      "clearTitle": "設定を削除",
+      "clearLabel": "{key}の設定を削除",
+      "suggested": "推奨キー：",
+      "alreadySet": "{hint}（設定済み）",
+      "keyPlaceholder": "キー",
+      "keyLabel": "設定のキー",
+      "valuePlaceholder": "値",
+      "valueLabel": "設定の値",
+      "add": "設定を追加",
+      "loading": "環境別の設定を読み込み中…",
+      "readFailed": "環境別の設定を読み込めませんでした。",
+      "retry": "再試行",
+      "keyRequired": "キーは必須です。",
+      "saveFailed": "保存できませんでした。",
+      "clearFailed": "削除できませんでした。",
+      "saved": "{key}を設定しました",
+      "cleared": "{key}を削除しました",
+      "refreshWarning": "変更は保存されましたが、環境別の設定を更新できませんでした。再試行して最新のデータを確認してください。",
+      "hints": {
+        "replicas": "ワークロードのレプリカ数",
+        "cpu_request": "PodごとのCPU要求",
+        "cpu_limit": "PodごとのCPU上限",
+        "memory_request": "Podごとのメモリ要求",
+        "memory_limit": "Podごとのメモリ上限"
+      }
     }
   },
   "settingsIndex": {
@@ -3863,6 +3936,29 @@
         "title": "承認",
         "empty": "まだ承認が記録されていません。",
         "unknownApprover": "不明"
+      },
+      "presentation": {
+        "loadFailed": "シークレット変更提案を読み込めませんでした",
+        "summary": "{env}：{op}",
+        "operations": {
+          "set": "シークレットを設定",
+          "delete": "シークレットを削除",
+          "attachBundle": "バンドルを関連付け",
+          "detachBundle": "バンドルの関連付けを解除",
+          "setMetadata": "メタデータを更新"
+        },
+        "statuses": {
+          "pending": "保留中",
+          "approved": "承認済み",
+          "rejected": "却下済み",
+          "applied": "適用済み",
+          "expired": "期限切れ",
+          "withdrawn": "取り下げ済み"
+        },
+        "decisions": {
+          "approved": "承認",
+          "rejected": "却下"
+        }
       }
     },
     "pendingGates": {

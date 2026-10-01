@@ -20,11 +20,39 @@ import type { useSecretProposalDetail } from "./use-secret-proposal-detail";
 
 export type SecretProposalDetailScreenProps = ReturnType<typeof useSecretProposalDetail>;
 
+const STATUS_KEYS: Readonly<Record<string, string>> = {
+  pending: "statuses.pending",
+  approved: "statuses.approved",
+  rejected: "statuses.rejected",
+  applied: "statuses.applied",
+  expired: "statuses.expired",
+  withdrawn: "statuses.withdrawn",
+};
+const OPERATION_KEYS: Readonly<Record<string, string>> = {
+  set: "operations.set",
+  delete: "operations.delete",
+  attach_bundle: "operations.attachBundle",
+  detach_bundle: "operations.detachBundle",
+  set_metadata: "operations.setMetadata",
+};
+const DECISION_KEYS: Readonly<Record<string, string>> = {
+  approved: "decisions.approved",
+  rejected: "decisions.rejected",
+};
+
+function proposalLabel(
+  value: string,
+  keys: Readonly<Record<string, string>>,
+  translate: (key: string) => string
+) {
+  return Object.hasOwn(keys, value) ? translate(keys[value]) : value;
+}
+
 /**
  * Detail view for a secret-change proposal (#488). Side-by-side diff
  * of current → proposed, the approver vote list, and the operator
- * affordances (approve / reject / withdraw). Values are masked at
- * render — explicit reveal lives behind the per-row revealAppSecret
+ * affordances (approve / reject / withdraw). Values arrive redacted by
+ * the server; explicit reveal lives behind the per-row revealAppSecret
  * mutation (#424) and is out of scope on the proposal page.
  */
 export function SecretProposalDetailScreen({
@@ -41,6 +69,7 @@ export function SecretProposalDetailScreen({
   onWithdraw,
 }: SecretProposalDetailScreenProps) {
   const t = useTranslations("approvals.secretProposalDetail");
+  const presentation = useTranslations("approvals.secretProposalDetail.presentation");
   const fmt = useFormatters();
 
   const [confirmApprove, setConfirmApprove] = React.useState(false);
@@ -59,8 +88,8 @@ export function SecretProposalDetailScreen({
 
   if (error) {
     return (
-      <PageShell title="Secret proposal">
-        <QueryError title="Could not load secret proposal" error={error} onRetry={onRetry} />
+      <PageShell title={t("loading.title")}>
+        <QueryError title={presentation("loadFailed")} error={error} onRetry={onRetry} />
       </PageShell>
     );
   }
@@ -73,8 +102,10 @@ export function SecretProposalDetailScreen({
   }
 
   const env = proposal.environmentName || t("appWide");
+  const operation = proposalLabel(proposal.op, OPERATION_KEYS, presentation);
   const summary =
-    (proposal.payloadDiff as { summary?: string })?.summary ?? `${proposal.op} on ${env}`;
+    (proposal.payloadDiff as { summary?: string })?.summary ??
+    presentation("summary", { op: operation, env });
   const isPending = proposal.status === "pending";
 
   return (
@@ -82,8 +113,10 @@ export function SecretProposalDetailScreen({
       <Card>
         <CardContent className="flex flex-col gap-3 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{proposal.status}</Badge>
-            <Badge variant="outline">{t("opLabel", { op: proposal.op })}</Badge>
+            <Badge variant="outline">
+              {proposalLabel(proposal.status, STATUS_KEYS, presentation)}
+            </Badge>
+            <Badge variant="outline">{t("opLabel", { op: operation })}</Badge>
             <Badge variant="outline">
               {t("approvalsCount", {
                 received: proposal.approvalsCount,
@@ -242,6 +275,7 @@ function DiffPairs({ entries }: { entries: Record<string, unknown> }) {
 
 function ApproverList({ proposal }: { proposal: AstroliftSecretChangeProposal }) {
   const t = useTranslations("approvals.secretProposalDetail.approvers");
+  const presentation = useTranslations("approvals.secretProposalDetail.presentation");
   if (proposal.approvals.length === 0) {
     return (
       <Section title={t("title")}>
@@ -263,7 +297,7 @@ function ApproverList({ proposal }: { proposal: AstroliftSecretChangeProposal })
                 variant={approval.decision === "approved" ? "outline" : "destructive"}
                 className="ml-2"
               >
-                {approval.decision}
+                {proposalLabel(approval.decision, DECISION_KEYS, presentation)}
               </Badge>
             </span>
             {approval.reason && (

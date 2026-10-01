@@ -182,9 +182,9 @@ provider trees: AWS `_base.tags_for` prefixes keys with `astrolift.io/extra/`;
 Azure ARM and Files emit `astrolift-extra-<name>-<digest>`; classic Files uses
 that same serializer; legacy Blob metadata uses `astrolift_io_extra_`. These
 keys cannot overwrite platform IDs, binding IDs or parent identity tags.
-Event Grid's separate subscription-label list explicitly rejects its exact
-`astrolift-managed` ownership sentinel and retains the checked parent topic
-scope. Recording-client regressions exercise hostile custom keys and existing
+Event Grid Basic's subscription-label list rejects the normalized Astrolift
+namespace and retains the checked parent topic scope. Recording-client
+regressions exercise hostile custom keys and existing
 Azure cross-driver foreign-owner refusals; they do not certify live cloud IAM.
 
 
@@ -590,3 +590,206 @@ binding dispatch. They do not certify Azure message delivery, live-service data
 persistence or external-race exclusion. The broader #2032/#2098 audits remain open.
 See the actual [topic properties contract](https://learn.microsoft.com/en-us/rest/api/servicebus/controlplane/topics/create-or-update?view=rest-servicebus-controlplane-2026-01-01)
 and [subscription properties contract](https://learn.microsoft.com/en-us/rest/api/servicebus/controlplane/subscriptions/create-or-update?view=rest-servicebus-controlplane-2026-01-01).
+
+
+### Azure Event Hubs owned ARM targets (#2032 / #2098, bounded family)
+
+Both `stream/event_hubs` and `event_stream/event_hubs_kafka` now save
+`kind/arm-v1/subscription-UUID/resource-group/namespace/hub/native-group`.
+Kafka uses the explicit `-` native-group sentinel; Kafka broker consumer groups
+are not ARM consumer groups and are not inventoried or managed here. Subscription
+and resource-group coordinates must still match the current provider installation.
+The complete handle and emitted hub ARM binding must each fit their actual
+512-character storage fields. Validation rejects invalid delimiters/names and
+oversize identities before SDK calls; no target is truncated or reconstructed.
+Existing server-owned placement identities, when present, remain validated by
+central lifecycle dispatch before provider construction.
+
+New default namespace, hub and native managed-group names retain all 32 hex
+characters of the canonical nonzero managed-service UUID. Basic, or an explicit
+operator choice of `$Default`, uses the observed built-in group instead. Only cosmetic operator
+prefixes are bounded; operators must keep them stable until initial provision
+records its handle. Explicit namespace/hub override fields remain available, but
+new override values must contain that same complete UUID hex and satisfy Azure's
+name limits; invalid overrides are refused, never normalized or ignored. Complete
+saved targets preserve exact physical names and selected native groups across
+human-name/prefix changes, even when those saved names use an older convention.
+Legacy short handles omit immutable ARM placement and cannot establish authority:
+they remain stored and return `ownership_unknown`; there is no automatic adoption,
+backfill, migration, or recreation of missing recorded resources.
+
+Every existing namespace requires the current source UUID/platform tags and exact
+returned ARM identity. Event Hubs additionally checks every declared or recognized
+case/punctuation spelling of the managed-service owner ID: all present values must
+name the exact current canonical UUID, including when canonical and legacy keys
+coexist. Matching released legacy aliases remain readable; conflicting/empty
+aliases refuse before effects or binding. This extra consistency check is local to
+Event Hubs; the common first-match reader and other families are unchanged. Each hub and custom ARM consumer group requires a typed
+`userMetadata` JSON envelope naming the same UUID/platform and its exact returned
+ARM identity. Complete bounded hub/group inventories must agree with exact GETs;
+other hubs, unowned/unmarked children, unknown pages or divergent ARM identities
+refuse before namespace/network/hub/group writes or namespace deletion. The
+Azure-created `$Default` group is structural only: its actual list and GET ARM
+identity must match the owned saved parent. The driver never stamps, PUTs, or
+individually deletes it. Microsoft documents automatic creation in its
+[official SDK sample](https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/eventhub/Azure.Messaging.EventHubs.Processor/samples/Sample04_ProcessingEvents.md)
+and exposes it in the [API2024 ARM inventory](https://learn.microsoft.com/en-us/rest/api/eventhub/consumer-groups/list-by-event-hub?view=rest-eventhub-2024-01-01).
+
+Each management observation admits work within a 20-second deadline, with at most
+5-second connect/read timeouts per request, retries/redirects disabled, and complete
+inventories limited to four pages/128 items. Continuations must retain the exact
+trusted ARM collection. A timeout is an unknown/incomplete observation, never
+absence. SDK12 supports `polling=False`/`NoPolling`: namespace create/delete starts
+no background LRO polling; reconciliation checks actual state with subsequent GETs.
+Azure may continue an accepted operation remotely. Connect/read timeouts govern
+transport phases, not a hard cancellation deadline for Azure or an absolute bound
+on an SDK response stream. Partial namespace/hub creation remains retryable and
+incomplete; retries with the same UUID/defaults reconcile the same owned target.
+If the workflow exhausts its finite retries, repair/retry is explicit; pending
+acceptance never skips unfinished child work or claims applied readiness.
+
+Locks are observed separately at subscription, resource-group and namespace
+resource scope. Microsoft's [SDK resource-level contract](https://learn.microsoft.com/en-us/python/api/azure-mgmt-resource/azure.mgmt.resource.locks.operations.managementlocksoperations?view=azure-python-preview)
+only lists the resource and below; it cannot alone establish absence of inherited
+locks. Initial namespace creation checks the two existing ancestor scopes first.
+Existing targets require all three collections, each complete within four pages
+and 128 items under the same 20-second operation admission deadline. Every returned
+lock needs a valid in-collection full ARM identity, matching name and known level.
+Only proven unrelated locks can be ignored; exact ancestor, namespace and descendant
+locks refuse. Missing identity, denial, overflow or a continuation outside its exact
+trusted collection returns unknown, including under `force_destroy`. Namespace
+ownership never authorizes deleting independent locks.
+
+The provider principal must have `Microsoft.Authorization/locks/read` for the
+subscription and resource-group inventories as well as the resource inventory.
+A principal limited to namespace reads can now refuse rather than falsely claim
+inherited locks absent. High lock counts can also exceed the bounded inventory;
+resolve access/locks/inventory separately. This adds no lock-write/delete grant.
+[Azure's lock inheritance documentation](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources)
+explains the parent-scope effects; independent administrators must still avoid
+adding locks after these observations, because the requests are not atomic.
+Only actual SDK `ResourceNotFoundError` proves relevant absence. Denial, invalid
+placement, partial inventories and diagnostic text cannot become cleanup success.
+Ownership-refused/unknown outcomes remain structured; failure diagnostics do not
+expose raw provider configuration.
+
+SDK enum values are decoded through `.value`, preserving API2024 wire spellings.
+Naming validation follows the [official Microsoft.EventHub rules](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsofteventhub).
+Only documented `Delete`/`Compact` cleanup policies are advertised. Missing/unknown hub state,
+Creating, Disabled, SendDisabled and ReceiveDisabled observations are not fully
+available. Namespace readiness requires observed Succeeded and no explicitly non-Active
+namespace status. The documented API2024 GET example omits namespace status;
+that remains reported as unknown, rather than invented Active. Hub readiness
+requires observed Active and the selected native group. Whole desired config may
+retain unchanged create-only settings; actual immutable changes and custom-group
+removals explicitly require reprovision. Supported custom-group additions and
+status disable/re-enable updates use exact current owned targets. Existing
+Sender/Receiver workload grants remain at the exact hub ARM scope, with no Data
+Owner or namespace management grant.
+
+Capture still requires the complete destination/identity block and an operator-
+allowlisted, pre-authorized UAMI. This does not certify tenant ownership of the
+external destination, create storage/Key Vault permissions, delete archives, or
+provide an exact stream snapshot. Private-only/perimeter modes still refuse without
+verified dependencies. `delete_data=False` preserves data by refusal (central
+snapshot dispatch also refuses); force cannot bypass it. Explicit destructive
+cleanup requires complete namespace exclusivity, and success requires observed
+namespace absence, rather than merely an accepted DELETE.
+
+The SDK has no atomic ownership compare-and-write/delete across these ARM requests.
+Independent cloud administrators must not replace/retag resources or add children
+between proof and effects. Controlled SDK12 wire/PostgreSQL checks do not certify
+live Azure tiers, data-plane delivery, Capture, or advanced dependency readiness.
+Focused forward-repair evidence uses Event Hubs SDK12.0.0 and Locks SDK1.0.0
+through a controlled HTTP transport, plus the same driver from a built/installed
+private wheel through real PostgreSQL lifecycle activities. It covers conflicting
+namespace/hub/group owner aliases, matching released aliases, inherited locks on
+later pages, exact collection continuations, denial/overflow/malformed observations,
+valid unrelated locks, initial-create no-write refusal and cleanup receipt safety.
+These checks use no live Azure resource, lock or data-plane operation.
+
+Older Event Hubs drivers cannot interpret new `arm-v1` handles safely: do not resume
+workflows for newly created targets on an older driver. Prefer forward repair or
+explicitly verified compatibility; never automatically rewrite handles on rollback.
+Other families and broader #2032/#2098 acceptance remain open.
+
+### Azure Event Grid Basic saved targets (#2032, #2098)
+
+This repair covers only `event_bus/event_grid`, not Event Grid Standard
+namespaces. New topics retain all 32 hex digits of the persisted canonical,
+nonzero managed-service UUID. The exact operator prefix must be valid and
+3–17 characters; it is never normalized or truncated. An explicit new
+`topic_name` must retain that full identity and satisfy Azure's 3–50 character
+limit. Child IDs use `astrolift-<service-UUID-hex>-<logical-name-digest>` within
+Azure's 64-character limit. Case-folded logical-name duplicates and generated
+child collisions refuse before HTTP. Reconciliation accepts at most 128
+declared subscriptions; this is an observation budget, not Azure capacity.
+See Microsoft's [Event Grid naming rules](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoft-eventgrid).
+
+New saved targets are opaque
+`event_bus/arm-v1/<subscription-UUID>/<exact-resource-group>/<exact-topic>`
+handles. Both the handle and emitted topic ARM binding must fit 512 characters.
+Unsafe delimiters/coordinates refuse before SDK calls. Valid complete saved
+targets retain their exact physical names across service/app renames and
+operator-prefix changes. Historical short handles remain stored and return
+`ownership_unknown`; this driver never guesses placement, adopts, backfills,
+recreates a missing recorded topic, or rewrites a handle. Existing server-owned
+placement identity remains subject to the central lifecycle guard; current
+config is not historical provenance. Older drivers cannot safely interpret
+`arm-v1`: do not resume newly created targets with an older worker/provider
+wheel. Prefer forward repair or verified compatibility, never automatic handle
+conversion.
+
+Supported provision, update, readiness, binding and teardown require the actual
+topic's returned ARM identity and unambiguous current platform/source tags.
+Canonical and legacy source aliases must agree. Every existing child needs its
+exact ARM identity, observed parent topic, full source UUID in its physical name,
+and matching platform/source labels. Historical unlabelled or external children
+refuse unchanged. Actual child labels are projected into the shared Azure
+ownership verifier's envelope; its mandatory-source rule also gates child reads.
+The family-specific ARM/name/label checks remain additional requirements.
+Complete child LIST plus individual GET proof precedes parent
+effects; a changed, missing, duplicate or partially observed child fails closed.
+SDK enum values and typed models are checked on the actual SDK 10.4.0,
+API `2025-02-15` wire, including readonly child parent/identity observations.
+See the [topic subscription API](https://learn.microsoft.com/en-us/rest/api/eventgrid/controlplane/topic-event-subscriptions/create-or-update?view=rest-eventgrid-controlplane-2025-02-15).
+
+Complete lock inventories cover subscription, resource group and existing topic
+scope. Resource-level inventory alone excludes inherited locks. Any applicable
+lock or unknown lock identity refuses even under force; this driver never deletes
+operator locks. Known unrelated locks may be ignored only after their returned
+ARM scope is validated against the queried collection. Each inventory is limited
+to four pages, 128 items and 2 MiB per response, with trusted exact-collection
+continuations; overflow or access failure is unknown before parent effects.
+Each operation has a 20-second request-admission budget, with at most five seconds
+per connect/read phase, no SDK retry or redirect. These are phase/admission
+bounds, not cancellation of an accepted Azure operation or an absolute streamed
+response deadline. [Azure locks inherit from parent scopes](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources).
+
+SDK-supported `NoPolling` prevents background LRO requests. Creating/updating or
+unknown observations remain pending; success requires observed `Succeeded` topic
+and children matching the desired supported fields. Whole desired snapshots may
+retain unchanged immutable settings; actual input-schema or physical-topic
+changes refuse. Supported updates perform no PATCH when actual typed observations
+already match. A successful DELETE response is insufficient: actual typed SDK
+`ResourceNotFoundError` and complete absent-child proof must confirm convergence.
+Access/transport failures remain structured `ownership_unknown`, regardless of
+diagnostic text, and rejected ownership remains `ownership_refused`.
+
+Binding preserves exact topic-scoped EventGrid Data Sender and, for manage,
+EventGrid EventSubscription Contributor grants. Endpoint, schema and region must
+be observed and representable; no key, token or namespace-wide authority is
+added. Existing destination and pre-authorized UAMI allowlists remain enforced.
+`delete_data=False` refuses, snapshots/restores remain unsupported, and force
+cannot bypass ownership, locks, failed deletion or retained-data refusal. This
+does not certify destination ownership, archives, event delivery or snapshots.
+
+Limits remain explicit: subscription labels are user-writable, and the existing
+manage grant permits topic-scoped subscription administration. UUID labels are
+consistency evidence, not cryptographic provenance or immutable incarnation
+proof. Independently privileged actors can forge/replace those labels or race
+the separate GET and effect calls; Azure effects here are not conditional on an
+incarnation token. Recording transport and real PostgreSQL lifecycle checks prove
+the supported source/dispatch/refusal contract, not live Azure persistence or
+delivery. The broader #2032/#2098 audit and this writable-label residual remain
+open.

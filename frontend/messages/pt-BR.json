@@ -1512,6 +1512,40 @@
           "close": "Fechar"
         },
         "loadFailed": "Não foi possível carregar os serviços gerenciados"
+      },
+      "archiveFlow": {
+        "title": "Arquivamento do aplicativo",
+        "archived": "Arquivado",
+        "archivedAt": "Arquivado {at}. As contagens salvas de réplicas são zero; as implantações estão suspensas.",
+        "archivedWithoutTime": "O aplicativo está arquivado. As contagens salvas de réplicas são zero.",
+        "description": "Arquivar salva zero réplicas e suspende as implantações. Restaurar salva as contagens anteriores. Isso não confirma uma implantação em execução.",
+        "archive": "Arquivar",
+        "restore": "Restaurar",
+        "archiveAccepted": "Arquivamento aceito para {slug}. As contagens salvas de réplicas são zero.",
+        "restoreAccepted": "Restauração aceita para {slug}. As contagens salvas voltam aos valores anteriores ao arquivamento.",
+        "archiveFailed": "Falha ao arquivar.",
+        "restoreFailed": "Falha ao restaurar.",
+        "refreshWarning": "A alteração foi aceita, mas a visualização não pôde ser atualizada. Atualize-a para verificar o estado atual.",
+        "navigationWarning": "O arquivamento foi aceito, mas a navegação falhou. Abra Aplicativos para continuar.",
+        "sourceChanged": "O aplicativo observado ou o acesso mudou. Revise o aplicativo atual antes de tentar novamente."
+      },
+      "retentionFlow": {
+        "title": "Retenção de dados",
+        "description": "Escolha os períodos de retenção salvos para cada sinal. Sem uma política registrada, este cartão mostra o padrão de {days, plural, one {# dia} other {# dias}}. Salvar uma política não confirma que os dados existentes foram excluídos.",
+        "platformDefault": "Padrão da plataforma",
+        "days": "{days, plural, one {# dia} other {# dias}}",
+        "selectorLabel": "Retenção de {signal}",
+        "saveAccepted": "Retenção de {signal} salva para {slug}: {days, plural, one {# dia} other {# dias}}.",
+        "noResponse": "Nenhuma resposta do servidor.",
+        "saveFailed": "Não foi possível salvar a política de retenção.",
+        "refreshWarning": "A alteração de retenção foi aceita, mas a visualização não pôde ser atualizada. Atualize-a para verificar a política salva.",
+        "sourceChanged": "O aplicativo, a política observada ou o acesso mudou. Revise o aplicativo atual antes de tentar novamente.",
+        "signals": {
+          "logs": "Logs",
+          "metrics": "Métricas",
+          "traces": "Rastreamentos",
+          "auditEvents": "Eventos de auditoria"
+        }
       }
     },
     "common": {
@@ -2580,6 +2614,12 @@
         "environments": "Ambientes",
         "domains": "Domínios",
         "dangerZone": "Zona de perigo"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} foi excluído",
+        "failed": "Não foi possível excluir o aplicativo",
+        "refreshWarning": "{slug} foi excluído, mas não foi possível atualizar a lista de aplicativos. Atualize-a para ver os dados atuais.",
+        "navigationWarning": "{slug} foi excluído, mas a navegação falhou. Abra Aplicativos para continuar."
       }
     },
     "settingsTab": {
@@ -2606,6 +2646,39 @@
         "save": "Salvar"
       },
       "empty": "Não há conteúdo aqui para este aplicativo."
+    },
+    "environmentOverrides": {
+      "title": "Configurações por ambiente",
+      "description": "Configurações de chave e valor por ambiente que complementam a configuração base do aplicativo.",
+      "environment": "Ambiente",
+      "selectEnvironment": "Selecionar ambiente",
+      "empty": "Nenhuma configuração para <name>{environment}</name>. Adicione uma abaixo ou escolha uma chave sugerida.",
+      "emptyValue": "(vazio)",
+      "clearTitle": "Remover configuração",
+      "clearLabel": "Remover configuração {key}",
+      "suggested": "Sugestões:",
+      "alreadySet": "{hint} (já definido)",
+      "keyPlaceholder": "CHAVE",
+      "keyLabel": "Chave da configuração",
+      "valuePlaceholder": "valor",
+      "valueLabel": "Valor da configuração",
+      "add": "Adicionar configuração",
+      "loading": "Carregando configurações por ambiente…",
+      "readFailed": "Não foi possível carregar as configurações por ambiente.",
+      "retry": "Tentar novamente",
+      "keyRequired": "A chave é obrigatória.",
+      "saveFailed": "Não foi possível salvar.",
+      "clearFailed": "Não foi possível remover.",
+      "saved": "{key} definido",
+      "cleared": "{key} removido",
+      "refreshWarning": "A alteração foi salva, mas não foi possível atualizar as configurações por ambiente. Tente novamente para ver os dados atuais.",
+      "hints": {
+        "replicas": "Número de réplicas da carga de trabalho",
+        "cpu_request": "Solicitação de CPU por pod",
+        "cpu_limit": "Limite de CPU por pod",
+        "memory_request": "Solicitação de memória por pod",
+        "memory_limit": "Limite de memória por pod"
+      }
     }
   },
   "settingsIndex": {
@@ -3863,6 +3936,29 @@
         "title": "Aprovações",
         "empty": "Nenhuma aprovação registrada ainda.",
         "unknownApprover": "desconhecido"
+      },
+      "presentation": {
+        "loadFailed": "Não foi possível carregar a proposta de segredo",
+        "summary": "{op} em {env}",
+        "operations": {
+          "set": "Definir segredo",
+          "delete": "Excluir segredo",
+          "attachBundle": "Associar pacote",
+          "detachBundle": "Desassociar pacote",
+          "setMetadata": "Atualizar metadados"
+        },
+        "statuses": {
+          "pending": "Pendente",
+          "approved": "Aprovada",
+          "rejected": "Rejeitada",
+          "applied": "Aplicada",
+          "expired": "Expirada",
+          "withdrawn": "Retirada"
+        },
+        "decisions": {
+          "approved": "Aprovado",
+          "rejected": "Rejeitado"
+        }
       }
     },
     "pendingGates": {

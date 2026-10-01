@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
-import hashlib
 import ipaddress
+import json
+import re
+import time
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
+from enum import Enum
+from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote, urlsplit
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+from uuid import UUID
 
 from _sdk._telemetry import driver_op
 from _sdk.azure_ownership import (
-    OWNERSHIP_ERROR_CODE,
     AzureOperation,
     AzureOwnershipError,
     owner_of,
@@ -31,6 +39,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import readable_keys
 from azure._managed_identities import unlisted_identity
 from azure.managed.tags import arm_tags_for as tags_for
 
@@ -54,14 +63,14 @@ _STATE_MAP = {
     "Renaming": "updating",
     "Restoring": "updating",
     "Disabled": "error",
-    "SendDisabled": "available",
-    "ReceiveDisabled": "available",
-    "Unknown": "updating",
+    "SendDisabled": "error",
+    "ReceiveDisabled": "error",
+    "Unknown": "error",
 }
 _ARCHIVE_FORMAT = "{Namespace}/{EventHub}/{PartitionId}/{Year}/{Month}/{Day}/{Hour}/{Minute}/{Second}"
 
 
-class AzureEventHubsError(Exception):
+class AzureEventHubsError(ValueError):
     """Event Hubs lifecycle or contract failure."""
 
 
@@ -122,291 +131,275 @@ class AzureEventHubsDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="event_hubs", audit=True, sensitive_kind="managed_service_provision")
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        cfg = spec.config or {}
-        validation = self._validate(cfg)
-        if validation:
-            return ProvisionResult(False, "", validation, ["invalid_runtime_controls"])
-        namespace_name = self._namespace_name_for(spec)
-        event_hub_name = self._event_hub_name_for(spec)
-        handle = self._handle_for(namespace_name, event_hub_name)
+        handle = spec.recorded_handle
+        token = _DEADLINE.set(time.monotonic() + 20)
         try:
-            namespace = self._describe_namespace(namespace_name)
+            target = self._provision_target(spec)
+            handle = target.handle(self._profile.kind)
+            cfg = spec.config or {}
+            validation = self._validate(cfg)
+            if validation:
+                return ProvisionResult(False, handle, validation, ["invalid_runtime_controls"])
+            namespace = self._describe_namespace(target.namespace)
             if namespace is None:
-                self._mgmt.namespaces.begin_create_or_update(
-                    resource_group_name=self._config.resource_group,
-                    namespace_name=namespace_name,
+                if spec.recorded_handle:
+                    raise _Ownership("ownership_unknown", "recorded namespace is missing; recreation is not authorized")
+                self._check_locks(target, resource_exists=False)
+                self._rpc(
+                    self._mgmt.namespaces.begin_create_or_update,
+                    resource_group_name=target.resource_group,
+                    namespace_name=target.namespace,
                     parameters=self._namespace_create_parameters(spec),
+                    polling=False,
                 ).result()
-            else:
-                existing_validation = self._validate({"sku": self._sku_name(namespace), **cfg})
-                if existing_validation:
-                    raise AzureEventHubsError(existing_validation)
-                self._assert_owned(namespace, spec, AzureOperation.PROVISION, namespace_name)
-                self._assert_create_only(namespace, cfg)
-                update = self._namespace_update_parameters(
-                    cfg,
-                    tags=tags_for(spec),
-                    current_sku=self._sku_name(namespace),
-                )
-                if self._payload_has_changes(update, ignored={"tags"}):
-                    self._mgmt.namespaces.update(
-                        resource_group_name=self._config.resource_group,
-                        namespace_name=namespace_name,
-                        parameters=update,
+                namespace = self._describe_namespace(target.namespace)
+                if namespace is None:
+                    return ProvisionResult(
+                        False, handle, "namespace creation is not yet observed", ["provision_pending"]
                     )
-            self._reconcile_network_rules(namespace_name, cfg)
-            existing_hub = self._describe_event_hub(namespace_name, event_hub_name)
-            if existing_hub is None or self._event_hub_fields_present(cfg):
-                self._mgmt.event_hubs.create_or_update(
-                    resource_group_name=self._config.resource_group,
-                    namespace_name=namespace_name,
-                    event_hub_name=event_hub_name,
-                    parameters=self._event_hub_parameters(spec, existing=existing_hub),
+            self._namespace_owned(namespace, target, spec)
+            if not self._namespace_active(namespace):
+                return ProvisionResult(False, handle, "namespace is not yet active", ["provision_pending"])
+            hub, groups = self._inventory(target, spec)
+            self._immutable_settings(namespace, hub, target, cfg)
+            self._group_changes(target, groups, cfg)
+            if hub is None and spec.recorded_handle:
+                raise _Ownership("ownership_unknown", "recorded event hub is missing; recreation is not authorized")
+            validation = self._validate({"sku": self._sku_name(namespace), **cfg})
+            if validation:
+                return ProvisionResult(False, handle, validation, ["invalid_runtime_controls"])
+            update = self._namespace_update_parameters(cfg, current_sku=self._sku_name(namespace))
+            if self._payload_has_changes(update, ignored={"tags"}):
+                self._rpc(
+                    self._mgmt.namespaces.update,
+                    resource_group_name=target.resource_group,
+                    namespace_name=target.namespace,
+                    parameters=update,
                 )
-            effective_sku = str(
-                cfg.get(
-                    "sku",
-                    self._sku_name(namespace) if namespace is not None else self._config.default_sku,
-                ),
+            self._reconcile_network_rules(target.namespace, cfg)
+            if hub is None or self._event_hub_fields_present(cfg):
+                self._rpc(
+                    self._mgmt.event_hubs.create_or_update,
+                    resource_group_name=target.resource_group,
+                    namespace_name=target.namespace,
+                    event_hub_name=target.hub,
+                    parameters=self._event_hub_parameters(spec, existing=hub),
+                )
+            hub = self._describe_event_hub(target.namespace, target.hub)
+            if hub is None:
+                return ProvisionResult(False, handle, "event hub creation is not yet observed", ["provision_pending"])
+            self._child_owned(hub, target.hub_id, spec)
+            if _enum(self._property(hub, "status", "")) != "Active":
+                return ProvisionResult(False, handle, "event hub is not yet active", ["provision_pending"])
+            self._reconcile_groups(target, spec, cfg)
+            namespace = self._describe_namespace(target.namespace)
+            if namespace is None:
+                raise _Ownership("ownership_unknown", "namespace disappeared during reconciliation")
+            self._namespace_owned(namespace, target, spec)
+            hub, _ = self._inventory(target, spec)
+            ready = (
+                self._namespace_active(namespace)
+                and hub is not None
+                and _enum(self._property(hub, "status", "")) == "Active"
             )
-            self._reconcile_consumer_groups(
-                namespace_name,
-                event_hub_name,
-                cfg,
-                sku=effective_sku,
+            return ProvisionResult(
+                True, handle, "Event Hubs target reconciled; readiness is observed separately", ready=ready
             )
-        except AzureOwnershipError as exc:
-            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
-        except Exception as exc:
-            return ProvisionResult(False, handle, f"provision Event Hubs resource: {exc}", [str(exc)])
-        return ProvisionResult(
-            True,
-            handle,
-            f"Azure {self._config.variant} {namespace_name}/{event_hub_name} is ready",
-            ready=True,
-        )
+        except (AzureEventHubsError, AzureOwnershipError) as exc:
+            return ProvisionResult(False, handle, str(exc), [_error_code(exc)])
+        except Exception:
+            return ProvisionResult(False, handle, "Event Hubs reconciliation observation failed", ["ownership_unknown"])
+        finally:
+            _DEADLINE.reset(token)
 
     @driver_op(cloud="azure", driver="event_hubs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        namespace_name, event_hub_name = self._parse_handle(spec.handle)
-        cfg = spec.config or {}
-        validation = self._validate(cfg)
-        if validation:
-            return UpdateResult(False, spec.handle, validation, ["invalid_runtime_controls"])
-        immutable = sorted(
-            key
-            for key in ("namespace_name", "event_hub_name", "sku", "zone_redundant", "kafka_enabled", "cleanup_policy")
-            if key in cfg
-        )
-        if immutable:
-            return UpdateResult(
-                False,
-                spec.handle,
-                f"Event Hubs fields require reprovision: {', '.join(immutable)}",
-                ["reprovision_required"],
-            )
-        namespace = self._describe_namespace(namespace_name)
-        existing_hub = self._describe_event_hub(namespace_name, event_hub_name)
-        if namespace is None or existing_hub is None:
-            return UpdateResult(False, spec.handle, "Event Hubs resource does not exist", ["not_found"])
+        token = _DEADLINE.set(time.monotonic() + 20)
         try:
-            self._assert_owned(namespace, spec, AzureOperation.UPDATE, namespace_name)
-        except AzureOwnershipError as exc:
-            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
-        existing_validation = self._validate({"sku": self._sku_name(namespace), **cfg})
-        if existing_validation:
-            return UpdateResult(
-                False,
-                spec.handle,
-                existing_validation,
-                ["invalid_runtime_controls"],
-            )
-        if "partition_count" in cfg and self._sku_name(namespace) not in {"Premium"}:
-            current = int(self._property(existing_hub, "partition_count", 0) or 0)
-            if current != int(cfg["partition_count"]):
+            target = self._saved_target(spec.handle, spec)
+            namespace, hub, groups = self._existing(target, spec)
+            cfg = spec.config or {}
+            self._immutable_settings(namespace, hub, target, cfg)
+            self._group_changes(target, groups, cfg)
+            validation = self._validate({"sku": self._sku_name(namespace), **cfg})
+            if validation:
+                return UpdateResult(False, spec.handle, validation, ["invalid_runtime_controls"], retryable=False)
+            current_status = _enum(self._property(hub, "status", ""))
+            if not self._namespace_active(namespace) or current_status not in {
+                "Active",
+                "Disabled",
+                "SendDisabled",
+                "ReceiveDisabled",
+            }:
+                return UpdateResult(False, spec.handle, "target is not in a stable observed state", ["update_pending"])
+            if (
+                "partition_count" in cfg
+                and self._sku_name(namespace) != "Premium"
+                and self._property(hub, "partition_count", None) != cfg["partition_count"]
+            ):
                 return UpdateResult(
                     False,
                     spec.handle,
-                    "partition_count can only change in-place on Premium; reprovision required",
+                    "partition count requires reprovision on this tier",
                     ["reprovision_required"],
+                    retryable=False,
                 )
-        try:
-            namespace_fields = {
-                "capacity",
-                "auto_inflate_enabled",
-                "maximum_throughput_units",
-                "public_network_access",
-                "disable_local_auth",
-                "minimum_tls_version",
-                "customer_managed_key_name",
-                "customer_managed_key_vault_uri",
-                "customer_managed_key_version",
-                "customer_managed_identity_resource_id",
-                "require_infrastructure_encryption",
-            }
             namespace_cfg = dict(cfg)
-            if spec.size and "capacity" not in namespace_cfg:
-                namespace_cfg["capacity"] = _SIZE_TO_CAPACITY.get(
-                    spec.size,
-                    self._config.default_capacity,
+            if spec.size:
+                if spec.size not in _SIZE_TO_CAPACITY:
+                    return UpdateResult(
+                        False, spec.handle, "unsupported Event Hubs size", ["invalid_runtime_controls"], retryable=False
+                    )
+                namespace_cfg.setdefault("capacity", _SIZE_TO_CAPACITY[spec.size])
+            update = self._namespace_update_parameters(namespace_cfg, current_sku=self._sku_name(namespace))
+            if self._payload_has_changes(update, ignored={"tags"}):
+                self._rpc(
+                    self._mgmt.namespaces.update,
+                    resource_group_name=target.resource_group,
+                    namespace_name=target.namespace,
+                    parameters=update,
                 )
-            if namespace_fields.intersection(namespace_cfg):
-                self._mgmt.namespaces.update(
-                    resource_group_name=self._config.resource_group,
-                    namespace_name=namespace_name,
-                    parameters=self._namespace_update_parameters(
-                        namespace_cfg,
-                        current_sku=self._sku_name(namespace),
-                    ),
-                )
-            if self._network_fields_present(cfg):
-                self._reconcile_network_rules(namespace_name, cfg)
+            self._reconcile_network_rules(target.namespace, cfg)
             if self._event_hub_fields_present(cfg):
-                target = ProvisionSpec(
-                    organization_id="",
-                    organization_slug="",
-                    app_id="",
-                    app_slug="",
-                    environment_id="",
-                    environment_name="",
-                    tenant_cluster_id="",
-                    service_handle_hint="",
-                    size=spec.size or "small",
-                    config=cfg,
+                self._rpc(
+                    self._mgmt.event_hubs.create_or_update,
+                    resource_group_name=target.resource_group,
+                    namespace_name=target.namespace,
+                    event_hub_name=target.hub,
+                    parameters=self._event_hub_parameters(spec, existing=hub),
                 )
-                self._mgmt.event_hubs.create_or_update(
-                    resource_group_name=self._config.resource_group,
-                    namespace_name=namespace_name,
-                    event_hub_name=event_hub_name,
-                    parameters=self._event_hub_parameters(target, existing=existing_hub),
-                )
-            self._reconcile_consumer_groups(
-                namespace_name,
-                event_hub_name,
-                cfg,
-                sku=self._sku_name(namespace),
-            )
-        except Exception as exc:
-            return UpdateResult(False, spec.handle, f"update Event Hubs resource: {exc}", [str(exc)])
-        return UpdateResult(True, spec.handle, f"Azure {self._config.variant} updated")
+            self._reconcile_groups(target, spec, cfg)
+            namespace, hub, _ = self._existing(target, spec)
+            expected_status = cfg.get("status", current_status)
+            if not self._namespace_active(namespace) or _enum(self._property(hub, "status", "")) != expected_status:
+                return UpdateResult(False, spec.handle, "updated desired state is not yet observed", ["update_pending"])
+            return UpdateResult(True, spec.handle, "Event Hubs supported settings reconciled")
+        except (AzureEventHubsError, AzureOwnershipError) as exc:
+            return UpdateResult(False, spec.handle, str(exc), [_error_code(exc)], retryable=False)
+        except Exception:
+            return UpdateResult(False, spec.handle, "Event Hubs update observation failed", ["ownership_unknown"])
+        finally:
+            _DEADLINE.reset(token)
 
-    @driver_op(
-        cloud="azure",
-        driver="event_hubs",
-        audit=True,
-        sensitive_kind="managed_service_deprovision",
-    )
+    @driver_op(cloud="azure", driver="event_hubs", audit=True, sensitive_kind="managed_service_deprovision")
     def deprovision(
-        self,
-        spec: DeprovisionSpec,
-        *,
-        delete_data: bool = False,
-        force_destroy: bool = False,
+        self, spec: DeprovisionSpec, *, delete_data: bool = False, force_destroy: bool = False
     ) -> DeprovisionResult:
-        namespace_name, event_hub_name = self._parse_handle(spec.handle)
-        namespace = self._describe_namespace(namespace_name)
-        if namespace is None:
-            return DeprovisionResult(True, spec.handle, f"Event Hubs namespace {namespace_name} already gone")
+        del force_destroy
+        token = _DEADLINE.set(time.monotonic() + 20)
         try:
-            self._assert_owned(namespace, spec, AzureOperation.DELETE, namespace_name)
-        except AzureOwnershipError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
-        if not delete_data:
-            return DeprovisionResult(
-                False,
-                spec.handle,
-                (
-                    f"Event Hubs stream {namespace_name}/{event_hub_name} has no exact snapshot primitive; "
-                    "configure downstream durability and pass delete_data=True"
-                ),
-                ["delete_data_required"],
-                retryable=False,
-            )
-        try:
-            locks = self._list_locks(namespace_name)
-        except Exception as exc:
-            return DeprovisionResult(False, spec.handle, f"list Event Hubs resource locks: {exc}", [str(exc)])
-        if locks and not force_destroy:
-            names = ", ".join(str(_field(lock, "name", default="?")) for lock in locks)
-            return DeprovisionResult(
-                False,
-                spec.handle,
-                f"Event Hubs namespace has resource locks ({names}); pass force_destroy=True",
-                ["resource_lock_present"],
-            )
-        try:
-            for lock in locks:
-                self._delete_lock(namespace_name, str(_field(lock, "name", default="")))
-            self._mgmt.namespaces.begin_delete(
-                resource_group_name=self._config.resource_group,
-                namespace_name=namespace_name,
+            target = self._saved_target(spec.handle, spec)
+            namespace = self._describe_namespace(target.namespace)
+            if namespace is None:
+                return DeprovisionResult(True, spec.handle, "exact recorded namespace is absent")
+            self._namespace_owned(namespace, target, spec)
+            self._inventory(target, spec)
+            if not delete_data:
+                return DeprovisionResult(
+                    False,
+                    spec.handle,
+                    "Event Hubs has no exact snapshot; deletion requires delete_data=True",
+                    ["delete_data_required"],
+                    retryable=False,
+                )
+            self._rpc(
+                self._mgmt.namespaces.begin_delete,
+                resource_group_name=target.resource_group,
+                namespace_name=target.namespace,
+                polling=False,
             ).result()
-        except Exception as exc:
-            return DeprovisionResult(False, spec.handle, f"delete Event Hubs namespace: {exc}", [str(exc)])
-        return DeprovisionResult(
-            True,
-            spec.handle,
-            f"Event Hubs namespace {namespace_name} deleted (force_destroy={force_destroy})",
-        )
+            if self._describe_namespace(target.namespace) is not None:
+                return DeprovisionResult(
+                    False, spec.handle, "namespace deletion is not yet observed", ["delete_pending"]
+                )
+            return DeprovisionResult(True, spec.handle, "exact recorded namespace deletion observed")
+        except (AzureEventHubsError, AzureOwnershipError) as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), [_error_code(exc)], retryable=False)
+        except Exception:
+            return DeprovisionResult(
+                False, spec.handle, "Event Hubs deletion observation failed", ["ownership_unknown"]
+            )
+        finally:
+            _DEADLINE.reset(token)
 
     @driver_op(cloud="azure", driver="event_hubs")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        namespace_name, event_hub_name = self._parse_handle(handle.handle)
-        namespace = self._describe_namespace(namespace_name)
-        if namespace is None:
-            return ServiceStatus(handle.handle, "deprovisioned", "Event Hubs namespace not found")
-        event_hub = self._describe_event_hub(namespace_name, event_hub_name)
-        if event_hub is None:
-            return ServiceStatus(handle.handle, "error", f"event hub {event_hub_name} is missing")
-        namespace_state = str(self._property(namespace, "status", "Active"))
-        hub_state = str(self._property(event_hub, "status", "Active"))
-        state = hub_state if hub_state != "Active" else namespace_state
-        return ServiceStatus(handle.handle, _STATE_MAP.get(state, "updating"), f"Azure reports {state}")
+        token = _DEADLINE.set(time.monotonic() + 20)
+        try:
+            target = self._saved_target(handle.handle, handle)
+            namespace = self._describe_namespace(target.namespace)
+            if namespace is None:
+                return ServiceStatus(handle.handle, "deprovisioned", "exact recorded namespace is absent")
+            self._namespace_owned(namespace, target, handle)
+            hub, groups = self._inventory(target, handle)
+            if hub is None:
+                return ServiceStatus(handle.handle, "error", "recorded event hub is absent")
+            ns_state = _enum(self._property(namespace, "status", ""))
+            hub_state = _enum(self._property(hub, "status", ""))
+            if not self._namespace_active(namespace):
+                state = (
+                    "provisioning"
+                    if _enum(self._property(namespace, "provisioning_state", ""))
+                    in {"Creating", "Updating", "Accepted"}
+                    else "error"
+                )
+            else:
+                state = _STATE_MAP.get(hub_state, "error")
+            if target.group != "-" and target.group not in groups:
+                state = "error"
+            return ServiceStatus(
+                handle.handle,
+                state,
+                f"Azure observed namespace={ns_state or 'unknown'}, event hub={hub_state or 'unknown'}",
+            )
+        except Exception:
+            return ServiceStatus(handle.handle, "error", "Event Hubs ownership/readiness observation unavailable")
+        finally:
+            _DEADLINE.reset(token)
 
     @driver_op(cloud="azure", driver="event_hubs")
-    def binding(
-        self,
-        handle: ServiceHandle,
-        config: dict[str, Any] | None = None,
-    ) -> Binding:
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         del config
-        namespace_name, event_hub_name = self._parse_handle(handle.handle)
-        namespace = self._describe_namespace(namespace_name)
-        if namespace is None or self._describe_event_hub(namespace_name, event_hub_name) is None:
-            raise AzureEventHubsError(f"binding requested for missing event hub {namespace_name}/{event_hub_name}")
-        resource_id = self._event_hub_resource_id(namespace_name, event_hub_name)
-        fqdn = f"{namespace_name}.servicebus.windows.net"
-        common = {
-            "EVENTHUB_NAMESPACE": ValueRef(literal=namespace_name),
-            "EVENTHUB_NAME": ValueRef(literal=event_hub_name),
-            "EVENTHUB_FULLY_QUALIFIED_NAMESPACE": ValueRef(literal=fqdn),
-            "EVENTHUB_RESOURCE_ID": ValueRef(literal=resource_id),
-        }
-        if self._profile.kafka:
-            common.update(
-                EVENT_STREAM_BROKERS=ValueRef(literal=f"{fqdn}:9093"),
-                EVENT_STREAM_TLS=ValueRef(literal="true"),
-                EVENT_STREAM_AUTH_MECHANISM=ValueRef(literal="OAUTHBEARER"),
-                EVENTHUB_KAFKA_TOPIC=ValueRef(literal=event_hub_name),
+        token = _DEADLINE.set(time.monotonic() + 20)
+        try:
+            target = self._saved_target(handle.handle, handle)
+            namespace, hub, groups = self._existing(target, handle)
+            if not self._namespace_active(namespace) or _enum(self._property(hub, "status", "")) != "Active":
+                raise AzureEventHubsError("binding requires an actually active target")
+            if target.group != "-" and target.group not in groups:
+                raise _Ownership("ownership_unknown", "saved native consumer group is absent")
+            fqdn = f"{target.namespace}.servicebus.windows.net"
+            common = {
+                "EVENTHUB_NAMESPACE": ValueRef(literal=target.namespace),
+                "EVENTHUB_NAME": ValueRef(literal=target.hub),
+                "EVENTHUB_FULLY_QUALIFIED_NAMESPACE": ValueRef(literal=fqdn),
+                "EVENTHUB_RESOURCE_ID": ValueRef(literal=target.hub_id),
+            }
+            if self._profile.kafka:
+                common.update(
+                    EVENT_STREAM_BROKERS=ValueRef(literal=f"{fqdn}:9093"),
+                    EVENT_STREAM_TLS=ValueRef(literal="true"),
+                    EVENT_STREAM_AUTH_MECHANISM=ValueRef(literal="OAUTHBEARER"),
+                    EVENTHUB_KAFKA_TOPIC=ValueRef(literal=target.hub),
+                )
+            else:
+                common.update(
+                    STREAM_NAME=ValueRef(literal=target.hub),
+                    STREAM_ARN=ValueRef(literal=target.hub_id),
+                    STREAM_ENDPOINT=ValueRef(literal=f"sb://{fqdn}/{target.hub}"),
+                    STREAM_REGION=ValueRef(literal=self._config.location),
+                    EVENTHUB_CONSUMER_GROUP=ValueRef(literal=target.group),
+                )
+            return Binding(
+                env_vars=common,
+                iam_grants=[
+                    Grant(target.hub_id, ["Azure Event Hubs Data Sender"]),
+                    Grant(target.hub_id, ["Azure Event Hubs Data Receiver"]),
+                ],
+                notes="Exact event-hub-scoped Microsoft Entra workload identity; no SAS credentials.",
             )
-        else:
-            common.update(
-                STREAM_NAME=ValueRef(literal=event_hub_name),
-                STREAM_ARN=ValueRef(literal=resource_id),
-                STREAM_ENDPOINT=ValueRef(literal=f"sb://{fqdn}/{event_hub_name}"),
-                STREAM_REGION=ValueRef(literal=self._config.location),
-                EVENTHUB_CONSUMER_GROUP=ValueRef(
-                    literal="$Default" if self._sku_name(namespace) == "Basic" else self._config.default_consumer_group,
-                ),
-            )
-        return Binding(
-            env_vars=common,
-            iam_grants=[
-                Grant(resource_id, ["Azure Event Hubs Data Sender"]),
-                Grant(resource_id, ["Azure Event Hubs Data Receiver"]),
-            ],
-            notes="Microsoft Entra workload identity binding; no SAS connection string is emitted.",
-        )
+        finally:
+            _DEADLINE.reset(token)
 
     @driver_op(cloud="azure", driver="event_hubs")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
@@ -444,7 +437,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                 "virtual_network_rule_ids": {"type": "array", "items": {"type": "string"}},
                 "ignore_missing_vnet_service_endpoint": {"type": "boolean"},
                 "partition_count": {"type": "integer", "minimum": 1, "maximum": 100},
-                "cleanup_policy": {"type": "string", "enum": ["Delete", "Compact", "DeleteOrCompact"]},
+                "cleanup_policy": {"type": "string", "enum": ["Delete", "Compact"]},
                 "retention_time_in_hours": {"type": "integer", "minimum": -1},
                 "min_compaction_lag_time_in_minutes": {"type": "integer", "minimum": 0},
                 "tombstone_retention_time_in_hours": {"type": "integer", "minimum": 1},
@@ -544,6 +537,11 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         unknown = sorted(set(cfg) - set(self.config_schema()["properties"]))
         if unknown:
             return f"unsupported Event Hubs config fields: {', '.join(unknown)}"
+        types = {"integer": int, "boolean": bool, "string": str, "array": list}
+        for name, value in cfg.items():
+            expected = types[self.config_schema()["properties"][name]["type"]]
+            if type(value) is not expected:
+                return f"Event Hubs {name} must be {expected.__name__}"
         sku = str(cfg.get("sku", self._config.default_sku))
         if sku not in {"Basic", "Standard", "Premium"}:
             return f"unsupported Event Hubs SKU {sku!r}"
@@ -601,9 +599,9 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         if not 1 <= partitions <= partition_limit:
             return f"Event Hubs {sku} partition_count must be between 1 and {partition_limit}"
         cleanup = str(cfg.get("cleanup_policy", "Delete"))
-        if cleanup not in {"Delete", "Compact", "DeleteOrCompact"}:
+        if cleanup not in {"Delete", "Compact"}:
             return "unsupported Event Hubs cleanup policy"
-        if cleanup in {"Compact", "DeleteOrCompact"} and sku == "Basic":
+        if cleanup in {"Compact"} and sku == "Basic":
             return "Event Hubs log compaction requires Standard or Premium"
         try:
             retention = int(cfg.get("retention_time_in_hours", 24))
@@ -613,11 +611,18 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         if retention != -1 and not 1 <= retention <= retention_limit:
             return f"Event Hubs {sku} retention must be -1 or between 1 and {retention_limit} hours"
         if retention == -1 and cleanup == "Delete":
-            return "infinite Event Hubs retention requires Compact or DeleteOrCompact"
+            return "infinite Event Hubs retention requires Compact"
         groups = cfg.get("consumer_groups", []) or []
         if not isinstance(groups, list) or any(not isinstance(value, str) or not value for value in groups):
             return "Event Hubs consumer_groups must be a list of non-empty strings"
-        if len(groups) != len(set(groups)):
+        for group in groups:
+            try:
+                _group_name(group)
+            except AzureEventHubsError:
+                return "native consumer group is not representable"
+            if group == "$Default":
+                return "$Default is structural and cannot be requested as a managed group"
+        if len(groups) != len({group.casefold() for group in groups}):
             return "Event Hubs consumer_groups must be unique"
         if self._profile.kafka and groups:
             return "Event Hubs Kafka consumer groups are client-managed and must not be provisioned"
@@ -750,7 +755,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
             properties=models.EHNamespaceProperties(**properties),
         )
 
-    def _event_hub_parameters(self, spec: ProvisionSpec, *, existing: Any | None = None) -> Any:
+    def _event_hub_parameters(self, spec: ProvisionSpec | UpdateSpec, *, existing: Any | None = None) -> Any:
         from azure.mgmt.eventhub import models
 
         cfg = spec.config or {}
@@ -758,7 +763,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         def current(name: str, default: Any) -> Any:
             return self._property(existing, name, default) if existing is not None else default
 
-        cleanup = str(
+        cleanup = _enum(
             cfg.get(
                 "cleanup_policy", self._nested_property(existing, "retention_description", "cleanup_policy", "Delete")
             )
@@ -772,7 +777,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         capture = self._capture_description(cfg, existing=existing)
         properties = models.EventhubProperties(
             partition_count=int(cfg.get("partition_count", current("partition_count", 2))),
-            status=str(cfg.get("status", current("status", "Active"))),
+            status=_enum(cfg.get("status", current("status", "Active"))),
             capture_description=capture,
             retention_description=models.RetentionDescription(
                 cleanup_policy=cleanup,
@@ -788,7 +793,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                     self._nested_property(existing, "retention_description", "tombstone_retention_time_in_hours", None),
                 ),
             ),
-            user_metadata=current("user_metadata", "astrolift-managed"),
+            user_metadata=_metadata(spec),
         )
         return models.Eventhub(properties=properties)
 
@@ -878,41 +883,103 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                 ],
             ),
         )
-        self._mgmt.namespaces.create_or_update_network_rule_set(
+        self._rpc(
+            self._mgmt.namespaces.create_or_update_network_rule_set,
             resource_group_name=self._config.resource_group,
             namespace_name=namespace_name,
             parameters=rules,
         )
 
-    def _reconcile_consumer_groups(
-        self,
-        namespace_name: str,
-        event_hub_name: str,
-        cfg: dict[str, Any],
-        *,
-        sku: str,
-    ) -> None:
+    def _reconcile_groups(self, target: _Target, source: object, cfg: dict[str, Any]) -> None:
         from azure.mgmt.eventhub import models
 
-        if sku == "Basic" or self._profile.kafka:
-            return
-        groups = list(cfg.get("consumer_groups") or [])
-        if not self._profile.kafka and self._config.default_consumer_group not in groups:
-            groups.append(self._config.default_consumer_group)
-        for group_name in groups:
-            self._mgmt.consumer_groups.create_or_update(
-                resource_group_name=self._config.resource_group,
-                namespace_name=namespace_name,
-                event_hub_name=event_hub_name,
-                consumer_group_name=str(group_name),
+        _, existing = self._inventory(target, source)
+        desired = self._desired_groups(target, cfg)
+        for name in sorted(desired - set(existing)):
+            self._rpc(
+                self._mgmt.consumer_groups.create_or_update,
+                resource_group_name=target.resource_group,
+                namespace_name=target.namespace,
+                event_hub_name=target.hub,
+                consumer_group_name=name,
                 parameters=models.ConsumerGroup(
-                    properties=models.ConsumerGroupProperties(user_metadata="astrolift-managed"),
+                    properties=models.ConsumerGroupProperties(user_metadata=_metadata(source))
                 ),
             )
+        _, observed = self._inventory(target, source)
+        if not desired <= set(observed):
+            raise _Ownership("ownership_unknown", "consumer-group creation not observed")
+
+    def _rpc(self, function: Callable[..., Any], **kwargs: Any) -> Any:
+        remaining = (_DEADLINE.get() or time.monotonic()) - time.monotonic()
+        if remaining <= 0:
+            raise _Ownership("ownership_unknown", "bounded management observation budget exhausted")
+        return function(
+            **kwargs,
+            retry_total=0,
+            retry_connect=0,
+            retry_read=0,
+            retry_status=0,
+            redirect_max=0,
+            connection_timeout=min(5, remaining / 2),
+            read_timeout=min(5, remaining / 2),
+        )
+
+    def _pages(self, function: Callable[..., Any], *, collection_path: str | None = None, **kwargs: Any) -> list[Any]:
+        continuation: str | None = None
+        values: list[Any] = []
+        for _ in range(4):
+            pager = self._rpc(function, **kwargs)
+            if not hasattr(pager, "by_page"):
+                raise _Ownership("ownership_unknown", "SDK inventory is not a paged response")
+            pages = iter(pager.by_page(continuation_token=continuation))
+            page = next(pages, None)
+            if page is None:
+                return values
+            continuation = pages.continuation_token
+            if continuation:
+                parsed = urlsplit(continuation)
+                namespace = kwargs.get("namespace_name", kwargs.get("resource_name"))
+                base = (
+                    f"/subscriptions/{self._config.subscription_id}/resourceGroups/{self._config.resource_group}"
+                    f"/providers/Microsoft.EventHub/namespaces/{namespace}"
+                )
+                suffix = (
+                    "/eventhubs/" + kwargs["event_hub_name"] + "/consumergroups"
+                    if "event_hub_name" in kwargs
+                    else "/eventhubs"
+                    if "namespace_name" in kwargs
+                    else "/providers/Microsoft.Authorization/locks"
+                )
+                expected_path = collection_path or base + suffix
+                trusted_paths = {expected_path.casefold()}
+                if "resource_name" in kwargs:
+                    # Locks SDK1 serializes an empty parent_resource_path as a double slash.
+                    trusted_paths.add(
+                        expected_path.replace(
+                            "/providers/Microsoft.EventHub/namespaces/",
+                            "/providers/Microsoft.EventHub//namespaces/",
+                        ).casefold()
+                    )
+                if (
+                    parsed.scheme != "https"
+                    or parsed.netloc != "management.azure.com"
+                    or parsed.fragment
+                    or unquote(parsed.path).casefold() not in trusted_paths
+                ):
+                    raise _Ownership("ownership_unknown", "inventory continuation changed the exact ARM collection")
+            for value in page:
+                values.append(value)
+                if len(values) > 128:
+                    raise _Ownership("ownership_unknown", "inventory item budget exceeded")
+            if not continuation:
+                return values
+        raise _Ownership("ownership_unknown", "inventory page budget exceeded")
 
     def _describe_namespace(self, namespace_name: str) -> Any | None:
         try:
-            return self._mgmt.namespaces.get(
+            return self._rpc(
+                self._mgmt.namespaces.get,
                 resource_group_name=self._config.resource_group,
                 namespace_name=namespace_name,
             )
@@ -923,7 +990,8 @@ class AzureEventHubsDriver(ManagedServiceDriver):
 
     def _describe_event_hub(self, namespace_name: str, event_hub_name: str) -> Any | None:
         try:
-            return self._mgmt.event_hubs.get(
+            return self._rpc(
+                self._mgmt.event_hubs.get,
                 resource_group_name=self._config.resource_group,
                 namespace_name=namespace_name,
                 event_hub_name=event_hub_name,
@@ -933,96 +1001,258 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                 return None
             raise
 
-    @staticmethod
-    def _assert_owned(namespace: Any, source: object, operation: AzureOperation, namespace_name: str) -> None:
+    def _namespace_owned(self, namespace: Any, target: _Target, source: object) -> None:
+        self._arm(namespace, target.namespace_id)
+        tags = dict(_field(namespace, "tags", default={}) or {})
         verify_azure_ownership(
-            dict(_field(namespace, "tags", default={}) or {}),
+            tags,
             owner_of(source),
-            operation=operation,
-            resource=f"Event Hubs namespace {namespace_name}",
+            operation=AzureOperation.UPDATE,
+            resource="recorded Event Hubs namespace",
         )
+        _consistent_owner(tags, source)
 
-    def _assert_create_only(self, namespace: Any, cfg: dict[str, Any]) -> None:
-        if "sku" in cfg and self._sku_name(namespace) != str(cfg["sku"]):
-            raise AzureEventHubsError("Event Hubs sku differs from existing namespace; reprovision required")
-        if "kafka_enabled" in cfg and bool(self._property(namespace, "kafka_enabled", False)) != bool(
-            cfg["kafka_enabled"],
-        ):
-            raise AzureEventHubsError("Event Hubs kafka_enabled differs from existing namespace; reprovision required")
-        if self._profile.kafka and not bool(self._property(namespace, "kafka_enabled", False)):
-            raise AzureEventHubsError(
-                "Event Hubs existing namespace does not expose Kafka; reprovision required",
-            )
-        if "zone_redundant" in cfg and bool(self._property(namespace, "zone_redundant", False)) != bool(
-            cfg["zone_redundant"],
-        ):
-            raise AzureEventHubsError("Event Hubs zone_redundant differs from existing namespace; reprovision required")
+    @staticmethod
+    def _arm(resource: Any, expected: str) -> None:
+        actual = _field(resource, "id", default=None)
+        if not isinstance(actual, str) or not actual:
+            raise _Ownership("ownership_unknown", "current ARM identity is missing")
+        if actual.casefold() != expected.casefold():
+            raise _Ownership("ownership_refused", "current ARM identity does not match the saved target")
 
-    def _list_locks(self, namespace_name: str) -> list[Any]:
-        return list(
-            self._locks.management_locks.list_at_resource_level(
-                resource_group_name=self._config.resource_group,
-                resource_provider_namespace="Microsoft.EventHub",
-                parent_resource_path="",
-                resource_type="namespaces",
-                resource_name=namespace_name,
+    def _child_owned(self, child: Any, expected: str, source: object) -> None:
+        self._arm(child, expected)
+        blob = self._property(child, "user_metadata", None)
+        try:
+            if not isinstance(blob, str) or len(blob) > 1024:
+                raise ValueError
+            tags = json.loads(blob, object_pairs_hook=_unique_object)
+            if not isinstance(tags, dict) or any(not isinstance(v, str) for v in tags.values()):
+                raise ValueError
+        except (TypeError, ValueError):
+            raise _Ownership("ownership_unknown", "child source/platform metadata is absent or invalid") from None
+        verify_azure_ownership(
+            tags, owner_of(source), operation=AzureOperation.UPDATE, resource="recorded Event Hubs child"
+        )
+        _consistent_owner(tags, source)
+
+    def _check_locks(self, target: _Target, *, resource_exists: bool = True) -> None:
+        subscription = f"/subscriptions/{self._config.subscription_id}"
+        group = subscription + f"/resourceGroups/{target.resource_group}"
+        operations = self._locks.management_locks
+        scopes: tuple[tuple[str, Callable[..., Any], dict[str, Any]], ...] = (
+            (subscription, operations.list_at_subscription_level, {}),
+            (group, operations.list_at_resource_group_level, {"resource_group_name": target.resource_group}),
+            (
+                target.namespace_id,
+                operations.list_at_resource_level,
+                {
+                    "resource_group_name": target.resource_group,
+                    "resource_provider_namespace": "Microsoft.EventHub",
+                    "parent_resource_path": "",
+                    "resource_type": "namespaces",
+                    "resource_name": target.namespace,
+                },
             ),
         )
+        present = False
+        for scope, operation, arguments in scopes if resource_exists else scopes[:2]:
+            rows = self._pages(
+                operation, collection_path=scope + "/providers/Microsoft.Authorization/locks", **arguments
+            )
+            for row in rows:
+                actual = _lock_scope(row)
+                if actual.casefold() != scope.casefold() and not actual.casefold().startswith(scope.casefold() + "/"):
+                    raise _Ownership("ownership_unknown", "lock inventory changed its ARM scope")
+                if actual.casefold() in {
+                    subscription.casefold(),
+                    group.casefold(),
+                    target.namespace_id.casefold(),
+                } or actual.casefold().startswith(target.namespace_id.casefold() + "/"):
+                    present = True
+        if present:
+            raise _Ownership(
+                "resource_lock_present", "namespace or inherited locks require separate operator resolution"
+            )
 
-    def _delete_lock(self, namespace_name: str, lock_name: str) -> None:
-        self._locks.management_locks.delete_at_resource_level(
-            resource_group_name=self._config.resource_group,
-            resource_provider_namespace="Microsoft.EventHub",
-            parent_resource_path="",
-            resource_type="namespaces",
-            resource_name=namespace_name,
-            lock_name=lock_name,
+    def _inventory(self, target: _Target, source: object) -> tuple[Any | None, dict[str, Any]]:
+        self._check_locks(target)
+        hubs = self._pages(
+            self._mgmt.event_hubs.list_by_namespace,
+            resource_group_name=target.resource_group,
+            namespace_name=target.namespace,
+            top=128,
         )
+        if len(hubs) > 1:
+            raise _Ownership("ownership_refused", "namespace contains resources outside the saved target")
+        hub = self._describe_event_hub(target.namespace, target.hub)
+        if hub is None:
+            if hubs:
+                raise _Ownership("ownership_unknown", "hub lookup and complete inventory disagree")
+            return None, {}
+        self._child_owned(hub, target.hub_id, source)
+        if len(hubs) != 1:
+            raise _Ownership("ownership_unknown", "hub lookup and complete inventory disagree")
+        self._child_owned(hubs[0], target.hub_id, source)
+        rows = self._pages(
+            self._mgmt.consumer_groups.list_by_event_hub,
+            resource_group_name=target.resource_group,
+            namespace_name=target.namespace,
+            event_hub_name=target.hub,
+            top=128,
+        )
+        groups: dict[str, Any] = {}
+        for row in rows:
+            name = _field(row, "name", default="")
+            _group_name(name)
+            if name.casefold() in {v.casefold() for v in groups}:
+                raise _Ownership("ownership_unknown", "duplicate consumer-group inventory")
+            actual = self._rpc(
+                self._mgmt.consumer_groups.get,
+                resource_group_name=target.resource_group,
+                namespace_name=target.namespace,
+                event_hub_name=target.hub,
+                consumer_group_name=name,
+            )
+            if name == "$Default":
+                self._arm(row, target.group_id(name))
+                self._arm(actual, target.group_id(name))
+            else:
+                self._child_owned(row, target.group_id(name), source)
+                self._child_owned(actual, target.group_id(name), source)
+            groups[name] = actual
+        if "$Default" not in groups:
+            raise _Ownership("ownership_unknown", "built-in $Default group has not been observed")
+        return hub, groups
+
+    def _existing(self, target: _Target, source: object) -> tuple[Any, Any, dict[str, Any]]:
+        namespace = self._describe_namespace(target.namespace)
+        if namespace is None:
+            raise _Ownership("ownership_unknown", "recorded namespace is absent")
+        self._namespace_owned(namespace, target, source)
+        hub, groups = self._inventory(target, source)
+        if hub is None:
+            raise _Ownership("ownership_unknown", "recorded event hub is absent")
+        return namespace, hub, groups
+
+    @staticmethod
+    def _namespace_active(namespace: Any) -> bool:
+        props = _field(namespace, "properties", default=None)
+        status = _enum(_field(props, "status", default=""))
+        generation = _enum(_field(props, "provisioning_state", default=""))
+        return generation == "Succeeded" and status in {"", "Active"}
+
+    def _desired_groups(self, target: _Target, cfg: dict[str, Any]) -> set[str]:
+        groups = set(cfg.get("consumer_groups") or [])
+        for name in groups:
+            _group_name(name)
+            if name == "$Default":
+                raise _Ownership("reprovision_required", "built-in $Default is structural, not a managed group")
+        if target.group not in {"-", "$Default"}:
+            groups.add(target.group)
+        return groups
+
+    def _group_changes(self, target: _Target, groups: dict[str, Any], cfg: dict[str, Any]) -> None:
+        desired = self._desired_groups(target, cfg)
+        if "consumer_groups" in cfg and set(groups) - {"$Default"} - desired:
+            raise _Ownership("reprovision_required", "consumer-group removal is not supported in place")
+
+    def _immutable_settings(self, namespace: Any, hub: Any, target: _Target, cfg: dict[str, Any]) -> None:
+        actual = {
+            "namespace_name": target.namespace,
+            "event_hub_name": target.hub,
+            "sku": self._sku_name(namespace),
+            "zone_redundant": self._property(namespace, "zone_redundant", None),
+            "kafka_enabled": self._property(namespace, "kafka_enabled", None),
+        }
+        if hub is not None:
+            actual["cleanup_policy"] = _enum(self._nested_property(hub, "retention_description", "cleanup_policy", ""))
+        for name, value in actual.items():
+            if name in cfg and cfg[name] != value:
+                raise _Ownership(
+                    "reprovision_required", f"{name} differs from the saved resource; reprovision required"
+                )
+        if self._profile.kafka and actual["kafka_enabled"] is not True:
+            raise _Ownership("ownership_refused", "saved namespace does not enable the Kafka endpoint")
+
+    def _provision_target(self, spec: ProvisionSpec) -> _Target:
+        sid = _source_uuid(spec)
+        if spec.recorded_handle:
+            return self._saved_target(spec.recorded_handle, spec)
+        compact = UUID(sid).hex
+        cfg = spec.config or {}
+        namespace = (
+            cfg["namespace_name"]
+            if "namespace_name" in cfg
+            else _new_name(self._config.namespace_name_prefix, compact, 50)
+        )
+        hub = (
+            cfg["event_hub_name"]
+            if "event_hub_name" in cfg
+            else _new_name(self._config.event_hub_name_prefix, compact, 256)
+        )
+        for name in (namespace, hub):
+            if not isinstance(name, str) or compact not in name:
+                raise _Ownership(
+                    "ownership_refused", "new physical-name overrides must retain the full immutable source UUID hex"
+                )
+        group = (
+            "-"
+            if self._profile.kafka
+            else (
+                "$Default"
+                if cfg.get("sku", self._config.default_sku) == "Basic"
+                or self._config.default_consumer_group == "$Default"
+                else _new_name(self._config.default_consumer_group, compact, 50)
+            )
+        )
+        return self._coordinates(namespace, hub, group)
+
+    def _coordinates(self, namespace: str, hub: str, group: str) -> _Target:
+        subscription = _uuid(self._config.subscription_id)
+        target = _Target(subscription, self._config.resource_group, namespace, hub, group)
+        if not re.fullmatch(r"[A-Za-z0-9_.()\-]{1,90}", target.resource_group) or target.resource_group.endswith("."):
+            raise _Ownership("ownership_unknown", "resource group is not representable")
+        if not isinstance(namespace, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]{4,48}[A-Za-z0-9]", namespace):
+            raise _Ownership("ownership_unknown", "namespace is not representable")
+        if not isinstance(hub, str) or not re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9_.-]{0,254}[A-Za-z0-9]|[A-Za-z0-9]", hub
+        ):
+            raise _Ownership("ownership_unknown", "event hub is not representable")
+        if self._profile.kafka:
+            if group != "-":
+                raise _Ownership("ownership_unknown", "Kafka target cannot imply an ARM consumer group")
+        else:
+            _group_name(group)
+        if len(target.handle(self._profile.kind)) > 512 or len(target.hub_id) > 512:
+            raise _Ownership("ownership_unknown", "saved target exceeds backend or binding storage")
+        return target
+
+    def _saved_target(self, handle: str, source: object) -> _Target:
+        _source_uuid(source)
+        parts = handle.split("/")
+        if len(parts) != 7 or parts[:2] != [self._profile.kind, "arm-v1"]:
+            raise _Ownership(
+                "ownership_unknown", "legacy or incomplete placement handle cannot establish the saved ARM target"
+            )
+        _, _, sub, group, ns, hub, consumer = parts
+        if _uuid(sub) != _uuid(self._config.subscription_id) or group != self._config.resource_group:
+            raise _Ownership(
+                "ownership_refused", "saved subscription/resource group differs from current provider placement"
+            )
+        target = self._coordinates(ns, hub, consumer)
+        if target.handle(self._profile.kind) != handle:
+            raise _Ownership("ownership_unknown", "saved target encoding is not canonical")
+        return target
 
     def _namespace_name_for(self, spec: ProvisionSpec) -> str:
-        explicit = str((spec.config or {}).get("namespace_name") or "")
-        if explicit:
-            return _bounded_name(explicit, 50, entropy=explicit)
-        base = "-".join(
-            filter(
-                None,
-                (
-                    self._config.namespace_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "events",
-                ),
-            ),
-        )
-        entropy = spec.managed_service_id or spec.app_id or spec.environment_id or base
-        return _bounded_name(base, 50, entropy=entropy)
+        return self._provision_target(spec).namespace
 
     def _event_hub_name_for(self, spec: ProvisionSpec) -> str:
-        explicit = str((spec.config or {}).get("event_hub_name") or "")
-        base = explicit or "-".join(
-            filter(None, (self._config.event_hub_name_prefix, spec.service_handle_hint or "events"))
-        )
-        return _safe_name(base, 256)
-
-    def _handle_for(self, namespace_name: str, event_hub_name: str) -> str:
-        return f"{self._profile.kind}/{namespace_name}/{event_hub_name}"
-
-    def _parse_handle(self, handle: str) -> tuple[str, str]:
-        parts = handle.split("/")
-        if len(parts) != 3 or parts[0] != self._profile.kind or not parts[1] or not parts[2]:
-            raise AzureEventHubsError(f"invalid {self._config.variant} handle {handle!r}")
-        return parts[1], parts[2]
-
-    def _event_hub_resource_id(self, namespace_name: str, event_hub_name: str) -> str:
-        return (
-            f"/subscriptions/{self._config.subscription_id}/resourceGroups/{self._config.resource_group}"
-            f"/providers/Microsoft.EventHub/namespaces/{namespace_name}/eventhubs/{event_hub_name}"
-        )
+        return self._provision_target(spec).hub
 
     def _sku_name(self, namespace: Any) -> str:
-        sku = _field(namespace, "sku", default=None)
-        return str(_field(sku, "name", default=""))
+        return _enum(_field(_field(namespace, "sku", default=None), "name", default=""))
 
     def _property(self, resource: Any, name: str, default: Any) -> Any:
         value = _field(resource, name, default=None)
@@ -1059,7 +1289,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
 
     def _payload_has_changes(self, payload: Any, *, ignored: set[str]) -> bool:
         data = payload.as_dict()
-        return bool(set(data) - ignored)
+        return any(value is not None and value != {} for key, value in data.items() if key not in ignored)
 
 
 def _field(value: Any, name: str, *, default: Any = None) -> Any:
@@ -1071,21 +1301,144 @@ def _field(value: Any, name: str, *, default: Any = None) -> Any:
 
 
 def _not_found(exc: Exception) -> bool:
-    return getattr(exc, "status_code", None) == 404 or type(exc).__name__ == "ResourceNotFoundError"
+    from azure.core.exceptions import ResourceNotFoundError
+
+    return isinstance(exc, ResourceNotFoundError)
 
 
-def _safe_name(value: str, max_length: int) -> str:
-    clean = "".join(char if char.isascii() and (char.isalnum() or char in {"-", "_", "."}) else "-" for char in value)
-    while "--" in clean:
-        clean = clean.replace("--", "-")
-    clean = clean.strip("-.")
-    if not clean:
-        raise AzureEventHubsError("Event Hubs resource name cannot be empty")
-    return clean[:max_length].rstrip("-.")
+_DEADLINE: ContextVar[float | None] = ContextVar("event_hubs_management_deadline", default=None)
 
 
-def _bounded_name(value: str, max_length: int, *, entropy: str) -> str:
-    clean = _safe_name(value.lower(), max(len(value), max_length)).replace("_", "-").replace(".", "-")
-    digest = hashlib.sha256(entropy.encode()).hexdigest()[:10]
-    prefix = clean[: max_length - len(digest) - 1].rstrip("-")
-    return f"{prefix}-{digest}"
+class _Ownership(AzureEventHubsError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _error_code(exc: Exception) -> str:
+    if isinstance(exc, _Ownership):
+        return exc.code
+    return "ownership_refused" if isinstance(exc, AzureOwnershipError) else "ownership_unknown"
+
+
+def _uuid(value: Any) -> str:
+    try:
+        parsed = UUID(value)
+        if not parsed.int or str(parsed) != value:
+            raise ValueError
+        return str(parsed)
+    except (ValueError, TypeError, AttributeError):
+        raise _Ownership("ownership_unknown", "canonical nonzero immutable UUID is required") from None
+
+
+def _source_uuid(source: object) -> str:
+    return _uuid(getattr(source, "managed_service_id", ""))
+
+
+def _enum(value: Any) -> str:
+    return str(value.value if isinstance(value, Enum) else value or "")
+
+
+def _consistent_owner(tags: dict[str, Any], source: object) -> None:
+    expected = _source_uuid(source)
+    declared = set(readable_keys("azure"))
+    normalized = {"astroliftmanagedserviceid", "astroliftiomanagedserviceid", "xastroliftmanagedserviceid"}
+    for key, value in tags.items():
+        if (key in declared or re.sub(r"[^a-z0-9]", "", key.casefold()) in normalized) and (
+            not isinstance(value, str) or value != expected
+        ):
+            raise _Ownership("ownership_refused", "ownership aliases do not consistently name the current source UUID")
+
+
+def _lock_scope(row: Any) -> str:
+    identity = _field(row, "id", default=None)
+    name = _field(row, "name", default=None)
+    if not isinstance(identity, str) or not isinstance(name, str) or not name:
+        raise _Ownership("ownership_unknown", "lock identity is missing")
+    parts = identity.split("/")
+    if any(not value or value in {".", ".."} or re.search(r"[\\%?#\x00-\x1f]", value) for value in parts[1:]):
+        raise _Ownership("ownership_unknown", "lock ARM identity is malformed")
+    if (
+        len(parts) < 7
+        or parts[0]
+        or [value.casefold() for value in parts[-4:-1]] != ["providers", "microsoft.authorization", "locks"]
+        or parts[-1].casefold() != name.casefold()
+    ):
+        raise _Ownership("ownership_unknown", "lock ARM identity is malformed")
+    scope_parts = parts[1:-4]
+    if len(scope_parts) < 2 or scope_parts[0].casefold() != "subscriptions":
+        raise _Ownership("ownership_unknown", "lock subscription identity is missing")
+    _uuid(scope_parts[1].lower())
+    if len(scope_parts) > 2:
+        if len(scope_parts) < 4 or scope_parts[2].casefold() != "resourcegroups":
+            raise _Ownership("ownership_unknown", "lock resource-group identity is malformed")
+        tail = scope_parts[4:]
+        while tail:
+            if len(tail) < 4 or tail[0].casefold() != "providers":
+                raise _Ownership("ownership_unknown", "lock resource identity is malformed")
+            tail = tail[2:]
+            while tail and tail[0].casefold() != "providers":
+                if len(tail) < 2:
+                    raise _Ownership("ownership_unknown", "lock resource identity is malformed")
+                tail = tail[2:]
+    properties = _field(row, "properties", default=None)
+    level = _field(properties, "level", default=_field(row, "level", default=None))
+    if _enum(level) not in {"CanNotDelete", "ReadOnly"}:
+        raise _Ownership("ownership_unknown", "lock level is missing or unsupported")
+    return "/" + "/".join(scope_parts)
+
+
+def _metadata(source: object) -> str:
+    return json.dumps(
+        {"astrolift-managed-by": "platform", "astrolift-managed-service-id": _source_uuid(source)},
+        separators=(",", ":"),
+    )
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate metadata key")
+        result[key] = value
+    return result
+
+
+def _group_name(name: Any) -> None:
+    if name == "$Default":
+        return
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,48}[A-Za-z0-9]|[A-Za-z0-9]", name):
+        raise _Ownership("ownership_unknown", "native consumer-group name is not representable")
+
+
+def _new_name(prefix: str, compact: str, maximum: int) -> str:
+    cleaned = re.sub(r"[^a-z0-9-]", "-", prefix.lower()).strip("-")
+    if not cleaned or not cleaned[0].isalpha():
+        raise _Ownership("ownership_unknown", "new name prefix must begin with a letter")
+    return cleaned[: maximum - 33].rstrip("-") + "-" + compact
+
+
+@dataclass(frozen=True)
+class _Target:
+    subscription: str
+    resource_group: str
+    namespace: str
+    hub: str
+    group: str
+
+    @property
+    def namespace_id(self) -> str:
+        return (
+            f"/subscriptions/{self.subscription}/resourceGroups/{self.resource_group}"
+            f"/providers/Microsoft.EventHub/namespaces/{self.namespace}"
+        )
+
+    @property
+    def hub_id(self) -> str:
+        return self.namespace_id + "/eventhubs/" + self.hub
+
+    def group_id(self, name: str) -> str:
+        return self.hub_id + "/consumergroups/" + name
+
+    def handle(self, kind: str) -> str:
+        return f"{kind}/arm-v1/{self.subscription}/{self.resource_group}/{self.namespace}/{self.hub}/{self.group}"

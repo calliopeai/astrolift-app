@@ -531,6 +531,12 @@
         "environments": "Environments",
         "domains": "Domains",
         "dangerZone": "Danger zone"
+      },
+      "deleteFeedback": {
+        "deleted": "Deleted {slug}",
+        "failed": "Delete failed",
+        "refreshWarning": "Deleted {slug}, but the Apps list could not be refreshed. Refresh to see current data.",
+        "navigationWarning": "Deleted {slug}, but navigation failed. Open Apps to continue."
       }
     },
     "common": {
@@ -2354,6 +2360,40 @@
           "close": "Close"
         },
         "loadFailed": "Could not load managed services"
+      },
+      "archiveFlow": {
+        "title": "App archive",
+        "archived": "Archived",
+        "archivedAt": "Archived {at}. Saved replica counts are zero; deploys are suppressed.",
+        "archivedWithoutTime": "App is archived. Saved replica counts are zero.",
+        "description": "Archive saves zero workload replicas and suppresses deploys. Restore saves pre-archive counts. This does not confirm a live rollout.",
+        "archive": "Archive",
+        "restore": "Restore",
+        "archiveAccepted": "Archive accepted for {slug}. Saved replica counts are zero.",
+        "restoreAccepted": "Restore accepted for {slug}. Saved replica counts return to their pre-archive values.",
+        "archiveFailed": "Archive failed.",
+        "restoreFailed": "Restore failed.",
+        "refreshWarning": "The change was accepted, but the view could not refresh. Refresh to check the current state.",
+        "navigationWarning": "The archive was accepted, but navigation failed. Open Apps to continue.",
+        "sourceChanged": "The observed app or access changed. Review the current app before trying again."
+      },
+      "retentionFlow": {
+        "title": "Data retention",
+        "description": "Choose saved retention periods for each signal. Without a recorded policy, this card shows the platform default of {days, plural, one {# day} other {# days}}. Saving a policy does not confirm that existing data has been deleted.",
+        "platformDefault": "Platform default",
+        "days": "{days, plural, one {# day} other {# days}}",
+        "selectorLabel": "{signal} retention",
+        "saveAccepted": "Saved {signal} retention for {slug}: {days, plural, one {# day} other {# days}}.",
+        "noResponse": "No response from the server.",
+        "saveFailed": "Could not save the retention policy.",
+        "refreshWarning": "The retention change was accepted, but the view could not refresh. Refresh to check the saved policy.",
+        "sourceChanged": "The observed app, policy or access changed. Review the current app before trying again.",
+        "signals": {
+          "logs": "Logs",
+          "metrics": "Metrics",
+          "traces": "Traces",
+          "auditEvents": "Audit events"
+        }
       }
     },
     "workloadDetail": {
@@ -2625,6 +2665,39 @@
       "unavailable": "Current workload permissions or version are unavailable. Refresh the page.",
       "selectedEnvironmentUnsupported": "This action targets the primary environment. It cannot target a selected environment.",
       "permissionDenied": "Permission denied"
+    },
+    "environmentOverrides": {
+      "title": "Environment overrides",
+      "description": "Per-environment key/value settings that supplement the app's base configuration.",
+      "environment": "Environment",
+      "selectEnvironment": "Select environment",
+      "empty": "No overrides set for <name>{environment}</name>. Add one below or pick a suggested key.",
+      "emptyValue": "(empty)",
+      "clearTitle": "Clear override",
+      "clearLabel": "Clear {key} override",
+      "suggested": "Suggested:",
+      "alreadySet": "{hint} (already set)",
+      "keyPlaceholder": "KEY",
+      "keyLabel": "Override key",
+      "valuePlaceholder": "value",
+      "valueLabel": "Override value",
+      "add": "Add override",
+      "loading": "Loading environment overrides…",
+      "readFailed": "Environment overrides could not be loaded.",
+      "retry": "Retry",
+      "keyRequired": "Key is required.",
+      "saveFailed": "Failed to save.",
+      "clearFailed": "Failed to clear.",
+      "saved": "Set {key}",
+      "cleared": "Cleared {key}",
+      "refreshWarning": "The change was saved, but environment overrides could not be refreshed. Retry to see current data.",
+      "hints": {
+        "replicas": "Workload replica count",
+        "cpu_request": "Per-pod CPU request",
+        "cpu_limit": "Per-pod CPU limit",
+        "memory_request": "Per-pod memory request",
+        "memory_limit": "Per-pod memory limit"
+      }
     }
   },
   "lists": {
@@ -3943,6 +4016,29 @@
         "title": "Approvals",
         "empty": "No approvals recorded yet.",
         "unknownApprover": "unknown"
+      },
+      "presentation": {
+        "loadFailed": "Could not load secret proposal",
+        "summary": "{op} on {env}",
+        "operations": {
+          "set": "Set secret",
+          "delete": "Delete secret",
+          "attachBundle": "Attach bundle",
+          "detachBundle": "Detach bundle",
+          "setMetadata": "Update metadata"
+        },
+        "statuses": {
+          "pending": "Pending",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "applied": "Applied",
+          "expired": "Expired",
+          "withdrawn": "Withdrawn"
+        },
+        "decisions": {
+          "approved": "Approved",
+          "rejected": "Rejected"
+        }
       }
     },
     "pendingGates": {
