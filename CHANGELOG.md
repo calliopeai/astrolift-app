@@ -20,6 +20,10 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- Refuse all normalized platform ownership labels in Pub/Sub and PSC tenant
+  config. Verify Pub/Sub source and child ownership before writes or binding,
+  preserve ownership labels during updates and retain recorded topic names.
+  Audit AWS/Azure custom-tag namespace isolation (#2098).
 
 - Shared model by-ID reads and locks include current organization constraints
   directly, including exact cluster-scoped provider locks. Install-shared

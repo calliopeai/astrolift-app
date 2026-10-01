@@ -158,3 +158,31 @@ When standing up a new tenant cluster:
 - Audit logging — k8s audit log + cloud audit log
   (CloudTrail / Cloud Audit Logs / Activity Log) configuration is
   cluster install scope, not per-deploy.
+
+
+## Ownership labels and tenant custom metadata (#2098)
+
+Managed-service IDs come from the lifecycle's persisted service GUID, never
+from a tenant label or a live resource's claimed owner. Eventarc, Managed Kafka,
+Pub/Sub and PSC reject the entire normalized Astrolift label namespace in
+service config, including dot, slash, underscore, hyphen, case and legacy
+`x-astrolift` spellings. Pub/Sub also validates subscription labels. Refusal
+happens before resource writes. Updates retain the platform ownership envelope;
+Pub/Sub verifies the live topic ID and the actual subscription topic reference
+before reconciliation, prune, teardown or returning a binding. A conflicting
+child ID is refused even when its topic or name matches. Legacy unlabelled
+children may be reconciled only under their verified, immutable parent topic.
+
+Unlabelled legacy topics require the internal exclusive recorded-handle proof;
+a conflicting ID always refuses that proof. Reprovision retains the recorded
+physical topic name. Missing source IDs fail closed on mutating/binding paths.
+
+The AWS/Azure audit covers every tenant custom-tag serializer in the managed
+provider trees: AWS `_base.tags_for` prefixes keys with `astrolift.io/extra/`;
+Azure ARM and Files emit `astrolift-extra-<name>-<digest>`; classic Files uses
+that same serializer; legacy Blob metadata uses `astrolift_io_extra_`. These
+keys cannot overwrite platform IDs, binding IDs or parent identity tags.
+Event Grid's separate subscription-label list explicitly rejects its exact
+`astrolift-managed` ownership sentinel and retains the checked parent topic
+scope. Recording-client regressions exercise hostile custom keys and existing
+Azure cross-driver foreign-owner refusals; they do not certify live cloud IAM.
