@@ -627,6 +627,33 @@ def test_new_parent_does_not_create_over_unknown_or_remaining_child_inventory(ob
     assert not result.ok and result.errors == ["ownership_unknown"] and writes(api) == []
 
 
+def test_child_authority_still_obeys_shared_verifier_before_effects_or_binding(monkeypatch):
+    import azure.managed.event_grid as module
+    from _sdk.azure_ownership import ARM_TAG_KEYS, AzureOperation, AzureOwnershipError
+
+    api, _, driver, spec = owned()
+    original = module.verify_azure_ownership
+    observed = []
+
+    def refuse_child(tags, expected, **kwargs):
+        if kwargs["resource"] == "recorded Event Grid subscription":
+            observed.append((tags, expected, kwargs["operation"]))
+            raise AzureOwnershipError("shared ownership refusal")
+        return original(tags, expected, **kwargs)
+
+    monkeypatch.setattr(module, "verify_azure_ownership", refuse_child)
+    result = driver.update(
+        UpdateSpec(spec.recorded_handle, managed_service_id=OWNER, config={"minimum_tls_version_allowed": "1.1"})
+    )
+    assert not result.ok and result.errors == ["ownership_refused"]
+    with pytest.raises(AzureEventGridError):
+        driver.binding(ServiceHandle(spec.recorded_handle, managed_service_id=OWNER))
+    assert len(observed) == 2 and writes(api) == []
+    for tags, expected, operation in observed:
+        assert tags == {ARM_TAG_KEYS.managed_by: "platform", ARM_TAG_KEYS.managed_service_id: OWNER}
+        assert expected.managed_service_id == OWNER and operation == AzureOperation.UPDATE
+
+
 @pytest.mark.parametrize("location", [None, "r" * 513])
 def test_binding_does_not_guess_unknown_or_truncate_unrepresentable_observed_region(location):
     api, _, driver, spec = owned()

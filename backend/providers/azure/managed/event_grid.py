@@ -21,6 +21,8 @@ from uuid import UUID
 
 from _sdk._telemetry import driver_op
 from _sdk.azure_ownership import (
+    ARM_TAG_KEYS,
+    PLATFORM_MANAGED_BY,
     AzureOperation,
     AzureOwnershipError,
     owner_of,
@@ -362,58 +364,55 @@ class AzureEventGridDriver(ManagedServiceDriver):
     @driver_op(cloud="azure", driver="event_grid")
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         try:
-            return self._binding(handle, config)
+            target = self._saved_target(handle.handle, handle)
+            topic = self._required_topic(target, handle, AzureOperation.INSPECT)
+            self._inventory(target, handle)
+            resource_id = target.topic_id
+            endpoint = str(_field(topic, "endpoint", default=""))
+            parsed = urlsplit(endpoint)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or not parsed.hostname.endswith(".eventgrid.azure.net")
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+                or parsed.port not in {None, 443}
+                or parsed.path != "/api/events"
+                or len(endpoint) > 512
+            ):
+                raise _Ownership("ownership_unknown", "topic publishing endpoint is not a bounded Azure endpoint")
+            input_schema = _enum(_field(topic, "input_schema"))
+            if input_schema not in {"CloudEventSchemaV1_0", "EventGridSchema"}:
+                raise _Ownership("ownership_unknown", "topic input schema is not observed")
+            location = _field(topic, "location", default=None)
+            if not isinstance(location, str) or not location or len(location) > 512:
+                raise _Ownership("ownership_unknown", "topic region is not observed within binding limits")
+            access_mode = str((config or {}).get("access_mode", "publish"))
+            if access_mode not in {"publish", "manage"}:
+                raise AzureEventGridError("unsupported binding access mode")
+            roles = ["EventGrid Data Sender"]
+            if access_mode == "manage":
+                roles.append("EventGrid EventSubscription Contributor")
+            return Binding(
+                env_vars={
+                    "EVENT_BUS_NAME": ValueRef(literal=target.topic),
+                    "EVENT_BUS_ARN": ValueRef(literal=resource_id),
+                    "EVENT_BUS_REGION": ValueRef(literal=location),
+                    "EVENT_BUS_ENDPOINT": ValueRef(literal=endpoint),
+                    "EVENT_GRID_TOPIC_NAME": ValueRef(literal=target.topic),
+                    "EVENT_GRID_TOPIC_ENDPOINT": ValueRef(literal=endpoint),
+                    "EVENT_GRID_TOPIC_RESOURCE_ID": ValueRef(literal=resource_id),
+                    "EVENT_GRID_INPUT_SCHEMA": ValueRef(literal=input_schema),
+                },
+                iam_grants=[Grant(resource=resource_id, actions=roles)],
+                notes="Microsoft Entra workload identity binding; no topic key or SAS token is emitted.",
+            )
         except AzureEventGridError:
             raise
         except Exception as exc:
             raise _Ownership("ownership_unknown", "Event Grid binding observation failed") from exc
-
-    def _binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
-        target = self._saved_target(handle.handle, handle)
-        topic = self._required_topic(target, handle, AzureOperation.INSPECT)
-        self._inventory(target, handle)
-        resource_id = target.topic_id
-        endpoint = str(_field(topic, "endpoint", default=""))
-        parsed = urlsplit(endpoint)
-        if (
-            parsed.scheme != "https"
-            or not parsed.hostname
-            or not parsed.hostname.endswith(".eventgrid.azure.net")
-            or parsed.username
-            or parsed.password
-            or parsed.query
-            or parsed.fragment
-            or parsed.port not in {None, 443}
-            or parsed.path != "/api/events"
-            or len(endpoint) > 512
-        ):
-            raise _Ownership("ownership_unknown", "topic publishing endpoint is not a bounded Azure endpoint")
-        input_schema = _enum(_field(topic, "input_schema"))
-        if input_schema not in {"CloudEventSchemaV1_0", "EventGridSchema"}:
-            raise _Ownership("ownership_unknown", "topic input schema is not observed")
-        location = _field(topic, "location", default=None)
-        if not isinstance(location, str) or not location or len(location) > 512:
-            raise _Ownership("ownership_unknown", "topic region is not observed within binding limits")
-        access_mode = str((config or {}).get("access_mode", "publish"))
-        if access_mode not in {"publish", "manage"}:
-            raise AzureEventGridError("unsupported binding access mode")
-        roles = ["EventGrid Data Sender"]
-        if access_mode == "manage":
-            roles.append("EventGrid EventSubscription Contributor")
-        return Binding(
-            env_vars={
-                "EVENT_BUS_NAME": ValueRef(literal=target.topic),
-                "EVENT_BUS_ARN": ValueRef(literal=resource_id),
-                "EVENT_BUS_REGION": ValueRef(literal=location),
-                "EVENT_BUS_ENDPOINT": ValueRef(literal=endpoint),
-                "EVENT_GRID_TOPIC_NAME": ValueRef(literal=target.topic),
-                "EVENT_GRID_TOPIC_ENDPOINT": ValueRef(literal=endpoint),
-                "EVENT_GRID_TOPIC_RESOURCE_ID": ValueRef(literal=resource_id),
-                "EVENT_GRID_INPUT_SCHEMA": ValueRef(literal=input_schema),
-            },
-            iam_grants=[Grant(resource=resource_id, actions=roles)],
-            notes="Microsoft Entra workload identity binding; no topic key or SAS token is emitted.",
-        )
 
     @driver_op(cloud="azure", driver="event_grid")
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
@@ -1326,6 +1325,29 @@ class AzureEventGridDriver(ManagedServiceDriver):
         if not _same_arm(_field(item, "id"), expected) or not _same_arm(_field(item, "topic"), target.topic_id):
             raise _Ownership("ownership_unknown", "subscription ARM parent/identity is not observed coherently")
         labels = _field(item, "labels", default=None)
+        observed_labels = labels if isinstance(labels, list) else []
+        observed_owners = [
+            value.removeprefix("astrolift-owner-")
+            for value in observed_labels
+            if isinstance(value, str) and re.fullmatch(r"astrolift-owner-[a-f0-9]{32}", value)
+        ]
+        # Subscription labels are the real child envelope; the shared rule still decides its authority.
+        try:
+            verify_azure_ownership(
+                {
+                    ARM_TAG_KEYS.managed_by: (
+                        PLATFORM_MANAGED_BY if observed_labels.count(_MANAGED_SUBSCRIPTION_LABEL) == 1 else ""
+                    ),
+                    ARM_TAG_KEYS.managed_service_id: (
+                        str(UUID(observed_owners[0])) if len(observed_owners) == 1 else ""
+                    ),
+                },
+                owner_of(source),
+                operation=AzureOperation.UPDATE,
+                resource="recorded Event Grid subscription",
+            )
+        except AzureOwnershipError as exc:
+            raise _Ownership("ownership_refused", "subscription platform/source labels do not match") from exc
         platform = [_MANAGED_SUBSCRIPTION_LABEL, f"astrolift-owner-{identity}"]
         if (
             not isinstance(labels, list)

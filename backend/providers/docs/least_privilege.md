@@ -745,7 +745,10 @@ topic's returned ARM identity and unambiguous current platform/source tags.
 Canonical and legacy source aliases must agree. Every existing child needs its
 exact ARM identity, observed parent topic, full source UUID in its physical name,
 and matching platform/source labels. Historical unlabelled or external children
-refuse unchanged. Complete child LIST plus individual GET proof precedes parent
+refuse unchanged. Actual child labels are projected into the shared Azure
+ownership verifier's envelope; its mandatory-source rule also gates child reads.
+The family-specific ARM/name/label checks remain additional requirements.
+Complete child LIST plus individual GET proof precedes parent
 effects; a changed, missing, duplicate or partially observed child fails closed.
 SDK enum values and typed models are checked on the actual SDK 10.4.0,
 API `2025-02-15` wire, including readonly child parent/identity observations.

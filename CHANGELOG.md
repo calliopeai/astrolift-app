@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep Event Grid Basic child ownership under the shared Azure verifier and
+  expose its unchanged binding envelope directly to the cross-driver contract
+  checks. Actual observed labels, exact ARM identity and strict source checks
+  remain required (#2032, #2098).
+
 - Azure Event Hubs rejects conflicting source-ID ownership aliases and checks
   bounded subscription/resource-group inherited locks before effects, including
   initial namespace creation. Requires ancestor `Microsoft.Authorization/locks/read`;
