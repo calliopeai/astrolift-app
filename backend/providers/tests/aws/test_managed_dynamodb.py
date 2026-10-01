@@ -483,7 +483,9 @@ def test_restore_creates_target_table(
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=MSID))
-    result = driver.restore(snap, _spec(service_handle_hint="restored"))
+    result = driver.restore(
+        snap, _spec(service_handle_hint="restored", managed_service_id="33333333-3333-4333-8333-333333333333")
+    )
     assert result.ok
     _, target = parse_handle(result.handle)
     assert target in fake.tables
@@ -571,11 +573,17 @@ def test_plugin_registers_dynamodb_under_kv_store() -> None:
 
 
 def test_provision_does_not_adopt_another_services_table(driver: DynamoDBDriver, fake: FakeDDB) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    """A recorded name still cannot authorize a different service (#1961)."""
+    first = driver.provision(_spec(managed_service_id=MSID))
+    second = driver.provision(
+        _spec(
+            managed_service_id="22222222-2222-4222-8222-222222222222",
+            recorded_handle=first.handle,
+            recorded_handle_exclusive=True,
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == ""
-    assert "refusing to adopt" in second.message
+    assert "ownership" in second.message
     assert fake.count("create_table") == 1

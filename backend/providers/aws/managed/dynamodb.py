@@ -62,10 +62,10 @@ from _sdk.managed_service import (
 from aws.managed._base import (
     LiveOwnershipError,
     ManagedServiceError,
-    adoption_refusal,
     assert_resource_arn,
     handle_for,
     live_ownership_refusal,
+    managed_name_for,
     parse_handle,
     tags_for,
 )
@@ -132,15 +132,17 @@ class DynamoDBDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        table_name = self._table_name_for(spec=spec)
+        try:
+            table_name = self._table_name_for(spec=spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
-        # Probe existing -- provision is idempotent.
-        existing = self._describe(table_name)
+        try:
+            existing = self._live_table(table_name, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return ProvisionResult(False, "", str(exc), [getattr(exc, "code", "ownership_unknown")])
         if existing is not None:
-            refusal = adoption_refusal(self._existing_tags(existing), spec, resource=f"dynamodb table {table_name}")
-            if refusal is not None:
-                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=table_name),
@@ -698,15 +700,6 @@ class DynamoDBDriver(ManagedServiceDriver):
             seen.add(token)
         raise LiveOwnershipError("DynamoDB ownership tag inventory limit exceeded")
 
-    def _existing_tags(self, existing: dict[str, Any]) -> list[dict[str, str]]:
-        """Tags of a resource found under this service's name; unreadable counts as untagged (#1961)."""
-        try:
-            return list(
-                self._ddb.list_tags_of_resource(ResourceArn=str(existing.get("TableArn", ""))).get("Tags", []) or []
-            )
-        except Exception:  # ownership unverifiable, so not adopted
-            return []
-
     def _describe(self, table_name: str) -> dict[str, Any] | None:
         try:
             resp = self._ddb.describe_table(TableName=table_name)
@@ -723,19 +716,8 @@ class DynamoDBDriver(ManagedServiceDriver):
         return table
 
     def _table_name_for(self, *, spec: ProvisionSpec) -> str:
-        # DynamoDB table names: 3-255 chars, [a-zA-Z0-9_.-].
-        parts = [
-            self._config.table_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "kv",
-        ]
-        raw = "-".join(p for p in parts if p)
-        clean = "".join(c if (c.isalnum() or c in "-_.") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-.")[:255]
+        name = managed_name_for(spec, kind=KIND, prefix=self._config.table_name_prefix, max_len=255)
+        return self._recorded_table_name(f"{KIND}/{name}")
 
 
 # ----- module-level helpers --------------------------------------------

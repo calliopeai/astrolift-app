@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from botocore.session import Session
 from botocore.validate import validate_parameters
 
@@ -132,7 +133,9 @@ def test_provision_explicit_visibility_in_config(
 
 def test_provision_exposes_full_fifo_encryption_redrive_and_long_poll_surface() -> None:
     client = MagicMock()
-    client.get_queue_url.side_effect = RuntimeError("AWS.SimpleQueueService.NonExistentQueue")
+    client.get_queue_url.side_effect = ClientError(
+        {"Error": {"Code": "QueueDoesNotExist", "Message": "queue absent"}}, "GetQueueUrl"
+    )
     client.create_queue.return_value = {
         "QueueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/platform.fifo",
     }
@@ -367,8 +370,14 @@ def test_config_schema_includes_fifo(driver: SQSDriver) -> None:
 
 def test_provision_does_not_adopt_or_retag_another_services_resource(driver) -> None:
     """The platform account "owns" every org's resources; only this service's is adopted (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    first = driver.provision(_spec(managed_service_id=MSID))
+    second = driver.provision(
+        _spec(
+            managed_service_id="22222222-2222-4222-8222-222222222222",
+            recorded_handle=first.handle,
+            recorded_handle_exclusive=True,
+        )
+    )
 
     assert first.ok, first.message
-    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
+    assert not second.ok and second.handle == "" and "ownership" in second.message

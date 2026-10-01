@@ -64,8 +64,7 @@ def test_provision_creates_bucket(driver: S3Driver, s3_client) -> None:
     assert result.ok is True
     kind, bucket_name = parse_handle(result.handle)
     assert kind == KIND
-    assert "acme" in bucket_name
-    assert "api" in bucket_name
+    assert MSID.replace("-", "") in bucket_name
     # Bucket actually exists
     response = s3_client.list_buckets()
     bucket_names = [b["Name"] for b in response["Buckets"]]
@@ -369,8 +368,14 @@ def test_mount_keys_are_editable_without_reprovision(driver: S3Driver) -> None:
 
 def test_provision_does_not_adopt_or_retag_another_services_resource(driver) -> None:
     """The platform account "owns" every org's resources; only this service's is adopted (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    first = driver.provision(_spec(managed_service_id=MSID))
+    second = driver.provision(
+        _spec(
+            managed_service_id="22222222-2222-4222-8222-222222222222",
+            recorded_handle=first.handle,
+            recorded_handle_exclusive=True,
+        )
+    )
 
     assert first.ok, first.message
-    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
+    assert not second.ok and second.handle == "" and "ownership" in second.message

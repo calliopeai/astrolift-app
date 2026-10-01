@@ -167,3 +167,16 @@ def assert_resource_arn(arn: str, *, service: str, region: str, resource: str, a
         or parts[5] != resource
     ):
         raise ManagedServiceError("live AWS resource identity does not match the recorded driver target")
+
+
+def managed_name_for(spec: ProvisionSpec, *, kind: str, prefix: str, max_len: int) -> str:
+    """A recorded physical target outranks naming defaults, but confers no ownership."""
+    from aws._naming import managed_service_identity, managed_service_name
+
+    managed_service_identity(spec.managed_service_id)
+    if spec.recorded_handle:
+        recorded_kind, name = parse_handle(spec.recorded_handle)
+        if recorded_kind != kind:
+            raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
+        return name
+    return managed_service_name(spec.managed_service_id, prefix=prefix, max_len=max_len)

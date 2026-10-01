@@ -18,7 +18,12 @@ pytestmark = pytest.mark.django_db
 def test_actual_s3_foreign_ownership_is_not_gone_when_physical_name_contains_not_found_marker(
     world,  # noqa: F811 - imported pytest fixture
 ):
-    svc = _service(org_slug="nosuchbucket-owner-2098", plugin_slug="aws", variant="s3", backend_ref="")
+    svc = _service(
+        org_slug="nosuchbucket-owner-2098",
+        plugin_slug="aws",
+        variant="s3",
+        backend_ref="object_store/astrolift-nosuchbucket-owner-2098",
+    )
     svc.kind = "object_store"
     svc.save(update_fields=["kind"])
     provisioned = _provision_sync(svc.pk)

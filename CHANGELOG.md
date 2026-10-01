@@ -68,6 +68,12 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- New S3/SQS/DynamoDB physical names retain the complete persisted service UUID,
+  avoiding joined/truncated tenant-slug collisions. Reprovision keeps validated
+  recorded names and data; missing identities, invalid targets and foreign or
+  unmarked pre-existing resources refuse before mutation. Other driver families
+  and excluded explicit/SES identities remain separate work (#2032, #2098).
+
 - SQS and DynamoDB updates, teardown and readiness verify live source identity
   and exact recorded target before actions. DynamoDB snapshots also verify the
   source and returned backup identity. Unknown tags/metadata and permission

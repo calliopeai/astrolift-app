@@ -188,6 +188,51 @@ scope. Recording-client regressions exercise hostile custom keys and existing
 Azure cross-driver foreign-owner refusals; they do not certify live cloud IAM.
 
 
+### Immutable AWS managed-service names (#2032, bounded scope)
+
+New S3 buckets, SQS queues and DynamoDB tables use
+`<sanitized-operator-prefix>-<complete-managed-service-UUID-hex>`. The platform
+passes the saved service GUID; the driver neither generates an ID nor falls
+back to tenant slugs, integer keys or hints. The UUID must be canonical and
+nonzero (current real service records generate UUIDv7). Missing, malformed,
+nil or noncanonical direct SDK identities refuse before provider calls.
+
+The complete 32-hex identity is retained when prefixes are truncated:
+[S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html)
+uses at most 63 characters;
+[SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_CreateQueue.html)
+uses at most 80 including its `.fifo` suffix; and
+[DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Constraints.html)
+uses at most 255. Names are lowercase ASCII with a sanitized operator prefix;
+S3 reserved/invalid names refuse instead of issuing an invalid create. Human
+org/app/environment/service names remain in display metadata and tags.
+
+The existing `ProvisionSpec.recorded_handle` takes precedence over new naming
+defaults, after exact driver-kind and physical-name validation. It is never
+truncated, silently replaced or treated as ownership authority. Reprovision
+preserves an owned legacy name and its data even after display-name/prefix
+changes. Recorded SQS type remains authoritative if an operator default
+changes; an explicitly incompatible `fifo` value refuses instead of renaming.
+Retries with unchanged operator defaults/type use the same saved identity and
+name even before the returned handle is finalized. Operators must keep those
+defaults stable until that first handle is recorded.
+
+All three provision paths require the live platform marker and exact source
+UUID for a pre-existing target. Neither matching old slugs nor a claimed
+`recorded_handle_exclusive` flag permits retagging a foreign/unmarked resource.
+Unmarked legacy resources need verified ownership backfill. S3 unavailable
+lookup proof is a refusal, and the SQS existing-name exception path rechecks
+current ownership before attribute/tag reconciliation. These checks are not
+atomic cloud create/compare-and-tag preconditions; independent cloud admins
+must not replace/retag resources during operations. A globally occupied S3
+UUID name is refused, never replaced with a fresh random identity.
+
+This leaf covers only these three AWS driver families. Other AWS/GCP/Azure/native
+families under #2032 remain separate; #2021's explicit tenant-set identities and
+`adopt_existing`, and #2029's SES identity contract remain excluded. DynamoDB
+restore/adoption, provisioning cloud races and the remaining broad ownership
+acceptance in #2098 are not closed by the naming change.
+
 ### AWS live binding and S3 incarnation checks (#2098)
 
 S3, SQS and DynamoDB bindings require the actual live resource's platform marker

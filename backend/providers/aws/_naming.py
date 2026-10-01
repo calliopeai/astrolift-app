@@ -12,12 +12,16 @@ two ways:
 
 ``iam_role_name`` produces a name valid for BOTH IAM (≤64) and the K8s
 ServiceAccount it doubles as (DNS label ≤63), hence the 63 default.
+
+Managed-service names retain the complete persisted service UUID independently
+of human slugs and only truncate the cosmetic operator prefix (#2032).
 """
 
 from __future__ import annotations
 
 import hashlib
 import re
+from uuid import UUID
 
 # Restrict to the slug-safe subset of IAM's allowed charset. IAM also
 # permits ``+=,.@`` but those never appear in slugs/repo names, and
@@ -46,3 +50,26 @@ def iam_role_name(*parts: str, max_len: int = 63) -> str:
         return cleaned
     digest = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()[:8]
     return cleaned[: max_len - 9].rstrip("-") + "-" + digest
+
+
+def managed_service_identity(managed_service_id: str) -> str:
+    """The complete persisted UUID; never invent an identity for an SDK request."""
+    try:
+        identity = UUID(managed_service_id) if isinstance(managed_service_id, str) else None
+    except (ValueError, AttributeError):
+        identity = None
+    if identity is None or not identity.int or str(identity) != managed_service_id:
+        raise ValueError("managed-service identity must be a persisted canonical nonzero UUID")
+    return identity.hex
+
+
+def managed_service_name(managed_service_id: str, *, prefix: str, max_len: int) -> str:
+    """Only the cosmetic operator prefix may be truncated; the UUID stays whole."""
+    identity = managed_service_identity(managed_service_id)
+    if not isinstance(prefix, str):
+        raise ValueError("AWS resource prefix must be a string")
+    cleaned = re.sub(r"-+", "-", re.sub(r"[^a-z0-9-]", "-", prefix.lower())).strip("-") or "astrolift"
+    if max_len < len(identity) + 2:
+        raise ValueError("AWS name limit cannot preserve the complete managed-service UUID")
+    cosmetic = cleaned[: max_len - len(identity) - 1].rstrip("-")
+    return f"{cosmetic}-{identity}"
