@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 
-from azure.managed.event_grid_namespace_ownership import (
+from azure._event_grid_namespace_ownership import (
     OwnershipUnknown,
     Receipts,
     Target,

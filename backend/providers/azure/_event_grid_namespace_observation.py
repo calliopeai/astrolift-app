@@ -13,8 +13,8 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlsplit
 
+from azure._event_grid_namespace_ownership import OwnershipUnknown
 from azure.core.polling import NoPolling
-from azure.managed.event_grid_namespace_ownership import OwnershipUnknown
 
 if TYPE_CHECKING:
     from collections.abc import Callable

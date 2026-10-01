@@ -4,9 +4,9 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
+from azure._event_grid_namespace_observation import Observation, bounded
+from azure._event_grid_namespace_ownership import OwnershipUnknown
 from azure.core.pipeline.transport import HttpTransport
-from azure.managed.event_grid_namespace_observation import Observation, bounded
-from azure.managed.event_grid_namespace_ownership import OwnershipUnknown
 from azure.mgmt.eventgrid import EventGridManagementClient, models
 from tests.azure.test_event_grid_namespace_receipts_2032 import RG, SUB, target
 from tests.azure.test_event_grid_wire_2032 import _Credential, _Response

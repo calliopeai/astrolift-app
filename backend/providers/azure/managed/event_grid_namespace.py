@@ -8,7 +8,7 @@ contract exposed here.
 
 from __future__ import annotations
 
-import json
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import timedelta
@@ -39,6 +39,17 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from azure._event_grid_namespace_observation import Observation, bounded
+from azure._event_grid_namespace_ownership import (
+    OwnershipUnknown,
+    Receipts,
+    Target,
+    assert_identity,
+    child_name,
+    contains,
+    namespace_identity_tags,
+    service_uuid,
+)
 from azure._managed_identities import unlisted_identity
 from azure.managed.event_grid import (
     _ADVANCED_FILTER_MODELS,
@@ -46,10 +57,8 @@ from azure.managed.event_grid import (
     _SENSITIVE_DELIVERY_ATTRIBUTE_NAMES,
     _SINGLE_VALUE_FILTERS,
     _field,
-    _generated_name,
     _integer_in_range,
     _is_arm_id,
-    _not_found,
     _slug,
     _validate_advanced_filter,
     _validate_delivery_attribute,
@@ -110,8 +119,8 @@ class AzureEventGridNamespaceConfig:
 
     def __post_init__(self) -> None:
         for field_name, value, maximum in (
-            ("namespace_name_prefix", self.namespace_name_prefix, 32),
-            ("topic_name_prefix", self.topic_name_prefix, 32),
+            ("namespace_name_prefix", self.namespace_name_prefix, 17),
+            ("topic_name_prefix", self.topic_name_prefix, 17),
             ("secret_name_prefix", self.secret_name_prefix, 40),
         ):
             normalized = _slug(value)
@@ -126,6 +135,7 @@ class AzureEventGridNamespaceConfig:
 class AzureEventGridNamespaceDriver(ManagedServiceDriver):
     def __init__(self, *, config: AzureEventGridNamespaceConfig) -> None:
         self._config = config
+        self._observation = Observation()
         if config.mgmt_client is not None:
             self._mgmt = config.mgmt_client
         else:
@@ -159,272 +169,260 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
         else:
             self._secrets = None
 
-    @driver_op(
-        cloud="azure",
-        driver=VARIANT,
-        audit=True,
-        sensitive_kind="managed_service_provision",
-    )
+    @bounded
+    @driver_op(cloud="azure", driver=VARIANT, audit=True, sensitive_kind="managed_service_provision")
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        if self._secrets is None:
-            return ProvisionResult(
-                False,
-                "",
-                "Event Grid namespaces require Key Vault for subscription ownership and pull credentials",
-                ["no_secret_backend"],
-            )
-        cfg = spec.config or {}
-        error = self._validate(cfg)
-        if error:
-            return ProvisionResult(False, "", error, ["invalid_event_grid_namespace_config"])
-        namespace_name = self._namespace_name(spec)
-        topic_name = self._topic_name(spec)
-        handle = self._handle(namespace_name, topic_name)
+        handle = spec.recorded_handle
         try:
-            namespace = self._namespace(namespace_name)
+            self._require_vault()
+            cfg = spec.config or {}
+            error = self._validate(cfg)
+            if error:
+                return ProvisionResult(False, handle, error, ["invalid_event_grid_namespace_config"])
+            target = self._provision_target(spec)
+            handle = target.handle
+            desired = self._desired_children(cfg, spec)
+            receipts = self._load_receipts(target, spec)
+            namespace, topic, children = self._inventory(target, spec, receipts)
+            self._assert_unlocked(target, namespace is not None, topic is not None, children)
             if namespace is None:
-                namespace = self._wait(
-                    self._mgmt.namespaces.begin_create_or_update(
-                        self._config.resource_group,
-                        namespace_name,
-                        self._namespace_parameters(spec),
-                    ),
+                if spec.recorded_handle or any(r["state"] != "reserved" for r in receipts.resources.values()):
+                    raise OwnershipUnknown("recorded namespace is missing; implicit recreation is refused")
+                accepted = self._observation.begin(
+                    self._mgmt.namespaces.begin_create_or_update,
+                    target.resource_group,
+                    target.namespace,
+                    self._namespace_parameters(spec),
                 )
-            else:
-                self._assert_owned(namespace, spec, AzureOperation.PROVISION, namespace_name)
-                self._assert_namespace_immutable(namespace, cfg, apply_defaults=True)
-                namespace = self._wait(
-                    self._mgmt.namespaces.begin_update(
-                        self._config.resource_group,
-                        namespace_name,
-                        self._namespace_update_parameters(cfg, tags=tags_for(spec), apply_defaults=True),
-                    ),
+                self._assert_owned(accepted, target, spec)
+                namespace = self._namespace(target.namespace)
+                if namespace is None or _state(namespace) != "Succeeded":
+                    return ProvisionResult(
+                        False, handle, "namespace creation is not yet observed ready", ["provision_pending"]
+                    )
+            self._assert_owned(namespace, target, spec)
+            self._immutable_settings(namespace, topic, target, cfg, apply_defaults=True)
+            if _state(namespace) != "Succeeded":
+                return ProvisionResult(
+                    False, handle, "namespace is not in an observed stable state", ["provision_pending"]
                 )
-            topic = self._topic(namespace_name, topic_name)
+            namespace, topic, children = self._inventory(target, spec, receipts)
+            self._assert_unlocked(target, True, topic is not None, children)
+            self._preflight_children(
+                target, desired, children, receipts, spec, prune=bool(cfg.get("prune_subscriptions"))
+            )
             if topic is None:
-                self._wait(
-                    self._mgmt.namespace_topics.begin_create_or_update(
-                        self._config.resource_group,
-                        namespace_name,
-                        topic_name,
-                        self._topic_parameters(cfg),
-                    ),
+                if spec.recorded_handle:
+                    raise OwnershipUnknown("recorded topic is missing; implicit recreation is refused")
+                if target.topic_id.casefold() in receipts.resources:
+                    if receipts.resources[target.topic_id.casefold()]["state"] != "reserved":
+                        raise OwnershipUnknown("recorded topic is missing; implicit recreation is refused")
+                else:
+                    receipts.reserve(target.topic_id, self._topic_parameters(cfg).serialize())
+                    self._store_receipts(receipts, spec)
+                self._current_namespace(target, spec)
+                accepted = self._observation.begin(
+                    self._mgmt.namespace_topics.begin_create_or_update,
+                    target.resource_group,
+                    target.namespace,
+                    target.topic,
+                    self._topic_parameters(cfg),
                 )
-            else:
-                self._assert_topic_immutable(topic, cfg, apply_defaults=True)
-                self._wait(
-                    self._mgmt.namespace_topics.begin_update(
-                        self._config.resource_group,
-                        namespace_name,
-                        topic_name,
-                        self._topic_update_parameters(cfg, apply_defaults=True),
-                    ),
+                receipts.accept(target.topic_id, accepted, self._topic_parameters(cfg).serialize())
+                self._store_receipts(receipts, spec)
+                topic = self._topic(target.namespace, target.topic)
+                if topic is None or not receipts.observe(target.topic_id, topic):
+                    return ProvisionResult(
+                        False, handle, "topic creation is not yet observed ready", ["provision_pending"]
+                    )
+            self._apply_update(target, cfg, spec, receipts, apply_defaults=True)
+            self._reconcile_owned_children(target, cfg, desired, spec, receipts)
+            if not self._observed(target, cfg, spec, receipts, apply_defaults=True):
+                return ProvisionResult(
+                    False, handle, "namespace, topic or subscriptions remain pending", ["provision_pending"]
                 )
-            registry = self._reconcile_subscriptions(namespace_name, topic_name, cfg)
-            self._sync_access_key(namespace_name, registry)
-        except AzureOwnershipError as exc:
-            return ProvisionResult(False, handle, str(exc), [OWNERSHIP_ERROR_CODE])
+            self._store_receipts(receipts, spec)
+            self._sync_owned_key(target, spec, receipts)
+            return ProvisionResult(True, handle, "owned Standard target observed reconciled", ready=True)
         except Exception as exc:
-            return ProvisionResult(False, handle, f"reconcile Event Grid namespace topic: {exc}", [str(exc)])
-        return ProvisionResult(
-            True,
-            handle,
-            f"Event Grid namespace topic {namespace_name}/{topic_name} available",
-            ready=True,
-        )
+            return ProvisionResult(False, handle, _failure_message(exc), [_failure_code(exc)])
 
+    @bounded
     @driver_op(cloud="azure", driver=VARIANT)
     def update(self, spec: UpdateSpec) -> UpdateResult:
         try:
-            namespace_name, topic_name = self._parse_handle(spec.handle)
-        except AzureEventGridNamespaceError as exc:
-            return UpdateResult(False, spec.handle, str(exc), ["invalid_handle"])
-        if self._secrets is None:
+            self._require_vault()
+            target = self._saved_target(spec.handle, spec)
+            receipts = self._load_receipts(target, spec)
+            namespace, topic, children = self._inventory(target, spec, receipts)
+            if namespace is None or topic is None:
+                raise OwnershipUnknown("the exact saved Standard target is missing")
+            cfg = spec.config or {}
+            effective = self._effective_partial_config(namespace, topic, cfg)
+            error = self._validate(effective, partial=True)
+            if error:
+                return UpdateResult(False, spec.handle, error, ["invalid_event_grid_namespace_config"], retryable=False)
+            desired = self._desired_children(effective, spec)
+            self._immutable_settings(namespace, topic, target, cfg, apply_defaults=False)
+            self._assert_unlocked(target, True, True, children)
+            self._preflight_children(
+                target, desired, children, receipts, spec, prune=bool(cfg.get("prune_subscriptions"))
+            )
+            if _state(namespace) != "Succeeded" or _state(topic) != "Succeeded":
+                return UpdateResult(False, spec.handle, "Standard target update remains pending", ["update_pending"])
+            self._apply_update(target, cfg, spec, receipts, apply_defaults=False)
+            if "subscriptions" in cfg or cfg.get("prune_subscriptions"):
+                self._reconcile_owned_children(target, effective, desired, spec, receipts)
+            if not self._observed(target, cfg, spec, receipts, apply_defaults=False):
+                return UpdateResult(
+                    False, spec.handle, "Standard update is not yet observed reconciled", ["update_pending"]
+                )
+            self._store_receipts(receipts, spec)
+            self._sync_owned_key(target, spec, receipts)
+            return UpdateResult(True, spec.handle, "owned Standard update observed reconciled")
+        except Exception as exc:
             return UpdateResult(
                 False,
                 spec.handle,
-                "Event Grid namespaces require Key Vault for subscription ownership and pull credentials",
-                ["no_secret_backend"],
+                _failure_message(exc),
+                [_failure_code(exc)],
+                retryable=not isinstance(exc, (OwnershipUnknown, AzureOwnershipError, AzureEventGridNamespaceError)),
             )
-        cfg = spec.config or {}
-        try:
-            namespace = self._namespace(namespace_name)
-            if namespace is None:
-                return UpdateResult(
-                    False, spec.handle, f"Event Grid namespace {namespace_name} not found", ["not_found"]
-                )
-            self._assert_owned(namespace, spec, AzureOperation.UPDATE, namespace_name)
-            topic = self._topic(namespace_name, topic_name)
-            if topic is None:
-                return UpdateResult(
-                    False, spec.handle, f"Event Grid namespace topic {topic_name} not found", ["not_found"]
-                )
-            effective_cfg = self._effective_partial_config(namespace, topic, cfg)
-            error = self._validate(effective_cfg, partial=True)
-            if error:
-                return UpdateResult(False, spec.handle, error, ["invalid_event_grid_namespace_config"])
-            self._assert_namespace_immutable(namespace, cfg, apply_defaults=False)
-            self._assert_topic_immutable(topic, cfg, apply_defaults=False)
-            if self._has_namespace_update(cfg):
-                self._wait(
-                    self._mgmt.namespaces.begin_update(
-                        self._config.resource_group,
-                        namespace_name,
-                        self._namespace_update_parameters(cfg),
-                    ),
-                )
-            if "topic_retention_days" in cfg:
-                self._wait(
-                    self._mgmt.namespace_topics.begin_update(
-                        self._config.resource_group,
-                        namespace_name,
-                        topic_name,
-                        self._topic_update_parameters(cfg),
-                    ),
-                )
-            if "subscriptions" in cfg or cfg.get("prune_subscriptions"):
-                registry = self._reconcile_subscriptions(namespace_name, topic_name, effective_cfg)
-                self._sync_access_key(namespace_name, registry)
-        except AzureOwnershipError as exc:
-            return UpdateResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
-        except Exception as exc:
-            return UpdateResult(False, spec.handle, f"update Event Grid namespace topic: {exc}", [str(exc)])
-        return UpdateResult(True, spec.handle, f"Event Grid namespace topic {namespace_name}/{topic_name} reconciled")
 
-    @driver_op(
-        cloud="azure",
-        driver=VARIANT,
-        audit=True,
-        sensitive_kind="managed_service_deprovision",
-    )
+    @bounded
+    @driver_op(cloud="azure", driver=VARIANT, audit=True, sensitive_kind="managed_service_deprovision")
     def deprovision(
-        self,
-        spec: DeprovisionSpec,
-        *,
-        delete_data: bool = False,
-        force_destroy: bool = False,
+        self, spec: DeprovisionSpec, *, delete_data: bool = False, force_destroy: bool = False
     ) -> DeprovisionResult:
+        del force_destroy
         try:
-            namespace_name, topic_name = self._parse_handle(spec.handle)
-        except AzureEventGridNamespaceError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), ["invalid_handle"], retryable=False)
-        try:
-            namespace = self._namespace(namespace_name)
-            if namespace is None:
-                self._delete_secrets(namespace_name, topic_name)
-                return DeprovisionResult(True, spec.handle, f"Event Grid namespace {namespace_name} already gone")
-            self._assert_owned(namespace, spec, AzureOperation.DELETE, namespace_name)
-            if not delete_data:
-                return DeprovisionResult(
-                    False,
-                    spec.handle,
-                    (
-                        "Event Grid namespace topics retain queued events for up to seven days; "
-                        "set delete_data=true to delete"
-                    ),
-                    ["delete_data_required"],
-                    retryable=False,
-                )
-            subscriptions = self._subscriptions(namespace_name, topic_name)
-            registry = self._load_registry(namespace_name, topic_name)
-            external_subscriptions = [
-                item for item in subscriptions if str(_field(item, "name", default="")) not in registry
-            ]
-            other_topics = [
-                item for item in self._topics(namespace_name) if str(_field(item, "name", default="")) != topic_name
-            ]
-            if (external_subscriptions or other_topics) and not force_destroy:
-                return DeprovisionResult(
-                    False,
-                    spec.handle,
-                    (
-                        f"Event Grid namespace has {len(external_subscriptions)} external subscription(s) "
-                        f"and {len(other_topics)} external topic(s)"
-                    ),
-                    ["external_resources_present"],
-                    retryable=False,
-                )
-            locks = self._resource_locks(namespace_name)
-            if locks and not force_destroy:
-                return DeprovisionResult(
-                    False,
-                    spec.handle,
-                    f"Event Grid namespace {namespace_name} is protected by an Azure resource lock",
-                    ["resource_lock_present"],
-                    retryable=False,
-                )
-            if locks:
-                self._delete_locks(namespace_name, locks)
-            for item in subscriptions:
-                name = str(_field(item, "name", default=""))
-                if force_destroy or name in registry:
-                    self._wait(
-                        self._mgmt.namespace_topic_event_subscriptions.begin_delete(
-                            self._config.resource_group,
-                            namespace_name,
-                            topic_name,
-                            name,
-                        ),
+            self._require_vault()
+            target = self._saved_target(spec.handle, spec)
+            receipts = self._load_receipts(target, spec)
+            namespace, topic, children = self._inventory(target, spec, receipts)
+            if namespace is not None:
+                if not delete_data:
+                    return DeprovisionResult(
+                        False,
+                        spec.handle,
+                        "queued events have no exact restorable snapshot; "
+                        "destructive deletion requires delete_data=true",
+                        ["delete_data_required"],
+                        retryable=False,
                     )
-            if self._topic(namespace_name, topic_name) is not None:
-                self._wait(
-                    self._mgmt.namespace_topics.begin_delete(
-                        self._config.resource_group,
-                        namespace_name,
-                        topic_name,
-                    ),
-                )
-            self._wait(self._mgmt.namespaces.begin_delete(self._config.resource_group, namespace_name))
-            self._delete_secrets(namespace_name, topic_name)
-        except AzureOwnershipError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), [OWNERSHIP_ERROR_CODE], retryable=False)
+                self._assert_unlocked(target, True, topic is not None, children)
+                for name in children:
+                    self._current_namespace(target, spec)
+                    current = self._subscription(target.namespace, target.topic, name)
+                    if current is not None:
+                        receipts.assert_authority(target.child_id(name), current)
+                        self._observation.begin(
+                            self._mgmt.namespace_topic_event_subscriptions.begin_delete,
+                            target.resource_group,
+                            target.namespace,
+                            target.topic,
+                            name,
+                        )
+                    if self._subscription(target.namespace, target.topic, name) is not None:
+                        return DeprovisionResult(
+                            False, spec.handle, "subscription deletion remains pending", ["delete_pending"]
+                        )
+                namespace, topic, children = self._inventory(target, spec, receipts)
+                if children:
+                    raise OwnershipUnknown("subscription absence is not observed")
+                self._assert_unlocked(target, True, topic is not None, children)
+                if topic is not None:
+                    receipts.assert_authority(target.topic_id, topic)
+                    self._observation.begin(
+                        self._mgmt.namespace_topics.begin_delete, target.resource_group, target.namespace, target.topic
+                    )
+                    if self._topic(target.namespace, target.topic) is not None:
+                        return DeprovisionResult(
+                            False, spec.handle, "topic deletion remains pending", ["delete_pending"]
+                        )
+                namespace, topic, children = self._inventory(target, spec, receipts)
+                self._assert_unlocked(target, True, False, children)
+                self._current_namespace(target, spec)
+                self._observation.begin(self._mgmt.namespaces.begin_delete, target.resource_group, target.namespace)
+                if self._namespace(target.namespace) is not None:
+                    return DeprovisionResult(
+                        False, spec.handle, "namespace deletion remains pending", ["delete_pending"]
+                    )
+            self._inventory(target, spec, receipts)
+            self._delete_owned_key(target, spec, receipts)
+            self._delete_receipt_secret(receipts, spec)
+            return DeprovisionResult(True, spec.handle, "saved Standard target observed absent")
         except Exception as exc:
-            return DeprovisionResult(False, spec.handle, f"delete Event Grid namespace topic: {exc}", [str(exc)])
-        return DeprovisionResult(
-            True,
-            spec.handle,
-            f"Event Grid namespace {namespace_name} deleted (force_destroy={force_destroy})",
-        )
+            return DeprovisionResult(
+                False,
+                spec.handle,
+                _failure_message(exc),
+                [_failure_code(exc)],
+                retryable=not isinstance(exc, (OwnershipUnknown, AzureOwnershipError, AzureEventGridNamespaceError)),
+            )
 
+    @bounded
     @driver_op(cloud="azure", driver=VARIANT)
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         try:
-            namespace_name, topic_name = self._parse_handle(handle.handle)
-            namespace = self._namespace(namespace_name)
+            self._require_vault()
+            target = self._saved_target(handle.handle, handle)
+            receipts = self._load_receipts(target, handle)
+            namespace, topic, children = self._inventory(target, handle, receipts)
             if namespace is None:
-                return ServiceStatus(handle.handle, "deprovisioned", "Event Grid namespace not found")
-            topic = self._topic(namespace_name, topic_name)
+                return ServiceStatus(handle.handle, "deprovisioned", "saved namespace absence independently observed")
             if topic is None:
-                return ServiceStatus(handle.handle, "error", f"Event Grid namespace topic {topic_name} not found")
-            namespace_state = str(_field(namespace, "provisioning_state", default="Succeeded"))
-            topic_state = str(_field(topic, "provisioning_state", default="Succeeded"))
-            subscriptions = self._subscriptions(namespace_name, topic_name)
-            state = topic_state if topic_state != "Succeeded" else namespace_state
+                return ServiceStatus(handle.handle, "error", "saved namespace topic is missing")
+            self._require_receipt_children(target, receipts, children)
+            ready = _state(namespace) == "Succeeded" and receipts.observe(target.topic_id, topic)
+            ready = all(receipts.observe(target.child_id(name), item) for name, item in children.items()) and ready
+            state = (
+                "available"
+                if ready
+                else "error"
+                if any(
+                    _state(item) in {"Failed", "Canceled", "DeleteFailed", "CreateFailed", "UpdatedFailed"}
+                    for item in [namespace, topic, *children.values()]
+                )
+                else "updating"
+            )
+            return ServiceStatus(
+                handle.handle,
+                state,
+                f"Azure reports namespace={_state(namespace) or 'unknown'}, "
+                f"topic={_state(topic) or 'unknown'}; {len(children)} owned subscription(s)",
+            )
         except Exception as exc:
-            return ServiceStatus(handle.handle, "error", f"describe Event Grid namespace topic: {exc}")
-        return ServiceStatus(
-            handle.handle,
-            _STATE_MAP.get(state, "updating"),
-            f"Azure reports namespace={namespace_state}, topic={topic_state}; {len(subscriptions)} subscription(s)",
-        )
+            return ServiceStatus(handle.handle, "error", _failure_message(exc))
 
+    @bounded
     @driver_op(cloud="azure", driver=VARIANT)
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
-        namespace_name, topic_name = self._parse_handle(handle.handle)
-        namespace = self._namespace(namespace_name)
-        if namespace is None:
-            raise AzureEventGridNamespaceError(f"binding requested for missing Event Grid namespace {namespace_name}")
-        self._assert_owned(namespace, handle, AzureOperation.INSPECT, namespace_name)
-        if self._topic(namespace_name, topic_name) is None:
-            raise AzureEventGridNamespaceError(f"binding requested for missing Event Grid namespace topic {topic_name}")
+        self._require_vault()
+        target = self._saved_target(handle.handle, handle)
+        receipts = self._load_receipts(target, handle)
+        namespace, topic, children = self._inventory(target, handle, receipts)
+        if (
+            namespace is None
+            or topic is None
+            or _state(namespace) != "Succeeded"
+            or not receipts.observe(target.topic_id, topic)
+        ):
+            raise OwnershipUnknown("binding requires an exact owned, observed ready namespace topic")
+        if not all(receipts.observe(target.child_id(name), item) for name, item in children.items()):
+            raise OwnershipUnknown("subscription completion is not observed")
+        self._require_receipt_children(target, receipts, children)
+        namespace_name, topic_name = target.namespace, target.topic
         hostname = self._hostname(namespace)
+        if not re.fullmatch(
+            re.escape(namespace_name) + r"\.[a-z0-9-]+\.eventgrid\.azure\.net", hostname, flags=re.IGNORECASE
+        ):
+            raise OwnershipUnknown("namespace hostname is not observed on the exact public Azure authority")
         publish_endpoint = f"https://{hostname}/topics/{topic_name}:publish"
         cfg = config or {}
         access_mode = str(cfg.get("access_mode", "publish"))
         if access_mode not in {"publish", "pull", "publish_pull", "manage"}:
-            raise AzureEventGridNamespaceError(
-                "Event Grid namespace binding access_mode must be publish, pull, publish_pull, or manage",
-            )
+            raise AzureEventGridNamespaceError("binding access_mode must be publish, pull, publish_pull, or manage")
         resource_id = self._topic_resource_id(namespace_name, topic_name)
         env_vars = {
             "EVENT_BUS_NAME": ValueRef(literal=topic_name),
@@ -442,37 +440,26 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             roles.append("EventGrid Data Sender")
             notes.append("publishing uses Microsoft Entra workload identity")
         if access_mode in {"pull", "publish_pull"}:
-            if self._secrets is None:
-                raise AzureEventGridNamespaceError("pull binding requires the configured Key Vault")
-            requested = str(cfg.get("subscription_name", ""))
-            if not requested:
-                raise AzureEventGridNamespaceError("pull binding requires subscription_name")
-            _validate_resource_name(requested, "subscription_name", max_length=64)
-            subscription_name = self._subscription_name(topic_name, requested)
-            registry = self._load_registry(namespace_name, topic_name)
-            if registry.get(subscription_name) != "Queue":
-                raise AzureEventGridNamespaceError(
-                    f"pull binding subscription {requested!r} is not recorded as platform-owned",
-                )
-            subscription = self._subscription(namespace_name, topic_name, subscription_name)
-            if subscription is None:
-                raise AzureEventGridNamespaceError(
-                    f"pull binding subscription {requested!r} is not declared on this namespace topic",
-                )
-            mode = str(_field(_field(subscription, "delivery_configuration"), "delivery_mode", default=""))
-            if mode != "Queue":
-                raise AzureEventGridNamespaceError(f"subscription {requested!r} is not a pull subscription")
-            receive_endpoint = f"https://{hostname}/topics/{topic_name}/eventsubscriptions/{subscription_name}:receive"
+            requested = cfg.get("subscription_name", "")
+            name = child_name(handle, requested)
+            subscription = children.get(name)
+            if (
+                subscription is None
+                or _field(_field(subscription, "delivery_configuration"), "delivery_mode") != "Queue"
+            ):
+                raise OwnershipUnknown("pull binding requires the exact observed owned Queue subscription")
+            if self._owned_key(target, handle, receipts) is None:
+                raise OwnershipUnknown("pull binding requires an observed source-bound cached key")
             env_vars.update(
                 {
-                    "EVENT_GRID_NAMESPACE_SUBSCRIPTION": ValueRef(literal=subscription_name),
-                    "EVENT_GRID_NAMESPACE_RECEIVE_ENDPOINT": ValueRef(literal=receive_endpoint),
-                    "EVENT_GRID_NAMESPACE_ACCESS_KEY": ValueRef(
-                        secret_ref=self._access_key_secret_name(namespace_name),
+                    "EVENT_GRID_NAMESPACE_SUBSCRIPTION": ValueRef(literal=name),
+                    "EVENT_GRID_NAMESPACE_RECEIVE_ENDPOINT": ValueRef(
+                        literal=f"https://{hostname}/topics/{topic_name}/eventsubscriptions/{name}:receive"
                     ),
-                },
+                    "EVENT_GRID_NAMESPACE_ACCESS_KEY": ValueRef(secret_ref=self._key_secret_name(receipts)),
+                }
             )
-            notes.append("pull delivery uses a Key Vault-backed namespace access key")
+            notes.append("pull delivery uses a source-bound Key Vault namespace access key")
         if access_mode == "manage":
             roles.append("EventGrid Contributor")
             notes.append("manage binding permits Event Grid control-plane operations")
@@ -551,7 +538,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             "additionalProperties": False,
             "required": ["name", "delivery_mode"],
             "properties": {
-                "name": {"type": "string", "minLength": 3, "maxLength": 64},
+                "name": {"type": "string", "minLength": 3, "maxLength": 50},
                 "delivery_mode": {"type": "string", "enum": ["pull", "push"]},
                 "destination": destination_schema,
                 "delivery_identity": identity_schema,
@@ -605,7 +592,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
                     "items": {"type": "string"},
                     "uniqueItems": True,
                 },
-                "subscriptions": {"type": "array", "items": subscription_schema, "maxItems": 500},
+                "subscriptions": {"type": "array", "items": subscription_schema, "maxItems": 128},
                 "prune_subscriptions": {"type": "boolean", "default": False},
                 "confirm_message_loss": {"type": "boolean", "default": False},
                 "access_mode": {
@@ -657,8 +644,6 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
                     _validate_resource_name(str(cfg[field_name]), field_name)
                 except Exception as exc:
                     return str(exc)
-                if partial:
-                    return f"Event Grid namespace {field_name} is immutable"
                 if field_name == "namespace_name" and _is_reserved_namespace_name(str(cfg[field_name])):
                     return "Event Grid namespace_name uses a provider-reserved prefix"
         if not _integer_in_range(cfg.get("capacity", self._config.default_capacity), 1, 40):
@@ -704,15 +689,15 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
         if str(cfg.get("access_mode", "publish")) not in {"publish", "pull", "publish_pull", "manage"}:
             return "Event Grid namespace access_mode must be publish, pull, publish_pull, or manage"
         subscriptions = cfg.get("subscriptions", []) or []
-        if not isinstance(subscriptions, list) or len(subscriptions) > 500:
-            return "Event Grid namespace subscriptions must be a list of at most 500 entries"
+        if not isinstance(subscriptions, list) or len(subscriptions) > 128:
+            return "Event Grid namespace subscriptions must be a list of at most 128 entries"
         names: list[str] = []
         for subscription in subscriptions:
             error = self._validate_subscription(subscription, cfg, int(retention))
             if error:
                 return error
             names.append(str(subscription["name"]))
-        if len(names) != len(set(names)):
+        if len(names) != len({name.casefold() for name in names}):
             return "Event Grid namespace subscription names must be unique"
         return ""
 
@@ -736,7 +721,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
         if unknown:
             return f"unsupported Event Grid namespace subscription fields: {', '.join(unknown)}"
         try:
-            _validate_resource_name(str(sub.get("name", "")), "subscription name", max_length=64)
+            _validate_resource_name(str(sub.get("name", "")), "subscription name", max_length=50)
         except Exception as exc:
             return str(exc)
         mode = str(sub.get("delivery_mode", ""))
@@ -870,7 +855,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             if str(item["name"]).lower() in _SENSITIVE_DELIVERY_ATTRIBUTE_NAMES:
                 return "Event Grid namespace sensitive delivery attributes require a secret-aware integration"
             names.append(str(item["name"]))
-        if len(names) != len(set(names)):
+        if len(names) != len({name.casefold() for name in names}):
             return "Event Grid namespace delivery attribute names must be unique"
         return ""
 
@@ -974,54 +959,6 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
         from azure.mgmt.eventgrid import models
 
         return [models.InboundIpRule(ip_mask=str(value), action="Allow") for value in cfg.get("inbound_ip_rules", [])]
-
-    def _reconcile_subscriptions(self, namespace_name: str, topic_name: str, cfg: dict[str, Any]) -> dict[str, str]:
-        registry = self._load_registry(namespace_name, topic_name)
-        desired: dict[str, str] = {}
-        for subscription in cfg.get("subscriptions", []) or []:
-            name = self._subscription_name(topic_name, str(subscription["name"]))
-            mode = "Queue" if subscription["delivery_mode"] == "pull" else "Push"
-            desired[name] = mode
-
-        for name in desired:
-            if self._subscription(namespace_name, topic_name, name) is not None and name not in registry:
-                raise AzureEventGridNamespaceError(
-                    f"Event Grid namespace subscription {name!r} already exists and is not recorded as platform-owned",
-                )
-
-        # Reserve deterministic names before cloud mutation. A retry can safely finish
-        # after a process failure between the registry write and Azure reconciliation.
-        reserved = dict(registry)
-        reserved.update(desired)
-        self._store_registry(namespace_name, topic_name, reserved)
-        for subscription in cfg.get("subscriptions", []) or []:
-            name = self._subscription_name(topic_name, str(subscription["name"]))
-            self._wait(
-                self._mgmt.namespace_topic_event_subscriptions.begin_create_or_update(
-                    self._config.resource_group,
-                    namespace_name,
-                    topic_name,
-                    name,
-                    self._subscription_parameters(subscription, cfg),
-                ),
-            )
-        if cfg.get("prune_subscriptions"):
-            for name in set(registry) - set(desired):
-                if self._subscription(namespace_name, topic_name, name) is not None:
-                    self._wait(
-                        self._mgmt.namespace_topic_event_subscriptions.begin_delete(
-                            self._config.resource_group,
-                            namespace_name,
-                            topic_name,
-                            name,
-                        ),
-                    )
-            registry = desired
-        else:
-            registry = reserved
-        if registry != reserved:
-            self._store_registry(namespace_name, topic_name, registry)
-        return registry
 
     def _subscription_parameters(self, subscription: dict[str, Any], cfg: dict[str, Any]) -> Any:
         from azure.mgmt.eventgrid import models
@@ -1156,105 +1093,526 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             user_assigned_identity=str(identity["user_assigned_identity_resource_id"]),
         )
 
-    def _namespace_name(self, spec: ProvisionSpec) -> str:
-        explicit = str((spec.config or {}).get("namespace_name") or "")
-        if explicit:
-            return explicit
-        hint = spec.service_handle_hint or f"{spec.app_slug}-{spec.environment_name}"
-        seed = "/".join(
-            [
-                self._config.subscription_id,
-                self._config.resource_group,
-                spec.organization_id,
-                spec.app_id,
-                spec.environment_id,
-                hint,
-                "namespace",
-            ],
+    def _require_vault(self) -> None:
+        if self._secrets is None:
+            raise _NoVault("Standard ownership receipts require the configured Key Vault")
+
+    def _provision_target(self, spec: ProvisionSpec) -> Target:
+        if spec.recorded_handle:
+            return self._saved_target(spec.recorded_handle, spec)
+        return Target.new(
+            subscription=self._config.subscription_id,
+            resource_group=self._config.resource_group,
+            namespace_prefix=self._config.namespace_name_prefix,
+            topic_prefix=self._config.topic_name_prefix,
+            source=spec,
+            config=spec.config or {},
         )
-        return _generated_name(self._config.namespace_name_prefix, hint, seed, 50)
+
+    def _saved_target(self, handle: str, source: object) -> Target:
+        return Target.saved(
+            handle, subscription=self._config.subscription_id, resource_group=self._config.resource_group, source=source
+        )
+
+    def _namespace_name(self, spec: ProvisionSpec) -> str:
+        return self._provision_target(spec).namespace
 
     def _topic_name(self, spec: ProvisionSpec) -> str:
-        explicit = str((spec.config or {}).get("topic_name") or "")
-        if explicit:
-            return explicit
-        hint = spec.service_handle_hint or spec.app_slug
-        seed = "/".join([spec.organization_id, spec.app_id, spec.environment_id, hint, "topic"])
-        return _generated_name(self._config.topic_name_prefix, hint, seed, 50)
+        return self._provision_target(spec).topic
 
-    @staticmethod
-    def _subscription_name(topic_name: str, requested: str) -> str:
-        return _generated_name(
-            _MANAGED_SUBSCRIPTION_PREFIX.rstrip("-"),
-            requested,
-            f"{topic_name}/{requested}",
-            64,
-        )
+    def _handle(self, namespace_name: str, topic_name: str) -> str:
+        return Target(self._config.subscription_id, self._config.resource_group, namespace_name, topic_name).handle
 
-    @staticmethod
-    def _handle(namespace_name: str, topic_name: str) -> str:
-        return f"{KIND}/{namespace_name}/{topic_name}"
-
-    @staticmethod
-    def _parse_handle(handle: str) -> tuple[str, str]:
+    def _parse_handle(self, handle: str) -> tuple[str, str]:
         parts = handle.split("/")
-        if len(parts) != 3 or parts[0] != KIND:
-            raise AzureEventGridNamespaceError(f"invalid Event Grid namespace handle {handle!r}")
-        _validate_resource_name(parts[1], "namespace handle")
-        _validate_resource_name(parts[2], "topic handle")
-        return parts[1], parts[2]
+        if len(parts) != 6 or parts[:2] != [KIND, "arm-v1"]:
+            raise OwnershipUnknown("historical Standard placement is not recorded unambiguously")
+        target = Target(parts[2], parts[3], parts[4], parts[5])
+        if target.handle != handle or (target.subscription, target.resource_group) != (
+            self._config.subscription_id,
+            self._config.resource_group,
+        ):
+            raise OwnershipUnknown("saved placement differs from the current provider")
+        return target.namespace, target.topic
+
+    @staticmethod
+    def _subscription_name(source: object, requested: str) -> str:
+        return child_name(source, requested)
+
+    def _desired_children(self, cfg: dict[str, Any], source: object) -> dict[str, dict[str, Any]]:
+        result = {}
+        logical_names = set()
+        for sub in cfg.get("subscriptions", []) or []:
+            name = child_name(source, sub["name"])
+            if name in result or sub["name"].casefold() in logical_names:
+                raise OwnershipUnknown("logical or generated subscription names collide")
+            result[name] = sub
+            logical_names.add(sub["name"].casefold())
+        return result
+
+    def _read(self, function: Any, *args: Any) -> Any | None:
+        from azure.core.exceptions import ResourceNotFoundError
+
+        try:
+            return self._observation.call(function, *args)
+        except ResourceNotFoundError as exc:
+            if exc.status_code == 404:
+                return None
+            raise
 
     def _namespace(self, namespace_name: str) -> Any | None:
-        try:
-            return self._mgmt.namespaces.get(self._config.resource_group, namespace_name)
-        except Exception as exc:
-            if _not_found(exc):
-                return None
-            raise
+        return self._read(self._mgmt.namespaces.get, self._config.resource_group, namespace_name)
 
     def _topic(self, namespace_name: str, topic_name: str) -> Any | None:
-        try:
-            return self._mgmt.namespace_topics.get(self._config.resource_group, namespace_name, topic_name)
-        except Exception as exc:
-            if _not_found(exc):
-                return None
-            raise
+        return self._read(self._mgmt.namespace_topics.get, self._config.resource_group, namespace_name, topic_name)
 
-    def _topics(self, namespace_name: str) -> list[Any]:
-        return list(self._mgmt.namespace_topics.list_by_namespace(self._config.resource_group, namespace_name))
-
-    def _subscription(self, namespace_name: str, topic_name: str, subscription_name: str) -> Any | None:
-        try:
-            return self._mgmt.namespace_topic_event_subscriptions.get(
-                self._config.resource_group,
-                namespace_name,
-                topic_name,
-                subscription_name,
-            )
-        except Exception as exc:
-            if _not_found(exc):
-                return None
-            raise
-
-    def _subscriptions(self, namespace_name: str, topic_name: str) -> list[Any]:
-        if self._topic(namespace_name, topic_name) is None:
-            return []
-        return list(
-            self._mgmt.namespace_topic_event_subscriptions.list_by_namespace_topic(
-                self._config.resource_group,
-                namespace_name,
-                topic_name,
-            ),
+    def _subscription(self, namespace_name: str, topic_name: str, name: str) -> Any | None:
+        return self._read(
+            self._mgmt.namespace_topic_event_subscriptions.get,
+            self._config.resource_group,
+            namespace_name,
+            topic_name,
+            name,
         )
+
+    def _assert_owned(self, namespace: Any, target: Target, source: object) -> None:
+        try:
+            tags = namespace_identity_tags(namespace, target, source)
+        except OwnershipUnknown as exc:
+            raise AzureOwnershipError(str(exc)) from exc
+        verify_azure_ownership(
+            tags, owner_of(source), operation=AzureOperation.UPDATE, resource="saved Event Grid Standard namespace"
+        )
+        if _enum(_field(_field(namespace, "sku"), "name")) != "Standard":
+            raise AzureEventGridNamespaceError("namespace SKU is not observed Standard; Standard is required")
+        if _enum(_field(namespace, "minimum_tls_version_allowed")) != "1.2":
+            raise OwnershipUnknown("namespace minimum TLS version is not observed as 1.2")
+        observed = _field(namespace, "location")
+        if (
+            not isinstance(observed, str)
+            or observed.replace(" ", "").casefold() != self._config.location.replace(" ", "").casefold()
+        ):
+            raise OwnershipUnknown("namespace location differs from the current provider")
+
+    def _current_namespace(self, target: Target, source: object) -> Any:
+        namespace = self._namespace(target.namespace)
+        if namespace is None:
+            raise OwnershipUnknown("namespace disappeared during the operation")
+        self._assert_owned(namespace, target, source)
+        return namespace
+
+    def _load_receipts(self, target: Target, source: object) -> Receipts:
+        self._require_vault()
+        receipts = Receipts.empty(target, source)
+        secret = self._read(self._secrets.get_secret, self._receipt_secret_name(receipts))
+        if secret is None:
+            return receipts
+        return Receipts.load(_field(secret, "value"), target, source)
+
+    def _store_receipts(self, receipts: Receipts, source: object) -> None:
+        self._load_receipts(receipts.target, source)
+        raw = receipts.dump()
+        self._observation.call(
+            self._secrets.set_secret, self._receipt_secret_name(receipts), raw, tags=self._secret_metadata(receipts)
+        )
+        actual = self._load_receipts(receipts.target, source)
+        if actual.dump() != raw:
+            raise OwnershipUnknown("receipt persistence is not observed; cloud effects are refused")
 
     @staticmethod
-    def _assert_owned(namespace: Any, source: object, operation: AzureOperation, namespace_name: str) -> None:
-        verify_azure_ownership(
-            dict(_field(namespace, "tags", default={}) or {}),
-            owner_of(source),
-            operation=operation,
-            resource=f"Event Grid namespace {namespace_name}",
+    def _secret_metadata(receipts: Receipts) -> dict[str, str]:
+        return {
+            "astrolift-managed-by": "platform",
+            "astrolift-managed-service-id": receipts.owner,
+            "astrolift-topic-sha256": hashlib.sha256(receipts.target.topic_id.casefold().encode()).hexdigest(),
+        }
+
+    def _receipt_secret_name(self, receipts: Receipts) -> str:
+        return receipts.secret_name_for(_slug(self._config.secret_name_prefix) + "-v2")
+
+    def _key_secret_name(self, receipts: Receipts) -> str:
+        return self._receipt_secret_name(receipts) + "-key"
+
+    def _owned_key(self, target: Target, source: object, receipts: Receipts) -> Any | None:
+        service_uuid(source)
+        secret = self._read(self._secrets.get_secret, self._key_secret_name(receipts))
+        if secret is None:
+            return None
+        tags = _field(_field(secret, "properties"), "tags")
+        wanted = self._secret_metadata(receipts)
+        if not isinstance(tags, dict) or any(tags.get(key) != value for key, value in wanted.items()):
+            raise OwnershipUnknown("cached key source and placement metadata are not observed")
+        for key, value in tags.items():
+            normalized = re.sub(r"[^a-z0-9]", "", key.casefold())
+            for name, expected in wanted.items():
+                if normalized == re.sub(r"[^a-z0-9]", "", name) and value != expected:
+                    raise OwnershipUnknown("cached key identity aliases disagree")
+        if target != receipts.target or not isinstance(_field(secret, "value"), str) or not _field(secret, "value"):
+            raise OwnershipUnknown("cached key is unavailable on the exact saved target")
+        return secret
+
+    def _delete_owned_key(self, target: Target, source: object, receipts: Receipts) -> None:
+        if self._owned_key(target, source, receipts) is not None:
+            name = self._key_secret_name(receipts)
+            self._observation.call(self._secrets.begin_delete_secret, name)
+            if self._read(self._secrets.get_secret, name) is not None:
+                raise _Pending("cached key deletion remains pending")
+
+    def _delete_receipt_secret(self, receipts: Receipts, source: object) -> None:
+        self._load_receipts(receipts.target, source)
+        if self._read(self._secrets.get_secret, self._receipt_secret_name(receipts)) is not None:
+            self._observation.call(self._secrets.begin_delete_secret, self._receipt_secret_name(receipts))
+            if self._read(self._secrets.get_secret, self._receipt_secret_name(receipts)) is not None:
+                raise _Pending("receipt secret deletion remains pending")
+
+    def _sync_owned_key(self, target: Target, source: object, receipts: Receipts) -> None:
+        namespace, topic, children = self._inventory(target, source, receipts)
+        if (
+            namespace is None
+            or topic is None
+            or _state(namespace) != "Succeeded"
+            or not receipts.observe(target.topic_id, topic)
+        ):
+            raise OwnershipUnknown("credential publication requires an observed ready exclusive target")
+        if not all(receipts.observe(target.child_id(name), child) for name, child in children.items()):
+            raise OwnershipUnknown("credential publication requires observed ready children")
+        self._require_receipt_children(target, receipts, children)
+        if any(
+            _field(_field(child, "delivery_configuration"), "delivery_mode") == "Queue" for child in children.values()
+        ):
+            self._assert_unlocked(target, True, True, children)
+            self._owned_key(target, source, receipts)
+            keys = self._observation.call(
+                self._mgmt.namespaces.list_shared_access_keys, target.resource_group, target.namespace
+            )
+            key = _field(keys, "key1")
+            if not isinstance(key, str) or not key:
+                raise OwnershipUnknown("namespace primary key is unavailable")
+            self._observation.call(
+                self._secrets.set_secret, self._key_secret_name(receipts), key, tags=self._secret_metadata(receipts)
+            )
+            persisted = self._owned_key(target, source, receipts)
+            if persisted is None or _field(persisted, "value") != key:
+                raise OwnershipUnknown("cached key persistence is not observed")
+        else:
+            self._delete_owned_key(target, source, receipts)
+
+    def _inventory(self, target: Target, source: object, receipts: Receipts) -> tuple[Any, Any, dict[str, Any]]:
+        namespace = self._namespace(target.namespace)
+        if namespace is None:
+            collection = (
+                f"/subscriptions/{target.subscription}/resourceGroups/{target.resource_group}"
+                "/providers/Microsoft.EventGrid/namespaces"
+            )
+            rows = self._observation.pages(
+                self._mgmt.namespaces.list_by_resource_group, collection, target.resource_group
+            )
+            observed_names = set()
+            for row in rows:
+                name = _field(row, "name")
+                if not isinstance(name, str) or "/" in name or not name:
+                    raise OwnershipUnknown("namespace inventory identity is unavailable")
+                expected = collection + "/" + name
+                assert_identity(row, expected)
+                if name.casefold() in observed_names or name.casefold() == target.namespace.casefold():
+                    raise OwnershipUnknown("namespace absence conflicts with the complete parent inventory")
+                observed_names.add(name.casefold())
+            return None, None, {}
+        self._assert_owned(namespace, target, source)
+        topics = self._observation.pages(
+            self._mgmt.namespace_topics.list_by_namespace,
+            target.namespace_id + "/topics",
+            target.resource_group,
+            target.namespace,
         )
+        topic = None
+        for row in topics:
+            if topic is not None or _field(row, "name") != target.topic:
+                raise OwnershipUnknown("namespace contains unrelated or duplicate topic resources")
+            receipts.assert_authority(target.topic_id, row)
+            topic = self._topic(target.namespace, target.topic)
+            if topic is None:
+                raise OwnershipUnknown("topic inventory conflicts with its direct read")
+            receipts.assert_authority(target.topic_id, topic)
+        direct = self._topic(target.namespace, target.topic)
+        if (topic is None) != (direct is None):
+            raise OwnershipUnknown("topic absence conflicts with the complete parent inventory")
+        if direct is not None:
+            receipts.assert_authority(target.topic_id, direct)
+            topic = direct
+        children: dict[str, Any] = {}
+        if topic is not None:
+            rows = self._observation.pages(
+                self._mgmt.namespace_topic_event_subscriptions.list_by_namespace_topic,
+                target.topic_id + "/eventSubscriptions",
+                target.resource_group,
+                target.namespace,
+                target.topic,
+            )
+            for row in rows:
+                name = _field(row, "name")
+                if not isinstance(name, str) or name in children:
+                    raise OwnershipUnknown("subscription inventory identity is missing or duplicated")
+                receipts.assert_authority(target.child_id(name), row)
+                current = self._subscription(target.namespace, target.topic, name)
+                if current is None:
+                    raise OwnershipUnknown("subscription inventory conflicts with its direct read")
+                receipts.assert_authority(target.child_id(name), current)
+                children[name] = current
+        for attr, path in (
+            ("clients", "clients"),
+            ("client_groups", "clientGroups"),
+            ("topic_spaces", "topicSpaces"),
+            ("permission_bindings", "permissionBindings"),
+        ):
+            operation = getattr(self._mgmt, attr)
+            rows = self._observation.pages(
+                operation.list_by_namespace, target.namespace_id + "/" + path, target.resource_group, target.namespace
+            )
+            seen = set()
+            for row in rows:
+                name = _field(row, "name")
+                if attr != "client_groups" or name != "$all" or name in seen:
+                    raise OwnershipUnknown("namespace contains MQTT resources outside this service shape")
+                expected = target.namespace_id + "/clientGroups/$all"
+                assert_identity(row, expected)
+                current = self._observation.call(operation.get, target.resource_group, target.namespace, "$all")
+                assert_identity(current, expected)
+                seen.add(name)
+        mqtt = _field(namespace, "topic_spaces_configuration")
+        if mqtt is not None and (_enum(_field(mqtt, "state")) != "Disabled" or _field(mqtt, "route_topic_resource_id")):
+            raise OwnershipUnknown("namespace MQTT configuration is outside this service shape")
+        return namespace, topic, children
+
+    def _assert_unlocked(
+        self, target: Target, namespace_exists: bool, topic_exists: bool, children: dict[str, Any]
+    ) -> None:
+        scopes = [
+            f"/subscriptions/{target.subscription}",
+            f"/subscriptions/{target.subscription}/resourceGroups/{target.resource_group}",
+        ]
+        calls = [
+            (self._locks.management_locks.list_at_subscription_level, scopes[0], {}),
+            (
+                self._locks.management_locks.list_at_resource_group_level,
+                scopes[1],
+                {"resource_group_name": target.resource_group},
+            ),
+        ]
+        resource_scopes = []
+        if namespace_exists:
+            resource_scopes.append((target.namespace_id, "", "namespaces", target.namespace))
+        if topic_exists:
+            resource_scopes.append((target.topic_id, "namespaces/" + target.namespace, "topics", target.topic))
+        resource_scopes.extend(
+            (
+                target.child_id(name),
+                "namespaces/" + target.namespace + "/topics/" + target.topic,
+                "eventSubscriptions",
+                name,
+            )
+            for name in children
+        )
+        for identity, parent, kind, name in resource_scopes:
+            calls.append(
+                (
+                    self._locks.management_locks.list_at_resource_level,
+                    identity,
+                    {
+                        "resource_group_name": target.resource_group,
+                        "resource_provider_namespace": "Microsoft.EventGrid",
+                        "parent_resource_path": parent,
+                        "resource_type": kind,
+                        "resource_name": name,
+                    },
+                )
+            )
+        for function, scope, options in calls:
+            rows = self._observation.pages(function, scope + "/providers/Microsoft.Authorization/locks", **options)
+            for row in rows:
+                identity = _field(row, "id")
+                if not isinstance(identity, str) or not identity.startswith("/"):
+                    raise OwnershipUnknown("lock identity is unavailable")
+                lock_scope, separator, name = identity.casefold().partition("/providers/microsoft.authorization/locks/")
+                if (
+                    not separator
+                    or not name
+                    or "/" in name
+                    or not (lock_scope == scope.casefold() or lock_scope.startswith(scope.casefold() + "/"))
+                ):
+                    raise OwnershipUnknown("lock inventory returned an unrelated or malformed identity")
+                if (
+                    lock_scope in {s.casefold() for s in scopes}
+                    or lock_scope == target.namespace_id.casefold()
+                    or lock_scope.startswith(target.namespace_id.casefold() + "/")
+                ):
+                    raise OwnershipUnknown("an inherited or target lock requires separate operator resolution")
+
+    def _immutable_settings(
+        self, namespace: Any, topic: Any, target: Target, cfg: dict[str, Any], *, apply_defaults: bool
+    ) -> None:
+        for name, expected in (("namespace_name", target.namespace), ("topic_name", target.topic)):
+            if name in cfg and cfg[name] != expected:
+                raise AzureEventGridNamespaceError(f"{name} differs from the saved resource; reprovision required")
+        self._assert_namespace_immutable(namespace, cfg, apply_defaults=apply_defaults)
+        if topic is not None:
+            self._assert_topic_immutable(topic, cfg, apply_defaults=apply_defaults)
+
+    @staticmethod
+    def _require_receipt_children(target: Target, receipts: Receipts, children: dict[str, Any]) -> None:
+        observed = {target.child_id(name).casefold() for name in children}
+        expected = set(receipts.resources) - {target.topic_id.casefold()}
+        if not expected <= observed:
+            raise OwnershipUnknown("recorded subscription completion or presence is not observed")
+
+    def _preflight_children(
+        self,
+        target: Target,
+        desired: dict[str, dict[str, Any]],
+        children: dict[str, Any],
+        receipts: Receipts,
+        source: object,
+        *,
+        prune: bool,
+    ) -> None:
+        for name in desired:
+            current = self._subscription(target.namespace, target.topic, name)
+            if current is not None:
+                receipts.assert_authority(target.child_id(name), current)
+                if name not in children:
+                    raise OwnershipUnknown("desired subscription direct read conflicts with its complete inventory")
+        changed = False
+        for key, record in list(receipts.resources.items()):
+            if key == target.topic_id.casefold():
+                continue
+            name = record["id"].rsplit("/", 1)[1]
+            if name in children:
+                continue
+            if self._subscription(target.namespace, target.topic, name) is not None:
+                raise OwnershipUnknown("recorded subscription direct read conflicts with its complete inventory")
+            if prune and name not in desired:
+                receipts.resources.pop(key)
+                changed = True
+            elif record["state"] != "reserved" or name not in desired:
+                raise OwnershipUnknown("recorded subscription is missing; implicit recreation is refused")
+        if changed:
+            self._store_receipts(receipts, source)
+
+    def _apply_update(
+        self, target: Target, cfg: dict[str, Any], source: object, receipts: Receipts, *, apply_defaults: bool
+    ) -> None:
+        namespace, topic, children = self._inventory(target, source, receipts)
+        if namespace is None or topic is None:
+            raise OwnershipUnknown("the exact saved target is unavailable for update")
+        self._assert_unlocked(target, True, True, children)
+        if self._has_namespace_update(cfg) or apply_defaults:
+            self._current_namespace(target, source)
+            actual = self._observation.begin(
+                self._mgmt.namespaces.begin_update,
+                target.resource_group,
+                target.namespace,
+                self._namespace_update_parameters(cfg, apply_defaults=apply_defaults),
+            )
+            self._assert_owned(actual, target, source)
+        if "topic_retention_days" in cfg or apply_defaults:
+            self._current_namespace(target, source)
+            current = self._topic(target.namespace, target.topic)
+            receipts.assert_authority(target.topic_id, current)
+            actual = self._observation.begin(
+                self._mgmt.namespace_topics.begin_update,
+                target.resource_group,
+                target.namespace,
+                target.topic,
+                self._topic_update_parameters(cfg, apply_defaults=apply_defaults),
+            )
+            parameters = self._topic_parameters(
+                {**cfg, "topic_retention_days": cfg.get("topic_retention_days", 1)}
+            ).serialize()
+            receipts.accept(target.topic_id, actual, parameters)
+            self._store_receipts(receipts, source)
+
+    def _reconcile_owned_children(
+        self,
+        target: Target,
+        cfg: dict[str, Any],
+        desired: dict[str, dict[str, Any]],
+        source: object,
+        receipts: Receipts,
+    ) -> None:
+        namespace, topic, children = self._inventory(target, source, receipts)
+        if namespace is None or topic is None:
+            raise OwnershipUnknown("subscription reconciliation requires the exact owned parent")
+        self._assert_unlocked(target, True, True, children)
+        for name, sub in desired.items():
+            identity = target.child_id(name)
+            parameters = self._subscription_parameters(sub, cfg)
+            self._current_namespace(target, source)
+            current = self._subscription(target.namespace, target.topic, name)
+            if current is not None:
+                receipts.assert_authority(identity, current)
+                if _state(current) != "Succeeded":
+                    raise _Pending("subscription update remains pending")
+            elif identity.casefold() in receipts.resources:
+                if receipts.resources[identity.casefold()]["state"] != "reserved":
+                    raise OwnershipUnknown("recorded subscription is missing; recreation is refused")
+            else:
+                receipts.reserve(identity, parameters.serialize())
+                self._store_receipts(receipts, source)
+            actual = self._observation.begin(
+                self._mgmt.namespace_topic_event_subscriptions.begin_create_or_update,
+                target.resource_group,
+                target.namespace,
+                target.topic,
+                name,
+                parameters,
+            )
+            receipts.accept(identity, actual, parameters.serialize())
+            self._store_receipts(receipts, source)
+        if cfg.get("prune_subscriptions"):
+            for name, current in children.items():
+                if name in desired:
+                    continue
+                identity = target.child_id(name)
+                self._current_namespace(target, source)
+                current = self._subscription(target.namespace, target.topic, name)
+                if current is not None:
+                    receipts.assert_authority(identity, current)
+                    self._observation.begin(
+                        self._mgmt.namespace_topic_event_subscriptions.begin_delete,
+                        target.resource_group,
+                        target.namespace,
+                        target.topic,
+                        name,
+                    )
+                if self._subscription(target.namespace, target.topic, name) is not None:
+                    raise _Pending("subscription pruning remains pending")
+                receipts.resources.pop(identity.casefold(), None)
+                self._store_receipts(receipts, source)
+
+    def _observed(
+        self, target: Target, cfg: dict[str, Any], source: object, receipts: Receipts, *, apply_defaults: bool
+    ) -> bool:
+        namespace, topic, children = self._inventory(target, source, receipts)
+        if (
+            namespace is None
+            or topic is None
+            or _state(namespace) != "Succeeded"
+            or not receipts.observe(target.topic_id, topic)
+        ):
+            return False
+        self._require_receipt_children(target, receipts, children)
+        expected = self._namespace_update_parameters(cfg, apply_defaults=apply_defaults).serialize()
+        if not contains(namespace.serialize(), expected):
+            return False
+        if not all(receipts.observe(target.child_id(name), child) for name, child in children.items()):
+            return False
+        if "subscriptions" in cfg:
+            desired = self._desired_children(cfg, source)
+            if not set(desired) <= set(children):
+                return False
+            if cfg.get("prune_subscriptions") and set(desired) != set(children):
+                return False
+        return True
 
     def _assert_namespace_immutable(self, namespace: Any, cfg: dict[str, Any], *, apply_defaults: bool) -> None:
         sku = _field(namespace, "sku")
@@ -1318,116 +1676,6 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             f"/providers/Microsoft.EventGrid/namespaces/{namespace_name}/topics/{topic_name}"
         )
 
-    def _registry_secret_name(self, namespace_name: str, topic_name: str) -> str:
-        digest = _generated_name("registry", topic_name, f"{namespace_name}/{topic_name}", 32)
-        return f"{_slug(self._config.secret_name_prefix)}-{_slug(namespace_name)[:45]}-{digest}"
-
-    def _access_key_secret_name(self, namespace_name: str) -> str:
-        return f"{_slug(self._config.secret_name_prefix)}-{_slug(namespace_name)[:50]}-access-key"
-
-    def _load_registry(self, namespace_name: str, topic_name: str) -> dict[str, str]:
-        if self._secrets is None:
-            return {}
-        try:
-            value = self._secrets.get_secret(self._registry_secret_name(namespace_name, topic_name))
-        except Exception as exc:
-            if _not_found(exc):
-                return {}
-            raise
-        raw = str(_field(value, "value", default=""))
-        try:
-            parsed = json.loads(raw or "{}")
-        except json.JSONDecodeError as exc:
-            raise AzureEventGridNamespaceError(
-                "Event Grid namespace subscription ownership registry is invalid JSON",
-            ) from exc
-        if not isinstance(parsed, dict) or any(
-            not isinstance(key, str) or mode not in {"Queue", "Push"} for key, mode in parsed.items()
-        ):
-            raise AzureEventGridNamespaceError("Event Grid namespace subscription ownership registry is invalid")
-        return {str(key): str(mode) for key, mode in parsed.items()}
-
-    def _store_registry(self, namespace_name: str, topic_name: str, registry: dict[str, str]) -> None:
-        if self._secrets is None:
-            raise AzureEventGridNamespaceError("Event Grid namespace subscription ownership requires Key Vault")
-        self._set_secret(
-            self._registry_secret_name(namespace_name, topic_name),
-            json.dumps(registry, sort_keys=True, separators=(",", ":")),
-        )
-
-    def _store_access_key(self, namespace_name: str) -> None:
-        if self._secrets is None:
-            raise AzureEventGridNamespaceError("Event Grid namespace pull delivery requires Key Vault")
-        keys = self._mgmt.namespaces.list_shared_access_keys(self._config.resource_group, namespace_name)
-        key = str(_field(keys, "key1", default=""))
-        if not key:
-            raise AzureEventGridNamespaceError("Event Grid namespace returned no primary access key")
-        self._set_secret(self._access_key_secret_name(namespace_name), key)
-
-    def _sync_access_key(self, namespace_name: str, registry: dict[str, str]) -> None:
-        if any(mode == "Queue" for mode in registry.values()):
-            self._store_access_key(namespace_name)
-            return
-        self._delete_secret_if_present(self._access_key_secret_name(namespace_name))
-
-    def _set_secret(self, name: str, value: str) -> None:
-        try:
-            self._secrets.set_secret(name, value)
-        except Exception as exc:
-            if getattr(exc, "status_code", None) != 409 and type(exc).__name__ != "ResourceExistsError":
-                raise
-            poller = self._secrets.begin_recover_deleted_secret(name)
-            self._wait(poller)
-            self._secrets.set_secret(name, value)
-
-    def _delete_secrets(self, namespace_name: str, topic_name: str) -> None:
-        if self._secrets is None:
-            return
-        names = [
-            self._access_key_secret_name(namespace_name),
-            self._registry_secret_name(namespace_name, topic_name),
-        ]
-        for name in names:
-            self._delete_secret_if_present(name)
-
-    def _delete_secret_if_present(self, name: str) -> None:
-        if self._secrets is None:
-            return
-        try:
-            self._secrets.begin_delete_secret(name)
-        except Exception as exc:
-            if not _not_found(exc):
-                raise
-
-    def _resource_locks(self, namespace_name: str) -> list[Any]:
-        return list(
-            self._locks.management_locks.list_at_resource_level(
-                resource_group_name=self._config.resource_group,
-                resource_provider_namespace="Microsoft.EventGrid",
-                parent_resource_path="",
-                resource_type="namespaces",
-                resource_name=namespace_name,
-            ),
-        )
-
-    def _delete_locks(self, namespace_name: str, locks: list[Any]) -> None:
-        for lock in locks:
-            name = str(_field(lock, "name", default=""))
-            if not name:
-                raise AzureEventGridNamespaceError("Event Grid namespace lock has no name")
-            self._locks.management_locks.delete_at_resource_level(
-                resource_group_name=self._config.resource_group,
-                resource_provider_namespace="Microsoft.EventGrid",
-                parent_resource_path="",
-                resource_type="namespaces",
-                resource_name=namespace_name,
-                lock_name=name,
-            )
-
-    @staticmethod
-    def _wait(poller: Any) -> Any:
-        return poller.result() if hasattr(poller, "result") else poller
-
 
 def _iso_minutes(minutes: int) -> str:
     days, remainder = divmod(minutes, 1440)
@@ -1441,3 +1689,39 @@ def _iso_minutes(minutes: int) -> str:
 
 def _is_reserved_namespace_name(value: str) -> bool:
     return value.lower().startswith(("microsoft", "system", "eventgrid"))
+
+
+class _Pending(Exception):
+    pass
+
+
+class _NoVault(OwnershipUnknown):
+    pass
+
+
+def _enum(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _state(value: Any) -> str:
+    return _enum(_field(value, "provisioning_state"))
+
+
+def _failure_code(exc: Exception) -> str:
+    if isinstance(exc, _NoVault):
+        return "no_secret_backend"
+    if isinstance(exc, AzureOwnershipError):
+        return OWNERSHIP_ERROR_CODE
+    if isinstance(exc, _Pending):
+        return "operation_pending"
+    if isinstance(exc, OwnershipUnknown):
+        return "ownership_unknown"
+    if isinstance(exc, AzureEventGridNamespaceError):
+        return "invalid_event_grid_namespace_config"
+    return "ownership_unknown"
+
+
+def _failure_message(exc: Exception) -> str:
+    if isinstance(exc, (_Pending, OwnershipUnknown, AzureOwnershipError, AzureEventGridNamespaceError)):
+        return str(exc)
+    return "Standard observation failed; current ownership or completion is unknown"

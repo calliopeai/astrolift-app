@@ -148,7 +148,7 @@ def assert_identity(actual: Any, resource_id: str) -> None:
         raise OwnershipUnknown("actual ARM identity does not match the exact saved resource")
 
 
-def assert_namespace_owner(actual: Any, target: Target, source: object) -> None:
+def namespace_identity_tags(actual: Any, target: Target, source: object) -> dict[str, str]:
     assert_identity(actual, target.namespace_id)
     wanted = str(service_uuid(source))
     tags = field(actual, "tags")
@@ -167,6 +167,11 @@ def assert_namespace_owner(actual: Any, target: Target, source: object) -> None:
             raise OwnershipUnknown("namespace platform identity aliases disagree")
     if not observed:
         raise OwnershipUnknown("current namespace source identity is missing")
+    return tags
+
+
+def assert_namespace_owner(actual: Any, target: Target, source: object) -> None:
+    tags = namespace_identity_tags(actual, target, source)
     try:
         verify_azure_ownership(
             tags, owner_of(source), operation=AzureOperation.UPDATE, resource="saved Event Grid Standard namespace"
@@ -177,6 +182,8 @@ def assert_namespace_owner(actual: Any, target: Target, source: object) -> None:
 
 def contains(actual: dict[str, Any], desired: dict[str, Any]) -> bool:
     for key, value in desired.items():
+        if key == "identity" and value == {"type": "None"} and actual.get(key) in (None, {"type": "None"}):
+            continue
         if key not in actual:
             return False
         if isinstance(value, dict):
@@ -208,8 +215,13 @@ class Receipts:
 
     @property
     def secret_name(self) -> str:
+        return self.secret_name_for("eventgridns")
+
+    def secret_name_for(self, prefix: str) -> str:
+        if not isinstance(prefix, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,42}", prefix):
+            raise OwnershipUnknown("receipt secret prefix requires 1-43 safe characters")
         digest = hashlib.sha256(self.target.topic_id.casefold().encode()).hexdigest()[:16]
-        return f"eventgridns-{canonical_uuid(self.owner).hex}-{digest}"
+        return f"{prefix}-{canonical_uuid(self.owner).hex}-{digest}"
 
     def _resource_id(self, identity: str) -> str:
         if same_arm(identity, self.target.topic_id):
