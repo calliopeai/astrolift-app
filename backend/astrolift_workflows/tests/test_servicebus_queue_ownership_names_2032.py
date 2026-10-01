@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from _sdk.azure_ownership import AzureOwnershipError
-from _sdk.managed_service import DeprovisionSpec
+from _sdk.managed_service import UPDATE_NOT_SUPPORTED_IN_PLACE, DeprovisionSpec
 from azure.managed.queue_servicebus import ServiceBusDriver
 
 from astrolift_workflows.activities.managed_service_lifecycle import (
@@ -160,7 +160,12 @@ def test_production_lifecycle_refuses_foreign_or_ambiguous_identity_and_never_mu
     row["properties"]["userMetadata"] = metadata
     before = copy.deepcopy(cloud.api.rows)
     assert not _provision_sync(svc.pk)["ok"]
-    assert not _update_sync(svc.pk)["ok"]
+    before_update = len(cloud.api.calls)
+    update = _update_sync(svc.pk)
+    assert (
+        not update["ok"] and not update["retryable"] and update["errors"] == [UPDATE_NOT_SUPPORTED_IN_PLACE]
+    )
+    assert len(cloud.api.calls) == before_update
     assert _check_ready_sync(svc.pk, svc.backend_ref) == "error"
     with pytest.raises((AzureOwnershipError, RuntimeError)):
         _managed_binding_for(svc)
@@ -216,3 +221,25 @@ def test_org_custom_tag_delimiter_cannot_forge_owner_through_actual_spec_builder
     result = _provision_sync(svc.pk)
     assert not result["ok"] and "ownership_refused" in result["errors"]
     assert cloud.api.calls == []
+
+
+@pytest.mark.parametrize("source", ["foreign", "unavailable", "invalid-handle"])
+def test_production_unsupported_update_keeps_permanent_contract_without_http(cloud, source):
+    svc = _owned(cloud, "unsupported-servicebus-update")
+    if source == "foreign":
+        row = next(iter(cloud.api.rows.values()))
+        row["properties"]["userMetadata"] = row["properties"]["userMetadata"].replace(
+            str(svc.guid), "foreign"
+        )
+    elif source == "unavailable":
+        cloud.api.failures["GET"] = (403, "UnavailableResourceNotFound")
+    else:
+        svc.backend_ref = "probe/handle"
+        svc.save(update_fields=["backend_ref"])
+    cloud.api.calls.clear()
+    before = copy.deepcopy(cloud.api.rows)
+    result = _update_sync(svc.pk)
+    assert (
+        not result["ok"] and not result["retryable"] and result["errors"] == [UPDATE_NOT_SUPPORTED_IN_PLACE]
+    )
+    assert cloud.api.calls == [] and cloud.api.rows == before

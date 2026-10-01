@@ -14,6 +14,10 @@
   inputs, retain committed writes through later failures, and discard old-cluster
   or withdrawn-source drafts (#2145).
 
+- Azure `queue/servicebus` preserves its permanent unsupported in-place update
+  contract without SDK reads or writes, including foreign/unavailable targets.
+  Supported lifecycle paths retain their actual ownership checks (#2032, #2098).
+
 - Azure `queue/servicebus` uses the full immutable managed-service UUID for new
   names and preserves recorded queue paths. Actual source/platform metadata
   and ARM target checks now gate lifecycle, readiness and workload bindings;

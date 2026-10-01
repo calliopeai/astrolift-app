@@ -140,17 +140,6 @@ class ServiceBusDriver(ManagedServiceDriver):
 
     @driver_op(cloud="azure", driver="queue_servicebus")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        try:
-            queue_name = self._validated_target(spec)
-            self._get_queue(queue_name, spec, _QueueCallBudget(), required=True)
-        except Exception as exc:
-            return UpdateResult(
-                ok=False,
-                handle=spec.handle,
-                message=_queue_error_message(exc),
-                errors=_queue_errors(exc),
-                retryable=not isinstance(exc, (AzureOwnershipError, AzureTagError)),
-            )
         return unsupported_update(spec.handle, "Service Bus queue settings reconcile on provision, not in place")
 
     @driver_op(

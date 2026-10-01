@@ -456,8 +456,8 @@ recorded paths refuse before HTTP. Existing queues without a complete,
 unambiguous ownership envelope require a separate authorized adoption/recovery
 process; this driver does not backfill an unlabelled queue from a slug or config.
 
-Provision/reprovision, unsupported in-place update, status, workload binding,
-and destructive teardown read the actual queue first. They require the same
+Provision/reprovision, status, workload binding, and destructive teardown
+read the actual queue first. They require the same
 managed-service UUID, platform marker, nonconflicting known identity aliases,
 and a returned ARM resource ID matching the configured subscription, resource
 group, namespace and exact recorded queue path (case-insensitive as ARM requires).
@@ -466,6 +466,11 @@ contradictory ownership metadata refuses. Binding still emits
 `SERVICEBUS_NAMESPACE`, `SERVICEBUS_QUEUE`, `SERVICEBUS_ENDPOINT` and the existing
 Data Sender/Data Receiver grants at that verified queue ARM ID; no namespace-wide
 grant or connection credential is added.
+
+In-place update remains permanently unsupported with
+`update_not_supported_in_place` and `retryable=False`. It performs no SDK read
+or write, even for a foreign, unavailable or malformed source; actual changes
+must use the ownership-checked reprovision path.
 
 The Azure extra now requires `azure-mgmt-servicebus>=10.0`. Stable 8.2 and 9.0
 queue models cannot serialize/read the required ARM `userMetadata` property.

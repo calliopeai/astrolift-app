@@ -16,7 +16,13 @@ from urllib.parse import parse_qs, unquote, urlsplit
 import pytest
 
 from _sdk.azure_ownership import AzureOwnershipError
-from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
+from _sdk.managed_service import (
+    UPDATE_NOT_SUPPORTED_IN_PLACE,
+    DeprovisionSpec,
+    ProvisionSpec,
+    ServiceHandle,
+    UpdateSpec,
+)
 from azure.core.credentials import AccessToken
 from azure.core.pipeline.transport import HttpResponse, HttpTransport
 from azure.managed.queue_servicebus import ServiceBusConfig, ServiceBusDriver
@@ -211,7 +217,10 @@ def test_every_operational_path_refuses_replaced_or_unknown_live_resource_before
     row["properties"]["userMetadata"] = metadata
     api.calls.clear()
     assert not driver.provision(spec(recorded_handle=result.handle)).ok
-    assert not driver.update(UpdateSpec(result.handle, managed_service_id=OWNER)).ok
+    before_update = len(api.calls)
+    update = driver.update(UpdateSpec(result.handle, managed_service_id=OWNER))
+    assert not update.ok and not update.retryable and update.errors == [UPDATE_NOT_SUPPORTED_IN_PLACE]
+    assert len(api.calls) == before_update
     assert driver.status(ServiceHandle(result.handle, managed_service_id=OWNER)).state == "error"
     with pytest.raises((AzureOwnershipError, RuntimeError)):
         driver.binding(ServiceHandle(result.handle, managed_service_id=OWNER))
@@ -373,3 +382,26 @@ def test_actual_sdk_cannot_follow_management_redirect_to_another_host(runtime, m
     result = driver.deprovision(DeprovisionSpec(outcome.handle, managed_service_id=OWNER), delete_data=True)
     assert not result.ok and result.errors == ["ownership_unknown"] and len(calls) == 1
     assert len(api.rows) == 1
+
+
+@pytest.mark.parametrize("source", ["foreign", "unavailable", "unknown", "invalid-handle"])
+def test_permanently_unsupported_update_does_not_read_or_mutate_any_source(runtime, source):
+    api, driver = runtime
+    outcome = driver.provision(spec())
+    assert outcome.ok
+    handle = outcome.handle
+    identity = OWNER
+    if source == "foreign":
+        row = next(iter(api.rows.values()))
+        row["properties"]["userMetadata"] = row["properties"]["userMetadata"].replace(OWNER, "foreign")
+    elif source == "unavailable":
+        api.failures["GET"] = (403, "UnavailableResourceNotFound")
+    elif source == "unknown":
+        identity = ""
+    else:
+        handle = "probe/handle"
+    api.calls.clear()
+    before = copy.deepcopy(api.rows)
+    result = driver.update(UpdateSpec(handle, managed_service_id=identity, config={"max_size_in_megabytes": 2048}))
+    assert not result.ok and not result.retryable and result.errors == [UPDATE_NOT_SUPPORTED_IN_PLACE]
+    assert result.handle == handle and api.calls == [] and api.rows == before
