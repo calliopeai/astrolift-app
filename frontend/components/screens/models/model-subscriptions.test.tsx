@@ -218,7 +218,8 @@ describe("shared model subscription review", () => {
   });
 
   it("reviews exact revocation identity and treats accepted revocation as pending", async () => {
-    const onRevoke = vi.fn(async (): Promise<SubscriptionActionResult> => ({ accepted: true }));
+    const pending = deferred();
+    const onRevoke = vi.fn(() => pending.promise);
     render(view({ ...subscriptionProps, onRevoke }));
     fireEvent.click(screen.getByRole("button", { name: "Review revocation" }));
     expect(screen.getByRole("alertdialog")).toHaveTextContent("storefront / production");
@@ -234,6 +235,8 @@ describe("shared model subscription review", () => {
         subscriptionVersion: 2,
       })
     );
+    expect(screen.queryByText(/Request accepted. Waiting for restart/)).not.toBeInTheDocument();
+    await act(async () => pending.resolve({ accepted: true }));
     expect(screen.getByText(/Request accepted. Waiting for restart/)).toBeInTheDocument();
     expect(screen.queryByText("Revoked")).not.toBeInTheDocument();
   });
