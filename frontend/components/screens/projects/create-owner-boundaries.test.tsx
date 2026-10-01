@@ -1,10 +1,20 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+
+import messages from "@/messages/en.json";
 
 import { CreateTeamSheet } from "../teams/CreateTeamSheet";
 import { CreateProjectSheet } from "./CreateProjectSheet";
 import { TEAMS } from "./projects-teams-dialogs.fixtures";
 import { isValidSlug, slugify } from "./project-team-slug";
+
+const Context = ({ children }: { children: ReactNode }) => (
+  <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+    {children}
+  </NextIntlClientProvider>
+);
 
 describe("backend-compatible default slugs", () => {
   it.each(["123", "2026 Team", "x".repeat(100), `${"a".repeat(39)} - trailing`, " API / Gateway "])(
@@ -49,7 +59,8 @@ describe("create sheet admission", () => {
         hasOrg
         creating={false}
         createTeam={createTeam}
-      />
+      />,
+      { wrapper: Context }
     );
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Demo" } });
     fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "1team" } });

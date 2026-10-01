@@ -44,13 +44,9 @@ it("shows no Temporal shortcut until an operator URL is configured", () => {
     return <MetricsScreen {...METRICS} list={list} temporalUiUrl={url} />;
   }
   const view = render(<Metrics />, { wrapper: Context });
-  expect(screen.queryByRole("link", { name: "Temporal UI (workflows)" })).not.toBeInTheDocument();
-  view.rerender(
-    <Context>
-      <Metrics url="https://workflows.operator.example/" />
-    </Context>
-  );
-  expect(screen.getByRole("link", { name: "Temporal UI (workflows)" })).toHaveAttribute(
+  expect(screen.queryByRole("link", { name: messages.metrics.temporalUi })).not.toBeInTheDocument();
+  view.rerender(<Metrics url="https://workflows.operator.example/" />);
+  expect(screen.getByRole("link", { name: messages.metrics.temporalUi })).toHaveAttribute(
     "href",
     "https://workflows.operator.example/"
   );
@@ -66,7 +62,8 @@ it("waits for workflow entitlement without reporting denied access or accepting 
       canCreate={false}
       entitlementLoading
       onCreate={onCreate}
-    />
+    />,
+    { wrapper: Context }
   );
   const button = screen.getByRole("button", { name: "Create workflow" });
   expect(button).toBeDisabled();

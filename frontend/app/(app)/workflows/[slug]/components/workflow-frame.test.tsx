@@ -1,6 +1,7 @@
 import { MockedProvider } from "@apollo/client/testing/react";
 import type { MockedResponse } from "@apollo/client/testing";
 import { render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,6 +9,7 @@ import {
   GET_TIERED_WORKFLOW_DEFINITION,
 } from "@/graphql/workflows/tiered.queries";
 import type { ConfiguredWorkflowWithRuns } from "@/graphql/workflows/tiered.types";
+import messages from "@/messages/en.json";
 
 import { useFramedWorkflow } from "./framed-workflow";
 import { WorkflowFrameContainer } from "./workflow-frame";
@@ -55,11 +57,13 @@ function RunBody() {
 }
 function setup(responses: MockedResponse[]) {
   return render(
-    <MockedProvider mocks={responses}>
-      <WorkflowFrameContainer slug={workflow.slug}>
-        <RunBody />
-      </WorkflowFrameContainer>
-    </MockedProvider>
+    <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+      <MockedProvider mocks={responses}>
+        <WorkflowFrameContainer slug={workflow.slug}>
+          <RunBody />
+        </WorkflowFrameContainer>
+      </MockedProvider>
+    </NextIntlClientProvider>
   );
 }
 
