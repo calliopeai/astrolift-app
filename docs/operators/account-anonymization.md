@@ -1,8 +1,8 @@
 # Account anonymization and attributed history
 
-The admitted `astroliftAnonymizeUser` mutation keeps the user's structural row,
-replaces the existing account/profile PII, disables the account and deactivates
-every live membership at every scope. Retained role bindings remain recorded;
+On an admitted first cleanup, `astroliftAnonymizeUser` keeps the user's structural
+row, replaces the existing account/profile PII, disables the account and
+deactivates every live membership at every scope. Retained role bindings remain recorded;
 they cannot authenticate an inactive owner. Self-anonymization returns
 `requiresLogout: true`; another person's cleanup does not log out the operator.
 The legacy elevated account-deletion route performs its existing self-logout.
@@ -44,7 +44,8 @@ actor alone does not establish ownership of generic email/name fields.
 An already-anonymous user can receive this cleanup, including supported history
 imported after the first request, without replacing the anonymous username or
 email or changing the profile anonymization time. A clean repeat performs no
-privacy updates and returns `requiresLogout: false`. The nullable status field
+privacy updates and returns `requiresLogout: false`. Repeat historical cleanup
+does not perform another membership or authentication-group transition. The nullable status field
 does not promise that every possible historical or external copy was erased.
 
 ## Append-only boundary and failure
