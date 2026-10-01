@@ -5970,6 +5970,17 @@
         "traces": "Traces",
         "operations": "Opérations"
       }
+    },
+    "unregister": {
+      "action": "Désenregistrer",
+      "title": "Désenregistrer le cluster {slug} ?",
+      "titleEmpty": "Désenregistrer le cluster ?",
+      "description": "Retire l’enregistrement de ce cluster du plan de contrôle. Les apps actives doivent d’abord être réaffectées et les déploiements de modèles partagés supprimés. Cela ne démantèle pas l’infrastructure en cours d’exécution et n’efface pas les enregistrements conservés.",
+      "accepted": "Le cluster {slug} a été désenregistré.",
+      "failed": "Impossible de désenregistrer le cluster",
+      "refreshWarning": "Le désenregistrement a été accepté, mais une lecture associée n’a pas pu être actualisée. Réessayez la lecture pour vérifier l’état actuel.",
+      "navigationWarning": "Le désenregistrement a été accepté, mais la navigation vers la liste des clusters a échoué. Ouvrez la liste manuellement.",
+      "sourceChanged": "Le cluster examiné ou la source visible a changé. Vérifiez la cible actuelle avant d’agir."
     }
   }
 }

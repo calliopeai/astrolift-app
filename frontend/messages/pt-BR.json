@@ -5967,6 +5967,17 @@
         "traces": "Rastreamentos",
         "operations": "Operações"
       }
+    },
+    "unregister": {
+      "action": "Cancelar registro",
+      "title": "Cancelar o registro do cluster {slug}?",
+      "titleEmpty": "Cancelar o registro do cluster?",
+      "description": "Retira o registro deste cluster do plano de controle. Primeiro, os apps ativos devem ser realocados e as implantações de modelos compartilhados removidas. Isso não desativa a infraestrutura em execução nem apaga os registros preservados.",
+      "accepted": "Registro do cluster {slug} cancelado.",
+      "failed": "Não foi possível cancelar o registro do cluster",
+      "refreshWarning": "O cancelamento foi aceito, mas uma leitura relacionada não pôde ser atualizada. Tente ler novamente para verificar o estado atual.",
+      "navigationWarning": "O cancelamento foi aceito, mas a navegação para a lista de clusters falhou. Abra a lista manualmente.",
+      "sourceChanged": "O cluster revisado ou a origem visível mudou. Revise o destino atual antes de agir."
     }
   }
 }

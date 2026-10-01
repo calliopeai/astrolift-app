@@ -6047,6 +6047,17 @@
         "traces": "Traces",
         "operations": "Operations"
       }
+    },
+    "unregister": {
+      "action": "Unregister",
+      "title": "Unregister cluster {slug}?",
+      "titleEmpty": "Unregister cluster?",
+      "description": "Retires this cluster’s control-plane registration. Active apps must be reassigned and shared model deployments removed first. This does not decommission running infrastructure or erase retained records.",
+      "accepted": "Cluster {slug} unregistered.",
+      "failed": "Could not unregister the cluster",
+      "refreshWarning": "Unregistration was accepted, but a related read could not be refreshed. Retry the read to verify current state.",
+      "navigationWarning": "Unregistration was accepted, but navigation to the cluster list failed. Open the list manually.",
+      "sourceChanged": "The reviewed cluster or visible source changed. Review the current target before acting."
     }
   }
 }

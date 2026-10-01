@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize list/detail cluster-unregistration reviews and feedback in all eight
+  locales. Preserve refused reviews without refreshing, retain accepted writes
+  through failed reads/navigation, and invalidate stale visible-target reviews.
+  Registration retirement does not claim infrastructure teardown or record
+  erasure (#2145).
+
 - Localize shared cluster headers, tabs and breadcrumb presentation in all eight
   locales. Preserve technical identities, unknown metadata, navigation targets
   and caller-owned source titles/actions; lifecycle and bootstrap operations

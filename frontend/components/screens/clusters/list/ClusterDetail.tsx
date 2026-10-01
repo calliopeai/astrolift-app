@@ -16,6 +16,7 @@ import {
   TrendingUpIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -36,6 +37,7 @@ import { useFormatters } from "@/lib/i18n/formatters";
 import { ClusterHeader } from "./ClusterHeader";
 import { lifecycleAction } from "./ClustersList";
 import { type Lifecycle, providerLabel } from "./clusters-list";
+import { useUnregisterReview } from "./use-unregister-review";
 import type { useClusterDetail } from "./use-cluster-detail";
 
 export type ClusterDetailProps = ReturnType<typeof useClusterDetail> & {
@@ -125,7 +127,8 @@ function isCapInstalled(key: CapKey, value: unknown): boolean {
 export function ClusterDetail(props: ClusterDetailProps) {
   const { slug, cluster, loading, renderLiveStats, deleting, onUnregister } = props;
   const fmt = useFormatters();
-  const [confirming, setConfirming] = React.useState(false);
+  const t = useTranslations("clusters.unregister");
+  const unregister = useUnregisterReview(cluster ? [cluster] : [], slug);
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
 
   if (!cluster) {
@@ -193,11 +196,11 @@ export function ClusterDetail(props: ClusterDetailProps) {
         <Can permission="cluster.unregister">
           <DropdownMenuItem
             variant="destructive"
-            onSelect={() => setConfirming(true)}
+            onSelect={() => unregister.open(cluster)}
             disabled={deleting}
           >
             <Trash2Icon className="size-4" />
-            Unregister
+            {t("action")}
           </DropdownMenuItem>
         </Can>
       </DropdownMenuContent>
@@ -337,13 +340,14 @@ export function ClusterDetail(props: ClusterDetailProps) {
       )}
 
       <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={`Unregister cluster ${cluster.slug}?`}
-        description="Refused if any active app still targets this cluster. The cluster's kubeconfig and probed capabilities are removed from the control plane."
-        confirmLabel="Unregister"
+        key={unregister.key}
+        open={unregister.target !== null}
+        onOpenChange={unregister.onOpenChange}
+        title={t("title", { slug: unregister.target?.slug ?? cluster.slug })}
+        description={t("description")}
+        confirmLabel={t("action")}
         destructive
-        onConfirm={() => onUnregister(cluster)}
+        onConfirm={() => unregister.confirm(onUnregister)}
       />
     </div>
   );

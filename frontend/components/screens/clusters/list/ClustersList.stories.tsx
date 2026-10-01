@@ -166,3 +166,20 @@ export const HeaderNavigation: Story = {
     ).toBeInTheDocument();
   },
 };
+
+const refusedUnregister = fn(async () => {
+  throw new Error("RAW_SERVER_REFUSAL_LITERAL");
+});
+export const UnregisterRefused: Story = {
+  render: () => <Clusters fleet={[CLUSTERS[0]]} onUnregister={refusedUnregister} />,
+  play: async ({ canvasElement }) => {
+    refusedUnregister.mockClear();
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /row actions/ }));
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(body.getByRole("menuitem", { name: "Unregister" }));
+    const dialog = within(await body.findByRole("alertdialog"));
+    await userEvent.click(dialog.getByRole("button", { name: "Unregister" }));
+    await expect(refusedUnregister).toHaveBeenCalledTimes(1);
+    await expect(body.getByRole("alertdialog")).toBeVisible();
+  },
+};

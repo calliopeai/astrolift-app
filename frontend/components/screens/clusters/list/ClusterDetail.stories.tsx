@@ -1,3 +1,4 @@
+import { expect, fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { ClusterDetail } from "./ClusterDetail";
@@ -74,4 +75,23 @@ export const Width768: Story = {
       />
     </div>
   ),
+};
+
+const refusedUnregister = fn(async () => {
+  throw new Error("RAW_SERVER_REFUSAL_LITERAL");
+});
+export const UnregisterRefused: Story = {
+  render: () => (
+    <ClusterDetail {...detailProps({ cluster: CLUSTERS[2], onUnregister: refusedUnregister })} />
+  ),
+  play: async ({ canvasElement }) => {
+    refusedUnregister.mockClear();
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Cluster actions" }));
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(body.getByRole("menuitem", { name: "Unregister" }));
+    const dialog = within(await body.findByRole("alertdialog"));
+    await userEvent.click(dialog.getByRole("button", { name: "Unregister" }));
+    await expect(refusedUnregister).toHaveBeenCalledTimes(1);
+    await expect(body.getByRole("alertdialog")).toBeVisible();
+  },
 };

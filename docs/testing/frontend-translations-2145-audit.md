@@ -696,3 +696,38 @@ their mutation hooks, bootstrap recipe and history/release tables, cluster statu
 bodies and ClusterTabFrame recovery copy. Their existing mutation acceptance,
 refresh-failure, target-review and recipe source-state risks require separate
 bounded work; no semantic changes to those paths are claimed here.
+
+## Bounded list/detail cluster-unregistration flow
+
+ClustersList/ClusterDetail unregister entries, confirmations and their exact
+useClusterActions outcome path use nine genuine `clusters.unregister` messages
+in all eight locales. Literal GUID/slug inputs, provider diagnostics, permissions,
+query variables and sibling Bring/Refresh actions retain their contracts.
+Unregistration wording describes registration retirement and existing app/model
+cleanup guards, without promising infrastructure destruction or record erasure.
+
+The unconditional awaited refresh previously could turn an accepted unregister
+into a displayed write failure or refresh even a refused write. This flow now
+refreshes only accepted envelopes through the shared committed-write feedback
+helper; original refusal/transport messages and reviews remain intact. Accepted
+writes survive refresh/navigation exceptions. Visible-row/permission/list-context
+review leases discard old selections and callbacks after replacement, withdrawal
+or source ABA; late completion cannot close a newer review or navigate another
+detail route. Locale changes alone preserve the reviewed target. No server
+immutable incarnation/version precondition is introduced.
+
+Proof: 223 checks pass across actual ClustersClient and ClusterDetailClient
+schema-validated HttpLink journeys in all eight locales, refusal/transport/fallback
+and retry, accepted-read/navigation failures, exact target inputs/active query
+variables, Cancel/no read or write, permission/identity withdrawal, stale callbacks,
+late completion, locale/ICU and SSR hydration. Thirty portable list/detail stories
+include connected refusal plays; nine existing cluster declaration/list-variable
+checks remain green. TypeScript, scoped ESLint and formatting pass. Source schema,
+typed documents, frozen chrome and catalogue values outside the additive owned
+subtree are preserved.
+
+This closes only the unregister action flow. Bring/Refresh/force-preflight,
+settings decommissioning, general list/detail labels and read-state gaps,
+bootstrap recipe/history, status bodies and other untranslated cluster settings
+remain separate #2145 boundaries. No backend/cloud actions or full-suite proof
+are claimed for this leaf.
