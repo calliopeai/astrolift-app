@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "팀 구성원",
+      "description": "{team}의 구성원입니다. 이 목록에서 팀에 부여할 수 있는 역할을 할당합니다.",
+      "loadError": "팀 구성원을 불러오지 못했습니다.",
+      "emptyTitle": "아직 팀 구성원이 없습니다",
+      "emptyDescription": "이 팀 범위에서 역할을 부여하여 구성원을 추가하세요.",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "사용자",
+        "lifecycle": "수명 주기",
+        "joined": "가입일"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "모든 팀 구성원 선택",
+      "selectRowLabel": "구성원 {user} 선택",
+      "selected": "{count, plural, =1 {구성원 1명 선택됨} other {구성원 #명 선택됨}}",
+      "clear": "선택 해제",
+      "assignButton": "{count}명에게 역할 할당",
+      "permissionHint": "이 팀의 구성원을 관리할 권한이 없습니다.",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {#명에게 역할 할당} other {#명에게 역할 할당}}",
+        "description": "팀 {team} 범위에서 역할을 부여합니다. 이미 역할을 가진 구성원은 건너뛰며 같은 역할을 다시 할당해도 추가 변경이 없습니다.",
+        "roleLabel": "이 팀에 부여할 수 있는 역할",
+        "rolePlaceholder": "역할 선택",
+        "noRoles": "이 팀에 사용할 수 있는 역할이 없습니다.",
+        "cancel": "취소",
+        "confirmLabel": "역할 할당"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {#명에게 역할을 할당했습니다.} other {#명에게 역할을 할당했습니다.}}",
+        "mixedIdempotent": "{assigned}명 할당, {already}명은 이미 보유했습니다.",
+        "partial": "{assigned}명 할당, {already}명은 이미 보유, {failed}명은 실패했습니다.",
+        "allFailed": "역할 할당 실패: {message}"
       }
     },
     "invitationExpiry": {
@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "이미 익명화됨",
         "anonymize": "사용자 데이터 익명화",
         "invite": "초대",
-        "grant": "접근 권한 부여"
+        "grant": "접근 권한 부여",
+        "reviewPrivacyCleanup": "개인정보 정리 내용 검토"
       },
       "emptyTitle": "아직 구성원이 없습니다",
       "emptyDescription": "조직에 사용자를 초대한 다음 역할을 부여하세요.",
@@ -3757,22 +3758,31 @@
       "deleted": "초대가 삭제되었습니다",
       "deleteFailed": "삭제에 실패했습니다",
       "anonymizeFailed": "익명화에 실패했습니다",
-      "anonymized": "사용자 데이터를 익명화했습니다."
+      "anonymized": "지원 범위의 사용자 개인정보 정리가 승인되었습니다.",
+      "logoutWarning": "개인정보 정리는 승인되었지만 로그아웃을 열지 못했습니다. 이 브라우저 세션을 종료하려면 로그아웃하세요."
     },
     "anonymization": {
       "title": "{name}을(를) 익명화하시겠습니까?",
-      "changes": "변경되는 항목",
-      "identity": "계정 이름과 이메일이 익명 식별 정보로 대체됩니다.",
-      "profile": "프로필의 개인 정보, 전화번호, 아바타, 주소 및 서명이 삭제되거나 대체됩니다.",
-      "account": "로그인이 비활성화되고 인증 그룹의 구성원 자격이 제거됩니다.",
-      "memberships": "플랫폼 전체에서 구성원 자격이 비활성화됩니다.",
-      "preserves": "유지되는 항목",
-      "records": "계정 기록과 과거 작업의 연결 관계는 유지됩니다.",
-      "history": "이 작업은 과거 감사 내용이나 저장된 역할 부여 기록을 삭제하지 않습니다.",
-      "irreversible": "이 작업은 되돌릴 수 없습니다. 원래 개인 정보는 복원할 수 없습니다. 이미 익명화된 계정에서 반복해도 추가 변경은 없습니다.",
+      "changes": "정리 범위",
+      "identity": "첫 정리에서는 계정 이름과 이메일을 익명 식별 정보로 바꿉니다.",
+      "profile": "첫 정리에서는 프로필 개인정보, 전화번호, 아바타, 주소와 서명을 지우거나 바꿉니다.",
+      "account": "첫 정리에서는 로그인을 비활성화하고 인증 그룹 소속을 제거합니다.",
+      "memberships": "첫 정리에서는 플랫폼 전체의 멤버십을 비활성화합니다.",
+      "preserves": "유지되는 기록과 제한",
+      "records": "계정 행, 과거 연결, 기록 ID, 결정과 타임스탬프는 유지됩니다.",
+      "history": "이 사용자에게 명확히 귀속되는 과거 이벤트와 감사 기록에서 지원되는 식별 및 요청 정보 필드를 가립니다.",
+      "irreversible": "지원 범위의 개인정보 정리는 되돌릴 수 없습니다. 다시 실행하면 이후 추가된 명확히 귀속되는 기록을 줄일 수 있지만 기존 익명 식별 정보는 바꾸지 않습니다.",
       "acknowledge": "이 작업을 되돌릴 수 없음을 이해합니다.",
       "working": "익명화 중…",
-      "confirm": "사용자 데이터 익명화"
+      "confirm": "사용자 데이터 익명화",
+      "reviewTitle": "{name}의 개인정보 정리 내용을 검토할까요?",
+      "anonymousIdentity": "기존 익명 계정의 식별 정보는 유지됩니다.",
+      "metadata": "지원되는 식별 정보 캐시, 세션과 토큰 메타데이터, 이메일 및 SMS 수신 연락처 정보를 줄입니다.",
+      "roleBindings": "저장된 역할 할당 기록은 유지됩니다. 비활성 사용자는 인증할 수 없습니다.",
+      "scopeLimits": "귀속이 불명확하거나 모호한 데이터, 자유 형식 내용, 다른 사용자의 정보 및 지원되지 않는 구조화 데이터는 남습니다.",
+      "external": "기존 내보내기, 보관 자료, 백업과 외부 시스템은 변경하지 않습니다.",
+      "reviewWorking": "개인정보 정리 중…",
+      "reviewConfirm": "개인정보 정리 실행"
     }
   },
   "stepUp": {
@@ -4518,6 +4528,45 @@
         "loadingRoles": "역할 불러오는 중…",
         "unknownRoles": "역할이 아직 확인되지 않았습니다.",
         "emptyRoles": "이 목록에 사용할 수 있는 역할이 없습니다."
+      },
+      "entityPanel": {
+        "label": "접근 권한",
+        "who": "대상",
+        "role": "역할",
+        "source": "출처",
+        "expires": "만료",
+        "never": "없음",
+        "share": "공유: {level}",
+        "search": "사용자, 그룹, 팀 및 역할 검색…",
+        "all": "전체",
+        "removeMapping": "이 그룹 매핑 삭제",
+        "removeGrant": "이 권한 부여 삭제",
+        "appSharing": "앱 공유 설정에서 변경",
+        "emptyTitle": "아직 접근 권한을 가진 대상이 없습니다",
+        "emptyDescription": "{subject} 또는 상위 범위에서 역할을 부여하면 보유 대상과 출처가 표시됩니다.",
+        "grant": "접근 권한 부여",
+        "removeTitle": "{name}에서 {role}을 삭제할까요?",
+        "removeGeneric": "접근 권한을 삭제할까요?",
+        "inherited": "이 권한은 {subject}가 아닌 {kind} {name}에 부여되어 있습니다. 삭제하면 출처와 영향을 받는 모든 범위에서 제거됩니다.",
+        "direct": "이 권한이 제공하는 {subject} 접근 권한을 잃습니다.",
+        "groupLoss": "그룹의 모든 구성원이 이 매핑을 잃습니다.",
+        "otherGrants": "다른 권한 부여는 계속 적용됩니다.",
+        "remove": "삭제",
+        "removed": "{role}을 삭제했습니다",
+        "removeFailed": "접근 권한을 삭제하지 못했습니다.",
+        "refreshWarning": "접근 권한은 삭제되었지만 화면을 새로 고치지 못했습니다. 최신 데이터를 다시 불러오세요.",
+        "accessName": "접근 권한",
+        "unavailable": "접근 권한 목록을 확인하지 못했습니다. 다시 시도하여 최신 데이터를 불러오세요.",
+        "notRemovable": "이 출처는 여기서 삭제할 수 없습니다.",
+        "noTarget": "현재 대상을 확인할 수 없습니다.",
+        "group": "IdP 그룹",
+        "groupCount": "{count, plural, one {IdP 그룹 · 구성원 #명} other {IdP 그룹 · 구성원 #명}}",
+        "sourceLabels": {
+          "USER_BINDING": "권한 부여",
+          "GROUP_BINDING": "그룹 권한 부여",
+          "GROUP_MAPPING": "그룹 매핑",
+          "TEAM_SHARE": "팀 공유"
+        }
       }
     },
     "settings": {
@@ -5420,6 +5469,53 @@
       "taken": "이 조직에서 이미 사용 중입니다.",
       "unchanged": "현재 슬러그 — URL에 사용됩니다.",
       "empty": "영문 소문자, 숫자, 하이픈을 사용하세요. URL에 사용됩니다."
+    },
+    "detail": {
+      "grant": "접근 권한 부여",
+      "notFound": "팀을 찾을 수 없음",
+      "notFoundDescription": "팀이 없거나 삭제되었거나 접근 권한이 없을 수 있습니다.",
+      "back": "팀 목록으로 돌아가기",
+      "principal": "팀 탐색",
+      "loadFailed": "이 페이지를 불러오지 못했습니다",
+      "retry": "다시 시도",
+      "unavailable": "팀 목록을 확인하지 못했습니다. 다시 시도하여 최신 데이터를 불러오세요.",
+      "access": "접근 권한",
+      "members": "구성원",
+      "admin": "관리",
+      "people": "사용자",
+      "teams": "팀",
+      "roles": "역할",
+      "policies": "정책",
+      "check": "접근 권한 확인",
+      "organization": "조직",
+      "projects": "프로젝트"
+    },
+    "members": {
+      "add": "구성원 추가",
+      "label": "구성원",
+      "emptyDescription": "이 팀 범위에서 사용자에게 역할을 부여하면 구성원이 됩니다.",
+      "search": "구성원 검색…",
+      "all": "전체",
+      "status": "상태",
+      "active": "활성",
+      "invited": "초대됨",
+      "suspended": "정지됨",
+      "unknownError": "진단 정보가 제공되지 않았습니다.",
+      "refreshWarning": "역할 할당은 수락되었지만 화면을 새로 고치지 못했습니다. 최신 데이터를 다시 불러오세요.",
+      "rolesLoading": "사용 가능한 역할을 불러오는 중…",
+      "rolesUnknown": "사용 가능한 역할을 아직 확인하지 못했습니다.",
+      "rolesFailed": "사용 가능한 역할을 불러오지 못했습니다.",
+      "rolesRetry": "역할 다시 불러오기",
+      "accepted": "역할 할당은 수락되었지만 결과 요약을 확인할 수 없습니다."
+    },
+    "access": {
+      "subject": "팀 {name}",
+      "reaches": "적용 범위",
+      "description": "팀 범위에는 이 프로젝트와 앱이 포함됩니다. 접근 권한은 역할과 정책에도 영향을 받습니다.",
+      "emptyTitle": "아직 프로젝트가 없습니다",
+      "emptyDescription": "이 팀 아래에 나중에 생성되는 프로젝트도 팀 범위에 포함됩니다.",
+      "unavailable": "프로젝트 목록을 확인하지 못했습니다. 다시 시도하여 최신 데이터를 불러오세요.",
+      "retry": "다시 시도"
     }
   },
   "apiKeys": {
@@ -5598,6 +5694,97 @@
       "scope18": {
         "label": "관리자",
         "description": "현재와 새 권한이 추가된 뒤에 소유자가 할 수 있는 모든 작업입니다. 좁은 범위를 선택하세요."
+      }
+    }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "하트비트 에이전트",
+      "description": "<namespace>astrolift-system</namespace> 네임스페이스의 에이전트가 서명된 하트비트를 전송하여 플랫폼이 Pod, 노드, 리소스 상태를 표시하고 연결 끊김을 감지할 수 있게 합니다. 하트비트 전송 간격은 <interval>{seconds, number}</interval>{seconds, plural, one {초} other {초}}입니다.",
+      "keyIssued": "키 발급됨",
+      "copyNow": "지금 이 키를 복사하세요. 다시 표시되지 않습니다.",
+      "copy": "복사",
+      "copied": "복사됨",
+      "copyFailed": "복사하지 못했습니다. 텍스트를 선택하여 직접 복사하세요.",
+      "installSecret": "에이전트 Secret 설치",
+      "installHelp": "그런 다음 에이전트를 배포하세요. 에이전트는 이 Secret에서 키와 URL을 읽습니다. 하트비트 수신으로 연결을 확인할 수 있습니다.",
+      "deploy": "클러스터에 에이전트 배포",
+      "done": "완료",
+      "deployHelp": "에이전트 Deployment를 적용합니다. 먼저 위 명령으로 <secret>astrolift-agent</secret> Secret을 만드세요.",
+      "rotate": "에이전트 키 교체",
+      "issue": "에이전트 키 발급",
+      "rotationHelp": "Deployment는 <secret>astrolift-agent</secret> Secret에서 키와 URL을 읽습니다. 키를 교체하면 이전 키가 무효화됩니다. 새 키로 Secret을 갱신한 뒤 다시 배포하세요. 이전 키로는 유효한 하트비트에 서명할 수 없습니다.",
+      "feedbackIssued": "에이전트 키를 발급했습니다. 지금 복사하세요. 다시 표시되지 않습니다.",
+      "feedbackRotated": "에이전트 키를 교체했습니다. 이전 키는 더 이상 사용할 수 없습니다.",
+      "feedbackDeployed": "에이전트 배포가 승인되었습니다. 하트비트 수신으로 연결을 확인할 수 있습니다.",
+      "feedbackIssueFailed": "에이전트 키를 발급하지 못했습니다.",
+      "feedbackDeployFailed": "에이전트를 배포하지 못했습니다.",
+      "feedbackRefreshWarning": "변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요."
+    },
+    "source": {
+      "readFailed": "클러스터 세부 정보를 읽지 못했습니다",
+      "cached": "마지막으로 확인된 클러스터 세부 정보를 표시합니다. 현재 상태를 확인하려면 화면을 새로고침하세요.",
+      "retry": "다시 시도",
+      "unknown": "클러스터 세부 정보가 확인되지 않았습니다. 다시 조회하세요.",
+      "notFoundHeader": "클러스터를 찾을 수 없음",
+      "notFound": "슬러그가 {slug}인 표시 가능한 클러스터가 없습니다",
+      "notFoundHelp": "클러스터가 존재하지 않거나 볼 수 있는 권한이 없습니다.",
+      "back": "클러스터 목록으로 돌아가기"
+    },
+    "centralAuth": {
+      "title": "중앙 인증",
+      "description": "인증 호스트의 상위 영역에 속한 앱 호스트에서 로그인을 공유합니다. ID 공급자에 정확한 콜백 URL <callback>{callbackUrl}</callback>을 등록하세요. Envoy와 nginx는 이 설정을 사용하며, ALB는 앱별 Cognito 인증을 사용합니다. 사용자 지정 도메인에는 별도의 인증 설정이 필요합니다.",
+      "authHost": "인증 호스트",
+      "discoveryUrl": "검색 URL",
+      "clientId": "클라이언트 ID",
+      "clientSecret": "클라이언트 시크릿",
+      "jwksOptional": "JWKS URI(선택 사항)",
+      "jwksUri": "JWKS 주소",
+      "secretKeep": "설정됨. 유지하려면 비워 두세요.",
+      "notSet": "설정되지 않음",
+      "secretUnknown": "확인되지 않음",
+      "writeOnly": "쓰기 전용입니다. 저장 후에는 다시 표시되지 않습니다.",
+      "jwksHint": "{jwksPath}에서 키를 제공하지 않는 공급자에만 지정하세요.",
+      "notConfigured": "구성되지 않았습니다.",
+      "cookieSecret": "쿠키 시크릿",
+      "gatewaySecret": "Gateway 시크릿",
+      "secretSet": "설정됨",
+      "secretBadge": "{label}: {state}",
+      "edit": "편집",
+      "setup": "중앙 인증 설정",
+      "saved": "중앙 인증을 저장했습니다.",
+      "saveFailed": "중앙 인증을 저장하지 못했습니다.",
+      "refreshWarning": "중앙 인증은 저장했지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
+      "secretNotSet": "설정되지 않음"
+    },
+    "ingressClass": {
+      "title": "Ingress 클래스",
+      "description": "이 클러스터의 앱을 서비스하는 진입 계층입니다. 각 앱은 다음 배포 때 전환됩니다. 클래스만 변경하면 실행 중인 앱은 다시 배포되지 않습니다.",
+      "change": "클래스 변경",
+      "gateHint": "앱은 {gate}을(를) 사용합니다.",
+      "missingAlb": "ALB Cognito 인증이 설정되지 않아 이 클래스를 사용하는 앱은 공개 상태가 됩니다.",
+      "missingCentral": "위의 중앙 인증이 구성되지 않아 이 클래스를 사용하는 앱은 공개 상태가 됩니다.",
+      "gateRefusal": "서버는 현재 인증을 제거하는 변경을 거부합니다. 먼저 새 인증을 구성하세요.",
+      "syncHint": "각 앱의 <file>astrolift.toml</file>에 새 인증을 기록하도록 요청합니다. 저장소 커밋이 성공하면 해당 앱의 배포가 시작되어 여러 앱이 함께 다시 배포될 수 있습니다. 소스 연결이 없거나 기록에 실패하면 일부 앱이 제외될 수 있습니다.",
+      "confirmTitle": "Ingress 클래스를 <target>{className}</target>(으)로 변경할까요?",
+      "syncReview": "이 클러스터의 앱에 astrolift.toml 커밋을 요청합니다. 커밋이 성공하면 해당 앱의 배포가 시작됩니다. 소스 연결이 없거나 기록에 실패하면 일부 앱이 제외될 수 있습니다.",
+      "nextDeployReview": "지금은 앱을 다시 배포하지 않습니다. 각 앱은 다음 배포 때 새 진입 계층으로 전환됩니다.",
+      "changed": "Ingress 클래스를 {target}(으)로 변경하는 요청이 승인되었습니다.",
+      "changeFailed": "Ingress 클래스를 변경하지 못했습니다.",
+      "refreshWarning": "클래스 변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
+      "classes": {
+        "envoy": {
+          "label": "Envoy 진입 계층(중앙 인증)",
+          "gate": "단일 Envoy Gateway의 중앙 인증"
+        },
+        "alb": {
+          "label": "ALB(앱별 Cognito)",
+          "gate": "ALB Cognito 인증"
+        },
+        "nginx": {
+          "label": "ingress-nginx(중앙 인증)",
+          "gate": "oauth2-proxy를 통한 중앙 인증; ingress-nginx 유지보수는 종료되었습니다"
+        }
       }
     }
   }

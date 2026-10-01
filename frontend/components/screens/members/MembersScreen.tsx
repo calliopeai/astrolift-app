@@ -71,6 +71,7 @@ const ROLES_SHOWN = 3;
 const TEAMS_SHOWN = 2;
 
 type InviteTarget = { kind: "resend" | "revoke" | "delete"; invitation: AstroliftInvitation };
+type PrivacyTarget = { row: UserRow; question: string };
 
 /**
  * Admin › Access › People (access UX design 3.1): one numbered list of
@@ -105,7 +106,30 @@ export function MembersScreen({
   const fmt = useFormatters();
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [inviteTarget, setInviteTarget] = React.useState<InviteTarget | null>(null);
-  const [anonymizeTarget, setAnonymizeTarget] = React.useState<UserRow | null>(null);
+  const [anonymizeTarget, setAnonymizeTarget] = React.useState<PrivacyTarget | null>(null);
+  const privacyQuestion = JSON.stringify([
+    list.state.q,
+    list.filters,
+    list.state.sort,
+    list.state.page,
+    list.state.pageSize,
+    list.state.after,
+  ]);
+  const privacyRow =
+    canManageMembers && anonymizeTarget?.question === privacyQuestion
+      ? rows.find(
+          (row): row is UserRow =>
+            row.kind === "user" &&
+            row.user.id === anonymizeTarget.row.user.id &&
+            row.user.username === anonymizeTarget.row.user.username
+        )
+      : undefined;
+  if (anonymizeTarget && !privacyRow) setAnonymizeTarget(null);
+  const currentPrivacyTarget = privacyRow ? anonymizeTarget : null;
+  const currentPrivacyRef = React.useRef(currentPrivacyTarget);
+  React.useLayoutEffect(() => {
+    currentPrivacyRef.current = currentPrivacyTarget;
+  }, [currentPrivacyTarget]);
 
   const columns: Column<PeopleRow>[] = [
     {
@@ -215,7 +239,7 @@ export function MembersScreen({
         </DropdownMenuItem>
       );
     }
-    const anonymized = row.lifecycle === "anonymized";
+    const anonymized = row.user.isAnonymized === true;
     return (
       <>
         <DropdownMenuItem asChild>
@@ -231,11 +255,10 @@ export function MembersScreen({
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
-          disabled={anonymized}
-          onSelect={() => setAnonymizeTarget(row)}
+          onSelect={() => setAnonymizeTarget({ row, question: privacyQuestion })}
         >
           <UserMinusIcon className="size-4" />
-          {t(anonymized ? "people.actions.alreadyAnonymized" : "people.actions.anonymize")}
+          {t(anonymized ? "people.actions.reviewPrivacyCleanup" : "people.actions.anonymize")}
         </DropdownMenuItem>
       </>
     );
@@ -322,12 +345,17 @@ export function MembersScreen({
         />
 
         <AnonymizeUserDialog
-          name={anonymizeTarget?.user.username ?? null}
+          name={privacyRow?.user.username ?? null}
+          targetId={privacyRow?.user.id ?? null}
+          isAnonymized={privacyRow?.user.isAnonymized}
           onOpenChange={(next) => {
-            if (!next) setAnonymizeTarget(null);
+            if (!next)
+              setAnonymizeTarget((current) => (current === currentPrivacyTarget ? null : current));
           }}
           onConfirm={() =>
-            anonymizeTarget ? onAnonymize(anonymizeTarget.user.id) : Promise.resolve(false)
+            privacyRow && currentPrivacyTarget && currentPrivacyRef.current === currentPrivacyTarget
+              ? onAnonymize(privacyRow.user.id)
+              : Promise.resolve(false)
           }
         />
       </div>

@@ -60,11 +60,12 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws.managed._base import (
+    LiveOwnershipError,
     ManagedServiceError,
-    adoption_refusal,
     assert_resource_arn,
     handle_for,
     live_ownership_refusal,
+    managed_name_for,
     parse_handle,
     tags_for,
 )
@@ -131,15 +132,17 @@ class DynamoDBDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        table_name = self._table_name_for(spec=spec)
+        try:
+            table_name = self._table_name_for(spec=spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
-        # Probe existing -- provision is idempotent.
-        existing = self._describe(table_name)
+        try:
+            existing = self._live_table(table_name, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return ProvisionResult(False, "", str(exc), [getattr(exc, "code", "ownership_unknown")])
         if existing is not None:
-            refusal = adoption_refusal(self._existing_tags(existing), spec, resource=f"dynamodb table {table_name}")
-            if refusal is not None:
-                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
             return ProvisionResult(
                 ok=True,
                 handle=handle_for(kind=KIND, resource_id=table_name),
@@ -266,7 +269,17 @@ class DynamoDBDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, table_name = parse_handle(spec.handle)
+        table_name = self._recorded_table_name(spec.handle)
+        try:
+            existing = self._live_table(table_name, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return UpdateResult(
+                False, spec.handle, str(exc), [getattr(exc, "code", "ownership_unknown")], retryable=False
+            )
+        if existing is None:
+            return UpdateResult(
+                False, spec.handle, "DynamoDB table does not exist", ["resource_missing"], retryable=False
+            )
         cfg = spec.config or {}
 
         update_kwargs: dict[str, Any] = {"TableName": table_name}
@@ -298,19 +311,29 @@ class DynamoDBDriver(ManagedServiceDriver):
             }
             modified = True
         elif "read_capacity" in cfg or "write_capacity" in cfg:
-            existing = self._describe(table_name) or {}
             current = existing.get("ProvisionedThroughput") or {}
+            if any(
+                key not in cfg and not isinstance(current.get(observed), int)
+                for key, observed in (("read_capacity", "ReadCapacityUnits"), ("write_capacity", "WriteCapacityUnits"))
+            ):
+                return UpdateResult(
+                    False,
+                    spec.handle,
+                    "DynamoDB current throughput is unavailable",
+                    ["throughput_unknown"],
+                    retryable=False,
+                )
             update_kwargs["ProvisionedThroughput"] = {
                 "ReadCapacityUnits": int(
                     cfg.get(
                         "read_capacity",
-                        current.get("ReadCapacityUnits", 5),
+                        current.get("ReadCapacityUnits"),
                     ),
                 ),
                 "WriteCapacityUnits": int(
                     cfg.get(
                         "write_capacity",
-                        current.get("WriteCapacityUnits", 5),
+                        current.get("WriteCapacityUnits"),
                     ),
                 ),
             }
@@ -367,9 +390,14 @@ class DynamoDBDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, table_name = parse_handle(spec.handle)
+        table_name = self._recorded_table_name(spec.handle)
 
-        existing = self._describe(table_name)
+        try:
+            existing = self._live_table(table_name, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return DeprovisionResult(
+                False, spec.handle, str(exc), [getattr(exc, "code", "ownership_unknown")], retryable=False
+            )
         if existing is None:
             return DeprovisionResult(
                 ok=True,
@@ -444,8 +472,11 @@ class DynamoDBDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, table_name = parse_handle(handle.handle)
-        existing = self._describe(table_name)
+        table_name = self._recorded_table_name(handle.handle)
+        try:
+            existing = self._live_table(table_name, handle.managed_service_id)
+        except ManagedServiceError as exc:
+            return ServiceStatus(handle.handle, "error", str(exc))
         if existing is None:
             return ServiceStatus(
                 handle=handle.handle,
@@ -461,22 +492,11 @@ class DynamoDBDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="kv_store_dynamodb")
     def binding(self, handle: ServiceHandle) -> Binding:
-        _, table_name = parse_handle(handle.handle)
-        existing = self._describe(table_name)
+        table_name = self._recorded_table_name(handle.handle)
+        existing = self._live_table(table_name, handle.managed_service_id)
         if existing is None:
-            raise ManagedServiceError(
-                f"binding requested for missing table {table_name}",
-            )
-        table_arn = existing.get("TableArn")
-        if existing.get("TableName") != table_name:
-            raise ManagedServiceError("live DynamoDB table does not match the recorded driver target")
-        assert_resource_arn(table_arn, service="dynamodb", region=self._config.region, resource=f"table/{table_name}")
-        tags = self._live_tags(table_arn)
-        refusal = live_ownership_refusal(
-            tags, managed_service_id=handle.managed_service_id, resource=f"table {table_name}"
-        )
-        if refusal:
-            raise ManagedServiceError(refusal)
+            raise ManagedServiceError("binding requested for missing DynamoDB table")
+        table_arn = existing["TableArn"]
 
         # IRSA pattern (mirrors object_store #1011): the workload assumes
         # an IRSA-backed role we fold the iam_grants below into. We bind
@@ -524,7 +544,10 @@ class DynamoDBDriver(ManagedServiceDriver):
     def snapshot(self, handle: ServiceHandle) -> SnapshotHandle:
         from datetime import UTC, datetime
 
-        _, table_name = parse_handle(handle.handle)
+        table_name = self._recorded_table_name(handle.handle)
+        existing = self._live_table(table_name, handle.managed_service_id)
+        if existing is None:
+            raise ManagedServiceError("snapshot requested for missing DynamoDB table")
         stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         backup_name = f"{table_name}-snap-{stamp}"
         try:
@@ -537,7 +560,10 @@ class DynamoDBDriver(ManagedServiceDriver):
                 f"create_backup: {exc}",
             ) from exc
         details = resp.get("BackupDetails") or {}
-        snapshot_id = details.get("BackupArn") or details.get("BackupName") or backup_name
+        snapshot_id = details.get("BackupArn")
+        prefix = existing["TableArn"] + "/backup/"
+        if not isinstance(snapshot_id, str) or not snapshot_id.startswith(prefix) or not snapshot_id[len(prefix) :]:
+            raise ManagedServiceError("DynamoDB backup identity did not match the recorded source")
         return SnapshotHandle(
             handle=handle.handle,
             snapshot_id=snapshot_id,
@@ -615,6 +641,38 @@ class DynamoDBDriver(ManagedServiceDriver):
 
     # ---- internals ----------------------------------------------------
 
+    @staticmethod
+    def _recorded_table_name(handle: str) -> str:
+        kind, name = parse_handle(handle)
+        if (
+            kind != KIND
+            or not 3 <= len(name) <= 255
+            or any(not c.isascii() or not (c.isalnum() or c in "-_.") for c in name)
+        ):
+            raise LiveOwnershipError("recorded DynamoDB target is invalid", code="ownership_refused")
+        return name
+
+    def _live_table(self, table_name: str, managed_service_id: str) -> dict[str, Any] | None:
+        existing = self._describe(table_name)
+        if existing is None:
+            return None
+        if existing.get("TableName") != table_name:
+            raise LiveOwnershipError("live DynamoDB table does not match the recorded target", code="ownership_refused")
+        table_arn = existing.get("TableArn")
+        try:
+            assert_resource_arn(
+                table_arn, service="dynamodb", region=self._config.region, resource=f"table/{table_name}"
+            )
+        except ManagedServiceError:
+            raise LiveOwnershipError(
+                "live DynamoDB resource does not match the recorded target", code="ownership_refused"
+            ) from None
+        tags = self._live_tags(table_arn)
+        refusal = live_ownership_refusal(tags, managed_service_id=managed_service_id, resource="DynamoDB table")
+        if refusal:
+            raise LiveOwnershipError(refusal, code="ownership_refused")
+        return existing
+
     def _live_tags(self, table_arn: str) -> list[dict[str, str]]:
         """Complete bounded tags before granting access, with no partial proof."""
         rows = []
@@ -627,53 +685,39 @@ class DynamoDBDriver(ManagedServiceDriver):
             try:
                 response = self._ddb.list_tags_of_resource(**kwargs)
             except Exception:
-                raise ManagedServiceError("DynamoDB live ownership tags could not be verified") from None
-            page = response.get("Tags", [])
+                raise LiveOwnershipError("DynamoDB live ownership tags could not be verified") from None
+            if not isinstance(response, dict):
+                raise LiveOwnershipError("DynamoDB ownership tag response is unknown")
+            page = response.get("Tags")
             if not isinstance(page, list) or len(rows) + len(page) > 1000:
-                raise ManagedServiceError("DynamoDB ownership tag inventory is unknown")
+                raise LiveOwnershipError("DynamoDB ownership tag inventory is unknown")
             rows.extend(page)
             token = response.get("NextToken", "")
             if not isinstance(token, str) or token in seen:
-                raise ManagedServiceError("DynamoDB ownership tag pagination is unknown")
+                raise LiveOwnershipError("DynamoDB ownership tag pagination is unknown")
             if not token:
                 return rows
             seen.add(token)
-        raise ManagedServiceError("DynamoDB ownership tag inventory limit exceeded")
-
-    def _existing_tags(self, existing: dict[str, Any]) -> list[dict[str, str]]:
-        """Tags of a resource found under this service's name; unreadable counts as untagged (#1961)."""
-        try:
-            return list(
-                self._ddb.list_tags_of_resource(ResourceArn=str(existing.get("TableArn", ""))).get("Tags", []) or []
-            )
-        except Exception:  # ownership unverifiable, so not adopted
-            return []
+        raise LiveOwnershipError("DynamoDB ownership tag inventory limit exceeded")
 
     def _describe(self, table_name: str) -> dict[str, Any] | None:
         try:
             resp = self._ddb.describe_table(TableName=table_name)
         except Exception as exc:
-            if type(exc).__name__ == "ResourceNotFoundException":
+            code = getattr(exc, "response", {}).get("Error", {}).get("Code")
+            if code == "ResourceNotFoundException" or type(exc).__name__ == "ResourceNotFoundException":
                 return None
-            if "ResourceNotFoundException" in str(exc):
-                return None
-            raise
-        return resp.get("Table")
+            raise LiveOwnershipError("DynamoDB live table lookup could not be verified") from None
+        if not isinstance(resp, dict):
+            raise LiveOwnershipError("DynamoDB live table identity is unavailable")
+        table = resp.get("Table")
+        if not isinstance(table, dict) or not table:
+            raise LiveOwnershipError("DynamoDB live table identity is unavailable")
+        return table
 
     def _table_name_for(self, *, spec: ProvisionSpec) -> str:
-        # DynamoDB table names: 3-255 chars, [a-zA-Z0-9_.-].
-        parts = [
-            self._config.table_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "kv",
-        ]
-        raw = "-".join(p for p in parts if p)
-        clean = "".join(c if (c.isalnum() or c in "-_.") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-.")[:255]
+        name = managed_name_for(spec, kind=KIND, prefix=self._config.table_name_prefix, max_len=255)
+        return self._recorded_table_name(f"{KIND}/{name}")
 
 
 # ----- module-level helpers --------------------------------------------

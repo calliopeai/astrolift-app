@@ -188,6 +188,177 @@ scope. Recording-client regressions exercise hostile custom keys and existing
 Azure cross-driver foreign-owner refusals; they do not certify live cloud IAM.
 
 
+### Immutable AWS managed-service names (#2032, bounded scope)
+
+New S3 buckets, SQS queues and DynamoDB tables use
+`<sanitized-operator-prefix>-<complete-managed-service-UUID-hex>`. The platform
+passes the saved service GUID; the driver neither generates an ID nor falls
+back to tenant slugs, integer keys or hints. The UUID must be canonical and
+nonzero (current real service records generate UUIDv7). Missing, malformed,
+nil or noncanonical direct SDK identities refuse before provider calls.
+
+The complete 32-hex identity is retained when prefixes are truncated:
+[S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html)
+uses at most 63 characters;
+[SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_CreateQueue.html)
+uses at most 80 including its `.fifo` suffix; and
+[DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Constraints.html)
+uses at most 255. Names are lowercase ASCII with a sanitized operator prefix;
+S3 reserved/invalid names refuse instead of issuing an invalid create. Human
+org/app/environment/service names remain in display metadata and tags.
+
+The existing `ProvisionSpec.recorded_handle` takes precedence over new naming
+defaults, after exact driver-kind and physical-name validation. It is never
+truncated, silently replaced or treated as ownership authority. Reprovision
+preserves an owned legacy name and its data even after display-name/prefix
+changes. Recorded SQS type remains authoritative if an operator default
+changes; an explicitly incompatible `fifo` value refuses instead of renaming.
+Retries with unchanged operator defaults/type use the same saved identity and
+name even before the returned handle is finalized. Operators must keep those
+defaults stable until that first handle is recorded.
+
+All three provision paths require the live platform marker and exact source
+UUID for a pre-existing target. Neither matching old slugs nor a claimed
+`recorded_handle_exclusive` flag permits retagging a foreign/unmarked resource.
+Unmarked legacy resources need verified ownership backfill. S3 unavailable
+lookup proof is a refusal, and the SQS existing-name exception path rechecks
+current ownership before attribute/tag reconciliation. These checks are not
+atomic cloud create/compare-and-tag preconditions; independent cloud admins
+must not replace/retag resources during operations. A globally occupied S3
+UUID name is refused, never replaced with a fresh random identity.
+
+This leaf covers only these three AWS driver families. Other AWS/GCP/Azure/native
+families under #2032 remain separate; #2021's explicit tenant-set identities and
+`adopt_existing`, and #2029's SES identity contract remain excluded. DynamoDB
+restore/adoption, provisioning cloud races and the remaining broad ownership
+acceptance in #2098 are not closed by the naming change.
+
+### Immutable GCP Pub/Sub topic names (#2032, bounded scope)
+
+New `topic/pubsub_topic` resources use
+`<normalized-operator-topic-prefix>-<complete-managed-service-UUID-hex>`.
+Canonical nonzero saved UUIDs are required, including the platform's current
+UUIDv7 records; the driver never invents an ID or substitutes human slugs.
+Only the cosmetic prefix is truncated to 21 characters, so new topic IDs
+retain all 32 identity characters within 54 characters. Prefix normalization
+preserves the API's alphabetic start and reserved `goog` rules; invalid/empty
+normalized prefixes and invalid recorded IDs refuse before provider calls.
+The [official Pub/Sub resource-name contract](https://docs.cloud.google.com/pubsub/docs/pubsub-basics)
+limits topic/subscription IDs to 3–255 characters and declares their allowed
+alphabet and reserved prefix.
+
+The existing declared subscription suffix is normalized to at most 200
+characters. Reserving those 200 characters plus a separator means new child
+IDs retain the complete topic UUID and distinct normalized suffixes within
+255 characters, even with a long operator prefix. Normalized declaration
+collisions refuse. Recorded legacy topic IDs keep their exact physical names
+and the existing child-name mapping, including historical truncation. If two
+new declarations under a long recorded parent map to the same physical child,
+the entire operation refuses before topic or child changes. Existing topic
+and subscription data is not migrated or renamed.
+
+The current live source-label and exclusive-record ownership gates remain in
+place. A recorded name is not authority to retag a foreign owner. Current child
+owners are preflighted before parent reconciliation, and actual SDK typed
+not-found/already-exists outcomes—not diagnostic substrings—decide absence or
+create reconciliation. Unavailable lookup proof never permits creation.
+Operators must keep the prefix stable until the first handle is recorded;
+after that, recorded handles override cosmetic prefix/display changes. Cloud
+admin replacement/retag races are not certified as atomic transactions.
+
+This leaf covers only GCP `topic/pubsub_topic`, not the separate `queue/pubsub`
+driver or other GCP/AWS/Azure/native families. #2032 stays open; #2021's explicit
+tenant-set/adoption identities and #2029's SES identities remain excluded.
+The PostgreSQL lifecycle proof runs the real Google Pub/Sub SDK through a
+bounded local recording gRPC server. It verifies serialized API requests,
+identity and no-write refusals, not GCP IAM, storage or delivery semantics.
+
+### Pub/Sub cleanup outcomes (#2098, bounded scope)
+
+The topic driver reports explicit `ownership_refused` for a current source or
+child owner mismatch, and `ownership_unknown` when SDK reads, subscription
+inventory/pagination or deletion fail without a concrete typed not-found
+outcome. Invalid handle/config and outside-declaration refusals retain their
+existing specific codes and add unknown authority. The central lifecycle
+therefore keeps those operations failed, even if a diagnostic, invalid handle,
+reserved custom label or outside-declaration child name contains `not found`
+or `NoSuchBucket`. Force/delete-data flags cannot bypass current source or
+child ownership. Permanent owner refusal is non-retryable; unavailable provider
+operations retain their retry behavior and never imply completed cleanup.
+
+Inventory must complete and every present child's immutable topic and source
+labels must pass before any destructive call. A failed second SDK page cannot
+produce deletes from a partial first page. A typed parent `NotFound` still
+converges for the parent; it does not assert former subscriptions are absent
+or delete unobserved children. A child with a typed `NotFound` during preflight
+is omitted from the delete plan; one disappearing during deletion is already
+gone. A failed child delete stops before deleting the parent, while a denied
+parent delete after successful child deletions remains failed partial cleanup.
+The retained-message acknowledgement and explicit-force requirements remain.
+
+These checks are current API observations, not atomic cloud replacement guards
+or certification of GCP IAM/delivery. Other drivers, broad #2098 acceptance and
+external resource replacement/retag races remain separate work. Tests use the
+real Google SDK, actual protobuf pagination and controlled localhost responses,
+with real PostgreSQL lifecycle records and no tenant cloud calls.
+
+### GCP Pub/Sub queue identity, ownership and retention (#2032, #2098)
+
+New `queue/pubsub` topics use a complete canonical nonzero persisted service
+UUID in hexadecimal; only the normalized cosmetic operator prefix is
+truncated. Parent IDs are at most 251 characters, reserving the literal `-sub`
+inside the subscription's 255-character ID limit. Exact valid recorded parent
+and default-child paths override new naming defaults. Invalid recorded IDs,
+unknown identities and recorded parents that cannot fit their derived child
+refuse; no fallback slug, fresh ID, truncation or rename is attempted. Prefixes
+must stay stable until the first handle is recorded.
+
+Provision, binding, readiness, update refusal and cleanup read the current
+topic and default subscription before accepting authority. The parent needs
+its exact service-ID label or the actual central exclusive legacy record;
+matching human labels do not suffice. Returned topic/subscription resource
+names must exactly match the requested configured-project paths; missing or
+foreign response identities cannot reuse owner labels as authority. A missing
+or malformed configured project refuses before any RPC. A legacy unlabelled default child may
+use its immutable topic reference only after the current parent's owner has
+been established. New children carry the complete service-ID label. Foreign
+labels and mismatched topic references always refuse. A missing parent with
+a remaining child is unknown authority, including a child pointing to GCP's
+`_deleted-topic_` marker; the driver does not adopt or remove it by inference.
+
+No queue operation has implicit SDK retries. Every RPC uses at most five
+seconds and the remaining 20-second operation budget. Cleanup explicitly
+requests at most ten 100-item inventory pages and at most 1,000 total child
+paths. Overflow, repeated cursors, incomplete pages, inaccessible reads and
+expired budgets refuse before destructive effects. Outside-default children
+require explicit force plus their own current source-ID/topic proof; they
+cannot use the unlabelled legacy default-child fallback. Foreign-project
+children always refuse. Cloud-admin replacement/retag races remain outside
+these observation checks; they are not atomic cloud incarnation locks.
+
+The old "drain" and force-success claims are removed. Pub/Sub
+[subscription deletion drops its retained messages](https://docs.cloud.google.com/pubsub/docs/reference/rest/v1/projects.subscriptions/delete),
+while [topic deletion leaves subscriptions and their backlog](https://docs.cloud.google.com/pubsub/docs/delete-topic).
+Without explicit `delete_data=true`, a present queue returns the existing
+retained-message refusal; it never seeks, acknowledges or deletes data.
+Snapshot/restore remain unsupported, so the central data-preserving path
+refuses without cloud mutation. Force cannot bypass current ownership or turn
+failed subscription deletion into success; the parent is not deleted after
+an unconfirmed child delete. Concrete typed absence of both recorded targets
+still converges. A late parent-delete failure remains failed partial cleanup.
+Structured refused/unknown codes prevent diagnostic substrings from becoming
+successful cleanup. Binding values, role scopes and the lack of editable
+queue settings remain unchanged.
+
+Real PostgreSQL production lifecycle tests use actual Google Publisher and
+Subscriber SDK calls through a bounded localhost protobuf/gRPC server. They
+verify API identity, deadlines, paging and refused side effects, not live GCP
+IAM, persistence or delivery guarantees. Other driver families and broad
+#2032/#2098 acceptance stay open; #2021 and #2029 remain excluded. The separate
+`topic/pubsub_topic` driver retains its existing transport/inventory limits
+and external replacement-race limitations; this queue leaf does not silently
+extend those contracts.
+
 ### AWS live binding and S3 incarnation checks (#2098)
 
 S3, SQS and DynamoDB bindings require the actual live resource's platform marker
@@ -215,10 +386,34 @@ and refuses malformed, repeated or unfinished pages. SQS/DynamoDB bindings also
 verify returned resource ARN/name/region identity; missing DynamoDB ARN never
 becomes an invented `UNKNOWN` grant.
 
-This bounded change does not establish ownership protection for every AWS
-lifecycle operation. SQS/DynamoDB update/teardown, provider status/snapshot
-paths and provisioning name races/legacy adoption remain separately tracked
-acceptance work. Workload tag-mutation authority is addressed below.
+SQS and DynamoDB now use the same live identity proof for updates (including
+no-ops), teardown and provider readiness/status. DynamoDB snapshots check the
+source before `CreateBackup` and require the returned backup ARN to name that
+source. Direct callers must carry the actual source ID on `UpdateSpec` and
+`DeprovisionSpec` as well. Tenant config cannot supply it, force flags cannot
+bypass it, and malformed or incomplete provider metadata fails closed. SQS
+snapshots/restore remain explicitly unsupported, so data-preserving central
+teardown refuses rather than claiming that queue messages have been retained.
+
+Only structured provider not-found outcomes (SQS
+[`GetQueueUrl`](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueUrl.html)
+and DynamoDB
+[`DescribeTable`](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html))
+mean an absent resource. Permission failures containing those words remain
+failures. SQS refuses safe deletion when its requested approximate message
+counts are missing instead of assuming zero; the counts are advisory and do
+not provide an atomic drain/delete guarantee. DynamoDB
+[`CreateBackup`](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_CreateBackup.html)
+returns a backup identity; this bounded change does not certify asynchronous
+backup completion or redesign retention orchestration.
+
+This still does not establish ownership protection for every AWS lifecycle
+operation. Provisioning name races/legacy adoption, DynamoDB restore/adoption,
+other providers' status/snapshot/update/teardown paths and cloud-admin concurrent
+retag/recreate races remain separately tracked acceptance work. Legacy live
+resources without the immutable source tag require verified operator backfill;
+matching tenant slugs alone do not authorize lifecycle operations. Workload
+tag-mutation authority is addressed below.
 
 
 ### SQS workload management excludes ownership and policy administration

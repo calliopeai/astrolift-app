@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+- Privacy review uses the server-confirmed anonymous-state flag and exact current
+  user identity. All eight locales distinguish first cleanup, repeated attributed
+  history cleanup and retained/unsupported records. Changed targets or withdrawn
+  sources require fresh acknowledgement; accepted cleanup stays accepted after
+  refresh or sign-out navigation failure (#2220).
+
+- Account anonymization reduces supported, attributable historical PII while
+  retaining structural audit facts, foreign subjects and stored role bindings.
+  Database guards admit only the exact reduction for an inactive anonymous
+  account; failures roll back the account transition. Repeat cleanup preserves
+  the anonymous identity, and a nullable user status supports accurate review.
+  IdP callbacks preserve subject/issuer ownership and refuse inactive accounts
+  before restoring caches or issuing sessions. See
+  `docs/operators/account-anonymization.md` for the source inventory and deliberate
+  exclusions (#2220).
+
+- GCP Pub/Sub queues use full immutable service-ID names for new resources and
+  preserve exact recorded paths. Current source/default-child ownership,
+  bounded inventory and finite SDK budgets gate operations. Retained-data
+  cleanup never seeks/discards messages without explicit deletion; failed child
+  deletion and force flags cannot fake success (#2032, #2098, bounded scope).
+
+- Pub/Sub cleanup preserves failed/unknown ownership outcomes across permission
+  errors, incomplete subscription inventory and denied child operations. Error
+  text and caller-controlled names cannot become successful deletion; concrete
+  typed missing-resource outcomes remain idempotent (#2098, bounded scope).
+
+- Localize ingress-class choices, gate guidance, opt-in deployment review and
+  outcomes in all eight locales. Preserve exact update inputs and raw refusals;
+  accepted changes survive failed reads, rejected changes trigger no refresh,
+  and cluster/source changes discard old reviews (#2145).
+
+- New GCP Pub/Sub topic names retain the full persisted service UUID and reserve
+  room for distinct declared subscription suffixes. Recorded topics and child
+  mappings stay unchanged; colliding legacy child declarations, invalid IDs
+  and unavailable ownership proof refuse before mutation (#2032, bounded scope).
+
+- Translate the connected central OIDC authentication form and feedback in all
+  eight locales. Preserve write-only secret omission and literal provider
+  metadata, retain committed updates through failed refreshes, and clear
+  previous-cluster/source drafts without changing mutation authority (#2145).
+
 - Translate connected People mutation/CSV feedback and the anonymization dialog
   in all eight locales. Describe actual account/profile and membership effects;
   keep historical-audit and stored-binding limitations explicit (#2220).
@@ -24,6 +66,22 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Localize the cluster heartbeat-agent key/deploy/install and clipboard outcomes
+  in all eight locales. Preserve accepted mutations and one-time keys through
+  failed refreshes, distinguish failed cluster reads from confirmed not-found,
+  and retry the real current-target read without changing permission decisions
+  (#2145).
+
+- Localize Team reach and connected access/removal presentation in all eight
+  locales. Preserve source identities and server refusals, retain accepted
+  removals through failed refreshes, and block old-target confirmations while
+  the current target is unavailable (#2145).
+
+- Translate connected Team detail/member navigation, role assignment and source
+  recovery in all eight locales. Preserve literal identities and request-timezone
+  dates; accepted assignments remain accepted if their read refresh fails, and
+  refused writes retain selection without refreshing (#2145).
+
 - Localize the connected legacy role-grant sheet and feedback in all eight locales,
   preserving literal role/scope identities and original backend refusals. Distinguish
   unknown, failed and unsupported target sources; accepted grants refresh the exact
@@ -52,6 +110,18 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- New S3/SQS/DynamoDB physical names retain the complete persisted service UUID,
+  avoiding joined/truncated tenant-slug collisions. Reprovision keeps validated
+  recorded names and data; missing identities, invalid targets and foreign or
+  unmarked pre-existing resources refuse before mutation. Other driver families
+  and excluded explicit/SES identities remain separate work (#2032, #2098).
+
+- SQS and DynamoDB updates, teardown and readiness verify live source identity
+  and exact recorded target before actions. DynamoDB snapshots also verify the
+  source and returned backup identity. Unknown tags/metadata and permission
+  errors cannot masquerade as absent resources; force flags cannot bypass
+  ownership. Queue snapshots remain unsupported (#2098).
+
 - Explicit provider ownership refusal or unavailable ownership proof never
   becomes successful cleanup because a resource name/diagnostic contains a
   not-found marker. Genuine missing-resource teardown still converges (#2098).

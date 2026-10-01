@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { grantHref, TEAMS_HREF } from "@/components/screens/administration/access/access-nav";
 import { useEntityAccess } from "@/components/screens/administration/access/use-entity-access";
 import { TeamAccessPanel } from "@/components/screens/teams/TeamAccessPanel";
@@ -10,9 +11,13 @@ import { useTeamMembers } from "@/components/screens/teams/use-team-members";
 import { useTeamProjects } from "@/components/screens/teams/use-team-projects";
 
 export function TeamAccessClient({ slug }: { slug: string }) {
+  const t = useTranslations("teams.access");
   const detail = useTeamDetail(slug);
   const team = detail.team;
-  const access = useEntityAccess(team ? { kind: "TEAM", id: team.id } : null, `team ${slug}`);
+  const access = useEntityAccess(
+    team ? { kind: "TEAM", id: team.id } : null,
+    t("subject", { name: slug })
+  );
   const reach = useTeamProjects(slug);
   const grant = team
     ? grantHref({
@@ -32,7 +37,7 @@ export function TeamMembersClient({ slug }: { slug: string }) {
   const members = useTeamMembers(detail.team);
   return (
     <TeamDetailScreen {...detail} tab="members">
-      {detail.team && <TeamMembersPanel {...members} team={detail.team} />}
+      {detail.team && <TeamMembersPanel key={detail.team.id} {...members} team={detail.team} />}
     </TeamDetailScreen>
   );
 }

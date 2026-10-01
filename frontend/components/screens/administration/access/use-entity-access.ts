@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 import { toast } from "sonner";
 
 import type { ScopeKind } from "@/components/access/access-model";
@@ -15,8 +17,9 @@ import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import {
   type AccessEntry,
   accessOnVariables,
-  ENTITY_ACCESS_LIST,
+  localizedEntityAccessList,
   removalOf,
+  entryKey,
 } from "./entity-access";
 import type { EntityAccessPanelProps } from "./EntityAccessPanel";
 
@@ -37,8 +40,9 @@ export function useEntityAccess(
   target: { kind: ScopeKind | "AGENT"; id: string } | null,
   subject: string
 ): Omit<EntityAccessPanelProps, "grantHref"> {
+  const t = useTranslations("shared.access.entityPanel");
   const perms = useMyPermissions();
-  const list = useListState(ENTITY_ACCESS_LIST);
+  const list = useListState(localizedEntityAccessList(t));
   const query = useQuery<AccessOnResp>(ACCESS_ON, {
     variables: target ? accessOnVariables(target, list.state) : undefined,
     skip: target === null,
@@ -46,22 +50,33 @@ export function useEntityAccess(
   });
   const [revoke] = useMutation<{
     revokeRoleBinding: MutationResult<{ id: string; deleted: boolean }>;
-  }>(REVOKE_ROLE_BINDING, { refetchQueries: REFETCH, awaitRefetchQueries: true });
+  }>(REVOKE_ROLE_BINDING, {
+    refetchQueries: (result) => (result.data?.revokeRoleBinding.ok ? REFETCH : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
   const [unmap] = useMutation<{
     deleteGroupRoleMapping: MutationResult<{ id: string; deleted: boolean }>;
-  }>(DELETE_GROUP_ROLE_MAPPING, { refetchQueries: REFETCH, awaitRefetchQueries: true });
+  }>(DELETE_GROUP_ROLE_MAPPING, {
+    refetchQueries: (result) => (result.data?.deleteGroupRoleMapping.ok ? REFETCH : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
 
-  const data = query.data ?? query.previousData;
+  const data = target ? query.data : undefined;
   const page = data?.astroliftAccessOn;
 
   async function onRemove(entry: AccessEntry): Promise<void> {
+    if (!target || !page?.items.some((item) => entryKey(item) === entryKey(entry)))
+      throw new Error(t("noTarget"));
+    if (!removalOf(entry)) throw new Error(t("notRemovable"));
     const input = { variables: { input: { id: entry.bindingId } } };
     const result =
       removalOf(entry) === "mapping"
         ? (await unmap(input)).data?.deleteGroupRoleMapping
         : (await revoke(input)).data?.revokeRoleBinding;
-    if (result?.ok) toast.success(`Removed ${entry.role?.slug ?? "access"}`);
-    else throw new Error(result?.errors?.[0]?.message ?? "Remove failed");
+    if (result?.ok) toast.success(t("removed", { role: entry.role?.slug ?? t("accessName") }));
+    else throw new Error(result?.errors?.[0]?.message ?? t("removeFailed"));
   }
 
   return {
@@ -70,9 +85,15 @@ export function useEntityAccess(
     rows: page?.items ?? [],
     totalCount: page?.totalCount ?? 0,
     loading: target === null || (query.loading && !data),
-    stale: query.loading && !query.data && Boolean(data),
-    error: query.error ? { message: query.error.message } : null,
-    onRetry: () => void query.refetch(),
+    stale: query.loading && Boolean(data),
+    error: query.error
+      ? { message: query.error.message }
+      : target && !query.loading && !page
+        ? { message: t("unavailable") }
+        : null,
+    onRetry: () => {
+      void query.refetch().catch(() => {});
+    },
     canManage: perms.can("org.manage_members"),
     onRemove,
   };

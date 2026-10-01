@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "团队成员",
+      "description": "{team} 的成员。可在此列表中分配能授予此团队的角色。",
+      "loadError": "无法加载团队成员。",
+      "emptyTitle": "此团队尚无成员",
+      "emptyDescription": "在团队范围内授予角色以添加成员。",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "用户",
+        "lifecycle": "生命周期",
+        "joined": "加入时间"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "选择所有团队成员",
+      "selectRowLabel": "选择成员 {user}",
+      "selected": "{count, plural, =1 {已选择 1 位成员} other {已选择 # 位成员}}",
+      "clear": "清除",
+      "assignButton": "向 {count} 位成员分配角色",
+      "permissionHint": "你没有管理此团队成员的权限。",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {向 # 位成员分配角色} other {向 # 位成员分配角色}}",
+        "description": "在团队 {team} 范围内授予角色。已拥有该角色的成员会被跳过；再次分配同一角色不会产生其他变化。",
+        "roleLabel": "可授予此团队的角色",
+        "rolePlaceholder": "选择角色",
+        "noRoles": "此团队没有可用角色。",
+        "cancel": "取消",
+        "confirmLabel": "分配角色"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {已向 # 位成员分配角色。} other {已向 # 位成员分配角色。}}",
+        "mixedIdempotent": "已分配 {assigned} 位；{already} 位已拥有。",
+        "partial": "已分配 {assigned} 位；{already} 位已拥有；{failed} 位失败。",
+        "allFailed": "角色分配失败：{message}"
       }
     },
     "invitationExpiry": {
@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "已匿名化",
         "anonymize": "匿名化用户数据",
         "invite": "邀请",
-        "grant": "授予访问权限"
+        "grant": "授予访问权限",
+        "reviewPrivacyCleanup": "查看个人信息清理"
       },
       "emptyTitle": "暂无人员",
       "emptyDescription": "邀请用户加入组织，然后授予角色。",
@@ -3757,22 +3758,31 @@
       "deleted": "邀请已删除",
       "deleteFailed": "删除失败",
       "anonymizeFailed": "匿名化失败",
-      "anonymized": "用户数据已匿名化。"
+      "anonymized": "已接受受支持范围内的用户个人信息清理。",
+      "logoutWarning": "清理已被接受，但无法打开退出登录。请退出登录以结束此浏览器会话。"
     },
     "anonymization": {
       "title": "匿名化 {name}？",
-      "changes": "将更改的内容",
-      "identity": "账户姓名和邮箱将替换为匿名身份信息。",
-      "profile": "个人资料字段、电话、头像、地址和签名将清除或替换。",
-      "account": "登录将禁用，认证群组成员关系将清除。",
-      "memberships": "平台中的成员资格将停用。",
-      "preserves": "将保留的内容",
-      "records": "账户记录以及历史操作中的关联将保留。",
-      "history": "此操作不会清除历史审计内容，也不会删除已存储的角色绑定记录。",
-      "irreversible": "此操作不可撤销，原始个人数据无法恢复。对已匿名化的账户重复执行不会产生进一步更改。",
+      "changes": "清理范围",
+      "identity": "首次清理会将账户姓名和邮箱替换为匿名身份。",
+      "profile": "首次清理会清除或替换个人资料字段、电话、头像、地址和签名。",
+      "account": "首次清理会停用登录，并清除认证群组成员关系。",
+      "memberships": "首次清理会停用整个平台上的成员资格。",
+      "preserves": "保留的记录和限制",
+      "records": "保留账户数据行、历史关联、记录 ID、决策和时间戳。",
+      "history": "对历史事件和审计记录中明确归属于此用户且受支持的身份及请求字段进行脱敏。",
+      "irreversible": "受支持范围内的清理无法撤销。重复执行可缩减后来出现的明确归属历史数据，但不会替换已有的匿名身份。",
       "acknowledge": "我理解此操作不可撤销。",
       "working": "正在匿名化…",
-      "confirm": "匿名化用户数据"
+      "confirm": "匿名化用户数据",
+      "reviewTitle": "查看 {name} 的个人信息清理范围？",
+      "anonymousIdentity": "保留账户现有的匿名身份。",
+      "metadata": "缩减受支持的身份缓存、会话和令牌元数据，以及邮件和短信发送联系信息。",
+      "roleBindings": "保留已存储的角色绑定记录；已停用的用户无法通过认证。",
+      "scopeLimits": "未归属、归属不明、自由文本、其他用户的数据以及不受支持的结构化数据仍会保留。",
+      "external": "不会更改现有导出、归档、备份或外部系统。",
+      "reviewWorking": "正在清理个人信息…",
+      "reviewConfirm": "执行个人信息清理"
     }
   },
   "stepUp": {
@@ -4518,6 +4528,45 @@
         "loadingRoles": "正在加载角色…",
         "unknownRoles": "角色尚未确认。",
         "emptyRoles": "此列表中没有可用角色。"
+      },
+      "entityPanel": {
+        "label": "访问权限",
+        "who": "对象",
+        "role": "角色",
+        "source": "来源",
+        "expires": "到期时间",
+        "never": "永不过期",
+        "share": "共享：{level}",
+        "search": "搜索用户、组、团队和角色…",
+        "all": "全部",
+        "removeMapping": "删除此组映射",
+        "removeGrant": "撤销此授权",
+        "appSharing": "在应用共享设置中更改",
+        "emptyTitle": "此处尚无人具有访问权限",
+        "emptyDescription": "在 {subject} 或更广的范围内授予角色，即可在此显示拥有者及其来源。",
+        "grant": "授予访问权限",
+        "removeTitle": "从 {name} 撤销 {role}？",
+        "removeGeneric": "撤销访问权限？",
+        "inherited": "此授权位于 {kind} {name}，而非 {subject}。撤销会在来源及其影响的所有范围内移除此权限。",
+        "direct": "他们将失去此授权在 {subject} 上提供的访问权限。",
+        "groupLoss": "组内所有成员都将失去此映射。",
+        "otherGrants": "其他授权仍然有效。",
+        "remove": "撤销",
+        "removed": "已撤销 {role}",
+        "removeFailed": "无法撤销访问权限。",
+        "refreshWarning": "访问权限已撤销，但无法刷新视图。请刷新以查看最新数据。",
+        "accessName": "访问权限",
+        "unavailable": "无法确认访问权限列表。请重试以加载最新数据。",
+        "notRemovable": "无法在此撤销此来源。",
+        "noTarget": "当前目标不可用。",
+        "group": "IdP 组",
+        "groupCount": "{count, plural, one {IdP 组 · # 位成员} other {IdP 组 · # 位成员}}",
+        "sourceLabels": {
+          "USER_BINDING": "授权",
+          "GROUP_BINDING": "组授权",
+          "GROUP_MAPPING": "组映射",
+          "TEAM_SHARE": "团队共享"
+        }
       }
     },
     "settings": {
@@ -5420,6 +5469,53 @@
       "taken": "此组织已在使用该标识符。",
       "unchanged": "当前标识符 — 用于URL。",
       "empty": "小写英文字母、数字和连字符。用于URL。"
+    },
+    "detail": {
+      "grant": "授予访问权限",
+      "notFound": "找不到团队",
+      "notFoundDescription": "此团队可能不存在、已被删除，或者你没有访问权限。",
+      "back": "返回团队列表",
+      "principal": "团队导航",
+      "loadFailed": "无法加载此页面",
+      "retry": "重试",
+      "unavailable": "无法确认团队列表。请重试以加载最新数据。",
+      "access": "访问权限",
+      "members": "成员",
+      "admin": "管理",
+      "people": "用户",
+      "teams": "团队",
+      "roles": "角色",
+      "policies": "策略",
+      "check": "检查访问权限",
+      "organization": "组织",
+      "projects": "项目"
+    },
+    "members": {
+      "add": "添加成员",
+      "label": "成员",
+      "emptyDescription": "在此团队范围内向用户授予角色，即可将其加入团队。",
+      "search": "搜索成员…",
+      "all": "全部",
+      "status": "状态",
+      "active": "有效",
+      "invited": "已邀请",
+      "suspended": "已停用",
+      "unknownError": "未提供诊断信息。",
+      "refreshWarning": "角色分配已接受，但无法刷新视图。请刷新以查看最新数据。",
+      "rolesLoading": "正在加载可用角色…",
+      "rolesUnknown": "尚未确认可用角色。",
+      "rolesFailed": "无法加载可用角色。",
+      "rolesRetry": "重新加载角色",
+      "accepted": "角色分配已接受，但无法获取结果摘要。"
+    },
+    "access": {
+      "subject": "团队 {name}",
+      "reaches": "适用范围",
+      "description": "团队范围包括这些项目及其应用。访问权限还取决于角色和策略。",
+      "emptyTitle": "尚无项目",
+      "emptyDescription": "之后在此团队下创建的项目也包含在团队范围内。",
+      "unavailable": "无法确认项目列表。请重试以加载最新数据。",
+      "retry": "重试"
     }
   },
   "apiKeys": {
@@ -5598,6 +5694,97 @@
       "scope18": {
         "label": "管理员",
         "description": "所有者现在以及新增权限后可执行的全部操作。请优先选择较小的权限范围。"
+      }
+    }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "心跳代理",
+      "description": "<namespace>astrolift-system</namespace> 命名空间中的代理发送签名心跳，让平台显示 Pod、节点和资源状态并检测连接中断。心跳间隔为 <interval>{seconds, number}</interval> {seconds, plural, one {秒} other {秒}}。",
+      "keyIssued": "密钥已签发",
+      "copyNow": "请立即复制此密钥，之后无法再次查看。",
+      "copy": "复制",
+      "copied": "已复制",
+      "copyFailed": "复制失败。请选中文本并手动复制。",
+      "installSecret": "安装代理 Secret",
+      "installHelp": "然后部署代理，代理会从此 Secret 读取密钥和 URL。收到心跳后才能确认连接。",
+      "deploy": "将代理部署到集群",
+      "done": "完成",
+      "deployHelp": "应用代理 Deployment。请先使用上方命令创建 <secret>astrolift-agent</secret> Secret。",
+      "rotate": "轮换代理密钥",
+      "issue": "签发代理密钥",
+      "rotationHelp": "Deployment 从 <secret>astrolift-agent</secret> Secret 读取密钥和 URL。轮换会使旧密钥失效。再次部署前，请用新密钥更新此 Secret；旧密钥将无法签署有效心跳。",
+      "feedbackIssued": "代理密钥已签发。请立即复制，之后无法再次查看。",
+      "feedbackRotated": "代理密钥已轮换，旧密钥已失效。",
+      "feedbackDeployed": "代理部署已接受。收到心跳后才能确认连接。",
+      "feedbackIssueFailed": "无法签发代理密钥。",
+      "feedbackDeployFailed": "无法部署代理。",
+      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。"
+    },
+    "source": {
+      "readFailed": "无法读取集群详情",
+      "cached": "正在显示上次确认的集群详情。请刷新以核实当前状态。",
+      "retry": "重试",
+      "unknown": "集群详情尚未确认，请重新读取。",
+      "notFoundHeader": "未找到集群",
+      "notFound": "没有可见的集群使用标识 {slug}",
+      "notFoundHelp": "集群不存在，或你没有查看权限。",
+      "back": "返回集群列表"
+    },
+    "centralAuth": {
+      "title": "中央认证",
+      "description": "认证主机父域内的应用主机共享登录。请在身份提供商中注册完全一致的回调 URL <callback>{callbackUrl}</callback>。Envoy 和 nginx 使用此配置；ALB 则使用各应用的 Cognito 认证。自定义域名需要独立配置认证。",
+      "authHost": "认证主机",
+      "discoveryUrl": "发现 URL",
+      "clientId": "客户端 ID",
+      "clientSecret": "客户端密钥",
+      "jwksOptional": "JWKS URI（可选）",
+      "jwksUri": "JWKS 地址",
+      "secretKeep": "已设置。留空以保留现有值。",
+      "notSet": "未设置",
+      "secretUnknown": "未确认",
+      "writeOnly": "仅可写入。保存后无法再次查看。",
+      "jwksHint": "仅在提供商未通过 {jwksPath} 发布密钥时填写。",
+      "notConfigured": "尚未配置。",
+      "cookieSecret": "Cookie 密钥",
+      "gatewaySecret": "Gateway 密钥",
+      "secretSet": "已设置",
+      "secretBadge": "{label}：{state}",
+      "edit": "编辑",
+      "setup": "设置中央认证",
+      "saved": "中央认证已保存。",
+      "saveFailed": "无法保存中央认证。",
+      "refreshWarning": "中央认证已保存，但无法刷新集群详情。请刷新页面以查看当前状态。",
+      "secretNotSet": "未设置"
+    },
+    "ingressClass": {
+      "title": "Ingress 类",
+      "description": "选择为此集群应用提供服务的入口。每个应用在下次部署时切换；仅更改类不会重新部署运行中的应用。",
+      "change": "更改类",
+      "gateHint": "应用将使用{gate}。",
+      "missingAlb": "尚未设置 ALB Cognito 认证，因此使用此类的应用将公开访问。",
+      "missingCentral": "上方尚未配置中央认证，因此使用此类的应用将公开访问。",
+      "gateRefusal": "服务器会拒绝移除现有认证的更改。请先配置新的认证。",
+      "syncHint": "同时请求将新认证写入各应用的 <file>astrolift.toml</file>。每个成功的仓库提交都会触发相应应用部署，因此多个应用可能同时重新部署。未连接源代码或写入失败时，部分应用可能被跳过。",
+      "confirmTitle": "将 Ingress 类更改为 <target>{className}</target>？",
+      "syncReview": "请求为此集群的应用提交 astrolift.toml。每个成功提交都会触发相应应用部署。未连接源代码或写入失败时，部分应用可能被跳过。",
+      "nextDeployReview": "现在不重新部署任何应用。各应用在下次部署时切换到新入口。",
+      "changed": "更改 Ingress 类为 {target} 的请求已接受。",
+      "changeFailed": "无法更改 Ingress 类。",
+      "refreshWarning": "类更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。",
+      "classes": {
+        "envoy": {
+          "label": "Envoy 入口（中央认证）",
+          "gate": "单一 Envoy Gateway 的中央认证"
+        },
+        "alb": {
+          "label": "ALB（各应用 Cognito）",
+          "gate": "ALB Cognito 认证"
+        },
+        "nginx": {
+          "label": "ingress-nginx（中央认证）",
+          "gate": "通过 oauth2-proxy 的中央认证；ingress-nginx 已停止维护"
+        }
       }
     }
   }

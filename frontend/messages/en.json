@@ -3396,10 +3396,10 @@
     },
     "teamMembersBulk": {
       "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
+      "description": "Members of {team}. Assign a role grantable to this team from this list.",
+      "loadError": "Could not load team members.",
       "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "emptyDescription": "Grant a role at this team’s scope to add a member.",
       "columns": {
         "user": "User",
         "lifecycle": "Lifecycle",
@@ -3410,21 +3410,21 @@
       "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
       "clear": "Clear",
       "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "permissionHint": "You do not have permission to manage members on this team.",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
+        "title": "{count, plural, one {Assign a role to # member} other {Assign a role to # members}}",
+        "description": "Grants the role at team {team}. Members who already have it are skipped; assigning that same role again makes no further change.",
+        "roleLabel": "Role grantable to this team",
         "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
+        "noRoles": "No roles are available for this team.",
         "cancel": "Cancel",
         "confirmLabel": "Assign role"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {Assigned a role to # member.} other {Assigned a role to # members.}}",
+        "mixedIdempotent": "Assigned {assigned}; {already} already had it.",
+        "partial": "Assigned {assigned}; {already} already had it; {failed} failed.",
+        "allFailed": "Role assignment failed: {message}"
       }
     },
     "invitationExpiry": {
@@ -3678,7 +3678,8 @@
         "alreadyAnonymized": "Already anonymized",
         "anonymize": "Anonymize user data",
         "invite": "Invite",
-        "grant": "Grant access"
+        "grant": "Grant access",
+        "reviewPrivacyCleanup": "Review privacy cleanup"
       },
       "emptyTitle": "No people yet",
       "emptyDescription": "Invite someone to the organization, then grant them a role.",
@@ -3776,22 +3777,31 @@
       "deleted": "Invitation deleted",
       "deleteFailed": "Delete failed",
       "anonymizeFailed": "Anonymization failed",
-      "anonymized": "User data anonymized."
+      "anonymized": "Supported user privacy cleanup accepted.",
+      "logoutWarning": "The cleanup was accepted, but sign-out could not open. Sign out to end this browser session."
     },
     "anonymization": {
       "title": "Anonymize {name}?",
-      "changes": "This changes",
-      "identity": "Account names and email are replaced with an anonymous identity.",
-      "profile": "Personal profile fields, phone, avatar, address and signature are cleared or replaced.",
-      "account": "Sign-in is disabled and authentication group memberships are cleared.",
-      "memberships": "Memberships across the platform are deactivated.",
-      "preserves": "This preserves",
-      "records": "The account row and links from historical actions remain.",
-      "history": "This action does not erase historical audit content or delete stored role-binding records.",
-      "irreversible": "This action is irreversible. The original personal data cannot be restored. Repeating it on an already anonymized account makes no further changes.",
+      "changes": "Cleanup scope",
+      "identity": "On a first cleanup, account names and email are replaced with an anonymous identity.",
+      "profile": "On a first cleanup, personal profile fields, phone, avatar, address and signature are cleared or replaced.",
+      "account": "On a first cleanup, sign-in is disabled and authentication group memberships are cleared.",
+      "memberships": "On a first cleanup, memberships across the platform are deactivated.",
+      "preserves": "Retained records and limits",
+      "records": "The account row, historical links, record IDs, decisions and timestamps remain.",
+      "history": "Supported identity and request fields in historical events and audit records clearly attributed to this user are redacted.",
+      "irreversible": "This supported cleanup cannot be undone. Repeating it can reduce newly available attributed history without replacing an existing anonymous identity.",
       "acknowledge": "I understand this is irreversible.",
       "working": "Anonymizing…",
-      "confirm": "Anonymize user data"
+      "confirm": "Anonymize user data",
+      "reviewTitle": "Review privacy cleanup for {name}?",
+      "anonymousIdentity": "The existing anonymous account identity is retained.",
+      "metadata": "Supported identity-cache, session and token metadata and email/SMS delivery contacts are reduced.",
+      "roleBindings": "Stored role-binding records remain; an inactive user cannot authenticate.",
+      "scopeLimits": "Unattributed, ambiguous, free-form, other users’ or unsupported structured data remains.",
+      "external": "Existing exports, archives, backups and external systems are not changed.",
+      "reviewWorking": "Cleaning privacy data…",
+      "reviewConfirm": "Run privacy cleanup"
     }
   },
   "securitySessions": {
@@ -4598,6 +4608,45 @@
         "loadingRoles": "Loading roles…",
         "unknownRoles": "Roles have not been confirmed yet.",
         "emptyRoles": "No roles are available in this list."
+      },
+      "entityPanel": {
+        "label": "Access",
+        "who": "Who",
+        "role": "Role",
+        "source": "Source",
+        "expires": "Expires",
+        "never": "never",
+        "share": "share: {level}",
+        "search": "Search people, groups, teams and roles…",
+        "all": "All",
+        "removeMapping": "Remove this mapping",
+        "removeGrant": "Remove this grant",
+        "appSharing": "Changed on the app’s sharing",
+        "emptyTitle": "Nobody has access here yet",
+        "emptyDescription": "Grant a role on {subject}, or a wider scope, to show its holders and sources here.",
+        "grant": "Grant access",
+        "removeTitle": "Remove {role} from {name}?",
+        "removeGeneric": "Remove access?",
+        "inherited": "This grant is held on {kind} {name}, not on {subject}. Removing it takes it away at its source and every scope it reaches.",
+        "direct": "They lose the access this grant gives on {subject}.",
+        "groupLoss": "Every member of the group loses this mapping.",
+        "otherGrants": "Other grants stay in effect.",
+        "remove": "Remove",
+        "removed": "Removed {role}",
+        "removeFailed": "Could not remove access.",
+        "refreshWarning": "Access was removed, but the view could not be refreshed. Refresh to see current data.",
+        "accessName": "access",
+        "unavailable": "The access list could not be confirmed. Retry to load current data.",
+        "notRemovable": "This source cannot be removed here.",
+        "noTarget": "The current target is unavailable.",
+        "group": "IdP group",
+        "groupCount": "{count, plural, one {IdP group · # member} other {IdP group · # members}}",
+        "sourceLabels": {
+          "USER_BINDING": "grant",
+          "GROUP_BINDING": "group grant",
+          "GROUP_MAPPING": "group mapping",
+          "TEAM_SHARE": "team share"
+        }
       }
     },
     "settings": {
@@ -5500,6 +5549,53 @@
       "taken": "Already taken in this organization.",
       "unchanged": "Current slug — used in URLs.",
       "empty": "Lowercase letters, numbers and hyphens. Used in URLs."
+    },
+    "detail": {
+      "grant": "Grant access",
+      "notFound": "Team not found",
+      "notFoundDescription": "This team may not exist, may have been deleted, or you may not have access to it.",
+      "back": "Back to Teams",
+      "principal": "Team navigation",
+      "loadFailed": "Could not load this page",
+      "retry": "Retry",
+      "unavailable": "The team list could not be confirmed. Retry to load current data.",
+      "access": "Access",
+      "members": "Members",
+      "admin": "Admin",
+      "people": "People",
+      "teams": "Teams",
+      "roles": "Roles",
+      "policies": "Policies",
+      "check": "Check access",
+      "organization": "Organization",
+      "projects": "Projects"
+    },
+    "members": {
+      "add": "Add member",
+      "label": "Members",
+      "emptyDescription": "Grant someone a role at this team’s scope to put them on it.",
+      "search": "Search members…",
+      "all": "All",
+      "status": "Status",
+      "active": "Active",
+      "invited": "Invited",
+      "suspended": "Suspended",
+      "unknownError": "No diagnostic was provided.",
+      "refreshWarning": "The assignment was accepted, but the view could not be refreshed. Refresh to see current data.",
+      "rolesLoading": "Loading available roles…",
+      "rolesUnknown": "Available roles have not been confirmed.",
+      "rolesFailed": "Could not load available roles.",
+      "rolesRetry": "Retry roles",
+      "accepted": "The assignment was accepted; its summary is unavailable."
+    },
+    "access": {
+      "subject": "team {name}",
+      "reaches": "Reaches",
+      "description": "Team scope includes these projects and their apps. Access also depends on the role and policy.",
+      "emptyTitle": "No projects yet",
+      "emptyDescription": "Team scope also includes projects created under the team later.",
+      "unavailable": "The project list could not be confirmed. Retry to load current data.",
+      "retry": "Retry"
     }
   },
   "apiKeys": {
@@ -5678,6 +5774,97 @@
       "scope18": {
         "label": "Admin",
         "description": "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes."
+      }
+    }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Keep-alive agent",
+      "description": "An agent in the <namespace>astrolift-system</namespace> namespace sends signed heartbeats so the platform can show pod, node, and resource state and detect a missing connection. Heartbeats are sent every <interval>{seconds, number}</interval> {seconds, plural, one {second} other {seconds}}.",
+      "keyIssued": "Key issued",
+      "copyNow": "Copy this key now — it will not be shown again.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Could not copy. Select and copy the text manually.",
+      "installSecret": "Install the agent Secret",
+      "installHelp": "Then deploy the agent, which reads the key and URL from this Secret. A received heartbeat confirms the connection.",
+      "deploy": "Deploy agent to cluster",
+      "done": "Done",
+      "deployHelp": "Applies the agent Deployment. First create the <secret>astrolift-agent</secret> Secret using the snippet above.",
+      "rotate": "Rotate agent key",
+      "issue": "Issue agent key",
+      "rotationHelp": "The Deployment reads the key and URL from the <secret>astrolift-agent</secret> Secret. Rotating invalidates the previous key. Update this Secret with the new key before deploying again; the old key can no longer sign valid heartbeats.",
+      "feedbackIssued": "Agent key issued — copy it now; it will not be shown again.",
+      "feedbackRotated": "Agent key rotated — the previous key no longer works.",
+      "feedbackDeployed": "Agent deployment accepted. A received heartbeat confirms the connection.",
+      "feedbackIssueFailed": "Could not issue the agent key.",
+      "feedbackDeployFailed": "Could not deploy the agent.",
+      "feedbackRefreshWarning": "The change was accepted, but cluster details could not be refreshed. Refresh to see current state."
+    },
+    "source": {
+      "readFailed": "Could not read cluster details",
+      "cached": "Showing the last confirmed cluster details. Refresh to verify current state.",
+      "retry": "Retry",
+      "unknown": "Cluster details have not been confirmed. Retry the read.",
+      "notFoundHeader": "Cluster not found",
+      "notFound": "No visible cluster with slug {slug}",
+      "notFoundHelp": "The cluster does not exist or you do not have permission to view it.",
+      "back": "Back to clusters"
+    },
+    "centralAuth": {
+      "title": "Central auth",
+      "description": "Shared sign-in for app hosts under the auth host’s parent zone. Register the exact callback <callback>{callbackUrl}</callback> with the identity provider. Envoy and nginx use this configuration; ALB uses its per-app Cognito gate instead. Custom domains require separate authentication configuration.",
+      "authHost": "Auth host",
+      "discoveryUrl": "Discovery URL",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "jwksOptional": "JWKS URI (optional)",
+      "jwksUri": "JWKS URI",
+      "secretKeep": "Set. Leave empty to keep it.",
+      "notSet": "Not set",
+      "secretUnknown": "Not confirmed",
+      "writeOnly": "Write-only. Never shown again once saved.",
+      "jwksHint": "Only for a provider that does not serve its keys at {jwksPath}.",
+      "notConfigured": "Not configured.",
+      "cookieSecret": "Cookie secret",
+      "gatewaySecret": "Gateway secret",
+      "secretSet": "set",
+      "secretBadge": "{label}: {state}",
+      "edit": "Edit",
+      "setup": "Set up central auth",
+      "saved": "Central auth saved.",
+      "saveFailed": "Could not save central auth.",
+      "refreshWarning": "Central auth was saved, but cluster details could not be refreshed. Refresh to see current state.",
+      "secretNotSet": "not set"
+    },
+    "ingressClass": {
+      "title": "Ingress class",
+      "description": "Which edge serves this cluster’s apps. Each app moves on its next deploy; changing the class alone does not redeploy running apps.",
+      "change": "Change class",
+      "gateHint": "Apps will use {gate}.",
+      "missingAlb": "No ALB Cognito gate is set, so apps on this class would be public.",
+      "missingCentral": "Central auth is not configured above, so apps on this class would be public.",
+      "gateRefusal": "The server refuses a change that removes the current authentication gate. Configure the new gate first.",
+      "syncHint": "Also request writing the new gate into each app’s <file>astrolift.toml</file>. Each successful repository commit starts that app’s deploy, so apps may redeploy together. Missing source connections or write-back failures can skip apps.",
+      "confirmTitle": "Change the ingress class to <target>{className}</target>?",
+      "syncReview": "Requests an astrolift.toml commit for apps on this cluster. Each successful commit starts that app’s deploy. Missing source connections or write-back failures can skip apps.",
+      "nextDeployReview": "No app redeploys now. Each one moves to the new edge on its next deploy.",
+      "changed": "Ingress class change to {target} accepted.",
+      "changeFailed": "Could not change the ingress class.",
+      "refreshWarning": "The class change was accepted, but cluster details could not be refreshed. Refresh to see current state.",
+      "classes": {
+        "envoy": {
+          "label": "Envoy edge (central auth)",
+          "gate": "central auth on one Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (per-app Cognito)",
+          "gate": "the ALB Cognito gate"
+        },
+        "nginx": {
+          "label": "ingress-nginx (central auth)",
+          "gate": "central auth through oauth2-proxy; ingress-nginx is past end of maintenance"
+        }
       }
     }
   }

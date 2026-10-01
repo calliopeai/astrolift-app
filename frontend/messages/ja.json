@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "チームのメンバー",
+      "description": "{team} のメンバー。この一覧から、チームに付与できるロールを割り当てます。",
+      "loadError": "チームのメンバーを読み込めませんでした。",
+      "emptyTitle": "このチームにはまだメンバーがいません",
+      "emptyDescription": "チームのスコープでロールを付与してメンバーを追加します。",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "ユーザー",
+        "lifecycle": "ライフサイクル",
+        "joined": "参加日"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "チームの全メンバーを選択",
+      "selectRowLabel": "メンバー {user} を選択",
+      "selected": "{count, plural, =1 {1 人のメンバーを選択中} other {# 人のメンバーを選択中}}",
+      "clear": "解除",
+      "assignButton": "{count} 人にロールを割り当て",
+      "permissionHint": "このチームのメンバーを管理する権限がありません。",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {# 人にロールを割り当て} other {# 人にロールを割り当て}}",
+        "description": "チーム {team} のスコープでロールを付与します。すでに持っているメンバーはスキップされ、同じロールを再度割り当てても追加の変更はありません。",
+        "roleLabel": "このチームに付与できるロール",
+        "rolePlaceholder": "ロールを選択",
+        "noRoles": "このチームで利用できるロールはありません。",
+        "cancel": "キャンセル",
+        "confirmLabel": "ロールを割り当て"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {# 人にロールを割り当てました。} other {# 人にロールを割り当てました。}}",
+        "mixedIdempotent": "{assigned} 人に割り当て、{already} 人は付与済みでした。",
+        "partial": "{assigned} 人に割り当て、{already} 人は付与済み、{failed} 人は失敗しました。",
+        "allFailed": "ロールの割り当てに失敗しました: {message}"
       }
     },
     "invitationExpiry": {
@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "匿名化済み",
         "anonymize": "ユーザーデータを匿名化",
         "invite": "招待",
-        "grant": "アクセスを許可"
+        "grant": "アクセスを許可",
+        "reviewPrivacyCleanup": "個人情報の削減内容を確認"
       },
       "emptyTitle": "メンバーがいません",
       "emptyDescription": "組織にユーザーを招待し、ロールを割り当ててください。",
@@ -3757,22 +3758,31 @@
       "deleted": "招待を削除しました",
       "deleteFailed": "削除に失敗しました",
       "anonymizeFailed": "匿名化に失敗しました",
-      "anonymized": "ユーザーデータを匿名化しました。"
+      "anonymized": "対応範囲のユーザーの個人情報削減が受け付けられました。",
+      "logoutWarning": "情報の削減は受け付けられましたが、サインアウトを開けませんでした。このブラウザーのセッションを終了するため、サインアウトしてください。"
     },
     "anonymization": {
       "title": "{name} を匿名化しますか？",
-      "changes": "変更される内容",
-      "identity": "アカウント名とメールアドレスは匿名の識別情報に置き換えられます。",
-      "profile": "個人プロフィールの項目、電話番号、アバター、住所、署名は削除または置き換えられます。",
-      "account": "ログインが無効になり、認証グループへの所属が解除されます。",
-      "memberships": "プラットフォーム全体のメンバーシップが無効化されます。",
-      "preserves": "保持される内容",
-      "records": "アカウントの記録と過去の操作からの参照は保持されます。",
-      "history": "この操作では、過去の監査内容や保存されたロール付与の記録は削除されません。",
-      "irreversible": "この操作は取り消せません。元の個人データは復元できません。匿名化済みのアカウントで繰り返しても追加の変更は行われません。",
+      "changes": "削減の対象",
+      "identity": "初回の処理では、アカウントの氏名とメールアドレスを匿名の識別情報に置き換えます。",
+      "profile": "初回の処理では、プロフィールの個人情報、電話番号、アバター、住所、署名を消去または置換します。",
+      "account": "初回の処理では、サインインを無効にし、認証グループの所属を解除します。",
+      "memberships": "初回の処理では、プラットフォーム全体のメンバーシップを無効にします。",
+      "preserves": "保持される記録と対象外の範囲",
+      "records": "アカウントの行、過去の関連付け、記録 ID、判断結果、タイムスタンプは保持されます。",
+      "history": "このユーザーに明確に帰属する過去のイベントや監査記録で、対応している識別情報とリクエストの項目を伏せ字にします。",
+      "irreversible": "対応範囲の情報を削減すると元には戻せません。再実行により、後から利用可能になった帰属の明確な履歴を削減できますが、既存の匿名の識別情報は置き換えません。",
       "acknowledge": "この操作を取り消せないことを理解しています。",
       "working": "匿名化中…",
-      "confirm": "ユーザーデータを匿名化"
+      "confirm": "ユーザーデータを匿名化",
+      "reviewTitle": "{name} の個人情報の削減内容を確認しますか？",
+      "anonymousIdentity": "既存の匿名アカウントの識別情報は保持されます。",
+      "metadata": "対応している識別情報キャッシュ、セッション、トークンのメタデータと、メール・SMS の配信先情報を削減します。",
+      "roleBindings": "保存済みのロール割り当て記録は保持されます。無効なユーザーは認証できません。",
+      "scopeLimits": "帰属不明、曖昧、自由記述、他のユーザーの情報、対応していない構造化データは残ります。",
+      "external": "既存のエクスポート、アーカイブ、バックアップ、外部システムは変更されません。",
+      "reviewWorking": "個人情報を削減中…",
+      "reviewConfirm": "個人情報の削減を実行"
     }
   },
   "stepUp": {
@@ -4518,6 +4528,45 @@
         "loadingRoles": "ロールを読み込み中…",
         "unknownRoles": "ロールはまだ確認されていません。",
         "emptyRoles": "この一覧にロールはありません。"
+      },
+      "entityPanel": {
+        "label": "アクセス",
+        "who": "対象",
+        "role": "ロール",
+        "source": "付与元",
+        "expires": "有効期限",
+        "never": "なし",
+        "share": "共有: {level}",
+        "search": "ユーザー、グループ、チーム、ロールを検索…",
+        "all": "すべて",
+        "removeMapping": "このグループ対応を削除",
+        "removeGrant": "この付与を削除",
+        "appSharing": "アプリの共有設定で変更します",
+        "emptyTitle": "まだアクセス権を持つ人はいません",
+        "emptyDescription": "{subject} または上位のスコープでロールを付与すると、保持者と付与元がここに表示されます。",
+        "grant": "アクセスを付与",
+        "removeTitle": "{name} から {role} を削除しますか？",
+        "removeGeneric": "アクセス権を削除しますか？",
+        "inherited": "この付与は {subject} ではなく {kind} {name} にあります。削除すると、付与元とそこから適用されるすべてのスコープで失われます。",
+        "direct": "この付与による {subject} へのアクセス権を失います。",
+        "groupLoss": "グループの全メンバーがこの対応による権限を失います。",
+        "otherGrants": "他の付与は引き続き有効です。",
+        "remove": "削除",
+        "removed": "{role} を削除しました",
+        "removeFailed": "アクセス権を削除できませんでした。",
+        "refreshWarning": "アクセス権は削除されましたが、表示を更新できませんでした。最新のデータを再読み込みしてください。",
+        "accessName": "アクセス権",
+        "unavailable": "アクセス権の一覧を確認できませんでした。再試行して最新のデータを読み込んでください。",
+        "notRemovable": "この付与元はここでは削除できません。",
+        "noTarget": "現在の対象を取得できません。",
+        "group": "IdP グループ",
+        "groupCount": "{count, plural, one {IdP グループ · メンバー # 人} other {IdP グループ · メンバー # 人}}",
+        "sourceLabels": {
+          "USER_BINDING": "付与",
+          "GROUP_BINDING": "グループへの付与",
+          "GROUP_MAPPING": "グループ対応",
+          "TEAM_SHARE": "チーム共有"
+        }
       }
     },
     "settings": {
@@ -5420,6 +5469,53 @@
       "taken": "この組織で既に使われています。",
       "unchanged": "現在のスラッグ — URLに使用されます。",
       "empty": "小文字の英字、数字、ハイフンを使います。URLに使用されます。"
+    },
+    "detail": {
+      "grant": "アクセスを付与",
+      "notFound": "チームが見つかりません",
+      "notFoundDescription": "このチームは存在しないか、削除されたか、アクセス権がない可能性があります。",
+      "back": "チーム一覧に戻る",
+      "principal": "チームのナビゲーション",
+      "loadFailed": "このページを読み込めませんでした",
+      "retry": "再試行",
+      "unavailable": "チーム一覧を確認できませんでした。再試行して最新のデータを読み込んでください。",
+      "access": "アクセス",
+      "members": "メンバー",
+      "admin": "管理",
+      "people": "ユーザー",
+      "teams": "チーム",
+      "roles": "ロール",
+      "policies": "ポリシー",
+      "check": "アクセスを確認",
+      "organization": "組織",
+      "projects": "プロジェクト"
+    },
+    "members": {
+      "add": "メンバーを追加",
+      "label": "メンバー",
+      "emptyDescription": "このチームのスコープでロールを付与すると、そのユーザーがメンバーになります。",
+      "search": "メンバーを検索…",
+      "all": "すべて",
+      "status": "状態",
+      "active": "有効",
+      "invited": "招待済み",
+      "suspended": "停止中",
+      "unknownError": "診断情報はありません。",
+      "refreshWarning": "割り当ては受け付けられましたが、表示を更新できませんでした。最新のデータを再読み込みしてください。",
+      "rolesLoading": "利用可能なロールを読み込み中…",
+      "rolesUnknown": "利用可能なロールをまだ確認できていません。",
+      "rolesFailed": "利用可能なロールを読み込めませんでした。",
+      "rolesRetry": "ロールを再読み込み",
+      "accepted": "割り当ては受け付けられましたが、結果の概要を取得できません。"
+    },
+    "access": {
+      "subject": "チーム {name}",
+      "reaches": "適用範囲",
+      "description": "チームのスコープには、これらのプロジェクトとアプリが含まれます。アクセス権はロールとポリシーにも依存します。",
+      "emptyTitle": "プロジェクトはまだありません",
+      "emptyDescription": "今後このチームの下に作成されるプロジェクトもスコープに含まれます。",
+      "unavailable": "プロジェクト一覧を確認できませんでした。再試行して最新のデータを読み込んでください。",
+      "retry": "再試行"
     }
   },
   "apiKeys": {
@@ -5598,6 +5694,97 @@
       "scope18": {
         "label": "管理者",
         "description": "現在および将来追加される権限を含め、所有者に可能なすべての操作です。限定的なスコープを優先してください。"
+      }
+    }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "ハートビートエージェント",
+      "description": "<namespace>astrolift-system</namespace> 名前空間のエージェントが署名付きハートビートを送信し、プラットフォームが Pod、ノード、リソースの状態を表示して接続断を検出できるようにします。送信間隔は <interval>{seconds, number}</interval> {seconds, plural, one {秒} other {秒}}です。",
+      "keyIssued": "キー発行済み",
+      "copyNow": "今すぐこのキーをコピーしてください。再表示はできません。",
+      "copy": "コピー",
+      "copied": "コピー済み",
+      "copyFailed": "コピーできませんでした。テキストを選択して手動でコピーしてください。",
+      "installSecret": "エージェントの Secret を作成",
+      "installHelp": "続いてエージェントをデプロイします。キーと URL はこの Secret から読み込まれます。ハートビートの受信によって接続を確認できます。",
+      "deploy": "クラスターにエージェントをデプロイ",
+      "done": "完了",
+      "deployHelp": "エージェントの Deployment を適用します。先に上のコマンドで <secret>astrolift-agent</secret> Secret を作成してください。",
+      "rotate": "エージェントキーを更新",
+      "issue": "エージェントキーを発行",
+      "rotationHelp": "Deployment は <secret>astrolift-agent</secret> Secret からキーと URL を読み込みます。キーを更新すると以前のキーは無効になります。新しいキーで Secret を更新してから再デプロイしてください。以前のキーでは有効なハートビートに署名できません。",
+      "feedbackIssued": "エージェントキーを発行しました。今すぐコピーしてください。再表示はできません。",
+      "feedbackRotated": "エージェントキーを更新しました。以前のキーは使用できません。",
+      "feedbackDeployed": "エージェントのデプロイを受け付けました。接続はハートビートの受信によって確認できます。",
+      "feedbackIssueFailed": "エージェントキーを発行できませんでした。",
+      "feedbackDeployFailed": "エージェントをデプロイできませんでした。",
+      "feedbackRefreshWarning": "変更は受け付けましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。"
+    },
+    "source": {
+      "readFailed": "クラスターの詳細を取得できませんでした",
+      "cached": "最後に確認できたクラスターの詳細を表示しています。画面を更新して現在の状態を確認してください。",
+      "retry": "再試行",
+      "unknown": "クラスターの詳細は未確認です。再取得してください。",
+      "notFoundHeader": "クラスターが見つかりません",
+      "notFound": "スラッグ {slug} の表示可能なクラスターはありません",
+      "notFoundHelp": "クラスターが存在しないか、表示する権限がありません。",
+      "back": "クラスター一覧に戻る"
+    },
+    "centralAuth": {
+      "title": "中央認証",
+      "description": "認証ホストの親ゾーン内にあるアプリホストでログインを共有します。ID プロバイダーに正確なコールバック URL <callback>{callbackUrl}</callback> を登録してください。Envoy と nginx はこの設定を使い、ALB はアプリごとの Cognito 認証を使います。カスタムドメインには独立した認証設定が必要です。",
+      "authHost": "認証ホスト",
+      "discoveryUrl": "検出 URL",
+      "clientId": "クライアント ID",
+      "clientSecret": "クライアントシークレット",
+      "jwksOptional": "JWKS URI（任意）",
+      "jwksUri": "JWKS の URI",
+      "secretKeep": "設定済み。保持するには空欄にしてください。",
+      "notSet": "未設定",
+      "secretUnknown": "未確認",
+      "writeOnly": "書き込み専用です。保存後に再表示はできません。",
+      "jwksHint": "{jwksPath} で鍵を公開していないプロバイダーのみ指定します。",
+      "notConfigured": "未構成です。",
+      "cookieSecret": "Cookie シークレット",
+      "gatewaySecret": "Gateway シークレット",
+      "secretSet": "設定済み",
+      "secretBadge": "{label}：{state}",
+      "edit": "編集",
+      "setup": "中央認証を設定",
+      "saved": "中央認証を保存しました。",
+      "saveFailed": "中央認証を保存できませんでした。",
+      "refreshWarning": "中央認証は保存しましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。",
+      "secretNotSet": "未設定"
+    },
+    "ingressClass": {
+      "title": "Ingress クラス",
+      "description": "このクラスターのアプリに使う入口を選びます。各アプリは次回のデプロイ時に切り替わります。クラスの変更だけでは実行中のアプリは再デプロイされません。",
+      "change": "クラスを変更",
+      "gateHint": "アプリは {gate} を使用します。",
+      "missingAlb": "ALB の Cognito 認証が設定されていないため、このクラスのアプリは公開状態になります。",
+      "missingCentral": "上の中央認証が設定されていないため、このクラスのアプリは公開状態になります。",
+      "gateRefusal": "現在の認証を削除する変更はサーバーが拒否します。先に新しい認証を設定してください。",
+      "syncHint": "各アプリの <file>astrolift.toml</file> に新しい認証を書き込むことも要求します。リポジトリへのコミットが成功すると、そのアプリのデプロイが始まり、複数のアプリが同時に再デプロイされる場合があります。ソース接続がない場合や書き込みに失敗した場合は、アプリが対象から外れることがあります。",
+      "confirmTitle": "Ingress クラスを <target>{className}</target> に変更しますか？",
+      "syncReview": "このクラスターのアプリに astrolift.toml のコミットを要求します。コミットが成功すると対象アプリのデプロイが始まります。ソース接続がない場合や書き込みに失敗した場合は、アプリが対象から外れることがあります。",
+      "nextDeployReview": "今はアプリを再デプロイしません。各アプリは次回のデプロイ時に新しい入口に切り替わります。",
+      "changed": "Ingress クラスを {target} に変更する要求を受け付けました。",
+      "changeFailed": "Ingress クラスを変更できませんでした。",
+      "refreshWarning": "クラスの変更は受け付けましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。",
+      "classes": {
+        "envoy": {
+          "label": "Envoy 入口（中央認証）",
+          "gate": "単一の Envoy Gateway による中央認証"
+        },
+        "alb": {
+          "label": "ALB（アプリごとの Cognito）",
+          "gate": "ALB の Cognito 認証"
+        },
+        "nginx": {
+          "label": "ingress-nginx（中央認証）",
+          "gate": "oauth2-proxy 経由の中央認証。ingress-nginx の保守は終了しています"
+        }
       }
     }
   }

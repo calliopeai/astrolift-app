@@ -13,6 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export interface PrincipalPageProps {
   crumbs: Crumb[];
+  presentation?: { tabsAriaLabel: string; loadFailed: string; retry: string };
+  showRefreshError?: boolean;
   /** Null while the principal is still being found. */
   principal: Principal | null;
   /** Shown as the title until the principal resolves. */
@@ -40,6 +42,8 @@ export interface PrincipalPageProps {
  */
 export function PrincipalPage({
   crumbs,
+  presentation,
+  showRefreshError = false,
   principal,
   fallbackTitle,
   status,
@@ -75,7 +79,7 @@ export function PrincipalPage({
         primaryAction={resolved ? primaryAction : undefined}
         menu={resolved ? menu : undefined}
         tabs={resolved ? tabs : undefined}
-        tabsAriaLabel="Principal"
+        tabsAriaLabel={presentation?.tabsAriaLabel ?? "Principal"}
       />
 
       {loading && !resolved ? (
@@ -87,13 +91,13 @@ export function PrincipalPage({
         <div className="flex flex-col items-center gap-3 rounded-md border py-10 text-center">
           <AlertTriangleIcon className="text-danger size-5" />
           <div className="min-w-0 px-6">
-            <p className="font-medium">Could not load this page</p>
+            <p className="font-medium">{presentation?.loadFailed ?? "Could not load this page"}</p>
             <p className="text-muted-foreground mt-1 max-w-md text-sm [overflow-wrap:anywhere]">
               {error.message}
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
+            {presentation?.retry ?? "Retry"}
           </Button>
         </div>
       ) : notFound || !resolved ? (
@@ -105,7 +109,23 @@ export function PrincipalPage({
           actionLabel={notFoundCopy.backLabel}
         />
       ) : (
-        <div className="flex min-w-0 flex-col gap-4">{children}</div>
+        <div className="flex min-w-0 flex-col gap-4">
+          {showRefreshError && error ? (
+            <div
+              role="alert"
+              className="border-danger-border bg-danger-bg text-danger-fg flex flex-wrap items-center gap-3 rounded-md border p-3"
+            >
+              <div className="min-w-0 flex-1">
+                <p>{presentation?.loadFailed ?? "Could not load this page"}</p>
+                <p className="text-sm [overflow-wrap:anywhere]">{error.message}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={onRetry}>
+                {presentation?.retry ?? "Retry"}
+              </Button>
+            </div>
+          ) : null}
+          {children}
+        </div>
       )}
     </div>
   );

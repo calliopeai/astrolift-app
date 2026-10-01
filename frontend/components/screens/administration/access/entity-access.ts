@@ -58,6 +58,17 @@ export const ENTITY_ACCESS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+export function localizedEntityAccessList(t: (key: string) => string): ListDefinition {
+  return {
+    ...ENTITY_ACCESS_LIST,
+    searchPlaceholder: t("search"),
+    views: ENTITY_ACCESS_LIST.views.map((view) => ({
+      ...view,
+      label: view.key === "all" ? t("all") : view.label,
+    })),
+  };
+}
+
 /** `astroliftAccessOn` variables: the object's kind and guid, the search, the page. */
 export function accessOnVariables(
   target: { kind: ScopeKind | "AGENT"; id: string },
@@ -77,7 +88,10 @@ export function entryKey(e: AccessEntry): string {
   return `${e.source}:${e.bindingId}:${e.user?.id ?? e.groupExternalId ?? e.teamId ?? ""}`;
 }
 
-export function principalOfEntry(e: AccessEntry): Principal {
+export function principalOfEntry(
+  e: AccessEntry,
+  groupDetail?: (count: number | null) => string
+): Principal {
   if (e.principalKind === "USER" && e.user) {
     return {
       kind: "user",
@@ -92,8 +106,9 @@ export function principalOfEntry(e: AccessEntry): Principal {
       kind: "group",
       id: e.groupExternalId,
       name: e.groupExternalId,
-      detail:
-        e.groupMemberCount != null
+      detail: groupDetail
+        ? groupDetail(e.groupMemberCount ?? null)
+        : e.groupMemberCount != null
           ? `IdP group · ${e.groupMemberCount} ${e.groupMemberCount === 1 ? "member" : "members"}`
           : "IdP group",
       href: `${PEOPLE_HREF}/${encodeURIComponent(groupParam(e.groupExternalId))}`,

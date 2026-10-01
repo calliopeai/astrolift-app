@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
 import { FolderIcon } from "lucide-react";
 
 import { ListSummary } from "@/components/list/ListSummary";
@@ -28,39 +30,49 @@ export interface TeamAccessPanelProps {
  * summary beside it (Leo's list rule 3). Pure.
  */
 export function TeamAccessPanel({ slug, access, reach }: TeamAccessPanelProps) {
+  const t = useTranslations("teams.access");
   return (
     <div className="grid min-w-0 grid-cols-12 items-start gap-6">
       <div className="col-span-12 min-w-0 xl:col-span-8">
         <EntityAccessPanel {...access} />
       </div>
-      <ListSummary<AstroliftProject>
-        span={4}
-        title="Reaches"
-        icon={<FolderIcon className="size-4" />}
-        description="A grant at this team applies to these projects and every app in them."
-        count={reach.projects.length}
-        rows={reach.projects}
-        keyOf={(p) => p.id}
-        renderRow={(p) => (
-          <div className="min-w-0">
-            <div className="truncate text-sm" title={p.name}>
-              {p.name}
-            </div>
-            <div className="text-muted-foreground truncate font-mono text-xs" title={p.slug}>
-              {slug}/{p.slug}
-            </div>
+      <div className="col-span-12 min-w-0 xl:col-span-4">
+        {reach.error && reach.projects.length > 0 ? (
+          <div role="alert" className="text-danger-fg mb-3 text-sm">
+            <p className="[overflow-wrap:anywhere]">{reach.error.message}</p>
+            <Button variant="outline" size="sm" onClick={reach.onRetry}>
+              {t("retry")}
+            </Button>
           </div>
-        )}
-        viewAllHref={`/administration/projects?q=${encodeURIComponent(slug)}`}
-        loading={reach.loading}
-        error={reach.error}
-        onRetry={reach.onRetry}
-        empty={{
-          icon: <FolderIcon className="size-5" />,
-          title: "No projects yet",
-          description: "A grant here still covers projects created under the team later.",
-        }}
-      />
+        ) : null}
+        <ListSummary<AstroliftProject>
+          title={t("reaches")}
+          icon={<FolderIcon className="size-4" />}
+          description={t("description")}
+          count={reach.loading || reach.error ? null : reach.projects.length}
+          rows={reach.projects}
+          keyOf={(p) => p.id}
+          renderRow={(p) => (
+            <div className="min-w-0">
+              <div className="truncate text-sm" title={p.name}>
+                {p.name}
+              </div>
+              <div className="text-muted-foreground truncate font-mono text-xs" title={p.slug}>
+                {slug}/{p.slug}
+              </div>
+            </div>
+          )}
+          viewAllHref={`/administration/projects?q=${encodeURIComponent(slug)}`}
+          loading={reach.loading}
+          error={reach.error}
+          onRetry={reach.onRetry}
+          empty={{
+            icon: <FolderIcon className="size-5" />,
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
+          }}
+        />
+      </div>
     </div>
   );
 }

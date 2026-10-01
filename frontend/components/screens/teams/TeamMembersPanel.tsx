@@ -59,11 +59,13 @@ export function TeamMembersPanel({
   error,
   onRetry,
   roles,
+  roleSource,
   canManageTeamMembers,
   assigning,
   onAssign,
 }: TeamMembersPanelProps) {
   const t = useTranslations("lists.teamMembersBulk");
+  const mt = useTranslations("teams.members");
   const fmt = useFormatters();
   const [target, setTarget] = React.useState<RowSelection | null>(null);
   const [roleId, setRoleId] = React.useState("");
@@ -86,7 +88,13 @@ export function TeamMembersPanel({
     {
       id: "lifecycle",
       header: t("columns.lifecycle"),
-      cell: (m) => <DetailStatusBadge status={m.lifecycle} tone={TONE[m.lifecycle] ?? "muted"} />,
+      cell: (m) => (
+        <DetailStatusBadge
+          status={m.lifecycle}
+          label={Object.hasOwn(TONE, m.lifecycle) ? mt(m.lifecycle) : m.lifecycle}
+          tone={TONE[m.lifecycle] ?? "muted"}
+        />
+      ),
     },
     {
       id: "joined",
@@ -118,7 +126,7 @@ export function TeamMembersPanel({
           <Button size="sm" variant="outline" asChild>
             <Link href={addHref}>
               <UserPlusIcon className="size-4" />
-              Add member
+              {mt("add")}
             </Link>
           </Button>
         </div>
@@ -126,7 +134,7 @@ export function TeamMembersPanel({
       <ListPage<AstroliftMember>
         embedded
         list={list}
-        label="Members"
+        label={mt("label")}
         columns={columns}
         rows={rows}
         getRowId={(m) => m.id}
@@ -155,8 +163,8 @@ export function TeamMembersPanel({
         empty={{
           icon: <UsersIcon className="size-5" />,
           title: t("emptyTitle"),
-          description: "Grant someone a role at this team's scope to put them on it.",
-          ...(canManageTeamMembers ? { actionHref: addHref, actionLabel: "Add member" } : {}),
+          description: mt("emptyDescription"),
+          ...(canManageTeamMembers ? { actionHref: addHref, actionLabel: mt("add") } : {}),
         }}
       />
 
@@ -177,7 +185,19 @@ export function TeamMembersPanel({
             <label className="text-sm font-medium" htmlFor="bulk-role-select">
               {t("assignDialog.roleLabel")}
             </label>
-            {roles.length === 0 ? (
+            {roleSource.error ? (
+              <div role="alert" className="text-destructive text-sm">
+                <p>{mt("rolesFailed")}</p>
+                <p className="[overflow-wrap:anywhere]">{roleSource.error.message}</p>
+                <Button type="button" variant="outline" onClick={roleSource.onRetry}>
+                  {mt("rolesRetry")}
+                </Button>
+              </div>
+            ) : roleSource.loading ? (
+              <p role="status">{mt("rolesLoading")}</p>
+            ) : !roleSource.known ? (
+              <p role="status">{mt("rolesUnknown")}</p>
+            ) : roles.length === 0 ? (
               <p className="text-muted-foreground text-xs">{t("assignDialog.noRoles")}</p>
             ) : (
               <Select value={roleId} onValueChange={setRoleId}>
@@ -198,7 +218,16 @@ export function TeamMembersPanel({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={assigning}>{t("assignDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              disabled={assigning || !roleId || roles.length === 0}
+              disabled={
+                assigning ||
+                !canManageTeamMembers ||
+                !roleId ||
+                roles.length === 0 ||
+                roleSource.loading ||
+                !roleSource.known ||
+                Boolean(roleSource.error) ||
+                !roles.some((role) => role.id === roleId)
+              }
               onClick={(e) => {
                 e.preventDefault();
                 void handleAssign();

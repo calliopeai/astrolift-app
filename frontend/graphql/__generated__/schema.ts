@@ -5211,6 +5211,8 @@ export type AstroliftUser = {
   email: Scalars['String']['output'];
   id: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
+  /** Stored anonymous-account state; null when the constructor does not know it. */
+  isAnonymized?: Maybe<Scalars['Boolean']['output']>;
   username: Scalars['String']['output'];
 };
 

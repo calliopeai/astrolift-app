@@ -5546,6 +5546,11 @@ type AstroliftUser {
   username: String!
   email: String!
   isActive: Boolean!
+
+  """
+  Stored anonymous-account state; null when the constructor does not know it.
+  """
+  isAnonymized: Boolean
 }
 
 type AstroliftUserAlertSubscription {

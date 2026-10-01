@@ -269,7 +269,7 @@ def test_provision_provisioned_billing_uses_size_capacity(
 def test_provision_surfaces_create_failure() -> None:
     class Boom:
         def describe_table(self, **_: Any) -> dict:
-            raise RuntimeError("ResourceNotFoundException")
+            raise ResourceNotFoundException("table absent")
 
         def create_table(self, **_: Any) -> dict:
             raise RuntimeError("synthetic create failure")
@@ -301,7 +301,7 @@ def test_deprovision_default_refuses_when_protected(
     fake: FakeDDB,
 ) -> None:
     provisioned = driver.provision(_spec())  # protection on by default
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=MSID))
     assert not result.ok
     assert "DeletionProtection" in result.message
     assert fake.count("delete_table") == 0
@@ -314,7 +314,7 @@ def test_deprovision_protection_off_takes_backup_then_deletes(
     provisioned = driver.provision(
         _spec(config={"deletion_protection": False}),
     )
-    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
+    result = driver.deprovision(DeprovisionSpec(handle=provisioned.handle, managed_service_id=MSID))
     assert result.ok
     assert "backup=taken" in result.message
     assert fake.count("create_backup") == 1
@@ -329,7 +329,7 @@ def test_deprovision_delete_data_skips_backup(
         _spec(config={"deletion_protection": False}),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=MSID),
         delete_data=True,
     )
     assert result.ok
@@ -343,7 +343,7 @@ def test_deprovision_force_destroy_clears_protection(
 ) -> None:
     provisioned = driver.provision(_spec())  # protected
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=MSID),
         force_destroy=True,
     )
     assert result.ok
@@ -360,7 +360,7 @@ def test_deprovision_atomic_both_flags(
 ) -> None:
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(handle=provisioned.handle, managed_service_id=MSID),
         delete_data=True,
         force_destroy=True,
     )
@@ -376,7 +376,7 @@ def test_deprovision_atomic_both_flags(
 
 def test_update_noop_when_nothing_to_change(driver: DynamoDBDriver) -> None:
     provisioned = driver.provision(_spec())
-    result = driver.update(UpdateSpec(handle=provisioned.handle))
+    result = driver.update(UpdateSpec(handle=provisioned.handle, managed_service_id=MSID))
     assert result.ok
     assert "no-op" in result.message
 
@@ -391,6 +391,7 @@ def test_update_capacity_change_issues_update_table(
     result = driver.update(
         UpdateSpec(
             handle=provisioned.handle,
+            managed_service_id=MSID,
             config={
                 "billing_mode": "PROVISIONED",
                 "read_capacity": 25,
@@ -482,7 +483,9 @@ def test_restore_creates_target_table(
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=MSID))
-    result = driver.restore(snap, _spec(service_handle_hint="restored"))
+    result = driver.restore(
+        snap, _spec(service_handle_hint="restored", managed_service_id="33333333-3333-4333-8333-333333333333")
+    )
     assert result.ok
     _, target = parse_handle(result.handle)
     assert target in fake.tables
@@ -570,11 +573,17 @@ def test_plugin_registers_dynamodb_under_kv_store() -> None:
 
 
 def test_provision_does_not_adopt_another_services_table(driver: DynamoDBDriver, fake: FakeDDB) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    """A recorded name still cannot authorize a different service (#1961)."""
+    first = driver.provision(_spec(managed_service_id=MSID))
+    second = driver.provision(
+        _spec(
+            managed_service_id="22222222-2222-4222-8222-222222222222",
+            recorded_handle=first.handle,
+            recorded_handle_exclusive=True,
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == ""
-    assert "refusing to adopt" in second.message
+    assert "ownership" in second.message
     assert fake.count("create_table") == 1

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from botocore.session import Session
 from botocore.validate import validate_parameters
 
@@ -132,7 +133,9 @@ def test_provision_explicit_visibility_in_config(
 
 def test_provision_exposes_full_fifo_encryption_redrive_and_long_poll_surface() -> None:
     client = MagicMock()
-    client.get_queue_url.side_effect = RuntimeError("AWS.SimpleQueueService.NonExistentQueue")
+    client.get_queue_url.side_effect = ClientError(
+        {"Error": {"Code": "QueueDoesNotExist", "Message": "queue absent"}}, "GetQueueUrl"
+    )
     client.create_queue.return_value = {
         "QueueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/platform.fifo",
     }
@@ -220,7 +223,7 @@ def test_binding_lookup_failure_is_not_replaced_with_fabricated_credentials(driv
 
 def test_update_changes_visibility(driver: SQSDriver, sqs_client) -> None:
     result = driver.provision(_spec(size="small"))
-    update = driver.update(UpdateSpec(handle=result.handle, size="large"))
+    update = driver.update(UpdateSpec(handle=result.handle, managed_service_id=MSID, size="large"))
     assert update.ok is True
 
     _, queue_name = parse_handle(result.handle)
@@ -238,6 +241,7 @@ def test_update_accepts_documented_snake_case_attribute_names(driver: SQSDriver,
     update = driver.update(
         UpdateSpec(
             handle=result.handle,
+            managed_service_id=MSID,
             config={
                 "visibility_timeout_seconds": 121,
                 "receive_message_wait_time_seconds": 20,
@@ -258,7 +262,7 @@ def test_update_accepts_documented_snake_case_attribute_names(driver: SQSDriver,
 
 def test_update_no_op_when_no_changes(driver: SQSDriver) -> None:
     result = driver.provision(_spec())
-    update = driver.update(UpdateSpec(handle=result.handle))
+    update = driver.update(UpdateSpec(handle=result.handle, managed_service_id=MSID))
     assert update.ok is True
 
 
@@ -276,7 +280,7 @@ def test_deprovision_deletes_queue(driver: SQSDriver, sqs_client) -> None:
     result = driver.provision(_spec())
     _, queue_name = parse_handle(result.handle)
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle),
+        DeprovisionSpec(handle=result.handle, managed_service_id=MSID),
         delete_data=True,
     )
     assert deprov.ok is True
@@ -299,8 +303,8 @@ def test_safe_deprovision_refuses_to_discard_messages(driver: SQSDriver, sqs_cli
     queue_url = sqs_client.get_queue_url(QueueName=queue_name)["QueueUrl"]
     sqs_client.send_message(QueueUrl=queue_url, MessageBody="important")
 
-    safe = driver.deprovision(DeprovisionSpec(result.handle))
-    destructive = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    safe = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=MSID))
+    destructive = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=MSID), delete_data=True)
 
     assert not safe.ok and not safe.retryable
     assert "drain it" in safe.message
@@ -309,7 +313,7 @@ def test_safe_deprovision_refuses_to_discard_messages(driver: SQSDriver, sqs_cli
 
 def test_deletion_protection_requires_force_destroy(driver: SQSDriver) -> None:
     result = driver.provision(_spec())
-    spec = DeprovisionSpec(result.handle, config={"deletion_protection": True})
+    spec = DeprovisionSpec(result.handle, managed_service_id=MSID, config={"deletion_protection": True})
 
     protected = driver.deprovision(spec, delete_data=True)
     forced = driver.deprovision(spec, delete_data=True, force_destroy=True)
@@ -366,8 +370,14 @@ def test_config_schema_includes_fifo(driver: SQSDriver) -> None:
 
 def test_provision_does_not_adopt_or_retag_another_services_resource(driver) -> None:
     """The platform account "owns" every org's resources; only this service's is adopted (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    first = driver.provision(_spec(managed_service_id=MSID))
+    second = driver.provision(
+        _spec(
+            managed_service_id="22222222-2222-4222-8222-222222222222",
+            recorded_handle=first.handle,
+            recorded_handle_exclusive=True,
+        )
+    )
 
     assert first.ok, first.message
-    assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
+    assert not second.ok and second.handle == "" and "ownership" in second.message

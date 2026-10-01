@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
 from _sdk._telemetry import driver_op
 from _sdk.managed_service import (
@@ -105,9 +106,10 @@ class PubSubTopicDriver(ManagedServiceDriver):
         if not spec.managed_service_id:
             return ProvisionResult(False, "", "managed-service id is required", ["missing_service_identity"])
         try:
+            _service_identity(spec.managed_service_id)
             topic_id = _parse_handle(spec.recorded_handle) if spec.recorded_handle else self._topic_id(spec)
         except ValueError as exc:
-            return ProvisionResult(False, "", str(exc), ["invalid_recorded_handle"])
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         topic_path = self._topic_path(topic_id)
         topic = self._topic_document(
             topic_path=topic_path,
@@ -199,11 +201,15 @@ class PubSubTopicDriver(ManagedServiceDriver):
         try:
             topic_id = _parse_handle(spec.handle)
         except ValueError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), ["invalid_handle"], retryable=False)
+            return DeprovisionResult(
+                False, spec.handle, str(exc), ["invalid_handle", "ownership_unknown"], retryable=False
+            )
         topic_path = self._topic_path(topic_id)
         error = self._validate_config(dict(spec.config or {}))
         if error:
-            return DeprovisionResult(False, spec.handle, error, ["invalid_pubsub_topic_config"], retryable=False)
+            return DeprovisionResult(
+                False, spec.handle, error, ["invalid_pubsub_topic_config", "ownership_unknown"], retryable=False
+            )
         try:
             topic = self._topic(topic_path)
             self._assert_topic_owned(topic, spec.managed_service_id, spec.recorded_handle_exclusive)
@@ -212,7 +218,10 @@ class PubSubTopicDriver(ManagedServiceDriver):
                 return DeprovisionResult(True, spec.handle, f"Pub/Sub topic {topic_id} already gone")
             return _deprovision_error(spec.handle, "describe Pub/Sub topic", exc)
 
-        subscriptions = self._subscription_paths(topic_path)
+        try:
+            subscriptions = self._subscription_paths(topic_path)
+        except Exception as exc:
+            return _deprovision_error(spec.handle, "inventory Pub/Sub subscriptions", exc)
         has_retention = bool(_get(topic, "message_retention_duration", ""))
         if (subscriptions or has_retention) and not delete_data:
             details = []
@@ -242,16 +251,23 @@ class PubSubTopicDriver(ManagedServiceDriver):
                     spec.handle,
                     "Pub/Sub topic has subscriptions outside this declaration; "
                     "set force_destroy=true to delete them: " + ", ".join(path.rsplit("/", 1)[-1] for path in foreign),
-                    ["foreign_subscriptions_require_force_destroy"],
+                    ["foreign_subscriptions_require_force_destroy", "ownership_unknown"],
                     retryable=False,
                 )
+        owned_subscriptions = []
         try:
             for path in subscriptions:
-                current = self._sub.get_subscription(request={"subscription": path})
+                try:
+                    current = self._sub.get_subscription(request={"subscription": path})
+                except Exception as exc:
+                    if _not_found(exc):
+                        continue
+                    raise
                 self._assert_subscription_owned(current, topic_path, spec.managed_service_id)
+                owned_subscriptions.append(path)
         except Exception as exc:
             return _deprovision_error(spec.handle, "check Pub/Sub subscription ownership", exc)
-        for path in subscriptions:
+        for path in owned_subscriptions:
             try:
                 self._sub.delete_subscription(request={"subscription": path})
             except Exception as exc:
@@ -703,18 +719,13 @@ class PubSubTopicDriver(ManagedServiceDriver):
         return self._sub.subscription_path(self._config.project_id, subscription_id)
 
     def _topic_id(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.topic_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "topic",
-            )
-            if part
-        )
-        return _resource_id(raw, max_length=255)
+        identity = _service_identity(spec.managed_service_id)
+        if not isinstance(self._config.topic_prefix, str):
+            raise ValueError("Pub/Sub topic prefix must be a string")
+        # Reserve the existing 200-character declared child suffix and separator
+        # inside Pub/Sub's 255-character resource-id limit.
+        prefix = _resource_id(self._config.topic_prefix or "astrolift", max_length=21)
+        return f"{prefix}-{identity}"
 
     def _topic_document(
         self,
@@ -793,7 +804,10 @@ class PubSubTopicDriver(ManagedServiceDriver):
         if "subscriptions" not in cfg:
             return
         topic_path = self._topic_path(topic_id)
-        paths = {self._subscription_path(topic_id, str(item["name"])) for item in cfg.get("subscriptions") or []}
+        declarations = cfg.get("subscriptions") or []
+        paths = {self._subscription_path(topic_id, str(item["name"])) for item in declarations}
+        if len(paths) != len(declarations):
+            raise PubSubTopicError("declared subscription names collide under the recorded topic's physical name")
         if cfg.get("prune_subscriptions"):
             try:
                 attached = self._subscription_paths(topic_path)
@@ -1072,7 +1086,19 @@ def _parse_handle(handle: str) -> str:
     kind, separator, topic_id = handle.partition("/")
     if separator != "/" or kind != KIND or not topic_id or "/" in topic_id:
         raise ValueError(f"invalid Pub/Sub topic handle {handle!r}; expected 'topic/<topic-id>'")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9._~+%\-]{2,254}", topic_id) or topic_id.lower().startswith("goog"):
+        raise ValueError("recorded Pub/Sub topic id violates resource naming rules")
     return topic_id
+
+
+def _service_identity(managed_service_id: str) -> str:
+    try:
+        identity = UUID(managed_service_id) if isinstance(managed_service_id, str) else None
+    except (ValueError, AttributeError):
+        identity = None
+    if identity is None or not identity.int or str(identity) != managed_service_id:
+        raise ValueError("managed-service identity must be a persisted canonical nonzero UUID")
+    return identity.hex
 
 
 def _get(value: Any, key: str, default: Any = None) -> Any:
@@ -1108,11 +1134,11 @@ def _subscription_delivery_state(subscription: Any) -> str:
 
 
 def _not_found(exc: Exception) -> bool:
-    return type(exc).__name__ in {"NotFound", "ResourceNotFoundError"} or "not found" in str(exc).lower()
+    return type(exc).__name__ in {"NotFound", "ResourceNotFoundError"}
 
 
 def _already_exists(exc: Exception) -> bool:
-    return type(exc).__name__ in {"AlreadyExists", "Conflict"} or "already exists" in str(exc).lower()
+    return type(exc).__name__ in {"AlreadyExists", "Conflict"}
 
 
 def _duration_error(
@@ -1139,7 +1165,14 @@ def _duration_seconds(value: Any) -> float:
 
 
 def _deprovision_error(handle: str, operation: str, exc: Exception) -> DeprovisionResult:
-    return DeprovisionResult(False, handle, f"{operation}: {exc}", [str(exc)])
+    refused = isinstance(exc, PubSubTopicError)
+    return DeprovisionResult(
+        False,
+        handle,
+        f"{operation}: {exc}",
+        ["ownership_refused" if refused else "ownership_unknown"],
+        retryable=not refused,
+    )
 
 
 __all__ = ["PubSubTopicConfig", "PubSubTopicDriver", "PubSubTopicError"]

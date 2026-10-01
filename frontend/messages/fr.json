@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "Membres de l’équipe",
+      "description": "Membres de {team}. Attribuez depuis cette liste un rôle pouvant être accordé à cette équipe.",
+      "loadError": "Impossible de charger les membres de l’équipe.",
+      "emptyTitle": "Cette équipe n’a pas encore de membres",
+      "emptyDescription": "Accordez un rôle dans le périmètre de cette équipe pour ajouter un membre.",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "Utilisateur",
+        "lifecycle": "Cycle de vie",
+        "joined": "Date d’entrée"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "Sélectionner tous les membres de l’équipe",
+      "selectRowLabel": "Sélectionner le membre {user}",
+      "selected": "{count, plural, =1 {1 membre sélectionné} other {# membres sélectionnés}}",
+      "clear": "Effacer",
+      "assignButton": "Attribuer un rôle à {count}",
+      "permissionHint": "Vous n’avez pas le droit de gérer les membres de cette équipe.",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {Attribuer un rôle à # membre} other {Attribuer un rôle à # membres}}",
+        "description": "Accorde le rôle sur l’équipe {team}. Les membres qui le possèdent déjà sont ignorés ; une nouvelle attribution du même rôle ne change rien d’autre.",
+        "roleLabel": "Rôle pouvant être accordé à cette équipe",
+        "rolePlaceholder": "Choisissez un rôle",
+        "noRoles": "Aucun rôle n’est disponible pour cette équipe.",
+        "cancel": "Annuler",
+        "confirmLabel": "Attribuer le rôle"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {Rôle attribué à # membre.} other {Rôle attribué à # membres.}}",
+        "mixedIdempotent": "Attribué à {assigned} ; {already} le possédaient déjà.",
+        "partial": "Attribué à {assigned} ; {already} le possédaient déjà ; {failed} ont échoué.",
+        "allFailed": "Échec de l’attribution du rôle : {message}"
       }
     },
     "invitationExpiry": {
@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "Déjà anonymisé",
         "anonymize": "Anonymiser les données de l’utilisateur",
         "invite": "Inviter",
-        "grant": "Accorder un accès"
+        "grant": "Accorder un accès",
+        "reviewPrivacyCleanup": "Examiner le nettoyage des données personnelles"
       },
       "emptyTitle": "Aucune personne pour le moment",
       "emptyDescription": "Invitez une personne dans l’organisation, puis attribuez-lui un rôle.",
@@ -3757,22 +3758,31 @@
       "deleted": "Invitation supprimée",
       "deleteFailed": "La suppression a échoué",
       "anonymizeFailed": "L’anonymisation a échoué",
-      "anonymized": "Données de l’utilisateur anonymisées."
+      "anonymized": "Le nettoyage des données personnelles utilisateur prises en charge a été accepté.",
+      "logoutWarning": "Le nettoyage a été accepté, mais la déconnexion n’a pas pu s’ouvrir. Déconnectez-vous pour terminer cette session du navigateur."
     },
     "anonymization": {
       "title": "Anonymiser {name} ?",
-      "changes": "Ce qui change",
-      "identity": "Les noms et l’e-mail du compte sont remplacés par une identité anonyme.",
-      "profile": "Les données personnelles du profil, le téléphone, l’avatar, l’adresse et la signature sont effacés ou remplacés.",
-      "account": "La connexion est désactivée et les appartenances aux groupes d’authentification sont supprimées.",
-      "memberships": "Les appartenances sur toute la plateforme sont désactivées.",
-      "preserves": "Ce qui est conservé",
-      "records": "L’enregistrement du compte et les liens des actions passées sont conservés.",
-      "history": "Cette action n’efface pas le contenu historique de l’audit et ne supprime pas les enregistrements d’attribution de rôles.",
-      "irreversible": "Cette action est irréversible. Les données personnelles d’origine ne peuvent pas être restaurées. La répéter sur un compte déjà anonymisé n’apporte aucune modification supplémentaire.",
+      "changes": "Périmètre du nettoyage",
+      "identity": "Lors du premier nettoyage, les noms et l’adresse e-mail du compte sont remplacés par une identité anonyme.",
+      "profile": "Lors du premier nettoyage, les données personnelles du profil, le téléphone, l’avatar, l’adresse et la signature sont effacés ou remplacés.",
+      "account": "Lors du premier nettoyage, la connexion est désactivée et les appartenances aux groupes d’authentification sont supprimées.",
+      "memberships": "Lors du premier nettoyage, les adhésions sur l’ensemble de la plateforme sont désactivées.",
+      "preserves": "Registres conservés et limites",
+      "records": "La ligne du compte, les liens historiques, les identifiants des registres, les décisions et les horodatages sont conservés.",
+      "history": "Les champs d’identité et de requête pris en charge, dans les événements historiques et les audits clairement attribués à cet utilisateur, sont masqués.",
+      "irreversible": "Ce nettoyage des données prises en charge est irréversible. Le répéter peut réduire un historique attribuable ajouté depuis, sans remplacer une identité anonyme existante.",
       "acknowledge": "Je comprends que cette action est irréversible.",
       "working": "Anonymisation en cours…",
-      "confirm": "Anonymiser les données de l’utilisateur"
+      "confirm": "Anonymiser les données de l’utilisateur",
+      "reviewTitle": "Examiner le nettoyage des données personnelles de {name} ?",
+      "anonymousIdentity": "L’identité anonyme existante du compte est conservée.",
+      "metadata": "Les métadonnées prises en charge des caches d’identité, des sessions et des jetons, ainsi que les coordonnées d’envoi par e-mail et SMS, sont réduites.",
+      "roleBindings": "Les registres d’attribution de rôles sont conservés ; un utilisateur inactif ne peut pas s’authentifier.",
+      "scopeLimits": "Les données sans attribution, ambiguës, en texte libre, d’autres utilisateurs ou structurées non prises en charge restent présentes.",
+      "external": "Les exports, archives, sauvegardes et systèmes externes existants ne sont pas modifiés.",
+      "reviewWorking": "Nettoyage des données personnelles…",
+      "reviewConfirm": "Nettoyer les données personnelles"
     }
   },
   "stepUp": {
@@ -4521,6 +4531,45 @@
         "loadingRoles": "Chargement des rôles…",
         "unknownRoles": "Les rôles n'ont pas encore été confirmés.",
         "emptyRoles": "Aucun rôle n'est disponible dans cette liste."
+      },
+      "entityPanel": {
+        "label": "Accès",
+        "who": "Qui",
+        "role": "Rôle",
+        "source": "Origine",
+        "expires": "Expiration",
+        "never": "jamais",
+        "share": "partage : {level}",
+        "search": "Rechercher des personnes, groupes, équipes et rôles…",
+        "all": "Tous",
+        "removeMapping": "Supprimer cette correspondance",
+        "removeGrant": "Retirer cette attribution",
+        "appSharing": "Modifié dans le partage de l’application",
+        "emptyTitle": "Personne n’a encore accès ici",
+        "emptyDescription": "Accordez un rôle sur {subject}, ou à un périmètre plus large, pour afficher ici ses bénéficiaires et origines.",
+        "grant": "Accorder un accès",
+        "removeTitle": "Retirer {role} de {name} ?",
+        "removeGeneric": "Retirer l’accès ?",
+        "inherited": "Cette attribution est portée par {kind} {name}, pas par {subject}. La retirer la supprime à sa source et de tous les périmètres qu’elle couvre.",
+        "direct": "Ils perdent l’accès accordé par cette attribution sur {subject}.",
+        "groupLoss": "Tous les membres du groupe perdent cette correspondance.",
+        "otherGrants": "Les autres attributions restent en vigueur.",
+        "remove": "Retirer",
+        "removed": "{role} retiré",
+        "removeFailed": "Impossible de retirer l’accès.",
+        "refreshWarning": "L’accès a été retiré, mais la vue n’a pas pu être actualisée. Actualisez pour voir les données actuelles.",
+        "accessName": "accès",
+        "unavailable": "La liste d’accès n’a pas pu être confirmée. Réessayez pour charger les données actuelles.",
+        "notRemovable": "Cette origine ne peut pas être retirée ici.",
+        "noTarget": "La cible actuelle n’est pas disponible.",
+        "group": "Groupe IdP",
+        "groupCount": "{count, plural, one {Groupe IdP · # membre} other {Groupe IdP · # membres}}",
+        "sourceLabels": {
+          "USER_BINDING": "attribution",
+          "GROUP_BINDING": "attribution au groupe",
+          "GROUP_MAPPING": "correspondance de groupe",
+          "TEAM_SHARE": "partage d’équipe"
+        }
       }
     },
     "settings": {
@@ -5423,6 +5472,53 @@
       "taken": "Déjà utilisé dans cette organisation.",
       "unchanged": "Identifiant actuel — utilisé dans les URL.",
       "empty": "Lettres minuscules, chiffres et tirets. Utilisé dans les URL."
+    },
+    "detail": {
+      "grant": "Accorder un accès",
+      "notFound": "Équipe introuvable",
+      "notFoundDescription": "Cette équipe n’existe peut-être pas, a été supprimée ou vous n’y avez pas accès.",
+      "back": "Retour aux équipes",
+      "principal": "Navigation de l’équipe",
+      "loadFailed": "Impossible de charger cette page",
+      "retry": "Réessayer",
+      "unavailable": "La liste des équipes n’a pas pu être confirmée. Réessayez pour charger les données actuelles.",
+      "access": "Accès",
+      "members": "Membres",
+      "admin": "Administration",
+      "people": "Personnes",
+      "teams": "Équipes",
+      "roles": "Rôles",
+      "policies": "Politiques",
+      "check": "Vérifier l’accès",
+      "organization": "Organisation",
+      "projects": "Projets"
+    },
+    "members": {
+      "add": "Ajouter un membre",
+      "label": "Membres",
+      "emptyDescription": "Accordez à une personne un rôle dans le périmètre de cette équipe pour l’y ajouter.",
+      "search": "Rechercher des membres…",
+      "all": "Tous",
+      "status": "État",
+      "active": "Actif",
+      "invited": "Invité",
+      "suspended": "Suspendu",
+      "unknownError": "Aucun diagnostic n’a été fourni.",
+      "refreshWarning": "L’attribution a été acceptée, mais la vue n’a pas pu être actualisée. Actualisez pour voir les données actuelles.",
+      "rolesLoading": "Chargement des rôles disponibles…",
+      "rolesUnknown": "Les rôles disponibles n’ont pas encore été confirmés.",
+      "rolesFailed": "Impossible de charger les rôles disponibles.",
+      "rolesRetry": "Recharger les rôles",
+      "accepted": "L’attribution a été acceptée ; son résumé n’est pas disponible."
+    },
+    "access": {
+      "subject": "équipe {name}",
+      "reaches": "Périmètre",
+      "description": "Le périmètre de l’équipe comprend ces projets et leurs applications. L’accès dépend aussi du rôle et de la politique.",
+      "emptyTitle": "Aucun projet pour le moment",
+      "emptyDescription": "Le périmètre de l’équipe comprend aussi les projets créés sous cette équipe par la suite.",
+      "unavailable": "La liste des projets n’a pas pu être confirmée. Réessayez pour charger les données actuelles.",
+      "retry": "Réessayer"
     }
   },
   "apiKeys": {
@@ -5601,6 +5697,97 @@
       "scope18": {
         "label": "Administration",
         "description": "Tout ce que le propriétaire peut faire, maintenant et après l'ajout de permissions. Préférez des portées limitées."
+      }
+    }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Agent de présence",
+      "description": "Un agent dans l’espace de noms <namespace>astrolift-system</namespace> envoie des signaux de présence signés pour afficher l’état des pods, des nœuds et des ressources et détecter une perte de connexion. Un signal est envoyé à un intervalle de <interval>{seconds, number}</interval> {seconds, plural, one {seconde} other {secondes}}.",
+      "keyIssued": "Clé émise",
+      "copyNow": "Copiez cette clé maintenant : elle ne sera plus affichée.",
+      "copy": "Copier",
+      "copied": "Copié",
+      "copyFailed": "La copie a échoué. Sélectionnez et copiez le texte manuellement.",
+      "installSecret": "Installer le Secret de l’agent",
+      "installHelp": "Déployez ensuite l’agent, qui lit la clé et l’URL dans ce Secret. La réception d’un signal de présence confirme la connexion.",
+      "deploy": "Déployer l’agent dans le cluster",
+      "done": "Terminé",
+      "deployHelp": "Applique le Deployment de l’agent. Créez d’abord le Secret <secret>astrolift-agent</secret> avec la commande ci-dessus.",
+      "rotate": "Renouveler la clé de l’agent",
+      "issue": "Émettre la clé de l’agent",
+      "rotationHelp": "Le Deployment lit la clé et l’URL dans le Secret <secret>astrolift-agent</secret>. Le renouvellement invalide l’ancienne clé. Mettez ce Secret à jour avec la nouvelle clé avant de redéployer ; l’ancienne clé ne peut plus signer de signaux valides.",
+      "feedbackIssued": "Clé de l’agent émise. Copiez-la maintenant : elle ne sera plus affichée.",
+      "feedbackRotated": "Clé de l’agent renouvelée. L’ancienne clé ne fonctionne plus.",
+      "feedbackDeployed": "Déploiement de l’agent accepté. La réception d’un signal de présence confirme la connexion.",
+      "feedbackIssueFailed": "Impossible d’émettre la clé de l’agent.",
+      "feedbackDeployFailed": "Impossible de déployer l’agent.",
+      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
+    },
+    "source": {
+      "readFailed": "Impossible de lire les détails du cluster",
+      "cached": "Les derniers détails confirmés du cluster sont affichés. Actualisez la vue pour vérifier l’état actuel.",
+      "retry": "Réessayer",
+      "unknown": "Les détails du cluster ne sont pas confirmés. Réessayez la lecture.",
+      "notFoundHeader": "Cluster introuvable",
+      "notFound": "Aucun cluster visible avec le slug {slug}",
+      "notFoundHelp": "Le cluster n’existe pas ou vous n’avez pas la permission de le consulter.",
+      "back": "Retour aux clusters"
+    },
+    "centralAuth": {
+      "title": "Authentification centrale",
+      "description": "Connexion partagée pour les hôtes des applications dans la zone parente de l’hôte d’authentification. Enregistrez exactement l’URL de retour <callback>{callbackUrl}</callback> auprès du fournisseur d’identité. Envoy et nginx utilisent cette configuration ; ALB utilise la protection Cognito propre à chaque application. Les domaines personnalisés nécessitent une configuration d’authentification distincte.",
+      "authHost": "Hôte d’authentification",
+      "discoveryUrl": "URL de découverte",
+      "clientId": "Identifiant du client",
+      "clientSecret": "Secret du client",
+      "jwksOptional": "URI JWKS (facultative)",
+      "jwksUri": "URI JWKS",
+      "secretKeep": "Configuré. Laissez le champ vide pour le conserver.",
+      "notSet": "Non configuré",
+      "secretUnknown": "Non confirmé",
+      "writeOnly": "En écriture seule. Il ne sera plus affiché après enregistrement.",
+      "jwksHint": "Uniquement pour un fournisseur qui ne publie pas ses clés à l’adresse {jwksPath}.",
+      "notConfigured": "Non configurée.",
+      "cookieSecret": "Secret du cookie",
+      "gatewaySecret": "Secret du Gateway",
+      "secretSet": "Configuré",
+      "secretBadge": "{label} : {state}",
+      "edit": "Modifier",
+      "setup": "Configurer l’authentification centrale",
+      "saved": "Authentification centrale enregistrée.",
+      "saveFailed": "Impossible d’enregistrer l’authentification centrale.",
+      "refreshWarning": "L’authentification centrale a été enregistrée, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
+      "secretNotSet": "Non configuré"
+    },
+    "ingressClass": {
+      "title": "Classe Ingress",
+      "description": "La passerelle qui sert les applications de ce cluster. Chaque application bascule lors de son prochain déploiement ; changer uniquement la classe ne redéploie pas les applications en cours d’exécution.",
+      "change": "Changer de classe",
+      "gateHint": "Les applications utiliseront {gate}.",
+      "missingAlb": "Aucune protection Cognito ALB n’est configurée ; les applications utilisant cette classe seraient donc publiques.",
+      "missingCentral": "L’authentification centrale n’est pas configurée ci-dessus ; les applications utilisant cette classe seraient donc publiques.",
+      "gateRefusal": "Le serveur refuse un changement qui supprime la protection d’authentification actuelle. Configurez d’abord la nouvelle protection.",
+      "syncHint": "Demander aussi l’écriture de la nouvelle protection dans le <file>astrolift.toml</file> de chaque application. Chaque commit réussi lance son déploiement ; plusieurs applications peuvent donc être redéployées ensemble. Une connexion au dépôt absente ou un échec d’écriture peut laisser certaines applications inchangées.",
+      "confirmTitle": "Changer la classe Ingress pour <target>{className}</target> ?",
+      "syncReview": "Demande un commit astrolift.toml pour les applications de ce cluster. Chaque commit réussi lance le déploiement correspondant. Une connexion au dépôt absente ou un échec d’écriture peut laisser certaines applications inchangées.",
+      "nextDeployReview": "Aucune application n’est redéployée maintenant. Chacune bascule vers la nouvelle passerelle lors de son prochain déploiement.",
+      "changed": "Changement de classe Ingress pour {target} accepté.",
+      "changeFailed": "Impossible de changer la classe Ingress.",
+      "refreshWarning": "Le changement de classe a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
+      "classes": {
+        "envoy": {
+          "label": "Passerelle Envoy (authentification centrale)",
+          "gate": "l’authentification centrale sur un Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (Cognito par application)",
+          "gate": "la protection Cognito ALB"
+        },
+        "nginx": {
+          "label": "ingress-nginx (authentification centrale)",
+          "gate": "l’authentification centrale via oauth2-proxy ; ingress-nginx n’est plus maintenu"
+        }
       }
     }
   }

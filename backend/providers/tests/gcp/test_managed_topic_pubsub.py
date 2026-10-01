@@ -23,6 +23,8 @@ from gcp.managed.topic_pubsub import (
     _resource_id,
 )
 
+SERVICE_ID = "11111111-1111-4111-8111-111111111111"
+
 
 class NotFound(Exception):
     pass
@@ -169,7 +171,7 @@ def _spec(config: dict[str, Any] | None = None) -> ProvisionSpec:
         config=config or {},
         tags={"Cost Center": "Engineering"},
         binding_id="binding-1",
-        managed_service_id="service-1",
+        managed_service_id=SERVICE_ID,
     )
 
 
@@ -230,7 +232,7 @@ def test_provision_creates_full_topic_and_subscription_shapes(harness: Harness) 
             ],
         },
     )
-    assert result.handle == "topic/astrolift-acme-api-prod-events"
+    assert result.handle == "topic/astrolift-11111111111141118111111111111111"
     assert not result.ready
     topic = next(iter(harness.state.topics.values()))
     assert topic["kms_key_name"].endswith("/events")
@@ -242,7 +244,10 @@ def test_provision_creates_full_topic_and_subscription_shapes(harness: Harness) 
     assert topic["labels"]["data-class"] == "internal"
     subscription = next(iter(harness.state.subscriptions.values()))
     assert subscription["ack_deadline_seconds"] == 60
-    assert subscription["labels"] == {"consumer": "workers", "astrolift_io_managed_service_id": "service-1"}
+    assert subscription["labels"] == {
+        "consumer": "workers",
+        "astrolift_io_managed_service_id": SERVICE_ID,
+    }
     assert subscription["push_config"]["push_endpoint"].startswith("https://")
 
 
@@ -356,7 +361,7 @@ def test_update_reconciles_topic_and_mutable_subscription(harness: Harness) -> N
     )
     result = harness.driver.update(
         UpdateSpec(
-            managed_service_id="service-1",
+            managed_service_id=SERVICE_ID,
             handle=provisioned.handle,
             config={
                 "kms_key_name": "projects/acme/locations/us/keyRings/r/cryptoKeys/events-v2",
@@ -397,7 +402,7 @@ def test_update_rejects_immutable_subscription_change(harness: Harness) -> None:
     )
     result = harness.driver.update(
         UpdateSpec(
-            managed_service_id="service-1",
+            managed_service_id=SERVICE_ID,
             handle=provisioned.handle,
             config={"subscriptions": [{"name": "workers", "filter": 'attributes.kind="b"'}]},
         ),
@@ -413,7 +418,7 @@ def test_update_rejects_message_ordering_change(harness: Harness) -> None:
     )
     result = harness.driver.update(
         UpdateSpec(
-            managed_service_id="service-1",
+            managed_service_id=SERVICE_ID,
             handle=provisioned.handle,
             config={"subscriptions": [{"name": "workers", "enable_message_ordering": False}]},
         ),
@@ -426,7 +431,7 @@ def test_update_can_add_bigquery_and_cloud_storage_subscriptions(harness: Harnes
     provisioned = _provision(harness)
     result = harness.driver.update(
         UpdateSpec(
-            managed_service_id="service-1",
+            managed_service_id=SERVICE_ID,
             handle=provisioned.handle,
             config={
                 "subscriptions": [
@@ -581,7 +586,7 @@ def test_update_cannot_move_a_subscription_to_an_unlisted_account(harness: Harne
 
     denied = harness.driver.update(
         UpdateSpec(
-            managed_service_id="service-1",
+            managed_service_id=SERVICE_ID,
             handle=provisioned.handle,
             config={
                 "subscriptions": [
@@ -611,7 +616,7 @@ def test_prune_removes_undeclared_topic_subscriptions(harness: Harness) -> None:
     )
     result = harness.driver.update(
         UpdateSpec(
-            managed_service_id="service-1",
+            managed_service_id=SERVICE_ID,
             handle=provisioned.handle,
             config={"subscriptions": [{"name": "keep"}], "prune_subscriptions": True},
         ),
@@ -628,7 +633,7 @@ def test_prune_leaves_subscriptions_not_owned_by_this_driver(harness: Harness) -
     harness.state.subscriptions[foreign] = {"name": foreign, "topic": topic_path}
     result = harness.driver.update(
         UpdateSpec(
-            managed_service_id="service-1",
+            managed_service_id=SERVICE_ID,
             handle=provisioned.handle,
             config={"subscriptions": [], "prune_subscriptions": True},
         ),
@@ -639,8 +644,8 @@ def test_prune_leaves_subscriptions_not_owned_by_this_driver(harness: Harness) -
 
 def test_binding_exposes_portable_values_and_publisher_role(harness: Harness) -> None:
     provisioned = _provision(harness)
-    binding = harness.driver.binding(ServiceHandle(provisioned.handle, managed_service_id="service-1"))
-    assert binding.env_vars["TOPIC_NAME"].literal == "astrolift-acme-api-prod-events"
+    binding = harness.driver.binding(ServiceHandle(provisioned.handle, managed_service_id=SERVICE_ID))
+    assert binding.env_vars["TOPIC_NAME"].literal == "astrolift-11111111111141118111111111111111"
     assert binding.env_vars["TOPIC_REGION"].literal == "global"
     assert json.loads(binding.env_vars["PUBSUB_SUBSCRIPTIONS"].literal or "null") == []
     assert [grant.actions for grant in binding.iam_grants] == [["roles/pubsub.publisher"]]
@@ -652,13 +657,13 @@ def test_binding_subscribe_and_manage_modes(harness: Harness) -> None:
         {"subscriptions": [{"name": "workers"}]},
     )
     subscribe = harness.driver.binding(
-        ServiceHandle(provisioned.handle, managed_service_id="service-1"),
+        ServiceHandle(provisioned.handle, managed_service_id=SERVICE_ID),
         config={"access_mode": "subscribe", "subscriptions": [{"name": "workers"}]},
     )
     assert subscribe.env_vars["PUBSUB_SUBSCRIPTION"].literal.endswith("-workers")
     assert [grant.actions for grant in subscribe.iam_grants] == [["roles/pubsub.subscriber"]]
     manage = harness.driver.binding(
-        ServiceHandle(provisioned.handle, managed_service_id="service-1"),
+        ServiceHandle(provisioned.handle, managed_service_id=SERVICE_ID),
         config={"access_mode": "manage"},
     )
     assert [grant.actions for grant in manage.iam_grants] == [
@@ -671,7 +676,7 @@ def test_subscribe_binding_requires_a_declared_subscription(harness: Harness) ->
     provisioned = _provision(harness)
     with pytest.raises(PubSubTopicError, match="requires at least one"):
         harness.driver.binding(
-            ServiceHandle(provisioned.handle, managed_service_id="service-1"),
+            ServiceHandle(provisioned.handle, managed_service_id=SERVICE_ID),
             config={"access_mode": "subscribe"},
         )
 
@@ -683,7 +688,9 @@ def test_deprovision_requires_explicit_data_acknowledgement(harness: Harness) ->
     )
     result = harness.driver.deprovision(
         DeprovisionSpec(
-            provisioned.handle, managed_service_id="service-1", config={"subscriptions": [{"name": "workers"}]}
+            provisioned.handle,
+            managed_service_id=SERVICE_ID,
+            config={"subscriptions": [{"name": "workers"}]},
         ),
     )
     assert not result.ok
@@ -698,13 +705,13 @@ def test_deprovision_requires_force_for_foreign_subscription(harness: Harness) -
     foreign = "projects/acme-prod/subscriptions/foreign"
     harness.state.subscriptions[foreign] = {"name": foreign, "topic": topic_path}
     result = harness.driver.deprovision(
-        DeprovisionSpec(provisioned.handle, managed_service_id="service-1"),
+        DeprovisionSpec(provisioned.handle, managed_service_id=SERVICE_ID),
         delete_data=True,
     )
     assert not result.ok
-    assert result.errors == ["foreign_subscriptions_require_force_destroy"]
+    assert result.errors == ["foreign_subscriptions_require_force_destroy", "ownership_unknown"]
     forced = harness.driver.deprovision(
-        DeprovisionSpec(provisioned.handle, managed_service_id="service-1"),
+        DeprovisionSpec(provisioned.handle, managed_service_id=SERVICE_ID),
         delete_data=True,
         force_destroy=True,
     )
@@ -717,11 +724,11 @@ def test_deprovision_deletes_declared_subscriptions_and_is_idempotent(harness: H
     config = {"subscriptions": [{"name": "workers"}]}
     provisioned = _provision(harness, config)
     first = harness.driver.deprovision(
-        DeprovisionSpec(provisioned.handle, managed_service_id="service-1", config=config),
+        DeprovisionSpec(provisioned.handle, managed_service_id=SERVICE_ID, config=config),
         delete_data=True,
     )
     second = harness.driver.deprovision(
-        DeprovisionSpec(provisioned.handle, managed_service_id="service-1", config=config),
+        DeprovisionSpec(provisioned.handle, managed_service_id=SERVICE_ID, config=config),
         delete_data=True,
     )
     assert first.ok and second.ok
@@ -744,7 +751,7 @@ def test_deprovision_continues_after_a_subscription_delete_race(harness: Harness
 
     harness.subscriber.delete_subscription = racing_delete  # type: ignore[method-assign]
     result = harness.driver.deprovision(
-        DeprovisionSpec(provisioned.handle, managed_service_id="service-1", config=config),
+        DeprovisionSpec(provisioned.handle, managed_service_id=SERVICE_ID, config=config),
         delete_data=True,
     )
     assert result.ok
@@ -760,7 +767,7 @@ def test_status_reports_encryption_and_subscription_count(harness: Harness) -> N
             "subscriptions": [{"name": "a"}, {"name": "b"}],
         },
     )
-    status = harness.driver.status(ServiceHandle(provisioned.handle, managed_service_id="service-1"))
+    status = harness.driver.status(ServiceHandle(provisioned.handle, managed_service_id=SERVICE_ID))
     assert status.state == "available"
     assert "2 managed / 2 attached subscriptions" in status.message
     assert "CMEK" in status.message
@@ -778,7 +785,7 @@ def test_status_surfaces_export_subscription_resource_errors(harness: Harness) -
     subscription = next(iter(harness.state.subscriptions.values()))
     subscription["state"] = "RESOURCE_ERROR"
     subscription["bigquery_config"]["state"] = "PERMISSION_DENIED"
-    status = harness.driver.status(ServiceHandle(provisioned.handle, managed_service_id="service-1"))
+    status = harness.driver.status(ServiceHandle(provisioned.handle, managed_service_id=SERVICE_ID))
     assert status.state == "error"
     assert "bigquery_config: PERMISSION_DENIED" in status.message
 
@@ -874,11 +881,15 @@ def test_provider_native_documents_and_update_masks_match_current_sdk(harness: H
 
 
 def test_provision_does_not_adopt_another_services_resource(harness) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    """A recorded handle cannot adopt another service's topic (#1961)."""
     import dataclasses
 
-    first = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
-    second = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+    first = harness.driver.provision(_spec())
+    second = harness.driver.provision(
+        dataclasses.replace(
+            _spec(), managed_service_id="22222222-2222-4222-8222-222222222222", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and "another managed service" in second.message
@@ -921,14 +932,16 @@ def test_platform_label_namespace_is_refused_before_any_write(harness: Harness, 
     assert _writes(harness) == before
     owned = _provision(harness)
     before = _writes(harness)
-    update = harness.driver.update(UpdateSpec(owned.handle, config=cfg, managed_service_id="service-1"))
+    update = harness.driver.update(UpdateSpec(owned.handle, config=cfg, managed_service_id=SERVICE_ID))
     teardown = harness.driver.deprovision(
-        DeprovisionSpec(owned.handle, config=cfg, managed_service_id="service-1"), delete_data=True, force_destroy=True
+        DeprovisionSpec(owned.handle, config=cfg, managed_service_id=SERVICE_ID),
+        delete_data=True,
+        force_destroy=True,
     )
     assert not update.ok and "ownership labels" in update.message
     assert not teardown.ok and "ownership labels" in teardown.message
     with pytest.raises(PubSubTopicError, match="ownership labels"):
-        harness.driver.binding(ServiceHandle(owned.handle, managed_service_id="service-1"), cfg)
+        harness.driver.binding(ServiceHandle(owned.handle, managed_service_id=SERVICE_ID), cfg)
     assert _writes(harness) == before
 
 
@@ -942,13 +955,15 @@ def test_foreign_or_unknown_topic_blocks_all_operations(harness: Harness, owner:
     before = _writes(harness)
     assert not harness.driver.provision(_spec()).ok
     assert not harness.driver.update(
-        UpdateSpec(owned.handle, config={"labels": {"cost": "new"}}, managed_service_id="service-1")
+        UpdateSpec(owned.handle, config={"labels": {"cost": "new"}}, managed_service_id=SERVICE_ID)
     ).ok
     assert not harness.driver.deprovision(
-        DeprovisionSpec(owned.handle, managed_service_id="service-1"), delete_data=True, force_destroy=True
+        DeprovisionSpec(owned.handle, managed_service_id=SERVICE_ID),
+        delete_data=True,
+        force_destroy=True,
     ).ok
     with pytest.raises(PubSubTopicError, match=r"another managed service|exclusive platform record"):
-        harness.driver.binding(ServiceHandle(owned.handle, managed_service_id="service-1"))
+        harness.driver.binding(ServiceHandle(owned.handle, managed_service_id=SERVICE_ID))
     assert _writes(harness) == before
     assert harness.state.topics and harness.state.subscriptions
 
@@ -956,19 +971,19 @@ def test_foreign_or_unknown_topic_blocks_all_operations(harness: Harness, owner:
 def test_label_update_preserves_owner_and_legacy_record_is_narrow(harness: Harness) -> None:
     owned = _provision(harness, {"labels": {"old": "gone"}})
     assert harness.driver.update(
-        UpdateSpec(owned.handle, config={"labels": {"new": "value"}}, managed_service_id="service-1")
+        UpdateSpec(owned.handle, config={"labels": {"new": "value"}}, managed_service_id=SERVICE_ID)
     ).ok
     labels = next(iter(harness.state.topics.values()))["labels"]
-    assert labels["astrolift_io_managed_service_id"] == "service-1"
+    assert labels["astrolift_io_managed_service_id"] == SERVICE_ID
     assert labels["new"] == "value" and "old" not in labels
     labels.clear()
     assert harness.driver.update(
-        UpdateSpec(owned.handle, managed_service_id="service-1", recorded_handle_exclusive=True)
+        UpdateSpec(owned.handle, managed_service_id=SERVICE_ID, recorded_handle_exclusive=True)
     ).ok
     labels["astrolift-managed-service-id"] = "foreign"
     before = _writes(harness)
     assert not harness.driver.update(
-        UpdateSpec(owned.handle, managed_service_id="service-1", recorded_handle_exclusive=True)
+        UpdateSpec(owned.handle, managed_service_id=SERVICE_ID, recorded_handle_exclusive=True)
     ).ok
     assert _writes(harness) == before
 
@@ -984,19 +999,23 @@ def test_child_collision_is_checked_before_topic_or_child_mutations(harness: Har
     cfg = {"labels": {"cost": "new"}, "subscriptions": [{"name": "workers", "ack_deadline_seconds": 60}]}
     before = _writes(harness)
     assert not harness.driver.provision(_spec(cfg)).ok
-    assert not harness.driver.update(UpdateSpec(owned.handle, config=cfg, managed_service_id="service-1")).ok
+    assert not harness.driver.update(UpdateSpec(owned.handle, config=cfg, managed_service_id=SERVICE_ID)).ok
     with pytest.raises(PubSubTopicError, match="another"):
         harness.driver.binding(
-            ServiceHandle(owned.handle, managed_service_id="service-1"),
+            ServiceHandle(owned.handle, managed_service_id=SERVICE_ID),
             {"access_mode": "subscribe", "subscriptions": [{"name": "workers"}]},
         )
     if not foreign_topic:
         assert not harness.driver.deprovision(
-            DeprovisionSpec(owned.handle, managed_service_id="service-1"), delete_data=True, force_destroy=True
+            DeprovisionSpec(owned.handle, managed_service_id=SERVICE_ID),
+            delete_data=True,
+            force_destroy=True,
         ).ok
         assert not harness.driver.update(
             UpdateSpec(
-                owned.handle, managed_service_id="service-1", config={"subscriptions": [], "prune_subscriptions": True}
+                owned.handle,
+                managed_service_id=SERVICE_ID,
+                config={"subscriptions": [], "prune_subscriptions": True},
             )
         ).ok
     assert _writes(harness) == before
@@ -1018,3 +1037,120 @@ def test_recorded_topic_name_survives_changed_slug_and_hint(harness: Harness) ->
     )
     assert result.ok and result.handle == first.handle
     assert len(harness.publisher.create_calls) == before
+
+
+@pytest.mark.parametrize(
+    "identity",
+    ["", "service-1", "0", "0" * 32, "00000000-0000-0000-0000-000000000000", "11111111111141118111111111111111", None],
+)
+@pytest.mark.parametrize("recorded", [False, True])
+def test_unknown_or_noncanonical_identity_refuses_before_any_provider_request(harness, identity, recorded, monkeypatch):
+    from dataclasses import replace
+
+    reads = []
+    monkeypatch.setattr(harness.publisher, "get_topic", lambda **kwargs: reads.append(kwargs))
+    result = harness.driver.provision(
+        replace(_spec(), managed_service_id=identity, recorded_handle="topic/legacy-events" if recorded else "")
+    )
+    assert not result.ok
+    assert not harness.publisher.create_calls and not harness.publisher.update_calls
+    assert not harness.subscriber.create_calls and not harness.subscriber.update_calls
+    assert not harness.state.topics and not reads
+
+
+def test_long_prefix_reserves_complete_uuid_and_two_distinct_long_child_suffixes(harness):
+    from dataclasses import replace
+
+    harness.driver._config = replace(harness.driver._config, topic_prefix="p" * 300)
+    children = [{"name": "s" * 199 + suffix} for suffix in ("x", "y")]
+    result = harness.driver.provision(_spec({"subscriptions": children}))
+    assert result.ok, result.message
+    topic_id = result.handle.partition("/")[2]
+    assert len(topic_id) == 54 and topic_id.endswith("11111111111141118111111111111111")
+    names = [path.rsplit("/", 1)[1] for path in harness.state.subscriptions]
+    assert len(names) == len(set(names)) == 2
+    assert all(len(name) == 255 and topic_id in name for name in names)
+    assert {name[-200:] for name in names} == {child["name"] for child in children}
+    before = (len(harness.publisher.create_calls), len(harness.subscriber.create_calls))
+    assert harness.driver.provision(_spec({"subscriptions": children})).handle == result.handle
+    assert before == (len(harness.publisher.create_calls), len(harness.subscriber.create_calls))
+
+
+def test_recorded_long_topic_child_keeps_legacy_mapping_and_refuses_colliding_new_declarations(harness):
+    from dataclasses import replace
+
+    topic_id = "p" * 250
+    spec = replace(_spec({"subscriptions": [{"name": "worker"}]}), recorded_handle=f"topic/{topic_id}")
+    topic_path = harness.publisher.topic_path("acme-prod", topic_id)
+    harness.state.topics[topic_path] = {
+        "name": topic_path,
+        "labels": {"astrolift_io_managed_service_id": spec.managed_service_id},
+    }
+    assert harness.driver.provision(spec).ok
+    child_path = harness.subscriber.subscription_path("acme-prod", "p" * 250 + "-work")
+    assert list(harness.state.subscriptions) == [child_path]
+    before = (
+        len(harness.publisher.update_calls),
+        len(harness.subscriber.create_calls),
+        len(harness.subscriber.update_calls),
+    )
+    assert harness.driver.provision(replace(spec, app_slug="renamed")).ok
+    assert list(harness.state.subscriptions) == [child_path]
+    before = (
+        len(harness.publisher.update_calls),
+        len(harness.subscriber.create_calls),
+        len(harness.subscriber.update_calls),
+    )
+    result = harness.driver.provision(
+        replace(spec, config={"subscriptions": [{"name": "worker-one"}, {"name": "worker-two"}]})
+    )
+    assert not result.ok and "physical name" in result.message
+    assert before == (
+        len(harness.publisher.update_calls),
+        len(harness.subscriber.create_calls),
+        len(harness.subscriber.update_calls),
+    )
+
+
+def test_permission_error_containing_not_found_cannot_authorize_creation(harness, monkeypatch):
+    def denied(**_):
+        raise PermissionError("permission denied: resource not found")
+
+    monkeypatch.setattr(harness.publisher, "get_topic", denied)
+    result = harness.driver.provision(_spec())
+    assert not result.ok
+    assert not harness.publisher.create_calls and not harness.publisher.update_calls
+    assert not harness.subscriber.create_calls
+
+
+@pytest.mark.parametrize("topic_id", ["x", "goog-events", "events/foreign", "p" * 256, "https://foreign", "bad!name"])
+def test_invalid_recorded_physical_name_refuses_without_renaming_or_effects(harness, topic_id):
+    from dataclasses import replace
+
+    result = harness.driver.provision(replace(_spec(), recorded_handle=f"topic/{topic_id}"))
+    assert not result.ok
+    assert not harness.publisher.create_calls and not harness.publisher.update_calls
+    assert not harness.subscriber.create_calls
+
+
+@pytest.mark.parametrize("prefix", ["", "GOOG-system", "123.~~", "Älpha", "p" * 300])
+def test_cosmetic_prefix_normalization_keeps_full_owner_uuid_and_google_resource_rules(harness, prefix):
+    import re
+    from dataclasses import replace
+
+    harness.driver._config = replace(harness.driver._config, topic_prefix=prefix)
+    result = harness.driver.provision(_spec())
+    assert result.ok, result.message
+    name = result.handle.partition("/")[2]
+    assert re.fullmatch(r"[A-Za-z][A-Za-z0-9._~+%\-]{2,53}", name)
+    assert not name.lower().startswith("goog")
+    assert name.endswith("11111111111141118111111111111111")
+
+
+def test_empty_after_normalization_prefix_refuses_instead_of_losing_owner_identity(harness):
+    from dataclasses import replace
+
+    harness.driver._config = replace(harness.driver._config, topic_prefix="!!!")
+    result = harness.driver.provision(_spec())
+    assert not result.ok and "cannot be empty" in result.message
+    assert not harness.publisher.create_calls and not harness.subscriber.create_calls

@@ -327,3 +327,266 @@ sources, custom metadata, ICU arguments/tags and portable stories are included.
 The legacy flat scope sources are preserved; this leaf does not add pagination,
 a new member picker, APP support or claim complete #2145 coverage. Team detail,
 member and access presentation remains the next independently bounded audit.
+
+## Connected Team detail and members
+
+Team detail and members now use real all-eight `teams.detail`, `teams.members`
+copy and translated `lists.teamMembersBulk` instead of copied English. Human
+breadcrumb/tab/list labels derive from the existing definitions; hrefs, query
+keys, scope tokens, selected IDs, role metadata and unknown lifecycle values
+remain literal. Membership guidance follows the actual role-at-team contract,
+including organization-level roles the existing picker already permits; it
+makes no nonexistent `/roles` navigation promise.
+
+The actual detail/member hooks distinguish failed and unconfirmed reads from
+known missing/empty results, expose real retries, and preserve cached identities
+with visible read failure. Role loading, unknown, error and confirmed empty
+states stay distinct in the assignment dialog. The existing team-management
+check controls actions; withdrawing it disables an open assignment without
+silently discarding its draft. Backend scope/grant checks remain authoritative.
+A changed team identity remounts that team's member panel rather than carrying
+another team's selected-member draft into a new target.
+
+Bulk assignment retains exact typed input and existing partial/idempotent result
+semantics. Only accepted replies refresh the same team-member query. A refresh
+failure warns that data could not be refreshed while keeping the committed
+result; a refused or failed write keeps the selection and original diagnostic.
+An accepted reply without an aggregate summary is labeled accepted with no
+fabricated counts. Real HttpLink tests exercise these boundaries, unknown/read
+errors and actual retries, click/keyboard confirmation, current permissions,
+all-eight ICU shape and SSR/hydration with explicit request timezone dates.
+Portable Team detail/member stories include translated and failed-read states.
+
+This leaf retains the legacy capped 500-row member source and its existing
+client list operations; it does not claim a new server pagination contract or
+complete access translation. The shared EntityAccessPanel/removal hook and Team
+reach summary are the separate next leaf. Other principal-page callers retain
+existing presentation defaults; Team opts into translated recovery labels and
+cached-refresh error display. Root's frozen Members/anonymization source is
+untouched.
+
+## Connected Team access and grant removal
+
+Team reach now uses genuine all-eight `teams.access` copy and the actual project
+read/retry. Cached project failures stay visible beside literal project rows;
+an unconfirmed reach read supplies no confirmed count. Scope guidance explains
+that a team's projects/apps are in its scope while role and policy still decide
+access. The route supplies a translated team subject without rewriting the team
+slug or the exact target GUID.
+
+The connected shared EntityAccessPanel/list/removal hook uses additive
+`shared.access.entityPanel` copy: columns/search/source nouns, group counts,
+expiry fallback, empty guidance, inherited/group blast radius, confirm and
+feedback. Custom/system role metadata, scope identifiers, technical share levels,
+unknown source labels and request arguments remain literal. Known source labels
+are translated through an exact enum-key mapping; unknown sources are not
+misrepresented as app shares. The optional group-detail presentation callback
+preserves the pure helper's existing behavior for other callers.
+
+Refused revoke/mapping replies trigger no refetch and preserve the raw error and
+open confirmation. Accepted replies refresh active queries with their existing
+variables; failed refreshes warn while keeping the committed removal successful.
+Neither missing/null reads nor transport errors appear as a healthy empty list.
+Retries execute the actual current source query and consume its rejection while
+the query state retains the diagnostic. Query.previousData is no longer carried
+across target changes: current query cache can remain visible during a same-target
+refresh, but the new target cannot display or remove the prior target's rows.
+An open confirm requires its row to be present in the current result and the
+existing management decision; unknown/nonremovable sources do not invent a
+role-binding write. Backend target/grant checks remain authoritative.
+
+Real HttpLink tests cover both actual removal operations in every locale with
+click/keyboard confirmation, complete inherited/group guidance, exact mutation
+IDs and current active refetch variables, transport/fallback/refusal/committed
+refresh outcomes, deferred target changes, null/failed reads and real retries.
+Locale changes retain open target identity. All-eight ICU and SSR/hydration
+checks preserve raw role/group/project metadata and explicit request-timezone
+dates. Portable shared/Team access stories cover translated, failure and removal
+states. Team detail/member and existing feedback/polling checks remain green.
+
+Team list/create/edit/delete, detail, member assignment and this access surface
+now have connected locale coverage; #2145 remains open for other uncompleted
+surfaces. Existing capped/flat team/member/project read contracts are unchanged;
+this work adds no pagination API, authority promise, schema or backend change.
+Other shared-panel callers' supplied literal subject descriptions and other
+principal screens remain their own translation boundaries. Root's frozen
+Members/anonymization source and current release are untouched.
+
+## Cluster settings heartbeat agent and source recovery
+
+The actual cluster settings Keep-alive agent card now uses genuine all-eight
+`clusterSettings.agent` copy for issue/rotate/deploy, one-time key handling,
+clipboard feedback and install instructions. Its interval uses request-locale
+number and singular/plural formatting with unchanged technical namespace and
+Secret names. Cluster GUIDs, heartbeat URLs, raw key values, the existing kubectl
+snippet and backend diagnostics remain literal. This is the existing cluster
+heartbeat agent; it adds no Agent Host Protocol work.
+
+Issue and deploy refresh the active GetCluster query only after an accepted
+mutation envelope, retaining its existing variables. Accepted replies survive a
+failed refresh with a translated warning; rejected replies do not refresh or
+announce a successful write. Transport failures are handled without discarding
+an already issued key. Deployment acceptance does not claim an observed
+heartbeat or guaranteed connection. Clipboard success is displayed only after
+the browser confirms the write, with the existing temporary copied label;
+clipboard refusal keeps the key/snippet available for manual copying.
+
+Transient key and copy feedback belong to the current cluster/issued response.
+Cluster changes clear the key, and a delayed old response cannot resurrect it
+when the viewer returns to that cluster. No new credential persistence, query,
+authority gate, backend contract or cloud operation is introduced.
+
+The connected existing settings read has a narrow optional error/retry seam.
+Initial errors and unknown/mismatched target results show unavailable, not a
+healthy not-found state. A confirmed null result remains visibly not-found or
+inaccessible. Same-target cached observations remain visible with the raw
+refresh error and an actual Retry action. The exact GetCluster variables,
+cache-and-network read, management polling and permission decisions are
+preserved. The existing header accepts an optional empty-state title without
+changing other callers' presentation.
+
+Actual Apollo HttpLink tests cover both credential operations in all eight
+locales, raw refusal/transport/fallback outcomes, exact active refresh inputs,
+accepted-write/failed-read and refused-write/no-read combinations, prior-key
+preservation, literal clipboard payloads and completion races. The actual
+ClusterSettingsClient route proves initial failure-to-retry, cached failure-to-
+retry, null/unknown distinctions and new-target pending admission. ICU argument,
+rich-tag and plural-option parity, locale changes, SSR/hydration and all existing
+settings portable stories are checked with the real locale context.
+
+Focused validation on this exact source: 198 checks pass across the agent
+translation/route and portable-story modules plus existing cluster preflight,
+connectivity and ingress-auth regressions. TypeScript, scoped ESLint (zero
+warnings), source/catalogue Prettier and git diff checks pass. Every pre-existing
+catalogue value matches the signed 1ed90e1d base exactly; only the two owned
+clusterSettings subtrees are added. No broad frontend/backend suite was run.
+
+This is a bounded #2145 leaf. Other cluster header/tab/lifecycle/connection,
+bootstrap, central/ingress-auth and auth-user presentation and feedback remain
+separate concrete translation boundaries. Their source/card/query contracts are
+unchanged; this leaf adds no paging/capacity guarantee and does not close #2145.
+
+## Cluster settings central OIDC authentication
+
+The connected CentralAuthView/useCentralAuth form and actual CentralAuthCard
+now use genuine all-eight `clusterSettings.centralAuth` presentation: labels,
+write-only hints, secret-presence badges, setup/edit, provider callback guidance
+and save/fallback/refresh feedback. The existing shared SettingsSection supplies
+localized Save/Saving/Cancel. The callback template and issuer/JWKS paths remain
+literal technical values. Missing presence flags are visibly unconfirmed rather
+than fabricated unset. Existing real boolean flags preserve their meaning.
+
+The exact updateTenantCluster input and existing config preservation are
+unchanged: public issuer/logout/upstream metadata survives, the required fields
+are trimmed as before, optional blank JWKS is removed, `_set` flags are not sent,
+and a blank secret omits the secret key so the backend retains the stored value.
+Only newly typed secrets enter the write. The client does not retrieve stored
+secrets or persist its draft to browser storage. Cancel clears the typed secret
+and discards the current draft.
+
+Only accepted update envelopes refresh active GetCluster queries with their
+existing variables. Refusals retain the raw diagnostic and reviewed draft and
+trigger no refresh or successful-write warning. Transport errors are handled;
+a committed write still reports saved and clears the typed secret if its refresh
+fails, while the source banner exposes the raw read error and actual retry.
+
+Local form state belongs to its cluster GUID and confirmed OIDC source presence.
+A new cluster or confirmed source withdrawal clears the prior draft and secret;
+an old promise cannot close/clear a newer editor. A locale change and same-target
+failed/refused operation retain the current reviewed values. The actual existing
+Restricted wrapper still decides read-only/hide behavior; withdrawal remounts a
+read-only card, preventing reopening/writes without a new authority rule.
+
+The help accurately describes first-party parent-zone shared sign-in and
+independent custom-domain authentication, following central-auth-envoy.md.
+Saving metadata is not proof of an IdP registration, current edge rollout,
+provider capability or authentication readiness. This form does not enumerate
+provider resources or create a new paging/capacity promise. Existing backend
+permissions and mutation authority remain decisive; no backend/schema/input or
+policy gate changes are introduced.
+
+Focused current-source proof: 155 checks pass across real Apollo HttpLink
+ClusterSettingsClient journeys, all-eight ICU/rich/SSR hydration and portable
+central/settings stories, plus the existing central/ingress-class card regressions.
+It covers keyboard save, exact public/secret payloads, raw refusal/transport and
+fallback, accepted-write/failed-read recovery, source withdrawal/failed/null reads,
+Cancel/no-write, cached target changes, delayed actual prior-target HTTP replies,
+existing permission withdrawal, unknown secret flags and locale changes.
+TypeScript, scoped ESLint (zero warnings), source/catalogue formatting and diff
+checks pass. All pre-existing catalogue values exactly match the signed 4050b17a
+base; only the owned centralAuth subtree is added.
+
+This bounded central-auth form is complete, while #2145 remains open. The sibling
+ingress-class selector/hook, Cognito ingress-auth card/pickers, auth-user list,
+other cluster header/tab/connection/lifecycle/bootstrap copy and their outcomes
+remain concrete subsequent boundaries. Those forms and their capability limits
+are unchanged; this leaf does not enable unsupported provider authentication.
+
+## Connected cluster ingress-class review and outcomes
+
+The ingress-class card and `useIngressClass` use the additive
+`clusterSettings.ingressClass` subtree with 20 genuine message leaves in all
+eight catalogues. Known class labels/guidance, gate warnings, manifest opt-in,
+confirmation and mutation/refresh feedback are translated. Technical class
+values and unknown future class identifiers remain literal; query variables,
+update inputs and existing permission decisions are unchanged. No credential
+configuration, backend/schema or provider-admission contract changes are made.
+
+Reviews are scoped to the current cluster GUID, observed class and authentication
+source facts. Switching the target or withdrawing confirmed source facts clears
+the older selection, opt-in and dialog; late completion cannot close a newer
+review or carry the old opt-in to a different cluster. A locale change preserves
+the reviewed technical target. The ALB advisory now treats an empty dictionary
+as unconfigured, matching the actual backend gate check. It does not introduce
+a new client authority rule.
+
+Only accepted update envelopes refresh active GetCluster queries with their
+existing variables. Original refusal/transport messages remain visible, and
+refused writes retain the review without announcing a committed-write warning.
+An accepted write remains accepted after a failed refresh; the cached source
+and raw read error stay visible with the actual current-target Retry. Confirm
+and Cancel keep their existing keyboard and pending-state semantics.
+
+The opt-in copy reflects best-effort SCM write-back rather than promising every
+app receives a commit. Successful commits may deploy apps together; missing
+source connections and write-back failures can skip apps. An accepted metadata
+change does not prove edge rollout, authentication readiness or complete app
+migration. Existing unsupported provider/capability limits remain explicit in
+central-auth-envoy.md; this card does not add a cluster/app enumeration or new
+paging promise.
+
+Focused proof: 237 current-source checks pass across all-eight real Apollo
+HttpLink ClusterSettingsClient outcomes, exact class/id/sync payloads and read
+variables, simultaneous refusal/read-failure modes, keyboard confirmation,
+Cancel/no-write, initial failed/null source retry, source withdrawal, cached
+target changes, a delayed accepted prior-target HTTP reply, late pure dialog
+completion, existing permission withdrawal, locale changes, ICU/rich-message
+parity, recoverable-error-free hydration and portable central/ingress stories.
+Radix Select legitimately populates its selected text/options after hydration;
+checks preserve request-local heading/copy and the literal hydrated identifier
+without requiring identical post-effect HTML. Existing central OIDC journeys
+also pass; its production view/hook are unchanged. All pre-existing message
+trees exactly match signed base d3528e61 outside the owned ingressClass subtree.
+
+This bounded selector is complete; #2145 remains open. AWS/Cognito ingress-auth
+configuration and source pickers, auth-user lists, cluster header/tab/connection,
+lifecycle/bootstrap settings and their feedback remain separate boundaries.
+
+## People privacy accuracy follow-up (#2220)
+
+The connected People review now uses the actual nullable server anonymous flag
+and exact current user GUID/name. A confirmed anonymous account offers repeated
+privacy cleanup; deactivated or anonymous-looking identities with false/unknown
+flags retain the ordinary review. Real Member lifecycle stays deactivated.
+All eight genuine locale messages explain conditional first cleanup, bounded
+attributed history/cache/contact reduction, retained role bindings and structural
+records, unsupported structured/unattributed data and external/archive copies.
+
+Focused current-schema HttpLink journeys cover ordinary and repeat actions,
+exact mutation inputs, refusal and transport failures, accepted cleanup with
+failed refresh, truthful self-logout navigation recovery, permission/row/filter
+withdrawal, cached same-target read failure, late completion and fresh
+acknowledgement after target changes. ICU argument parity, locale changes,
+closed-server-review hydration and six portable dialog stories cover presentation.
+This is the bounded #2220 UI contract; unrelated #2145 cluster/AWS/Cognito and
+other untranslated settings boundaries remain open.

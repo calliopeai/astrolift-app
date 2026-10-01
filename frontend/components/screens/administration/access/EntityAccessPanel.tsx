@@ -1,6 +1,7 @@
 "use client";
 
 import { ShieldIcon, Trash2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { type RoleRef, SCOPE_NOUN } from "@/components/access/access-model";
@@ -64,19 +65,25 @@ export function EntityAccessPanel({
   onRemove,
   grantHref,
 }: EntityAccessPanelProps) {
+  const t = useTranslations("shared.access.entityPanel"),
+    accessT = useTranslations("shared.access");
+  const principal = (entry: AccessEntry) =>
+    principalOfEntry(entry, (count) => (count == null ? t("group") : t("groupCount", { count })));
+  const kind = (value: string) =>
+    Object.hasOwn(SCOPE_NOUN, value) ? accessT(`scope.${value}`) : value;
   const fmt = useFormatters();
   const [target, setTarget] = React.useState<AccessEntry | null>(null);
 
   const columns: Column<AccessEntry>[] = [
     {
       id: "principal",
-      header: "Who",
+      header: t("who"),
       cellClassName: "relative z-10 max-w-64",
-      cell: (e) => <PrincipalChip principal={principalOfEntry(e)} variant="block" />,
+      cell: (e) => <PrincipalChip principal={principal(e)} variant="block" />,
     },
     {
       id: "role",
-      header: "Role",
+      header: t("role"),
       cellClassName: "max-w-80",
       cell: (e) =>
         e.role ? (
@@ -86,28 +93,28 @@ export function EntityAccessPanel({
           />
         ) : (
           <span className="text-muted-foreground font-mono text-xs">
-            share: {e.accessLevel ?? "—"}
+            {t("share", { level: e.accessLevel ?? "—" })}
           </span>
         ),
     },
     {
       id: "source",
-      header: "Source",
+      header: t("source"),
       cellClassName: "relative z-10 max-w-64",
       cell: (e) => (
         <div className="flex min-w-0 flex-col items-start gap-1">
           <GrantSource source={sourceOfEntry(e)} />
           <span className="text-muted-foreground text-2xs">
-            {SOURCE_LABEL[e.source] ?? e.source}
+            {Object.hasOwn(SOURCE_LABEL, e.source) ? t(`sourceLabels.${e.source}`) : e.source}
           </span>
         </div>
       ),
     },
     {
       id: "expires",
-      header: "Expires",
+      header: t("expires"),
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (e) => (e.expiresAt ? fmt.formatDate(e.expiresAt) : "never"),
+      cell: (e) => (e.expiresAt ? fmt.formatDate(e.expiresAt) : t("never")),
     },
   ];
 
@@ -118,7 +125,7 @@ export function EntityAccessPanel({
       <ListPage<AccessEntry>
         embedded
         list={list}
-        label="Access"
+        label={t("label")}
         columns={columns}
         rows={rows}
         getRowId={entryKey}
@@ -133,18 +140,20 @@ export function EntityAccessPanel({
                 removalOf(e) ? (
                   <DropdownMenuItem variant="destructive" onSelect={() => setTarget(e)}>
                     <Trash2Icon className="size-4" />
-                    {removalOf(e) === "mapping" ? "Remove this mapping" : "Remove this grant"}
+                    {removalOf(e) === "mapping" ? t("removeMapping") : t("removeGrant")}
                   </DropdownMenuItem>
                 ) : (
-                  <DropdownMenuItem disabled>Changed on the app&apos;s sharing</DropdownMenuItem>
+                  <DropdownMenuItem disabled>
+                    {e.source === "TEAM_SHARE" ? t("appSharing") : t("notRemovable")}
+                  </DropdownMenuItem>
                 )
             : undefined
         }
         empty={{
           icon: <ShieldIcon className="size-5" />,
-          title: "Nobody has access here yet",
-          description: `Grant a role on ${subject}, or wider, and whoever holds it appears here with where it comes from.`,
-          ...(grantHref && canManage ? { actionHref: grantHref, actionLabel: "Grant access" } : {}),
+          title: t("emptyTitle"),
+          description: t("emptyDescription", { subject }),
+          ...(grantHref && canManage ? { actionHref: grantHref, actionLabel: t("grant") } : {}),
         }}
       />
       <ConfirmDialog
@@ -154,19 +163,29 @@ export function EntityAccessPanel({
         }}
         title={
           target && where
-            ? `Remove ${target.role?.slug ?? "access"} from ${principalOfEntry(target).name}?`
-            : "Remove?"
+            ? t("removeTitle", {
+                role: target.role?.slug ?? t("accessName"),
+                name: principal(target).name,
+              })
+            : t("removeGeneric")
         }
         description={
           target && where
-            ? `${
+            ? [
                 target.inherited
-                  ? `This is held on ${SCOPE_NOUN[where.kind] ?? where.kind} ${where.name}, not on ${subject}: removing it takes it away there and everywhere under it.`
-                  : `They lose what it gives on ${subject}.`
-              }${removalOf(target) === "mapping" ? " Every member of the group loses it." : ""} Other grants stay in effect.`
+                  ? t("inherited", { kind: kind(where.kind), name: where.name, subject })
+                  : t("direct", { subject }),
+                removalOf(target) === "mapping" ? t("groupLoss") : "",
+                t("otherGrants"),
+              ]
+                .filter(Boolean)
+                .join(" ")
             : ""
         }
-        confirmLabel="Remove"
+        confirmLabel={t("remove")}
+        confirmDisabled={
+          !canManage || !target || !rows.some((row) => entryKey(row) === entryKey(target))
+        }
         destructive
         onConfirm={async () => {
           if (target) await onRemove(target);

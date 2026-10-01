@@ -11,6 +11,8 @@ workflow layer doesn't special-case S3.
 from __future__ import annotations
 
 import contextlib
+import ipaddress
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,9 +40,9 @@ from _sdk.managed_service import (
 from aws._errors import map_client_error
 from aws.managed._base import (
     ManagedServiceError,
-    adoption_refusal,
     handle_for,
     live_ownership_refusal,
+    managed_name_for,
     parse_handle,
     tags_for,
 )
@@ -90,14 +92,23 @@ class S3Driver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        bucket_name = self._bucket_name_for(spec=spec)
+        try:
+            bucket_name = self._bucket_name_for(spec=spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         # The platform account "owns" every org's buckets, and create_bucket
         # succeeds on an owned one (us-east-1), so the tagging below would take
         # another service's bucket over. Only this service's is adopted (#1961).
-        if self._bucket_exists(bucket_name):
-            refusal = adoption_refusal(self._bucket_tags(bucket_name), spec, resource=f"bucket {bucket_name}")
+        try:
+            exists = self._bucket_exists(bucket_name)
+        except ManagedServiceError as exc:
+            return ProvisionResult(False, "", str(exc), ["ownership_unknown"])
+        if exists:
+            refusal = live_ownership_refusal(
+                self._bucket_tags(bucket_name), managed_service_id=spec.managed_service_id, resource="S3 bucket"
+            )
             if refusal is not None:
-                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
+                return ProvisionResult(False, "", refusal, ["ownership_refused"])
         try:
             create_kwargs: dict[str, Any] = {"Bucket": bucket_name}
             if self._config.region != "us-east-1":
@@ -108,8 +119,11 @@ class S3Driver(ManagedServiceDriver):
                 }
             self._s3.create_bucket(**create_kwargs)
         except self._s3.exceptions.BucketAlreadyOwnedByYou:
-            # Idempotent — this service's bucket (checked above)
-            pass
+            refusal = live_ownership_refusal(
+                self._bucket_tags(bucket_name), managed_service_id=spec.managed_service_id, resource="S3 bucket"
+            )
+            if refusal:
+                return ProvisionResult(False, "", refusal, ["ownership_refused"])
         except self._s3.exceptions.BucketAlreadyExists:
             return ProvisionResult(
                 ok=False,
@@ -553,12 +567,14 @@ class S3Driver(ManagedServiceDriver):
     # ---- internals ------------------------------------------------
 
     def _bucket_exists(self, bucket_name: str) -> bool:
-        """This account holds ``bucket_name`` (another account's answers 403, handled by create)."""
         try:
             self._s3.head_bucket(Bucket=bucket_name)
             return True
-        except Exception:  # 404, or 403 for another account's bucket
-            return False
+        except Exception as exc:
+            response = getattr(exc, "response", {})
+            if response.get("Error", {}).get("Code") in {"404", "NoSuchBucket", "NotFound"}:
+                return False
+            raise ManagedServiceError("S3 live bucket lookup could not be verified") from None
 
     def _bucket_tags(self, bucket_name: str) -> list[dict[str, str]]:
         """An existing bucket's tags; none, or unreadable, counts as untagged (#1961)."""
@@ -568,27 +584,19 @@ class S3Driver(ManagedServiceDriver):
             return []
 
     def _bucket_name_for(self, *, spec: ProvisionSpec) -> str:
-        """S3 bucket names are GLOBAL across AWS — collisions on
-        a sensible name are common. Use a deterministic but
-        scoped name: <prefix>-<org>-<app>-<env>-<hint>.
-        """
-        parts = [
-            self._config.bucket_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        # S3 names: lowercase, 3-63 chars, no underscores, no dots
-        # in the way (DNS-style). Collapse underscores/dots → dash.
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        # Collapse runs of dashes
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-")
-        return clean[:63]
+        name = managed_name_for(spec, kind=KIND, prefix=self._config.bucket_name_prefix, max_len=63)
+        if (
+            not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", name)
+            or ".." in name
+            or name.startswith(("xn--", "sthree-", "amzn-s3-demo-"))
+            or name.endswith(("-s3alias", "--ol-s3", ".mrap", "--x-s3", "--table-s3", "-an"))
+        ):
+            raise ManagedServiceError("recorded or configured S3 name violates bucket naming rules")
+        try:
+            ipaddress.IPv4Address(name)
+        except ipaddress.AddressValueError:
+            return name
+        raise ManagedServiceError("S3 name cannot be an IP address")
 
     def _empty_bucket(self, *, bucket_name: str) -> None:
         """Empties versioned buckets including delete markers.

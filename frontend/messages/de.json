@@ -3121,36 +3121,36 @@
       }
     },
     "teamMembersBulk": {
-      "tabTitle": "Team members",
-      "description": "Members of {team}. Bulk-assign a team-scoped role from this list.",
-      "loadError": "Couldn't load team members.",
-      "emptyTitle": "No members on this team yet",
-      "emptyDescription": "Add users to the team from the org members page, then come back here to assign team-scoped roles.",
+      "tabTitle": "Teammitglieder",
+      "description": "Mitglieder von {team}. Weise über diese Liste eine für dieses Team zulässige Rolle zu.",
+      "loadError": "Teammitglieder konnten nicht geladen werden.",
+      "emptyTitle": "Dieses Team hat noch keine Mitglieder",
+      "emptyDescription": "Gewähre eine Rolle im Geltungsbereich dieses Teams, um ein Mitglied hinzuzufügen.",
       "columns": {
-        "user": "User",
-        "lifecycle": "Lifecycle",
-        "joined": "Joined"
+        "user": "Benutzer",
+        "lifecycle": "Lebenszyklus",
+        "joined": "Beigetreten"
       },
-      "selectAllLabel": "Select all team members",
-      "selectRowLabel": "Select member {user}",
-      "selected": "{count, plural, =1 {1 member selected} other {# members selected}}",
-      "clear": "Clear",
-      "assignButton": "Assign role to {count}",
-      "permissionHint": "You don't have permission to manage members on this team.",
+      "selectAllLabel": "Alle Teammitglieder auswählen",
+      "selectRowLabel": "Mitglied {user} auswählen",
+      "selected": "{count, plural, =1 {1 Mitglied ausgewählt} other {# Mitglieder ausgewählt}}",
+      "clear": "Leeren",
+      "assignButton": "Rolle an {count} zuweisen",
+      "permissionHint": "Du darfst die Mitglieder dieses Teams nicht verwalten.",
       "assignDialog": {
-        "title": "Assign role to {count} member(s)",
-        "description": "Grants the role at the {team} team scope. Members that already have this role are skipped — re-running with the same role is a no-op.",
-        "roleLabel": "Team-scoped role",
-        "rolePlaceholder": "Choose a role",
-        "noRoles": "No team-scoped roles available. Create one on /roles first.",
-        "cancel": "Cancel",
-        "confirmLabel": "Assign role"
+        "title": "{count, plural, one {# Mitglied eine Rolle zuweisen} other {# Mitgliedern eine Rolle zuweisen}}",
+        "description": "Gewährt die Rolle für Team {team}. Mitglieder, die sie bereits haben, werden übersprungen; eine erneute Zuweisung derselben Rolle ändert nichts weiter.",
+        "roleLabel": "Für dieses Team zulässige Rolle",
+        "rolePlaceholder": "Rolle auswählen",
+        "noRoles": "Für dieses Team sind keine Rollen verfügbar.",
+        "cancel": "Abbrechen",
+        "confirmLabel": "Rolle zuweisen"
       },
       "toasts": {
-        "allOk": "Assigned role to {count} member(s).",
-        "mixedIdempotent": "Assigned {assigned}, {already} already had it.",
-        "partial": "Assigned {assigned}, {already} already had it, {failed} failed.",
-        "allFailed": "Bulk assign failed: {message}"
+        "allOk": "{count, plural, one {# Mitglied wurde eine Rolle zugewiesen.} other {# Mitgliedern wurde eine Rolle zugewiesen.}}",
+        "mixedIdempotent": "{assigned} zugewiesen; {already} hatten die Rolle bereits.",
+        "partial": "{assigned} zugewiesen; {already} hatten die Rolle bereits; {failed} fehlgeschlagen.",
+        "allFailed": "Rollenzuweisung fehlgeschlagen: {message}"
       }
     },
     "invitationExpiry": {
@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "Bereits anonymisiert",
         "anonymize": "Benutzerdaten anonymisieren",
         "invite": "Einladen",
-        "grant": "Zugriff gewähren"
+        "grant": "Zugriff gewähren",
+        "reviewPrivacyCleanup": "Bereinigung personenbezogener Daten prüfen"
       },
       "emptyTitle": "Noch keine Personen",
       "emptyDescription": "Laden Sie jemanden in die Organisation ein und weisen Sie eine Rolle zu.",
@@ -3757,22 +3758,31 @@
       "deleted": "Einladung gelöscht",
       "deleteFailed": "Löschen fehlgeschlagen",
       "anonymizeFailed": "Anonymisierung fehlgeschlagen",
-      "anonymized": "Benutzerdaten anonymisiert."
+      "anonymized": "Die Bereinigung unterstützter personenbezogener Nutzerdaten wurde angenommen.",
+      "logoutWarning": "Die Bereinigung wurde angenommen, aber die Abmeldung konnte nicht geöffnet werden. Melden Sie sich ab, um diese Browsersitzung zu beenden."
     },
     "anonymization": {
       "title": "{name} anonymisieren?",
-      "changes": "Diese Änderungen erfolgen",
-      "identity": "Kontonamen und E-Mail werden durch eine anonyme Identität ersetzt.",
-      "profile": "Persönliche Profilfelder, Telefon, Avatar, Adresse und Signatur werden gelöscht oder ersetzt.",
-      "account": "Die Anmeldung wird deaktiviert und Mitgliedschaften in Authentifizierungsgruppen werden entfernt.",
-      "memberships": "Mitgliedschaften auf der gesamten Plattform werden deaktiviert.",
-      "preserves": "Diese Daten bleiben erhalten",
-      "records": "Der Kontodatensatz und Verknüpfungen aus früheren Aktionen bleiben erhalten.",
-      "history": "Diese Aktion löscht weder historische Audit-Inhalte noch gespeicherte Rollenzuweisungen.",
-      "irreversible": "Diese Aktion ist unumkehrbar. Die ursprünglichen personenbezogenen Daten können nicht wiederhergestellt werden. Eine Wiederholung bei einem bereits anonymisierten Konto bewirkt keine weiteren Änderungen.",
+      "changes": "Umfang der Bereinigung",
+      "identity": "Bei der ersten Bereinigung werden Kontonamen und E-Mail-Adresse durch eine anonyme Identität ersetzt.",
+      "profile": "Bei der ersten Bereinigung werden persönliche Profilfelder, Telefonnummer, Avatar, Adresse und Signatur gelöscht oder ersetzt.",
+      "account": "Bei der ersten Bereinigung wird die Anmeldung deaktiviert und die Mitgliedschaft in Authentifizierungsgruppen entfernt.",
+      "memberships": "Bei der ersten Bereinigung werden Mitgliedschaften auf der gesamten Plattform deaktiviert.",
+      "preserves": "Erhaltene Datensätze und Grenzen",
+      "records": "Der Kontodatensatz, historische Verknüpfungen, Datensatz-IDs, Entscheidungen und Zeitstempel bleiben erhalten.",
+      "history": "Unterstützte Identitäts- und Anfragefelder in historischen Ereignissen und Prüfprotokollen, die diesem Nutzer eindeutig zugeordnet sind, werden unkenntlich gemacht.",
+      "irreversible": "Diese Bereinigung unterstützter Daten kann nicht rückgängig gemacht werden. Eine Wiederholung kann neu hinzugekommene zuordenbare Historie reduzieren, ohne eine vorhandene anonyme Identität zu ersetzen.",
       "acknowledge": "Ich verstehe, dass dies unumkehrbar ist.",
       "working": "Wird anonymisiert…",
-      "confirm": "Benutzerdaten anonymisieren"
+      "confirm": "Benutzerdaten anonymisieren",
+      "reviewTitle": "Bereinigung personenbezogener Daten für {name} prüfen?",
+      "anonymousIdentity": "Die vorhandene anonyme Kontoidentität bleibt erhalten.",
+      "metadata": "Unterstützte Metadaten in Identitäts-Caches, Sitzungen und Tokens sowie Kontaktadressen für E-Mail- und SMS-Zustellungen werden reduziert.",
+      "roleBindings": "Gespeicherte Rollenzuweisungen bleiben erhalten; ein inaktiver Nutzer kann sich nicht authentifizieren.",
+      "scopeLimits": "Nicht zugeordnete, mehrdeutige, frei formulierte, fremde oder nicht unterstützte strukturierte Daten bleiben erhalten.",
+      "external": "Vorhandene Exporte, Archive, Sicherungen und externe Systeme werden nicht geändert.",
+      "reviewWorking": "Personenbezogene Daten werden bereinigt…",
+      "reviewConfirm": "Personenbezogene Daten bereinigen"
     }
   },
   "stepUp": {
@@ -4521,6 +4531,45 @@
         "loadingRoles": "Rollen werden geladen…",
         "unknownRoles": "Rollen sind noch nicht bestätigt.",
         "emptyRoles": "In dieser Liste sind keine Rollen verfügbar."
+      },
+      "entityPanel": {
+        "label": "Zugriff",
+        "who": "Wer",
+        "role": "Rolle",
+        "source": "Quelle",
+        "expires": "Läuft ab",
+        "never": "nie",
+        "share": "Freigabe: {level}",
+        "search": "Personen, Gruppen, Teams und Rollen suchen…",
+        "all": "Alle",
+        "removeMapping": "Diese Gruppenzuordnung entfernen",
+        "removeGrant": "Diese Berechtigung entfernen",
+        "appSharing": "Wird in der App-Freigabe geändert",
+        "emptyTitle": "Hier hat noch niemand Zugriff",
+        "emptyDescription": "Gewähre eine Rolle für {subject} oder einen übergeordneten Bereich, um ihre Inhaber und Quellen hier anzuzeigen.",
+        "grant": "Zugriff gewähren",
+        "removeTitle": "{role} von {name} entfernen?",
+        "removeGeneric": "Zugriff entfernen?",
+        "inherited": "Diese Berechtigung liegt auf {kind} {name}, nicht auf {subject}. Entfernen nimmt sie an ihrer Quelle und in allen erreichten Bereichen weg.",
+        "direct": "Sie verlieren den durch diese Berechtigung gewährten Zugriff auf {subject}.",
+        "groupLoss": "Jedes Gruppenmitglied verliert diese Zuordnung.",
+        "otherGrants": "Andere Berechtigungen bleiben wirksam.",
+        "remove": "Entfernen",
+        "removed": "{role} entfernt",
+        "removeFailed": "Zugriff konnte nicht entfernt werden.",
+        "refreshWarning": "Der Zugriff wurde entfernt, aber die Ansicht konnte nicht aktualisiert werden. Lade die aktuellen Daten erneut.",
+        "accessName": "Zugriff",
+        "unavailable": "Die Zugriffsliste konnte nicht bestätigt werden. Lade die aktuellen Daten erneut.",
+        "notRemovable": "Diese Quelle kann hier nicht entfernt werden.",
+        "noTarget": "Das aktuelle Ziel ist nicht verfügbar.",
+        "group": "IdP-Gruppe",
+        "groupCount": "{count, plural, one {IdP-Gruppe · # Mitglied} other {IdP-Gruppe · # Mitglieder}}",
+        "sourceLabels": {
+          "USER_BINDING": "Berechtigung",
+          "GROUP_BINDING": "Gruppenberechtigung",
+          "GROUP_MAPPING": "Gruppenzuordnung",
+          "TEAM_SHARE": "Teamfreigabe"
+        }
       }
     },
     "settings": {
@@ -5423,6 +5472,53 @@
       "taken": "In dieser Organisation bereits vergeben.",
       "unchanged": "Aktueller Slug — wird in URLs verwendet.",
       "empty": "Kleinbuchstaben, Zahlen und Bindestriche. Wird in URLs verwendet."
+    },
+    "detail": {
+      "grant": "Zugriff gewähren",
+      "notFound": "Team nicht gefunden",
+      "notFoundDescription": "Dieses Team existiert möglicherweise nicht, wurde gelöscht oder ist für dich nicht zugänglich.",
+      "back": "Zurück zu Teams",
+      "principal": "Teamnavigation",
+      "loadFailed": "Diese Seite konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "unavailable": "Die Teamliste konnte nicht bestätigt werden. Lade die aktuellen Daten erneut.",
+      "access": "Zugriff",
+      "members": "Mitglieder",
+      "admin": "Administration",
+      "people": "Personen",
+      "teams": "Teams",
+      "roles": "Rollen",
+      "policies": "Richtlinien",
+      "check": "Zugriff prüfen",
+      "organization": "Organisation",
+      "projects": "Projekte"
+    },
+    "members": {
+      "add": "Mitglied hinzufügen",
+      "label": "Mitglieder",
+      "emptyDescription": "Gewähre einer Person eine Rolle im Geltungsbereich dieses Teams, um sie aufzunehmen.",
+      "search": "Mitglieder suchen…",
+      "all": "Alle",
+      "status": "Status",
+      "active": "Aktiv",
+      "invited": "Eingeladen",
+      "suspended": "Gesperrt",
+      "unknownError": "Es wurde keine Fehlerbeschreibung übermittelt.",
+      "refreshWarning": "Die Zuweisung wurde angenommen, aber die Ansicht konnte nicht aktualisiert werden. Lade die aktuellen Daten erneut.",
+      "rolesLoading": "Verfügbare Rollen werden geladen…",
+      "rolesUnknown": "Die verfügbaren Rollen wurden noch nicht bestätigt.",
+      "rolesFailed": "Verfügbare Rollen konnten nicht geladen werden.",
+      "rolesRetry": "Rollen erneut laden",
+      "accepted": "Die Zuweisung wurde angenommen; ihre Zusammenfassung ist nicht verfügbar."
+    },
+    "access": {
+      "subject": "Team {name}",
+      "reaches": "Geltungsbereich",
+      "description": "Der Teambereich umfasst diese Projekte und ihre Apps. Der Zugriff hängt auch von Rolle und Richtlinie ab.",
+      "emptyTitle": "Noch keine Projekte",
+      "emptyDescription": "Der Teambereich umfasst auch später unter diesem Team erstellte Projekte.",
+      "unavailable": "Die Projektliste konnte nicht bestätigt werden. Lade die aktuellen Daten erneut.",
+      "retry": "Erneut versuchen"
     }
   },
   "apiKeys": {
@@ -5601,6 +5697,97 @@
       "scope18": {
         "label": "Administration",
         "description": "Alles, was der Besitzer tun kann, jetzt und mit neuen Berechtigungen. Engere Bereiche bevorzugen."
+      }
+    }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Heartbeat-Agent",
+      "description": "Ein Agent im Namespace <namespace>astrolift-system</namespace> sendet signierte Heartbeats, damit die Plattform den Zustand von Pods, Knoten und Ressourcen anzeigen und eine unterbrochene Verbindung erkennen kann. Heartbeats werden alle <interval>{seconds, number}</interval> {seconds, plural, one {Sekunde} other {Sekunden}} gesendet.",
+      "keyIssued": "Schlüssel ausgegeben",
+      "copyNow": "Kopieren Sie diesen Schlüssel jetzt. Er wird nicht erneut angezeigt.",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen. Wählen Sie den Text aus und kopieren Sie ihn manuell.",
+      "installSecret": "Secret für den Agenten installieren",
+      "installHelp": "Stellen Sie anschließend den Agenten bereit. Er liest Schlüssel und URL aus diesem Secret. Ein empfangener Heartbeat bestätigt die Verbindung.",
+      "deploy": "Agent im Cluster bereitstellen",
+      "done": "Fertig",
+      "deployHelp": "Wendet das Deployment des Agenten an. Erstellen Sie zuerst das Secret <secret>astrolift-agent</secret> mit dem obigen Befehl.",
+      "rotate": "Agentenschlüssel erneuern",
+      "issue": "Agentenschlüssel ausgeben",
+      "rotationHelp": "Das Deployment liest Schlüssel und URL aus dem Secret <secret>astrolift-agent</secret>. Eine Erneuerung macht den bisherigen Schlüssel ungültig. Aktualisieren Sie das Secret mit dem neuen Schlüssel, bevor Sie erneut bereitstellen. Der alte Schlüssel kann keine gültigen Heartbeats mehr signieren.",
+      "feedbackIssued": "Agentenschlüssel ausgegeben. Kopieren Sie ihn jetzt. Er wird nicht erneut angezeigt.",
+      "feedbackRotated": "Agentenschlüssel erneuert. Der bisherige Schlüssel funktioniert nicht mehr.",
+      "feedbackDeployed": "Bereitstellung des Agenten angenommen. Ein empfangener Heartbeat bestätigt die Verbindung.",
+      "feedbackIssueFailed": "Agentenschlüssel konnte nicht ausgegeben werden.",
+      "feedbackDeployFailed": "Agent konnte nicht bereitgestellt werden.",
+      "feedbackRefreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
+    },
+    "source": {
+      "readFailed": "Clusterdetails konnten nicht gelesen werden",
+      "cached": "Die zuletzt bestätigten Clusterdetails werden angezeigt. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu prüfen.",
+      "retry": "Erneut versuchen",
+      "unknown": "Die Clusterdetails sind noch nicht bestätigt. Wiederholen Sie die Abfrage.",
+      "notFoundHeader": "Cluster nicht gefunden",
+      "notFound": "Kein sichtbarer Cluster mit dem Slug {slug}",
+      "notFoundHelp": "Der Cluster existiert nicht oder Sie haben keine Berechtigung, ihn anzuzeigen.",
+      "back": "Zurück zu Clustern"
+    },
+    "centralAuth": {
+      "title": "Zentrale Authentifizierung",
+      "description": "Gemeinsame Anmeldung für App-Hosts unter der übergeordneten Zone des Authentifizierungshosts. Registrieren Sie die genaue Rückruf-URL <callback>{callbackUrl}</callback> beim Identitätsanbieter. Envoy und nginx verwenden diese Konfiguration; ALB verwendet stattdessen die Cognito-Zugangskontrolle pro App. Benutzerdefinierte Domains benötigen eine separate Authentifizierungskonfiguration.",
+      "authHost": "Authentifizierungshost",
+      "discoveryUrl": "Discovery-URL",
+      "clientId": "Client-ID",
+      "clientSecret": "Client-Geheimnis",
+      "jwksOptional": "JWKS-URI (optional)",
+      "jwksUri": "JWKS-URI",
+      "secretKeep": "Gesetzt. Zum Beibehalten leer lassen.",
+      "notSet": "Nicht gesetzt",
+      "secretUnknown": "Nicht bestätigt",
+      "writeOnly": "Nur zum Schreiben. Nach dem Speichern wird es nicht erneut angezeigt.",
+      "jwksHint": "Nur für Anbieter, die ihre Schlüssel nicht unter {jwksPath} bereitstellen.",
+      "notConfigured": "Nicht konfiguriert.",
+      "cookieSecret": "Cookie-Geheimnis",
+      "gatewaySecret": "Gateway-Geheimnis",
+      "secretSet": "Gesetzt",
+      "secretBadge": "{label}: {state}",
+      "edit": "Bearbeiten",
+      "setup": "Zentrale Authentifizierung einrichten",
+      "saved": "Zentrale Authentifizierung gespeichert.",
+      "saveFailed": "Zentrale Authentifizierung konnte nicht gespeichert werden.",
+      "refreshWarning": "Die zentrale Authentifizierung wurde gespeichert, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen.",
+      "secretNotSet": "Nicht gesetzt"
+    },
+    "ingressClass": {
+      "title": "Ingress-Klasse",
+      "description": "Welche Eingangsschicht die Apps dieses Clusters bedient. Jede App wechselt bei ihrer nächsten Bereitstellung. Ein Klassenwechsel allein stellt laufende Apps nicht erneut bereit.",
+      "change": "Klasse ändern",
+      "gateHint": "Die Apps verwenden {gate}.",
+      "missingAlb": "Es ist keine ALB-Cognito-Zugangskontrolle eingerichtet. Apps mit dieser Klasse wären daher öffentlich.",
+      "missingCentral": "Die zentrale Authentifizierung ist oben nicht eingerichtet. Apps mit dieser Klasse wären daher öffentlich.",
+      "gateRefusal": "Der Server verweigert einen Wechsel, der die aktuelle Authentifizierung entfernt. Richten Sie zuerst die neue Zugangskontrolle ein.",
+      "syncHint": "Auch das Schreiben der neuen Zugangskontrolle in die <file>astrolift.toml</file> jeder App anfordern. Jeder erfolgreiche Repository-Commit startet die Bereitstellung dieser App; mehrere Apps können gleichzeitig bereitgestellt werden. Fehlende Quellverbindungen oder Schreibfehler können Apps auslassen.",
+      "confirmTitle": "Ingress-Klasse zu <target>{className}</target> ändern?",
+      "syncReview": "Fordert für die Apps dieses Clusters einen astrolift.toml-Commit an. Jeder erfolgreiche Commit startet die zugehörige Bereitstellung. Fehlende Quellverbindungen oder Schreibfehler können Apps auslassen.",
+      "nextDeployReview": "Jetzt wird keine App erneut bereitgestellt. Jede wechselt bei ihrer nächsten Bereitstellung zur neuen Eingangsschicht.",
+      "changed": "Wechsel der Ingress-Klasse zu {target} angenommen.",
+      "changeFailed": "Ingress-Klasse konnte nicht geändert werden.",
+      "refreshWarning": "Der Klassenwechsel wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen.",
+      "classes": {
+        "envoy": {
+          "label": "Envoy-Eingang (zentrale Authentifizierung)",
+          "gate": "zentrale Authentifizierung auf einem Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (Cognito pro App)",
+          "gate": "die ALB-Cognito-Zugangskontrolle"
+        },
+        "nginx": {
+          "label": "ingress-nginx (zentrale Authentifizierung)",
+          "gate": "zentrale Authentifizierung über oauth2-proxy; die Wartung von ingress-nginx ist eingestellt"
+        }
       }
     }
   }

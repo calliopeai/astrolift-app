@@ -1,40 +1,14 @@
-"""GCP Pub/Sub queue managed-service driver (#363).
+"""GCP queue/pubsub owns one topic and default subscription.
 
-Implements ``ManagedServiceDriver`` for the canonical GCP managed-
-queue path. Symmetric to AWS SQS — same Binding shape, just
-google-cloud-pubsub backed. Each provision creates a topic + a
-default subscription named ``<topic>-sub``; workloads need both
-(publish to topic, consume from subscription) and the binding
-exposes both.
-
-Four-corner deprovision matrix:
-
-  delete_data=False, force_destroy=False (default):
-    Drain (seek the subscription to ``now`` to acknowledge in-flight
-    messages without dispatching them) and then delete BOTH the
-    subscription and the topic. Pub/Sub has no "retain queue
-    contents" path because messages aren't durable beyond the
-    subscription's retention window — the topic itself has no
-    persistent state, so retention is implicit. delete_data=False
-    therefore means "don't republish/redeliver the in-flight set".
-
-  delete_data=False, force_destroy=True:
-    Same as the default safe path; force_destroy is meaningful only
-    when a subscription is actively pulling. We log the bypass for
-    operator visibility but otherwise behave identically.
-
-  delete_data=True, force_destroy=False:
-    Skip the drain seek and delete topic + subscription
-    immediately. Any in-flight redeliveries are lost.
-
-  delete_data=True, force_destroy=True:
-    Atomic — skip drain, ignore subscriber-attached refusal
-    (``FAILED_PRECONDITION`` on delete when consumers are pulling).
+New targets retain the complete persisted service UUID. Cleanup requires current
+ownership, complete bounded child inventory and explicit data deletion; no seek,
+fictional drain or force-success bypass is performed.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import monotonic
 from typing import Any
 
 from _sdk._telemetry import driver_op
@@ -55,9 +29,28 @@ from _sdk.managed_service import (
     ValueRef,
     unsupported_update,
 )
-from gcp.managed._ownership import label_adoption_refusal
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import label_identity_refusal
+from gcp.managed.topic_pubsub import _already_exists, _get, _not_found, _resource_id, _service_identity
 
 KIND = "queue"
+
+
+class PubSubQueueError(RuntimeError):
+    def __init__(self, message: str, code: str = "ownership_unknown") -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class _CallBudget:
+    def __init__(self) -> None:
+        self.deadline = monotonic() + 20
+
+    def call(self, method: Any, request: dict[str, Any]) -> Any:
+        remaining = self.deadline - monotonic()
+        if remaining <= 0:
+            raise PubSubQueueError("Pub/Sub queue observation budget exceeded")
+        return method(request=request, timeout=min(5, remaining), retry=None)
 
 
 @dataclass(frozen=True)
@@ -74,13 +67,13 @@ class PubSubDriver(ManagedServiceDriver):
         if config.publisher_client is not None:
             self._pub = config.publisher_client
         else:
-            from google.cloud import pubsub_v1
+            import google.cloud.pubsub_v1 as pubsub_v1
 
             self._pub = pubsub_v1.PublisherClient()
         if config.subscriber_client is not None:
             self._sub = config.subscriber_client
         else:
-            from google.cloud import pubsub_v1
+            import google.cloud.pubsub_v1 as pubsub_v1
 
             self._sub = pubsub_v1.SubscriberClient()
 
@@ -91,59 +84,57 @@ class PubSubDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        topic_id = self._topic_id(spec=spec)
-        sub_id = f"{topic_id}-sub"
-        topic_path = self._pub.topic_path(
-            self._config.project_id,
-            topic_id,
-        )
-        sub_path = self._sub.subscription_path(
-            self._config.project_id,
-            sub_id,
-        )
+        budget = _CallBudget()
         try:
-            self._pub.create_topic(request={"name": topic_path, "labels": _labels_for(spec)})
-        except Exception as exc:
-            if type(exc).__name__ != "AlreadyExists":
-                return ProvisionResult(
-                    ok=False,
-                    handle="",
-                    message=f"create_topic: {exc}",
-                    errors=[str(exc)],
-                )
-            # Topics created before labels carry none and are adopted as
-            # before; one labeled for another service or org is refused (#1961).
-            try:
-                existing = self._pub.get_topic(request={"topic": topic_path})
-            except Exception as lookup_exc:
-                return ProvisionResult(False, "", f"get_topic: {lookup_exc}", [str(lookup_exc)])
-            labels = existing.get("labels") if isinstance(existing, dict) else getattr(existing, "labels", None)
-            refusal = (
-                label_adoption_refusal(dict(labels), spec, resource=f"Pub/Sub topic {topic_id}") if labels else None
-            )
-            if refusal is not None:
-                return ProvisionResult(False, "", refusal, [refusal])
+            _service_identity(spec.managed_service_id)
+            topic_id = _parse_handle(spec.recorded_handle) if spec.recorded_handle else self._topic_id(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
+        record_proves = spec.recorded_handle_exclusive and spec.recorded_handle == f"{KIND}/{topic_id}"
         try:
-            self._sub.create_subscription(
-                request={"name": sub_path, "topic": topic_path},
-            )
+            topic_path, sub_path = self._paths(topic_id)
+            topic, child = self._resources(topic_id, spec.managed_service_id, record_proves, budget)
+            if topic is None:
+                try:
+                    budget.call(self._pub.create_topic, {"name": topic_path, "labels": _labels_for(spec)})
+                except Exception as exc:
+                    if not _already_exists(exc):
+                        raise
+                topic, child = self._resources(topic_id, spec.managed_service_id, False, budget)
+                if topic is None:
+                    raise PubSubQueueError("created Pub/Sub queue topic could not be observed")
+            if child is None:
+                try:
+                    budget.call(
+                        self._sub.create_subscription,
+                        {
+                            "name": sub_path,
+                            "topic": topic_path,
+                            "labels": {MANAGED_SERVICE_ID_LABEL: spec.managed_service_id},
+                        },
+                    )
+                except Exception as exc:
+                    if not _already_exists(exc):
+                        raise
+            topic, child = self._resources(topic_id, spec.managed_service_id, record_proves, budget)
+            if topic is None or child is None:
+                raise PubSubQueueError("Pub/Sub queue creation has not been observed")
         except Exception as exc:
-            if type(exc).__name__ != "AlreadyExists":
-                return ProvisionResult(
-                    ok=False,
-                    handle="",
-                    message=f"create_subscription: {exc}",
-                    errors=[str(exc)],
-                )
+            return ProvisionResult(False, "", f"provision Pub/Sub queue: {exc}", [_error_code(exc)])
         return ProvisionResult(
-            ok=True,
-            handle=f"{KIND}/{topic_id}",
-            message=(f"Pub/Sub topic + subscription provisioned: {topic_id}"),
+            True, f"{KIND}/{topic_id}", "Pub/Sub queue topic and default subscription observed", ready=True
         )
 
     @driver_op(cloud="gcp", driver="queue_pubsub")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        return unsupported_update(spec.handle, "Pub/Sub subscription settings reconcile on provision, not in place")
+        try:
+            topic_id = _parse_handle(spec.handle)
+            self._resources(topic_id, spec.managed_service_id, spec.recorded_handle_exclusive, _CallBudget())
+        except Exception as exc:
+            return UpdateResult(
+                False, spec.handle, f"verify Pub/Sub queue update target: {exc}", [_error_code(exc)], retryable=False
+            )
+        return unsupported_update(spec.handle, "Pub/Sub queue has no editable settings")
 
     @driver_op(
         cloud="gcp",
@@ -158,130 +149,81 @@ class PubSubDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        from datetime import UTC, datetime
-
-        _, _, topic_id = spec.handle.partition("/")
-        sub_id = f"{topic_id}-sub"
-        sub_path = self._sub.subscription_path(
-            self._config.project_id,
-            sub_id,
-        )
-        topic_path = self._pub.topic_path(
-            self._config.project_id,
-            topic_id,
-        )
-
-        # Track whether the resources existed at all — a fully-gone
-        # topic+sub is a successful no-op regardless of flags.
-        any_present = False
-
-        if not delete_data:
-            # Drain in-flight messages by seeking the subscription
-            # forward to "now". This acks anything pending without
-            # dispatching it. Best-effort: NotFound means already
-            # gone; other errors surface as warnings, not blockers
-            # — failing to drain shouldn't prevent delete.
+        budget = _CallBudget()
+        try:
+            topic_id = _parse_handle(spec.handle)
+            topic, child = self._resources(topic_id, spec.managed_service_id, spec.recorded_handle_exclusive, budget)
+            topic_path, sub_path = self._paths(topic_id)
+            if topic is None and child is None:
+                return DeprovisionResult(True, spec.handle, "Pub/Sub queue recorded targets already gone")
+            if not delete_data:
+                return DeprovisionResult(
+                    False,
+                    spec.handle,
+                    "Pub/Sub queue may retain messages; explicit delete_data=true is required; snapshot is unsupported",
+                    ["retained_messages_require_delete_data"],
+                    retryable=False,
+                )
+            paths = self._inventory(topic_path, budget)
+            outside = set(paths) - {sub_path}
+            if outside and not force_destroy:
+                return DeprovisionResult(
+                    False,
+                    spec.handle,
+                    "Pub/Sub queue has subscriptions outside its default declaration; force_destroy is required",
+                    ["foreign_subscriptions_require_force_destroy", "ownership_unknown"],
+                    retryable=False,
+                )
+            owned = {sub_path} if child is not None else set()
+            for path in outside:
+                current = self._read(self._sub.get_subscription, {"subscription": path}, budget)
+                if current is not None:
+                    self._assert_child(current, topic_path, spec.managed_service_id, expected_path=path, legacy=False)
+                    owned.add(path)
+            for path in sorted(owned):
+                try:
+                    budget.call(self._sub.delete_subscription, {"subscription": path})
+                except Exception as exc:
+                    if not _not_found(exc):
+                        raise
             try:
-                self._sub.seek(
-                    request={
-                        "subscription": sub_path,
-                        "time": datetime.now(UTC).isoformat(),
-                    },
-                )
-                any_present = True
+                budget.call(self._pub.delete_topic, {"topic": topic_path})
             except Exception as exc:
-                if type(exc).__name__ != "NotFound":
-                    # Surface but don't abort.
-                    pass
-
-        try:
-            self._sub.delete_subscription(
-                request={"subscription": sub_path},
-            )
-            any_present = True
+                if not _not_found(exc):
+                    raise
         except Exception as exc:
-            err_name = type(exc).__name__
-            if err_name == "NotFound":
-                pass
-            elif err_name in ("FailedPrecondition", "FAILED_PRECONDITION") or "FAILED_PRECONDITION" in str(exc):
-                if not force_destroy:
-                    return DeprovisionResult(
-                        ok=False,
-                        handle=spec.handle,
-                        message=(f"subscription {sub_id} has active subscribers — pass force_destroy=True to bypass"),
-                        errors=[str(exc)],
-                    )
-                # force_destroy: log the bypass via message and treat
-                # as already-detached.
-            else:
-                return DeprovisionResult(
-                    ok=False,
-                    handle=spec.handle,
-                    message=str(exc),
-                    errors=[str(exc)],
-                )
-        try:
-            self._pub.delete_topic(request={"topic": topic_path})
-            any_present = True
-        except Exception as exc:
-            if type(exc).__name__ != "NotFound":
-                return DeprovisionResult(
-                    ok=False,
-                    handle=spec.handle,
-                    message=str(exc),
-                    errors=[str(exc)],
-                )
-
-        if not any_present:
             return DeprovisionResult(
-                ok=True,
-                handle=spec.handle,
-                message=f"Pub/Sub {topic_id} already gone",
+                False,
+                spec.handle,
+                f"delete Pub/Sub queue: {exc}",
+                [_error_code(exc)],
+                retryable=_error_code(exc) != "ownership_refused",
             )
-        suffix = " (force_destroy)" if force_destroy else ""
-        return DeprovisionResult(
-            ok=True,
-            handle=spec.handle,
-            message=(
-                f"Pub/Sub topic + subscription deleted: {topic_id} (drained={'no' if delete_data else 'yes'}){suffix}"
-            ),
-        )
+        return DeprovisionResult(True, spec.handle, "Pub/Sub queue observed topic and owned subscriptions deleted")
 
     @driver_op(cloud="gcp", driver="queue_pubsub")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, _, topic_id = handle.handle.partition("/")
         try:
-            self._pub.get_topic(
-                request={
-                    "topic": self._pub.topic_path(
-                        self._config.project_id,
-                        topic_id,
-                    ),
-                },
+            topic, child = self._resources(
+                _parse_handle(handle.handle), handle.managed_service_id, handle.recorded_handle_exclusive, _CallBudget()
             )
         except Exception as exc:
-            if type(exc).__name__ == "NotFound":
-                return ServiceStatus(
-                    handle=handle.handle,
-                    state="deprovisioned",
-                    message=f"topic {topic_id} does not exist",
-                )
-            return ServiceStatus(
-                handle=handle.handle,
-                state="error",
-                message=str(exc),
-            )
-        return ServiceStatus(
-            handle=handle.handle,
-            state="available",
-            message=f"topic {topic_id} reachable",
-        )
+            return ServiceStatus(handle.handle, "error", f"verify Pub/Sub queue: {exc}")
+        if topic is None and child is None:
+            return ServiceStatus(handle.handle, "deprovisioned", "Pub/Sub queue recorded targets absent")
+        if topic is None or child is None:
+            return ServiceStatus(handle.handle, "error", "Pub/Sub queue target is incomplete")
+        return ServiceStatus(handle.handle, "available", "Pub/Sub queue topic and default subscription observed")
 
     @driver_op(cloud="gcp", driver="queue_pubsub")
-    def binding(self, handle: ServiceHandle) -> Binding:
-        _, _, topic_id = handle.handle.partition("/")
-        topic_path = f"projects/{self._config.project_id}/topics/{topic_id}"
-        sub_path = f"projects/{self._config.project_id}/subscriptions/{topic_id}-sub"
+    def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
+        topic_id = _parse_handle(handle.handle)
+        topic, child = self._resources(
+            topic_id, handle.managed_service_id, handle.recorded_handle_exclusive, _CallBudget()
+        )
+        if topic is None or child is None:
+            raise PubSubQueueError("Pub/Sub queue binding target is incomplete")
+        topic_path, sub_path = self._paths(topic_id)
         return Binding(
             env_vars={
                 "PUBSUB_TOPIC": ValueRef(literal=topic_path),
@@ -344,20 +286,115 @@ class PubSubDriver(ManagedServiceDriver):
         return []
 
     def _topic_id(self, *, spec: ProvisionSpec) -> str:
-        parts = [
-            self._config.topic_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        raw = "-".join(p for p in parts if p)
-        # Pub/Sub topic IDs: alphanumeric + dash + underscore; max 255
-        clean = "".join(c if c.isalnum() or c in "-_" else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:255]
+        identity = _service_identity(spec.managed_service_id)
+        if not isinstance(self._config.topic_prefix, str):
+            raise ValueError("Pub/Sub queue prefix must be a string")
+        prefix = _resource_id(self._config.topic_prefix or "astrolift", max_length=218)
+        return f"{prefix}-{identity}"
+
+    def _paths(self, topic_id: str) -> tuple[str, str]:
+        project = self._config.project_id
+        if not isinstance(project, str) or not project or project.strip() != project or "/" in project:
+            raise PubSubQueueError("Pub/Sub queue configured project identity is unavailable")
+        return (
+            self._pub.topic_path(self._config.project_id, topic_id),
+            self._sub.subscription_path(self._config.project_id, f"{topic_id}-sub"),
+        )
+
+    @staticmethod
+    def _read(method: Any, request: dict[str, Any], budget: _CallBudget) -> Any | None:
+        try:
+            return budget.call(method, request)
+        except Exception as exc:
+            if _not_found(exc):
+                return None
+            raise
+
+    def _resources(
+        self, topic_id: str, managed_service_id: str, exclusive: bool, budget: _CallBudget
+    ) -> tuple[Any | None, Any | None]:
+        _service_identity(managed_service_id)
+        topic_path, sub_path = self._paths(topic_id)
+        topic = self._read(self._pub.get_topic, {"topic": topic_path}, budget)
+        if topic is not None:
+            if _get(topic, "name", "") != topic_path:
+                raise PubSubQueueError("Pub/Sub queue topic response does not match the recorded physical target")
+            refusal = label_identity_refusal(
+                dict(_get(topic, "labels", {}) or {}),
+                managed_service_id,
+                record_proves=exclusive,
+                resource="Pub/Sub queue topic",
+            )
+            if refusal:
+                raise PubSubQueueError(refusal, "ownership_refused")
+        child = self._read(self._sub.get_subscription, {"subscription": sub_path}, budget)
+        if child is not None:
+            if topic is None:
+                raise PubSubQueueError("Pub/Sub queue parent is absent while its default subscription remains")
+            self._assert_child(child, topic_path, managed_service_id, expected_path=sub_path, legacy=True)
+        return topic, child
+
+    @staticmethod
+    def _assert_child(
+        child: Any, topic_path: str, managed_service_id: str, *, expected_path: str, legacy: bool
+    ) -> None:
+        if _get(child, "name", "") != expected_path:
+            raise PubSubQueueError("Pub/Sub queue subscription response does not match the recorded physical target")
+        if _get(child, "topic", "") != topic_path:
+            raise PubSubQueueError("Pub/Sub queue subscription belongs to another topic", "ownership_refused")
+        refusal = label_identity_refusal(
+            dict(_get(child, "labels", {}) or {}),
+            managed_service_id,
+            record_proves=legacy,
+            resource="Pub/Sub queue subscription",
+        )
+        if refusal:
+            raise PubSubQueueError(refusal, "ownership_refused")
+
+    def _inventory(self, topic_path: str, budget: _CallBudget) -> list[str]:
+        paths: list[str] = []
+        token = ""
+        seen = set()
+        for _ in range(10):
+            reply = budget.call(
+                self._pub.list_topic_subscriptions, {"topic": topic_path, "page_size": 100, "page_token": token}
+            )
+            page = next(iter(reply.pages)) if hasattr(reply, "pages") else reply
+            rows = _get(page, "subscriptions", page)
+            for row in rows:
+                path = str(_get(row, "name", row))
+                if not path.startswith(f"projects/{self._config.project_id}/subscriptions/"):
+                    raise PubSubQueueError(
+                        "Pub/Sub queue has a subscription outside its configured project", "ownership_refused"
+                    )
+                if path in paths or len(paths) >= 1000:
+                    raise PubSubQueueError("Pub/Sub queue subscription inventory is invalid or exceeds its item budget")
+                paths.append(path)
+            token = str(_get(page, "next_page_token", "") or "")
+            if not token:
+                return paths
+            if token in seen:
+                raise PubSubQueueError("Pub/Sub queue subscription pagination repeated a cursor")
+            seen.add(token)
+        raise PubSubQueueError("Pub/Sub queue subscription inventory exceeds its page budget")
+
+
+def _parse_handle(handle: str) -> str:
+    import re
+
+    kind, separator, topic_id = handle.partition("/")
+    if (
+        kind != KIND
+        or not separator
+        or not re.fullmatch(r"[A-Za-z][A-Za-z0-9._~+%\-]{2,250}", topic_id)
+        or topic_id.lower().startswith("goog")
+    ):
+        raise ValueError("invalid Pub/Sub queue handle; expected exact queue/<topic-id> with room for -sub")
+    return topic_id
+
+
+def _error_code(exc: Exception) -> str:
+    return exc.code if isinstance(exc, PubSubQueueError) else "ownership_unknown"
 
 
 def _labels_for(spec: ProvisionSpec) -> dict[str, str]:
@@ -373,5 +410,6 @@ def _labels_for(spec: ProvisionSpec) -> dict[str, str]:
         "astrolift-environment": _clean(spec.environment_name),
     }
     if spec.managed_service_id:
-        labels["astrolift-managed-service-id"] = _clean(spec.managed_service_id)
+        labels["astrolift-managed-service-id"] = spec.managed_service_id
+        labels[MANAGED_SERVICE_ID_LABEL] = spec.managed_service_id
     return labels

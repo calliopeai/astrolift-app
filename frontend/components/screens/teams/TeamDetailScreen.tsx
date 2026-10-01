@@ -2,6 +2,7 @@
 
 import { ShieldPlusIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import {
@@ -37,10 +38,36 @@ export function TeamDetailScreen({
   tab,
   children,
 }: TeamDetailScreenProps) {
-  const tabs = teamTabs(slug, tab);
+  const t = useTranslations("teams.detail");
+  const tabs = teamTabs(slug, tab).map((tab) => ({ ...tab, label: t(tab.key) }));
+  const keys: Record<string, string> = {
+    "/administration/organization": "organization",
+    "/administration/access": "access",
+    "/administration/projects": "projects",
+    "/administration/access/people": "people",
+    "/administration/access/teams": "teams",
+    "/administration/permissions": "roles",
+    "/administration/policies": "policies",
+    "/administration/permissions/diagnostics": "check",
+  };
+  const crumbs = accessCrumbs("teams", team?.name ?? slug).map((crumb, index) => ({
+    ...crumb,
+    label:
+      index === 0 ? t("admin") : index === 1 ? t("access") : index === 2 ? t("teams") : crumb.label,
+    switcher: crumb.switcher?.map((option) => ({
+      ...option,
+      label: keys[option.href] ? t(keys[option.href]) : option.label,
+    })),
+  }));
   return (
     <PrincipalPage
-      crumbs={accessCrumbs("teams", team?.name ?? slug)}
+      crumbs={crumbs}
+      presentation={{
+        tabsAriaLabel: t("principal"),
+        loadFailed: t("loadFailed"),
+        retry: t("retry"),
+      }}
+      showRefreshError
       principal={team ? { kind: "team", id: team.slug, name: team.name } : null}
       fallbackTitle={slug}
       context={team ? <span className="font-mono">{team.slug}</span> : undefined}
@@ -54,7 +81,7 @@ export function TeamDetailScreen({
               })}
             >
               <ShieldPlusIcon className="size-4" />
-              Grant access
+              {t("grant")}
             </Link>
           </Button>
         ) : undefined
@@ -65,11 +92,10 @@ export function TeamDetailScreen({
       onRetry={onRetry}
       notFound={!loading && !error && !team}
       notFoundCopy={{
-        title: "Team not found",
-        description:
-          "This team may not exist, may have been deleted, or you may not have access to it.",
+        title: t("notFound"),
+        description: t("notFoundDescription"),
         backHref: TEAMS_HREF,
-        backLabel: "Back to Teams",
+        backLabel: t("back"),
       }}
     >
       {children}

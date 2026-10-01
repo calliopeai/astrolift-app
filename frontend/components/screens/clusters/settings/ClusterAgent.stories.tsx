@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import ja from "@/messages/ja.json";
 
 import { ClusterAgentView } from "./ClusterAgent";
 import { AGENT, AGENT_ISSUED, LONG } from "./fixtures";
@@ -20,6 +23,30 @@ export const KeyIssued: Story = { render: () => <ClusterAgentView {...AGENT_ISSU
 
 export const Loading: Story = {
   render: () => <ClusterAgentView {...AGENT} issuing deploying />,
+};
+
+export const GermanIssued: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={de}>
+      <ClusterAgentView {...AGENT_ISSUED} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const JapaneseUnprovisioned: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <ClusterAgentView {...AGENT} provisioned={false} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const Width768: Story = {
+  render: () => (
+    <div style={{ width: 768 }}>
+      <ClusterAgentView {...AGENT_ISSUED} />
+    </div>
+  ),
 };
 
 export const LongStrings: Story = {
