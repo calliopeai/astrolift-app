@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- New GCP Pub/Sub topic names retain the full persisted service UUID and reserve
+  room for distinct declared subscription suffixes. Recorded topics and child
+  mappings stay unchanged; colliding legacy child declarations, invalid IDs
+  and unavailable ownership proof refuse before mutation (#2032, bounded scope).
+
+
 - Translate the connected central OIDC authentication form and feedback in all
   eight locales. Preserve write-only secret omission and literal provider
   metadata, retain committed updates through failed refreshes, and clear

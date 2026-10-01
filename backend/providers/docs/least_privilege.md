@@ -233,6 +233,46 @@ families under #2032 remain separate; #2021's explicit tenant-set identities and
 restore/adoption, provisioning cloud races and the remaining broad ownership
 acceptance in #2098 are not closed by the naming change.
 
+### Immutable GCP Pub/Sub topic names (#2032, bounded scope)
+
+New `topic/pubsub_topic` resources use
+`<normalized-operator-topic-prefix>-<complete-managed-service-UUID-hex>`.
+Canonical nonzero saved UUIDs are required, including the platform's current
+UUIDv7 records; the driver never invents an ID or substitutes human slugs.
+Only the cosmetic prefix is truncated to 21 characters, so new topic IDs
+retain all 32 identity characters within 54 characters. Prefix normalization
+preserves the API's alphabetic start and reserved `goog` rules; invalid/empty
+normalized prefixes and invalid recorded IDs refuse before provider calls.
+The [official Pub/Sub resource-name contract](https://docs.cloud.google.com/pubsub/docs/pubsub-basics)
+limits topic/subscription IDs to 3–255 characters and declares their allowed
+alphabet and reserved prefix.
+
+The existing declared subscription suffix is normalized to at most 200
+characters. Reserving those 200 characters plus a separator means new child
+IDs retain the complete topic UUID and distinct normalized suffixes within
+255 characters, even with a long operator prefix. Normalized declaration
+collisions refuse. Recorded legacy topic IDs keep their exact physical names
+and the existing child-name mapping, including historical truncation. If two
+new declarations under a long recorded parent map to the same physical child,
+the entire operation refuses before topic or child changes. Existing topic
+and subscription data is not migrated or renamed.
+
+The current live source-label and exclusive-record ownership gates remain in
+place. A recorded name is not authority to retag a foreign owner. Current child
+owners are preflighted before parent reconciliation, and actual SDK typed
+not-found/already-exists outcomes—not diagnostic substrings—decide absence or
+create reconciliation. Unavailable lookup proof never permits creation.
+Operators must keep the prefix stable until the first handle is recorded;
+after that, recorded handles override cosmetic prefix/display changes. Cloud
+admin replacement/retag races are not certified as atomic transactions.
+
+This leaf covers only GCP `topic/pubsub_topic`, not the separate `queue/pubsub`
+driver or other GCP/AWS/Azure/native families. #2032 stays open; #2021's explicit
+tenant-set/adoption identities and #2029's SES identities remain excluded.
+The PostgreSQL lifecycle proof runs the real Google Pub/Sub SDK through a
+bounded local recording gRPC server. It verifies serialized API requests,
+identity and no-write refusals, not GCP IAM, storage or delivery semantics.
+
 ### AWS live binding and S3 incarnation checks (#2098)
 
 S3, SQS and DynamoDB bindings require the actual live resource's platform marker
