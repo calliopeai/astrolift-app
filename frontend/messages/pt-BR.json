@@ -4518,6 +4518,45 @@
         "loadingRoles": "Carregando papéis…",
         "unknownRoles": "Os papéis ainda não foram confirmados.",
         "emptyRoles": "Nenhum papel está disponível nesta lista."
+      },
+      "entityPanel": {
+        "label": "Acesso",
+        "who": "Quem",
+        "role": "Papel",
+        "source": "Origem",
+        "expires": "Expira",
+        "never": "nunca",
+        "share": "compartilhamento: {level}",
+        "search": "Buscar pessoas, grupos, equipes e papéis…",
+        "all": "Todos",
+        "removeMapping": "Remover este mapeamento",
+        "removeGrant": "Remover esta concessão",
+        "appSharing": "Alterado no compartilhamento do app",
+        "emptyTitle": "Ninguém tem acesso aqui ainda",
+        "emptyDescription": "Conceda um papel em {subject}, ou em um escopo mais amplo, para mostrar aqui os titulares e as origens.",
+        "grant": "Conceder acesso",
+        "removeTitle": "Remover {role} de {name}?",
+        "removeGeneric": "Remover acesso?",
+        "inherited": "Esta concessão está em {kind} {name}, não em {subject}. Removê-la retira o acesso na origem e em todos os escopos alcançados.",
+        "direct": "Eles perdem o acesso que esta concessão oferece em {subject}.",
+        "groupLoss": "Todos os membros do grupo perdem este mapeamento.",
+        "otherGrants": "As outras concessões continuam em vigor.",
+        "remove": "Remover",
+        "removed": "{role} removido",
+        "removeFailed": "Não foi possível remover o acesso.",
+        "refreshWarning": "O acesso foi removido, mas não foi possível atualizar a visualização. Atualize para ver os dados atuais.",
+        "accessName": "acesso",
+        "unavailable": "Não foi possível confirmar a lista de acesso. Tente novamente para carregar os dados atuais.",
+        "notRemovable": "Esta origem não pode ser removida aqui.",
+        "noTarget": "O destino atual não está disponível.",
+        "group": "Grupo do IdP",
+        "groupCount": "{count, plural, one {Grupo do IdP · # membro} other {Grupo do IdP · # membros}}",
+        "sourceLabels": {
+          "USER_BINDING": "concessão",
+          "GROUP_BINDING": "concessão ao grupo",
+          "GROUP_MAPPING": "mapeamento de grupo",
+          "TEAM_SHARE": "compartilhamento da equipe"
+        }
       }
     },
     "settings": {
@@ -5458,6 +5497,15 @@
       "rolesFailed": "Não foi possível carregar os papéis disponíveis.",
       "rolesRetry": "Recarregar papéis",
       "accepted": "A atribuição foi aceita; o resumo não está disponível."
+    },
+    "access": {
+      "subject": "equipe {name}",
+      "reaches": "Abrangência",
+      "description": "O escopo da equipe inclui estes projetos e seus apps. O acesso também depende do papel e da política.",
+      "emptyTitle": "Ainda não há projetos",
+      "emptyDescription": "O escopo da equipe também inclui projetos criados nela posteriormente.",
+      "unavailable": "Não foi possível confirmar a lista de projetos. Tente novamente para carregar os dados atuais.",
+      "retry": "Tentar novamente"
     }
   },
   "apiKeys": {

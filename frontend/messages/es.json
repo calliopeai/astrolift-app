@@ -4521,6 +4521,45 @@
         "loadingRoles": "Cargando roles…",
         "unknownRoles": "Todavía no se han confirmado los roles.",
         "emptyRoles": "No hay roles disponibles en esta lista."
+      },
+      "entityPanel": {
+        "label": "Acceso",
+        "who": "Quién",
+        "role": "Rol",
+        "source": "Origen",
+        "expires": "Caduca",
+        "never": "nunca",
+        "share": "acceso compartido: {level}",
+        "search": "Buscar personas, grupos, equipos y roles…",
+        "all": "Todos",
+        "removeMapping": "Eliminar esta asignación de grupo",
+        "removeGrant": "Eliminar esta concesión",
+        "appSharing": "Se cambia en el acceso compartido de la aplicación",
+        "emptyTitle": "Nadie tiene acceso aquí todavía",
+        "emptyDescription": "Concede un rol en {subject}, o en un ámbito más amplio, para mostrar aquí sus titulares y orígenes.",
+        "grant": "Conceder acceso",
+        "removeTitle": "¿Eliminar {role} de {name}?",
+        "removeGeneric": "¿Eliminar acceso?",
+        "inherited": "Esta concesión está en {kind} {name}, no en {subject}. Eliminarla la retira de su origen y de todos los ámbitos que alcanza.",
+        "direct": "Pierden el acceso que esta concesión da en {subject}.",
+        "groupLoss": "Todos los miembros del grupo pierden esta asignación.",
+        "otherGrants": "Las demás concesiones siguen vigentes.",
+        "remove": "Eliminar",
+        "removed": "Se eliminó {role}",
+        "removeFailed": "No se pudo eliminar el acceso.",
+        "refreshWarning": "El acceso se eliminó, pero no se pudo actualizar la vista. Actualiza para ver los datos actuales.",
+        "accessName": "acceso",
+        "unavailable": "No se pudo confirmar la lista de acceso. Reintenta para cargar los datos actuales.",
+        "notRemovable": "Este origen no se puede eliminar aquí.",
+        "noTarget": "El destino actual no está disponible.",
+        "group": "Grupo del IdP",
+        "groupCount": "{count, plural, one {Grupo del IdP · # miembro} other {Grupo del IdP · # miembros}}",
+        "sourceLabels": {
+          "USER_BINDING": "concesión",
+          "GROUP_BINDING": "concesión al grupo",
+          "GROUP_MAPPING": "asignación de grupo",
+          "TEAM_SHARE": "acceso compartido del equipo"
+        }
       }
     },
     "settings": {
@@ -5461,6 +5500,15 @@
       "rolesFailed": "No se pudieron cargar los roles disponibles.",
       "rolesRetry": "Reintentar roles",
       "accepted": "La asignación se aceptó; el resumen no está disponible."
+    },
+    "access": {
+      "subject": "equipo {name}",
+      "reaches": "Alcance",
+      "description": "El ámbito del equipo incluye estos proyectos y sus aplicaciones. El acceso también depende del rol y la política.",
+      "emptyTitle": "Aún no hay proyectos",
+      "emptyDescription": "El ámbito del equipo también incluye los proyectos que se creen bajo él más adelante.",
+      "unavailable": "No se pudo confirmar la lista de proyectos. Reintenta para cargar los datos actuales.",
+      "retry": "Reintentar"
     }
   },
   "apiKeys": {

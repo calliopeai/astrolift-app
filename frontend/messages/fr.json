@@ -4521,6 +4521,45 @@
         "loadingRoles": "Chargement des rôles…",
         "unknownRoles": "Les rôles n'ont pas encore été confirmés.",
         "emptyRoles": "Aucun rôle n'est disponible dans cette liste."
+      },
+      "entityPanel": {
+        "label": "Accès",
+        "who": "Qui",
+        "role": "Rôle",
+        "source": "Origine",
+        "expires": "Expiration",
+        "never": "jamais",
+        "share": "partage : {level}",
+        "search": "Rechercher des personnes, groupes, équipes et rôles…",
+        "all": "Tous",
+        "removeMapping": "Supprimer cette correspondance",
+        "removeGrant": "Retirer cette attribution",
+        "appSharing": "Modifié dans le partage de l’application",
+        "emptyTitle": "Personne n’a encore accès ici",
+        "emptyDescription": "Accordez un rôle sur {subject}, ou à un périmètre plus large, pour afficher ici ses bénéficiaires et origines.",
+        "grant": "Accorder un accès",
+        "removeTitle": "Retirer {role} de {name} ?",
+        "removeGeneric": "Retirer l’accès ?",
+        "inherited": "Cette attribution est portée par {kind} {name}, pas par {subject}. La retirer la supprime à sa source et de tous les périmètres qu’elle couvre.",
+        "direct": "Ils perdent l’accès accordé par cette attribution sur {subject}.",
+        "groupLoss": "Tous les membres du groupe perdent cette correspondance.",
+        "otherGrants": "Les autres attributions restent en vigueur.",
+        "remove": "Retirer",
+        "removed": "{role} retiré",
+        "removeFailed": "Impossible de retirer l’accès.",
+        "refreshWarning": "L’accès a été retiré, mais la vue n’a pas pu être actualisée. Actualisez pour voir les données actuelles.",
+        "accessName": "accès",
+        "unavailable": "La liste d’accès n’a pas pu être confirmée. Réessayez pour charger les données actuelles.",
+        "notRemovable": "Cette origine ne peut pas être retirée ici.",
+        "noTarget": "La cible actuelle n’est pas disponible.",
+        "group": "Groupe IdP",
+        "groupCount": "{count, plural, one {Groupe IdP · # membre} other {Groupe IdP · # membres}}",
+        "sourceLabels": {
+          "USER_BINDING": "attribution",
+          "GROUP_BINDING": "attribution au groupe",
+          "GROUP_MAPPING": "correspondance de groupe",
+          "TEAM_SHARE": "partage d’équipe"
+        }
       }
     },
     "settings": {
@@ -5461,6 +5500,15 @@
       "rolesFailed": "Impossible de charger les rôles disponibles.",
       "rolesRetry": "Recharger les rôles",
       "accepted": "L’attribution a été acceptée ; son résumé n’est pas disponible."
+    },
+    "access": {
+      "subject": "équipe {name}",
+      "reaches": "Périmètre",
+      "description": "Le périmètre de l’équipe comprend ces projets et leurs applications. L’accès dépend aussi du rôle et de la politique.",
+      "emptyTitle": "Aucun projet pour le moment",
+      "emptyDescription": "Le périmètre de l’équipe comprend aussi les projets créés sous cette équipe par la suite.",
+      "unavailable": "La liste des projets n’a pas pu être confirmée. Réessayez pour charger les données actuelles.",
+      "retry": "Réessayer"
     }
   },
   "apiKeys": {

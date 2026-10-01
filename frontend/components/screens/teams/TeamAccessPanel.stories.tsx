@@ -1,7 +1,9 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import de from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { useLocalListState } from "@/components/list/use-list-state";
-import { ENTITY_ACCESS_LIST } from "@/components/screens/administration/access/entity-access";
+import { localizedEntityAccessList } from "@/components/screens/administration/access/entity-access";
 import {
   entityAccessProps,
   TEAM_ACCESS,
@@ -36,11 +38,20 @@ function Panel({
   projects?: typeof PROJECTS;
   loading?: boolean;
 }) {
-  const list = useLocalListState(ENTITY_ACCESS_LIST);
+  const t = useTranslations("shared.access.entityPanel"),
+    teamT = useTranslations("teams.access");
+  const list = useLocalListState(localizedEntityAccessList(t));
   return (
     <TeamAccessPanel
       slug="platform"
-      access={{ list, ...entityAccessProps({ rows: entries, loading }) }}
+      access={{
+        list,
+        ...entityAccessProps({
+          rows: entries,
+          loading,
+          subject: teamT("subject", { name: "platform" }),
+        }),
+      }}
       reach={{ projects, loading, error: null, onRetry: () => {} }}
     />
   );
@@ -64,3 +75,35 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const GermanWidth768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Panel />
+    </div>
+  ),
+};
+function ReachFailed() {
+  const t = useTranslations("shared.access.entityPanel"),
+    list = useLocalListState(localizedEntityAccessList(t));
+  return (
+    <TeamAccessPanel
+      slug="platform"
+      access={{ list, ...entityAccessProps() }}
+      reach={{
+        projects: [],
+        loading: false,
+        error: { message: "RAW_PROJECT_READ_FAILURE" },
+        onRetry: () => {},
+      }}
+    />
+  );
+}
+export const ReachReadFailed: Story = { render: () => <ReachFailed /> };

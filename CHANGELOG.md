@@ -24,6 +24,11 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Localize Team reach and connected access/removal presentation in all eight
+  locales. Preserve source identities and server refusals, retain accepted
+  removals through failed refreshes, and block old-target confirmations while
+  the current target is unavailable (#2145).
+
 - Translate connected Team detail/member navigation, role assignment and source
   recovery in all eight locales. Preserve literal identities and request-timezone
   dates; accepted assignments remain accepted if their read refresh fails, and

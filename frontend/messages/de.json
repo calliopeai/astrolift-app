@@ -4521,6 +4521,45 @@
         "loadingRoles": "Rollen werden geladen…",
         "unknownRoles": "Rollen sind noch nicht bestätigt.",
         "emptyRoles": "In dieser Liste sind keine Rollen verfügbar."
+      },
+      "entityPanel": {
+        "label": "Zugriff",
+        "who": "Wer",
+        "role": "Rolle",
+        "source": "Quelle",
+        "expires": "Läuft ab",
+        "never": "nie",
+        "share": "Freigabe: {level}",
+        "search": "Personen, Gruppen, Teams und Rollen suchen…",
+        "all": "Alle",
+        "removeMapping": "Diese Gruppenzuordnung entfernen",
+        "removeGrant": "Diese Berechtigung entfernen",
+        "appSharing": "Wird in der App-Freigabe geändert",
+        "emptyTitle": "Hier hat noch niemand Zugriff",
+        "emptyDescription": "Gewähre eine Rolle für {subject} oder einen übergeordneten Bereich, um ihre Inhaber und Quellen hier anzuzeigen.",
+        "grant": "Zugriff gewähren",
+        "removeTitle": "{role} von {name} entfernen?",
+        "removeGeneric": "Zugriff entfernen?",
+        "inherited": "Diese Berechtigung liegt auf {kind} {name}, nicht auf {subject}. Entfernen nimmt sie an ihrer Quelle und in allen erreichten Bereichen weg.",
+        "direct": "Sie verlieren den durch diese Berechtigung gewährten Zugriff auf {subject}.",
+        "groupLoss": "Jedes Gruppenmitglied verliert diese Zuordnung.",
+        "otherGrants": "Andere Berechtigungen bleiben wirksam.",
+        "remove": "Entfernen",
+        "removed": "{role} entfernt",
+        "removeFailed": "Zugriff konnte nicht entfernt werden.",
+        "refreshWarning": "Der Zugriff wurde entfernt, aber die Ansicht konnte nicht aktualisiert werden. Lade die aktuellen Daten erneut.",
+        "accessName": "Zugriff",
+        "unavailable": "Die Zugriffsliste konnte nicht bestätigt werden. Lade die aktuellen Daten erneut.",
+        "notRemovable": "Diese Quelle kann hier nicht entfernt werden.",
+        "noTarget": "Das aktuelle Ziel ist nicht verfügbar.",
+        "group": "IdP-Gruppe",
+        "groupCount": "{count, plural, one {IdP-Gruppe · # Mitglied} other {IdP-Gruppe · # Mitglieder}}",
+        "sourceLabels": {
+          "USER_BINDING": "Berechtigung",
+          "GROUP_BINDING": "Gruppenberechtigung",
+          "GROUP_MAPPING": "Gruppenzuordnung",
+          "TEAM_SHARE": "Teamfreigabe"
+        }
       }
     },
     "settings": {
@@ -5461,6 +5500,15 @@
       "rolesFailed": "Verfügbare Rollen konnten nicht geladen werden.",
       "rolesRetry": "Rollen erneut laden",
       "accepted": "Die Zuweisung wurde angenommen; ihre Zusammenfassung ist nicht verfügbar."
+    },
+    "access": {
+      "subject": "Team {name}",
+      "reaches": "Geltungsbereich",
+      "description": "Der Teambereich umfasst diese Projekte und ihre Apps. Der Zugriff hängt auch von Rolle und Richtlinie ab.",
+      "emptyTitle": "Noch keine Projekte",
+      "emptyDescription": "Der Teambereich umfasst auch später unter diesem Team erstellte Projekte.",
+      "unavailable": "Die Projektliste konnte nicht bestätigt werden. Lade die aktuellen Daten erneut.",
+      "retry": "Erneut versuchen"
     }
   },
   "apiKeys": {

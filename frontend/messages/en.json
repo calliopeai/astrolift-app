@@ -4598,6 +4598,45 @@
         "loadingRoles": "Loading roles…",
         "unknownRoles": "Roles have not been confirmed yet.",
         "emptyRoles": "No roles are available in this list."
+      },
+      "entityPanel": {
+        "label": "Access",
+        "who": "Who",
+        "role": "Role",
+        "source": "Source",
+        "expires": "Expires",
+        "never": "never",
+        "share": "share: {level}",
+        "search": "Search people, groups, teams and roles…",
+        "all": "All",
+        "removeMapping": "Remove this mapping",
+        "removeGrant": "Remove this grant",
+        "appSharing": "Changed on the app’s sharing",
+        "emptyTitle": "Nobody has access here yet",
+        "emptyDescription": "Grant a role on {subject}, or a wider scope, to show its holders and sources here.",
+        "grant": "Grant access",
+        "removeTitle": "Remove {role} from {name}?",
+        "removeGeneric": "Remove access?",
+        "inherited": "This grant is held on {kind} {name}, not on {subject}. Removing it takes it away at its source and every scope it reaches.",
+        "direct": "They lose the access this grant gives on {subject}.",
+        "groupLoss": "Every member of the group loses this mapping.",
+        "otherGrants": "Other grants stay in effect.",
+        "remove": "Remove",
+        "removed": "Removed {role}",
+        "removeFailed": "Could not remove access.",
+        "refreshWarning": "Access was removed, but the view could not be refreshed. Refresh to see current data.",
+        "accessName": "access",
+        "unavailable": "The access list could not be confirmed. Retry to load current data.",
+        "notRemovable": "This source cannot be removed here.",
+        "noTarget": "The current target is unavailable.",
+        "group": "IdP group",
+        "groupCount": "{count, plural, one {IdP group · # member} other {IdP group · # members}}",
+        "sourceLabels": {
+          "USER_BINDING": "grant",
+          "GROUP_BINDING": "group grant",
+          "GROUP_MAPPING": "group mapping",
+          "TEAM_SHARE": "team share"
+        }
       }
     },
     "settings": {
@@ -5538,6 +5577,15 @@
       "rolesFailed": "Could not load available roles.",
       "rolesRetry": "Retry roles",
       "accepted": "The assignment was accepted; its summary is unavailable."
+    },
+    "access": {
+      "subject": "team {name}",
+      "reaches": "Reaches",
+      "description": "Team scope includes these projects and their apps. Access also depends on the role and policy.",
+      "emptyTitle": "No projects yet",
+      "emptyDescription": "Team scope also includes projects created under the team later.",
+      "unavailable": "The project list could not be confirmed. Retry to load current data.",
+      "retry": "Retry"
     }
   },
   "apiKeys": {

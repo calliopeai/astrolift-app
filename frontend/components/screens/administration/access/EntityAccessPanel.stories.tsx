@@ -1,9 +1,11 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 
-import { ENTITY_ACCESS_LIST } from "./entity-access";
+import { localizedEntityAccessList } from "./entity-access";
 import { EntityAccessPanel, type EntityAccessPanelProps } from "./EntityAccessPanel";
 import { APP_ACCESS, entityAccessProps, TEAM_ACCESS } from "./principal.fixtures";
 
@@ -16,7 +18,8 @@ export default meta;
 type Story = StoryObj;
 
 function Panel(overrides: Partial<Omit<EntityAccessPanelProps, "list">>) {
-  const list = useLocalListState(ENTITY_ACCESS_LIST);
+  const t = useTranslations("shared.access.entityPanel");
+  const list = useLocalListState(localizedEntityAccessList(t));
   return <EntityAccessPanel list={list} {...entityAccessProps(overrides)} />;
 }
 
@@ -75,4 +78,36 @@ export const Width768: Story = {
       <Panel rows={APP_ACCESS} />
     </div>
   ),
+};
+
+export const JapaneseWidth768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja} timeZone="Asia/Tokyo">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Panel />
+    </div>
+  ),
+};
+export const RemoveRefused: Story = {
+  render: () => (
+    <Panel
+      rows={TEAM_ACCESS.slice(0, 1)}
+      onRemove={async () => {
+        throw new Error("RAW_REMOVE_REFUSAL");
+      }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("button", { name: /row actions|actions/i }));
+    await userEvent.click(
+      await within(document.body).findByRole("menuitem", { name: "Remove this grant" })
+    );
+  },
 };

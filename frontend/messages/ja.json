@@ -4518,6 +4518,45 @@
         "loadingRoles": "ロールを読み込み中…",
         "unknownRoles": "ロールはまだ確認されていません。",
         "emptyRoles": "この一覧にロールはありません。"
+      },
+      "entityPanel": {
+        "label": "アクセス",
+        "who": "対象",
+        "role": "ロール",
+        "source": "付与元",
+        "expires": "有効期限",
+        "never": "なし",
+        "share": "共有: {level}",
+        "search": "ユーザー、グループ、チーム、ロールを検索…",
+        "all": "すべて",
+        "removeMapping": "このグループ対応を削除",
+        "removeGrant": "この付与を削除",
+        "appSharing": "アプリの共有設定で変更します",
+        "emptyTitle": "まだアクセス権を持つ人はいません",
+        "emptyDescription": "{subject} または上位のスコープでロールを付与すると、保持者と付与元がここに表示されます。",
+        "grant": "アクセスを付与",
+        "removeTitle": "{name} から {role} を削除しますか？",
+        "removeGeneric": "アクセス権を削除しますか？",
+        "inherited": "この付与は {subject} ではなく {kind} {name} にあります。削除すると、付与元とそこから適用されるすべてのスコープで失われます。",
+        "direct": "この付与による {subject} へのアクセス権を失います。",
+        "groupLoss": "グループの全メンバーがこの対応による権限を失います。",
+        "otherGrants": "他の付与は引き続き有効です。",
+        "remove": "削除",
+        "removed": "{role} を削除しました",
+        "removeFailed": "アクセス権を削除できませんでした。",
+        "refreshWarning": "アクセス権は削除されましたが、表示を更新できませんでした。最新のデータを再読み込みしてください。",
+        "accessName": "アクセス権",
+        "unavailable": "アクセス権の一覧を確認できませんでした。再試行して最新のデータを読み込んでください。",
+        "notRemovable": "この付与元はここでは削除できません。",
+        "noTarget": "現在の対象を取得できません。",
+        "group": "IdP グループ",
+        "groupCount": "{count, plural, one {IdP グループ · メンバー # 人} other {IdP グループ · メンバー # 人}}",
+        "sourceLabels": {
+          "USER_BINDING": "付与",
+          "GROUP_BINDING": "グループへの付与",
+          "GROUP_MAPPING": "グループ対応",
+          "TEAM_SHARE": "チーム共有"
+        }
       }
     },
     "settings": {
@@ -5458,6 +5497,15 @@
       "rolesFailed": "利用可能なロールを読み込めませんでした。",
       "rolesRetry": "ロールを再読み込み",
       "accepted": "割り当ては受け付けられましたが、結果の概要を取得できません。"
+    },
+    "access": {
+      "subject": "チーム {name}",
+      "reaches": "適用範囲",
+      "description": "チームのスコープには、これらのプロジェクトとアプリが含まれます。アクセス権はロールとポリシーにも依存します。",
+      "emptyTitle": "プロジェクトはまだありません",
+      "emptyDescription": "今後このチームの下に作成されるプロジェクトもスコープに含まれます。",
+      "unavailable": "プロジェクト一覧を確認できませんでした。再試行して最新のデータを読み込んでください。",
+      "retry": "再試行"
     }
   },
   "apiKeys": {

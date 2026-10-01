@@ -4518,6 +4518,45 @@
         "loadingRoles": "正在加载角色…",
         "unknownRoles": "角色尚未确认。",
         "emptyRoles": "此列表中没有可用角色。"
+      },
+      "entityPanel": {
+        "label": "访问权限",
+        "who": "对象",
+        "role": "角色",
+        "source": "来源",
+        "expires": "到期时间",
+        "never": "永不过期",
+        "share": "共享：{level}",
+        "search": "搜索用户、组、团队和角色…",
+        "all": "全部",
+        "removeMapping": "删除此组映射",
+        "removeGrant": "撤销此授权",
+        "appSharing": "在应用共享设置中更改",
+        "emptyTitle": "此处尚无人具有访问权限",
+        "emptyDescription": "在 {subject} 或更广的范围内授予角色，即可在此显示拥有者及其来源。",
+        "grant": "授予访问权限",
+        "removeTitle": "从 {name} 撤销 {role}？",
+        "removeGeneric": "撤销访问权限？",
+        "inherited": "此授权位于 {kind} {name}，而非 {subject}。撤销会在来源及其影响的所有范围内移除此权限。",
+        "direct": "他们将失去此授权在 {subject} 上提供的访问权限。",
+        "groupLoss": "组内所有成员都将失去此映射。",
+        "otherGrants": "其他授权仍然有效。",
+        "remove": "撤销",
+        "removed": "已撤销 {role}",
+        "removeFailed": "无法撤销访问权限。",
+        "refreshWarning": "访问权限已撤销，但无法刷新视图。请刷新以查看最新数据。",
+        "accessName": "访问权限",
+        "unavailable": "无法确认访问权限列表。请重试以加载最新数据。",
+        "notRemovable": "无法在此撤销此来源。",
+        "noTarget": "当前目标不可用。",
+        "group": "IdP 组",
+        "groupCount": "{count, plural, one {IdP 组 · # 位成员} other {IdP 组 · # 位成员}}",
+        "sourceLabels": {
+          "USER_BINDING": "授权",
+          "GROUP_BINDING": "组授权",
+          "GROUP_MAPPING": "组映射",
+          "TEAM_SHARE": "团队共享"
+        }
       }
     },
     "settings": {
@@ -5458,6 +5497,15 @@
       "rolesFailed": "无法加载可用角色。",
       "rolesRetry": "重新加载角色",
       "accepted": "角色分配已接受，但无法获取结果摘要。"
+    },
+    "access": {
+      "subject": "团队 {name}",
+      "reaches": "适用范围",
+      "description": "团队范围包括这些项目及其应用。访问权限还取决于角色和策略。",
+      "emptyTitle": "尚无项目",
+      "emptyDescription": "之后在此团队下创建的项目也包含在团队范围内。",
+      "unavailable": "无法确认项目列表。请重试以加载最新数据。",
+      "retry": "重试"
     }
   },
   "apiKeys": {

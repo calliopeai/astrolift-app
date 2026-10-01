@@ -3,7 +3,7 @@ import fr from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { useLocalListState } from "@/components/list/use-list-state";
-import { ENTITY_ACCESS_LIST } from "@/components/screens/administration/access/entity-access";
+import { localizedEntityAccessList } from "@/components/screens/administration/access/entity-access";
 import { entityAccessProps } from "@/components/screens/administration/access/principal.fixtures";
 
 import { TeamAccessPanel } from "./TeamAccessPanel";
@@ -28,11 +28,13 @@ export default meta;
 type Story = StoryObj;
 
 function Access() {
-  const list = useLocalListState(ENTITY_ACCESS_LIST);
+  const t = useTranslations("shared.access.entityPanel"),
+    teamT = useTranslations("teams.access");
+  const list = useLocalListState(localizedEntityAccessList(t));
   return (
     <TeamAccessPanel
       slug="platform"
-      access={{ list, ...entityAccessProps() }}
+      access={{ list, ...entityAccessProps({ subject: teamT("subject", { name: "platform" }) }) }}
       reach={{ projects: PROJECTS, loading: false, error: null, onRetry: () => {} }}
     />
   );

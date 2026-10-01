@@ -365,3 +365,51 @@ reach summary are the separate next leaf. Other principal-page callers retain
 existing presentation defaults; Team opts into translated recovery labels and
 cached-refresh error display. Root's frozen Members/anonymization source is
 untouched.
+
+
+## Connected Team access and grant removal
+
+Team reach now uses genuine all-eight `teams.access` copy and the actual project
+read/retry. Cached project failures stay visible beside literal project rows;
+an unconfirmed reach read supplies no confirmed count. Scope guidance explains
+that a team's projects/apps are in its scope while role and policy still decide
+access. The route supplies a translated team subject without rewriting the team
+slug or the exact target GUID.
+
+The connected shared EntityAccessPanel/list/removal hook uses additive
+`shared.access.entityPanel` copy: columns/search/source nouns, group counts,
+expiry fallback, empty guidance, inherited/group blast radius, confirm and
+feedback. Custom/system role metadata, scope identifiers, technical share levels,
+unknown source labels and request arguments remain literal. Known source labels
+are translated through an exact enum-key mapping; unknown sources are not
+misrepresented as app shares. The optional group-detail presentation callback
+preserves the pure helper's existing behavior for other callers.
+
+Refused revoke/mapping replies trigger no refetch and preserve the raw error and
+open confirmation. Accepted replies refresh active queries with their existing
+variables; failed refreshes warn while keeping the committed removal successful.
+Neither missing/null reads nor transport errors appear as a healthy empty list.
+Retries execute the actual current source query and consume its rejection while
+the query state retains the diagnostic. Query.previousData is no longer carried
+across target changes: current query cache can remain visible during a same-target
+refresh, but the new target cannot display or remove the prior target's rows.
+An open confirm requires its row to be present in the current result and the
+existing management decision; unknown/nonremovable sources do not invent a
+role-binding write. Backend target/grant checks remain authoritative.
+
+Real HttpLink tests cover both actual removal operations in every locale with
+click/keyboard confirmation, complete inherited/group guidance, exact mutation
+IDs and current active refetch variables, transport/fallback/refusal/committed
+refresh outcomes, deferred target changes, null/failed reads and real retries.
+Locale changes retain open target identity. All-eight ICU and SSR/hydration
+checks preserve raw role/group/project metadata and explicit request-timezone
+dates. Portable shared/Team access stories cover translated, failure and removal
+states. Team detail/member and existing feedback/polling checks remain green.
+
+Team list/create/edit/delete, detail, member assignment and this access surface
+now have connected locale coverage; #2145 remains open for other uncompleted
+surfaces. Existing capped/flat team/member/project read contracts are unchanged;
+this work adds no pagination API, authority promise, schema or backend change.
+Other shared-panel callers' supplied literal subject descriptions and other
+principal screens remain their own translation boundaries. Root's frozen
+Members/anonymization source and current release are untouched.

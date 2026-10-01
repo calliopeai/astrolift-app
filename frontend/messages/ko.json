@@ -4518,6 +4518,45 @@
         "loadingRoles": "역할 불러오는 중…",
         "unknownRoles": "역할이 아직 확인되지 않았습니다.",
         "emptyRoles": "이 목록에 사용할 수 있는 역할이 없습니다."
+      },
+      "entityPanel": {
+        "label": "접근 권한",
+        "who": "대상",
+        "role": "역할",
+        "source": "출처",
+        "expires": "만료",
+        "never": "없음",
+        "share": "공유: {level}",
+        "search": "사용자, 그룹, 팀 및 역할 검색…",
+        "all": "전체",
+        "removeMapping": "이 그룹 매핑 삭제",
+        "removeGrant": "이 권한 부여 삭제",
+        "appSharing": "앱 공유 설정에서 변경",
+        "emptyTitle": "아직 접근 권한을 가진 대상이 없습니다",
+        "emptyDescription": "{subject} 또는 상위 범위에서 역할을 부여하면 보유 대상과 출처가 표시됩니다.",
+        "grant": "접근 권한 부여",
+        "removeTitle": "{name}에서 {role}을 삭제할까요?",
+        "removeGeneric": "접근 권한을 삭제할까요?",
+        "inherited": "이 권한은 {subject}가 아닌 {kind} {name}에 부여되어 있습니다. 삭제하면 출처와 영향을 받는 모든 범위에서 제거됩니다.",
+        "direct": "이 권한이 제공하는 {subject} 접근 권한을 잃습니다.",
+        "groupLoss": "그룹의 모든 구성원이 이 매핑을 잃습니다.",
+        "otherGrants": "다른 권한 부여는 계속 적용됩니다.",
+        "remove": "삭제",
+        "removed": "{role}을 삭제했습니다",
+        "removeFailed": "접근 권한을 삭제하지 못했습니다.",
+        "refreshWarning": "접근 권한은 삭제되었지만 화면을 새로 고치지 못했습니다. 최신 데이터를 다시 불러오세요.",
+        "accessName": "접근 권한",
+        "unavailable": "접근 권한 목록을 확인하지 못했습니다. 다시 시도하여 최신 데이터를 불러오세요.",
+        "notRemovable": "이 출처는 여기서 삭제할 수 없습니다.",
+        "noTarget": "현재 대상을 확인할 수 없습니다.",
+        "group": "IdP 그룹",
+        "groupCount": "{count, plural, one {IdP 그룹 · 구성원 #명} other {IdP 그룹 · 구성원 #명}}",
+        "sourceLabels": {
+          "USER_BINDING": "권한 부여",
+          "GROUP_BINDING": "그룹 권한 부여",
+          "GROUP_MAPPING": "그룹 매핑",
+          "TEAM_SHARE": "팀 공유"
+        }
       }
     },
     "settings": {
@@ -5458,6 +5497,15 @@
       "rolesFailed": "사용 가능한 역할을 불러오지 못했습니다.",
       "rolesRetry": "역할 다시 불러오기",
       "accepted": "역할 할당은 수락되었지만 결과 요약을 확인할 수 없습니다."
+    },
+    "access": {
+      "subject": "팀 {name}",
+      "reaches": "적용 범위",
+      "description": "팀 범위에는 이 프로젝트와 앱이 포함됩니다. 접근 권한은 역할과 정책에도 영향을 받습니다.",
+      "emptyTitle": "아직 프로젝트가 없습니다",
+      "emptyDescription": "이 팀 아래에 나중에 생성되는 프로젝트도 팀 범위에 포함됩니다.",
+      "unavailable": "프로젝트 목록을 확인하지 못했습니다. 다시 시도하여 최신 데이터를 불러오세요.",
+      "retry": "다시 시도"
     }
   },
   "apiKeys": {

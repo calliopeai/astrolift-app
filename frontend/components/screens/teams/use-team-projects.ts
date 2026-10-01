@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useQuery } from "@apollo/client/react";
 
 import { LIST_PROJECTS } from "@/graphql/identity/identity.queries";
@@ -11,16 +12,22 @@ import type { AstroliftProject } from "@/graphql/identity/identity.types";
  * this is usually a cache read of the one the nav already made.
  */
 export function useTeamProjects(slug: string) {
+  const t = useTranslations("teams.access");
   const { data, loading, error, refetch } = useQuery<{ astroliftProjects: AstroliftProject[] }>(
-    LIST_PROJECTS
+    LIST_PROJECTS,
+    { fetchPolicy: "cache-first" }
   );
   const projects = (data?.astroliftProjects ?? []).filter((p) => p.team.slug === slug);
   return {
     projects,
     loading: loading && !data,
-    error: error && !data ? { message: error.message } : null,
+    error: error
+      ? { message: error.message }
+      : !loading && data?.astroliftProjects == null
+        ? { message: t("unavailable") }
+        : null,
     onRetry: () => {
-      void refetch();
+      void refetch().catch(() => {});
     },
   };
 }
