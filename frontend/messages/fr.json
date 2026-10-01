@@ -2596,6 +2596,12 @@
         "environments": "Environnements",
         "domains": "Domaines",
         "dangerZone": "Zone de danger"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} a été supprimée",
+        "failed": "La suppression a échoué",
+        "refreshWarning": "{slug} a été supprimée, mais la liste des applications n’a pas pu être actualisée. Actualisez-la pour voir les données actuelles.",
+        "navigationWarning": "{slug} a été supprimée, mais la navigation a échoué. Ouvrez Applications pour continuer."
       }
     },
     "settingsTab": {

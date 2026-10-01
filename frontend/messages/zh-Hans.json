@@ -2596,6 +2596,12 @@
         "environments": "环境",
         "domains": "域名",
         "dangerZone": "危险操作"
+      },
+      "deleteFeedback": {
+        "deleted": "已删除 {slug}",
+        "failed": "删除应用失败",
+        "refreshWarning": "已删除 {slug}，但无法刷新应用列表。请刷新以查看最新数据。",
+        "navigationWarning": "已删除 {slug}，但页面跳转失败。请打开应用列表以继续。"
       }
     },
     "settingsTab": {

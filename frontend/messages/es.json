@@ -2596,6 +2596,12 @@
         "environments": "Entornos",
         "domains": "Dominios",
         "dangerZone": "Zona de peligro"
+      },
+      "deleteFeedback": {
+        "deleted": "Se ha eliminado {slug}",
+        "failed": "No se pudo eliminar la aplicación",
+        "refreshWarning": "Se ha eliminado {slug}, pero no se pudo actualizar la lista de aplicaciones. Actualízala para ver los datos actuales.",
+        "navigationWarning": "Se ha eliminado {slug}, pero no se pudo cambiar de página. Abre Aplicaciones para continuar."
       }
     },
     "settingsTab": {

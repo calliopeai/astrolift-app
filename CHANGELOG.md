@@ -40,6 +40,10 @@
   readiness. Legacy ambiguous handles refuse unchanged; retained-data/Capture
   limits and exact hub-scoped Sender/Receiver grants remain explicit (#2032, #2098).
 
+- Localize app-frame delete feedback in all eight locales. Preserve accepted
+  soft deletion through failed Apps refresh or navigation; refused writes retain
+  their confirmation and exact diagnostics (#2145, bounded item 5 flow).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

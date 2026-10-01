@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -38,6 +38,7 @@ interface WorkloadsResp {
  */
 export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
   const router = useRouter();
+  const client = useApolloClient();
   const pathname = usePathname() ?? "";
   const tDetail = useTranslations("apps.detail");
   const tFrame = useTranslations("apps.frame");
@@ -59,10 +60,7 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
   });
   const [softDelete, { loading: deleting }] = useMutation<{
     softDeleteApp: MutationResult<{ id: string; deleted: boolean }>;
-  }>(SOFT_DELETE_APP, {
-    refetchQueries: [{ query: LIST_APPS }],
-    awaitRefetchQueries: true,
-  });
+  }>(SOFT_DELETE_APP);
   const archive = useArchiveApp(slug);
 
   const a = appQ.data?.astroliftApp ?? null;
@@ -117,15 +115,40 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
     }
   }
 
-  /** Throws on failure so the confirm dialog stays open and shows it. */
+  /** Failed/refused writes keep confirmation open; later failures retain acceptance. */
   async function onDelete() {
     if (!a) return;
-    const { data } = await softDelete({ variables: { input: { id: a.id } } });
-    if (data?.softDeleteApp.ok) {
-      toast.success(`Deleted ${a.slug}`);
+    const deletedSlug = a.slug;
+    let data;
+    try {
+      ({ data } = await softDelete({ variables: { input: { id: a.id } } }));
+    } catch (error) {
+      throw new Error(
+        error instanceof Error && error.message
+          ? error.message
+          : typeof error === "string" && error
+            ? error
+            : tFrame("deleteFeedback.failed")
+      );
+    }
+    if (!data?.softDeleteApp.ok)
+      throw new Error(data?.softDeleteApp.errors?.[0]?.message || tFrame("deleteFeedback.failed"));
+    toast.success(tFrame("deleteFeedback.deleted", { slug: deletedSlug }));
+    function warn(key: "refreshWarning" | "navigationWarning", error: unknown) {
+      toast.warning(tFrame(`deleteFeedback.${key}`, { slug: deletedSlug }), {
+        description:
+          error instanceof Error ? error.message : typeof error === "string" ? error : undefined,
+      });
+    }
+    try {
+      await client.query({ query: LIST_APPS, fetchPolicy: "network-only" });
+    } catch (error) {
+      warn("refreshWarning", error);
+    }
+    try {
       router.push("/apps");
-    } else {
-      throw new Error(data?.softDeleteApp.errors?.[0]?.message ?? "Delete failed");
+    } catch (error) {
+      warn("navigationWarning", error);
     }
   }
 

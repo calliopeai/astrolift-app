@@ -531,6 +531,12 @@
         "environments": "Environments",
         "domains": "Domains",
         "dangerZone": "Danger zone"
+      },
+      "deleteFeedback": {
+        "deleted": "Deleted {slug}",
+        "failed": "Delete failed",
+        "refreshWarning": "Deleted {slug}, but the Apps list could not be refreshed. Refresh to see current data.",
+        "navigationWarning": "Deleted {slug}, but navigation failed. Open Apps to continue."
       }
     },
     "common": {

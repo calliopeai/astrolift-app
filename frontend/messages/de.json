@@ -2596,6 +2596,12 @@
         "environments": "Umgebungen",
         "domains": "Domains",
         "dangerZone": "Gefahrenbereich"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} wurde gelöscht",
+        "failed": "Löschen fehlgeschlagen",
+        "refreshWarning": "{slug} wurde gelöscht, aber die App-Liste konnte nicht aktualisiert werden. Aktualisiere sie, um die aktuellen Daten zu sehen.",
+        "navigationWarning": "{slug} wurde gelöscht, aber die Navigation ist fehlgeschlagen. Öffne Apps, um fortzufahren."
       }
     },
     "settingsTab": {

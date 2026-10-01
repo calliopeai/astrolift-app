@@ -789,3 +789,33 @@ installation or live request was performed.
 This completes this card within original item 13, not the whole item. Retention,
 environment overrides, managed-service administration, agent-mode resync and
 remaining operational-hook feedback are separate connected translation gaps.
+
+## Connected app-frame delete feedback
+
+The remaining `useAppFrame` delete success/fallback strings use four additive
+`apps.frame.deleteFeedback` keys in all eight locales. Slugs, IDs and provider,
+transport, refresh and navigation diagnostics remain literal. The existing
+`SOFT_DELETE_APP` document, `{ input: { id } }` payload, `app.delete` visibility
+gate, confirmation and `/apps` navigation request remain intact.
+
+A refused or failed mutation keeps confirmation open, retains its diagnostic and
+runs no Apps-list refresh or navigation. An `ok: true` response reports the
+accepted soft deletion, then reads the same `LIST_APPS` query over the network.
+Refresh failure produces a localized warning and still requests navigation;
+synchronous navigation failure produces its own localized warning. Both retain
+the accepted write and close confirmation, without issuing a second delete. The
+warning description keeps any actual diagnostic. The pending confirmation
+remains disabled until the write and its follow-up settle.
+
+The six focused files pass 149 checks: 72 real schema-validated HttpLink/frame
+cases across all eight locales, eight ICU/key-contract cases, 23 portable
+AppFrame story checks and 46 existing detail/chrome/polling regressions. Portable
+components use the actual project decorators and RTL-owned cleanup. Catalogue
+comparison to `ec1abcd6` confirms exactly four new leaves per locale and no
+changes outside this subtree. TypeScript, scoped ESLint and formatting pass.
+
+This proves the displayed API acceptance and local follow-up boundaries. It
+does not establish downstream workload teardown, completed browser navigation,
+provider deletion or new lifecycle authority. Archive/restore, other app-frame
+feedback, API/backend/schema and other catalogue subtrees are outside this leaf;
+#2145 remains open for its remaining surfaces. No production or cloud call ran.

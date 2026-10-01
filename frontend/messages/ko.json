@@ -2596,6 +2596,12 @@
         "environments": "환경",
         "domains": "도메인",
         "dangerZone": "위험한 작업"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug}을(를) 삭제했습니다",
+        "failed": "앱을 삭제하지 못했습니다",
+        "refreshWarning": "{slug}을(를) 삭제했지만 앱 목록을 새로 고치지 못했습니다. 최신 데이터를 보려면 새로 고쳐 주세요.",
+        "navigationWarning": "{slug}을(를) 삭제했지만 페이지를 이동하지 못했습니다. 계속하려면 앱 목록을 여세요."
       }
     },
     "settingsTab": {

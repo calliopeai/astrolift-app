@@ -2596,6 +2596,12 @@
         "environments": "環境",
         "domains": "ドメイン",
         "dangerZone": "危険な操作"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} を削除しました",
+        "failed": "アプリを削除できませんでした",
+        "refreshWarning": "{slug} を削除しましたが、アプリ一覧を更新できませんでした。最新のデータを表示するには更新してください。",
+        "navigationWarning": "{slug} を削除しましたが、ページを移動できませんでした。続行するにはアプリ一覧を開いてください。"
       }
     },
     "settingsTab": {

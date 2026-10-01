@@ -2596,6 +2596,12 @@
         "environments": "Ambientes",
         "domains": "Domínios",
         "dangerZone": "Zona de perigo"
+      },
+      "deleteFeedback": {
+        "deleted": "{slug} foi excluído",
+        "failed": "Não foi possível excluir o aplicativo",
+        "refreshWarning": "{slug} foi excluído, mas não foi possível atualizar a lista de aplicativos. Atualize-a para ver os dados atuais.",
+        "navigationWarning": "{slug} foi excluído, mas a navegação falhou. Abra Aplicativos para continuar."
       }
     },
     "settingsTab": {
