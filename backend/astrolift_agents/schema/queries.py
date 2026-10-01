@@ -34,6 +34,7 @@ from astrolift_agents.models import (
     AgentInteraction,
     AgentSecretBundleRef,
     AgentTask,
+    AgentTaskCallbackPolicy,
     AgentTaskEvent,
     AgentTaskInputMessage,
     Brief,
@@ -62,6 +63,7 @@ from astrolift_agents.schema.types import (
     AgentSecretStatusType,
     AgentTaskBacklogItemType,
     AgentTaskBacklogType,
+    AgentTaskCallbackPolicyType,
     AgentTaskEventType,
     AgentTaskInputMessageType,
     AgentTaskLogPageType,
@@ -798,6 +800,25 @@ def _slice_page(rows: list, page: int | None, page_size: int | None) -> tuple[li
 @strawberry.type
 class AgentsQuery:
     @strawberry.field
+    @require_permission(Permission.ORG_READ, scope=agent_org_scope)
+    @tenant_scoped()
+    def agent_task_callback_policy(self, info: Info) -> AgentTaskCallbackPolicyType:
+        from astrolift_identity.api_tokens import get_current_api_token
+        from core.permissions import PermissionDenied, PermissionScope, ScopeKind
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant is not None else None
+        token = get_current_api_token()
+        if token is not None and (token.organization_id != org_id or token.team_id is not None):
+            raise PermissionDenied(
+                Permission.ORG_READ,
+                PermissionScope(kind=ScopeKind.ORG, id=org_id),
+                "callback policy reads require an organization-scoped credential",
+            )
+        policy = AgentTaskCallbackPolicy.objects.filter(organization_id=org_id).first()
+        return AgentTaskCallbackPolicyType(allowed_hosts=policy.allowed_hosts if policy else [])
+
+    @strawberry.field
     @require_permission(Permission.AGENT_DISPATCH, any_scope=True)
     @tenant_scoped()
     def agent_quarantines(self, info: Info) -> list[AgentQuarantineType]:
@@ -1125,6 +1146,7 @@ class AgentsQuery:
             "agent_definition",
             "dispatcher",
             "dispatcher__tenant_cluster",
+            "completion_callback",
         ).order_by("-created_at")[:200]
         return agent_tasks_to_types(qs)
 
@@ -1158,6 +1180,7 @@ class AgentsQuery:
                 "agent_definition",
                 "dispatcher",
                 "dispatcher__tenant_cluster",
+                "completion_callback",
             )
             .order_by("-started_at", "-created_at")[:200]
         )
@@ -1186,6 +1209,7 @@ class AgentsQuery:
                 "agent_definition",
                 "dispatcher",
                 "dispatcher__tenant_cluster",
+                "completion_callback",
             )
             .first()
         )
@@ -1235,6 +1259,7 @@ class AgentsQuery:
             "agent_definition",
             "dispatcher",
             "dispatcher__tenant_cluster",
+            "completion_callback",
         ).order_by("updated_at")[:capped]
         return agent_tasks_to_types(qs)
 
@@ -2105,7 +2130,12 @@ class AgentsQuery:
                 )
             )
         qs = qs.select_related(
-            "organization", "project", "agent_definition", "dispatcher", "dispatcher__tenant_cluster"
+            "organization",
+            "project",
+            "agent_definition",
+            "dispatcher",
+            "dispatcher__tenant_cluster",
+            "completion_callback",
         )
         page = keyset_page(
             qs,

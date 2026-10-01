@@ -82,6 +82,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # Webhook subscription surfaces.
     "webhooks.subscribe",
     "webhooks.secret_rotation",
+    "agents.completion_callbacks",
+    "agents.completion_callback_redelivery",
     # Notifications.
     "notifications.in_app",
     "notifications.email",
