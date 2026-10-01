@@ -8,7 +8,9 @@ test("agent replicas and zero concurrency are visible before a save", async ({ p
   await expect(page.getByRole("spinbutton", { name: "Concurrency cap" })).toHaveValue("0");
 });
 
-test("ingress reconciliation shows busy progress while its request is pending", async ({ page }) => {
+test("ingress reconciliation shows busy progress while its request is pending", async ({
+  page,
+}) => {
   await page.goto("/iframe.html?id=screens-clusters-settings-ingressauth--saving&viewMode=story");
   const reconcile = page.getByRole("button", { name: "Reconcile cluster Ingresses", exact: true });
   await expect(reconcile).toBeDisabled();
