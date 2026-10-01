@@ -5926,5 +5926,58 @@
         "EXTERNAL_PROVIDER": "Provedor externo"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "Administração",
+      "clusters": "Clusters",
+      "notFound": "Cluster não encontrado",
+      "tabsAria": "Abas do cluster",
+      "inactive": "inativo",
+      "lifecycle": {
+        "registered": "Registrado",
+        "managing": "Configurando gerenciamento…",
+        "managed": "Gerenciado",
+        "error": "Erro"
+      },
+      "tabs": {
+        "overview": "Visão geral",
+        "status": "Estado",
+        "health": "Integridade",
+        "activity": "Atividade",
+        "settings": "Configurações"
+      },
+      "functions": {
+        "organization": "Organização",
+        "access": "Acesso",
+        "projects": "Projetos",
+        "clusters": "Clusters",
+        "domains": "Domínios",
+        "providers": "Provedores",
+        "webhooks": "Webhooks",
+        "metrics": "Métricas",
+        "tokens": "Chaves de API",
+        "audit": "Auditoria",
+        "run-audit": "Execuções",
+        "features": "Funcionalidades",
+        "activity": "Atividade da plataforma",
+        "alerts": "Alertas",
+        "events": "Eventos",
+        "logs": "Logs",
+        "traces": "Rastreamentos",
+        "operations": "Operações"
+      }
+    },
+    "unregister": {
+      "action": "Cancelar registro",
+      "title": "Cancelar o registro do cluster {slug}?",
+      "titleEmpty": "Cancelar o registro do cluster?",
+      "description": "Retira o registro deste cluster do plano de controle. Primeiro, os apps ativos devem ser realocados e as implantações de modelos compartilhados removidas. Isso não desativa a infraestrutura em execução nem apaga os registros preservados.",
+      "accepted": "Registro do cluster {slug} cancelado.",
+      "failed": "Não foi possível cancelar o registro do cluster",
+      "refreshWarning": "O cancelamento foi aceito, mas uma leitura relacionada não pôde ser atualizada. Tente ler novamente para verificar o estado atual.",
+      "navigationWarning": "O cancelamento foi aceito, mas a navegação para a lista de clusters falhou. Abra a lista manualmente.",
+      "sourceChanged": "O cluster revisado ou a origem visível mudou. Revise o destino atual antes de agir."
+    }
   }
 }

@@ -666,3 +666,85 @@ provider-user identity. The separate deduplicated backend follow-up is
 [APP #2225](https://github.com/calliopeai/astrolift-app/issues/2225). This card is a
 bounded #2145 leaf, not closure of the remaining cluster header/tab/bootstrap,
 lifecycle or other untranslated settings surfaces.
+
+## Shared cluster header and navigation
+
+ClusterHeader/ClusterTabs now use 32 genuine `clusters.chrome` messages in all
+eight locales, including their tab/aria labels, known lifecycle descriptions,
+inactive/default missing copy and breadcrumb switcher presentation. The pure
+localizedClusterCrumbs factory is opt-in: the existing static clusterCrumbs,
+list declarations and route/active-tab predicates retain their contracts.
+Names, slugs, regions, provider identities, unknown lifecycle values and future
+navigation labels stay literal. Caller-supplied emptyTitle, primaryAction and
+menu nodes retain their meaning and authority; this header supplies none.
+
+Focused proof covers actual ClusterSettingsClient/GetCluster Apollo HttpLink
+journeys in every locale for all four known lifecycle values. Existing failed
+read versus confirmed-null titles, cached failed-read recovery/current Retry,
+changed observed targets and permission-fenced cards remain intact. Keyboard
+breadcrumb/tab navigation preserves exact hrefs and active marks. ICU parity,
+locale changes, SSR hydration, literal future metadata and 15 portable header/
+tab stories accompany the existing cluster list-variable/declaration tests.
+There are 120 passing focused checks, with TypeScript, scoped ESLint and source
+formatting green. Existing locale trees outside this additive subtree match the
+signed base exactly; query/schema, read/mutation hooks and sibling cards are
+unchanged. No live requests or new permissions are introduced.
+
+This bounded chrome leaf does not close #2145. Remaining connected English
+includes lifecycle action/confirmation/outcome copy in list/detail/settings and
+their mutation hooks, bootstrap recipe and history/release tables, cluster status
+bodies and ClusterTabFrame recovery copy. Their existing mutation acceptance,
+refresh-failure, target-review and recipe source-state risks require separate
+bounded work; no semantic changes to those paths are claimed here.
+
+## Bounded list/detail cluster-unregistration flow
+
+ClustersList/ClusterDetail unregister entries, confirmations and their exact
+useClusterActions outcome path use nine genuine `clusters.unregister` messages
+in all eight locales. Literal GUID/slug inputs, provider diagnostics, permissions,
+query variables and sibling Bring/Refresh actions retain their contracts.
+Unregistration wording describes registration retirement and existing app/model
+cleanup guards, without promising infrastructure destruction or record erasure.
+
+The unconditional awaited refresh previously could turn an accepted unregister
+into a displayed write failure or refresh even a refused write. This flow now
+refreshes only accepted envelopes through the shared committed-write feedback
+helper; original refusal/transport messages and reviews remain intact. Accepted
+writes survive refresh/navigation exceptions. Visible-row/permission/list-context
+review leases discard old selections and callbacks after replacement, withdrawal
+or source ABA; late completion cannot close a newer review or navigate another
+detail route. Locale changes alone preserve the reviewed target. No server
+immutable incarnation/version precondition is introduced.
+
+Proof: 223 checks pass across actual ClustersClient and ClusterDetailClient
+schema-validated HttpLink journeys in all eight locales, refusal/transport/fallback
+and retry, accepted-read/navigation failures, exact target inputs/active query
+variables, Cancel/no read or write, permission/identity withdrawal, stale callbacks,
+late completion, locale/ICU and SSR hydration. Thirty portable list/detail stories
+include connected refusal plays; nine existing cluster declaration/list-variable
+checks remain green. TypeScript, scoped ESLint and formatting pass. Source schema,
+typed documents, frozen chrome and catalogue values outside the additive owned
+subtree are preserved.
+
+This closes only the unregister action flow. Bring/Refresh/force-preflight,
+settings decommissioning, general list/detail labels and read-state gaps,
+bootstrap recipe/history, status bodies and other untranslated cluster settings
+remain separate #2145 boundaries. No backend/cloud actions or full-suite proof
+are claimed for this leaf.
+
+## Reviewed auth-user source and subject preconditions (#2225)
+
+The subsequent #2225 contract adds authoritative nullable provider pool/source
+proof and immutable provider-user subjects to the connected inventory and
+optional expected-target fields to all seven existing writes. The web hook sends
+literal observed proofs, includes source revision in its source lease, and
+refuses missing proof. The view retains observations while disabling source/user
+operations with unknown proof; unknown identity is not reported as a failed read.
+Existing presentation keys cover these states in all eight locales; no locale
+catalogue or sibling settings changes are needed.
+
+The original 440-check presentation proof above describes its frozen source.
+The extended schema-validated HttpLink/portable/card proof includes unknown
+source/user identity and exact expected-source/subject envelopes in every locale.
+Provider-side conditional CAS remains unsupported; see
+[reviewed-target operator contract](../operators/cluster-auth-user-preconditions.md).

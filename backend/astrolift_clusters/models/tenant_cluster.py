@@ -287,6 +287,26 @@ class TenantCluster(NamedBaseCoreModel):
         ),
     )
 
+    def save(self, *args, **kwargs):
+        fields = kwargs.get("update_fields")
+        # Partial source writes must persist the revision used by reviewed actions.
+        if fields is not None and set(fields) & {
+            "organization_id",
+            "deleted_at",
+            "alb_auth_config",
+            "region",
+            "auth_method",
+            "auth_config",
+            "oidc_auth_config",
+            "is_active",
+            "provider_plugin",
+            "provider_config",
+            "organization",
+            "provider_plugin_id",
+        }:
+            kwargs["update_fields"] = set(fields) | {"version", "updated_at"}
+        return super().save(*args, **kwargs)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

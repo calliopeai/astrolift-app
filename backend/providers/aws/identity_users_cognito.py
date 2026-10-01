@@ -8,8 +8,12 @@ on that pool only.
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
 
 from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.identity_users import IdentityUser, IdentityUsersError
@@ -46,6 +50,28 @@ class CognitoIdentityUsersDriver:
     def __init__(self, config: CognitoUsersConfig, client: Any = None) -> None:
         self._config = config
         self._client = client
+        self._before_write: Callable[[], None] | None = None
+
+    @contextmanager
+    def guard_writes(self, before_write: Callable[[], None]) -> Iterator[None]:
+        previous = self._before_write
+        self._before_write = before_write
+        try:
+            yield
+        finally:
+            self._before_write = previous
+
+    @property
+    def pool_id(self) -> str:
+        return self._config.pool_id
+
+    def verify_user(self, *, username: str, expected_user_id: str) -> None:
+        if not expected_user_id:
+            raise IdentityUsersError("The reviewed provider user identity is unknown.")
+        raw = self._call("admin_get_user", Username=username)
+        actual = _attr(raw, "sub")
+        if not expected_user_id or not actual or actual != expected_user_id or raw.get("Username") != username:
+            raise IdentityUsersError("The reviewed provider user has changed or its identity is unknown.")
 
     # ---- plumbing ------------------------------------------------------
 
@@ -55,6 +81,13 @@ class CognitoIdentityUsersDriver:
         return self._client
 
     def _call(self, method: str, **kwargs: Any) -> Any:
+        if self._before_write is not None and method not in {
+            "list_users",
+            "list_groups",
+            "admin_get_user",
+            "admin_list_groups_for_user",
+        }:
+            self._before_write()
         try:
             return getattr(self._idp(), method)(UserPoolId=self._config.pool_id, **kwargs)
         except Exception as exc:  # botocore ClientError and friends
@@ -76,6 +109,7 @@ class CognitoIdentityUsersDriver:
             status=str(raw.get("UserStatus") or ""),
             created_at=raw.get("UserCreateDate"),
             groups=groups,
+            provider_user_id=_attr(raw, "sub") or None,
         )
 
     def _groups_of(self, username: str) -> tuple[str, ...]:
@@ -119,9 +153,14 @@ class CognitoIdentityUsersDriver:
             kwargs["MessageAction"] = "SUPPRESS"
         created = self._call("admin_create_user", **kwargs).get("User") or {}
         username = str(created.get("Username") or email)
+        subject = _attr(created, "sub")
         if password and permanent:
+            if self._before_write is not None:
+                self.verify_user(username=username, expected_user_id=subject)
             self.set_password(username=username, password=password, permanent=True)
         for group in groups:
+            if self._before_write is not None:
+                self.verify_user(username=username, expected_user_id=subject)
             self.add_to_group(username=username, group=group)
         return self._user(created, tuple(sorted(groups)))
 

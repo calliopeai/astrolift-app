@@ -6006,5 +6006,58 @@
         "EXTERNAL_PROVIDER": "External provider"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "Admin",
+      "clusters": "Clusters",
+      "notFound": "Cluster not found",
+      "tabsAria": "Cluster tabs",
+      "inactive": "inactive",
+      "lifecycle": {
+        "registered": "Registered",
+        "managing": "Managing…",
+        "managed": "Managed",
+        "error": "Error"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "status": "Status",
+        "health": "Health",
+        "activity": "Activity",
+        "settings": "Settings"
+      },
+      "functions": {
+        "organization": "Organization",
+        "access": "Access",
+        "projects": "Projects",
+        "clusters": "Clusters",
+        "domains": "Domains",
+        "providers": "Providers",
+        "webhooks": "Webhooks",
+        "metrics": "Metrics",
+        "tokens": "API keys",
+        "audit": "Audit",
+        "run-audit": "Runs",
+        "features": "Features",
+        "activity": "Platform activity",
+        "alerts": "Alerts",
+        "events": "Events",
+        "logs": "Logs",
+        "traces": "Traces",
+        "operations": "Operations"
+      }
+    },
+    "unregister": {
+      "action": "Unregister",
+      "title": "Unregister cluster {slug}?",
+      "titleEmpty": "Unregister cluster?",
+      "description": "Retires this cluster’s control-plane registration. Active apps must be reassigned and shared model deployments removed first. This does not decommission running infrastructure or erase retained records.",
+      "accepted": "Cluster {slug} unregistered.",
+      "failed": "Could not unregister the cluster",
+      "refreshWarning": "Unregistration was accepted, but a related read could not be refreshed. Retry the read to verify current state.",
+      "navigationWarning": "Unregistration was accepted, but navigation to the cluster list failed. Open the list manually.",
+      "sourceChanged": "The reviewed cluster or visible source changed. Review the current target before acting."
+    }
   }
 }

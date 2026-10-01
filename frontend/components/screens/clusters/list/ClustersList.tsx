@@ -11,6 +11,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -34,6 +35,7 @@ import { cn } from "@/lib/utils";
 
 import { clusterCrumbs, LIFECYCLE_LABEL, type Lifecycle, providerLabel } from "./clusters-list";
 import type { ClusterActions } from "./use-cluster-actions";
+import { useUnregisterReview } from "./use-unregister-review";
 import type { ClusterRow } from "./use-clusters-list";
 
 export type ClustersListProps = ClusterActions & {
@@ -228,8 +230,16 @@ export function ClustersList(props: ClustersListProps) {
     onUnregister,
   } = props;
   const fmt = useFormatters();
-  const [unregisterTarget, setUnregisterTarget] = React.useState<AstroliftTenantCluster | null>(
-    null
+  const t = useTranslations("clusters.unregister");
+  const unregister = useUnregisterReview(
+    rows,
+    JSON.stringify([
+      list.state.q,
+      list.filters,
+      list.state.sort,
+      list.state.page,
+      list.state.pageSize,
+    ])
   );
   const busy = bringing || refreshing || deleting;
 
@@ -370,11 +380,11 @@ export function ClustersList(props: ClustersListProps) {
         <Can permission="cluster.unregister">
           <DropdownMenuItem
             variant="destructive"
-            onSelect={() => setUnregisterTarget(c)}
+            onSelect={() => unregister.open(c)}
             disabled={busy}
           >
             <Trash2Icon className="size-4" />
-            Unregister
+            {t("action")}
           </DropdownMenuItem>
         </Can>
       </>
@@ -416,19 +426,14 @@ export function ClustersList(props: ClustersListProps) {
       />
 
       <ConfirmDialog
-        open={unregisterTarget !== null}
-        onOpenChange={(next) => {
-          if (!next) setUnregisterTarget(null);
-        }}
-        title={
-          unregisterTarget ? `Unregister cluster ${unregisterTarget.slug}?` : "Unregister cluster?"
-        }
-        description="Refused if any active app still targets this cluster. The cluster's kubeconfig and probed capabilities are removed from the control plane."
-        confirmLabel="Unregister"
+        key={unregister.key}
+        open={unregister.target !== null}
+        onOpenChange={unregister.onOpenChange}
+        title={unregister.target ? t("title", { slug: unregister.target.slug }) : t("titleEmpty")}
+        description={t("description")}
+        confirmLabel={t("action")}
         destructive
-        onConfirm={async () => {
-          if (unregisterTarget) await onUnregister(unregisterTarget);
-        }}
+        onConfirm={() => unregister.confirm(onUnregister)}
       />
     </>
   );

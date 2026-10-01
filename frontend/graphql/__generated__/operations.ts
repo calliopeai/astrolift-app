@@ -1788,11 +1788,18 @@ export type AstroliftCiWorkflowSyncStatusMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftClusterAuthSource = {
+  providerPluginId: Scalars['GUID']['output'];
+  providerPoolId: Scalars['String']['output'];
+  sourceVersion: Scalars['String']['output'];
+};
+
 export type AstroliftClusterAuthUser = {
   createdAt?: Maybe<Scalars['DateTime']['output']>;
   email: Scalars['String']['output'];
   enabled: Scalars['Boolean']['output'];
   groups: Array<Scalars['String']['output']>;
+  providerUserId?: Maybe<Scalars['String']['output']>;
   status: Scalars['String']['output'];
   username: Scalars['String']['output'];
 };
@@ -1819,6 +1826,7 @@ export type AstroliftClusterAuthUsers = {
   provider: Scalars['String']['output'];
   reachNote: Scalars['String']['output'];
   reason: Scalars['String']['output'];
+  source?: Maybe<AstroliftClusterAuthSource>;
   supported: Scalars['Boolean']['output'];
   users: Array<AstroliftClusterAuthUser>;
 };
@@ -5770,6 +5778,8 @@ export type CloudOrphanType = {
 
 export type ClusterAuthUserRefInput = {
   clusterId: Scalars['GUID']['input'];
+  expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
+  expectedUserId: InputMaybe<Scalars['String']['input']>;
   username: Scalars['String']['input'];
 };
 
@@ -5986,12 +5996,14 @@ export type CreateApiTokenInput = {
 export type CreateClusterAuthGroupInput = {
   clusterId: Scalars['GUID']['input'];
   description: Scalars['String']['input'];
+  expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
   name: Scalars['String']['input'];
 };
 
 export type CreateClusterAuthUserInput = {
   clusterId: Scalars['GUID']['input'];
   email: Scalars['String']['input'];
+  expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
   groups: Array<Scalars['String']['input']>;
   password: InputMaybe<Scalars['String']['input']>;
   permanent: Scalars['Boolean']['input'];
@@ -6359,6 +6371,12 @@ export type EntityType =
 
 export type EnvironmentByIdInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type ExpectedClusterAuthSourceInput = {
+  providerPluginId: Scalars['GUID']['input'];
+  providerPoolId: Scalars['String']['input'];
+  sourceVersion: Scalars['String']['input'];
 };
 
 export type ExportAppLogsInput = {
@@ -12253,18 +12271,24 @@ export type SetAppSubdomainInput = {
 export type SetClusterAuthUserEnabledInput = {
   clusterId: Scalars['GUID']['input'];
   enabled: Scalars['Boolean']['input'];
+  expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
+  expectedUserId: InputMaybe<Scalars['String']['input']>;
   username: Scalars['String']['input'];
 };
 
 export type SetClusterAuthUserGroupsInput = {
   add: Array<Scalars['String']['input']>;
   clusterId: Scalars['GUID']['input'];
+  expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
+  expectedUserId: InputMaybe<Scalars['String']['input']>;
   remove: Array<Scalars['String']['input']>;
   username: Scalars['String']['input'];
 };
 
 export type SetClusterAuthUserPasswordInput = {
   clusterId: Scalars['GUID']['input'];
+  expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
+  expectedUserId: InputMaybe<Scalars['String']['input']>;
   password: Scalars['String']['input'];
   permanent: Scalars['Boolean']['input'];
   username: Scalars['String']['input'];
@@ -13929,7 +13953,7 @@ export type ClusterAuthUsersQueryVariables = Exact<{
 }>;
 
 
-export type ClusterAuthUsersQuery = { astroliftClusterAuthUsers?: { supported: boolean, reason: string, provider: string, reachNote: string, groups: Array<string>, users: Array<{ username: string, email: string, enabled: boolean, status: string, createdAt?: string | null, groups: Array<string> }> } | null };
+export type ClusterAuthUsersQuery = { astroliftClusterAuthUsers?: { supported: boolean, reason: string, provider: string, reachNote: string, groups: Array<string>, source?: { providerPluginId: string, providerPoolId: string, sourceVersion: string } | null, users: Array<{ username: string, providerUserId?: string | null, email: string, enabled: boolean, status: string, createdAt?: string | null, groups: Array<string> }> } | null };
 
 export type CreateClusterAuthUserMutationVariables = Exact<{
   input: CreateClusterAuthUserInput;

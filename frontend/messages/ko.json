@@ -5926,5 +5926,58 @@
         "EXTERNAL_PROVIDER": "외부 공급자"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "관리",
+      "clusters": "클러스터",
+      "notFound": "클러스터를 찾을 수 없음",
+      "tabsAria": "클러스터 탭",
+      "inactive": "비활성",
+      "lifecycle": {
+        "registered": "등록됨",
+        "managing": "관리 설정 중…",
+        "managed": "관리됨",
+        "error": "오류"
+      },
+      "tabs": {
+        "overview": "개요",
+        "status": "상태",
+        "health": "건강 상태",
+        "activity": "활동",
+        "settings": "설정"
+      },
+      "functions": {
+        "organization": "조직",
+        "access": "접근",
+        "projects": "프로젝트",
+        "clusters": "클러스터",
+        "domains": "도메인",
+        "providers": "공급자",
+        "webhooks": "웹훅",
+        "metrics": "메트릭",
+        "tokens": "API 키",
+        "audit": "감사",
+        "run-audit": "실행",
+        "features": "기능",
+        "activity": "플랫폼 활동",
+        "alerts": "알림",
+        "events": "이벤트",
+        "logs": "로그",
+        "traces": "추적",
+        "operations": "작업"
+      }
+    },
+    "unregister": {
+      "action": "등록 해제",
+      "title": "클러스터 {slug}의 등록을 해제할까요?",
+      "titleEmpty": "클러스터 등록을 해제할까요?",
+      "description": "제어 영역에서 이 클러스터의 등록을 제거합니다. 먼저 활성 앱을 다른 클러스터로 옮기고 공유 모델 배포를 제거해야 합니다. 실행 중인 인프라를 종료하거나 보존된 기록을 지우지는 않습니다.",
+      "accepted": "클러스터 {slug}의 등록이 해제되었습니다.",
+      "failed": "클러스터 등록을 해제할 수 없습니다",
+      "refreshWarning": "등록 해제가 수락되었지만 관련 조회를 새로 고칠 수 없습니다. 조회를 다시 시도하여 현재 상태를 확인하세요.",
+      "navigationWarning": "등록 해제가 수락되었지만 클러스터 목록으로 이동하지 못했습니다. 목록을 직접 여세요.",
+      "sourceChanged": "검토한 클러스터 또는 표시된 정보의 출처가 변경되었습니다. 작업 전에 현재 대상을 검토하세요."
+    }
   }
 }

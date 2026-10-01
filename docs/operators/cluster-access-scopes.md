@@ -43,3 +43,28 @@ with real PostgreSQL RoleBindings in the shared two-team world, including
 selected sibling teams, project/foreign-org grants and bearer ceilings. The
 surface guardrail has no `#2108` gap exemptions. API fields and database schema
 are unchanged.
+
+## Unregistration review and feedback
+
+The list/detail unregister flow retains the exact `unregisterTenantCluster`
+input `{ id }`, CLUSTER_UNREGISTER organization/bearer checks and shared-cluster
+operator fence. The server refuses while active apps target the cluster or live
+cluster-owned shared model deployments remain. Move apps and deprovision shared
+models first. This mutation retires control-plane registration; it does not
+claim infrastructure decommissioning, physical credential erasure, or removal
+of retained records. Decommissioning remains a separate operation.
+
+Refusals retain the reviewed target and original diagnostic without triggering
+list/detail/legacy inventory reads. Only accepted envelopes refresh those
+existing queries with their original variables. Failed refreshes warn about the
+read without changing the accepted outcome. A detail-page navigation exception
+likewise reports acceptance and suggests opening the cluster list manually.
+An old accepted reply cannot navigate a newer route or close a newer review.
+
+Local reviews use the current visible GUID/slug/name/organization/provider/
+region/lifecycle/active snapshot and existing permission visibility. Withdrawn
+rows or authority, changed list context, observed replacements and A→B→A source
+transitions invalidate old callbacks. Cached same-target observations retain
+their current read behavior; changing locale alone preserves the review.
+These checks add no server immutable-incarnation/version precondition and do
+not establish identity or infrastructure state beyond the actual response.

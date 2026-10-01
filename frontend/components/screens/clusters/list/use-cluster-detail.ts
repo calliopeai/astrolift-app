@@ -1,6 +1,8 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
@@ -43,11 +45,34 @@ export function useClusterDetail(slug: string) {
   }, [lifecycle, startPolling, stopPolling]);
 
   const router = useRouter();
+  const t = useTranslations("clusters.unregister");
+  const routeLease = React.useMemo(() => ({ slug }), [slug]);
+  const currentRoute = React.useRef<{ lease: typeof routeLease; id: string | undefined } | null>({
+    lease: routeLease,
+    id: cluster?.id,
+  });
+  React.useLayoutEffect(() => {
+    currentRoute.current = { lease: routeLease, id: cluster?.id };
+    return () => {
+      currentRoute.current = null;
+    };
+  }, [routeLease, cluster?.id]);
   const actions = useClusterActions();
   // The cluster is gone once unregistered; land on the list it left.
   async function onUnregister(c: AstroliftTenantCluster) {
+    if (currentRoute.current?.lease !== routeLease || currentRoute.current.id !== c.id)
+      throw new Error(t("sourceChanged"));
     await actions.onUnregister(c);
-    router.push("/clusters");
+    if (
+      currentRoute.current?.lease !== routeLease ||
+      (currentRoute.current.id && currentRoute.current.id !== c.id)
+    )
+      return;
+    try {
+      router.push("/clusters");
+    } catch {
+      toast.warning(t("navigationWarning"));
+    }
   }
 
   return { slug, cluster, loading, ...actions, onUnregister };

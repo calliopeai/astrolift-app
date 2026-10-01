@@ -90,6 +90,12 @@ def _cluster(*, shared=False, discovery=COGNITO):
     return cluster, org
 
 
+def _actor():
+    from django.contrib.auth import get_user_model
+
+    return get_user_model().objects.create_user(username=f"actor-{uuid.uuid4().hex}")
+
+
 def _info(user=None):
     return SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=user), user=user))
 
@@ -98,7 +104,7 @@ def test_listing_returns_users_groups_and_what_a_user_can_reach(permission_resol
     permission_resolver.grant(Permission.CLUSTER_USERS)
     cluster, org = _cluster()
 
-    with tenant_context(TenantContext(organization_id=org.pk)):
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_actor().pk)):
         result = ClusterAuthUsersQuery().astrolift_cluster_auth_users(_info(), GUID(str(cluster.guid)))
 
     assert result.supported is True
@@ -112,7 +118,7 @@ def test_an_external_provider_is_reported_unsupported_not_an_error(permission_re
     permission_resolver.grant(Permission.CLUSTER_USERS)
     cluster, org = _cluster(discovery="https://login.example.net/oidc")
 
-    with tenant_context(TenantContext(organization_id=org.pk)):
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_actor().pk)):
         result = ClusterAuthUsersQuery().astrolift_cluster_auth_users(_info(), GUID(str(cluster.guid)))
 
     assert result.supported is False
@@ -123,7 +129,7 @@ def test_creating_a_user_never_returns_the_password(permission_resolver, driver)
     permission_resolver.grant(Permission.CLUSTER_USERS)
     cluster, org = _cluster()
 
-    with tenant_context(TenantContext(organization_id=org.pk)):
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_actor().pk)):
         result = ClusterAuthUsersMutation().create_cluster_auth_user(
             _info(),
             CreateClusterAuthUserInput(
@@ -144,7 +150,7 @@ def test_a_bad_email_is_refused_before_the_provider(permission_resolver, driver)
     permission_resolver.grant(Permission.CLUSTER_USERS)
     cluster, org = _cluster()
 
-    with tenant_context(TenantContext(organization_id=org.pk)):
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_actor().pk)):
         result = ClusterAuthUsersMutation().create_cluster_auth_user(
             _info(), CreateClusterAuthUserInput(cluster_id=GUID(str(cluster.guid)), email="not-an-email")
         )
@@ -175,7 +181,10 @@ def test_a_shared_clusters_pool_is_the_platform_operators_to_read(permission_res
     cluster, org = _cluster(shared=True)
     tenant_user = SimpleNamespace(is_authenticated=True, is_superuser=False, is_staff=False, pk=1)
 
-    with tenant_context(TenantContext(organization_id=org.pk)), pytest.raises((PermissionDenied, Exception)):
+    with (
+        tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_actor().pk)),
+        pytest.raises((PermissionDenied, Exception)),
+    ):
         ClusterAuthUsersQuery().astrolift_cluster_auth_users(_info(tenant_user), GUID(str(cluster.guid)))
 
 

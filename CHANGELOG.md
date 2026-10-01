@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+- Localize list/detail cluster-unregistration reviews and feedback in all eight
+  locales. Preserve refused reviews without refreshing, retain accepted writes
+  through failed reads/navigation, and invalidate stale visible-target reviews.
+  Registration retirement does not claim infrastructure teardown or record
+  erasure (#2145).
+
+- Localize shared cluster headers, tabs and breadcrumb presentation in all eight
+  locales. Preserve technical identities, unknown metadata, navigation targets
+  and caller-owned source titles/actions; lifecycle and bootstrap operations
+  remain separate translation boundaries (#2145).
+
+- Azure topic/default-subscription aliases use full immutable service UUID names
+  and save exact ARM placement/child coordinates. Typed SDK 10 writes, current
+  parent/child ownership and complete bounded inventory gate supported effects
+  and sender bindings. Unknown legacy provenance stays refused; denied cleanup
+  never becomes success. Only actual topic capacity/TTL updates are editable;
+  retention and backup limits remain explicit (#2032, #2098).
+
+- Bind reviewed cluster sign-in user writes to an observed provider pool/source
+  revision and immutable provider user subject. Recheck locked source and current
+  authority before SDK effects, reject recreated usernames, preserve optional
+  legacy caller semantics, and make unknown review proof read-only in the web UI.
+  Persist existing tracking markers on partial cluster/provider source saves;
+  Cognito get-to-write races and partial multi-call effects remain explicit (#2225).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

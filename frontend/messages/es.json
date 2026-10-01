@@ -5929,5 +5929,58 @@
         "EXTERNAL_PROVIDER": "Proveedor externo"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "Administración",
+      "clusters": "Clústeres",
+      "notFound": "Clúster no encontrado",
+      "tabsAria": "Pestañas del clúster",
+      "inactive": "inactivo",
+      "lifecycle": {
+        "registered": "Registrado",
+        "managing": "Incorporando a la gestión…",
+        "managed": "Gestionado",
+        "error": "Error"
+      },
+      "tabs": {
+        "overview": "Resumen",
+        "status": "Estado",
+        "health": "Salud",
+        "activity": "Actividad",
+        "settings": "Configuración"
+      },
+      "functions": {
+        "organization": "Organización",
+        "access": "Acceso",
+        "projects": "Proyectos",
+        "clusters": "Clústeres",
+        "domains": "Dominios",
+        "providers": "Proveedores",
+        "webhooks": "Webhooks",
+        "metrics": "Métricas",
+        "tokens": "Claves de API",
+        "audit": "Auditoría",
+        "run-audit": "Ejecuciones",
+        "features": "Funciones",
+        "activity": "Actividad de la plataforma",
+        "alerts": "Alertas",
+        "events": "Eventos",
+        "logs": "Registros",
+        "traces": "Trazas",
+        "operations": "Operaciones"
+      }
+    },
+    "unregister": {
+      "action": "Dar de baja",
+      "title": "¿Dar de baja el clúster {slug}?",
+      "titleEmpty": "¿Dar de baja el clúster?",
+      "description": "Retira el registro de este clúster del plano de control. Primero deben reasignarse las apps activas y eliminarse los despliegues de modelos compartidos. No desmantela la infraestructura en ejecución ni borra los registros conservados.",
+      "accepted": "Se dio de baja el clúster {slug}.",
+      "failed": "No se pudo dar de baja el clúster",
+      "refreshWarning": "La baja se aceptó, pero no se pudo actualizar una lectura relacionada. Reintenta la lectura para verificar el estado actual.",
+      "navigationWarning": "La baja se aceptó, pero falló la navegación a la lista de clústeres. Abre la lista manualmente.",
+      "sourceChanged": "Cambió el clúster revisado o la fuente visible. Revisa el destino actual antes de actuar."
+    }
   }
 }

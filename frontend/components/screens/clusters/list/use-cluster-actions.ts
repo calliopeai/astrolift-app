@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 import { toast } from "sonner";
 
 import {
@@ -32,10 +34,12 @@ export interface ClusterActions {
 
 /** The cluster lifecycle mutations, shared by the list rows and the detail header. */
 export function useClusterActions(): ClusterActions {
+  const t = useTranslations("clusters.unregister");
   const [unregister, { loading: deleting }] = useMutation<{
     unregisterTenantCluster: MutationResult<{ id: string; deleted: boolean }>;
   }>(UNREGISTER_TENANT_CLUSTER, {
-    refetchQueries: REFETCH_LIST,
+    refetchQueries: (result) => (result.data?.unregisterTenantCluster.ok ? REFETCH_LIST : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
     awaitRefetchQueries: true,
   });
   const [bring, { loading: bringing }] = useMutation<{
@@ -54,9 +58,9 @@ export function useClusterActions(): ClusterActions {
   async function onUnregister(c: AstroliftTenantCluster) {
     const { data } = await unregister({ variables: { input: { id: c.id } } });
     if (data?.unregisterTenantCluster.ok) {
-      toast.success(`Unregistered ${c.slug}`);
+      toast.success(t("accepted", { slug: c.slug }));
     } else {
-      throw new Error(data?.unregisterTenantCluster.errors?.[0]?.message ?? "Failed");
+      throw new Error(data?.unregisterTenantCluster.errors?.[0]?.message ?? t("failed"));
     }
   }
 

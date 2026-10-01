@@ -1853,6 +1853,12 @@ type AstroliftCiWorkflowSyncStatusMutationResult {
   data: AstroliftCiWorkflowSyncStatus
 }
 
+type AstroliftClusterAuthSource {
+  providerPluginId: GUID!
+  providerPoolId: String!
+  sourceVersion: String!
+}
+
 type AstroliftClusterAuthUser {
   username: String!
   email: String!
@@ -1860,6 +1866,7 @@ type AstroliftClusterAuthUser {
   status: String!
   createdAt: DateTime
   groups: [String!]!
+  providerUserId: String
 }
 
 type AstroliftClusterAuthUserChange {
@@ -1886,6 +1893,7 @@ type AstroliftClusterAuthUsers {
   reachNote: String!
   users: [AstroliftClusterAuthUser!]!
   groups: [String!]!
+  source: AstroliftClusterAuthSource
 }
 
 type AstroliftClusterBootstrapComponent {
@@ -6139,7 +6147,9 @@ type CloudOrphanType {
 
 input ClusterAuthUserRefInput {
   clusterId: GUID!
+  expectedSource: ExpectedClusterAuthSourceInput = null
   username: String!
+  expectedUserId: String = null
 }
 
 type ClusterModelDensity {
@@ -6363,12 +6373,14 @@ input CreateApiTokenInput {
 
 input CreateClusterAuthGroupInput {
   clusterId: GUID!
+  expectedSource: ExpectedClusterAuthSourceInput = null
   name: String!
   description: String! = ""
 }
 
 input CreateClusterAuthUserInput {
   clusterId: GUID!
+  expectedSource: ExpectedClusterAuthSourceInput = null
   email: String!
   password: String = null
   permanent: Boolean! = false
@@ -6745,6 +6757,12 @@ enum EntityType {
 
 input EnvironmentByIdInput {
   id: GUID!
+}
+
+input ExpectedClusterAuthSourceInput {
+  providerPluginId: GUID!
+  providerPoolId: String!
+  sourceVersion: String!
 }
 
 input ExportAppLogsInput {
@@ -8968,20 +8986,26 @@ input SetAppSubdomainInput {
 
 input SetClusterAuthUserEnabledInput {
   clusterId: GUID!
+  expectedSource: ExpectedClusterAuthSourceInput = null
   username: String!
+  expectedUserId: String = null
   enabled: Boolean!
 }
 
 input SetClusterAuthUserGroupsInput {
   clusterId: GUID!
+  expectedSource: ExpectedClusterAuthSourceInput = null
   username: String!
+  expectedUserId: String = null
   add: [String!]! = []
   remove: [String!]! = []
 }
 
 input SetClusterAuthUserPasswordInput {
   clusterId: GUID!
+  expectedSource: ExpectedClusterAuthSourceInput = null
   username: String!
+  expectedUserId: String = null
   password: String!
   permanent: Boolean! = false
 }

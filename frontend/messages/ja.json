@@ -5926,5 +5926,58 @@
         "EXTERNAL_PROVIDER": "外部プロバイダー"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "管理",
+      "clusters": "クラスター",
+      "notFound": "クラスターが見つかりません",
+      "tabsAria": "クラスターのタブ",
+      "inactive": "無効",
+      "lifecycle": {
+        "registered": "登録済み",
+        "managing": "管理を設定中…",
+        "managed": "管理対象",
+        "error": "エラー"
+      },
+      "tabs": {
+        "overview": "概要",
+        "status": "状態",
+        "health": "健全性",
+        "activity": "アクティビティ",
+        "settings": "設定"
+      },
+      "functions": {
+        "organization": "組織",
+        "access": "アクセス",
+        "projects": "プロジェクト",
+        "clusters": "クラスター",
+        "domains": "ドメイン",
+        "providers": "プロバイダー",
+        "webhooks": "Webhook",
+        "metrics": "メトリクス",
+        "tokens": "API キー",
+        "audit": "監査",
+        "run-audit": "実行",
+        "features": "機能",
+        "activity": "プラットフォームのアクティビティ",
+        "alerts": "アラート",
+        "events": "イベント",
+        "logs": "ログ",
+        "traces": "トレース",
+        "operations": "操作"
+      }
+    },
+    "unregister": {
+      "action": "登録解除",
+      "title": "クラスター {slug} の登録を解除しますか？",
+      "titleEmpty": "クラスターの登録を解除しますか？",
+      "description": "コントロールプレーンからこのクラスターの登録を取り下げます。先に有効なアプリを別のクラスターに割り当て、共有モデルのデプロイを削除する必要があります。稼働中のインフラの廃止や保持された記録の消去は行いません。",
+      "accepted": "クラスター {slug} の登録を解除しました。",
+      "failed": "クラスターの登録を解除できませんでした",
+      "refreshWarning": "登録解除は受理されましたが、関連する読み取りを更新できませんでした。読み取りを再試行して現在の状態を確認してください。",
+      "navigationWarning": "登録解除は受理されましたが、クラスター一覧への移動に失敗しました。一覧を手動で開いてください。",
+      "sourceChanged": "確認したクラスターまたは表示中の情報源が変わりました。操作前に現在の対象を確認してください。"
+    }
   }
 }
