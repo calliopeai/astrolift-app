@@ -163,12 +163,13 @@ def one_cluster(org, app, env, cluster, monkeypatch):
     env.managed_domain = zone
     env.save()
     database = ManagedService.objects.create(
-        registered_app=app,
-        app_environment=env,
+        project=app.project,
+        tenant_cluster=cluster,
         kind=ManagedService.Kind.POSTGRES,
         name="main-db",
         status=ManagedService.Status.ACTIVE,
     )
+    ManagedServiceAttachment.objects.create(managed_service=database, app_environment=env)
     ManagedServiceBinding.objects.create(
         managed_service=database,
         env_key="DATABASE_HOST",
@@ -196,8 +197,7 @@ def one_cluster(org, app, env, cluster, monkeypatch):
 
 
 def _open_pull_request(app, database, number=7):
-    """The preview the PR webhook creates, with the production database
-    attached the way preview service provisioning attaches a slice."""
+    """The webhook's preview, explicitly attached to the project's shared database."""
     from astrolift_scm.github_pr_dispatch import PrEventContext
     from astrolift_scm.webhook_views import _ensure_preview_environment
 
@@ -331,3 +331,33 @@ def test_tearing_down_the_preview_leaves_production_standing(one_cluster):
     # production object is touched.
     prod_objects = state.cluster.written_by(state.prod.name)
     assert not {obj for obj in state.cluster.deleted_objects if obj in prod_objects}
+
+
+def test_an_inherited_private_database_requires_a_durable_slice(one_cluster):
+    from astrolift_workflows.activities.app_lifecycle import _update_secrets_sync
+
+    state = one_cluster
+    ManagedService.objects.filter(pk=state.database.pk).update(
+        project=None,
+        tenant_cluster=None,
+        registered_app=state.app,
+        app_environment=state.prod,
+    )
+    preview = _open_pull_request(state.app, state.database)
+    deployment = Deployment.objects.create(
+        registered_app=state.app,
+        app_environment=preview.app_environment,
+        trigger_kind=Deployment.TriggerKind.MANUAL.value,
+        status=Deployment.Status.PENDING.value,
+        image_tag="pr-7",
+    )
+
+    with pytest.raises(ValueError, match="no durable slice identity"):
+        _update_secrets_sync(deployment.pk)
+
+    assert not state.cluster.objects
+    assert not state.cluster.namespaces
+    assert not state.iam.trust
+    assert (
+        ManagedServiceBinding.objects.get(managed_service=state.database).env_value_ref == "main-db.internal"
+    )
