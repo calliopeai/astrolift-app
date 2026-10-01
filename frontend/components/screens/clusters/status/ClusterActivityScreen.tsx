@@ -9,6 +9,7 @@
  */
 
 import { CheckIcon, ClockIcon, GitBranchIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
@@ -38,9 +39,7 @@ export function ClusterActivityBody({ workflows, lifecycle }: ClusterActivityBod
 }
 
 // ─── Recent workflows card (#394) ────────────────────────────────────────
-// Pulled live from Temporal's visibility API filtered by workflow ids
-// that reference this cluster's guid. Empty when Temporal is disabled
-// or the query fails — identical empty-state copy in both cases.
+// Empty results also cover disabled Temporal; they do not prove a complete census.
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   RUNNING: "secondary",
@@ -52,6 +51,29 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   CONTINUED_AS_NEW: "outline",
 };
 
+const STATUS_LABELS = {
+  RUNNING: "running",
+  COMPLETED: "completed",
+  FAILED: "failed",
+  CANCELED: "canceled",
+  TERMINATED: "terminated",
+  TIMED_OUT: "timedOut",
+  CONTINUED_AS_NEW: "continuedAsNew",
+} as const;
+
+function observedDate(value: string): Date | null {
+  if (typeof value !== "string" || !value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function observedDuration(startedAt: string, closedAt: string): number | null {
+  const started = observedDate(startedAt);
+  const closed = observedDate(closedAt);
+  if (!started || !closed || closed.getTime() < started.getTime()) return null;
+  return Math.round((closed.getTime() - started.getTime()) / 1000);
+}
+
 function ActivityWorkflowsCard({
   runs,
   loading,
@@ -60,17 +82,18 @@ function ActivityWorkflowsCard({
   more,
 }: ClusterActivityBodyProps["workflows"]) {
   const fmt = useFormatters();
+  const t = useTranslations("clusterActivity");
 
   return (
     <Panel
       span={6}
       icon={<GitBranchIcon className="size-4" />}
-      title="Recent workflows"
-      description="Temporal runs targeting this cluster — BringClusterIntoManagement, Refresh, Decommission, InstallClusterPrereqs, DriftDetection. Polls every 15s while a run is in flight."
+      title={t("workflowTitle")}
+      description={t("workflowDescription")}
       flush
     >
       <Feed<WorkflowRun>
-        label="Recent workflows"
+        label={t("workflowTitle")}
         items={runs}
         keyOf={(r) => r.workflowId + r.runId}
         loading={loading && runs.length === 0}
@@ -81,31 +104,36 @@ function ActivityWorkflowsCard({
         className="px-4"
         empty={{
           icon: <GitBranchIcon className="size-5" />,
-          title: "No workflow runs recorded yet",
-          description:
-            "Operator actions like Bring into management, Refresh, or Install prereqs will appear here.",
+          title: t("noRuns"),
+          description: t("noRunsHelp"),
         }}
         renderItem={(r) => {
-          const duration =
-            r.closedAt && r.startedAt
-              ? Math.max(
-                  0,
-                  Math.round(
-                    (new Date(r.closedAt).getTime() - new Date(r.startedAt).getTime()) / 1000
-                  )
-                )
-              : null;
+          const duration = observedDuration(r.startedAt, r.closedAt);
+          const started = observedDate(r.startedAt);
+          const known = typeof r.status === "string" && Object.hasOwn(STATUS_LABELS, r.status);
+          const label = known
+            ? t(STATUS_LABELS[r.status as keyof typeof STATUS_LABELS])
+            : (typeof r.status === "string" && r.status) || t("unknown");
           return (
             <div className="flex min-w-0 flex-wrap items-baseline gap-2 text-sm">
               <code className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
                 {r.workflowType}
               </code>
-              <Badge variant={STATUS_VARIANT[r.status] ?? "outline"} className="text-2xs font-mono">
-                {r.status}
+              <Badge
+                variant={known ? STATUS_VARIANT[r.status] : "outline"}
+                className="text-2xs max-w-full min-w-0 font-mono"
+                title={typeof r.status === "string" ? r.status : undefined}
+              >
+                <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
               </Badge>
-              <span className="text-muted-foreground ml-auto font-mono text-xs">
-                {r.startedAt ? fmt.formatDateTime(r.startedAt) : "—"}
-                {duration !== null && <span className="opacity-60"> · {duration}s</span>}
+              <span className="text-muted-foreground ml-auto font-mono text-xs" title={r.startedAt}>
+                {started ? fmt.formatDateTime(started) : r.startedAt ? t("unknown") : "—"}
+                {r.closedAt && (
+                  <span className="opacity-60">
+                    {" "}
+                    · {duration !== null ? t("seconds", { count: duration }) : t("unknown")}
+                  </span>
+                )}
               </span>
             </div>
           );
@@ -128,17 +156,18 @@ function ActivityLifecycleCard({
   more,
 }: ClusterActivityBodyProps["lifecycle"]) {
   const fmt = useFormatters();
+  const t = useTranslations("clusterActivity");
 
   return (
     <Panel
       span={6}
       icon={<ClockIcon className="size-4" />}
-      title="Lifecycle + activity"
-      description="Every mutation that targeted this cluster — registered → managing → managed transitions, refreshes, prereq installs, decommission attempts. Sourced from the platform audit log."
+      title={t("lifecycleTitle")}
+      description={t("lifecycleDescription")}
       flush
     >
       <Feed<AuditRow>
-        label="Lifecycle events"
+        label={t("lifecycleLabel")}
         items={entries}
         keyOf={(e) => `${e.timestamp}-${e.operation}`}
         groupBy={{ day: (e) => e.timestamp }}
@@ -150,8 +179,8 @@ function ActivityLifecycleCard({
         className="px-4"
         empty={{
           icon: <ClockIcon className="size-5" />,
-          title: "No lifecycle events recorded yet",
-          description: "Operator mutations against this cluster will show up here.",
+          title: t("noEvents"),
+          description: t("noEventsHelp"),
         }}
         renderItem={(e) => (
           <div className="flex min-w-0 items-start gap-2">
@@ -170,11 +199,14 @@ function ActivityLifecycleCard({
                 </code>
                 {e.actor && (
                   <span className="text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]">
-                    by <span className="font-mono">{e.actor}</span>
+                    {t.rich("actor", {
+                      name: e.actor,
+                      actor: (chunks) => <span className="font-mono">{chunks}</span>,
+                    })}
                   </span>
                 )}
                 <span className="text-muted-foreground ml-auto font-mono text-xs">
-                  {fmt.formatDateTime(e.timestamp)}
+                  {observedDate(e.timestamp) ? fmt.formatDateTime(e.timestamp) : t("unknown")}
                 </span>
               </div>
               {!e.success && e.errors.length > 0 && (

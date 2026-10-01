@@ -6354,5 +6354,26 @@
     "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
     "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
     "daysAgo": "{count, plural, one {# day ago} other {# days ago}}"
+  },
+  "clusterActivity": {
+    "workflowTitle": "Recent workflows",
+    "workflowDescription": "Recent workflow runs for this cluster. Checked every 15 seconds.",
+    "noRuns": "No workflow runs returned",
+    "noRunsHelp": "Management, refresh and prerequisite workflows appear here when returned by Temporal.",
+    "lifecycleTitle": "Lifecycle and activity",
+    "lifecycleDescription": "Cluster changes recorded in the platform audit log.",
+    "lifecycleLabel": "Lifecycle events",
+    "noEvents": "No lifecycle events returned",
+    "noEventsHelp": "Recorded cluster mutations appear here.",
+    "actor": "by <actor>{name}</actor>",
+    "unknown": "Unknown",
+    "seconds": "{count, plural, one {# second} other {# seconds}}",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "canceled": "Canceled",
+    "terminated": "Terminated",
+    "timedOut": "Timed out",
+    "continuedAsNew": "Continued as new"
   }
 }

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize cluster Activity feeds in all eight locales, retaining workflow IDs,
+  audit operations, actors and diagnostics. Unknown statuses stay neutral and
+  literal; malformed or reversed timestamps cannot report a zero-second duration.
+  Feed retry and load-older callbacks remain independent. Empty returned feeds
+  do not certify a complete workflow or audit census (#2145).
+
 - Localize cluster connection snapshots and shared read recovery in all eight
   locales. Failed, incomplete and wrong-target reads cannot confirm connectivity
   or mount driver cards. Cached reports remain explicitly unconfirmed, unknown

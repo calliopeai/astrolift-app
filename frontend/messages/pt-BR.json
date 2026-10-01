@@ -6274,5 +6274,26 @@
     "minutesAgo": "{count, plural, one {há # minuto} other {há # minutos}}",
     "hoursAgo": "{count, plural, one {há # hora} other {há # horas}}",
     "daysAgo": "{count, plural, one {há # dia} other {há # dias}}"
+  },
+  "clusterActivity": {
+    "workflowTitle": "Workflows recentes",
+    "workflowDescription": "Execuções recentes deste cluster. Verificação a cada 15 segundos.",
+    "noRuns": "Nenhuma execução retornada",
+    "noRunsHelp": "Workflows de gestão, atualização e pré-requisitos aparecem quando retornados pelo Temporal.",
+    "lifecycleTitle": "Ciclo de vida e atividade",
+    "lifecycleDescription": "Alterações do cluster registradas no log de auditoria da plataforma.",
+    "lifecycleLabel": "Eventos do ciclo de vida",
+    "noEvents": "Nenhum evento de ciclo de vida retornado",
+    "noEventsHelp": "As operações registradas do cluster aparecem aqui.",
+    "actor": "por <actor>{name}</actor>",
+    "unknown": "Desconhecido",
+    "seconds": "{count, plural, one {# segundo} other {# segundos}}",
+    "running": "Em execução",
+    "completed": "Concluído",
+    "failed": "Falhou",
+    "canceled": "Cancelado",
+    "terminated": "Encerrado",
+    "timedOut": "Tempo esgotado",
+    "continuedAsNew": "Continuado como novo"
   }
 }

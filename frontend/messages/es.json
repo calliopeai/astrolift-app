@@ -6277,5 +6277,26 @@
     "minutesAgo": "{count, plural, one {hace # minuto} other {hace # minutos}}",
     "hoursAgo": "{count, plural, one {hace # hora} other {hace # horas}}",
     "daysAgo": "{count, plural, one {hace # día} other {hace # días}}"
+  },
+  "clusterActivity": {
+    "workflowTitle": "Flujos recientes",
+    "workflowDescription": "Ejecuciones recientes para este clúster. Se consultan cada 15 segundos.",
+    "noRuns": "No se devolvieron ejecuciones",
+    "noRunsHelp": "Los flujos de gestión, actualización y requisitos aparecen aquí cuando Temporal los devuelve.",
+    "lifecycleTitle": "Ciclo de vida y actividad",
+    "lifecycleDescription": "Cambios del clúster registrados en la auditoría de la plataforma.",
+    "lifecycleLabel": "Eventos del ciclo de vida",
+    "noEvents": "No se devolvieron eventos del ciclo de vida",
+    "noEventsHelp": "Las operaciones registradas del clúster aparecen aquí.",
+    "actor": "por <actor>{name}</actor>",
+    "unknown": "Desconocido",
+    "seconds": "{count, plural, one {# segundo} other {# segundos}}",
+    "running": "En ejecución",
+    "completed": "Completado",
+    "failed": "Fallido",
+    "canceled": "Cancelado",
+    "terminated": "Terminado",
+    "timedOut": "Tiempo agotado",
+    "continuedAsNew": "Continuado como nuevo"
   }
 }

@@ -6274,5 +6274,26 @@
     "minutesAgo": "{count, plural, other {# 分钟前}}",
     "hoursAgo": "{count, plural, other {# 小时前}}",
     "daysAgo": "{count, plural, other {# 天前}}"
+  },
+  "clusterActivity": {
+    "workflowTitle": "最近的工作流",
+    "workflowDescription": "此集群最近的运行，每15秒检查一次。",
+    "noRuns": "未返回工作流运行",
+    "noRunsHelp": "Temporal返回管理、刷新和前置条件工作流后，会在此处显示。",
+    "lifecycleTitle": "生命周期与活动",
+    "lifecycleDescription": "平台审计日志中记录的集群变更。",
+    "lifecycleLabel": "生命周期事件",
+    "noEvents": "未返回生命周期事件",
+    "noEventsHelp": "已记录的集群操作将在此处显示。",
+    "actor": "操作人：<actor>{name}</actor>",
+    "unknown": "未知",
+    "seconds": "{count, plural, other {#秒}}",
+    "running": "运行中",
+    "completed": "已完成",
+    "failed": "失败",
+    "canceled": "已取消",
+    "terminated": "已终止",
+    "timedOut": "已超时",
+    "continuedAsNew": "继续为新运行"
   }
 }

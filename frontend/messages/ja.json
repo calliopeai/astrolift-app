@@ -6274,5 +6274,26 @@
     "minutesAgo": "{count, plural, other {# 分前}}",
     "hoursAgo": "{count, plural, other {# 時間前}}",
     "daysAgo": "{count, plural, other {# 日前}}"
+  },
+  "clusterActivity": {
+    "workflowTitle": "最近のワークフロー",
+    "workflowDescription": "このクラスターの最近の実行。15秒ごとに確認します。",
+    "noRuns": "ワークフローの実行が返されませんでした",
+    "noRunsHelp": "管理、更新、前提条件のワークフローは、Temporalから返された場合に表示されます。",
+    "lifecycleTitle": "ライフサイクルとアクティビティ",
+    "lifecycleDescription": "プラットフォームの監査ログに記録されたクラスターの変更。",
+    "lifecycleLabel": "ライフサイクルイベント",
+    "noEvents": "ライフサイクルイベントが返されませんでした",
+    "noEventsHelp": "記録されたクラスター操作がここに表示されます。",
+    "actor": "実行者：<actor>{name}</actor>",
+    "unknown": "不明",
+    "seconds": "{count, plural, other {#秒}}",
+    "running": "実行中",
+    "completed": "完了",
+    "failed": "失敗",
+    "canceled": "キャンセル",
+    "terminated": "終了",
+    "timedOut": "タイムアウト",
+    "continuedAsNew": "新しい実行として継続"
   }
 }
