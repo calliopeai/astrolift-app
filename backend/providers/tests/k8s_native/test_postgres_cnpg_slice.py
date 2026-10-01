@@ -21,6 +21,7 @@ from typing import Any
 
 import pytest
 
+from _sdk.cluster import ApplyError, ApplyResult
 from _sdk.managed_service import ServiceHandle, SliceSpec
 from k8s_native.managed._handle import pack as pack_handle
 from k8s_native.managed.postgres_cnpg import CNPGConfig, CNPGPostgresDriver
@@ -190,8 +191,89 @@ def test_reprovisioning_the_same_slice_does_not_duplicate_its_role():
     fake.applied.clear()
     driver.provision_slice(_spec())
 
-    roles = _of_kind(fake.applied, "Cluster")[0]["spec"]["managed"]["roles"]
-    assert len(roles) == 1
+    assert _of_kind(fake.applied, "Cluster") == []
+    assert len(fake.parent["spec"]["managed"]["roles"]) == 1
+
+
+def test_live_operator_conflict_reobserves_parent_version_and_merges_current_roles():
+    driver, fake = _driver(parent=_parent_object())
+    actual_apply = fake.apply_manifests
+    attempts = []
+
+    def conflict_once(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == "Cluster":
+            attempts.append(deepcopy(manifests[0]))
+            if len(attempts) == 1:
+                fake.parent["metadata"]["resourceVersion"] = "operator-new-version"
+                fake.parent["spec"]["instances"] = 4
+                fake.parent["spec"]["managed"] = {"roles": [{"name": "other_owned_preview", "login": True}]}
+                return ApplyResult(
+                    [],
+                    [],
+                    [],
+                    [ApplyError("Cluster", "pg-main", namespace, "ConflictError", "controlled HTTP 409", False)],
+                )
+        return actual_apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = conflict_once
+    driver.provision_slice(_spec())
+    assert len(attempts) == 2
+    assert attempts[1]["metadata"]["uid"] == attempts[0]["metadata"]["uid"] == "parent-uid"
+    assert attempts[1]["metadata"]["resourceVersion"] == "operator-new-version"
+    assert attempts[1]["spec"]["instances"] == 4
+    assert "other_owned_preview" in {entry["name"] for entry in attempts[1]["spec"]["managed"]["roles"]}
+    assert len(driver._config.secrets_backend.writes) == 1
+
+
+@pytest.mark.parametrize("changed", ["parent_uid", "foreign_role", "foreign_secret"])
+def test_operator_conflict_refuses_replaced_parent_role_or_credentials(changed):
+    driver, fake = _driver(parent=_parent_object())
+    actual_apply = fake.apply_manifests
+    attempts = []
+
+    def replaced(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == "Cluster":
+            attempts.append(manifests[0])
+            if changed == "parent_uid":
+                fake.parent["metadata"]["uid"] = "replacement-uid"
+            elif changed == "foreign_role":
+                fake.parent["spec"]["managed"] = {
+                    "roles": [{"name": driver._slice_names(_spec())[1], "passwordSecret": {"name": "foreign"}}]
+                }
+            else:
+                fake.objects[("Secret", driver._slice_names(_spec())[2])]["metadata"]["labels"] = {}
+            return ApplyResult(
+                [], [], [], [ApplyError("Cluster", "pg-main", namespace, "ConflictError", "controlled HTTP 409", False)]
+            )
+        return actual_apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = replaced
+    with pytest.raises(ValueError):
+        driver.provision_slice(_spec())
+    assert len(attempts) == 1
+    assert _of_kind(fake.applied, "Database") == []
+    assert len(driver._config.secrets_backend.writes) == 1
+
+
+@pytest.mark.parametrize("error_type, expected_attempts", [("ConflictError", 3), ("ForbiddenError", 1)])
+def test_role_reconciliation_conflicts_are_bounded_and_other_errors_are_not_retried(error_type, expected_attempts):
+    driver, fake = _driver(parent=_parent_object())
+    actual_apply = fake.apply_manifests
+    attempts = []
+
+    def refused(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == "Cluster":
+            attempts.append(manifests[0])
+            return ApplyResult(
+                [], [], [], [ApplyError("Cluster", "pg-main", namespace, error_type, "controlled refusal", False)]
+            )
+        return actual_apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = refused
+    with pytest.raises(RuntimeError, match="role reconciliation failed"):
+        driver.provision_slice(_spec())
+    assert len(attempts) == expected_attempts
+    assert _of_kind(fake.applied, "Database") == []
 
 
 def test_an_unreadable_parent_refuses_before_credentials_or_apply():

@@ -164,16 +164,6 @@ def provision_slice(driver: Any, spec: SliceSpec) -> SliceResult:
         created = config.cluster_driver.apply_manifests(parsed.cluster_id, parsed.namespace, [secret], create_only=True)
         if created.errors:
             raise RuntimeError("CNPG slice credential creation failed; retry after verifying ownership")
-    managed = dict(parent["spec"].get("managed") or {})
-    roles = [dict(item) for item in managed.get("roles", []) if isinstance(item, dict) and item.get("name") != role]
-    roles.append({"name": role, "ensure": "present", "login": True, "passwordSecret": {"name": secret_name}})
-    managed["roles"] = roles
-    parent_patch = {
-        "apiVersion": parent["apiVersion"],
-        "kind": "Cluster",
-        "metadata": {key: value for key, value in parent_meta.items() if key != "managedFields"},
-        "spec": {**parent["spec"], "managed": managed},
-    }
     db_object = secret_name.removesuffix("-owner")
     database_manifest = {
         "apiVersion": "postgresql.cnpg.io/v1",
@@ -181,9 +171,16 @@ def provision_slice(driver: Any, spec: SliceSpec) -> SliceResult:
         "metadata": {"name": db_object, "namespace": parsed.namespace, "labels": labels},
         "spec": {"name": database, "owner": role, "cluster": {"name": parsed.name}, "databaseReclaimPolicy": "delete"},
     }
-    result = config.cluster_driver.apply_manifests(parsed.cluster_id, parsed.namespace, [parent_patch])
-    if result.errors:
-        raise RuntimeError("CNPG slice role reconciliation failed")
+    _reconcile_role(
+        driver,
+        spec,
+        parsed,
+        parent_uid=parent_meta["uid"],
+        role=role,
+        secret_name=secret_name,
+        labels=labels,
+        password=password,
+    )
     if existing_db is None:
         result = config.cluster_driver.apply_manifests(
             parsed.cluster_id, parsed.namespace, [database_manifest], create_only=True
@@ -199,6 +196,56 @@ def provision_slice(driver: Any, spec: SliceSpec) -> SliceResult:
             "CNPG role/database reconciliation accepted; operator readiness is not certified by apply acknowledgement."
         ),
     )
+
+
+def _reconcile_role(
+    driver: Any,
+    spec: SliceSpec,
+    parsed: ParsedHandle,
+    *,
+    parent_uid: str,
+    role: str,
+    secret_name: str,
+    labels: dict[str, str],
+    password: str,
+) -> None:
+    config = driver._config
+    desired = {"name": role, "ensure": "present", "login": True, "passwordSecret": {"name": secret_name}}
+    for _ in range(3):
+        retained = config.cluster_driver.get_manifest(parsed.cluster_id, parsed.namespace, "v1/Secret", secret_name)
+        if (
+            not retained
+            or _retained_password(
+                retained, secret_name=secret_name, namespace=parsed.namespace, labels=labels, role=role
+            )
+            != password
+        ):
+            raise ValueError("CNPG slice credentials changed during role reconciliation")
+        parent = _live_parent(driver, spec, parsed)
+        meta = parent["metadata"]
+        if meta["uid"] != parent_uid:
+            raise ValueError("CNPG slice parent changed during role reconciliation")
+        managed = dict(parent["spec"].get("managed") or {})
+        previous = managed.get("roles", [])
+        matching = [item for item in previous if item.get("name") == role]
+        if any(item.get("passwordSecret", {}).get("name") != secret_name for item in matching):
+            raise ValueError("CNPG slice role is already managed with different credentials")
+        if len(matching) == 1 and all(matching[0].get(key) == value for key, value in desired.items()):
+            return
+        managed["roles"] = [dict(item) for item in previous if item.get("name") != role] + [desired]
+        patch = {
+            "apiVersion": parent["apiVersion"],
+            "kind": "Cluster",
+            "metadata": {key: value for key, value in meta.items() if key != "managedFields"},
+            "spec": {**parent["spec"], "managed": managed},
+        }
+        result = config.cluster_driver.apply_manifests(parsed.cluster_id, parsed.namespace, [patch])
+        if not result.errors:
+            return
+        # Reobserve ownership and merge the latest complete spec; never weaken the CAS.
+        if any(error.exception_type != "ConflictError" for error in result.errors):
+            break
+    raise RuntimeError("CNPG slice role reconciliation failed")
 
 
 def _owned_database(
