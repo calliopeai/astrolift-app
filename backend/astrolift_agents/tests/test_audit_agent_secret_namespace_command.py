@@ -17,6 +17,7 @@ from django.core.management.base import CommandError
 
 from astrolift_agents.models import AgentEnvironmentSpec
 from astrolift_agents.models.agent_secret_binding import AgentSecretBindingOverride
+from astrolift_agents.services.secret_audit_reporting import metadata_digest
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp
@@ -173,7 +174,7 @@ def test_lists_config_naming_another_owners_secret_and_a_foreign_google_secret()
         owner_ns
         in found[("acme-owner-audit", f"event_stream/events ({service.guid})", "config.password_secret_ref")]
     )
-    gcp_root = f"astrolift-services-{gcp_org.guid}-{function.registered_app.guid}-"
+    gcp_root = f"services/{gcp_org.guid}/{function.registered_app.guid}/"
     assert (
         gcp_root
         in found[
@@ -184,6 +185,20 @@ def test_lists_config_naming_another_owners_secret_and_a_foreign_google_secret()
             )
         ]
     )
+
+
+def test_invalid_raw_locations_never_enter_command_output():
+    org = _org("opaque-audit")
+    raw = "private-location\nnever-echo-this"
+    spec = _spec(org, [{"env_var": "TOKEN", "uri": raw}])
+    bundle = SecretBundle.objects.create(organization=org, name="B", slug="b", backend_ref=raw)
+    service = _app_service(org, config={"password_secret_ref": raw})
+    out = StringIO()
+    call_command("audit_agent_secret_namespace", org=org.slug, stdout=out)
+    output = out.getvalue()
+    assert raw not in output and "never-echo-this" not in output
+    assert all(str(row.guid) in output for row in (spec, bundle, service))
+    assert metadata_digest(raw) in output
 
 
 def test_filters_to_one_organization_by_slug_or_guid():

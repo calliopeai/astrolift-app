@@ -28,11 +28,17 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
 from astrolift_agents.models import AgentEnvironmentSpec
-from astrolift_dispatch.agent_secrets import unscoped_bundle_reason, unscoped_secret_refs
+from astrolift_agents.services.secret_audit_reporting import refusal_summary
+from astrolift_dispatch.agent_secrets import (
+    effective_secret_refs,
+    unscoped_bundle_reason,
+    unscoped_secret_refs,
+)
 from astrolift_identity.models import Organization
 from astrolift_services.models import ManagedService, SecretBundle
 from astrolift_services.secret_ref_config import (
     managed_binding_ref_reason,
+    owner_secret_namespace,
     service_organization,
     service_owner,
     unscoped_config_secret_refs,
@@ -68,7 +74,13 @@ class Command(BaseCommand):
         if org is not None:
             specs = specs.filter(organization=org)
         for spec in specs.order_by("organization__slug", "slug"):
-            for env_var, reason in sorted(unscoped_secret_refs(spec).items()):
+            refs = {row["env_var"]: row["uri"] for row in effective_secret_refs(spec)}
+            for env_var in sorted(unscoped_secret_refs(spec)):
+                reason = refusal_summary(
+                    f"invalid_effective_secret_ref; record_guid={spec.guid}",
+                    refs.get(env_var),
+                    namespace=f"agents/{spec.organization.guid}/",
+                )
                 yield _row(spec.organization, "agent env spec", spec.slug, env_var, reason)
 
     def _bundles(self, org):
@@ -78,24 +90,37 @@ class Command(BaseCommand):
         for bundle in bundles.order_by("organization__slug", "slug"):
             reason = unscoped_bundle_reason(bundle, organization=bundle.organization)
             if reason is not None:
+                reason = refusal_summary(
+                    f"invalid_bundle_ref; record_guid={bundle.guid}",
+                    bundle.backend_ref,
+                    namespace=f"agent-bundles/{bundle.organization.guid}/",
+                )
                 yield _row(bundle.organization, "secret bundle", bundle.slug, "backendRef", reason)
 
     def _services(self, org):
         services = ManagedService.objects.filter(deleted_at__isnull=True).select_related(
+            "organization",
             "registered_app__organization",
             "project__organization",
             "tenant_cluster__provider_plugin",
             "app_environment__tenant_cluster__provider_plugin",
         )
         if org is not None:
-            services = services.filter(Q(registered_app__organization=org) | Q(project__organization=org))
+            services = services.filter(
+                Q(organization=org) | Q(registered_app__organization=org) | Q(project__organization=org)
+            )
         for svc in services.order_by("kind", "name", "pk"):
             organization = service_organization(svc)
             where = f"{svc.kind}/{svc.name or svc.kind} ({svc.guid})"
             findings: dict[str, str] = {}
             owner, cluster = service_owner(svc), svc.effective_cluster
             for config in (svc.config, svc.applied_config):
-                for path, _ref, reason in unscoped_config_secret_refs(config, owner=owner, cluster=cluster):
+                for path, ref, _reason in unscoped_config_secret_refs(config, owner=owner, cluster=cluster):
+                    reason = refusal_summary(
+                        f"invalid_config_ref; record_guid={svc.guid}",
+                        ref,
+                        namespace=owner_secret_namespace(owner) if owner else "unresolved",
+                    )
                     findings.setdefault(f"config.{path}", reason)
             if not findings:
                 # A driver may also copy a string from a field no check names
@@ -113,6 +138,11 @@ class Command(BaseCommand):
                 for field, ref in rows:
                     reason = managed_binding_ref_reason(svc, ref)
                     if reason is not None:
+                        reason = refusal_summary(
+                            f"invalid_binding_ref; record_guid={svc.guid}",
+                            ref,
+                            namespace=owner_secret_namespace(owner) if owner else "unresolved",
+                        )
                         findings.setdefault(field, reason)
             for field, reason in findings.items():
                 yield _row(organization, "managed service", where, field, reason)
