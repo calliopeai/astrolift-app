@@ -261,6 +261,37 @@ export function peopleList(roles: readonly AstroliftRole[]): ListDefinition {
   };
 }
 
+/** Presentation only; server filter tokens and organization-owned role labels stay literal. */
+export function localizedPeopleList(
+  definition: ListDefinition,
+  t: { (key: string): string; has: (key: string) => boolean }
+): ListDefinition {
+  const copy = (key: string, fallback: string) => (t.has(key) ? t(key) : fallback);
+  return {
+    ...definition,
+    searchPlaceholder: t("people.searchPlaceholder"),
+    fields: definition.fields.map((field) => ({
+      ...field,
+      label: copy(`people.filters.${field.key}`, field.label),
+      options: field.options?.map((option) => ({
+        ...option,
+        label:
+          field.key === "role" || field.key === "team"
+            ? option.label
+            : copy(
+                `people.${field.key === "lifecycle" ? "lifecycle" : field.key === "status" ? "invitationStatus" : `options.${field.key}`}.${option.value}`,
+                option.label
+              ),
+      })),
+    })),
+    views: definition.views.map((view) => ({
+      ...view,
+      label: copy(`people.views.${view.key}`, view.label),
+      ...(view.note ? { note: copy(`people.notes.${view.key}`, view.note) } : {}),
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Each view's query
 // ---------------------------------------------------------------------------

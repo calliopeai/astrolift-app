@@ -3639,7 +3639,107 @@
     "sourceTooltipAria": "{scope} 経由で付与",
     "sourceColumn": "ソース",
     "grantRoleRowLabel": "{name} にロールを付与",
-    "grantRoleRowTooltip": "{name} にロールを付与"
+    "grantRoleRowTooltip": "{name} にロールを付与",
+    "people": {
+      "title": "メンバー",
+      "description": "この組織にアクセスできるユーザーと ID プロバイダーのグループ。",
+      "columns": {
+        "who": "ユーザー・グループ",
+        "roles": "ロール",
+        "teams": "チーム",
+        "status": "状態",
+        "joined": "参加日"
+      },
+      "actions": {
+        "viewAccess": "アクセスを表示",
+        "resend": "招待を再送信",
+        "revoke": "取り消す",
+        "deleteResolved": "処理済みの招待を削除",
+        "grantTo": "{name} にアクセスを許可",
+        "alreadyAnonymized": "匿名化済み",
+        "anonymize": "ユーザーデータを匿名化",
+        "invite": "招待",
+        "grant": "アクセスを許可"
+      },
+      "emptyTitle": "メンバーがいません",
+      "emptyDescription": "組織にユーザーを招待し、ロールを割り当ててください。",
+      "confirm": {
+        "resend": {
+          "title": "{email} に招待を再送信しますか？",
+          "description": "新しいワンタイムリンクを生成し、メール送信を試みます。古いリンクは直ちに無効になります。送信に失敗した場合は新しいリンクをコピーしてください。",
+          "label": "招待を再送信"
+        },
+        "revoke": {
+          "title": "{email} の招待を取り消しますか？",
+          "description": "保留中の招待リンクは直ちに無効になります。必要に応じて新しい招待を送信できます。",
+          "label": "取り消す"
+        },
+        "delete": {
+          "title": "{email} の処理済み招待を削除しますか？",
+          "description": "処理済みの招待を一覧から削除します。メンバーシップとロールは変更されません。",
+          "label": "削除"
+        }
+      },
+      "export": {
+        "actions": "一覧のその他の操作",
+        "working": "CSV をエクスポート中…",
+        "label": "{count, number} 件を CSV にエクスポート"
+      },
+      "grants": "{count, plural, one {# 件の権限付与} other {# 件の権限付与}}",
+      "mappings": "、{count, plural, one {# 件のマッピング} other {# 件のマッピング}}",
+      "idpGroup": "ID プロバイダーのグループ",
+      "admin": "管理者",
+      "invitationStatus": {
+        "pending": "保留中",
+        "accepted": "承認済み",
+        "expired": "期限切れ",
+        "revoked": "取り消し済み"
+      },
+      "lifecycle": {
+        "active": "有効",
+        "invited": "招待済み",
+        "pending_invite": "招待待ち",
+        "pending_first_login": "初回ログイン待ち",
+        "suspended": "停止中",
+        "deactivated": "無効化済み",
+        "anonymized": "匿名化済み"
+      },
+      "filters": {
+        "kind": "種類",
+        "role": "ロール",
+        "team": "チーム",
+        "lifecycle": "ライフサイクル",
+        "active": "最終アクティビティ",
+        "status": "招待の状態"
+      },
+      "options": {
+        "kind": {
+          "user": "ユーザー",
+          "group": "グループ",
+          "invitation": "招待"
+        },
+        "active": {
+          "7d": "過去 7 日間",
+          "30d": "過去 30 日間",
+          "90d": "過去 90 日間",
+          "stale": "90 日以上活動なし",
+          "never": "未活動"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分に関連",
+        "invited": "招待済み",
+        "groups": "グループ",
+        "admins": "管理者"
+      },
+      "notes": {
+        "mine": "自分と同じチームに所属するユーザー。",
+        "invited": "保留中の招待です。承認済み、期限切れ、取り消し済みの招待は状態フィルターで確認できます。",
+        "groups": "ログイン、権限付与、マッピングで確認された ID プロバイダーのグループです。プロバイダーが割り当てた全ユーザーにグループのアクセス権が適用されます。"
+      },
+      "searchPlaceholder": "ユーザー、メール、グループを検索…  role:org_admin  team:payments"
+    }
   },
   "stepUp": {
     "title": "本人確認",

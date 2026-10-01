@@ -3639,7 +3639,107 @@
     "sourceTooltipAria": "{scope}을(를) 통해 부여됨",
     "sourceColumn": "출처",
     "grantRoleRowLabel": "{name}에게 역할 부여",
-    "grantRoleRowTooltip": "{name}에게 역할 부여"
+    "grantRoleRowTooltip": "{name}에게 역할 부여",
+    "people": {
+      "title": "구성원",
+      "description": "이 조직에 접근할 수 있는 사용자와 ID 공급자 그룹입니다.",
+      "columns": {
+        "who": "사용자 또는 그룹",
+        "roles": "역할",
+        "teams": "팀",
+        "status": "상태",
+        "joined": "가입일"
+      },
+      "actions": {
+        "viewAccess": "접근 권한 보기",
+        "resend": "초대 다시 보내기",
+        "revoke": "초대 취소",
+        "deleteResolved": "처리된 초대 삭제",
+        "grantTo": "{name}에게 접근 권한 부여",
+        "alreadyAnonymized": "이미 익명화됨",
+        "anonymize": "사용자 데이터 익명화",
+        "invite": "초대",
+        "grant": "접근 권한 부여"
+      },
+      "emptyTitle": "아직 구성원이 없습니다",
+      "emptyDescription": "조직에 사용자를 초대한 다음 역할을 부여하세요.",
+      "confirm": {
+        "resend": {
+          "title": "{email}에게 초대를 다시 보내시겠습니까?",
+          "description": "새 일회용 링크를 생성하고 이메일 전송을 시도합니다. 기존 링크는 즉시 무효화됩니다. 전송이 실패하면 새 링크를 복사하세요.",
+          "label": "초대 다시 보내기"
+        },
+        "revoke": {
+          "title": "{email}의 초대를 취소하시겠습니까?",
+          "description": "대기 중인 초대 링크는 즉시 무효화됩니다. 필요하면 새 초대를 보낼 수 있습니다.",
+          "label": "초대 취소"
+        },
+        "delete": {
+          "title": "{email}의 처리된 초대를 삭제하시겠습니까?",
+          "description": "처리된 초대를 목록에서 삭제합니다. 구성원 자격과 역할은 유지됩니다.",
+          "label": "삭제"
+        }
+      },
+      "export": {
+        "actions": "목록 추가 작업",
+        "working": "CSV 내보내는 중…",
+        "label": "{count, number}개를 CSV로 내보내기"
+      },
+      "grants": "{count, plural, one {권한 부여 #개} other {권한 부여 #개}}",
+      "mappings": ", {count, plural, one {매핑 #개} other {매핑 #개}}",
+      "idpGroup": "ID 공급자 그룹",
+      "admin": "관리자",
+      "invitationStatus": {
+        "pending": "대기 중",
+        "accepted": "수락됨",
+        "expired": "만료됨",
+        "revoked": "취소됨"
+      },
+      "lifecycle": {
+        "active": "활성",
+        "invited": "초대됨",
+        "pending_invite": "초대 대기",
+        "pending_first_login": "첫 로그인 대기",
+        "suspended": "정지됨",
+        "deactivated": "비활성화됨",
+        "anonymized": "익명화됨"
+      },
+      "filters": {
+        "kind": "유형",
+        "role": "역할",
+        "team": "팀",
+        "lifecycle": "수명 주기",
+        "active": "마지막 활동",
+        "status": "초대 상태"
+      },
+      "options": {
+        "kind": {
+          "user": "사용자",
+          "group": "그룹",
+          "invitation": "초대"
+        },
+        "active": {
+          "7d": "최근 7일 이내",
+          "30d": "최근 30일 이내",
+          "90d": "최근 90일 이내",
+          "stale": "90일 동안 활동 없음",
+          "never": "활동 없음"
+        }
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 관련 구성원",
+        "invited": "초대됨",
+        "groups": "그룹",
+        "admins": "관리자"
+      },
+      "notes": {
+        "mine": "나와 같은 팀에 속한 구성원입니다.",
+        "invited": "대기 중인 초대입니다. 수락, 만료 또는 취소된 초대는 상태 필터로 확인하세요.",
+        "groups": "로그인, 권한 부여 및 매핑으로 알려진 ID 공급자 그룹입니다. 공급자가 배정한 모든 사용자에게 그룹의 접근 권한이 적용됩니다."
+      },
+      "searchPlaceholder": "사용자, 이메일, 그룹 검색…  role:org_admin  team:payments"
+    }
   },
   "stepUp": {
     "title": "본인 확인",

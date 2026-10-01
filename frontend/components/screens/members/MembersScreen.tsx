@@ -12,7 +12,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useNow, useTranslations } from "next-intl";
 import * as React from "react";
 
 import { PrincipalChip } from "@/components/access/PrincipalChip";
@@ -41,7 +41,13 @@ import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AnonymizeUserDialog } from "./AnonymizeUserDialog";
 import { InvitationExpiryBadge } from "./InvitationExpiryBadge";
-import { type PeopleRow, principalHref, principalOf, type UserRow } from "./people-model";
+import {
+  localizedPeopleList,
+  type PeopleRow,
+  principalHref,
+  principalOf,
+  type UserRow,
+} from "./people-model";
 import type { useMembers } from "./use-members";
 
 export type MembersScreenProps = Omit<ReturnType<typeof useMembers>, "list"> & {
@@ -94,6 +100,8 @@ export function MembersScreen({
   renderInviteDialog,
 }: MembersScreenProps) {
   const t = useTranslations("orgMembers");
+  const shared = useTranslations("shared.confirmation");
+  const grant = useTranslations("shared.access.grant");
   const fmt = useFormatters();
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [inviteTarget, setInviteTarget] = React.useState<InviteTarget | null>(null);
@@ -102,29 +110,38 @@ export function MembersScreen({
   const columns: Column<PeopleRow>[] = [
     {
       id: "principal",
-      header: "Who",
+      header: t("people.columns.who"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (row) => (
-        <PrincipalChip principal={principalOf(row)} variant="block" showId={row.kind === "group"} />
+        <PrincipalChip
+          principal={{
+            ...principalOf(row),
+            ...(row.kind === "group"
+              ? { detail: grant("groupDetail", { count: row.memberCount }) }
+              : {}),
+          }}
+          variant="block"
+          showId={row.kind === "group"}
+        />
       ),
     },
     {
       id: "roles",
-      header: "Roles",
+      header: t("people.columns.roles"),
       sortKey: "roles",
       cellClassName: "max-w-80",
       cell: (row) => <RolesCell row={row} />,
     },
     {
       id: "teams",
-      header: "Teams",
+      header: t("people.columns.teams"),
       cellClassName: "max-w-56",
       cell: (row) => <TeamsCell row={row} />,
     },
     {
       id: "status",
-      header: "Status",
+      header: t("people.columns.status"),
       cell: (row) => <StatusCell row={row} />,
     },
     {
@@ -144,7 +161,7 @@ export function MembersScreen({
     },
     {
       id: "joined",
-      header: "Joined",
+      header: t("people.columns.joined"),
       sortKey: "joined",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (row) =>
@@ -162,7 +179,7 @@ export function MembersScreen({
         <DropdownMenuItem asChild>
           <Link href={principalHref(row)}>
             <ShieldCheckIcon className="size-4" />
-            View access
+            {t("people.actions.viewAccess")}
           </Link>
         </DropdownMenuItem>
       );
@@ -176,7 +193,7 @@ export function MembersScreen({
             onSelect={() => setInviteTarget({ kind: "resend", invitation: inv })}
           >
             <SendIcon className="size-4" />
-            Resend invitation
+            {t("people.actions.resend")}
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
@@ -184,7 +201,7 @@ export function MembersScreen({
             onSelect={() => setInviteTarget({ kind: "revoke", invitation: inv })}
           >
             <Trash2Icon className="size-4" />
-            Revoke
+            {t("people.actions.revoke")}
           </DropdownMenuItem>
         </>
       ) : (
@@ -194,7 +211,7 @@ export function MembersScreen({
           onSelect={() => setInviteTarget({ kind: "delete", invitation: inv })}
         >
           <Trash2Icon className="size-4" />
-          Delete this resolved invitation
+          {t("people.actions.deleteResolved")}
         </DropdownMenuItem>
       );
     }
@@ -209,7 +226,7 @@ export function MembersScreen({
             })}
           >
             <ShieldPlusIcon className="size-4" />
-            Grant access to {row.user.username}
+            {t("people.actions.grantTo", { name: row.user.username })}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -218,13 +235,21 @@ export function MembersScreen({
           onSelect={() => setAnonymizeTarget(row)}
         >
           <UserMinusIcon className="size-4" />
-          {anonymized ? "Already anonymized" : "Anonymize user data"}
+          {t(anonymized ? "people.actions.alreadyAnonymized" : "people.actions.anonymize")}
         </DropdownMenuItem>
       </>
     );
   }
 
-  const confirm = inviteTarget ? INVITE_CONFIRM[inviteTarget.kind](inviteTarget.invitation) : null;
+  const confirm = inviteTarget
+    ? {
+        title: t(`people.confirm.${inviteTarget.kind}.title`, {
+          email: inviteTarget.invitation.email,
+        }),
+        description: t(`people.confirm.${inviteTarget.kind}.description`),
+        confirmLabel: t(`people.confirm.${inviteTarget.kind}.label`),
+      }
+    : null;
 
   return (
     <TooltipProvider>
@@ -232,27 +257,27 @@ export function MembersScreen({
         <ListPage<PeopleRow>
           header={{
             crumbs: accessCrumbs("people"),
-            title: "People",
-            context: "Users and IdP groups with access to this organization.",
+            title: t("people.title"),
+            context: t("people.description"),
             primaryAction: (
               <Can permission="org.manage_members">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)}>
                     <MailIcon className="size-4" />
-                    Invite
+                    {t("people.actions.invite")}
                   </Button>
                   <Button size="sm" asChild>
                     <Link href={grantHref({ returnTo: PEOPLE_HREF })}>
                       <ShieldPlusIcon className="size-4" />
-                      Grant access
+                      {t("people.actions.grant")}
                     </Link>
                   </Button>
                 </div>
               </Can>
             ),
           }}
-          list={list}
-          label="People"
+          list={{ ...list, definition: localizedPeopleList(list.definition, t) }}
+          label={t("people.title")}
           columns={columns}
           rows={rows}
           getRowId={(r) => r.key}
@@ -270,8 +295,8 @@ export function MembersScreen({
           menu={<ExportMenu count={totalCount} onExport={onExportCsv} exporting={exportingCsv} />}
           empty={{
             icon: <UsersIcon className="size-5" />,
-            title: "No people yet",
-            description: "Invite someone to the organization, then grant them a role.",
+            title: t("people.emptyTitle"),
+            description: t("people.emptyDescription"),
           }}
         />
 
@@ -284,7 +309,7 @@ export function MembersScreen({
           }}
           title={confirm?.title ?? ""}
           description={confirm?.description ?? ""}
-          confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+          confirmLabel={confirm?.confirmLabel ?? shared("confirm")}
           destructive={inviteTarget?.kind !== "resend"}
           onConfirm={async () => {
             if (!inviteTarget) return;
@@ -310,31 +335,6 @@ export function MembersScreen({
   );
 }
 
-const INVITE_CONFIRM: Record<
-  InviteTarget["kind"],
-  (inv: AstroliftInvitation) => { title: string; description: string; confirmLabel: string }
-> = {
-  // Re-sending rotates the token, which kills any link already handed out.
-  resend: (inv) => ({
-    title: `Re-send invitation to ${inv.email}?`,
-    description:
-      "A fresh one-time link is generated and emailed. The link this person already has stops working immediately, so re-send only if the original was lost or never arrived.",
-    confirmLabel: "Re-send invitation",
-  }),
-  revoke: (inv) => ({
-    title: `Revoke invitation for ${inv.email}?`,
-    description:
-      "The pending invitation link stops working immediately. You can re-send a fresh invitation if needed.",
-    confirmLabel: "Revoke",
-  }),
-  delete: (inv) => ({
-    title: `Delete resolved invitation for ${inv.email}?`,
-    description:
-      "Removes this resolved invitation from the list. It has no effect on the person's membership or roles.",
-    confirmLabel: "Delete",
-  }),
-};
-
 /**
  * CSV export from the filter bar's `⋯` (spec 44 §5.1, Admin lists): every
  * row the view and filters match, walked from the server, not only the page
@@ -349,17 +349,18 @@ function ExportMenu({
   onExport: () => void;
   exporting: boolean;
 }) {
+  const t = useTranslations("orgMembers.people.export");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8" aria-label="More list actions">
+        <Button variant="ghost" size="icon" className="size-8" aria-label={t("actions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem disabled={count === 0 || exporting} onSelect={onExport}>
           <DownloadIcon className="size-4" />
-          {exporting ? "Exporting CSV…" : `Export ${count.toLocaleString("en-US")} as CSV`}
+          {exporting ? t("working") : t("label", { count })}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -367,12 +368,12 @@ function ExportMenu({
 }
 
 function RolesCell({ row }: { row: PeopleRow }) {
+  const t = useTranslations("orgMembers.people");
   if (row.kind === "group") {
     return (
       <span className="text-muted-foreground text-xs">
-        {row.bindingsCount} {row.bindingsCount === 1 ? "grant" : "grants"}
-        {row.mappingsCount > 0 &&
-          `, ${row.mappingsCount} ${row.mappingsCount === 1 ? "mapping" : "mappings"}`}
+        {t("grants", { count: row.bindingsCount })}
+        {row.mappingsCount > 0 && t("mappings", { count: row.mappingsCount })}
       </span>
     );
   }
@@ -428,10 +429,11 @@ function TeamsCell({ row }: { row: PeopleRow }) {
 }
 
 function StatusCell({ row }: { row: PeopleRow }) {
+  const t = useTranslations("orgMembers.people");
   if (row.kind === "group") {
     return (
       <Badge variant="secondary" className="text-2xs">
-        IdP group
+        {t("idpGroup")}
       </Badge>
     );
   }
@@ -441,69 +443,55 @@ function StatusCell({ row }: { row: PeopleRow }) {
       <InvitationExpiryBadge expiresAt={inv.expiresAt} />
     ) : (
       <Badge variant="secondary" className="font-mono capitalize">
-        {inv.status}
+        {t.has(`invitationStatus.${inv.status}`) ? t(`invitationStatus.${inv.status}`) : inv.status}
       </Badge>
     );
   }
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <DetailStatusBadge status={row.lifecycle} tone={LIFECYCLE_TONE[row.lifecycle] ?? "muted"} />
+      <DetailStatusBadge
+        status={
+          t.has(`lifecycle.${row.lifecycle}`) ? t(`lifecycle.${row.lifecycle}`) : row.lifecycle
+        }
+        tone={LIFECYCLE_TONE[row.lifecycle] ?? "muted"}
+      />
       {row.admin && <AdminBadge />}
     </div>
   );
 }
 
 function AdminBadge() {
+  const t = useTranslations("orgMembers.people");
   return (
     <Badge variant="outline" className="text-2xs">
-      admin
+      {t("admin")}
     </Badge>
   );
-}
-
-const RELATIVE_DIVISIONS: ReadonlyArray<{ amount: number; unit: Intl.RelativeTimeFormatUnit }> = [
-  { amount: 60, unit: "second" },
-  { amount: 60, unit: "minute" },
-  { amount: 24, unit: "hour" },
-  { amount: 7, unit: "day" },
-  { amount: 4.34524, unit: "week" },
-  { amount: 12, unit: "month" },
-  { amount: Number.POSITIVE_INFINITY, unit: "year" },
-];
-
-function formatRelative(iso: string, now: number): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  let duration = (date.getTime() - now) / 1000;
-  for (const division of RELATIVE_DIVISIONS) {
-    if (Math.abs(duration) < division.amount) {
-      return rtf.format(Math.round(duration), division.unit);
-    }
-    duration /= division.amount;
-  }
-  return iso;
 }
 
 /**
  * Relative time with the absolute one on hover, and a muted "inactive" chip
  * past `STALE_THRESHOLD_DAYS`. No value reads as "never", not as suspicious.
- * "Now" is snapshotted at mount so render stays pure.
+ * The provider's request clock keeps server and initial client render consistent.
  */
 function LastActiveCell({ value }: { value: string | null | undefined }) {
   const t = useTranslations("orgMembers");
   const fmt = useFormatters();
-  const [now] = React.useState(() => Date.now());
+  const now = useNow();
   if (!value) {
     return <span className="text-muted-foreground text-sm">{t("lastActiveNever")}</span>;
   }
   const date = new Date(value);
-  const isStale = (now - date.getTime()) / (1000 * 60 * 60 * 24) > STALE_THRESHOLD_DAYS;
+  if (Number.isNaN(date.getTime()))
+    return <span className="text-muted-foreground text-sm">{value}</span>;
+  const isStale = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24) > STALE_THRESHOLD_DAYS;
   return (
     <div className="flex flex-col items-start gap-1">
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="text-foreground cursor-help text-sm">{formatRelative(value, now)}</span>
+          <span className="text-foreground cursor-help text-sm">
+            {fmt.formatRelativeTime(value, now)}
+          </span>
         </TooltipTrigger>
         <TooltipContent>{fmt.formatDateTime(date)}</TooltipContent>
       </Tooltip>

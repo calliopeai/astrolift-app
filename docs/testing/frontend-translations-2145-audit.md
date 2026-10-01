@@ -40,6 +40,22 @@ surface and is not the active workflow run list. New real playground copy also
 uses all locales. Catalogue completion and the remaining source-copy work are
 required before this issue closes.
 
+## People list presentation
+
+`MembersScreen` localizes headings, row actions, invitation confirmations, empty
+states, CSV export counts, lifecycle/status labels and group counts in all eight
+locales. Its translated definition keeps role/team labels, filter tokens, sorts,
+pages and routes intact; unknown metadata stays literal. Last-active ages use
+the locale and request clock, and absolute dates use the configured time zone.
+Invalid last-active timestamps remain literal instead of breaking the list.
+
+`people-translations.test.tsx` covers all eight catalogs, ICU contracts,
+current permission gates, exact identity/destination preservation, CSV callbacks,
+refusal retention and hydration. Existing People model tests retain the server
+query contracts; portable stories exercise all declared list states. The wider
+Members item remains incomplete until connected mutation feedback and the
+anonymization/grant dialog bodies are translated and verified.
+
 ## Shared list and table chrome
 
 `ListPage`, `FilterBar`, `ViewToggle`, `NewRowsPill`, `ListSummary`, the DataTable

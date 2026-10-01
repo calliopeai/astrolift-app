@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Translate People list headings, filters, views, group counts, export actions
+  and invitation confirmations in all eight locales. Last-active ages use the
+  request clock and selected locale; identities, role slugs, server query tokens,
+  raw refusals and confirmation requirements remain intact (#2145).
+
 - Translate deployment Metrics and pending human reviews in all eight locales,
   preserving model/app identities, query/filter values and raw read diagnostics.
   Failed Metrics reads offer retry and retain the last observed snapshot;

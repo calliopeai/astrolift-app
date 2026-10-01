@@ -3658,7 +3658,107 @@
     "sourceTooltipAria": "Granted via {scope}",
     "sourceColumn": "Source",
     "grantRoleRowLabel": "Grant role to {name}",
-    "grantRoleRowTooltip": "Grant role to {name}"
+    "grantRoleRowTooltip": "Grant role to {name}",
+    "people": {
+      "title": "People",
+      "description": "Users and IdP groups with access to this organization.",
+      "columns": {
+        "who": "Who",
+        "roles": "Roles",
+        "teams": "Teams",
+        "status": "Status",
+        "joined": "Joined"
+      },
+      "actions": {
+        "viewAccess": "View access",
+        "resend": "Resend invitation",
+        "revoke": "Revoke",
+        "deleteResolved": "Delete this resolved invitation",
+        "grantTo": "Grant access to {name}",
+        "alreadyAnonymized": "Already anonymized",
+        "anonymize": "Anonymize user data",
+        "invite": "Invite",
+        "grant": "Grant access"
+      },
+      "emptyTitle": "No people yet",
+      "emptyDescription": "Invite someone to the organization, then grant them a role.",
+      "confirm": {
+        "resend": {
+          "title": "Re-send invitation to {email}?",
+          "description": "Generate a fresh one-time link and attempt email delivery. The old link stops working immediately. Copy the fresh link if delivery fails.",
+          "label": "Re-send invitation"
+        },
+        "revoke": {
+          "title": "Revoke invitation for {email}?",
+          "description": "The pending invitation link stops working immediately. You can send a new invitation if needed.",
+          "label": "Revoke"
+        },
+        "delete": {
+          "title": "Delete resolved invitation for {email}?",
+          "description": "Remove this resolved invitation from the list. Membership and roles stay unchanged.",
+          "label": "Delete"
+        }
+      },
+      "export": {
+        "actions": "More list actions",
+        "working": "Exporting CSV…",
+        "label": "Export {count, number} as CSV"
+      },
+      "grants": "{count, plural, one {# grant} other {# grants}}",
+      "mappings": ", {count, plural, one {# mapping} other {# mappings}}",
+      "idpGroup": "IdP group",
+      "admin": "admin",
+      "invitationStatus": {
+        "pending": "pending",
+        "accepted": "accepted",
+        "expired": "expired",
+        "revoked": "revoked"
+      },
+      "lifecycle": {
+        "active": "active",
+        "invited": "invited",
+        "pending_invite": "pending invite",
+        "pending_first_login": "pending first login",
+        "suspended": "suspended",
+        "deactivated": "deactivated",
+        "anonymized": "anonymized"
+      },
+      "filters": {
+        "kind": "Kind",
+        "role": "Role",
+        "team": "Team",
+        "lifecycle": "Lifecycle",
+        "active": "Last active",
+        "status": "Invitation status"
+      },
+      "options": {
+        "kind": {
+          "user": "user",
+          "group": "group",
+          "invitation": "invitation"
+        },
+        "active": {
+          "7d": "in the last 7 days",
+          "30d": "in the last 30 days",
+          "90d": "in the last 90 days",
+          "stale": "not in 90 days",
+          "never": "never"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "invited": "Invited",
+        "groups": "Groups",
+        "admins": "Admins"
+      },
+      "notes": {
+        "mine": "People who share a team with you.",
+        "invited": "Pending invitations. Use the status filter for accepted, expired or revoked invitations.",
+        "groups": "Known IdP groups from sign-ins, grants and mappings. Group access applies to everyone assigned by the identity provider."
+      },
+      "searchPlaceholder": "Search people, emails, groups…  role:org_admin  team:payments"
+    }
   },
   "securitySessions": {
     "title": "Active sessions",

@@ -3639,7 +3639,107 @@
     "sourceTooltipAria": "通过 {scope} 授予",
     "sourceColumn": "来源",
     "grantRoleRowLabel": "为 {name} 授予角色",
-    "grantRoleRowTooltip": "为 {name} 授予角色"
+    "grantRoleRowTooltip": "为 {name} 授予角色",
+    "people": {
+      "title": "人员",
+      "description": "有权访问此组织的用户和身份提供方群组。",
+      "columns": {
+        "who": "用户或群组",
+        "roles": "角色",
+        "teams": "团队",
+        "status": "状态",
+        "joined": "加入时间"
+      },
+      "actions": {
+        "viewAccess": "查看访问权限",
+        "resend": "重新发送邀请",
+        "revoke": "撤销",
+        "deleteResolved": "删除此已处理的邀请",
+        "grantTo": "向 {name} 授予访问权限",
+        "alreadyAnonymized": "已匿名化",
+        "anonymize": "匿名化用户数据",
+        "invite": "邀请",
+        "grant": "授予访问权限"
+      },
+      "emptyTitle": "暂无人员",
+      "emptyDescription": "邀请用户加入组织，然后授予角色。",
+      "confirm": {
+        "resend": {
+          "title": "重新向 {email} 发送邀请？",
+          "description": "生成新的单次使用链接并尝试发送邮件。旧链接立即失效。若发送失败，请复制新链接。",
+          "label": "重新发送邀请"
+        },
+        "revoke": {
+          "title": "撤销 {email} 的邀请？",
+          "description": "待处理的邀请链接立即失效。必要时可以发送新邀请。",
+          "label": "撤销"
+        },
+        "delete": {
+          "title": "删除 {email} 已处理的邀请？",
+          "description": "从列表中删除此已处理的邀请。成员资格和角色保持不变。",
+          "label": "删除"
+        }
+      },
+      "export": {
+        "actions": "更多列表操作",
+        "working": "正在导出 CSV…",
+        "label": "将 {count, number} 项导出为 CSV"
+      },
+      "grants": "{count, plural, one {# 项授权} other {# 项授权}}",
+      "mappings": "，{count, plural, one {# 项映射} other {# 项映射}}",
+      "idpGroup": "身份提供方群组",
+      "admin": "管理员",
+      "invitationStatus": {
+        "pending": "待处理",
+        "accepted": "已接受",
+        "expired": "已过期",
+        "revoked": "已撤销"
+      },
+      "lifecycle": {
+        "active": "活跃",
+        "invited": "已邀请",
+        "pending_invite": "待邀请",
+        "pending_first_login": "待首次登录",
+        "suspended": "已暂停",
+        "deactivated": "已停用",
+        "anonymized": "已匿名化"
+      },
+      "filters": {
+        "kind": "类型",
+        "role": "角色",
+        "team": "团队",
+        "lifecycle": "生命周期",
+        "active": "最近活动",
+        "status": "邀请状态"
+      },
+      "options": {
+        "kind": {
+          "user": "用户",
+          "group": "群组",
+          "invitation": "邀请"
+        },
+        "active": {
+          "7d": "最近 7 天内",
+          "30d": "最近 30 天内",
+          "90d": "最近 90 天内",
+          "stale": "90 天内无活动",
+          "never": "从未活动"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "与我相关",
+        "invited": "已邀请",
+        "groups": "群组",
+        "admins": "管理员"
+      },
+      "notes": {
+        "mine": "与你同属一个团队的人员。",
+        "invited": "待处理的邀请。使用状态筛选器查看已接受、已过期或已撤销的邀请。",
+        "groups": "从登录、授权和映射中已知的身份提供方群组。群组访问权限适用于身份提供方分配的所有用户。"
+      },
+      "searchPlaceholder": "搜索人员、邮箱、群组…  role:org_admin  team:payments"
+    }
   },
   "stepUp": {
     "title": "确认身份",

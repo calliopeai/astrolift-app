@@ -3639,7 +3639,107 @@
     "sourceTooltipAria": "Attribué via {scope}",
     "sourceColumn": "Source",
     "grantRoleRowLabel": "Attribuer un rôle à {name}",
-    "grantRoleRowTooltip": "Attribuer un rôle à {name}"
+    "grantRoleRowTooltip": "Attribuer un rôle à {name}",
+    "people": {
+      "title": "Personnes",
+      "description": "Utilisateurs et groupes du fournisseur d’identité ayant accès à cette organisation.",
+      "columns": {
+        "who": "Personne ou groupe",
+        "roles": "Rôles",
+        "teams": "Équipes",
+        "status": "État",
+        "joined": "Date d’arrivée"
+      },
+      "actions": {
+        "viewAccess": "Voir les accès",
+        "resend": "Renvoyer l’invitation",
+        "revoke": "Révoquer",
+        "deleteResolved": "Supprimer cette invitation traitée",
+        "grantTo": "Accorder un accès à {name}",
+        "alreadyAnonymized": "Déjà anonymisé",
+        "anonymize": "Anonymiser les données de l’utilisateur",
+        "invite": "Inviter",
+        "grant": "Accorder un accès"
+      },
+      "emptyTitle": "Aucune personne pour le moment",
+      "emptyDescription": "Invitez une personne dans l’organisation, puis attribuez-lui un rôle.",
+      "confirm": {
+        "resend": {
+          "title": "Renvoyer l’invitation à {email} ?",
+          "description": "Génère un nouveau lien à usage unique et tente de l’envoyer par e-mail. L’ancien lien cesse immédiatement de fonctionner. Copiez le nouveau lien si l’envoi échoue.",
+          "label": "Renvoyer l’invitation"
+        },
+        "revoke": {
+          "title": "Révoquer l’invitation de {email} ?",
+          "description": "Le lien de l’invitation en attente cesse immédiatement de fonctionner. Vous pouvez envoyer une nouvelle invitation si nécessaire.",
+          "label": "Révoquer"
+        },
+        "delete": {
+          "title": "Supprimer l’invitation traitée de {email} ?",
+          "description": "Supprime cette invitation traitée de la liste. L’appartenance et les rôles restent inchangés.",
+          "label": "Supprimer"
+        }
+      },
+      "export": {
+        "actions": "Autres actions de la liste",
+        "working": "Export CSV en cours…",
+        "label": "Exporter {count, number} en CSV"
+      },
+      "grants": "{count, plural, one {# autorisation} other {# autorisations}}",
+      "mappings": ", {count, plural, one {# correspondance} other {# correspondances}}",
+      "idpGroup": "Groupe du fournisseur d’identité",
+      "admin": "administrateur",
+      "invitationStatus": {
+        "pending": "en attente",
+        "accepted": "acceptée",
+        "expired": "expirée",
+        "revoked": "révoquée"
+      },
+      "lifecycle": {
+        "active": "actif",
+        "invited": "invité",
+        "pending_invite": "invitation en attente",
+        "pending_first_login": "première connexion en attente",
+        "suspended": "suspendu",
+        "deactivated": "désactivé",
+        "anonymized": "anonymisé"
+      },
+      "filters": {
+        "kind": "Type",
+        "role": "Rôle",
+        "team": "Équipe",
+        "lifecycle": "Cycle de vie",
+        "active": "Dernière activité",
+        "status": "État de l’invitation"
+      },
+      "options": {
+        "kind": {
+          "user": "utilisateur",
+          "group": "groupe",
+          "invitation": "invitation"
+        },
+        "active": {
+          "7d": "au cours des 7 derniers jours",
+          "30d": "au cours des 30 derniers jours",
+          "90d": "au cours des 90 derniers jours",
+          "stale": "aucune activité depuis 90 jours",
+          "never": "jamais"
+        }
+      },
+      "views": {
+        "all": "Tous",
+        "mine": "Les miens",
+        "invited": "Invités",
+        "groups": "Groupes",
+        "admins": "Administrateurs"
+      },
+      "notes": {
+        "mine": "Personnes qui partagent une équipe avec vous.",
+        "invited": "Invitations en attente. Utilisez le filtre d’état pour voir les invitations acceptées, expirées ou révoquées.",
+        "groups": "Groupes connus du fournisseur d’identité issus des connexions, autorisations et correspondances. L’accès du groupe s’applique à chaque personne affectée par le fournisseur."
+      },
+      "searchPlaceholder": "Rechercher des personnes, e-mails, groupes…  role:org_admin  team:payments"
+    }
   },
   "stepUp": {
     "title": "Confirmez votre identité",

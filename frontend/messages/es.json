@@ -3639,7 +3639,107 @@
     "sourceTooltipAria": "Otorgado mediante {scope}",
     "sourceColumn": "Origen",
     "grantRoleRowLabel": "Otorgar rol a {name}",
-    "grantRoleRowTooltip": "Otorgar rol a {name}"
+    "grantRoleRowTooltip": "Otorgar rol a {name}",
+    "people": {
+      "title": "Personas",
+      "description": "Usuarios y grupos del proveedor de identidad con acceso a esta organización.",
+      "columns": {
+        "who": "Persona o grupo",
+        "roles": "Roles",
+        "teams": "Equipos",
+        "status": "Estado",
+        "joined": "Se unió"
+      },
+      "actions": {
+        "viewAccess": "Ver acceso",
+        "resend": "Reenviar invitación",
+        "revoke": "Revocar",
+        "deleteResolved": "Eliminar esta invitación resuelta",
+        "grantTo": "Otorgar acceso a {name}",
+        "alreadyAnonymized": "Ya anonimizado",
+        "anonymize": "Anonimizar datos del usuario",
+        "invite": "Invitar",
+        "grant": "Otorgar acceso"
+      },
+      "emptyTitle": "Aún no hay personas",
+      "emptyDescription": "Invita a alguien a la organización y asígnale un rol.",
+      "confirm": {
+        "resend": {
+          "title": "¿Reenviar la invitación a {email}?",
+          "description": "Genera un enlace nuevo de un solo uso e intenta enviarlo por correo. El enlace anterior deja de funcionar de inmediato. Copia el nuevo si el envío falla.",
+          "label": "Reenviar invitación"
+        },
+        "revoke": {
+          "title": "¿Revocar la invitación de {email}?",
+          "description": "El enlace de la invitación pendiente deja de funcionar de inmediato. Puedes enviar una nueva invitación si hace falta.",
+          "label": "Revocar"
+        },
+        "delete": {
+          "title": "¿Eliminar la invitación resuelta de {email}?",
+          "description": "Elimina esta invitación resuelta de la lista. La membresía y los roles se mantienen.",
+          "label": "Eliminar"
+        }
+      },
+      "export": {
+        "actions": "Más acciones de la lista",
+        "working": "Exportando CSV…",
+        "label": "Exportar {count, number} como CSV"
+      },
+      "grants": "{count, plural, one {# concesión} other {# concesiones}}",
+      "mappings": ", {count, plural, one {# asignación} other {# asignaciones}}",
+      "idpGroup": "Grupo del proveedor de identidad",
+      "admin": "administrador",
+      "invitationStatus": {
+        "pending": "pendiente",
+        "accepted": "aceptada",
+        "expired": "vencida",
+        "revoked": "revocada"
+      },
+      "lifecycle": {
+        "active": "activo",
+        "invited": "invitado",
+        "pending_invite": "invitación pendiente",
+        "pending_first_login": "primer inicio de sesión pendiente",
+        "suspended": "suspendido",
+        "deactivated": "desactivado",
+        "anonymized": "anonimizado"
+      },
+      "filters": {
+        "kind": "Tipo",
+        "role": "Rol",
+        "team": "Equipo",
+        "lifecycle": "Ciclo de vida",
+        "active": "Última actividad",
+        "status": "Estado de la invitación"
+      },
+      "options": {
+        "kind": {
+          "user": "usuario",
+          "group": "grupo",
+          "invitation": "invitación"
+        },
+        "active": {
+          "7d": "en los últimos 7 días",
+          "30d": "en los últimos 30 días",
+          "90d": "en los últimos 90 días",
+          "stale": "sin actividad en 90 días",
+          "never": "nunca"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Los míos",
+        "invited": "Invitados",
+        "groups": "Grupos",
+        "admins": "Administradores"
+      },
+      "notes": {
+        "mine": "Personas que comparten un equipo contigo.",
+        "invited": "Invitaciones pendientes. Usa el filtro de estado para ver las aceptadas, vencidas o revocadas.",
+        "groups": "Grupos conocidos del proveedor de identidad a partir de inicios de sesión, concesiones y asignaciones. El acceso del grupo se aplica a todas las personas asignadas por el proveedor."
+      },
+      "searchPlaceholder": "Buscar personas, correos, grupos…  role:org_admin  team:payments"
+    }
   },
   "stepUp": {
     "title": "Confirma tu identidad",

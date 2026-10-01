@@ -3639,7 +3639,107 @@
     "sourceTooltipAria": "Concedido via {scope}",
     "sourceColumn": "Origem",
     "grantRoleRowLabel": "Conceder função a {name}",
-    "grantRoleRowTooltip": "Conceder função a {name}"
+    "grantRoleRowTooltip": "Conceder função a {name}",
+    "people": {
+      "title": "Pessoas",
+      "description": "Usuários e grupos do provedor de identidade com acesso a esta organização.",
+      "columns": {
+        "who": "Pessoa ou grupo",
+        "roles": "Papéis",
+        "teams": "Equipes",
+        "status": "Estado",
+        "joined": "Entrada"
+      },
+      "actions": {
+        "viewAccess": "Ver acesso",
+        "resend": "Reenviar convite",
+        "revoke": "Revogar",
+        "deleteResolved": "Excluir este convite resolvido",
+        "grantTo": "Conceder acesso a {name}",
+        "alreadyAnonymized": "Já anonimizado",
+        "anonymize": "Anonimizar dados do usuário",
+        "invite": "Convidar",
+        "grant": "Conceder acesso"
+      },
+      "emptyTitle": "Ainda não há pessoas",
+      "emptyDescription": "Convide alguém para a organização e atribua um papel.",
+      "confirm": {
+        "resend": {
+          "title": "Reenviar o convite para {email}?",
+          "description": "Gera um novo link de uso único e tenta enviá-lo por e-mail. O link anterior deixa de funcionar imediatamente. Copie o novo link se o envio falhar.",
+          "label": "Reenviar convite"
+        },
+        "revoke": {
+          "title": "Revogar o convite para {email}?",
+          "description": "O link do convite pendente deixa de funcionar imediatamente. Você pode enviar um novo convite se necessário.",
+          "label": "Revogar"
+        },
+        "delete": {
+          "title": "Excluir o convite resolvido para {email}?",
+          "description": "Remove este convite resolvido da lista. A associação e os papéis permanecem iguais.",
+          "label": "Excluir"
+        }
+      },
+      "export": {
+        "actions": "Mais ações da lista",
+        "working": "Exportando CSV…",
+        "label": "Exportar {count, number} como CSV"
+      },
+      "grants": "{count, plural, one {# concessão} other {# concessões}}",
+      "mappings": ", {count, plural, one {# mapeamento} other {# mapeamentos}}",
+      "idpGroup": "Grupo do provedor de identidade",
+      "admin": "administrador",
+      "invitationStatus": {
+        "pending": "pendente",
+        "accepted": "aceito",
+        "expired": "expirado",
+        "revoked": "revogado"
+      },
+      "lifecycle": {
+        "active": "ativo",
+        "invited": "convidado",
+        "pending_invite": "convite pendente",
+        "pending_first_login": "primeiro acesso pendente",
+        "suspended": "suspenso",
+        "deactivated": "desativado",
+        "anonymized": "anonimizado"
+      },
+      "filters": {
+        "kind": "Tipo",
+        "role": "Papel",
+        "team": "Equipe",
+        "lifecycle": "Ciclo de vida",
+        "active": "Última atividade",
+        "status": "Estado do convite"
+      },
+      "options": {
+        "kind": {
+          "user": "usuário",
+          "group": "grupo",
+          "invitation": "convite"
+        },
+        "active": {
+          "7d": "nos últimos 7 dias",
+          "30d": "nos últimos 30 dias",
+          "90d": "nos últimos 90 dias",
+          "stale": "sem atividade há 90 dias",
+          "never": "nunca"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "invited": "Convidados",
+        "groups": "Grupos",
+        "admins": "Administradores"
+      },
+      "notes": {
+        "mine": "Pessoas que compartilham uma equipe com você.",
+        "invited": "Convites pendentes. Use o filtro de estado para ver convites aceitos, expirados ou revogados.",
+        "groups": "Grupos conhecidos do provedor de identidade a partir de acessos, concessões e mapeamentos. O acesso do grupo vale para todas as pessoas atribuídas pelo provedor."
+      },
+      "searchPlaceholder": "Buscar pessoas, e-mails, grupos…  role:org_admin  team:payments"
+    }
   },
   "stepUp": {
     "title": "Confirme sua identidade",

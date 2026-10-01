@@ -3639,7 +3639,107 @@
     "sourceTooltipAria": "Vergeben über {scope}",
     "sourceColumn": "Quelle",
     "grantRoleRowLabel": "Rolle an {name} vergeben",
-    "grantRoleRowTooltip": "Rolle an {name} vergeben"
+    "grantRoleRowTooltip": "Rolle an {name} vergeben",
+    "people": {
+      "title": "Personen",
+      "description": "Benutzer und Gruppen des Identitätsanbieters mit Zugriff auf diese Organisation.",
+      "columns": {
+        "who": "Person oder Gruppe",
+        "roles": "Rollen",
+        "teams": "Teams",
+        "status": "Status",
+        "joined": "Beigetreten"
+      },
+      "actions": {
+        "viewAccess": "Zugriff ansehen",
+        "resend": "Einladung erneut senden",
+        "revoke": "Widerrufen",
+        "deleteResolved": "Diese erledigte Einladung löschen",
+        "grantTo": "{name} Zugriff gewähren",
+        "alreadyAnonymized": "Bereits anonymisiert",
+        "anonymize": "Benutzerdaten anonymisieren",
+        "invite": "Einladen",
+        "grant": "Zugriff gewähren"
+      },
+      "emptyTitle": "Noch keine Personen",
+      "emptyDescription": "Laden Sie jemanden in die Organisation ein und weisen Sie eine Rolle zu.",
+      "confirm": {
+        "resend": {
+          "title": "Einladung an {email} erneut senden?",
+          "description": "Erzeugt einen neuen Einmallink und versucht ihn per E-Mail zu senden. Der alte Link wird sofort ungültig. Kopieren Sie den neuen Link, falls der Versand fehlschlägt.",
+          "label": "Einladung erneut senden"
+        },
+        "revoke": {
+          "title": "Einladung für {email} widerrufen?",
+          "description": "Der Link der ausstehenden Einladung wird sofort ungültig. Bei Bedarf können Sie eine neue Einladung senden.",
+          "label": "Widerrufen"
+        },
+        "delete": {
+          "title": "Erledigte Einladung für {email} löschen?",
+          "description": "Entfernt diese erledigte Einladung aus der Liste. Mitgliedschaft und Rollen bleiben erhalten.",
+          "label": "Löschen"
+        }
+      },
+      "export": {
+        "actions": "Weitere Listenaktionen",
+        "working": "CSV wird exportiert…",
+        "label": "{count, number} als CSV exportieren"
+      },
+      "grants": "{count, plural, one {# Zuweisung} other {# Zuweisungen}}",
+      "mappings": ", {count, plural, one {# Zuordnung} other {# Zuordnungen}}",
+      "idpGroup": "Gruppe des Identitätsanbieters",
+      "admin": "Administrator",
+      "invitationStatus": {
+        "pending": "ausstehend",
+        "accepted": "angenommen",
+        "expired": "abgelaufen",
+        "revoked": "widerrufen"
+      },
+      "lifecycle": {
+        "active": "aktiv",
+        "invited": "eingeladen",
+        "pending_invite": "Einladung ausstehend",
+        "pending_first_login": "erste Anmeldung ausstehend",
+        "suspended": "gesperrt",
+        "deactivated": "deaktiviert",
+        "anonymized": "anonymisiert"
+      },
+      "filters": {
+        "kind": "Art",
+        "role": "Rolle",
+        "team": "Team",
+        "lifecycle": "Lebenszyklus",
+        "active": "Zuletzt aktiv",
+        "status": "Einladungsstatus"
+      },
+      "options": {
+        "kind": {
+          "user": "Benutzer",
+          "group": "Gruppe",
+          "invitation": "Einladung"
+        },
+        "active": {
+          "7d": "in den letzten 7 Tagen",
+          "30d": "in den letzten 30 Tagen",
+          "90d": "in den letzten 90 Tagen",
+          "stale": "seit 90 Tagen nicht aktiv",
+          "never": "nie"
+        }
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "invited": "Eingeladene",
+        "groups": "Gruppen",
+        "admins": "Administratoren"
+      },
+      "notes": {
+        "mine": "Personen, die mit Ihnen in einem Team sind.",
+        "invited": "Ausstehende Einladungen. Verwenden Sie den Statusfilter für angenommene, abgelaufene oder widerrufene Einladungen.",
+        "groups": "Bekannte Gruppen des Identitätsanbieters aus Anmeldungen, Zuweisungen und Zuordnungen. Der Gruppenzugriff gilt für alle vom Anbieter zugeordneten Personen."
+      },
+      "searchPlaceholder": "Personen, E-Mails, Gruppen suchen…  role:org_admin  team:payments"
+    }
   },
   "stepUp": {
     "title": "Bestätige deine Identität",
