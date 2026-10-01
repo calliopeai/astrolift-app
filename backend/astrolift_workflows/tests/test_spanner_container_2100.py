@@ -18,7 +18,6 @@ from gcp.managed.graph_spanner import (
     _dynamic_graph_ddl,
     _owner_ddl,
 )
-from tests.gcp.test_managed_graph_spanner import FakeSpannerClient
 
 from astrolift_services.models import ManagedService
 from astrolift_workflows.activities.managed_service_lifecycle import (
@@ -30,6 +29,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
 )
 from astrolift_workflows.spanner_ownership import container_exclusive
 from astrolift_workflows.tests.test_recorded_handle_exclusive_2086 import _service
+from providers.tests.gcp.test_managed_graph_spanner import FakeSpannerClient
 
 pytestmark = pytest.mark.django_db
 HANDLE = "graph_db/legacy-container/knowledge"
