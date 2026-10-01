@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- GCP Pub/Sub queues use full immutable service-ID names for new resources and
+  preserve exact recorded paths. Current source/default-child ownership,
+  bounded inventory and finite SDK budgets gate operations. Retained-data
+  cleanup never seeks/discards messages without explicit deletion; failed child
+  deletion and force flags cannot fake success (#2032, #2098, bounded scope).
+
 - Pub/Sub cleanup preserves failed/unknown ownership outcomes across permission
   errors, incomplete subscription inventory and denied child operations. Error
   text and caller-controlled names cannot become successful deletion; concrete

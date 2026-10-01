@@ -302,6 +302,63 @@ external resource replacement/retag races remain separate work. Tests use the
 real Google SDK, actual protobuf pagination and controlled localhost responses,
 with real PostgreSQL lifecycle records and no tenant cloud calls.
 
+### GCP Pub/Sub queue identity, ownership and retention (#2032, #2098)
+
+New `queue/pubsub` topics use a complete canonical nonzero persisted service
+UUID in hexadecimal; only the normalized cosmetic operator prefix is
+truncated. Parent IDs are at most 251 characters, reserving the literal `-sub`
+inside the subscription's 255-character ID limit. Exact valid recorded parent
+and default-child paths override new naming defaults. Invalid recorded IDs,
+unknown identities and recorded parents that cannot fit their derived child
+refuse; no fallback slug, fresh ID, truncation or rename is attempted. Prefixes
+must stay stable until the first handle is recorded.
+
+Provision, binding, readiness, update refusal and cleanup read the current
+topic and default subscription before accepting authority. The parent needs
+its exact service-ID label or the actual central exclusive legacy record;
+matching human labels do not suffice. Returned topic/subscription resource
+names must exactly match the requested configured-project paths; missing or
+foreign response identities cannot reuse owner labels as authority. A missing
+or malformed configured project refuses before any RPC. A legacy unlabelled default child may
+use its immutable topic reference only after the current parent's owner has
+been established. New children carry the complete service-ID label. Foreign
+labels and mismatched topic references always refuse. A missing parent with
+a remaining child is unknown authority, including a child pointing to GCP's
+`_deleted-topic_` marker; the driver does not adopt or remove it by inference.
+
+No queue operation has implicit SDK retries. Every RPC uses at most five
+seconds and the remaining 20-second operation budget. Cleanup explicitly
+requests at most ten 100-item inventory pages and at most 1,000 total child
+paths. Overflow, repeated cursors, incomplete pages, inaccessible reads and
+expired budgets refuse before destructive effects. Outside-default children
+require explicit force plus their own current source-ID/topic proof; they
+cannot use the unlabelled legacy default-child fallback. Foreign-project
+children always refuse. Cloud-admin replacement/retag races remain outside
+these observation checks; they are not atomic cloud incarnation locks.
+
+The old "drain" and force-success claims are removed. Pub/Sub
+[subscription deletion drops its retained messages](https://docs.cloud.google.com/pubsub/docs/reference/rest/v1/projects.subscriptions/delete),
+while [topic deletion leaves subscriptions and their backlog](https://docs.cloud.google.com/pubsub/docs/delete-topic).
+Without explicit `delete_data=true`, a present queue returns the existing
+retained-message refusal; it never seeks, acknowledges or deletes data.
+Snapshot/restore remain unsupported, so the central data-preserving path
+refuses without cloud mutation. Force cannot bypass current ownership or turn
+failed subscription deletion into success; the parent is not deleted after
+an unconfirmed child delete. Concrete typed absence of both recorded targets
+still converges. A late parent-delete failure remains failed partial cleanup.
+Structured refused/unknown codes prevent diagnostic substrings from becoming
+successful cleanup. Binding values, role scopes and the lack of editable
+queue settings remain unchanged.
+
+Real PostgreSQL production lifecycle tests use actual Google Publisher and
+Subscriber SDK calls through a bounded localhost protobuf/gRPC server. They
+verify API identity, deadlines, paging and refused side effects, not live GCP
+IAM, persistence or delivery guarantees. Other driver families and broad
+#2032/#2098 acceptance stay open; #2021 and #2029 remain excluded. The separate
+`topic/pubsub_topic` driver retains its existing transport/inventory limits
+and external replacement-race limitations; this queue leaf does not silently
+extend those contracts.
+
 ### AWS live binding and S3 incarnation checks (#2098)
 
 S3, SQS and DynamoDB bindings require the actual live resource's platform marker
