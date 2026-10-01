@@ -70,10 +70,11 @@ export interface ClusterSettingsCards {
 
 export type ClusterSettingsScreenProps = Omit<
   ReturnType<typeof useClusterSettings>,
-  "error" | "onRetry"
+  "error" | "onRetry" | "readOnly"
 > & {
   error?: string | null;
   onRetry?: () => void;
+  readOnly?: boolean;
   slug: string;
   cards?: ClusterSettingsCards;
   /** The bootstrap history list, mounted only while its disclosure is open. */
@@ -105,9 +106,11 @@ export function ClusterSettingsScreen({
   loading,
   error,
   onRetry,
+  readOnly = false,
   lifecycle,
   bringing,
   refreshing,
+  decommissioning,
   onBring,
   onRefresh,
   onDecommission,
@@ -118,6 +121,10 @@ export function ClusterSettingsScreen({
   section,
 }: ClusterSettingsScreenProps) {
   const sourceT = useTranslations("clusterSettings.source");
+  const lifecycleT = useTranslations("clusterSettings.lifecycle");
+  const presentationT = useTranslations("clusterSettings.presentation");
+  const centralT = useTranslations("clusterSettings.centralAuth");
+  const ingressClassT = useTranslations("clusterSettings.ingressClass");
   const ingressAuthT = useTranslations("clusterSettings.ingressAuth");
   const authUsersT = useTranslations("clusterSettings.authUsers");
   const fmt = useFormatters();
@@ -191,14 +198,17 @@ export function ClusterSettingsScreen({
     );
   }
 
-  const caps = (cluster.capabilities ?? {}) as Record<string, unknown>;
-  const certManager = (caps.cert_manager ?? {}) as { installed?: boolean };
-  const ingress = (caps.ingress ?? {}) as { installed?: boolean };
+  const caps = reportObject(cluster.capabilities);
   const missingHeadlinePrereq =
-    lifecycle === "managed" && (!certManager.installed || !ingress.installed);
+    lifecycle === "managed" &&
+    (reportObject(caps.cert_manager).installed !== true ||
+      reportObject(caps.ingress).installed !== true);
 
+  const actionsBlocked =
+    readOnly || loading || !!error || bringing || refreshing || decommissioning;
+  const reviewKey = JSON.stringify([slug, cluster, loading, error, readOnly, access]);
   const { primaryAction, menu } = access.manage
-    ? lifecycleActions({ lifecycle, bringing, refreshing, onBring, onRefresh })
+    ? lifecycleActions({ lifecycle, onBring, onRefresh, blocked: actionsBlocked, t: lifecycleT })
     : { primaryAction: undefined, menu: undefined };
 
   return (
@@ -220,12 +230,9 @@ export function ClusterSettingsScreen({
         >
           <p className="text-danger flex items-center gap-2 text-sm font-medium">
             <AlertTriangleIcon className="size-4 shrink-0" />
-            Last management failure
+            {lifecycleT("failureTitle")}
           </p>
-          <p className="text-muted-foreground text-sm">
-            The workflow recorded this error on its most recent attempt. Fix the underlying issue
-            and click Retry to re-run.
-          </p>
+          <p className="text-muted-foreground text-sm">{lifecycleT("failureHelp")}</p>
           <pre className="text-danger font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
             {cluster.lastManagementError}
           </pre>
@@ -237,18 +244,18 @@ export function ClusterSettingsScreen({
         sections={[
           {
             id: "agent",
-            title: "Agent",
+            title: presentationT("agent"),
             content: (
               <div className="flex min-w-0 flex-col gap-10">
                 <Section
-                  title="Connection"
-                  description="How the platform reaches the cluster's API server."
+                  title={presentationT("connection")}
+                  description={presentationT("connectionHelp")}
                   divided
                 >
                   <dl className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-                    <Field label="API endpoint" mono value={cluster.endpoint} />
+                    <Field label={presentationT("endpoint")} mono value={cluster.endpoint} />
                     <Field
-                      label="Auth method"
+                      label={presentationT("authMethod")}
                       value={
                         <span className="inline-flex min-w-0 items-center gap-1.5">
                           <ShieldIcon className="size-3.5 shrink-0" />
@@ -258,8 +265,12 @@ export function ClusterSettingsScreen({
                         </span>
                       }
                     />
-                    <Field label="Ingress class" mono value={cluster.ingressClass} />
-                    <Field label="Registered" mono value={fmt.formatDateTime(cluster.createdAt)} />
+                    <Field label={ingressClassT("title")} mono value={cluster.ingressClass} />
+                    <Field
+                      label={presentationT("registered")}
+                      mono
+                      value={fmt.formatDateTime(cluster.createdAt)}
+                    />
                   </dl>
                 </Section>
                 <Restricted
@@ -274,7 +285,7 @@ export function ClusterSettingsScreen({
           },
           {
             id: "ingress-class",
-            title: "Ingress class",
+            title: ingressClassT("title"),
             content: (
               <Restricted mode={restrictedMode} allowed={access.update} permission="cluster.update">
                 {cards.ingressClass}
@@ -283,7 +294,7 @@ export function ClusterSettingsScreen({
           },
           {
             id: "central-auth",
-            title: "Central auth",
+            title: centralT("title"),
             content: (
               <Restricted mode={restrictedMode} allowed={access.update} permission="cluster.update">
                 {cards.centralAuth}
@@ -307,14 +318,14 @@ export function ClusterSettingsScreen({
             ) : (
               // The user list itself needs the permission, so there are no
               // fields to show disabled: only the sentence.
-              <Section title="Sign-in users" divided>
-                <PermissionNote permission="cluster.users" verb="Seeing and changing them" />
+              <Section title={authUsersT("title")} divided>
+                <PermissionNote permission="cluster.users" verb={presentationT("usersVerb")} />
               </Section>
             ),
           },
           {
             id: "bootstrap",
-            title: "Bootstrap",
+            title: presentationT("bootstrap"),
             content: (
               <div className="flex min-w-0 flex-col gap-10">
                 <CapabilitiesSection
@@ -354,38 +365,38 @@ export function ClusterSettingsScreen({
               allowed={access.unregister}
               permission="cluster.unregister"
             >
-              <div className="flex min-w-0 flex-col divide-y">
+              <fieldset
+                disabled={actionsBlocked || !["managed", "error"].includes(lifecycle)}
+                className="flex min-w-0 flex-col divide-y"
+              >
                 <DangerAction
-                  title="Decommission"
-                  description="The platform stops managing this cluster; the cluster keeps running. Apps already bound here must be migrated first: the workflow refuses while bindings are active."
-                  actionLabel="Decommission"
-                  confirmTitle={
-                    <>
-                      Decommission <span className="font-mono">{cluster.slug}</span>?
-                    </>
-                  }
-                  confirmDescription="Its lifecycle flips to decommissioned and it leaves the active-cluster picker for new app deploys. The cluster and its cloud infrastructure keep running."
+                  key={`${reviewKey}:keep`}
+                  title={lifecycleT("retire")}
+                  description={lifecycleT("retireHelp")}
+                  actionLabel={lifecycleT("retire")}
+                  confirmTitle={lifecycleT.rich("retireConfirm", {
+                    cluster: () => <span className="font-mono">{cluster.slug}</span>,
+                  })}
+                  confirmDescription={lifecycleT("retireConfirmHelp")}
                   onConfirm={() => onDecommission(false)}
                 />
                 <DangerAction
-                  title="Decommission and delete the cluster"
-                  description={
-                    <>
-                      Also calls the {cluster.providerPluginSlug} driver&apos;s{" "}
-                      <code className="font-mono text-xs">teardown_cluster</code>, which
-                      irreversibly deletes the underlying managed cluster.
-                    </>
-                  }
-                  actionLabel="Decommission + delete cluster"
-                  confirmTitle={
-                    <>
-                      Decommission and delete <span className="font-mono">{cluster.slug}</span>?
-                    </>
-                  }
-                  confirmDescription="Node groups and Fargate profiles cascade-delete with the managed cluster. The cloud-controlled VPC, IAM and DNS roots remain operator-owned. Apps already bound here must be migrated first."
+                  key={`${reviewKey}:delete`}
+                  title={lifecycleT("deleteCluster")}
+                  description={lifecycleT.rich("deleteHelp", {
+                    provider: () => (
+                      <code className="font-mono text-xs">{cluster.providerPluginSlug}</code>
+                    ),
+                    command: () => <code className="font-mono text-xs">teardown_cluster</code>,
+                  })}
+                  actionLabel={lifecycleT("deleteAction")}
+                  confirmTitle={lifecycleT.rich("deleteConfirm", {
+                    cluster: () => <span className="font-mono">{cluster.slug}</span>,
+                  })}
+                  confirmDescription={lifecycleT("deleteConfirmHelp")}
                   onConfirm={() => onDecommission(true)}
                 />
-              </div>
+              </fieldset>
             </Restricted>
           )
         }
@@ -400,20 +411,20 @@ export function ClusterSettingsScreen({
  */
 function lifecycleActions({
   lifecycle,
-  bringing,
-  refreshing,
   onBring,
   onRefresh,
-}: Pick<
-  ClusterSettingsScreenProps,
-  "lifecycle" | "bringing" | "refreshing" | "onBring" | "onRefresh"
->): { primaryAction: React.ReactNode; menu?: React.ReactNode } {
+  blocked,
+  t,
+}: Pick<ClusterSettingsScreenProps, "lifecycle" | "onBring" | "onRefresh"> & {
+  blocked: boolean;
+  t: ReturnType<typeof useTranslations<"clusterSettings.lifecycle">>;
+}): { primaryAction: React.ReactNode; menu?: React.ReactNode } {
   if (lifecycle === "managing") {
     return {
       primaryAction: (
-        <Button size="sm" variant="outline" onClick={() => onRefresh(true)} disabled={refreshing}>
+        <Button size="sm" variant="outline" onClick={() => onRefresh(true)} disabled={blocked}>
           <RefreshCcwIcon className="size-4" />
-          Force retrigger
+          {t("forceRetrigger")}
         </Button>
       ),
     };
@@ -421,36 +432,51 @@ function lifecycleActions({
   if (lifecycle === "managed") {
     return {
       primaryAction: (
-        <Button size="sm" variant="outline" onClick={() => onRefresh(false)} disabled={refreshing}>
+        <Button size="sm" variant="outline" onClick={() => onRefresh(false)} disabled={blocked}>
           <RefreshCcwIcon className="size-4" />
-          Refresh setup
+          {t("refresh")}
         </Button>
       ),
       menu: (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" aria-label="More actions">
+            <Button size="icon" variant="ghost" aria-label={t("more")} disabled={blocked}>
               <MoreHorizontalIcon className="size-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled={refreshing} onSelect={() => onRefresh(true)}>
+            <DropdownMenuItem disabled={blocked} onSelect={() => onRefresh(true)}>
               <PlayIcon className="size-4" />
-              Re-run preflight
+              {t("fullRefresh")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
     };
   }
+  if (!["registered", "error"].includes(lifecycle)) return { primaryAction: undefined };
   return {
     primaryAction: (
-      <Button size="sm" onClick={onBring} disabled={bringing}>
+      <Button size="sm" onClick={onBring} disabled={blocked}>
         <PlayIcon className="size-4" />
-        {lifecycle === "error" ? "Retry bring into management" : "Bring into management"}
+        {t(lifecycle === "error" ? "retryManage" : "manage")}
       </Button>
     ),
   };
+}
+
+function reportObject(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function reportText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function reportedInstalled(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
 }
 
 function CapabilitiesSection({
@@ -462,20 +488,14 @@ function CapabilitiesSection({
   probedAt?: string | null;
   lifecycle: Lifecycle;
 }) {
+  const t = useTranslations("clusterSettings.presentation");
   return (
-    <Section
-      title="Probed capabilities"
-      description="Reported by the management workflow on the most recent run. Empty until the cluster is brought into management; Refresh setup re-probes."
-      divided
-    >
+    <Section title={t("capabilities")} description={t("capabilitiesHelp")} divided>
       {Object.keys(caps).length === 0 ? (
-        !probedAt || lifecycle === "managing" ? (
+        lifecycle === "managing" && !probedAt ? (
           <Skeleton className="h-32 w-full" />
         ) : (
-          <p className="text-muted-foreground text-sm">
-            No capabilities reported yet. Click <strong>Bring into management</strong> to run the
-            probe.
-          </p>
+          <p className="text-muted-foreground text-sm">{t("noCapabilities")}</p>
         )
       ) : (
         <dl className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
@@ -489,63 +509,58 @@ function CapabilitiesSection({
 }
 
 function MissingPrereqs({ slug }: { slug: string }) {
+  const t = useTranslations("clusterSettings.presentation");
   return (
     <div className="border-muted-foreground/30 bg-muted/30 min-w-0 rounded-md border border-dashed p-4 text-sm">
-      <p className="font-medium">Missing platform prerequisites</p>
-      <p className="text-muted-foreground mt-1">
-        One or more headline prereqs (cert-manager, ingress controller) aren&apos;t detected. Tenant
-        deploys may fail at TLS / ingress provisioning. Two paths to fix:
-      </p>
+      <p className="font-medium">{t("missingTitle")}</p>
+      <p className="text-muted-foreground mt-1">{t("missingHelp")}</p>
       <ul className="text-muted-foreground mt-2 ml-4 list-disc space-y-1">
+        <li>{t("recipeHelp")}</li>
         <li>
-          Use the bootstrap recipe below to apply driver-tuned prereqs via Flux (recommended for
-          managed clusters).
+          {t.rich("cliHelp", {
+            command: () => (
+              <code className="font-mono text-xs [overflow-wrap:anywhere]">
+                astro cluster bootstrap --cluster-slug {slug}
+              </code>
+            ),
+            link: (children) => (
+              <Link href="/downloads" className="text-primary underline-offset-4 hover:underline">
+                {children}
+              </Link>
+            ),
+          })}
         </li>
         <li>
-          Run{" "}
-          <code className="font-mono text-xs [overflow-wrap:anywhere]">
-            astro cluster bootstrap --cluster-slug {slug}
-          </code>{" "}
-          from your terminal for the one-shot CLI path.{" "}
-          <Link href="/downloads" className="text-primary underline-offset-4 hover:underline">
-            Install the CLI
-          </Link>
-          .
-        </li>
-        <li>
-          See{" "}
-          <Link
-            href="/documentation/cluster-prerequisites"
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            cluster prerequisites
-          </Link>{" "}
-          for manual install commands per controller.
+          {t.rich("manualHelp", {
+            link: (children) => (
+              <Link
+                href="/documentation/cluster-prerequisites"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                {children}
+              </Link>
+            ),
+          })}
         </li>
       </ul>
     </div>
   );
 }
 
-// Per-capability renderer. Each key in the JSONField shape has a small
-// adapter that pulls out the user-facing status string + detail line,
-// so the operator reads a fixed set of facts without decoding the JSON.
 function CapabilityItem({ keyName, value }: { keyName: string; value: unknown }) {
-  const presentation = formatCapability(keyName, value);
+  const t = useTranslations("clusterSettings.presentation");
+  const historyT = useTranslations("clusterSettings.bootstrapHistory");
+  const presentation = formatCapability(keyName, value, t);
   return (
     <div className="min-w-0">
       <dt className="font-mono text-xs">{presentation.label}</dt>
       <dd className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
-        {presentation.installed ? (
-          <Badge variant="default" className="gap-1">
-            <CheckCircleIcon className="size-3" />
-            Installed
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="gap-1">
-            Not detected
-          </Badge>
-        )}
+        <Badge variant={presentation.installed === true ? "default" : "outline"} className="gap-1">
+          {presentation.installed === true && <CheckCircleIcon className="size-3" />}
+          {presentation.installed === null
+            ? historyT("unknown")
+            : t(presentation.installed ? "installed" : "notDetected")}
+        </Badge>
         <span className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
           {presentation.detail}
         </span>
@@ -556,72 +571,50 @@ function CapabilityItem({ keyName, value }: { keyName: string; value: unknown })
 
 function formatCapability(
   key: string,
-  value: unknown
-): { label: string; installed: boolean; detail: string } {
-  if (key === "cert_manager") {
-    const v = (value ?? {}) as {
-      installed?: boolean;
-      version?: string | null;
-      default_issuer?: string | null;
-    };
+  value: unknown,
+  t: ReturnType<typeof useTranslations<"clusterSettings.presentation">>
+): { label: string; installed: boolean | null; detail: string } {
+  const v = reportObject(value);
+  const detail = (key: "versionDetail" | "issuerDetail" | "classDetail", value: unknown) => {
+    const text = reportText(value);
+    return text ? t(key, { value: text }) : undefined;
+  };
+  if (key === "cert_manager")
     return {
       label: "cert-manager",
-      installed: !!v.installed,
+      installed: reportedInstalled(v.installed),
       detail:
-        [v.version && `version ${v.version}`, v.default_issuer && `issuer ${v.default_issuer}`]
+        [detail("versionDetail", v.version), detail("issuerDetail", v.default_issuer)]
           .filter(Boolean)
           .join(" · ") || "—",
     };
-  }
-  if (key === "ingress") {
-    const v = (value ?? {}) as {
-      installed?: boolean;
-      class?: string | null;
-      controller_version?: string | null;
-    };
+  if (key === "ingress")
     return {
-      label: "ingress controller",
-      installed: !!v.installed,
+      label: t("ingressController"),
+      installed: reportedInstalled(v.installed),
       detail:
-        [v.class && `class ${v.class}`, v.controller_version && `version ${v.controller_version}`]
+        [detail("classDetail", v.class), detail("versionDetail", v.controller_version)]
           .filter(Boolean)
           .join(" · ") || "—",
     };
-  }
-  if (key === "external_dns") {
-    const v = (value ?? {}) as { installed?: boolean; provider?: string | null };
+  if (key === "external_dns")
     return {
       label: "external-dns",
-      installed: !!v.installed,
-      detail: v.provider ?? "—",
+      installed: reportedInstalled(v.installed),
+      detail: reportText(v.provider) || "—",
     };
-  }
   if (key === "storage_classes") {
-    const arr = Array.isArray(value) ? (value as string[]) : [];
+    const known = Array.isArray(value) && value.every((item) => reportText(item) !== undefined);
     return {
-      label: "storage classes",
-      installed: arr.length > 0,
-      detail: arr.length > 0 ? arr.join(", ") : "—",
-    };
-  }
-  if (key === "metrics_server") {
-    return {
-      label: "metrics-server",
-      installed: !!value,
-      detail: "—",
-    };
-  }
-  if (key === "prometheus") {
-    return {
-      label: "Prometheus",
-      installed: !!value,
-      detail: "—",
+      label: t("storageClasses"),
+      installed: known ? value.length > 0 : null,
+      detail: known && value.length ? value.join(", ") : "—",
     };
   }
   return {
-    label: key,
-    installed: false,
-    detail: typeof value === "object" ? JSON.stringify(value) : String(value),
+    label: key === "metrics_server" ? "metrics-server" : "Prometheus",
+    installed: reportedInstalled(value),
+    detail: "—",
   };
 }
 
@@ -648,18 +641,18 @@ function LastBootstrapSection({
   const fmt = useFormatters();
 
   const cliHint = `astro cluster bootstrap --cluster-slug ${slug}`;
+  const t = useTranslations("clusterSettings.presentation");
+  const historyT = useTranslations("clusterSettings.bootstrapHistory");
 
   if (!run) {
     return (
       <Section
-        title="Last bootstrap"
-        description={
-          <>
-            No bootstrap runs reported for this cluster yet. Run{" "}
-            <code className="font-mono text-xs [overflow-wrap:anywhere]">{cliHint}</code> from the
-            CLI to install platform prerequisites; the outcome will land here automatically.
-          </>
-        }
+        title={t("lastBootstrap")}
+        description={t.rich("noBootstrap", {
+          command: () => (
+            <code className="font-mono text-xs [overflow-wrap:anywhere]">{cliHint}</code>
+          ),
+        })}
         divided
       >
         {null}
@@ -668,17 +661,15 @@ function LastBootstrapSection({
   }
 
   const succeeded = run.status === "succeeded";
-  const releaseCount = bootstrapReleaseCount(run.installedReleases);
+  const failed = run.status === "failed";
+  const releaseCount = Array.isArray(run.installedReleases) ? run.installedReleases.length : null;
 
   return (
     <Section
-      title="Last bootstrap"
-      description={
-        <>
-          Most recent <code className="font-mono text-xs">astro cluster bootstrap</code> run
-          reported by the CLI. Re-runs append; the row never mutates after the CLI submits it.
-        </>
-      }
+      title={t("lastBootstrap")}
+      description={t.rich("lastBootstrapHelp", {
+        command: (children) => <code className="font-mono text-xs">{children}</code>,
+      })}
       divided
     >
       <div className="flex min-w-0 flex-col gap-3">
@@ -686,13 +677,15 @@ function LastBootstrapSection({
           {succeeded ? (
             <Badge variant="default" className="gap-1">
               <CheckCircleIcon className="size-3" />
-              Succeeded
+              {historyT("succeeded")}
             </Badge>
-          ) : (
+          ) : failed ? (
             <Badge variant="destructive" className="gap-1">
               <XCircleIcon className="size-3" />
-              Failed
+              {historyT("failed")}
             </Badge>
+          ) : (
+            <Badge variant="outline">{run.status || historyT("unknown")}</Badge>
           )}
           <span
             className="text-muted-foreground font-mono text-xs"
@@ -708,42 +701,41 @@ function LastBootstrapSection({
         </div>
 
         <dl className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-          <Field label="Chart version" mono value={run.chartVersion || "—"} />
+          <Field label={historyT("chart")} mono value={run.chartVersion || "—"} />
           <Field
-            label="Installed releases"
+            label={historyT("releases")}
             value={
               <span>
-                <span className="font-mono font-semibold">{releaseCount}</span>{" "}
-                <span className="text-muted-foreground text-xs">
-                  release{releaseCount === 1 ? "" : "s"}
-                </span>
+                {releaseCount === null
+                  ? historyT("unknown")
+                  : t("releasesCount", { count: releaseCount })}
               </span>
             }
           />
           <Field
-            label="Triggered by"
+            label={historyT("operator")}
             value={
               <span className="inline-flex items-center gap-1.5">
                 <UserIcon className="size-3.5" />
                 <span className="font-mono [overflow-wrap:anywhere]">
-                  {run.triggeredByUsername || "unknown"}
+                  {run.triggeredByUsername || historyT("unknown")}
                 </span>
               </span>
             }
           />
-          <Field label="Started" mono value={fmt.formatDateTime(run.startedAt)} />
+          <Field label={t("started")} mono value={fmt.formatDateTime(run.startedAt)} />
         </dl>
 
         {!succeeded && run.errorMessage && (
           <div className="border-danger-border bg-danger/5 min-w-0 rounded-md border p-3">
-            <p className="text-danger text-xs font-medium">Error reported by the CLI</p>
+            <p className="text-danger text-xs font-medium">{t("diagnostic")}</p>
             <pre className="text-danger mt-1 font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
               {run.errorMessage}
             </pre>
           </div>
         )}
 
-        {releaseCount > 0 && Array.isArray(run.installedReleases) && (
+        {releaseCount !== null && releaseCount > 0 && Array.isArray(run.installedReleases) && (
           <>
             <button
               type="button"
@@ -754,7 +746,7 @@ function LastBootstrapSection({
               <ChevronDownIcon
                 className={cn("size-3 transition-transform", releasesOpen && "rotate-180")}
               />
-              {releasesOpen ? "Hide installed releases" : "View installed releases"}
+              {t(releasesOpen ? "hideReleases" : "viewReleases")}
             </button>
             {releasesOpen && <InstalledReleases releases={run.installedReleases} />}
           </>
@@ -769,7 +761,7 @@ function LastBootstrapSection({
           <ChevronDownIcon
             className={cn("size-3 transition-transform", historyOpen && "rotate-180")}
           />
-          {historyOpen ? "Hide history" : "View history"}
+          {t(historyOpen ? "hideHistory" : "viewHistory")}
         </button>
 
         {historyOpen && history}
@@ -786,8 +778,6 @@ interface ReleaseRow {
   status: string;
 }
 
-const NOT_PERSONAL = "Bootstrap runs are the cluster's, not a person's, so Mine is empty.";
-
 const releaseKey = (r: ReleaseRow) => r.key;
 
 const RELEASES_SELECT: SelectRowsSpec<ReleaseRow> = {
@@ -801,16 +791,27 @@ const RELEASES_SELECT: SelectRowsSpec<ReleaseRow> = {
   id: releaseKey,
 };
 
-function releasesList(rows: ReleaseRow[]): ListDefinition {
+function releasesList(
+  rows: ReleaseRow[],
+  t: ReturnType<typeof useTranslations<"clusterSettings.presentation">>,
+  historyT: ReturnType<typeof useTranslations<"clusterSettings.bootstrapHistory">>
+): ListDefinition {
   const statuses = [...new Set(rows.map((r) => r.status).filter(Boolean))].sort();
   return {
     id: "clusters.settings.bootstrap-releases",
     fields: [
-      { key: "status", label: "Status", options: statuses.map((v) => ({ value: v, label: v })) },
+      {
+        key: "status",
+        label: historyT("status"),
+        options: statuses.map((v) => ({ value: v, label: v })),
+      },
     ],
-    searchPlaceholder: "Search releases, versions…",
+    searchPlaceholder: t("searchReleases"),
     defaultSort: [{ key: "name", dir: "asc" }],
-    views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+    views: standardViews({ owner: "me" }, [], { mineNote: historyT("mineNote") }).map((view) => ({
+      ...view,
+      label: historyT(view.key === "all" ? "all" : "mine"),
+    })),
     paging: "numbered",
     pageSizes: [25, 50, 100],
   };
@@ -818,33 +819,37 @@ function releasesList(rows: ReleaseRow[]): ListDefinition {
 
 /** The last run's installed releases (nested in its payload), as an embedded list. */
 function InstalledReleases({ releases }: { releases: unknown[] }) {
-  const rows: ReleaseRow[] = (releases as Array<Record<string, unknown>>).map((r, i) => ({
-    key: `${String(r.name ?? "release")}-${i}`,
-    name: String(r.name ?? "unknown"),
-    version: String(r.version ?? "unknown"),
-    status: String(r.status ?? ""),
-  }));
-  const [def] = React.useState(() => releasesList(rows));
-  const list = useLocalListState(def);
+  const t = useTranslations("clusterSettings.presentation");
+  const historyT = useTranslations("clusterSettings.bootstrapHistory");
+  const rows: ReleaseRow[] = releases.map((value, i) => {
+    const r = reportObject(value);
+    return {
+      key: `release-${i}`,
+      name: reportText(r.name) || historyT("unknown"),
+      version: reportText(r.version) || historyT("unknown"),
+      status: reportText(r.status) || historyT("unknown"),
+    };
+  });
+  const list = useLocalListState(releasesList(rows, t, historyT));
   const page = selectRows(rows, pageState(list), RELEASES_SELECT);
   const columns: Column<ReleaseRow>[] = [
     {
       id: "name",
-      header: "Release",
+      header: t("release"),
       sortKey: "name",
       cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
       cell: (r) => r.name,
     },
     {
       id: "version",
-      header: "Version",
+      header: t("version"),
       sortKey: "version",
       cellClassName: "font-mono text-xs break-all",
       cell: (r) => r.version,
     },
     {
       id: "status",
-      header: "Status",
+      header: historyT("status"),
       sortKey: "status",
       cellClassName: "text-muted-foreground text-xs",
       cell: (r) => r.status,
@@ -854,12 +859,12 @@ function InstalledReleases({ releases }: { releases: unknown[] }) {
     <ListPage<ReleaseRow>
       embedded
       list={list}
-      label="Installed releases"
+      label={historyT("releases")}
       columns={columns}
       rows={page.rows}
       getRowId={releaseKey}
       totalCount={page.totalCount}
-      empty={{ icon: <PackageIcon className="size-5" />, title: "No installed releases" }}
+      empty={{ icon: <PackageIcon className="size-5" />, title: t("noReleases") }}
     />
   );
 }

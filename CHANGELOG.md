@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize cluster lifecycle controls and stored bootstrap reports in all eight
+  locales. Require an observed network read before writes, keep accepted requests
+  distinct from failed refreshes, and close destructive reviews after observed
+  source or permission changes. Malformed capabilities and release fields remain
+  unknown; stored reports do not certify current cluster health (#2145).
+
 - Localize cluster bootstrap recipe controls, request feedback and recent history
   in all eight locales. Preserve driver-supplied data, show read failures with
   retry, keep unknown history statuses literal, and invalidate callbacks after
