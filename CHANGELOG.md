@@ -74,6 +74,11 @@
   config. Verify Pub/Sub source and child ownership before writes or binding,
   preserve ownership labels during updates and retain recorded topic names.
   Audit AWS/Azure custom-tag namespace isolation (#2098).
+- Add disposable CNPG operator acceptance through durable consumer Secrets,
+  real host/URI authentication, role/database privilege checks, stable partial
+  retries and physical finalizer-driven cleanup, with credential-free provenance
+  and explicit runtime/integration boundaries (Refs #2092).
+
 - Restrict generated CNPG preview logins to their own database over TLS, ahead
   of broad operator authentication defaults, and explicitly remove elevated
   role attributes and inherited memberships (Refs #2092).

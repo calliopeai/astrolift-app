@@ -159,3 +159,46 @@ foreign credential/role or another error refuses. An already matching role and
 authentication rule set require no write. The retained role, authentication rules
 and portable credential envelope after cleanup still do not constitute credential
 revocation.
+
+## Disposable operator acceptance (#2092)
+
+The opt-in
+`backend/astrolift_workflows/tests/test_preview_slice_cnpg_kind_2092.py` uses only
+the explicitly owned `kind-astrolift-cnpg-slice-2092` context from
+`ASTROLIFT_CNPG_SLICE_KUBECONFIG`. It configures the actual native driver from the
+persisted source cluster, invokes actual activity functions in Temporal's SDK
+`ActivityEnvironment`, persists the consumer attachment, and makes a fresh
+deployment write the actual Kubernetes consumer Secret. A separate client pod
+uses that Secret through `envFrom`; credential values never enter test output or
+process arguments. URI authentication reads the complete URI over psql stdin,
+without reusing the preceding connection's host/user/password.
+
+The [public proof record](proofs/cnpg-preview-slice-2092.json) identifies actual
+disposable owner/source/environment GUIDs, Secret and Database UIDs, all 12 binding
+keys, database owner, applied generation and runtime versions. CNPG 1.30.1 with
+PostgreSQL 16.15 passed host/URI authentication from another namespace under custom
+DNS domain `private.test`, own-database DML, exact ownership, absent elevated
+privileges/memberships, denied parent-user credentials, denied parent/default DB
+login, and denied plaintext login. The controlled first Database-create failure
+left no attachment; retries and repeated calls retained one independently issued
+credential envelope, the same physical Secret and database contents.
+
+A held real Database finalizer made cleanup report incomplete and retain its
+attachment/credential Secret. After the operator physically dropped the slice
+database, removing only the test's hold allowed cleanup to finish; the parent
+table remained intact. The login role and portable envelope remained, exactly as
+documented. This does not certify credential revocation.
+
+The final operator run passed one check in 30.03 seconds; 48 focused provider
+checks and 31 existing real PostgreSQL materialization checks passed. The actual
+Kubernetes version was 1.37.0, which CNPG 1.30 lists as tested but unsupported;
+supported versions are 1.34–1.36. This is authentication/lifecycle evidence,
+not supported-version compatibility certification. See
+[CNPG supported releases](https://cloudnative-pg.io/docs/1.30/supported_releases/).
+The private persistent credential-store adapter proves issuance/reuse across fresh
+adapter reads; it does not certify live Vault integration or a Temporal workflow
+server. Production composition and authenticated deployment checks remain separate.
+
+The exact owned kind cluster, private kubeconfig, temporary credential files and
+`test_astrolift_cnpg_acceptance_2092` PostgreSQL database were removed after the
+proof. The unrelated `edge-poc` cluster was retained.
