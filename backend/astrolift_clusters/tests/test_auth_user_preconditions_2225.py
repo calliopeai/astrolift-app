@@ -33,6 +33,7 @@ class Idp:
         self.after_read = None
         self.after_write = None
         self.after_get = None
+        self.after_create = None
 
     def __getattr__(self, name):
         def call(**kwargs):
@@ -55,6 +56,8 @@ class Idp:
                     self.after_get()
                 return {"Username": user["Username"], "UserAttributes": user["Attributes"]}
             if name == "admin_create_user":
+                if self.after_create:
+                    self.after_create()
                 return {"User": user}
             if name in {"list_groups", "admin_list_groups_for_user"}:
                 return {"Groups": [{"GroupName": "GROUP_LITERAL"}]}
@@ -325,3 +328,65 @@ def test_provider_withdrawal_and_replacement_refuse_without_sdk(setup):
     s.cluster.save(update_fields=["provider_plugin"])
     assert execute(s, OPERATIONS[5], expected, s.idp.subject)["ok"] is False
     assert s.idp.calls == []
+
+
+@pytest.mark.parametrize("reviewed", [True, False])
+def test_creation_followups_use_subject_reads_only_for_reviewed_callers(setup, reviewed):
+    s = setup
+    expected = source(s) if reviewed else None
+    operation = (
+        "createClusterAuthUser",
+        "CreateClusterAuthUserInput",
+        {
+            "email": "new@example.test",
+            "password": "WRITE_ONLY_TEST_PASSWORD",
+            "permanent": True,
+            "groups": ["NEW_GROUP"],
+        },
+        False,
+    )
+    s.idp.calls.clear()
+    assert execute(s, operation, expected)["ok"] is True
+    expected_calls = (
+        [
+            "admin_create_user",
+            "admin_get_user",
+            "admin_set_user_password",
+            "admin_get_user",
+            "admin_add_user_to_group",
+        ]
+        if reviewed
+        else ["admin_create_user", "admin_set_user_password", "admin_add_user_to_group"]
+    )
+    assert [name for name, _ in s.idp.calls] == expected_calls
+
+
+@pytest.mark.parametrize("change", ["subject", "actor"])
+def test_reviewed_creation_rechecks_subject_and_authority_before_followups(setup, change):
+    s = setup
+    expected = source(s)
+    operation = (
+        "createClusterAuthUser",
+        "CreateClusterAuthUserInput",
+        {
+            "email": "new@example.test",
+            "password": "WRITE_ONLY_TEST_PASSWORD",
+            "permanent": True,
+            "groups": ["NEW_GROUP"],
+        },
+        False,
+    )
+
+    def replace():
+        if change == "subject":
+            s.idp.subject = "replacement-subject"
+        else:
+            s.actor.is_active = False
+            s.actor.save(update_fields=["is_active"])
+
+    s.idp.after_create = replace
+    s.idp.calls.clear()
+    result = execute(s, operation, expected)
+    assert result["ok"] is False
+    assert [name for name, _ in s.idp.calls] == ["admin_create_user", "admin_get_user"]
+    assert result["errors"][0]["code"] == ("PRECONDITION" if change == "subject" else "PERMISSION_DENIED")

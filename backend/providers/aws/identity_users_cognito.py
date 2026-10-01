@@ -155,10 +155,12 @@ class CognitoIdentityUsersDriver:
         username = str(created.get("Username") or email)
         subject = _attr(created, "sub")
         if password and permanent:
-            self.verify_user(username=username, expected_user_id=subject)
+            if self._before_write is not None:
+                self.verify_user(username=username, expected_user_id=subject)
             self.set_password(username=username, password=password, permanent=True)
         for group in groups:
-            self.verify_user(username=username, expected_user_id=subject)
+            if self._before_write is not None:
+                self.verify_user(username=username, expected_user_id=subject)
             self.add_to_group(username=username, group=group)
         return self._user(created, tuple(sorted(groups)))
 

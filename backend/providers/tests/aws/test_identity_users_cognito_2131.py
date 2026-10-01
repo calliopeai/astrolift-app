@@ -200,8 +200,9 @@ def test_user_recreated_after_creation_cannot_receive_permanent_password_or_grou
             return call
 
     idp = Replaced()
-    with pytest.raises(IdentityUsersError):
-        _driver(idp).create_user(email="new@example.test", password="WRITE_ONLY", permanent=True, groups=("group",))
+    driver = _driver(idp)
+    with driver.guard_writes(lambda: None), pytest.raises(IdentityUsersError):
+        driver.create_user(email="new@example.test", password="WRITE_ONLY", permanent=True, groups=("group",))
     assert [name for name, _ in idp.calls] == ["admin_create_user", "admin_get_user"]
 
 
@@ -223,3 +224,20 @@ def test_guard_runs_before_each_actual_create_followup_and_membership_write():
     ]
     driver.set_enabled(username="uuid-1", enabled=False)
     assert len(calls) == 4
+
+
+def test_legacy_creation_keeps_original_iam_and_effect_sequence_without_admin_get_user():
+    class LegacyIdp(FakeIdp):
+        def __getattr__(self, method):
+            if method == "admin_get_user":
+                raise AssertionError("Legacy creation did not require AdminGetUser permission")
+            return super().__getattr__(method)
+
+    idp = LegacyIdp()
+    _driver(idp).create_user(email="new@example.test", password="WRITE_ONLY", permanent=True, groups=("a", "b"))
+    assert [name for name, _ in idp.calls] == [
+        "admin_create_user",
+        "admin_set_user_password",
+        "admin_add_user_to_group",
+        "admin_add_user_to_group",
+    ]

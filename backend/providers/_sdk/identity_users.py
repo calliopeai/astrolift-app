@@ -82,7 +82,8 @@ class ReviewedIdentityUsersDriver(IdentityUsersDriver, Protocol):
     Verification is an observation before a write, never external provider CAS.
     """
 
-    pool_id: str
+    @property
+    def pool_id(self) -> str: ...
 
     def verify_user(self, *, username: str, expected_user_id: str) -> None: ...
 

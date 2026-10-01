@@ -40,7 +40,10 @@ Cognito's optional reviewed-driver extension verifies the current
 `AdminGetUser` subject immediately before each existing-user effect and rechecks
 current actor/grants before each SDK write. Group changes recheck before each
 membership effect. User creation verifies the subject returned by
-`AdminCreateUser` before permanent-password and group follow-ups. Creation never
+`AdminCreateUser` before permanent-password and group follow-ups in a reviewed operation.
+The scoped provider role needs `cognito-idp:AdminGetUser` on the exact configured
+pool for these reviewed reads, in addition to the existing relevant admin write
+actions. This change does not grant IAM permission automatically. Creation never
 adopts an existing username. Unknown subjects refuse follow-ups.
 
 ## Compatibility and actual race boundary
@@ -48,7 +51,9 @@ adopts an existing username. Unknown subjects refuse follow-ups.
 The new read fields and input fields are additive and nullable. Callers that omit
 both expectations keep the existing current-target semantics, resolving the
 currently configured pool and supplied username. They do not gain an immutable
-review guarantee. Existing drivers remain compatible; reviewed operation support
+review guarantee. Legacy creation keeps its prior SDK effect sequence and does
+not add an `AdminGetUser` requirement before password/group follow-ups. Existing
+drivers remain compatible; reviewed operation support
 is an optional protocol extension. A driver without authoritative proof leaves
 that proof unknown and the reviewed UI read-only.
 
