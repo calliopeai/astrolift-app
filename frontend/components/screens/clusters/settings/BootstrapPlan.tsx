@@ -2,8 +2,10 @@
 
 import { Loader2Icon, PlayIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Can } from "@/components/Can";
+import { QueryError } from "@/components/QueryError";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
@@ -12,7 +14,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { preselected } from "./types";
 import type { useBootstrapPlan } from "./use-bootstrap";
 
-export type BootstrapPlanViewProps = ReturnType<typeof useBootstrapPlan>;
+export type BootstrapPlanViewProps = Omit<
+  ReturnType<typeof useBootstrapPlan>,
+  "error" | "onRetry" | "readOnly"
+> & {
+  error?: string | null;
+  onRetry?: () => void;
+  readOnly?: boolean;
+};
 
 /**
  * Bootstrap plan card (#67 + #66). Renders the driver's bootstrap recipe
@@ -26,7 +35,11 @@ export function BootstrapPlanView({
   loading,
   installing,
   onInstall,
+  error,
+  onRetry,
+  readOnly = false,
 }: BootstrapPlanViewProps) {
+  const t = useTranslations("clusterSettings.bootstrapPlan");
   const [draft, setDraft] = React.useState<{
     clusterId: string | null;
     selected: Record<string, boolean>;
@@ -52,9 +65,21 @@ export function BootstrapPlanView({
     }
   }
 
-  if (loading) {
+  if (error) {
     return (
-      <Section title="Bootstrap recipe" divided>
+      <Section title={t("title")} divided>
+        <QueryError title={t("loadFailed")} error={error} />
+        {onRetry && (
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            {t("retry")}
+          </Button>
+        )}
+      </Section>
+    );
+  }
+  if (loading && !plan) {
+    return (
+      <Section title={t("title")} divided>
         <div className="flex min-w-0 flex-col gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div
@@ -76,11 +101,12 @@ export function BootstrapPlanView({
   if (!plan || plan.components.length === 0) {
     return (
       <Section
-        title="Bootstrap recipe"
+        title={t("title")}
         description={
           <>
-            No driver recipe available for this provider. Install platform prerequisites manually or
-            via the <code className="font-mono text-xs">astro cluster bootstrap</code> CLI.
+            {t.rich("empty", {
+              command: (chunks) => <code className="font-mono text-xs">{chunks}</code>,
+            })}
           </>
         }
         divided
@@ -94,15 +120,16 @@ export function BootstrapPlanView({
 
   return (
     <Section
-      title="Bootstrap recipe"
+      title={t("title")}
       description={
         <>
-          Driver recipe from{" "}
-          <Badge variant="outline" className="text-2xs mx-1 font-mono">
-            {plan.providerPluginSlug || "unknown"}
-          </Badge>
-          : pre-tuned helm values per component. Re-installing converges via Flux; un-checking a
-          previously-installed component deletes its HelmRelease on the next install.
+          {t.rich("description", {
+            provider: () => (
+              <Badge variant="outline" className="text-2xs mx-1 font-mono">
+                {plan.providerPluginSlug || t("unknown")}
+              </Badge>
+            ),
+          })}
         </>
       }
       divided
@@ -114,6 +141,7 @@ export function BootstrapPlanView({
               <input
                 type="checkbox"
                 checked={!!selected[c.key]}
+                disabled={readOnly || installing}
                 onChange={(e) =>
                   setDraft((s) => ({
                     ...s,
@@ -127,12 +155,12 @@ export function BootstrapPlanView({
                   {c.title}
                   {c.installedByRecipe && (
                     <Badge variant="secondary" className="text-2xs">
-                      installed by the recipe
+                      {t("installed")}
                     </Badge>
                   )}
                   {c.runningOutsideRecipe && (
                     <Badge variant="outline" className="text-2xs">
-                      already running outside the recipe
+                      {t("outsideRecipe")}
                     </Badge>
                   )}
                 </div>
@@ -141,7 +169,7 @@ export function BootstrapPlanView({
                   <div className="mt-1 flex flex-wrap gap-1">
                     {c.requires.map((r) => (
                       <Badge key={r} variant="secondary" className="text-2xs font-mono">
-                        requires: {r}
+                        {t("requires", { requirement: r })}
                       </Badge>
                     ))}
                   </div>
@@ -154,6 +182,8 @@ export function BootstrapPlanView({
                   <div key={o.key} className="flex min-w-0 items-center gap-2">
                     <span className="text-muted-foreground w-32 truncate text-xs">{o.label}</span>
                     <select
+                      aria-label={o.label}
+                      disabled={readOnly || installing}
                       value={optionValues[c.key]?.[o.key] ?? o.default}
                       onChange={(e) =>
                         setDraft((prev) => ({
@@ -181,23 +211,23 @@ export function BootstrapPlanView({
       </div>
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t pt-3">
         <span className="text-muted-foreground font-mono text-xs">
-          {selectedCount} of {plan.components.length} selected
+          {t("selected", { count: selectedCount, total: plan.components.length })}
         </span>
         <Can permission="cluster.manage">
           <Button
             size="sm"
             onClick={() => onInstall(selected, optionValues)}
-            disabled={installing || selectedCount === 0}
+            disabled={readOnly || installing || selectedCount === 0}
           >
             {installing ? (
               <>
                 <Loader2Icon className="size-3 animate-spin" />
-                Installing…
+                {t("requesting")}
               </>
             ) : (
               <>
                 <PlayIcon className="size-3" />
-                Install / reconcile
+                {t("install")}
               </>
             )}
           </Button>

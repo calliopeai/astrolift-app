@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize cluster bootstrap recipe controls, request feedback and recent history
+  in all eight locales. Preserve driver-supplied data, show read failures with
+  retry, keep unknown history statuses literal, and invalidate callbacks after
+  observed source/permission changes. Accepted installation starts a workflow;
+  it does not certify completed reconciliation (#2145).
+
 - Localize app managed-service administration in all eight languages. Preserve
   unchanged typed configuration when the backend replaces config, expand the
   wildcard editor to existing keys, and refuse nonfinite numbers and ambiguous

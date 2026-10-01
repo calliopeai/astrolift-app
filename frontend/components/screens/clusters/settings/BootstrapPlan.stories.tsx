@@ -19,6 +19,18 @@ export const Empty: Story = { render: () => <BootstrapPlanView {...PLAN} plan={n
 
 export const Installing: Story = { render: () => <BootstrapPlanView {...PLAN} installing /> };
 
+export const ReadFailed: Story = {
+  render: () => (
+    <BootstrapPlanView
+      {...PLAN}
+      error="LITERAL_BOOTSTRAP_READ_DIAGNOSTIC"
+      onRetry={() => undefined}
+    />
+  ),
+};
+
+export const ReadOnly: Story = { render: () => <BootstrapPlanView {...PLAN} readOnly /> };
+
 export const LongStrings: Story = {
   render: () => (
     <BootstrapPlanView

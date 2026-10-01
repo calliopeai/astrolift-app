@@ -874,30 +874,36 @@ function pageState(list: ListStateController) {
   };
 }
 
-const HISTORY_LIST: ListDefinition = {
-  id: "clusters.settings.bootstrap-history",
-  fields: [
-    {
-      key: "status",
-      label: "Status",
-      options: [
-        { value: "succeeded", label: "Succeeded" },
-        { value: "failed", label: "Failed" },
-      ],
-    },
-  ],
-  searchPlaceholder: "Search charts, operators…",
-  defaultSort: [{ key: "when", dir: "desc" }],
-  views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
-  paging: "numbered",
-  pageSizes: [25, 50, 100],
-};
+function historyList(
+  t: ReturnType<typeof useTranslations<"clusterSettings.bootstrapHistory">>
+): ListDefinition {
+  return {
+    id: "clusters.settings.bootstrap-history",
+    fields: [
+      {
+        key: "status",
+        label: t("status"),
+        options: [
+          { value: "succeeded", label: t("succeeded") },
+          { value: "failed", label: t("failed") },
+        ],
+      },
+    ],
+    searchPlaceholder: t("search"),
+    defaultSort: [{ key: "when", dir: "desc" }],
+    views: standardViews({ owner: "me" }, [], { mineNote: t("mineNote") }).map((view) => ({
+      ...view,
+      label: t(view.key === "all" ? "all" : "mine"),
+    })),
+    paging: "numbered",
+    pageSizes: [25, 50, 100],
+  };
+}
 
 const HISTORY_SELECT: SelectRowsSpec<BootstrapRun> = {
   filter: {
     owner: () => false,
-    status: (r, value) =>
-      value === "succeeded" ? r.status === "succeeded" : r.status !== "succeeded",
+    status: (r, value) => r.status === value,
   },
   text: (r) => [r.chartVersion, r.triggeredByUsername, r.cliVersion],
   sort: {
@@ -909,37 +915,46 @@ const HISTORY_SELECT: SelectRowsSpec<BootstrapRun> = {
   id: (r) => r.id,
 };
 
-export type BootstrapHistoryViewProps = ReturnType<typeof useBootstrapHistory>;
+export type BootstrapHistoryViewProps = Omit<
+  ReturnType<typeof useBootstrapHistory>,
+  "error" | "onRetry"
+> & {
+  error?: string | null;
+  onRetry?: () => void;
+};
 
 /**
  * The per-cluster bootstrap history (#319), inside the Last bootstrap card:
  * the recent runs the query returns, as an embedded list.
  */
-export function BootstrapHistoryView({ runs, loading }: BootstrapHistoryViewProps) {
+export function BootstrapHistoryView({ runs, loading, error, onRetry }: BootstrapHistoryViewProps) {
+  const t = useTranslations("clusterSettings.bootstrapHistory");
   const fmt = useFormatters();
-  const list = useLocalListState(HISTORY_LIST);
+  const list = useLocalListState(historyList(t));
   const page = selectRows(runs, pageState(list), HISTORY_SELECT);
 
   const columns: Column<BootstrapRun>[] = [
     {
       id: "status",
-      header: "Status",
+      header: t("status"),
       cell: (r) =>
         r.status === "succeeded" ? (
           <Badge variant="default" className="gap-1">
             <CheckCircleIcon className="size-3" />
-            Succeeded
+            {t("succeeded")}
           </Badge>
-        ) : (
+        ) : r.status === "failed" ? (
           <Badge variant="destructive" className="gap-1">
             <XCircleIcon className="size-3" />
-            Failed
+            {t("failed")}
           </Badge>
+        ) : (
+          <Badge variant="outline">{r.status || t("unknown")}</Badge>
         ),
     },
     {
       id: "when",
-      header: "When",
+      header: t("when"),
       sortKey: "when",
       cellClassName: "font-mono text-xs",
       cell: (r) => (
@@ -948,24 +963,24 @@ export function BootstrapHistoryView({ runs, loading }: BootstrapHistoryViewProp
     },
     {
       id: "chart",
-      header: "Chart",
+      header: t("chart"),
       sortKey: "chart",
       cellClassName: "font-mono text-xs break-all",
-      cell: (r) => r.chartVersion || "unknown",
+      cell: (r) => r.chartVersion || t("unknown"),
     },
     {
       id: "releases",
-      header: "Releases",
+      header: t("releases"),
       sortKey: "releases",
       cellClassName: "font-mono text-xs",
       cell: (r) => bootstrapReleaseCount(r.installedReleases),
     },
     {
       id: "operator",
-      header: "Operator",
+      header: t("operator"),
       sortKey: "operator",
       cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
-      cell: (r) => r.triggeredByUsername || "unknown",
+      cell: (r) => r.triggeredByUsername || t("unknown"),
     },
   ];
 
@@ -973,13 +988,15 @@ export function BootstrapHistoryView({ runs, loading }: BootstrapHistoryViewProp
     <ListPage<BootstrapRun>
       embedded
       list={list}
-      label="Bootstrap runs"
+      label={t("label")}
       columns={columns}
       rows={page.rows}
       getRowId={(r) => r.id}
       totalCount={page.totalCount}
       loading={loading}
-      empty={{ icon: <HistoryIcon className="size-5" />, title: "No prior bootstrap runs." }}
+      error={error ? { message: error } : null}
+      onRetry={onRetry}
+      empty={{ icon: <HistoryIcon className="size-5" />, title: t("empty") }}
     />
   );
 }

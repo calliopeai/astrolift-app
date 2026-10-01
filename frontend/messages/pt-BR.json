@@ -5850,6 +5850,42 @@
     }
   },
   "clusterSettings": {
+    "bootstrapPlan": {
+      "title": "Receita de preparação",
+      "empty": "Nenhuma receita do driver está disponível para este provedor. Instale os pré-requisitos manualmente ou use <command>astro cluster bootstrap</command>.",
+      "description": "Receita de <provider></provider>. Solicite a instalação dos pré-requisitos selecionados. Desmarcar um componente instalado por esta receita solicita a remoção de seu HelmRelease.",
+      "unknown": "desconhecido",
+      "installed": "instalado pela receita",
+      "outsideRecipe": "em execução fora da receita",
+      "requires": "requer: {requirement}",
+      "selected": "{count, number} de {total, number} selecionados",
+      "requesting": "Solicitando…",
+      "install": "Solicitar instalação / reconciliação",
+      "loadFailed": "Não foi possível carregar a receita de preparação",
+      "retry": "Tentar novamente",
+      "sourceChanged": "A receita observada ou a permissão mudou. Revise a fonte atual antes de solicitar a instalação.",
+      "invalidOption": "A opção selecionada não está na receita atual.",
+      "requested": "Instalação solicitada para {count, plural, one {# componente} other {# componentes}}. A conclusão ainda não foi confirmada. Destino: {clusterId}.",
+      "failed": "A solicitação de instalação falhou",
+      "unavailable": "A receita de preparação está indisponível."
+    },
+    "bootstrapHistory": {
+      "status": "Status",
+      "succeeded": "Concluído",
+      "failed": "Falhou",
+      "search": "Buscar nos charts e operadores retornados…",
+      "mineNote": "Estas execuções pertencem ao cluster, portanto Minhas está vazio.",
+      "all": "Todas",
+      "mine": "Minhas",
+      "when": "Quando",
+      "chart": "Chart",
+      "releases": "Releases instalados",
+      "operator": "Operador",
+      "unknown": "desconhecido",
+      "label": "Preparações recentes",
+      "empty": "Nenhuma execução de preparação foi retornada.",
+      "unavailable": "O histórico de preparação está indisponível."
+    },
     "agent": {
       "title": "Agente de pulsação",
       "description": "Um agente no namespace <namespace>astrolift-system</namespace> envia pulsações assinadas para que a plataforma mostre o estado de pods, nós e recursos e detecte a perda de conexão. As pulsações são enviadas a cada <interval>{seconds, number}</interval> {seconds, plural, one {segundo} other {segundos}}.",

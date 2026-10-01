@@ -5850,6 +5850,42 @@
     }
   },
   "clusterSettings": {
+    "bootstrapPlan": {
+      "title": "ブートストラップ手順",
+      "empty": "このプロバイダーのドライバー手順はありません。前提条件を手動でインストールするか、<command>astro cluster bootstrap</command> を使用してください。",
+      "description": "<provider></provider> の手順です。選択した前提条件のインストールを要求します。この手順で以前にインストールしたコンポーネントの選択を解除すると、その HelmRelease の削除を要求します。",
+      "unknown": "不明",
+      "installed": "この手順でインストール済み",
+      "outsideRecipe": "この手順とは別に稼働中",
+      "requires": "必要: {requirement}",
+      "selected": "{total, number} 件中 {count, number} 件を選択",
+      "requesting": "要求中…",
+      "install": "インストール / 調整を要求",
+      "loadFailed": "ブートストラップ手順を読み込めませんでした",
+      "retry": "再試行",
+      "sourceChanged": "確認済みの手順または権限が変更されました。現在のソースを確認してからインストールを要求してください。",
+      "invalidOption": "選択したオプションは現在の手順にありません。",
+      "requested": "{count, plural, one {# 件} other {# 件}}のコンポーネントのインストールを要求しました。完了はまだ確認されていません。 対象: {clusterId}。",
+      "failed": "インストール要求に失敗しました",
+      "unavailable": "ブートストラップ手順を取得できません。"
+    },
+    "bootstrapHistory": {
+      "status": "状態",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "search": "返されたチャート、実行者を検索…",
+      "mineNote": "この実行はクラスターに属するため、自分の実行は空です。",
+      "all": "すべて",
+      "mine": "自分の実行",
+      "when": "日時",
+      "chart": "チャート",
+      "releases": "インストール済みリリース",
+      "operator": "実行者",
+      "unknown": "不明",
+      "label": "最近のブートストラップ実行",
+      "empty": "ブートストラップ実行は返されませんでした。",
+      "unavailable": "ブートストラップ履歴を取得できません。"
+    },
     "agent": {
       "title": "ハートビートエージェント",
       "description": "<namespace>astrolift-system</namespace> 名前空間のエージェントが署名付きハートビートを送信し、プラットフォームが Pod、ノード、リソースの状態を表示して接続断を検出できるようにします。送信間隔は <interval>{seconds, number}</interval> {seconds, plural, one {秒} other {秒}}です。",

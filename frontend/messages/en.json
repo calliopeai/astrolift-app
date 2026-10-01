@@ -5930,6 +5930,42 @@
     }
   },
   "clusterSettings": {
+    "bootstrapPlan": {
+      "title": "Bootstrap recipe",
+      "empty": "No driver recipe is available for this provider. Install prerequisites manually or use <command>astro cluster bootstrap</command>.",
+      "description": "Recipe from <provider></provider>. Request installation of the selected prerequisites. Unchecking a component previously installed by this recipe requests removal of its HelmRelease.",
+      "unknown": "unknown",
+      "installed": "installed by the recipe",
+      "outsideRecipe": "running outside the recipe",
+      "requires": "requires: {requirement}",
+      "selected": "{count, number} of {total, number} selected",
+      "requesting": "Requesting…",
+      "install": "Request install / reconcile",
+      "loadFailed": "Could not load the bootstrap recipe",
+      "retry": "Retry",
+      "sourceChanged": "The observed recipe or permission changed. Review the current source before requesting installation.",
+      "invalidOption": "The selected option is not in the current recipe.",
+      "requested": "Installation requested for {count, plural, one {# component} other {# components}}. Completion is not yet confirmed. Target: {clusterId}.",
+      "failed": "Installation request failed",
+      "unavailable": "The bootstrap recipe is unavailable."
+    },
+    "bootstrapHistory": {
+      "status": "Status",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "search": "Search returned charts, operators…",
+      "mineNote": "These runs belong to the cluster, so Mine is empty.",
+      "all": "All",
+      "mine": "Mine",
+      "when": "When",
+      "chart": "Chart",
+      "releases": "Releases",
+      "operator": "Operator",
+      "unknown": "unknown",
+      "label": "Recent bootstrap runs",
+      "empty": "No bootstrap runs were returned.",
+      "unavailable": "Bootstrap history is unavailable."
+    },
     "agent": {
       "title": "Keep-alive agent",
       "description": "An agent in the <namespace>astrolift-system</namespace> namespace sends signed heartbeats so the platform can show pod, node, and resource state and detect a missing connection. Heartbeats are sent every <interval>{seconds, number}</interval> {seconds, plural, one {second} other {seconds}}.",
