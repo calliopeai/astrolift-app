@@ -60,6 +60,7 @@ class RecordingEventHubs(HttpTransport):
         self.replaced_ids: dict[str, str] = {}
         self.pages: dict[str, list[dict[str, Any] | tuple[int, str]]] = {}
         self.locks: list[dict[str, Any]] = []
+        self.scoped_locks: dict[str, list[dict[str, Any]]] = {}
         self.omit_namespace_status = False
         self.pending_create = False
         self.pending_delete = False
@@ -107,15 +108,17 @@ class RecordingEventHubs(HttpTransport):
                 request, status, {"error": {"code": code, "message": "access refused: ResourceNotFound diagnostic"}}
             )
         if request.method == "GET" and category in {"locks", "hubs", "groups"}:
-            if category in self.pages:
-                page = self.pages[category][int(query.get("$skip", ["0"])[0])]
+            canonical_path = "/" + "/".join(part for part in path.split("/") if part)
+            page_key = next((key for key in self.pages if key.casefold() == canonical_path.casefold()), category)
+            if page_key in self.pages:
+                page = self.pages[page_key][int(query.get("$skip", ["0"])[0])]
                 if isinstance(page, tuple):
                     return _Response(
                         request, page[0], {"error": {"code": page[1], "message": "denied ResourceNotFound"}}
                     )
                 return _Response(request, 200, page)
             rows = (
-                self.locks
+                self.scoped_locks.get(path, self.locks)
                 if category == "locks"
                 else [
                     copy.deepcopy(row)
@@ -305,7 +308,8 @@ def test_paging_denial_overflow_or_changed_arm_collection_refuses_before_effects
         else "/providers/Microsoft.Authorization/locks"
     )
     base = "https://management.azure.com" + target.namespace_id + suffix
-    api.pages[kind] = [
+    page_key = target.namespace_id + suffix if kind == "locks" else kind
+    api.pages[page_key] = [
         {
             "value": [],
             "nextLink": base + "?api-version=" + ("2020-05-01" if kind == "locks" else "2024-01-01") + "&$skip=1",
@@ -314,9 +318,20 @@ def test_paging_denial_overflow_or_changed_arm_collection_refuses_before_effects
     ]
     result = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True)
     assert not result.ok and result.errors == ["ownership_unknown"]
-    assert len([c for c in api.calls if c[0] == "GET" and c[1].endswith(suffix)]) == 2
+    assert (
+        len(
+            [
+                c
+                for c in api.calls
+                if c[0] == "GET"
+                and ("/" + "/".join(part for part in c[1].split("/") if part)).casefold()
+                == (target.namespace_id + suffix).casefold()
+            ]
+        )
+        == 2
+    )
     api.calls.clear()
-    api.pages[kind] = [{"value": [], "nextLink": "https://foreign.invalid/collection"}]
+    api.pages[page_key] = [{"value": [], "nextLink": "https://foreign.invalid/collection"}]
     result = driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 2}))
     assert not result.ok and result.errors == ["ownership_unknown"]
     assert all(verb == "GET" for verb, *_ in api.calls)
@@ -327,7 +342,8 @@ def test_no_polling_background_requests_and_partial_retry(runtime):
     api.pending_create = True
     result = driver.provision(spec())
     assert not result.ok and not result.ready and result.errors == ["provision_pending"]
-    assert len(api.calls) == 3 and not any("background" in path for _, path, *_ in api.calls)
+    assert len(api.calls) == 5 and not any("background" in path for _, path, *_ in api.calls)
+    assert len([c for c in api.calls if c[1].endswith("/locks")]) == 2
     target = driver._saved_target(result.handle, spec())
     api.rows[target.namespace_id]["properties"]["provisioningState"] = "Succeeded"
     api.pending_create = False
@@ -628,3 +644,214 @@ def test_explicit_install_builtin_default_is_looked_up_and_never_rewritten():
     assert not any("consumergroups" in path and verb != "GET" for verb, path, *_ in api.calls)
     cfg.mgmt_client.close()
     cfg.locks_client.close()
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "astrolift_io_managed_service_id",
+        "astrolift_managed_service_id",
+        "astrolift.io/managed_service_id",
+        "x-astrolift-managed-service-id",
+        "ASTROLIFT-MANAGED-SERVICE-ID",
+    ],
+)
+@pytest.mark.parametrize("entity", ["namespace", "hub", "group"])
+def test_conflicting_owner_alias_refuses_all_effects_and_binding(runtime, entity, alias):
+    api, driver, handle, target = owned(runtime)
+    path = target.namespace_id if entity == "namespace" else target.hub_id
+    if entity == "group":
+        path = target.group_id("custom")
+        api.rows[path] = {
+            "id": path,
+            "name": "custom",
+            "properties": {"userMetadata": api.rows[target.hub_id]["properties"]["userMetadata"]},
+        }
+    tags = api.rows[path]["tags"] if entity == "namespace" else json.loads(api.rows[path]["properties"]["userMetadata"])
+    tags[alias] = "018f42f0-4420-7000-8000-000000000099"
+    if entity != "namespace":
+        api.rows[path]["properties"]["userMetadata"] = json.dumps(tags)
+    before = copy.deepcopy(api.rows)
+    result = driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 3}))
+    assert not result.ok and result.errors == ["ownership_refused"], result
+    assert not driver.provision(spec(recorded_handle=handle)).ok
+    assert not driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True, force_destroy=True
+    ).ok
+    assert driver.status(ServiceHandle(handle, managed_service_id=OWNER)).state == "error"
+    with pytest.raises((AzureEventHubsError, ValueError)):
+        driver.binding(ServiceHandle(handle, managed_service_id=OWNER))
+    assert api.rows == before and all(verb == "GET" for verb, *_ in api.calls)
+
+
+@pytest.mark.parametrize("scope", ["subscription", "resource-group"])
+def test_inherited_lock_is_not_visible_at_resource_level_but_refuses_effects(runtime, scope):
+    api, driver, handle, _ = owned(runtime)
+    parent = f"/subscriptions/{SUBSCRIPTION}" + ("/resourceGroups/controlled-rg" if scope == "resource-group" else "")
+    collection = parent + "/providers/Microsoft.Authorization/locks"
+    api.scoped_locks[collection] = [
+        {"id": collection + "/operator", "name": "operator", "properties": {"level": "CanNotDelete"}}
+    ]
+    before = copy.deepcopy(api.rows)
+    result = driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 3}))
+    assert not result.ok and result.errors == ["resource_lock_present"], result
+    assert not driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True, force_destroy=True
+    ).ok
+    assert api.rows == before and all(verb == "GET" for verb, *_ in api.calls)
+
+
+def lock_collection(scope, target):
+    base = f"/subscriptions/{SUBSCRIPTION}"
+    if scope == "resource-group":
+        base += "/resourceGroups/controlled-rg"
+    elif scope == "resource":
+        base = target.namespace_id
+    return base + "/providers/Microsoft.Authorization/locks"
+
+
+def wire_lock(scope, name="operator", level="ReadOnly"):
+    return {
+        "id": scope + "/providers/Microsoft.Authorization/locks/" + name,
+        "name": name,
+        "properties": {"level": level},
+    }
+
+
+@pytest.mark.parametrize("alias", ["astrolift_io_managed_service_id", "astrolift_managed_service_id"])
+@pytest.mark.parametrize("keep_canonical", [True, False])
+def test_matching_released_aliases_remain_usable(runtime, alias, keep_canonical):
+    api, driver, handle, target = owned(runtime)
+    api.rows[target.namespace_id]["tags"][alias] = OWNER
+    if not keep_canonical:
+        api.rows[target.namespace_id]["tags"].pop("astrolift-managed-service-id")
+    for row in api.rows.values():
+        if row["properties"].get("userMetadata"):
+            tags = json.loads(row["properties"]["userMetadata"])
+            tags[alias] = OWNER
+            if not keep_canonical:
+                tags.pop("astrolift-managed-service-id")
+            row["properties"]["userMetadata"] = json.dumps(tags)
+    assert driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 2})).ok
+    assert driver.binding(ServiceHandle(handle, managed_service_id=OWNER)).iam_grants
+    assert driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True).ok
+
+
+@pytest.mark.parametrize("scope", ["subscription", "resource-group"])
+def test_inherited_lock_refuses_initial_namespace_creation(runtime, scope):
+    api, driver = runtime
+    target = driver._provision_target(spec())
+    collection = lock_collection(scope, target)
+    api.scoped_locks[collection] = [wire_lock(collection.removesuffix("/providers/Microsoft.Authorization/locks"))]
+    result = driver.provision(spec())
+    assert not result.ok and result.errors == ["resource_lock_present"]
+    assert not api.rows and all(verb == "GET" for verb, *_ in api.calls)
+
+
+@pytest.mark.parametrize("scope", ["subscription", "resource-group", "resource"])
+@pytest.mark.parametrize("failure", ["denial", "wrong-scope", "untrusted-host", "pages", "items"])
+def test_complete_inherited_lock_pagination_required_before_effects(runtime, scope, failure):
+    api, driver, handle, target = owned(runtime)
+    collection = lock_collection(scope, target)
+    base = "https://management.azure.com" + collection + "?api-version=2020-05-01&$skip="
+    if failure == "denial":
+        pages = [{"value": [], "nextLink": base + "1"}, (403, "ForbiddenResourceNotFound")]
+    elif failure in {"wrong-scope", "untrusted-host"}:
+        next_link = (
+            base.replace("controlled-rg", "foreign-rg")
+            if failure == "wrong-scope" and scope != "subscription"
+            else base.replace(SUBSCRIPTION, "018f42f0-4420-7000-8000-000000000099")
+        )
+        if failure == "untrusted-host":
+            next_link = base.replace("management.azure.com", "foreign.invalid")
+        pages = [{"value": [], "nextLink": next_link + "1"}]
+    elif failure == "pages":
+        pages = [{"value": [], "nextLink": base + str(index + 1)} for index in range(5)]
+    else:
+        pages = [{"value": [wire_lock(collection.removesuffix("/providers/Microsoft.Authorization/locks"))] * 129}]
+    api.pages[collection] = pages
+    before = copy.deepcopy(api.rows)
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True, force_destroy=True)
+    assert not result.ok and result.errors == ["ownership_unknown"], result
+    assert api.rows == before and all(verb == "GET" for verb, *_ in api.calls)
+    if failure == "pages":
+        assert (
+            len(
+                [
+                    c
+                    for c in api.calls
+                    if ("/" + "/".join(p for p in c[1].split("/") if p)).casefold() == collection.casefold()
+                ]
+            )
+            == 4
+        )
+
+
+@pytest.mark.parametrize("scope", ["subscription", "resource-group", "resource"])
+def test_later_lock_page_refuses_even_when_first_page_is_empty(runtime, scope):
+    api, driver, handle, target = owned(runtime)
+    collection = lock_collection(scope, target)
+    base = "https://management.azure.com" + collection + "?api-version=2020-05-01&$skip=1"
+    api.pages[collection] = [
+        {"value": [], "nextLink": base},
+        {"value": [wire_lock(collection.removesuffix("/providers/Microsoft.Authorization/locks"))]},
+    ]
+    result = driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 2}))
+    assert not result.ok and result.errors == ["resource_lock_present"]
+    assert all(verb == "GET" for verb, *_ in api.calls)
+
+
+@pytest.mark.parametrize("bad", ["no-id", "foreign-sub", "malformed", "name-mismatch", "unknown-level"])
+def test_unknown_lock_identity_cannot_be_classified_as_unrelated(runtime, bad):
+    api, driver, handle, target = owned(runtime)
+    collection = lock_collection("subscription", target)
+    lock = wire_lock(
+        f"/subscriptions/{SUBSCRIPTION}/resourceGroups/other/providers/Microsoft.Storage/storageAccounts/unrelated"
+    )
+    if bad == "no-id":
+        lock.pop("id")
+    elif bad == "foreign-sub":
+        lock["id"] = lock["id"].replace(SUBSCRIPTION, "018f42f0-4420-7000-8000-000000000099")
+    elif bad == "malformed":
+        lock["id"] = lock["id"].replace("storageAccounts/unrelated", "storageAccounts")
+    elif bad == "name-mismatch":
+        lock["name"] = "other"
+    else:
+        lock["properties"]["level"] = "FutureLevel"
+    api.scoped_locks[collection] = [lock]
+    result = driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 2}))
+    assert not result.ok and result.errors == ["ownership_unknown"]
+    assert all(verb == "GET" for verb, *_ in api.calls)
+
+
+def test_valid_unrelated_locks_do_not_block_target_but_child_locks_do(runtime):
+    api, driver, handle, target = owned(runtime)
+    subscription_collection = lock_collection("subscription", target)
+    group_collection = lock_collection("resource-group", target)
+    api.scoped_locks[subscription_collection] = [wire_lock(f"/subscriptions/{SUBSCRIPTION}/resourceGroups/other")]
+    api.scoped_locks[group_collection] = [
+        wire_lock(
+            f"/subscriptions/{SUBSCRIPTION}/resourceGroups/controlled-rg/providers/Microsoft.EventHub/namespaces/other"
+        )
+    ]
+    assert driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 2})).ok
+    api.calls.clear()
+    api.scoped_locks[subscription_collection] = [wire_lock(target.group_id("$Default"))]
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True, force_destroy=True)
+    assert not result.ok and result.errors == ["resource_lock_present"]
+    assert all(verb == "GET" for verb, *_ in api.calls)
+
+
+def test_resource_lock_next_link_preserves_exact_sdk_empty_parent_collection(runtime):
+    api, driver, handle, target = owned(runtime)
+    collection = lock_collection("resource", target)
+    wire_path = collection.replace(
+        "/providers/Microsoft.EventHub/namespaces/", "/providers/Microsoft.EventHub//namespaces/"
+    )
+    api.pages[collection] = [
+        {"value": [], "nextLink": "https://management.azure.com" + wire_path + "?api-version=2020-05-01&$skip=1"},
+        {"value": [wire_lock(target.namespace_id)]},
+    ]
+    result = driver.update(UpdateSpec(handle, managed_service_id=OWNER, config={"capacity": 2}))
+    assert not result.ok and result.errors == ["resource_lock_present"]
+    assert all(verb == "GET" for verb, *_ in api.calls)

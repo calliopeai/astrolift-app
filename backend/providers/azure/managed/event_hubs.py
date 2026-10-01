@@ -39,6 +39,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.managed_service_tags import readable_keys
 from azure._managed_identities import unlisted_identity
 from azure.managed.tags import arm_tags_for as tags_for
 
@@ -143,6 +144,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
             if namespace is None:
                 if spec.recorded_handle:
                     raise _Ownership("ownership_unknown", "recorded namespace is missing; recreation is not authorized")
+                self._check_locks(target, resource_exists=False)
                 self._rpc(
                     self._mgmt.namespaces.begin_create_or_update,
                     resource_group_name=target.resource_group,
@@ -923,7 +925,7 @@ class AzureEventHubsDriver(ManagedServiceDriver):
             read_timeout=min(5, remaining / 2),
         )
 
-    def _pages(self, function: Callable[..., Any], **kwargs: Any) -> list[Any]:
+    def _pages(self, function: Callable[..., Any], *, collection_path: str | None = None, **kwargs: Any) -> list[Any]:
         continuation: str | None = None
         values: list[Any] = []
         for _ in range(4):
@@ -949,11 +951,21 @@ class AzureEventHubsDriver(ManagedServiceDriver):
                     if "namespace_name" in kwargs
                     else "/providers/Microsoft.Authorization/locks"
                 )
+                expected_path = collection_path or base + suffix
+                trusted_paths = {expected_path.casefold()}
+                if "resource_name" in kwargs:
+                    # Locks SDK1 serializes an empty parent_resource_path as a double slash.
+                    trusted_paths.add(
+                        expected_path.replace(
+                            "/providers/Microsoft.EventHub/namespaces/",
+                            "/providers/Microsoft.EventHub//namespaces/",
+                        ).casefold()
+                    )
                 if (
                     parsed.scheme != "https"
                     or parsed.netloc != "management.azure.com"
                     or parsed.fragment
-                    or unquote(parsed.path).casefold() != (base + suffix).casefold()
+                    or unquote(parsed.path).casefold() not in trusted_paths
                 ):
                     raise _Ownership("ownership_unknown", "inventory continuation changed the exact ARM collection")
             for value in page:
@@ -991,12 +1003,14 @@ class AzureEventHubsDriver(ManagedServiceDriver):
 
     def _namespace_owned(self, namespace: Any, target: _Target, source: object) -> None:
         self._arm(namespace, target.namespace_id)
+        tags = dict(_field(namespace, "tags", default={}) or {})
         verify_azure_ownership(
-            dict(_field(namespace, "tags", default={}) or {}),
+            tags,
             owner_of(source),
             operation=AzureOperation.UPDATE,
             resource="recorded Event Hubs namespace",
         )
+        _consistent_owner(tags, source)
 
     @staticmethod
     def _arm(resource: Any, expected: str) -> None:
@@ -1020,20 +1034,49 @@ class AzureEventHubsDriver(ManagedServiceDriver):
         verify_azure_ownership(
             tags, owner_of(source), operation=AzureOperation.UPDATE, resource="recorded Event Hubs child"
         )
+        _consistent_owner(tags, source)
 
-    def _inventory(self, target: _Target, source: object) -> tuple[Any | None, dict[str, Any]]:
-        locks = self._pages(
-            self._locks.management_locks.list_at_resource_level,
-            resource_group_name=target.resource_group,
-            resource_provider_namespace="Microsoft.EventHub",
-            parent_resource_path="",
-            resource_type="namespaces",
-            resource_name=target.namespace,
+    def _check_locks(self, target: _Target, *, resource_exists: bool = True) -> None:
+        subscription = f"/subscriptions/{self._config.subscription_id}"
+        group = subscription + f"/resourceGroups/{target.resource_group}"
+        operations = self._locks.management_locks
+        scopes: tuple[tuple[str, Callable[..., Any], dict[str, Any]], ...] = (
+            (subscription, operations.list_at_subscription_level, {}),
+            (group, operations.list_at_resource_group_level, {"resource_group_name": target.resource_group}),
+            (
+                target.namespace_id,
+                operations.list_at_resource_level,
+                {
+                    "resource_group_name": target.resource_group,
+                    "resource_provider_namespace": "Microsoft.EventHub",
+                    "parent_resource_path": "",
+                    "resource_type": "namespaces",
+                    "resource_name": target.namespace,
+                },
+            ),
         )
-        if locks:
+        present = False
+        for scope, operation, arguments in scopes if resource_exists else scopes[:2]:
+            rows = self._pages(
+                operation, collection_path=scope + "/providers/Microsoft.Authorization/locks", **arguments
+            )
+            for row in rows:
+                actual = _lock_scope(row)
+                if actual.casefold() != scope.casefold() and not actual.casefold().startswith(scope.casefold() + "/"):
+                    raise _Ownership("ownership_unknown", "lock inventory changed its ARM scope")
+                if actual.casefold() in {
+                    subscription.casefold(),
+                    group.casefold(),
+                    target.namespace_id.casefold(),
+                } or actual.casefold().startswith(target.namespace_id.casefold() + "/"):
+                    present = True
+        if present:
             raise _Ownership(
                 "resource_lock_present", "namespace or inherited locks require separate operator resolution"
             )
+
+    def _inventory(self, target: _Target, source: object) -> tuple[Any | None, dict[str, Any]]:
+        self._check_locks(target)
         hubs = self._pages(
             self._mgmt.event_hubs.list_by_namespace,
             resource_group_name=target.resource_group,
@@ -1294,6 +1337,55 @@ def _source_uuid(source: object) -> str:
 
 def _enum(value: Any) -> str:
     return str(value.value if isinstance(value, Enum) else value or "")
+
+
+def _consistent_owner(tags: dict[str, Any], source: object) -> None:
+    expected = _source_uuid(source)
+    declared = set(readable_keys("azure"))
+    normalized = {"astroliftmanagedserviceid", "astroliftiomanagedserviceid", "xastroliftmanagedserviceid"}
+    for key, value in tags.items():
+        if (key in declared or re.sub(r"[^a-z0-9]", "", key.casefold()) in normalized) and (
+            not isinstance(value, str) or value != expected
+        ):
+            raise _Ownership("ownership_refused", "ownership aliases do not consistently name the current source UUID")
+
+
+def _lock_scope(row: Any) -> str:
+    identity = _field(row, "id", default=None)
+    name = _field(row, "name", default=None)
+    if not isinstance(identity, str) or not isinstance(name, str) or not name:
+        raise _Ownership("ownership_unknown", "lock identity is missing")
+    parts = identity.split("/")
+    if any(not value or value in {".", ".."} or re.search(r"[\\%?#\x00-\x1f]", value) for value in parts[1:]):
+        raise _Ownership("ownership_unknown", "lock ARM identity is malformed")
+    if (
+        len(parts) < 7
+        or parts[0]
+        or [value.casefold() for value in parts[-4:-1]] != ["providers", "microsoft.authorization", "locks"]
+        or parts[-1].casefold() != name.casefold()
+    ):
+        raise _Ownership("ownership_unknown", "lock ARM identity is malformed")
+    scope_parts = parts[1:-4]
+    if len(scope_parts) < 2 or scope_parts[0].casefold() != "subscriptions":
+        raise _Ownership("ownership_unknown", "lock subscription identity is missing")
+    _uuid(scope_parts[1].lower())
+    if len(scope_parts) > 2:
+        if len(scope_parts) < 4 or scope_parts[2].casefold() != "resourcegroups":
+            raise _Ownership("ownership_unknown", "lock resource-group identity is malformed")
+        tail = scope_parts[4:]
+        while tail:
+            if len(tail) < 4 or tail[0].casefold() != "providers":
+                raise _Ownership("ownership_unknown", "lock resource identity is malformed")
+            tail = tail[2:]
+            while tail and tail[0].casefold() != "providers":
+                if len(tail) < 2:
+                    raise _Ownership("ownership_unknown", "lock resource identity is malformed")
+                tail = tail[2:]
+    properties = _field(row, "properties", default=None)
+    level = _field(properties, "level", default=_field(row, "level", default=None))
+    if _enum(level) not in {"CanNotDelete", "ReadOnly"}:
+        raise _Ownership("ownership_unknown", "lock level is missing or unsupported")
+    return "/" + "/".join(scope_parts)
 
 
 def _metadata(source: object) -> str:

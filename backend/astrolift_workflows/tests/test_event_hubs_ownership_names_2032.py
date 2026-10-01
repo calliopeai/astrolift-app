@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -341,3 +342,60 @@ def test_actual_pg_documented_namespace_shape_and_explicit_refusal(cloud):
     assert _check_ready_sync(row.pk, row.backend_ref) == "error"
     with pytest.raises(ValueError, match="active"):
         _managed_binding_for(row)
+
+
+@pytest.mark.parametrize("entity", ["namespace", "hub", "group"])
+def test_installed_driver_conflicting_owner_alias_never_writes_or_records_cleanup(cloud, entity):
+    row, target = owned(cloud)
+    path = target.namespace_id if entity == "namespace" else target.hub_id
+    if entity == "group":
+        path = target.group_id("custom")
+        cloud.api.rows[path] = {
+            "id": path,
+            "name": "custom",
+            "properties": {"userMetadata": cloud.api.rows[target.hub_id]["properties"]["userMetadata"]},
+        }
+    tags = (
+        cloud.api.rows[path]["tags"]
+        if entity == "namespace"
+        else json.loads(cloud.api.rows[path]["properties"]["userMetadata"])
+    )
+    tags["astrolift_io_managed_service_id"] = "018f42f0-4420-7000-8000-000000000099"
+    if entity != "namespace":
+        cloud.api.rows[path]["properties"]["userMetadata"] = json.dumps(tags)
+    row.config = {"capacity": 2}
+    row.save(update_fields=["config"])
+    before = copy.deepcopy(cloud.api.rows)
+    for result in [_provision_sync(row.pk), _update_sync(row.pk), _deprovision_sync(row.pk, True, True)]:
+        assert not result["ok"] and result["errors"] == ["ownership_refused"], result
+    assert _check_ready_sync(row.pk, row.backend_ref) == "error"
+    with pytest.raises(ValueError):
+        _managed_binding_for(row)
+    row.refresh_from_db()
+    assert row.provider_cleanup_receipt is None and cloud.api.rows == before
+    assert all(verb == "GET" for verb, *_ in cloud.api.calls)
+
+
+@pytest.mark.parametrize("scope", ["subscription", "resource-group"])
+def test_installed_driver_parent_lock_never_writes_or_records_cleanup_then_converges(cloud, scope):
+    row, target = owned(cloud)
+    parent = f"/subscriptions/{cloud.cfg.subscription_id}"
+    if scope == "resource-group":
+        parent += f"/resourceGroups/{cloud.cfg.resource_group}"
+    collection = parent + "/providers/Microsoft.Authorization/locks"
+    cloud.api.scoped_locks[collection] = [
+        {"id": collection + "/operator", "name": "operator", "properties": {"level": "CanNotDelete"}}
+    ]
+    row.config = {"capacity": 2}
+    row.save(update_fields=["config"])
+    before = copy.deepcopy(cloud.api.rows)
+    for result in [_provision_sync(row.pk), _update_sync(row.pk), _deprovision_sync(row.pk, True, True)]:
+        assert not result["ok"] and result["errors"] == ["resource_lock_present"], result
+    with pytest.raises(ValueError):
+        _managed_binding_for(row)
+    row.refresh_from_db()
+    assert row.provider_cleanup_receipt is None and cloud.api.rows == before
+    assert all(verb == "GET" for verb, *_ in cloud.api.calls)
+    cloud.api.scoped_locks[collection] = []
+    assert _deprovision_sync(row.pk, True, True)["ok"]
+    assert not cloud.api.rows

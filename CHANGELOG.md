@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Azure Event Hubs rejects conflicting source-ID ownership aliases and checks
+  bounded subscription/resource-group inherited locks before effects, including
+  initial namespace creation. Requires ancestor `Microsoft.Authorization/locks/read`;
+  no independent lock is deleted and other Azure families remain unchanged
+  (Refs #2032, #2098).
+
 - Localize list/detail cluster-unregistration reviews and feedback in all eight
   locales. Preserve refused reviews without refreshing, retain accepted writes
   through failed reads/navigation, and invalidate stale visible-target reviews.

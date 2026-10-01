@@ -619,7 +619,12 @@ they remain stored and return `ownership_unknown`; there is no automatic adoptio
 backfill, migration, or recreation of missing recorded resources.
 
 Every existing namespace requires the current source UUID/platform tags and exact
-returned ARM identity. Each hub and custom ARM consumer group requires a typed
+returned ARM identity. Event Hubs additionally checks every declared or recognized
+case/punctuation spelling of the managed-service owner ID: all present values must
+name the exact current canonical UUID, including when canonical and legacy keys
+coexist. Matching released legacy aliases remain readable; conflicting/empty
+aliases refuse before effects or binding. This extra consistency check is local to
+Event Hubs; the common first-match reader and other families are unchanged. Each hub and custom ARM consumer group requires a typed
 `userMetadata` JSON envelope naming the same UUID/platform and its exact returned
 ARM identity. Complete bounded hub/group inventories must agree with exact GETs;
 other hubs, unowned/unmarked children, unknown pages or divergent ARM identities
@@ -643,9 +648,26 @@ incomplete; retries with the same UUID/defaults reconcile the same owned target.
 If the workflow exhausts its finite retries, repair/retry is explicit; pending
 acceptance never skips unfinished child work or claims applied readiness.
 
-Namespace/inherited locks are fully inventoried within those bounds. Any present
-or unknown lock refuses, including under `force_destroy`; namespace ownership does
-not authorize removing independent locks. Operators must resolve locks separately.
+Locks are observed separately at subscription, resource-group and namespace
+resource scope. Microsoft's [SDK resource-level contract](https://learn.microsoft.com/en-us/python/api/azure-mgmt-resource/azure.mgmt.resource.locks.operations.managementlocksoperations?view=azure-python-preview)
+only lists the resource and below; it cannot alone establish absence of inherited
+locks. Initial namespace creation checks the two existing ancestor scopes first.
+Existing targets require all three collections, each complete within four pages
+and 128 items under the same 20-second operation admission deadline. Every returned
+lock needs a valid in-collection full ARM identity, matching name and known level.
+Only proven unrelated locks can be ignored; exact ancestor, namespace and descendant
+locks refuse. Missing identity, denial, overflow or a continuation outside its exact
+trusted collection returns unknown, including under `force_destroy`. Namespace
+ownership never authorizes deleting independent locks.
+
+The provider principal must have `Microsoft.Authorization/locks/read` for the
+subscription and resource-group inventories as well as the resource inventory.
+A principal limited to namespace reads can now refuse rather than falsely claim
+inherited locks absent. High lock counts can also exceed the bounded inventory;
+resolve access/locks/inventory separately. This adds no lock-write/delete grant.
+[Azure's lock inheritance documentation](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources)
+explains the parent-scope effects; independent administrators must still avoid
+adding locks after these observations, because the requests are not atomic.
 Only actual SDK `ResourceNotFoundError` proves relevant absence. Denial, invalid
 placement, partial inventories and diagnostic text cannot become cleanup success.
 Ownership-refused/unknown outcomes remain structured; failure diagnostics do not
@@ -678,6 +700,14 @@ The SDK has no atomic ownership compare-and-write/delete across these ARM reques
 Independent cloud administrators must not replace/retag resources or add children
 between proof and effects. Controlled SDK12 wire/PostgreSQL checks do not certify
 live Azure tiers, data-plane delivery, Capture, or advanced dependency readiness.
+Focused forward-repair evidence uses Event Hubs SDK12.0.0 and Locks SDK1.0.0
+through a controlled HTTP transport, plus the same driver from a built/installed
+private wheel through real PostgreSQL lifecycle activities. It covers conflicting
+namespace/hub/group owner aliases, matching released aliases, inherited locks on
+later pages, exact collection continuations, denial/overflow/malformed observations,
+valid unrelated locks, initial-create no-write refusal and cleanup receipt safety.
+These checks use no live Azure resource, lock or data-plane operation.
+
 Older Event Hubs drivers cannot interpret new `arm-v1` handles safely: do not resume
 workflows for newly created targets on an older driver. Prefer forward repair or
 explicitly verified compatibility; never automatically rewrite handles on rollback.

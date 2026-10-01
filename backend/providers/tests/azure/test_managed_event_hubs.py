@@ -246,10 +246,27 @@ class FakeManagementLocks:
     deleted: list[str] = field(default_factory=list)
     list_error: Exception | None = None
 
+    def list_at_subscription_level(self, **kwargs: Any):
+        if self.list_error:
+            raise self.list_error
+        return _Pager([])
+
+    def list_at_resource_group_level(self, **kwargs: Any):
+        return self.list_at_subscription_level(**kwargs)
+
     def list_at_resource_level(self, **kwargs: Any) -> list[FakeLock]:
         if self.list_error:
             raise self.list_error
-        return _Pager(list(self.locks))
+        return _Pager(
+            [
+                SimpleNamespace(
+                    name=lock.name,
+                    id=f"/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/{kwargs['resource_group_name']}/providers/Microsoft.EventHub/namespaces/{kwargs['resource_name']}/providers/Microsoft.Authorization/locks/{lock.name}",
+                    properties=SimpleNamespace(level="CanNotDelete"),
+                )
+                for lock in self.locks
+            ]
+        )
 
     def delete_at_resource_level(self, *, lock_name: str, **kwargs: Any) -> None:
         self.deleted.append(lock_name)
