@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
+import { useId } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
@@ -67,41 +68,107 @@ import type { useClusterWorkloadHealth } from "./use-cluster-workload-health";
 import type { useRecentClusterWorkflows } from "./use-recent-cluster-workflows";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
-function fmtTs(ts: number): string {
-  return new Date(ts * 1000).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const METRIC_LABELS = {
+  node_count: { label: "Nodes", unit: "count", key: "nodes" },
+  pod_running_ratio: { label: "Pods running", unit: "ratio", key: "podsRunning" },
+  cpu_utilization: { label: "CPU utilization", unit: "ratio", key: "cpu" },
+  memory_utilization: { label: "Memory utilization", unit: "ratio", key: "memory" },
+  deployment_ready_ratio: { label: "Deployments ready", unit: "ratio", key: "deploymentsReady" },
+  latency_p99: { label: "Apiserver p99", unit: "seconds", key: "latency" },
+  network_rx: { label: "Network receive", unit: "bytes_per_sec", key: "network" },
+  restart_rate: { label: "Restarts / min", unit: "count", key: "restartRate" },
+} as const;
+
+function observedMetric(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
-function fmtValue(value: number | null, unit: string): string {
-  if (value === null) return "—";
-  if (unit === "ratio") return `${(value * 100).toFixed(1)}%`;
-  if (unit === "count") return value < 0.1 ? "0" : value.toFixed(2);
-  if (unit === "seconds") {
-    if (value < 0.001) return `${(value * 1_000_000).toFixed(0)}µs`;
-    if (value < 1) return `${(value * 1000).toFixed(0)}ms`;
-    return `${value.toFixed(2)}s`;
+function useMetricsFormat() {
+  const t = useTranslations("clusterMetrics");
+  const format = useFormatter();
+  function value(value: unknown, unit: string, metric?: string): string {
+    if (value === null) return "—";
+    if (!observedMetric(value)) return t("unknown");
+    if (metric === "node_count" && !observedCount(value)) return t("unknown");
+    if ((metric === "pod_running_ratio" || metric === "deployment_ready_ratio") && value > 1)
+      return t("unknown");
+    if (unit === "ratio") {
+      if (!Number.isFinite(value * 100)) return t("unknown");
+      return format.number(value, {
+        style: "percent",
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      });
+    }
+    if (unit === "seconds") {
+      const [scaled, key, decimals] =
+        value < 0.001
+          ? ([value * 1_000_000, "microseconds", 0] as const)
+          : value < 1
+            ? ([value * 1000, "milliseconds", 0] as const)
+            : ([value, "seconds", 2] as const);
+      return t(key, {
+        value: format.number(scaled, {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        }),
+      });
+    }
+    if (unit === "bytes_per_sec") {
+      const [scaled, key, decimals] =
+        value < 1024
+          ? ([value, "bytes", 0] as const)
+          : value < 1024 ** 2
+            ? ([value / 1024, "kibibytes", 1] as const)
+            : value < 1024 ** 3
+              ? ([value / 1024 ** 2, "mebibytes", 1] as const)
+              : ([value / 1024 ** 3, "gibibytes", 2] as const);
+      return t(key, {
+        value: format.number(scaled, {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        }),
+      });
+    }
+    return value > 0 && value < 0.01
+      ? format.number(value, {
+          notation: value < 0.001 ? "scientific" : "standard",
+          maximumSignificantDigits: 2,
+        })
+      : format.number(value, { maximumFractionDigits: 2 });
   }
-  if (unit === "bytes_per_sec") {
-    if (value < 1024) return `${value.toFixed(0)} B/s`;
-    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB/s`;
-    if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB/s`;
-    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB/s`;
-  }
-  return value.toFixed(2);
+  return {
+    t,
+    value,
+    time: (seconds: number) =>
+      observedMetric(seconds) && Number.isFinite(new Date(seconds * 1000).getTime())
+        ? format.dateTime(new Date(seconds * 1000), { hour: "2-digit", minute: "2-digit" })
+        : t("unknown"),
+    label: (series: RangeSeries) => {
+      const known = Object.hasOwn(METRIC_LABELS, series.metric)
+        ? METRIC_LABELS[series.metric as keyof typeof METRIC_LABELS]
+        : null;
+      return known && series.label === known.label && series.unit === known.unit
+        ? t(known.key)
+        : series.label;
+    },
+  };
 }
 
 function seriesTone(series: RangeSeries): "ok" | "warn" | "bad" | "neutral" {
   const v = series.current;
-  if (v === null) return "neutral";
-  if (series.metric === "pod_running_ratio" || series.metric === "deployment_ready_ratio") {
+  if (!observedMetric(v)) return "neutral";
+  if (
+    (series.metric === "pod_running_ratio" || series.metric === "deployment_ready_ratio") &&
+    series.unit === "ratio"
+  ) {
+    if (v > 1) return "neutral";
     if (v >= 0.9) return "ok";
     if (v >= 0.7) return "warn";
     return "bad";
   }
   // latency — low is good; apiserver p99 > 500ms is concerning
-  if (series.metric === "latency_p99") {
+  if (series.metric === "latency_p99" && series.unit === "seconds") {
     if (v < 0.1) return "ok";
     if (v < 0.5) return "warn";
     return "bad";
@@ -109,13 +176,19 @@ function seriesTone(series: RangeSeries): "ok" | "warn" | "bad" | "neutral" {
   // network throughput — neutral (volume isn't inherently bad)
   if (series.metric === "network_rx") return "neutral";
   // restart rate — any restarts are concerning
-  if (series.metric === "restart_rate") {
+  if (series.metric === "restart_rate" && series.unit === "count") {
     if (v === 0) return "ok";
     if (v < 1) return "warn";
     return "bad";
   }
-  if (series.unit === "count") return "neutral";
+  if (
+    (series.metric !== "cpu_utilization" && series.metric !== "memory_utilization") ||
+    series.unit !== "ratio" ||
+    !Number.isFinite(v * 100)
+  )
+    return "neutral";
   // utilization metrics — high is bad
+  if (!Number.isFinite(v * 100)) return "neutral";
   if (v < 0.7) return "ok";
   if (v < 0.9) return "warn";
   return "bad";
@@ -579,23 +652,32 @@ export function StatusMetricsCard({
   error,
   refetch,
 }: { slug: string } & ReturnType<typeof useClusterMetrics>) {
+  const t = useTranslations("clusterMetrics");
   return (
     <Panel
       icon={<BarChart3Icon className="size-4" />}
-      title="Cluster saturation"
-      description="Prometheus-sourced golden signals — current snapshot and historical trend."
+      title={t("title")}
+      description={
+        <>
+          {t("description")}
+          {error && (instant || range) && (
+            <span role="alert" className="mt-2 block space-y-1">
+              <span className="block">{t("cachedFailed")}</span>
+              <code className="block font-mono [overflow-wrap:anywhere]">{error}</code>
+              <Button size="sm" variant="outline" onClick={refetch}>
+                {t("retry")}
+              </Button>
+            </span>
+          )}
+        </>
+      }
       actions={<WindowSelector value={selectedWindow} onChange={onWindowChange} />}
       error={!instant && !range && !instantLoading && !rangeLoading ? error : null}
       onRetry={refetch}
     >
       <SaturationKPIBar instant={instant} loading={instantLoading} slug={slug} />
       <div className="mt-5">
-        <SparklineGrid
-          range={range}
-          loading={rangeLoading}
-          slug={slug}
-          instantReason={instant?.reason ?? null}
-        />
+        <SparklineGrid range={range} loading={rangeLoading} slug={slug} />
       </div>
     </Panel>
   );
@@ -611,6 +693,8 @@ function SaturationKPIBar({
   loading: boolean;
   slug: string;
 }) {
+  const fmt = useMetricsFormat();
+  const { t } = fmt;
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -630,32 +714,37 @@ function SaturationKPIBar({
     );
   }
 
-  const kpis: { label: string; value: number | null; unit: string; tone: Tone }[] = [
-    {
-      label: "CPU utilization",
-      value: instant.cpuUtilization,
-      unit: "ratio",
-      tone: utilizationTone(instant.cpuUtilization),
-    },
-    {
-      label: "Memory utilization",
-      value: instant.memoryUtilization,
-      unit: "ratio",
-      tone: utilizationTone(instant.memoryUtilization),
-    },
-    {
-      label: "Nodes",
-      value: instant.nodeCount,
-      unit: "count",
-      tone: "neutral",
-    },
-    {
-      label: "Pod health",
-      value: instant.podRunningRatio,
-      unit: "ratio",
-      tone: healthTone(instant.podRunningRatio),
-    },
-  ];
+  const kpis: { label: string; metric: string; value: number | null; unit: string; tone: Tone }[] =
+    [
+      {
+        label: t("cpu"),
+        metric: "cpu_utilization",
+        value: instant.cpuUtilization,
+        unit: "ratio",
+        tone: utilizationTone(instant.cpuUtilization),
+      },
+      {
+        label: t("memory"),
+        metric: "memory_utilization",
+        value: instant.memoryUtilization,
+        unit: "ratio",
+        tone: utilizationTone(instant.memoryUtilization),
+      },
+      {
+        label: t("nodes"),
+        metric: "node_count",
+        value: instant.nodeCount,
+        unit: "count",
+        tone: "neutral",
+      },
+      {
+        label: t("podHealth"),
+        metric: "pod_running_ratio",
+        value: instant.podRunningRatio,
+        unit: "ratio",
+        tone: healthTone(instant.podRunningRatio),
+      },
+    ];
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -667,7 +756,7 @@ function SaturationKPIBar({
           <p
             className={`font-mono text-2xl font-semibold tabular-nums ${TONE_COLORS[k.tone].text}`}
           >
-            {fmtValue(k.value, k.unit)}
+            {fmt.value(k.value, k.unit, k.metric)}
           </p>
         </div>
       ))}
@@ -676,14 +765,16 @@ function SaturationKPIBar({
 }
 
 function utilizationTone(v: number | null): Tone {
-  if (v === null) return "neutral";
+  if (!observedMetric(v)) return "neutral";
+  if (!Number.isFinite(v * 100)) return "neutral";
   if (v < 0.7) return "ok";
   if (v < 0.9) return "warn";
   return "bad";
 }
 
 function healthTone(v: number | null): Tone {
-  if (v === null) return "neutral";
+  if (!observedMetric(v)) return "neutral";
+  if (v > 1) return "neutral";
   if (v >= 0.9) return "ok";
   if (v >= 0.7) return "warn";
   return "bad";
@@ -694,12 +785,10 @@ function SparklineGrid({
   range,
   loading,
   slug,
-  instantReason,
 }: {
   range: PrometheusRange | null;
   loading: boolean;
   slug: string;
-  instantReason: string | null;
 }) {
   if (loading) {
     return (
@@ -714,7 +803,7 @@ function SparklineGrid({
   if (!range?.available) {
     return (
       <PrometheusUnavailableCard
-        reason={range?.reason ?? instantReason}
+        reason={range?.reason ?? null}
         settingsHref={`/clusters/${slug}/settings`}
       />
     );
@@ -737,44 +826,33 @@ function PrometheusUnavailableCard({
   reason: string | null;
   settingsHref: string;
 }) {
-  const isNoEndpoint = reason === "no_endpoint";
-  // The control plane queries Prometheus over HTTP from outside the
-  // cluster, so a ClusterIP or *.svc name is not routable however
-  // healthy Prometheus is. Naming that ends an investigation that
-  // otherwise finishes at a Prometheus with nothing wrong with it (#1711).
-  const isClusterInternal = reason === "cluster_internal_endpoint";
-  const Icon = isNoEndpoint ? RefreshCwIcon : WifiOffIcon;
-  const title = isNoEndpoint
-    ? "No Prometheus endpoint"
-    : isClusterInternal
-      ? "Prometheus endpoint is cluster-internal"
-      : "Prometheus unreachable";
-  const body = isNoEndpoint
-    ? "The control plane hasn't discovered a Prometheus endpoint for this cluster yet."
-    : isClusterInternal
-      ? "The stored endpoint is an in-cluster address. The control plane queries Prometheus over HTTP from outside the cluster, where a Service ClusterIP doesn't resolve."
-      : "The control plane can't reach the Prometheus endpoint stored for this cluster.";
-  const hint = isNoEndpoint
-    ? "Go to Settings and run Refresh cluster management to auto-discover the endpoint, or set prometheus_endpoint in provider_config."
-    : isClusterInternal
-      ? "Put an internal load balancer in front of Prometheus and set prometheus_endpoint to that address."
-      : "Verify the endpoint is accessible from the control plane on port 9090 and that firewall rules allow inbound traffic from the ECS task security group.";
-
+  const t = useTranslations("clusterMetrics");
+  const kind =
+    reason === "no_endpoint"
+      ? "noEndpoint"
+      : reason === "cluster_internal_endpoint"
+        ? "internal"
+        : reason === "unreachable"
+          ? "unreachable"
+          : "unavailable";
+  const Icon =
+    kind === "noEndpoint" ? RefreshCwIcon : kind === "unavailable" ? InfoIcon : WifiOffIcon;
   return (
     <div className="border-warning-border bg-warning/5 flex items-start gap-3 rounded-md border p-3">
       <Icon className="text-warning mt-0.5 size-5 shrink-0" />
       <div className="min-w-0 space-y-1">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-muted-foreground text-sm">{body}</p>
-        <p className="text-muted-foreground text-xs">{hint}</p>
-        {isNoEndpoint && (
-          <Link
-            href={settingsHref}
-            className="text-primary mt-2 inline-block text-xs underline-offset-4 hover:underline"
-          >
-            Go to cluster settings →
-          </Link>
+        <p className="text-sm font-medium">{t(`${kind}Title`)}</p>
+        <p className="text-muted-foreground text-sm">{t(`${kind}Help`)}</p>
+        <p className="text-muted-foreground text-xs">{t(`${kind}Hint`)}</p>
+        {reason && (
+          <code className="block font-mono text-xs [overflow-wrap:anywhere]">{reason}</code>
         )}
+        <Link
+          href={settingsHref}
+          className="text-primary mt-2 inline-block text-xs underline-offset-4 hover:underline"
+        >
+          {t("settings")} →
+        </Link>
       </div>
     </div>
   );
@@ -788,6 +866,7 @@ function WindowSelector({
   value: WindowLabel;
   onChange: (w: WindowLabel) => void;
 }) {
+  const t = useTranslations("clusterMetrics");
   return (
     <div className="flex flex-wrap items-center gap-1">
       {WINDOWS.map((w) => (
@@ -796,9 +875,12 @@ function WindowSelector({
           variant={value === w.label ? "secondary" : "ghost"}
           size="sm"
           className="h-7 px-3 text-xs"
+          aria-pressed={value === w.label}
           onClick={() => onChange(w.label)}
         >
-          {w.label}
+          {w.rangeSeconds < 86400
+            ? t("hours", { count: w.rangeSeconds / 3600 })
+            : t("days", { count: w.rangeSeconds / 86400 })}
         </Button>
       ))}
     </div>
@@ -807,18 +889,25 @@ function WindowSelector({
 
 // ─── Single metric sparkline card ────────────────────────────────────
 function MetricSparklineCard({ series }: { series: RangeSeries }) {
+  const fmt = useMetricsFormat();
+  const gradientId = useId();
   const tone = seriesTone(series);
   const colors = TONE_COLORS[tone];
-  const chartData = series.points.map((p) => ({ ts: p.ts, value: p.value }));
+  const chartData = series.points
+    .filter((p) => observedMetric(p.ts) && Number.isFinite(new Date(p.ts * 1000).getTime()))
+    .map((p) => ({ ts: p.ts, value: observedMetric(p.value) ? p.value : null }));
 
   return (
     <div className="min-w-0 overflow-hidden rounded-md border">
       <div className="min-w-0 px-4 pt-4 pb-2">
-        <span className="text-muted-foreground text-xs tracking-wide [overflow-wrap:anywhere] uppercase">
-          {series.label}
+        <span
+          title={series.label}
+          className="text-muted-foreground text-xs tracking-wide [overflow-wrap:anywhere] uppercase"
+        >
+          {fmt.label(series)}
         </span>
         <p className={`font-mono text-2xl font-semibold tabular-nums ${colors.text}`}>
-          {fmtValue(series.current, series.unit)}
+          {fmt.value(series.current, series.unit, series.metric)}
         </p>
       </div>
       <div>
@@ -826,7 +915,7 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
           <ResponsiveContainer width="100%" height={80}>
             <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <defs>
-                <linearGradient id={`grad-${series.metric}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={colors.stroke} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={colors.stroke} stopOpacity={0.0} />
                 </linearGradient>
@@ -838,9 +927,9 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
                   const pt = payload[0].payload as RangePoint;
                   return (
                     <div className="bg-popover rounded border px-2 py-1 text-xs shadow-md">
-                      <div className="text-muted-foreground font-mono">{fmtTs(pt.ts)}</div>
+                      <div className="text-muted-foreground font-mono">{fmt.time(pt.ts)}</div>
                       <div className={`font-semibold ${colors.text}`}>
-                        {fmtValue(pt.value, series.unit)}
+                        {fmt.value(pt.value, series.unit, series.metric)}
                       </div>
                     </div>
                   );
@@ -851,7 +940,7 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
                 dataKey="value"
                 stroke={colors.stroke}
                 strokeWidth={2}
-                fill={`url(#grad-${series.metric})`}
+                fill={`url(#${gradientId})`}
                 dot={false}
                 isAnimationActive={false}
               />
@@ -860,7 +949,7 @@ function MetricSparklineCard({ series }: { series: RangeSeries }) {
         ) : (
           <div className="flex h-20 items-center justify-center">
             <span className="text-muted-foreground text-xs">
-              {series.points.length === 0 ? "No data in window" : "Collecting data…"}
+              {chartData.length === 0 ? fmt.t("noData") : fmt.t("collecting")}
             </span>
           </div>
         )}

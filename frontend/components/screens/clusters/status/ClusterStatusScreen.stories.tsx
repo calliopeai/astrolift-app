@@ -247,6 +247,73 @@ export const HealthUnknownReports: Story = {
   ),
 };
 
+export const MetricsUnknownReason: Story = {
+  render: () => (
+    <Screen
+      metrics={
+        <StatusMetricsCard
+          slug={CLUSTER.slug}
+          {...METRICS_NO_ENDPOINT}
+          instant={{ ...METRICS_NO_ENDPOINT.instant!, reason: "RAW_FUTURE_PROMETHEUS_REASON" }}
+          range={{ ...METRICS_NO_ENDPOINT.range!, reason: null }}
+        />
+      }
+    />
+  ),
+};
+
+export const MetricsUnknownValues: Story = {
+  render: () => (
+    <Screen
+      metrics={
+        <StatusMetricsCard
+          slug={CLUSTER.slug}
+          {...METRICS}
+          instant={{ ...METRICS.instant!, cpuUtilization: Infinity, nodeCount: -1 }}
+          range={{
+            ...METRICS.range!,
+            series: [
+              {
+                metric: "restart_rate",
+                label: "Restarts / min",
+                unit: "count",
+                current: 0.01,
+                points: [],
+              },
+              {
+                metric: "RAW_FUTURE_METRIC",
+                label: "RAW_PROVIDER_METRIC_LABEL",
+                unit: "ratio",
+                current: 0.99,
+                points: [],
+              },
+            ],
+          }}
+        />
+      }
+    />
+  ),
+};
+
+export const MetricsCachedReadFailed: Story = {
+  render: () => (
+    <Screen metrics={<StatusMetricsCard slug={CLUSTER.slug} {...METRICS} {...QUERY_FAILED} />} />
+  ),
+};
+
+export const MetricsDuplicateInstances: Story = {
+  render: () => (
+    <Screen
+      metrics={
+        <>
+          <StatusMetricsCard slug={CLUSTER.slug} {...METRICS} />
+          <StatusMetricsCard slug={CLUSTER.slug} {...METRICS} />
+        </>
+      }
+    />
+  ),
+};
+
 /** Prometheus is configured but unreachable / cluster-internal. */
 export const PrometheusError: Story = {
   render: () => (

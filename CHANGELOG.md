@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize cluster saturation metrics, windows and recovery copy in all eight
+  locales. Label CPU/memory ratios as requests against allocatable resources;
+  retain custom labels and unknown reasons without diagnosing unreachable
+  Prometheus. Invalid metrics stay unknown, small nonzero restart rates remain
+  visible, and chart gradients are unique across repeated cards (#2145).
+
 - Localize cluster Status workload and driver-health reports in all eight locales.
   Retained reports show cached/unconfirmed notices after failed or pending reads,
   with independent retries and literal diagnostics. Unknown pod phases stay
