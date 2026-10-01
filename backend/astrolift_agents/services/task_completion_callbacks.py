@@ -84,7 +84,12 @@ def callback_configuration(
 
 def normalized_usage(value: object) -> dict:
     source = value if isinstance(value, dict) else {}
-    usage = {"input_tokens": None, "output_tokens": None, "total_cost_usd": None, "model": None}
+    usage: dict[str, int | float | str | None] = {
+        "input_tokens": None,
+        "output_tokens": None,
+        "total_cost_usd": None,
+        "model": None,
+    }
     for key in ("input_tokens", "output_tokens"):
         item = source.get(key)
         if isinstance(item, int) and not isinstance(item, bool) and 0 <= item <= 2**63 - 1:

@@ -9,6 +9,7 @@ import ssl
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import cast
 from urllib.parse import urlsplit
 
 from astrolift_agents.completion_webhook import (
@@ -29,7 +30,7 @@ def _resolve(host, port):
     future = _DNS_POOL.submit(socket.getaddrinfo, host, port, type=socket.SOCK_STREAM)
     future.add_done_callback(lambda _: _DNS_SLOTS.release())
     addresses = future.result(timeout=REQUEST_TIMEOUT_SECONDS)
-    if not addresses or any(blocked_address(item[4][0]) for item in addresses):
+    if not addresses or any(blocked_address(cast(str, item[4][0])) for item in addresses):
         raise CallbackConfigurationError("callback address is not permitted")
     return list(dict.fromkeys(item[4][0] for item in addresses))
 
@@ -58,7 +59,7 @@ def post_completion_callback(url: str, allowed_hosts: list[str], body: bytes, se
                 continue
         raise OSError("callback connection unavailable")
 
-    connection._create_connection = connect
+    connection._create_connection = connect  # type: ignore[attr-defined]
 
     def expire():
         if connection.sock:
@@ -70,6 +71,7 @@ def post_completion_callback(url: str, allowed_hosts: list[str], body: bytes, se
     timer.daemon = True
     timer.start()
     try:
+        telemetry: contextlib.AbstractContextManager[None]
         try:
             from opentelemetry.instrumentation.utils import suppress_http_instrumentation
 
