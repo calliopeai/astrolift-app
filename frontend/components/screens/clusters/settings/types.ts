@@ -10,7 +10,7 @@ import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 export type ClusterWithHeartbeat = AstroliftTenantCluster &
   Pick<ClusterHeartbeatFields, "heartbeatStatus">;
 
-export type Lifecycle = "registered" | "managing" | "managed" | "error";
+export type Lifecycle = NonNullable<ClusterWithHeartbeat["lifecycle"]>;
 
 /** What the viewer may change on the settings tab, one flag per permission. */
 export interface ClusterSettingsAccess {

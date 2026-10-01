@@ -92,6 +92,91 @@ export const CachedReadFailed: Story = {
   ),
 };
 
+export const LifecycleReadOnly: Story = {
+  render: () => <ClusterSettingsScreen {...SETTINGS} readOnly />,
+};
+
+export const LifecyclePending: Story = {
+  render: () => <ClusterSettingsScreen {...SETTINGS} refreshing />,
+};
+
+export const Retiring: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      lifecycle="decommissioning"
+      cluster={{ ...CLUSTER, lifecycle: "decommissioning" }}
+    />
+  ),
+};
+
+export const Retired: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      lifecycle="decommissioned"
+      cluster={{ ...CLUSTER, lifecycle: "decommissioned" }}
+    />
+  ),
+};
+
+export const UnknownLifecycle: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      lifecycle="LITERAL_FUTURE_LIFECYCLE"
+      cluster={{ ...CLUSTER, lifecycle: "LITERAL_FUTURE_LIFECYCLE" }}
+    />
+  ),
+};
+
+export const UnknownCapabilities: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      cluster={{ ...CLUSTER, capabilities: { cert_manager: {}, metrics_server: "false" } }}
+    />
+  ),
+};
+
+export const LastBootstrapUnknownStatus: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      cluster={{
+        ...CLUSTER,
+        lastBootstrapRun: {
+          ...CLUSTER.lastBootstrapRun!,
+          status: "LITERAL_FUTURE_BOOTSTRAP_STATUS",
+        },
+      }}
+    />
+  ),
+};
+
+export const MalformedReleaseReport: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      cluster={{
+        ...CLUSTER,
+        lastBootstrapRun: {
+          ...CLUSTER.lastBootstrapRun!,
+          installedReleases: [
+            null,
+            { name: 42, version: {}, status: false },
+          ] as unknown as NonNullable<typeof CLUSTER.lastBootstrapRun>["installedReleases"],
+        },
+      }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(
+      within(canvasElement).getByRole("button", { name: "View installed releases" })
+    );
+  },
+};
+
 /** Registered but never brought into management: nothing probed yet. */
 export const Registered: Story = {
   render: () => (
@@ -105,7 +190,10 @@ export const Registered: Story = {
         capabilitiesProbedAt: "2026-09-27T14:06:00Z",
         lastBootstrapRun: null,
       }}
-      cards={{ ...cards, bootstrapPlan: <BootstrapPlanView {...PLAN} plan={null} /> }}
+      cards={{
+        ...cards,
+        bootstrapPlan: <BootstrapPlanView {...PLAN} plan={{ ...PLAN.plan!, components: [] }} />,
+      }}
     />
   ),
 };

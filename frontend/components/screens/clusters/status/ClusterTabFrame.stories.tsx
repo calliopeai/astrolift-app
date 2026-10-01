@@ -53,6 +53,21 @@ export const LoadError: Story = {
   ),
 };
 
+export const CachedReadFailed: Story = {
+  render: () => (
+    <ClusterTabFrame
+      slug={CLUSTER.slug}
+      cluster={CLUSTER}
+      loading={false}
+      error="RAW_CLUSTER_READ_DIAGNOSTIC"
+      onRetry={QUERY_FAILED.refetch}
+      active="status"
+    >
+      {body}
+    </ClusterTabFrame>
+  ),
+};
+
 export const LongStrings: Story = {
   render: () => (
     <ClusterTabFrame

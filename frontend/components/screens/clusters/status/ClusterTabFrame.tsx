@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, ServerCrashIcon } from "lucide-react";
 import type * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ClusterHeader } from "@/components/screens/clusters/list/ClusterHeader";
@@ -16,7 +17,7 @@ export interface ClusterTabFrameProps {
   slug: string;
   cluster: ClusterSummary | null;
   loading: boolean;
-  /** The cluster list query failed and no cluster is cached. */
+  /** The scoped read failed; last confirmed details may still be visible. */
   error?: string | null;
   onRetry?: () => void;
   /** The active entry in the cluster's tab row. */
@@ -42,11 +43,35 @@ export function ClusterTabFrame({
   active,
   children,
 }: ClusterTabFrameProps) {
+  const t = useTranslations("clusterSettings.source");
   const pending = loading && !cluster;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
       <ClusterHeader slug={slug} cluster={cluster} loading={pending} active={active} />
+      {cluster && error && (
+        <div
+          role="alert"
+          className="border-danger-border bg-danger/5 flex min-w-0 flex-col gap-2 rounded-md border p-4"
+        >
+          <p className="text-danger-fg text-sm font-medium">{t("readFailed")}</p>
+          <p className="text-muted-foreground text-sm">{t("cached")}</p>
+          <pre className="font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
+            {error}
+          </pre>
+          {onRetry && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              onClick={onRetry}
+              disabled={loading}
+            >
+              {t("retry")}
+            </Button>
+          )}
+        </div>
+      )}
 
       {pending ? (
         <div className="grid min-w-0 grid-cols-12 gap-4" aria-busy>
@@ -63,24 +88,24 @@ export function ClusterTabFrame({
         >
           <ServerCrashIcon className="text-danger size-5" aria-hidden />
           <div className="min-w-0 px-6">
-            <p className="font-medium">Could not load this cluster</p>
+            <p className="font-medium">{t("readFailed")}</p>
             <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
               {error}
             </p>
           </div>
           {onRetry && (
             <Button size="sm" variant="outline" onClick={onRetry}>
-              Retry
+              {t("retry")}
             </Button>
           )}
         </div>
       ) : (
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No cluster with slug ${slug}`}
-          description="The cluster doesn't exist or you don't have permission to view it."
+          title={t("notFound", { slug })}
+          description={t("notFoundHelp")}
           actionHref="/clusters"
-          actionLabel="Back to clusters"
+          actionLabel={t("back")}
         />
       )}
     </div>

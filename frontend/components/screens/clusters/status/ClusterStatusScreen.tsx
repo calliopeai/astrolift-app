@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
+import { useTranslations } from "next-intl";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 import { ListSummary } from "@/components/list/ListSummary";
@@ -39,14 +40,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  clusterOfflineMessage,
-  formatHeartbeatAge,
-  heartbeatPresentation,
   isClusterLive,
   type ClusterLiveState,
   type HeartbeatStatus,
 } from "@/lib/cluster-heartbeat";
 import { formatRelativeAge } from "@/lib/format";
+import { useClusterHeartbeat } from "@/lib/i18n/cluster-heartbeat";
 
 import {
   type AuditRow,
@@ -199,18 +198,19 @@ export function ClusterStatusBody({
   workflows,
   lifecycle,
 }: ClusterStatusBodyProps) {
+  const t = useTranslations("clusterConnection");
   const state = liveState.state;
-  const status: HeartbeatStatus = state?.status ?? "never_seen";
+  const status: HeartbeatStatus = typeof state?.status === "string" ? state.status : "";
   const age = state?.heartbeatAgeSeconds ?? null;
   const live = isClusterLive(status);
 
   return (
     <PanelGrid>
       <StatusLiveStateCard slug={slug} {...liveState} />
-      {!state ? (
+      {!state || liveState.loading || liveState.error ? (
         liveState.loading ? (
           <>
-            {["Cluster saturation", "Workload health", "Live health", "Recent workflows"].map(
+            {[t("saturation"), t("workloadHealth"), t("liveHealth"), t("recentWorkflows")].map(
               (title, index) => (
                 <Panel
                   key={title}
@@ -235,28 +235,28 @@ export function ClusterStatusBody({
           <OfflineCard
             span={12}
             icon={<BarChart3Icon className="size-4" />}
-            title="Cluster saturation"
+            title={t("saturation")}
             status={status}
             age={age}
             slug={slug}
           />
           <OfflineCard
             icon={<ServerIcon className="size-4" />}
-            title="Workload health"
+            title={t("workloadHealth")}
             status={status}
             age={age}
             slug={slug}
           />
           <OfflineCard
             icon={<ActivityIcon className="size-4" />}
-            title="Live health"
+            title={t("liveHealth")}
             status={status}
             age={age}
             slug={slug}
           />
           <OfflineCard
             icon={<GitBranchIcon className="size-4" />}
-            title="Recent workflows"
+            title={t("recentWorkflows")}
             status={status}
             age={age}
             slug={slug}
@@ -287,6 +287,8 @@ function OfflineCard({
   age: number | null;
   slug: string;
 }) {
+  const t = useTranslations("clusterConnection");
+  const p = useClusterHeartbeat(status, age);
   return (
     <Panel
       span={span}
@@ -296,22 +298,28 @@ function OfflineCard({
         <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
           {status === "never_seen" ? (
             <ServerOffIcon className="size-3.5" />
-          ) : (
+          ) : status === "offline" ? (
             <WifiOffIcon className="size-3.5" />
+          ) : (
+            <InfoIcon className="size-3.5" />
           )}
-          {status === "never_seen" ? "No agent" : "Offline"}
+          {p.label}
         </span>
       }
     >
       <div className="border-border/70 text-muted-foreground flex items-start gap-3 rounded-md border border-dashed px-3 py-4 text-sm">
-        <WifiOffIcon className="text-muted-foreground/70 mt-0.5 size-4 shrink-0" />
+        {status === "offline" || status === "never_seen" ? (
+          <WifiOffIcon className="text-muted-foreground/70 mt-0.5 size-4 shrink-0" />
+        ) : (
+          <InfoIcon className="text-muted-foreground/70 mt-0.5 size-4 shrink-0" />
+        )}
         <div className="min-w-0 space-y-1">
-          <p>{clusterOfflineMessage(status, age)}</p>
+          <p>{p.message}</p>
           <Link
             href={`/clusters/${slug}/settings`}
             className="text-primary inline-block text-xs underline-offset-4 hover:underline"
           >
-            Check cluster settings →
+            {t("checkSettings")}
           </Link>
         </div>
       </div>
@@ -333,30 +341,53 @@ export function StatusLiveStateCard({
   error,
   refetch,
 }: { slug: string } & ReturnType<typeof useClusterLiveState>) {
-  const status: HeartbeatStatus = state?.status ?? "never_seen";
-  const p = heartbeatPresentation(status);
-  const age = formatHeartbeatAge(state?.heartbeatAgeSeconds ?? null);
+  const t = useTranslations("clusterConnection");
+  const sourceT = useTranslations("clusterSettings.source");
+  const status: HeartbeatStatus = typeof state?.status === "string" ? state.status : "";
+  const p = useClusterHeartbeat(status, state?.heartbeatAgeSeconds ?? null);
+  const age = p.age;
   const live = isClusterLive(status);
 
-  if (!state) {
+  if (!state || loading || error) {
     return (
       <Panel
         icon={<ActivityIcon className="size-4" />}
-        title="Cluster connection"
-        description="Keep-alive heartbeat from the in-cluster agent."
-        loading={loading}
+        title={t("title")}
+        description={t("help")}
+        loading={loading && !state}
         skeleton={<Skeleton className="h-16 w-full" />}
-        error={error ?? (loading ? null : "Cluster connection state unavailable")}
+        error={!state ? (error ?? (loading ? null : t("unavailable"))) : null}
         onRetry={refetch}
-      />
+        failure={
+          state && error
+            ? {
+                title: t("unavailable"),
+                reason: error,
+                action: (
+                  <Button variant="outline" size="sm" onClick={refetch}>
+                    {sourceT("retry")}
+                  </Button>
+                ),
+              }
+            : null
+        }
+      >
+        {state && (
+          <div className="space-y-3">
+            {loading && <p className="text-muted-foreground text-sm">{t("unconfirmed")}</p>}
+            <p className="text-muted-foreground text-sm">{t("cached")}</p>
+            <LiveSnapshotGrid state={state} age={age} />
+          </div>
+        )}
+      </Panel>
     );
   }
 
   return (
     <Panel
       icon={<ActivityIcon className="size-4" />}
-      title="Cluster connection"
-      description="Keep-alive heartbeat from the in-cluster agent. Polls every 30s."
+      title={t("title")}
+      description={t("help")}
       actions={
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${p.pill}`}
@@ -365,8 +396,10 @@ export function StatusLiveStateCard({
             <CircleDotIcon className="size-3" />
           ) : status === "never_seen" ? (
             <ServerOffIcon className="size-3" />
-          ) : (
+          ) : status === "offline" ? (
             <WifiOffIcon className="size-3" />
+          ) : (
+            <InfoIcon className="size-3" />
           )}
           {p.label}
         </span>
@@ -376,33 +409,35 @@ export function StatusLiveStateCard({
         <div className="border-border/70 flex items-start gap-3 rounded-md border border-dashed p-3">
           <ServerOffIcon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
           <div className="min-w-0 space-y-1 text-sm">
-            <p className="font-medium">No keep-alive agent</p>
-            <p className="text-muted-foreground">
-              No agent has reported from this cluster yet. Install the keep-alive agent to surface
-              live pod, node, and resource state here.
-            </p>
+            <p className="font-medium">{t("noAgentTitle")}</p>
+            <p className="text-muted-foreground">{t("noAgentHelp")}</p>
             <Link
               href={`/clusters/${slug}/settings`}
               className="text-primary mt-1 inline-block text-xs underline-offset-4 hover:underline"
             >
-              Set up the cluster agent →
+              {t("setUp")}
             </Link>
           </div>
         </div>
       ) : !live ? (
-        <div className="border-destructive/30 bg-destructive/5 flex items-start gap-3 rounded-md border p-3">
-          <WifiOffIcon className="text-destructive mt-0.5 size-5 shrink-0" />
+        <div
+          className={`flex items-start gap-3 rounded-md border p-3 ${status === "offline" ? "border-destructive/30 bg-destructive/5" : "border-border bg-muted/30"}`}
+        >
+          {status === "offline" ? (
+            <WifiOffIcon className="text-destructive mt-0.5 size-5 shrink-0" />
+          ) : (
+            <InfoIcon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
+          )}
           <div className="min-w-0 space-y-1 text-sm">
-            <p className="font-medium">Cluster disconnected</p>
+            <p className="font-medium">{t(status === "offline" ? "disconnected" : "unknown")}</p>
             <p className="text-muted-foreground">
-              {clusterOfflineMessage(status, state?.heartbeatAgeSeconds ?? null)} The live cards
-              below may be empty or stale until the agent reconnects.
+              {p.message} {t("recoveryHelp")}
             </p>
             <Link
               href={`/clusters/${slug}/settings`}
               className="text-primary mt-1 inline-block text-xs underline-offset-4 hover:underline"
             >
-              Check cluster settings →
+              {t("checkSettings")}
             </Link>
           </div>
         </div>
@@ -414,45 +449,62 @@ export function StatusLiveStateCard({
 }
 
 function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string | null }) {
+  const t = useTranslations("clusterConnection");
+  const count = (value: unknown): value is number =>
+    typeof value === "number" && Number.isInteger(value) && value >= 0;
+  const percentage = (value: unknown) =>
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isFinite(value * 100) &&
+    value >= 0
+      ? `${(value * 100).toFixed(0)}%`
+      : "—";
   // Node readiness — "N/M ready" when the agent reports the ready count
   // (#112), falling back to the bare total for agents that predate it.
   const nodeValue: React.ReactNode =
-    state.nodeReadyCount !== null && state.nodeCount !== null ? (
+    count(state.nodeReadyCount) &&
+    count(state.nodeCount) &&
+    state.nodeReadyCount <= state.nodeCount ? (
       <>
         {state.nodeReadyCount}/{state.nodeCount}
-        <span className="text-muted-foreground ml-1 text-xs font-normal">ready</span>
+        <span className="text-muted-foreground ml-1 text-xs font-normal">{t("ready")}</span>
       </>
-    ) : state.nodeCount !== null ? (
+    ) : count(state.nodeCount) && state.nodeReadyCount == null ? (
       String(state.nodeCount)
     ) : (
       "—"
     );
 
   const tiles: { label: string; value: React.ReactNode }[] = [
-    { label: "Last heartbeat", value: age ?? "—" },
-    { label: "Nodes", value: nodeValue },
+    { label: t("lastHeartbeat"), value: age ?? "—" },
+    { label: t("nodes"), value: nodeValue },
     {
-      label: "Pods",
-      value: state.podTotal !== null ? String(state.podTotal) : "—",
+      label: t("pods"),
+      value: count(state.podTotal) ? String(state.podTotal) : "—",
     },
     {
       label: "CPU",
-      value: state.cpuUtilization !== null ? `${(state.cpuUtilization * 100).toFixed(0)}%` : "—",
+      value: percentage(state.cpuUtilization),
     },
     {
-      label: "Memory",
-      value:
-        state.memoryUtilization !== null ? `${(state.memoryUtilization * 100).toFixed(0)}%` : "—",
+      label: t("memory"),
+      value: percentage(state.memoryUtilization),
     },
   ];
 
-  // Per-app pod readiness from the heartbeat payload, keyed by app slug
-  // (#112). Only present here when the cluster is online — this grid is
-  // mounted only in the live branch of LiveStateSection, so it never
-  // shows stale readiness for an offline / never-seen cluster.
-  const appEntries = Object.entries(state.appReadiness ?? {}).sort(([a], [b]) =>
+  // JSON reports are independent of the connection token. Keep malformed
+  // reports unknown; cached snapshots are explicitly labeled by the caller.
+  const knownReadiness =
+    state.appReadiness !== null &&
+    typeof state.appReadiness === "object" &&
+    !Array.isArray(state.appReadiness);
+  const appEntries = Object.entries(knownReadiness ? state.appReadiness : {}).sort(([a], [b]) =>
     a.localeCompare(b)
   );
+  const knownIngress =
+    Array.isArray(state.ingressIps) && state.ingressIps.every((ip) => typeof ip === "string");
+  const ingressIps = knownIngress ? state.ingressIps : [];
+  const knownVersion = typeof state.agentVersion === "string";
 
   return (
     <div className="space-y-3">
@@ -466,22 +518,26 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
           </div>
         ))}
       </div>
-      {appEntries.length > 0 && (
+      {(!knownReadiness || appEntries.length > 0) && (
         <div className="space-y-1.5">
           <p className="text-muted-foreground text-2xs font-medium tracking-wider uppercase">
-            App readiness
+            {t("appReadiness")}
           </p>
           <div className="flex flex-wrap gap-2">
+            {!knownReadiness && (
+              <span className="text-muted-foreground text-xs">{t("unknown")}</span>
+            )}
             {appEntries.map(([appSlug, r]) => (
-              <AppReadinessPill key={appSlug} appSlug={appSlug} ready={r.ready} total={r.total} />
+              <AppReadinessPill key={appSlug} appSlug={appSlug} value={r} />
             ))}
           </div>
         </div>
       )}
-      {state.ingressIps.length > 0 && (
+      {(!knownIngress || ingressIps.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-muted-foreground">Ingress:</span>
-          {state.ingressIps.map((ip) => (
+          <span className="text-muted-foreground">{t("ingress")}:</span>
+          {!knownIngress && <span>{t("unknown")}</span>}
+          {ingressIps.map((ip) => (
             <code
               key={ip}
               className="bg-muted text-2xs max-w-full rounded px-1.5 py-0.5 font-mono [overflow-wrap:anywhere]"
@@ -491,9 +547,10 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
           ))}
         </div>
       )}
-      {state.agentVersion && (
+      {(!knownVersion || state.agentVersion) && (
         <p className="text-muted-foreground text-2xs [overflow-wrap:anywhere]">
-          Agent <span className="font-mono">{state.agentVersion}</span>
+          {t("agent")}{" "}
+          <span className="font-mono">{knownVersion ? state.agentVersion : t("unknown")}</span>
         </p>
       )}
     </div>
@@ -503,16 +560,23 @@ function LiveSnapshotGrid({ state, age }: { state: ClusterLiveState; age: string
 // Per-app pod readiness pill (#112). Tone tracks the ready/total ratio —
 // green when fully ready, red when nothing is ready, amber in between.
 // Mirrors the PodPhasePill shape so the live cards read consistently.
-function AppReadinessPill({
-  appSlug,
-  ready,
-  total,
-}: {
-  appSlug: string;
-  ready: number;
-  total: number;
-}) {
-  const tone: Tone = total === 0 ? "neutral" : ready >= total ? "ok" : ready === 0 ? "bad" : "warn";
+function AppReadinessPill({ appSlug, value }: { appSlug: string; value: unknown }) {
+  const t = useTranslations("clusterConnection");
+  const row =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const ready = row.ready;
+  const total = row.total;
+  const known =
+    typeof ready === "number" &&
+    typeof total === "number" &&
+    Number.isInteger(ready) &&
+    Number.isInteger(total) &&
+    ready >= 0 &&
+    total >= ready;
+  const tone: Tone =
+    !known || total === 0 ? "neutral" : ready === total ? "ok" : ready === 0 ? "bad" : "warn";
   const classes: Record<Tone, string> = {
     ok: "bg-success/10 text-success-fg border-success-border",
     warn: "bg-warning/10 text-warning-fg border-warning-border",
@@ -527,7 +591,13 @@ function AppReadinessPill({
         {appSlug}
       </code>
       <span className="shrink-0 font-mono tabular-nums opacity-80">
-        {ready}/{total} ready
+        {known ? (
+          <>
+            {ready}/{total} {t("ready")}
+          </>
+        ) : (
+          t("unknown")
+        )}
       </span>
     </span>
   );

@@ -8,14 +8,12 @@
  * looks identical everywhere and the "is the cluster reachable?"
  * decision is made one way.
  *
- * Typed locally rather than off the generated schema: the repo's
- * committed GraphQL codegen output lags the live backend, so the
- * generated ``AstroliftTenantCluster`` doesn't yet carry these fields.
- * The client components type the heartbeat surface here instead — the
- * same inline-interface pattern the cluster Status tab already uses.
+ * Status is a schema String. Preserve future tokens instead of treating
+ * an unrecognized value as the known never-seen state.
  */
 
-export type HeartbeatStatus = "never_seen" | "connected" | "degraded" | "offline";
+export type KnownHeartbeatStatus = "never_seen" | "connected" | "degraded" | "offline";
+export type HeartbeatStatus = string;
 
 /** Heartbeat fields the backend adds to every cluster row (#808). */
 export interface ClusterHeartbeatFields {
@@ -72,7 +70,7 @@ export interface HeartbeatPresentation {
   pill: string;
 }
 
-const PRESENTATION: Record<HeartbeatStatus, HeartbeatPresentation> = {
+const PRESENTATION: Record<KnownHeartbeatStatus, HeartbeatPresentation> = {
   connected: {
     label: "Connected",
     dot: "ok",
@@ -100,7 +98,9 @@ const PRESENTATION: Record<HeartbeatStatus, HeartbeatPresentation> = {
 };
 
 export function heartbeatPresentation(status: HeartbeatStatus): HeartbeatPresentation {
-  return PRESENTATION[status] ?? PRESENTATION.never_seen;
+  return Object.hasOwn(PRESENTATION, status)
+    ? PRESENTATION[status as KnownHeartbeatStatus]
+    : { ...PRESENTATION.never_seen, label: status || "Unknown" };
 }
 
 /**
@@ -110,7 +110,13 @@ export function heartbeatPresentation(status: HeartbeatStatus): HeartbeatPresent
  * branch on the never-seen copy.
  */
 export function formatHeartbeatAge(ageSeconds: number | null): string | null {
-  if (ageSeconds === null || ageSeconds === undefined) return null;
+  if (
+    ageSeconds === null ||
+    ageSeconds === undefined ||
+    !Number.isFinite(ageSeconds) ||
+    ageSeconds < 0
+  )
+    return null;
   const s = Math.max(0, Math.floor(ageSeconds));
   if (s < 5) return "just now";
   if (s < 60) return `${s}s ago`;
@@ -128,6 +134,9 @@ export function formatHeartbeatAge(ageSeconds: number | null): string | null {
  * reads naturally. ``ageSeconds`` carries the last-seen cue.
  */
 export function clusterOfflineMessage(status: HeartbeatStatus, ageSeconds: number | null): string {
+  if (!["never_seen", "connected", "degraded", "offline"].includes(status)) {
+    return "Cluster connection state unknown.";
+  }
   if (status === "never_seen") {
     return "No keep-alive agent has reported from this cluster yet. Install the agent from cluster settings to see live state.";
   }

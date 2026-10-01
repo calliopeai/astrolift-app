@@ -21,24 +21,21 @@ interface Resp {
   astroliftCluster: ClusterWithHeartbeat | null;
 }
 
+interface LifecycleResp {
+  bringClusterIntoManagement?: MutationResult<AstroliftTenantCluster>;
+  refreshClusterManagement?: MutationResult<AstroliftTenantCluster>;
+  decommissionCluster?: MutationResult<AstroliftTenantCluster>;
+}
+
+type Action = "bring" | "refresh" | "decommission";
 const POLL_INTERVAL_MS = 4000;
 
-// The cluster on screen, by operation name: its variables carry the slug.
-const REFETCH_CLUSTER = "GetCluster";
-
-/**
- * The cluster behind the settings tab and every lifecycle mutation it
- * drives (Bring into management, Refresh, Re-run preflight, Force
- * retrigger, Decommission). Polls while the management workflow runs.
- * Also what the viewer may change, per section. The data half of
- * ClusterSettingsScreen.
- */
 export function useClusterSettings(slug: string) {
-  const t = useTranslations("clusterSettings.source");
-  // One cluster by slug (#2150); the SSR preload answers before the org
-  // cookie is set, so the first client read goes to the network.
+  const sourceT = useTranslations("clusterSettings.source");
+  const t = useTranslations("clusterSettings.lifecycle");
   const {
     data,
+    previousData,
     error: readError,
     refetch,
     loading,
@@ -46,13 +43,13 @@ export function useClusterSettings(slug: string) {
     stopPolling,
   } = useQuery<Resp>(GET_CLUSTER, {
     variables: { slug },
-    fetchPolicy: "cache-and-network",
+    // A cache merge can replace missing network fields with an older confirmed read.
+    fetchPolicy: "no-cache",
+    notifyOnNetworkStatusChange: true,
   });
   const perms = useMyPermissions();
-  // Optimistic while the permission set loads, as `Can` is: the backend
-  // still refuses, and the fields do not flash disabled on first paint.
-  const pending = perms.loading && perms.granted.size === 0;
-  const allow = (p: AstroliftPermission) => pending || perms.can(p);
+  const permissionPending = perms.loading && perms.granted.size === 0;
+  const allow = (p: AstroliftPermission) => permissionPending || perms.can(p);
   const access: ClusterSettingsAccess = {
     manage: allow("cluster.manage"),
     update: allow("cluster.update"),
@@ -60,12 +57,32 @@ export function useClusterSettings(slug: string) {
     unregister: allow("cluster.unregister"),
   };
   const observedCluster = data?.astroliftCluster;
-  const cluster = observedCluster?.slug === slug ? observedCluster : null;
+  const lastCluster = previousData?.astroliftCluster;
+  const cluster =
+    observedCluster?.slug === slug
+      ? observedCluster
+      : (readError || loading || observedCluster === undefined) && lastCluster?.slug === slug
+        ? lastCluster
+        : null;
   const error =
     readError?.message ??
-    (!loading && (observedCluster === undefined || (observedCluster !== null && !cluster))
-      ? t("unknown")
+    (!loading &&
+    (observedCluster === undefined || (observedCluster !== null && observedCluster.slug !== slug))
+      ? sourceT("unknown")
       : null);
+  const observed = !!cluster && !loading && !error;
+  const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
+  const fingerprint = JSON.stringify([slug, cluster, observed, access.manage, access.unregister]);
+  const context = React.useMemo(() => ({ fingerprint }), [fingerprint]);
+  const current = React.useRef<object | null>(context);
+  React.useLayoutEffect(() => {
+    current.current = context;
+    return () => {
+      current.current = null;
+    };
+  }, [context]);
+  const [pending, setPending] = React.useState<{ context: object; action: Action } | null>(null);
+  const running = React.useRef<object | null>(null);
 
   async function onRetry() {
     try {
@@ -74,7 +91,6 @@ export function useClusterSettings(slug: string) {
       /* The query retains its diagnostic. */
     }
   }
-  const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
 
   React.useEffect(() => {
     if (lifecycle === "managing") {
@@ -85,65 +101,88 @@ export function useClusterSettings(slug: string) {
     return undefined;
   }, [lifecycle, startPolling, stopPolling]);
 
-  const [bring, { loading: bringing }] = useMutation<{
-    bringClusterIntoManagement: MutationResult<AstroliftTenantCluster>;
-  }>(BRING_CLUSTER_INTO_MANAGEMENT, {
-    refetchQueries: [REFETCH_CLUSTER],
-    awaitRefetchQueries: true,
+  const [bring] = useMutation<LifecycleResp>(BRING_CLUSTER_INTO_MANAGEMENT, {
+    fetchPolicy: "no-cache",
   });
-  const [refresh, { loading: refreshing }] = useMutation<{
-    refreshClusterManagement: MutationResult<AstroliftTenantCluster>;
-  }>(REFRESH_CLUSTER_MANAGEMENT, {
-    refetchQueries: [REFETCH_CLUSTER],
-    awaitRefetchQueries: true,
+  const [refresh] = useMutation<LifecycleResp>(REFRESH_CLUSTER_MANAGEMENT, {
+    fetchPolicy: "no-cache",
   });
-  const [decommission, { loading: decommissioning }] = useMutation<{
-    decommissionCluster: MutationResult<AstroliftTenantCluster>;
-  }>(DECOMMISSION_CLUSTER, {
-    refetchQueries: [REFETCH_CLUSTER],
-    awaitRefetchQueries: true,
+  const [decommission] = useMutation<LifecycleResp>(DECOMMISSION_CLUSTER, {
+    fetchPolicy: "no-cache",
   });
 
-  /** Throws on refusal, so the confirm dialog stays open with the error. */
-  async function onDecommission(deleteCloudInfra: boolean): Promise<void> {
-    if (!cluster) return;
-    const { data } = await decommission({
-      variables: { input: { clusterId: cluster.id, deleteCloudInfra } },
-    });
-    if (data?.decommissionCluster.ok) {
-      toast.success(
-        deleteCloudInfra
-          ? `Decommissioning ${cluster.slug} + deleting cloud infrastructure`
-          : `Decommissioning ${cluster.slug} (cluster left running)`
-      );
-      return;
+  async function request(action: Action, flag = false) {
+    const allowed = action === "decommission" ? access.unregister : access.manage;
+    if (current.current !== context || !observed || !cluster || !allowed) {
+      throw new Error(t("sourceChanged"));
     }
-    throw new Error(data?.decommissionCluster.errors?.[0]?.message ?? "Failed");
+    if (running.current === context) throw new Error(t("pending"));
+    running.current = context;
+    setPending({ context, action });
+    try {
+      const operation = { bring, refresh, decommission }[action];
+      const input = {
+        clusterId: cluster.id,
+        ...(action === "refresh" ? { forcePreflight: flag } : {}),
+        ...(action === "decommission" ? { deleteCloudInfra: flag } : {}),
+      };
+      const field = {
+        bring: "bringClusterIntoManagement",
+        refresh: "refreshClusterManagement",
+        decommission: "decommissionCluster",
+      }[action] as keyof LifecycleResp;
+      const result = (await operation({ variables: { input } })).data?.[field];
+      if (!result?.ok) throw new Error(result?.errors?.[0]?.message || t("failed"));
+      const target = t("target", { clusterId: cluster.id });
+      toast.success(
+        t(
+          action === "bring"
+            ? "manageRequested"
+            : action === "refresh"
+              ? flag
+                ? "fullRequested"
+                : "refreshRequested"
+              : flag
+                ? "deleteRequested"
+                : "retireRequested",
+          { slug: cluster.slug }
+        ) +
+          " " +
+          target
+      );
+      if (current.current !== context) return;
+      try {
+        const next = await refetch();
+        if (
+          next.error ||
+          !next.data?.astroliftCluster ||
+          next.data.astroliftCluster.id !== cluster.id ||
+          next.data.astroliftCluster.slug !== cluster.slug
+        ) {
+          toast.warning(t("acceptedRefreshFailed", { slug: cluster.slug }) + " " + target);
+        }
+      } catch {
+        toast.warning(t("acceptedRefreshFailed", { slug: cluster.slug }) + " " + target);
+      }
+    } finally {
+      if (running.current === context) running.current = null;
+      setPending((active) => (active?.context === context ? null : active));
+    }
   }
 
   async function onBring() {
-    if (!cluster) return;
-    const { data } = await bring({ variables: { input: { clusterId: cluster.id } } });
-    if (data?.bringClusterIntoManagement.ok) {
-      toast.success(`Bringing ${cluster.slug} into management`);
-    } else {
-      toast.error(data?.bringClusterIntoManagement.errors?.[0]?.message ?? "Failed");
+    try {
+      await request("bring");
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : t("failed"));
     }
   }
 
   async function onRefresh(forcePreflight: boolean) {
-    if (!cluster) return;
-    const { data } = await refresh({
-      variables: { input: { clusterId: cluster.id, forcePreflight } },
-    });
-    if (data?.refreshClusterManagement.ok) {
-      toast.success(
-        forcePreflight
-          ? `Refreshing ${cluster.slug} (full preflight)`
-          : `Refreshing ${cluster.slug}`
-      );
-    } else {
-      toast.error(data?.refreshClusterManagement.errors?.[0]?.message ?? "Failed");
+    try {
+      await request("refresh", forcePreflight);
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : t("failed"));
     }
   }
 
@@ -152,13 +191,14 @@ export function useClusterSettings(slug: string) {
     loading,
     error,
     onRetry,
+    readOnly: !observed,
     lifecycle,
-    bringing,
-    refreshing,
-    decommissioning,
+    bringing: pending?.context === context && pending.action === "bring",
+    refreshing: pending?.context === context && pending.action === "refresh",
+    decommissioning: pending?.context === context && pending.action === "decommission",
     onBring,
     onRefresh,
-    onDecommission,
+    onDecommission: (deleteCloudInfra: boolean) => request("decommission", deleteCloudInfra),
     access,
   };
 }

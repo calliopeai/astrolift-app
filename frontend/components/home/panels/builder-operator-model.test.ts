@@ -49,7 +49,22 @@ describe("clusters", () => {
       degraded: 1,
       never_seen: 1,
       connected: 2,
+      unknown: 0,
     });
+  });
+
+  it("counts unknown heartbeat tokens without treating them as known agent absence", () => {
+    for (const heartbeatStatus of ["LITERAL_FUTURE_STATUS", "__proto__", "constructor", ""]) {
+      const row = { ...CLUSTERS[0]!, lifecycle: "managed", heartbeatStatus };
+      const counts = healthCounts([row]);
+      expect(counts.unknown).toBe(1);
+      expect(counts.never_seen).toBe(0);
+      expect(counts.connected).toBe(0);
+      expect(Object.values(counts).reduce((total, n) => total + n, 0)).toBe(1);
+      expect(clustersWorstFirst([row, ...CLUSTERS]).findIndex((cluster) => cluster === row)).toBe(
+        3
+      );
+    }
   });
 });
 
