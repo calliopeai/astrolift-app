@@ -19,16 +19,16 @@ boundaries.
 
 ## Supported persisted reductions
 
-| Source | Authority and changed fields | Preserved facts |
-| --- | --- | --- |
-| Django User / core Profile | Existing `Profile.anonymize_user` account/profile fields; random anonymous identity, unusable password, inactive account | User identity and structural references; profile anonymization follows its existing behavior |
-| operations Event | Typed user resource identity or explicit recognized user identity within the payload; supported identity/contact/session PII string values in `payload` | Actor FK, organization, resource identity, event type, severity, request/trace IDs and timestamps |
-| operations AuditEvent | Exact `actor_kind=user` plus actor PK for actor display, request IP/agent and actor/request PII; typed target-user identity for target slug and subject PII; explicit payload identities for nested subjects | Actor/target IDs and kinds, decision, action, organization, request ID, parent chain and timestamps |
-| auth1 UserInfo | Exact `internal_user` FK: names, nickname, email, verification flag and picture | Issuer, subject and other opaque identity/session claims, FK and timestamps |
-| identity AstroliftSession | Exact user FK, including soft-deleted rows: label, last-seen IP/agent | Session identity, client kind, timing, revocation and attestation facts |
-| identity ApiToken | Exact owner FK, including soft-deleted rows: last-used IP/agent | Token hash, ID, scopes, expiry and revocation facts; inactive-owner verification refuses the token |
-| operations NotificationDelivery | Exact recipient-user FK, email/SMS only: target address | Delivery identity, channel, status, provider message ID, times and mixed content |
-| core MutationAuditLog | Exact actor-user FK: request IP | Organization, actor FK, operation, variables, errors, success and timestamp |
+| Source                          | Authority and changed fields                                                                                                                                                                                 | Preserved facts                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Django User / core Profile      | Existing `Profile.anonymize_user` account/profile fields; random anonymous identity, unusable password, inactive account                                                                                     | User identity and structural references; profile anonymization follows its existing behavior        |
+| operations Event                | Typed user resource identity or explicit recognized user identity within the payload; supported identity/contact/session PII string values in `payload`                                                      | Actor FK, organization, resource identity, event type, severity, request/trace IDs and timestamps   |
+| operations AuditEvent           | Exact `actor_kind=user` plus actor PK for actor display, request IP/agent and actor/request PII; typed target-user identity for target slug and subject PII; explicit payload identities for nested subjects | Actor/target IDs and kinds, decision, action, organization, request ID, parent chain and timestamps |
+| auth1 UserInfo                  | Exact `internal_user` FK: names, nickname, email, verification flag and picture                                                                                                                              | Issuer, subject and other opaque identity/session claims, FK and timestamps                         |
+| identity AstroliftSession       | Exact user FK, including soft-deleted rows: label, last-seen IP/agent                                                                                                                                        | Session identity, client kind, timing, revocation and attestation facts                             |
+| identity ApiToken               | Exact owner FK, including soft-deleted rows: last-used IP/agent                                                                                                                                              | Token hash, ID, scopes, expiry and revocation facts; inactive-owner verification refuses the token  |
+| operations NotificationDelivery | Exact recipient-user FK, email/SMS only: target address                                                                                                                                                      | Delivery identity, channel, status, provider message ID, times and mixed content                    |
+| core MutationAuditLog           | Exact actor-user FK: request IP                                                                                                                                                                              | Organization, actor FK, operation, variables, errors, success and timestamp                         |
 
 The database projection supports direct string PII values and string leaves in
 `{old, new}`-only value objects. Its identity fields include email, names,
@@ -116,3 +116,23 @@ code refuses when its function is unavailable. Previously erased PII cannot be
 restored by rollback. Operator review of this documented exception and supported
 source inventory is required before a release can claim #2220 acceptance;
 local proof is not production privacy execution.
+
+## Connected People review
+
+The People list requests the nullable `AstroliftUser.isAnonymized` field. Only
+`true` offers **Review privacy cleanup** for an existing anonymous account;
+`false` or unknown keeps the ordinary first-cleanup review. Member lifecycle
+remains `deactivated`. Email, display name and membership state do not establish
+anonymous status in the browser. Both actions call the same server-authorized
+mutation with the exact user GUID and require irreversible acknowledgement.
+
+All eight locale reviews describe the supported attributed-history reduction,
+retained account/audit/role-binding facts and unsupported opaque, structured,
+unattributed and external copies. Repeated cleanup preserves anonymous identity;
+it does not claim blanket historical deletion or replace that identity.
+Changing the reviewed GUID/name, list question or existing management visibility
+withdraws the review. A cached same-target read failure preserves the review;
+a confirmed missing row does not. Locale changes alone retain acknowledgement.
+Accepted cleanup remains accepted if refresh or required sign-out navigation
+fails, with separate recovery feedback. Navigation failure never claims the
+browser session was successfully ended.

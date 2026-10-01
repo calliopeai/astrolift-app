@@ -167,10 +167,19 @@ export const LONG_MEMBERS: AstroliftMember[] = [
       PAYMENTS,
     ],
   }),
-  member("m-anon", user("6", "anon-7c2f19ab", "7c2f19ab@anonymized.invalid"), {
-    lifecycle: "anonymized",
-    teams: [],
-  }),
+  member(
+    "m-anon",
+    {
+      ...user("6", "anon-6-7c2f19ab", "anon-6-7c2f19ab@anon-astrolift.net"),
+      isActive: false,
+      isAnonymized: true,
+    },
+    {
+      lifecycle: "deactivated",
+      isActive: false,
+      teams: [],
+    }
+  ),
 ];
 
 /** IdP groups as `astroliftPrincipalSearch(filter: {kind: ["GROUP"]})` returns them. */

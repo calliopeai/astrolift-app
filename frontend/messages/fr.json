@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "Déjà anonymisé",
         "anonymize": "Anonymiser les données de l’utilisateur",
         "invite": "Inviter",
-        "grant": "Accorder un accès"
+        "grant": "Accorder un accès",
+        "reviewPrivacyCleanup": "Examiner le nettoyage des données personnelles"
       },
       "emptyTitle": "Aucune personne pour le moment",
       "emptyDescription": "Invitez une personne dans l’organisation, puis attribuez-lui un rôle.",
@@ -3757,22 +3758,31 @@
       "deleted": "Invitation supprimée",
       "deleteFailed": "La suppression a échoué",
       "anonymizeFailed": "L’anonymisation a échoué",
-      "anonymized": "Données de l’utilisateur anonymisées."
+      "anonymized": "Le nettoyage des données personnelles utilisateur prises en charge a été accepté.",
+      "logoutWarning": "Le nettoyage a été accepté, mais la déconnexion n’a pas pu s’ouvrir. Déconnectez-vous pour terminer cette session du navigateur."
     },
     "anonymization": {
       "title": "Anonymiser {name} ?",
-      "changes": "Ce qui change",
-      "identity": "Les noms et l’e-mail du compte sont remplacés par une identité anonyme.",
-      "profile": "Les données personnelles du profil, le téléphone, l’avatar, l’adresse et la signature sont effacés ou remplacés.",
-      "account": "La connexion est désactivée et les appartenances aux groupes d’authentification sont supprimées.",
-      "memberships": "Les appartenances sur toute la plateforme sont désactivées.",
-      "preserves": "Ce qui est conservé",
-      "records": "L’enregistrement du compte et les liens des actions passées sont conservés.",
-      "history": "Cette action n’efface pas le contenu historique de l’audit et ne supprime pas les enregistrements d’attribution de rôles.",
-      "irreversible": "Cette action est irréversible. Les données personnelles d’origine ne peuvent pas être restaurées. La répéter sur un compte déjà anonymisé n’apporte aucune modification supplémentaire.",
+      "changes": "Périmètre du nettoyage",
+      "identity": "Lors du premier nettoyage, les noms et l’adresse e-mail du compte sont remplacés par une identité anonyme.",
+      "profile": "Lors du premier nettoyage, les données personnelles du profil, le téléphone, l’avatar, l’adresse et la signature sont effacés ou remplacés.",
+      "account": "Lors du premier nettoyage, la connexion est désactivée et les appartenances aux groupes d’authentification sont supprimées.",
+      "memberships": "Lors du premier nettoyage, les adhésions sur l’ensemble de la plateforme sont désactivées.",
+      "preserves": "Registres conservés et limites",
+      "records": "La ligne du compte, les liens historiques, les identifiants des registres, les décisions et les horodatages sont conservés.",
+      "history": "Les champs d’identité et de requête pris en charge, dans les événements historiques et les audits clairement attribués à cet utilisateur, sont masqués.",
+      "irreversible": "Ce nettoyage des données prises en charge est irréversible. Le répéter peut réduire un historique attribuable ajouté depuis, sans remplacer une identité anonyme existante.",
       "acknowledge": "Je comprends que cette action est irréversible.",
       "working": "Anonymisation en cours…",
-      "confirm": "Anonymiser les données de l’utilisateur"
+      "confirm": "Anonymiser les données de l’utilisateur",
+      "reviewTitle": "Examiner le nettoyage des données personnelles de {name} ?",
+      "anonymousIdentity": "L’identité anonyme existante du compte est conservée.",
+      "metadata": "Les métadonnées prises en charge des caches d’identité, des sessions et des jetons, ainsi que les coordonnées d’envoi par e-mail et SMS, sont réduites.",
+      "roleBindings": "Les registres d’attribution de rôles sont conservés ; un utilisateur inactif ne peut pas s’authentifier.",
+      "scopeLimits": "Les données sans attribution, ambiguës, en texte libre, d’autres utilisateurs ou structurées non prises en charge restent présentes.",
+      "external": "Les exports, archives, sauvegardes et systèmes externes existants ne sont pas modifiés.",
+      "reviewWorking": "Nettoyage des données personnelles…",
+      "reviewConfirm": "Nettoyer les données personnelles"
     }
   },
   "stepUp": {

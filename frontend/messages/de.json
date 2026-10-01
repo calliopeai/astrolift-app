@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "Bereits anonymisiert",
         "anonymize": "Benutzerdaten anonymisieren",
         "invite": "Einladen",
-        "grant": "Zugriff gewähren"
+        "grant": "Zugriff gewähren",
+        "reviewPrivacyCleanup": "Bereinigung personenbezogener Daten prüfen"
       },
       "emptyTitle": "Noch keine Personen",
       "emptyDescription": "Laden Sie jemanden in die Organisation ein und weisen Sie eine Rolle zu.",
@@ -3757,22 +3758,31 @@
       "deleted": "Einladung gelöscht",
       "deleteFailed": "Löschen fehlgeschlagen",
       "anonymizeFailed": "Anonymisierung fehlgeschlagen",
-      "anonymized": "Benutzerdaten anonymisiert."
+      "anonymized": "Die Bereinigung unterstützter personenbezogener Nutzerdaten wurde angenommen.",
+      "logoutWarning": "Die Bereinigung wurde angenommen, aber die Abmeldung konnte nicht geöffnet werden. Melden Sie sich ab, um diese Browsersitzung zu beenden."
     },
     "anonymization": {
       "title": "{name} anonymisieren?",
-      "changes": "Diese Änderungen erfolgen",
-      "identity": "Kontonamen und E-Mail werden durch eine anonyme Identität ersetzt.",
-      "profile": "Persönliche Profilfelder, Telefon, Avatar, Adresse und Signatur werden gelöscht oder ersetzt.",
-      "account": "Die Anmeldung wird deaktiviert und Mitgliedschaften in Authentifizierungsgruppen werden entfernt.",
-      "memberships": "Mitgliedschaften auf der gesamten Plattform werden deaktiviert.",
-      "preserves": "Diese Daten bleiben erhalten",
-      "records": "Der Kontodatensatz und Verknüpfungen aus früheren Aktionen bleiben erhalten.",
-      "history": "Diese Aktion löscht weder historische Audit-Inhalte noch gespeicherte Rollenzuweisungen.",
-      "irreversible": "Diese Aktion ist unumkehrbar. Die ursprünglichen personenbezogenen Daten können nicht wiederhergestellt werden. Eine Wiederholung bei einem bereits anonymisierten Konto bewirkt keine weiteren Änderungen.",
+      "changes": "Umfang der Bereinigung",
+      "identity": "Bei der ersten Bereinigung werden Kontonamen und E-Mail-Adresse durch eine anonyme Identität ersetzt.",
+      "profile": "Bei der ersten Bereinigung werden persönliche Profilfelder, Telefonnummer, Avatar, Adresse und Signatur gelöscht oder ersetzt.",
+      "account": "Bei der ersten Bereinigung wird die Anmeldung deaktiviert und die Mitgliedschaft in Authentifizierungsgruppen entfernt.",
+      "memberships": "Bei der ersten Bereinigung werden Mitgliedschaften auf der gesamten Plattform deaktiviert.",
+      "preserves": "Erhaltene Datensätze und Grenzen",
+      "records": "Der Kontodatensatz, historische Verknüpfungen, Datensatz-IDs, Entscheidungen und Zeitstempel bleiben erhalten.",
+      "history": "Unterstützte Identitäts- und Anfragefelder in historischen Ereignissen und Prüfprotokollen, die diesem Nutzer eindeutig zugeordnet sind, werden unkenntlich gemacht.",
+      "irreversible": "Diese Bereinigung unterstützter Daten kann nicht rückgängig gemacht werden. Eine Wiederholung kann neu hinzugekommene zuordenbare Historie reduzieren, ohne eine vorhandene anonyme Identität zu ersetzen.",
       "acknowledge": "Ich verstehe, dass dies unumkehrbar ist.",
       "working": "Wird anonymisiert…",
-      "confirm": "Benutzerdaten anonymisieren"
+      "confirm": "Benutzerdaten anonymisieren",
+      "reviewTitle": "Bereinigung personenbezogener Daten für {name} prüfen?",
+      "anonymousIdentity": "Die vorhandene anonyme Kontoidentität bleibt erhalten.",
+      "metadata": "Unterstützte Metadaten in Identitäts-Caches, Sitzungen und Tokens sowie Kontaktadressen für E-Mail- und SMS-Zustellungen werden reduziert.",
+      "roleBindings": "Gespeicherte Rollenzuweisungen bleiben erhalten; ein inaktiver Nutzer kann sich nicht authentifizieren.",
+      "scopeLimits": "Nicht zugeordnete, mehrdeutige, frei formulierte, fremde oder nicht unterstützte strukturierte Daten bleiben erhalten.",
+      "external": "Vorhandene Exporte, Archive, Sicherungen und externe Systeme werden nicht geändert.",
+      "reviewWorking": "Personenbezogene Daten werden bereinigt…",
+      "reviewConfirm": "Personenbezogene Daten bereinigen"
     }
   },
   "stepUp": {

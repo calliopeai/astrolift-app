@@ -3678,7 +3678,8 @@
         "alreadyAnonymized": "Already anonymized",
         "anonymize": "Anonymize user data",
         "invite": "Invite",
-        "grant": "Grant access"
+        "grant": "Grant access",
+        "reviewPrivacyCleanup": "Review privacy cleanup"
       },
       "emptyTitle": "No people yet",
       "emptyDescription": "Invite someone to the organization, then grant them a role.",
@@ -3776,22 +3777,31 @@
       "deleted": "Invitation deleted",
       "deleteFailed": "Delete failed",
       "anonymizeFailed": "Anonymization failed",
-      "anonymized": "User data anonymized."
+      "anonymized": "Supported user privacy cleanup accepted.",
+      "logoutWarning": "The cleanup was accepted, but sign-out could not open. Sign out to end this browser session."
     },
     "anonymization": {
       "title": "Anonymize {name}?",
-      "changes": "This changes",
-      "identity": "Account names and email are replaced with an anonymous identity.",
-      "profile": "Personal profile fields, phone, avatar, address and signature are cleared or replaced.",
-      "account": "Sign-in is disabled and authentication group memberships are cleared.",
-      "memberships": "Memberships across the platform are deactivated.",
-      "preserves": "This preserves",
-      "records": "The account row and links from historical actions remain.",
-      "history": "This action does not erase historical audit content or delete stored role-binding records.",
-      "irreversible": "This action is irreversible. The original personal data cannot be restored. Repeating it on an already anonymized account makes no further changes.",
+      "changes": "Cleanup scope",
+      "identity": "On a first cleanup, account names and email are replaced with an anonymous identity.",
+      "profile": "On a first cleanup, personal profile fields, phone, avatar, address and signature are cleared or replaced.",
+      "account": "On a first cleanup, sign-in is disabled and authentication group memberships are cleared.",
+      "memberships": "On a first cleanup, memberships across the platform are deactivated.",
+      "preserves": "Retained records and limits",
+      "records": "The account row, historical links, record IDs, decisions and timestamps remain.",
+      "history": "Supported identity and request fields in historical events and audit records clearly attributed to this user are redacted.",
+      "irreversible": "This supported cleanup cannot be undone. Repeating it can reduce newly available attributed history without replacing an existing anonymous identity.",
       "acknowledge": "I understand this is irreversible.",
       "working": "Anonymizing…",
-      "confirm": "Anonymize user data"
+      "confirm": "Anonymize user data",
+      "reviewTitle": "Review privacy cleanup for {name}?",
+      "anonymousIdentity": "The existing anonymous account identity is retained.",
+      "metadata": "Supported identity-cache, session and token metadata and email/SMS delivery contacts are reduced.",
+      "roleBindings": "Stored role-binding records remain; an inactive user cannot authenticate.",
+      "scopeLimits": "Unattributed, ambiguous, free-form, other users’ or unsupported structured data remains.",
+      "external": "Existing exports, archives, backups and external systems are not changed.",
+      "reviewWorking": "Cleaning privacy data…",
+      "reviewConfirm": "Run privacy cleanup"
     }
   },
   "securitySessions": {

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Privacy review uses the server-confirmed anonymous-state flag and exact current
+  user identity. All eight locales distinguish first cleanup, repeated attributed
+  history cleanup and retained/unsupported records. Changed targets or withdrawn
+  sources require fresh acknowledgement; accepted cleanup stays accepted after
+  refresh or sign-out navigation failure (#2220).
+
 - Account anonymization reduces supported, attributable historical PII while
   retaining structural audit facts, foreign subjects and stored role bindings.
   Database guards admit only the exact reduction for an inactive anonymous
@@ -33,12 +39,10 @@
   mappings stay unchanged; colliding legacy child declarations, invalid IDs
   and unavailable ownership proof refuse before mutation (#2032, bounded scope).
 
-
 - Translate the connected central OIDC authentication form and feedback in all
   eight locales. Preserve write-only secret omission and literal provider
   metadata, retain committed updates through failed refreshes, and clear
   previous-cluster/source drafts without changing mutation authority (#2145).
-
 
 - Translate connected People mutation/CSV feedback and the anonymization dialog
   in all eight locales. Describe actual account/profile and membership effects;

@@ -278,7 +278,13 @@ export function useMembers() {
         throw new Error(data?.astroliftAnonymizeUser?.errors?.[0]?.message || t("anonymizeFailed"));
       }
       toast.success(t("anonymized"));
-      if (data.astroliftAnonymizeUser.data.requiresLogout) router.replace("/auth/logout");
+      if (data.astroliftAnonymizeUser.data.requiresLogout) {
+        try {
+          router.replace("/auth/logout");
+        } catch {
+          toast.warning(t("logoutWarning"));
+        }
+      }
       return true;
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : t("anonymizeFailed"));

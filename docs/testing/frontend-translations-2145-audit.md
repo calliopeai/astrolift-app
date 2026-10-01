@@ -328,7 +328,6 @@ The legacy flat scope sources are preserved; this leaf does not add pagination,
 a new member picker, APP support or claim complete #2145 coverage. Team detail,
 member and access presentation remains the next independently bounded audit.
 
-
 ## Connected Team detail and members
 
 Team detail and members now use real all-eight `teams.detail`, `teams.members`
@@ -365,7 +364,6 @@ reach summary are the separate next leaf. Other principal-page callers retain
 existing presentation defaults; Team opts into translated recovery labels and
 cached-refresh error display. Root's frozen Members/anonymization source is
 untouched.
-
 
 ## Connected Team access and grant removal
 
@@ -413,7 +411,6 @@ this work adds no pagination API, authority promise, schema or backend change.
 Other shared-panel callers' supplied literal subject descriptions and other
 principal screens remain their own translation boundaries. Root's frozen
 Members/anonymization source and current release are untouched.
-
 
 ## Cluster settings heartbeat agent and source recovery
 
@@ -468,7 +465,6 @@ This is a bounded #2145 leaf. Other cluster header/tab/lifecycle/connection,
 bootstrap, central/ingress-auth and auth-user presentation and feedback remain
 separate concrete translation boundaries. Their source/card/query contracts are
 unchanged; this leaf adds no paging/capacity guarantee and does not close #2145.
-
 
 ## Cluster settings central OIDC authentication
 
@@ -526,7 +522,6 @@ other cluster header/tab/connection/lifecycle/bootstrap copy and their outcomes
 remain concrete subsequent boundaries. Those forms and their capability limits
 are unchanged; this leaf does not enable unsupported provider authentication.
 
-
 ## Connected cluster ingress-class review and outcomes
 
 The ingress-class card and `useIngressClass` use the additive
@@ -576,3 +571,22 @@ trees exactly match signed base d3528e61 outside the owned ingressClass subtree.
 This bounded selector is complete; #2145 remains open. AWS/Cognito ingress-auth
 configuration and source pickers, auth-user lists, cluster header/tab/connection,
 lifecycle/bootstrap settings and their feedback remain separate boundaries.
+
+## People privacy accuracy follow-up (#2220)
+
+The connected People review now uses the actual nullable server anonymous flag
+and exact current user GUID/name. A confirmed anonymous account offers repeated
+privacy cleanup; deactivated or anonymous-looking identities with false/unknown
+flags retain the ordinary review. Real Member lifecycle stays deactivated.
+All eight genuine locale messages explain conditional first cleanup, bounded
+attributed history/cache/contact reduction, retained role bindings and structural
+records, unsupported structured/unattributed data and external/archive copies.
+
+Focused current-schema HttpLink journeys cover ordinary and repeat actions,
+exact mutation inputs, refusal and transport failures, accepted cleanup with
+failed refresh, truthful self-logout navigation recovery, permission/row/filter
+withdrawal, cached same-target read failure, late completion and fresh
+acknowledgement after target changes. ICU argument parity, locale changes,
+closed-server-review hydration and six portable dialog stories cover presentation.
+This is the bounded #2220 UI contract; unrelated #2145 cluster/AWS/Cognito and
+other untranslated settings boundaries remain open.

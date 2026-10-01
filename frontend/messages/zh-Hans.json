@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "已匿名化",
         "anonymize": "匿名化用户数据",
         "invite": "邀请",
-        "grant": "授予访问权限"
+        "grant": "授予访问权限",
+        "reviewPrivacyCleanup": "查看个人信息清理"
       },
       "emptyTitle": "暂无人员",
       "emptyDescription": "邀请用户加入组织，然后授予角色。",
@@ -3757,22 +3758,31 @@
       "deleted": "邀请已删除",
       "deleteFailed": "删除失败",
       "anonymizeFailed": "匿名化失败",
-      "anonymized": "用户数据已匿名化。"
+      "anonymized": "已接受受支持范围内的用户个人信息清理。",
+      "logoutWarning": "清理已被接受，但无法打开退出登录。请退出登录以结束此浏览器会话。"
     },
     "anonymization": {
       "title": "匿名化 {name}？",
-      "changes": "将更改的内容",
-      "identity": "账户姓名和邮箱将替换为匿名身份信息。",
-      "profile": "个人资料字段、电话、头像、地址和签名将清除或替换。",
-      "account": "登录将禁用，认证群组成员关系将清除。",
-      "memberships": "平台中的成员资格将停用。",
-      "preserves": "将保留的内容",
-      "records": "账户记录以及历史操作中的关联将保留。",
-      "history": "此操作不会清除历史审计内容，也不会删除已存储的角色绑定记录。",
-      "irreversible": "此操作不可撤销，原始个人数据无法恢复。对已匿名化的账户重复执行不会产生进一步更改。",
+      "changes": "清理范围",
+      "identity": "首次清理会将账户姓名和邮箱替换为匿名身份。",
+      "profile": "首次清理会清除或替换个人资料字段、电话、头像、地址和签名。",
+      "account": "首次清理会停用登录，并清除认证群组成员关系。",
+      "memberships": "首次清理会停用整个平台上的成员资格。",
+      "preserves": "保留的记录和限制",
+      "records": "保留账户数据行、历史关联、记录 ID、决策和时间戳。",
+      "history": "对历史事件和审计记录中明确归属于此用户且受支持的身份及请求字段进行脱敏。",
+      "irreversible": "受支持范围内的清理无法撤销。重复执行可缩减后来出现的明确归属历史数据，但不会替换已有的匿名身份。",
       "acknowledge": "我理解此操作不可撤销。",
       "working": "正在匿名化…",
-      "confirm": "匿名化用户数据"
+      "confirm": "匿名化用户数据",
+      "reviewTitle": "查看 {name} 的个人信息清理范围？",
+      "anonymousIdentity": "保留账户现有的匿名身份。",
+      "metadata": "缩减受支持的身份缓存、会话和令牌元数据，以及邮件和短信发送联系信息。",
+      "roleBindings": "保留已存储的角色绑定记录；已停用的用户无法通过认证。",
+      "scopeLimits": "未归属、归属不明、自由文本、其他用户的数据以及不受支持的结构化数据仍会保留。",
+      "external": "不会更改现有导出、归档、备份或外部系统。",
+      "reviewWorking": "正在清理个人信息…",
+      "reviewConfirm": "执行个人信息清理"
     }
   },
   "stepUp": {

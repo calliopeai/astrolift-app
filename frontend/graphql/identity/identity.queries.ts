@@ -421,6 +421,7 @@ const MEMBER_FIELDS = gql`
       username
       email
       isActive
+      isAnonymized
     }
     scopeKind
     scopeId

@@ -3659,7 +3659,8 @@
         "alreadyAnonymized": "Ya anonimizado",
         "anonymize": "Anonimizar datos del usuario",
         "invite": "Invitar",
-        "grant": "Otorgar acceso"
+        "grant": "Otorgar acceso",
+        "reviewPrivacyCleanup": "Revisar limpieza de datos personales"
       },
       "emptyTitle": "Aún no hay personas",
       "emptyDescription": "Invita a alguien a la organización y asígnale un rol.",
@@ -3757,22 +3758,31 @@
       "deleted": "Invitación eliminada",
       "deleteFailed": "No se pudo eliminar",
       "anonymizeFailed": "La anonimización falló",
-      "anonymized": "Datos del usuario anonimizados."
+      "anonymized": "Se aceptó la limpieza de los datos personales admitidos del usuario.",
+      "logoutWarning": "Se aceptó la limpieza, pero no se pudo abrir el cierre de sesión. Cierra la sesión para finalizar esta sesión del navegador."
     },
     "anonymization": {
       "title": "¿Anonimizar a {name}?",
-      "changes": "Esto cambia",
-      "identity": "Los nombres y el correo de la cuenta se reemplazan por una identidad anónima.",
-      "profile": "Los campos personales del perfil, el teléfono, el avatar, la dirección y la firma se borran o reemplazan.",
-      "account": "Se desactiva el inicio de sesión y se eliminan las membresías de grupos de autenticación.",
-      "memberships": "Se desactivan las membresías en toda la plataforma.",
-      "preserves": "Esto se conserva",
-      "records": "Se conservan el registro de la cuenta y los vínculos de las acciones históricas.",
-      "history": "Esta acción no borra el contenido histórico de auditoría ni elimina los registros de asignación de roles.",
-      "irreversible": "Esta acción es irreversible. Los datos personales originales no se pueden restaurar. Repetirla en una cuenta ya anonimizada no produce más cambios.",
+      "changes": "Alcance de la limpieza",
+      "identity": "En la primera limpieza, los nombres y el correo de la cuenta se sustituyen por una identidad anónima.",
+      "profile": "En la primera limpieza, los datos personales del perfil, teléfono, avatar, dirección y firma se borran o sustituyen.",
+      "account": "En la primera limpieza, se desactiva el inicio de sesión y se eliminan las pertenencias a grupos de autenticación.",
+      "memberships": "En la primera limpieza, se desactivan las membresías en toda la plataforma.",
+      "preserves": "Registros conservados y límites",
+      "records": "Se conservan la fila de la cuenta, los enlaces históricos, los identificadores de registros, las decisiones y las marcas de tiempo.",
+      "history": "Se ocultan los campos de identidad y solicitudes admitidos en eventos históricos y registros de auditoría claramente atribuibles a este usuario.",
+      "irreversible": "Esta limpieza de los datos admitidos no se puede deshacer. Repetirla puede reducir el historial atribuible incorporado después sin sustituir una identidad anónima existente.",
       "acknowledge": "Entiendo que esto es irreversible.",
       "working": "Anonimizando…",
-      "confirm": "Anonimizar datos del usuario"
+      "confirm": "Anonimizar datos del usuario",
+      "reviewTitle": "¿Revisar la limpieza de datos personales de {name}?",
+      "anonymousIdentity": "Se conserva la identidad anónima existente de la cuenta.",
+      "metadata": "Se reducen los metadatos admitidos de cachés de identidad, sesiones y tokens, y los contactos de envío por correo y SMS.",
+      "roleBindings": "Se conservan los registros de asignaciones de roles; un usuario inactivo no puede autenticarse.",
+      "scopeLimits": "Se conservan los datos sin atribución, ambiguos, de texto libre, de otros usuarios o estructurados no admitidos.",
+      "external": "No se modifican las exportaciones, archivos, copias de seguridad ni sistemas externos existentes.",
+      "reviewWorking": "Limpiando datos personales…",
+      "reviewConfirm": "Ejecutar limpieza de datos personales"
     }
   },
   "stepUp": {
