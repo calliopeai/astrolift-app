@@ -52,6 +52,10 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- Explicit provider ownership refusal or unavailable ownership proof never
+  becomes successful cleanup because a resource name/diagnostic contains a
+  not-found marker. Genuine missing-resource teardown still converges (#2098).
+
 - SQS workload `manage` keeps message operations and queue purging while omitting
   tag mutation and unrestricted queue-policy editing. Ownership tags and
   permission administration no longer follow from the app workload grant;

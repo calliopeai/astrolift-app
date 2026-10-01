@@ -748,7 +748,10 @@ def _deprovision_sync(
         message = f"{message}; {dynamic_cleanup_message}" if message else dynamic_cleanup_message
     errors = list(getattr(result, "errors", []) or [])
     retryable = bool(getattr(result, "retryable", True))
-    if not ok and _signals_already_gone(message, *errors):
+    # A resource name or provider diagnostic can contain a not-found marker.
+    # Explicit ownership refusals/unavailable proof are never cleanup success.
+    ownership_failed = any(error in {"ownership_refused", "ownership_unknown"} for error in errors)
+    if not ok and not ownership_failed and _signals_already_gone(message, *errors):
         # Driver REPORTED a not-found failure (e.g. S3 "empty failed:
         # NoSuchBucket") — the resource is already gone, so deprovision is
         # effectively complete. Coerce to success so the workflow finalizes
