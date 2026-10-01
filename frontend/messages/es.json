@@ -5436,7 +5436,8 @@
       "offline": "Sin conexión",
       "degraded": "Degradado",
       "never_seen": "Nunca visto",
-      "connected": "Conectado"
+      "connected": "Conectado",
+      "unknown": "Desconocido"
     },
     "severity": {
       "critical": "crítica",
@@ -6238,5 +6239,43 @@
       "navigationWarning": "La baja se aceptó, pero falló la navegación a la lista de clústeres. Abre la lista manualmente.",
       "sourceChanged": "Cambió el clúster revisado o la fuente visible. Revisa el destino actual antes de actuar."
     }
+  },
+  "clusterConnection": {
+    "title": "Conexión del clúster",
+    "help": "Latido comunicado por el agente del clúster. Se consulta cada 30 segundos.",
+    "unavailable": "Estado de conexión del clúster no disponible",
+    "cached": "Se muestra el último estado confirmado del agente. Reintenta para confirmar la conectividad actual.",
+    "unconfirmed": "La conectividad actual del clúster no se ha confirmado.",
+    "connected": "Conectado",
+    "degraded": "Degradado",
+    "offline": "Desconectado",
+    "noAgent": "Sin agente",
+    "unknown": "Desconocido",
+    "noAgentTitle": "Sin agente de conexión",
+    "noAgentHelp": "Ningún agente ha comunicado datos de este clúster. Instala el agente para comunicar el estado de pods, nodos y recursos.",
+    "setUp": "Configurar el agente del clúster →",
+    "disconnected": "Clúster desconectado",
+    "offlineAge": "Clúster desconectado; última conexión {age}.",
+    "offlineNoAge": "Clúster desconectado; no hay latidos recientes.",
+    "unknownHelp": "El estado de conexión comunicado es desconocido. Las tarjetas que dependen del controlador no están disponibles.",
+    "checkSettings": "Revisar la configuración del clúster →",
+    "recoveryHelp": "Las tarjetas que dependen del controlador no están disponibles hasta que una lectura válida confirme que el agente está conectado o degradado.",
+    "saturation": "Saturación del clúster",
+    "workloadHealth": "Estado de las cargas",
+    "liveHealth": "Estado en vivo",
+    "recentWorkflows": "Flujos recientes",
+    "lastHeartbeat": "Último latido",
+    "nodes": "Nodos",
+    "pods": "Pods",
+    "memory": "Memoria",
+    "appReadiness": "Disponibilidad de apps",
+    "ready": "listos",
+    "ingress": "Ingress",
+    "agent": "Agente",
+    "justNow": "ahora mismo",
+    "secondsAgo": "{count, plural, one {hace # segundo} other {hace # segundos}}",
+    "minutesAgo": "{count, plural, one {hace # minuto} other {hace # minutos}}",
+    "hoursAgo": "{count, plural, one {hace # hora} other {hace # horas}}",
+    "daysAgo": "{count, plural, one {hace # día} other {hace # días}}"
   }
 }

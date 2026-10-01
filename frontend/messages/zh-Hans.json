@@ -5433,7 +5433,8 @@
       "offline": "离线",
       "degraded": "性能下降",
       "never_seen": "从未检测到",
-      "connected": "已连接"
+      "connected": "已连接",
+      "unknown": "未知"
     },
     "severity": {
       "critical": "严重",
@@ -6235,5 +6236,43 @@
       "navigationWarning": "注销请求已被接受，但无法跳转到集群列表。请手动打开列表。",
       "sourceChanged": "已审阅的集群或可见数据源发生变化。操作前请重新审阅当前目标。"
     }
+  },
+  "clusterConnection": {
+    "title": "集群连接",
+    "help": "集群内代理报告的心跳。每 30 秒查询一次。",
+    "unavailable": "集群连接状态不可用",
+    "cached": "显示最近确认的代理状态。请重试以确认当前连接。",
+    "unconfirmed": "集群当前的连接状态尚未确认。",
+    "connected": "已连接",
+    "degraded": "降级",
+    "offline": "离线",
+    "noAgent": "无代理",
+    "unknown": "未知",
+    "noAgentTitle": "无心跳代理",
+    "noAgentHelp": "此集群尚未收到代理报告。请安装代理以报告 Pod、节点和资源状态。",
+    "setUp": "设置集群代理 →",
+    "disconnected": "集群已断开",
+    "offlineAge": "集群离线；最后确认于 {age}。",
+    "offlineNoAge": "集群离线；没有近期心跳。",
+    "unknownHelp": "报告的连接状态未知。依赖驱动程序的卡片不可用。",
+    "checkSettings": "检查集群设置 →",
+    "recoveryHelp": "依赖驱动程序的卡片会保持不可用，直到有效读取确认代理已连接或降级。",
+    "saturation": "集群使用情况",
+    "workloadHealth": "工作负载健康状态",
+    "liveHealth": "实时健康状态",
+    "recentWorkflows": "近期工作流",
+    "lastHeartbeat": "最近心跳",
+    "nodes": "节点",
+    "pods": "Pod",
+    "memory": "内存",
+    "appReadiness": "应用就绪状态",
+    "ready": "已就绪",
+    "ingress": "Ingress",
+    "agent": "代理",
+    "justNow": "刚刚",
+    "secondsAgo": "{count, plural, other {# 秒前}}",
+    "minutesAgo": "{count, plural, other {# 分钟前}}",
+    "hoursAgo": "{count, plural, other {# 小时前}}",
+    "daysAgo": "{count, plural, other {# 天前}}"
   }
 }

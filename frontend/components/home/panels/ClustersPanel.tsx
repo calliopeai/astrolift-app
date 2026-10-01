@@ -33,9 +33,17 @@ const HEALTH: Record<ClusterHealth, "ok" | "warn" | "error" | "muted"> = {
   degraded: "warn",
   never_seen: "muted",
   connected: "ok",
+  unknown: "muted",
 };
 
-const ORDER: ClusterHealth[] = ["error", "offline", "degraded", "never_seen", "connected"];
+const ORDER: ClusterHealth[] = [
+  "error",
+  "offline",
+  "degraded",
+  "unknown",
+  "never_seen",
+  "connected",
+];
 
 /** "3 connected · 1 offline", the healths that have any clusters, worst first. */
 function Summary({ rows }: { rows: ClusterRow[] }) {
@@ -57,7 +65,10 @@ function Summary({ rows }: { rows: ClusterRow[] }) {
 
 function ClusterLine({ cluster }: { cluster: ClusterRow }) {
   const { t } = useHomePresentation();
-  const health = HEALTH[clusterHealth(cluster)];
+  const state = clusterHealth(cluster);
+  const health = HEALTH[state];
+  const label =
+    state === "unknown" ? cluster.heartbeatStatus || t("health.unknown") : t(`health.${state}`);
   return (
     <span className="flex min-w-0 items-center gap-2">
       <StatusDot status={health} />
@@ -67,8 +78,8 @@ function ClusterLine({ cluster }: { cluster: ClusterRow }) {
       <span className="text-muted-foreground hidden shrink-0 font-mono text-xs sm:inline">
         {providerLabel(cluster.providerPluginSlug)} · {cluster.region}
       </span>
-      <span className="text-muted-foreground shrink-0 text-xs">
-        {t(`health.${clusterHealth(cluster)}`)}
+      <span className="text-muted-foreground max-w-40 shrink-0 truncate text-xs" title={label}>
+        {label}
       </span>
     </span>
   );

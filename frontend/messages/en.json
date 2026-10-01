@@ -5513,7 +5513,8 @@
       "offline": "Offline",
       "degraded": "Degraded",
       "never_seen": "Never seen",
-      "connected": "Connected"
+      "connected": "Connected",
+      "unknown": "Unknown"
     },
     "severity": {
       "critical": "critical",
@@ -6315,5 +6316,43 @@
       "navigationWarning": "Unregistration was accepted, but navigation to the cluster list failed. Open the list manually.",
       "sourceChanged": "The reviewed cluster or visible source changed. Review the current target before acting."
     }
+  },
+  "clusterConnection": {
+    "title": "Cluster connection",
+    "help": "Keep-alive heartbeat reported by the in-cluster agent. Polls every 30 seconds.",
+    "unavailable": "Cluster connection state unavailable",
+    "cached": "Showing the last confirmed agent snapshot. Retry to confirm current connectivity.",
+    "unconfirmed": "Current cluster connectivity has not been confirmed.",
+    "connected": "Connected",
+    "degraded": "Degraded",
+    "offline": "Offline",
+    "noAgent": "No agent",
+    "unknown": "Unknown",
+    "noAgentTitle": "No keep-alive agent",
+    "noAgentHelp": "No agent has reported from this cluster yet. Install the keep-alive agent to report pod, node and resource state.",
+    "setUp": "Set up the cluster agent →",
+    "disconnected": "Cluster disconnected",
+    "offlineAge": "Cluster offline; last seen {age}.",
+    "offlineNoAge": "Cluster offline; no recent heartbeat.",
+    "unknownHelp": "The reported connection status is unknown. Driver-dependent cards are unavailable.",
+    "checkSettings": "Check cluster settings →",
+    "recoveryHelp": "Driver-dependent cards remain unavailable until a valid connection read confirms that the agent is connected or degraded.",
+    "saturation": "Cluster saturation",
+    "workloadHealth": "Workload health",
+    "liveHealth": "Live health",
+    "recentWorkflows": "Recent workflows",
+    "lastHeartbeat": "Last heartbeat",
+    "nodes": "Nodes",
+    "pods": "Pods",
+    "memory": "Memory",
+    "appReadiness": "App readiness",
+    "ready": "ready",
+    "ingress": "Ingress",
+    "agent": "Agent",
+    "justNow": "just now",
+    "secondsAgo": "{count, plural, one {# second ago} other {# seconds ago}}",
+    "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
+    "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+    "daysAgo": "{count, plural, one {# day ago} other {# days ago}}"
   }
 }

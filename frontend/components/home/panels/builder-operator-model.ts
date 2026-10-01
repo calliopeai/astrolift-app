@@ -35,20 +35,33 @@ export function alertsFiringFirst(events: AlertEvent[]): AlertEvent[] {
 
 // ---------------------------------------------------------------- clusters
 
-export type ClusterHealth = "error" | "offline" | "degraded" | "never_seen" | "connected";
+export type ClusterHealth =
+  | "error"
+  | "offline"
+  | "degraded"
+  | "never_seen"
+  | "connected"
+  | "unknown";
 
 /** One word for a cluster's health: a failed setup outranks its heartbeat. */
 export function clusterHealth(c: ClusterRow): ClusterHealth {
   if (c.lifecycle === "error") return "error";
-  return c.heartbeatStatus ?? "never_seen";
+  const status = c.heartbeatStatus;
+  return status === "offline" ||
+    status === "degraded" ||
+    status === "never_seen" ||
+    status === "connected"
+    ? status
+    : "unknown";
 }
 
 const HEALTH_RANK: Record<ClusterHealth, number> = {
   error: 0,
   offline: 1,
   degraded: 2,
-  never_seen: 3,
-  connected: 4,
+  unknown: 3,
+  never_seen: 4,
+  connected: 5,
 };
 
 /** The least healthy first, then by name, so a healthy fleet reads alphabetically. */
@@ -67,6 +80,7 @@ export function healthCounts(fleet: ClusterRow[]): Record<ClusterHealth, number>
     degraded: 0,
     never_seen: 0,
     connected: 0,
+    unknown: 0,
   };
   for (const c of fleet) out[clusterHealth(c)] += 1;
   return out;

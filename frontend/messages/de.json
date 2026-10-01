@@ -5436,7 +5436,8 @@
       "offline": "Offline",
       "degraded": "Beeinträchtigt",
       "never_seen": "Nie gesehen",
-      "connected": "Verbunden"
+      "connected": "Verbunden",
+      "unknown": "Unbekannt"
     },
     "severity": {
       "critical": "kritisch",
@@ -6238,5 +6239,43 @@
       "navigationWarning": "Die Entfernung wurde akzeptiert, aber der Wechsel zur Clusterliste ist fehlgeschlagen. Öffnen Sie die Liste manuell.",
       "sourceChanged": "Der geprüfte Cluster oder die sichtbare Quelle hat sich geändert. Prüfen Sie das aktuelle Ziel vor der Aktion."
     }
+  },
+  "clusterConnection": {
+    "title": "Clusterverbindung",
+    "help": "Lebenszeichen vom Agenten im Cluster. Abfrage alle 30 Sekunden.",
+    "unavailable": "Clusterverbindungsstatus nicht verfügbar",
+    "cached": "Zuletzt bestätigter Agentenzustand. Wiederholen Sie die Abfrage, um die aktuelle Verbindung zu bestätigen.",
+    "unconfirmed": "Die aktuelle Clusterverbindung wurde nicht bestätigt.",
+    "connected": "Verbunden",
+    "degraded": "Beeinträchtigt",
+    "offline": "Offline",
+    "noAgent": "Kein Agent",
+    "unknown": "Unbekannt",
+    "noAgentTitle": "Kein Verbindungsagent",
+    "noAgentHelp": "Noch kein Agent hat Daten von diesem Cluster gemeldet. Installieren Sie den Agenten, um Pod-, Knoten- und Ressourcenzustände zu melden.",
+    "setUp": "Clusteragent einrichten →",
+    "disconnected": "Cluster getrennt",
+    "offlineAge": "Cluster offline; zuletzt gesehen {age}.",
+    "offlineNoAge": "Cluster offline; kein aktuelles Lebenszeichen.",
+    "unknownHelp": "Der gemeldete Verbindungsstatus ist unbekannt. Treiberabhängige Karten sind nicht verfügbar.",
+    "checkSettings": "Clustereinstellungen prüfen →",
+    "recoveryHelp": "Treiberabhängige Karten bleiben gesperrt, bis eine gültige Abfrage einen verbundenen oder beeinträchtigten Agenten bestätigt.",
+    "saturation": "Clusterauslastung",
+    "workloadHealth": "Zustand der Workloads",
+    "liveHealth": "Live-Zustand",
+    "recentWorkflows": "Aktuelle Workflows",
+    "lastHeartbeat": "Letztes Lebenszeichen",
+    "nodes": "Knoten",
+    "pods": "Pods",
+    "memory": "Arbeitsspeicher",
+    "appReadiness": "App-Bereitschaft",
+    "ready": "bereit",
+    "ingress": "Ingress",
+    "agent": "Agent",
+    "justNow": "gerade eben",
+    "secondsAgo": "{count, plural, one {vor # Sekunde} other {vor # Sekunden}}",
+    "minutesAgo": "{count, plural, one {vor # Minute} other {vor # Minuten}}",
+    "hoursAgo": "{count, plural, one {vor # Stunde} other {vor # Stunden}}",
+    "daysAgo": "{count, plural, one {vor # Tag} other {vor # Tagen}}"
   }
 }

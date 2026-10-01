@@ -49,6 +49,24 @@ export const AllHealthy: Story = {
   ),
 };
 
+export const UnknownHeartbeat: Story = {
+  render: () => (
+    <Grid width={768}>
+      <ClustersPanelView
+        panel={PANEL.clusters}
+        rows={[
+          {
+            ...CLUSTERS_HEALTHY[0],
+            heartbeatStatus: "LITERAL_FUTURE_CONNECTION_STATUS_WITH_LONG_PROVIDER_DETAILS",
+          },
+        ]}
+        count={1}
+        {...READY}
+      />
+    </Grid>
+  ),
+};
+
 export const Loading: Story = {
   render: () => (
     <Grid>

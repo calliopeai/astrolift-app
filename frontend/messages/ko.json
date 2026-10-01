@@ -5433,7 +5433,8 @@
       "offline": "오프라인",
       "degraded": "성능 저하",
       "never_seen": "관측된 적 없음",
-      "connected": "연결됨"
+      "connected": "연결됨",
+      "unknown": "알 수 없음"
     },
     "severity": {
       "critical": "심각",
@@ -6235,5 +6236,43 @@
       "navigationWarning": "등록 해제가 수락되었지만 클러스터 목록으로 이동하지 못했습니다. 목록을 직접 여세요.",
       "sourceChanged": "검토한 클러스터 또는 표시된 정보의 출처가 변경되었습니다. 작업 전에 현재 대상을 검토하세요."
     }
+  },
+  "clusterConnection": {
+    "title": "클러스터 연결",
+    "help": "클러스터 내 에이전트가 보고하는 하트비트입니다. 30초마다 조회합니다.",
+    "unavailable": "클러스터 연결 상태를 확인할 수 없습니다",
+    "cached": "마지막으로 확인된 에이전트 상태를 표시합니다. 재시도하여 현재 연결을 확인하세요.",
+    "unconfirmed": "현재 클러스터 연결이 확인되지 않았습니다.",
+    "connected": "연결됨",
+    "degraded": "성능 저하",
+    "offline": "오프라인",
+    "noAgent": "에이전트 없음",
+    "unknown": "알 수 없음",
+    "noAgentTitle": "연결 에이전트 없음",
+    "noAgentHelp": "이 클러스터에서 에이전트가 아직 보고하지 않았습니다. 에이전트를 설치하여 Pod, 노드 및 리소스 상태를 보고하세요.",
+    "setUp": "클러스터 에이전트 설정 →",
+    "disconnected": "클러스터 연결 끊김",
+    "offlineAge": "클러스터가 오프라인입니다. 마지막 확인: {age}.",
+    "offlineNoAge": "클러스터가 오프라인입니다. 최근 하트비트가 없습니다.",
+    "unknownHelp": "보고된 연결 상태를 알 수 없습니다. 드라이버에 의존하는 카드를 사용할 수 없습니다.",
+    "checkSettings": "클러스터 설정 확인 →",
+    "recoveryHelp": "유효한 조회로 에이전트의 연결 또는 성능 저하 상태가 확인될 때까지 드라이버에 의존하는 카드를 사용할 수 없습니다.",
+    "saturation": "클러스터 사용량",
+    "workloadHealth": "워크로드 상태",
+    "liveHealth": "실시간 상태",
+    "recentWorkflows": "최근 워크플로",
+    "lastHeartbeat": "마지막 하트비트",
+    "nodes": "노드",
+    "pods": "Pod",
+    "memory": "메모리",
+    "appReadiness": "앱 준비 상태",
+    "ready": "준비됨",
+    "ingress": "Ingress",
+    "agent": "에이전트",
+    "justNow": "방금",
+    "secondsAgo": "{count, plural, other {#초 전}}",
+    "minutesAgo": "{count, plural, other {#분 전}}",
+    "hoursAgo": "{count, plural, other {#시간 전}}",
+    "daysAgo": "{count, plural, other {#일 전}}"
   }
 }

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize cluster connection snapshots and shared read recovery in all eight
+  locales. Failed, incomplete and wrong-target reads cannot confirm connectivity
+  or mount driver cards. Cached reports remain explicitly unconfirmed, unknown
+  status tokens stay literal, and malformed readiness/resource reports remain
+  unknown. Heartbeats do not certify provider health or available capacity (#2145).
+
 - Localize cluster lifecycle controls and stored bootstrap reports in all eight
   locales. Require an observed network read before writes, keep accepted requests
   distinct from failed refreshes, and close destructive reviews after observed

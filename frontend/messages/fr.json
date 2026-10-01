@@ -5436,7 +5436,8 @@
       "offline": "Hors ligne",
       "degraded": "Dégradé",
       "never_seen": "Jamais vu",
-      "connected": "Connecté"
+      "connected": "Connecté",
+      "unknown": "Inconnu"
     },
     "severity": {
       "critical": "critique",
@@ -6238,5 +6239,43 @@
       "navigationWarning": "Le désenregistrement a été accepté, mais la navigation vers la liste des clusters a échoué. Ouvrez la liste manuellement.",
       "sourceChanged": "Le cluster examiné ou la source visible a changé. Vérifiez la cible actuelle avant d’agir."
     }
+  },
+  "clusterConnection": {
+    "title": "Connexion du cluster",
+    "help": "Signal de présence envoyé par l’agent du cluster. Vérification toutes les 30 secondes.",
+    "unavailable": "État de connexion du cluster indisponible",
+    "cached": "Dernier état confirmé de l’agent. Réessayez pour confirmer la connectivité actuelle.",
+    "unconfirmed": "La connectivité actuelle du cluster n’est pas confirmée.",
+    "connected": "Connecté",
+    "degraded": "Dégradé",
+    "offline": "Hors ligne",
+    "noAgent": "Aucun agent",
+    "unknown": "Inconnu",
+    "noAgentTitle": "Aucun agent de présence",
+    "noAgentHelp": "Aucun agent n’a encore envoyé de données pour ce cluster. Installez l’agent pour signaler l’état des pods, nœuds et ressources.",
+    "setUp": "Configurer l’agent du cluster →",
+    "disconnected": "Cluster déconnecté",
+    "offlineAge": "Cluster hors ligne ; dernière présence {age}.",
+    "offlineNoAge": "Cluster hors ligne ; aucun signal récent.",
+    "unknownHelp": "L’état de connexion signalé est inconnu. Les cartes dépendantes du pilote sont indisponibles.",
+    "checkSettings": "Vérifier les paramètres du cluster →",
+    "recoveryHelp": "Les cartes dépendantes du pilote restent indisponibles jusqu’à ce qu’une lecture valide confirme un agent connecté ou dégradé.",
+    "saturation": "Saturation du cluster",
+    "workloadHealth": "État des charges",
+    "liveHealth": "État en direct",
+    "recentWorkflows": "Workflows récents",
+    "lastHeartbeat": "Dernier signal",
+    "nodes": "Nœuds",
+    "pods": "Pods",
+    "memory": "Mémoire",
+    "appReadiness": "Disponibilité des apps",
+    "ready": "prêts",
+    "ingress": "Ingress",
+    "agent": "Agent",
+    "justNow": "à l’instant",
+    "secondsAgo": "{count, plural, one {il y a # seconde} other {il y a # secondes}}",
+    "minutesAgo": "{count, plural, one {il y a # minute} other {il y a # minutes}}",
+    "hoursAgo": "{count, plural, one {il y a # heure} other {il y a # heures}}",
+    "daysAgo": "{count, plural, one {il y a # jour} other {il y a # jours}}"
   }
 }

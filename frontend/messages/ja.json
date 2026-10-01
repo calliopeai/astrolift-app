@@ -5433,7 +5433,8 @@
       "offline": "オフライン",
       "degraded": "性能低下",
       "never_seen": "未検出",
-      "connected": "接続済み"
+      "connected": "接続済み",
+      "unknown": "不明"
     },
     "severity": {
       "critical": "重大",
@@ -6235,5 +6236,43 @@
       "navigationWarning": "登録解除は受理されましたが、クラスター一覧への移動に失敗しました。一覧を手動で開いてください。",
       "sourceChanged": "確認したクラスターまたは表示中の情報源が変わりました。操作前に現在の対象を確認してください。"
     }
+  },
+  "clusterConnection": {
+    "title": "クラスター接続",
+    "help": "クラスター内のエージェントが報告するハートビート。30 秒ごとに確認します。",
+    "unavailable": "クラスターの接続状態を取得できません",
+    "cached": "最後に確認したエージェントの状態です。再試行して現在の接続を確認してください。",
+    "unconfirmed": "現在のクラスター接続は未確認です。",
+    "connected": "接続済み",
+    "degraded": "不安定",
+    "offline": "オフライン",
+    "noAgent": "エージェントなし",
+    "unknown": "不明",
+    "noAgentTitle": "接続エージェントなし",
+    "noAgentHelp": "このクラスターからエージェントの報告はまだありません。エージェントをインストールして Pod、ノード、リソースの状態を報告してください。",
+    "setUp": "クラスターエージェントを設定 →",
+    "disconnected": "クラスター切断",
+    "offlineAge": "クラスターはオフラインです。最終確認: {age}。",
+    "offlineNoAge": "クラスターはオフラインです。最近のハートビートがありません。",
+    "unknownHelp": "報告された接続状態が不明です。ドライバーに依存するカードは利用できません。",
+    "checkSettings": "クラスター設定を確認 →",
+    "recoveryHelp": "有効な読み取りでエージェントの接続済みまたは不安定の状態が確認されるまで、ドライバーに依存するカードは利用できません。",
+    "saturation": "クラスター使用状況",
+    "workloadHealth": "ワークロードの状態",
+    "liveHealth": "現在の状態",
+    "recentWorkflows": "最近のワークフロー",
+    "lastHeartbeat": "最終ハートビート",
+    "nodes": "ノード",
+    "pods": "Pod",
+    "memory": "メモリ",
+    "appReadiness": "アプリの準備状態",
+    "ready": "準備完了",
+    "ingress": "Ingress",
+    "agent": "エージェント",
+    "justNow": "たった今",
+    "secondsAgo": "{count, plural, other {# 秒前}}",
+    "minutesAgo": "{count, plural, other {# 分前}}",
+    "hoursAgo": "{count, plural, other {# 時間前}}",
+    "daysAgo": "{count, plural, other {# 日前}}"
   }
 }

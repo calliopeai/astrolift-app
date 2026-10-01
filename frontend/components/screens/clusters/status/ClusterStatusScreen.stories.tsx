@@ -113,6 +113,41 @@ export const Offline: Story = { render: () => <Screen liveState={LIVE_OFFLINE} /
 /** No agent has ever reported. */
 export const NoAgent: Story = { render: () => <Screen liveState={LIVE_NEVER_SEEN} /> };
 
+export const CachedConnectionFailed: Story = {
+  render: () => (
+    <Screen liveState={{ ...LIVE_CONNECTED, error: "RAW_HEARTBEAT_READ_DIAGNOSTIC" }} />
+  ),
+};
+
+export const ConnectionRefreshing: Story = {
+  render: () => <Screen liveState={{ ...LIVE_CONNECTED, loading: true }} />,
+};
+
+export const UnknownConnectionStatus: Story = {
+  render: () => (
+    <Screen
+      liveState={{
+        ...LIVE_CONNECTED,
+        state: { ...LIVE_CONNECTED.state!, status: "LITERAL_FUTURE_CONNECTION_STATUS" },
+      }}
+    />
+  ),
+};
+
+export const MalformedReadiness: Story = {
+  render: () => (
+    <Screen
+      liveState={{
+        ...LIVE_CONNECTED,
+        state: {
+          ...LIVE_CONNECTED.state!,
+          appReadiness: { RAW_MALFORMED_APP: { ready: 4, total: 3 } },
+        },
+      }}
+    />
+  ),
+};
+
 /** Prometheus is configured but unreachable / cluster-internal. */
 export const PrometheusError: Story = {
   render: () => (
