@@ -53,6 +53,7 @@ def _svc(config: dict[str, Any] | None = None) -> SimpleNamespace:
         kind="email",
         variant="",
         config=config or {},
+        provider_placement_identity=None,
         # A saved row always has one; drivers stamp it as the ownership id.
         guid=uuid.UUID("00000000-0000-4000-8000-0000000000ab"),
     )
