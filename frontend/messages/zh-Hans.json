@@ -5686,5 +5686,40 @@
         "description": "所有者现在以及新增权限后可执行的全部操作。请优先选择较小的权限范围。"
       }
     }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "心跳代理",
+      "description": "<namespace>astrolift-system</namespace> 命名空间中的代理发送签名心跳，让平台显示 Pod、节点和资源状态并检测连接中断。心跳间隔为 <interval>{seconds, number}</interval> {seconds, plural, one {秒} other {秒}}。",
+      "keyIssued": "密钥已签发",
+      "copyNow": "请立即复制此密钥，之后无法再次查看。",
+      "copy": "复制",
+      "copied": "已复制",
+      "copyFailed": "复制失败。请选中文本并手动复制。",
+      "installSecret": "安装代理 Secret",
+      "installHelp": "然后部署代理，代理会从此 Secret 读取密钥和 URL。收到心跳后才能确认连接。",
+      "deploy": "将代理部署到集群",
+      "done": "完成",
+      "deployHelp": "应用代理 Deployment。请先使用上方命令创建 <secret>astrolift-agent</secret> Secret。",
+      "rotate": "轮换代理密钥",
+      "issue": "签发代理密钥",
+      "rotationHelp": "Deployment 从 <secret>astrolift-agent</secret> Secret 读取密钥和 URL。轮换会使旧密钥失效。再次部署前，请用新密钥更新此 Secret；旧密钥将无法签署有效心跳。",
+      "feedbackIssued": "代理密钥已签发。请立即复制，之后无法再次查看。",
+      "feedbackRotated": "代理密钥已轮换，旧密钥已失效。",
+      "feedbackDeployed": "代理部署已接受。收到心跳后才能确认连接。",
+      "feedbackIssueFailed": "无法签发代理密钥。",
+      "feedbackDeployFailed": "无法部署代理。",
+      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。"
+    },
+    "source": {
+      "readFailed": "无法读取集群详情",
+      "cached": "正在显示上次确认的集群详情。请刷新以核实当前状态。",
+      "retry": "重试",
+      "unknown": "集群详情尚未确认，请重新读取。",
+      "notFoundHeader": "未找到集群",
+      "notFound": "没有可见的集群使用标识 {slug}",
+      "notFoundHelp": "集群不存在，或你没有查看权限。",
+      "back": "返回集群列表"
+    }
   }
 }

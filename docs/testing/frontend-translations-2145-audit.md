@@ -413,3 +413,58 @@ this work adds no pagination API, authority promise, schema or backend change.
 Other shared-panel callers' supplied literal subject descriptions and other
 principal screens remain their own translation boundaries. Root's frozen
 Members/anonymization source and current release are untouched.
+
+
+## Cluster settings heartbeat agent and source recovery
+
+The actual cluster settings Keep-alive agent card now uses genuine all-eight
+`clusterSettings.agent` copy for issue/rotate/deploy, one-time key handling,
+clipboard feedback and install instructions. Its interval uses request-locale
+number and singular/plural formatting with unchanged technical namespace and
+Secret names. Cluster GUIDs, heartbeat URLs, raw key values, the existing kubectl
+snippet and backend diagnostics remain literal. This is the existing cluster
+heartbeat agent; it adds no Agent Host Protocol work.
+
+Issue and deploy refresh the active GetCluster query only after an accepted
+mutation envelope, retaining its existing variables. Accepted replies survive a
+failed refresh with a translated warning; rejected replies do not refresh or
+announce a successful write. Transport failures are handled without discarding
+an already issued key. Deployment acceptance does not claim an observed
+heartbeat or guaranteed connection. Clipboard success is displayed only after
+the browser confirms the write, with the existing temporary copied label;
+clipboard refusal keeps the key/snippet available for manual copying.
+
+Transient key and copy feedback belong to the current cluster/issued response.
+Cluster changes clear the key, and a delayed old response cannot resurrect it
+when the viewer returns to that cluster. No new credential persistence, query,
+authority gate, backend contract or cloud operation is introduced.
+
+The connected existing settings read has a narrow optional error/retry seam.
+Initial errors and unknown/mismatched target results show unavailable, not a
+healthy not-found state. A confirmed null result remains visibly not-found or
+inaccessible. Same-target cached observations remain visible with the raw
+refresh error and an actual Retry action. The exact GetCluster variables,
+cache-and-network read, management polling and permission decisions are
+preserved. The existing header accepts an optional empty-state title without
+changing other callers' presentation.
+
+Actual Apollo HttpLink tests cover both credential operations in all eight
+locales, raw refusal/transport/fallback outcomes, exact active refresh inputs,
+accepted-write/failed-read and refused-write/no-read combinations, prior-key
+preservation, literal clipboard payloads and completion races. The actual
+ClusterSettingsClient route proves initial failure-to-retry, cached failure-to-
+retry, null/unknown distinctions and new-target pending admission. ICU argument,
+rich-tag and plural-option parity, locale changes, SSR/hydration and all existing
+settings portable stories are checked with the real locale context.
+
+Focused validation on this exact source: 198 checks pass across the agent
+translation/route and portable-story modules plus existing cluster preflight,
+connectivity and ingress-auth regressions. TypeScript, scoped ESLint (zero
+warnings), source/catalogue Prettier and git diff checks pass. Every pre-existing
+catalogue value matches the signed 1ed90e1d base exactly; only the two owned
+clusterSettings subtrees are added. No broad frontend/backend suite was run.
+
+This is a bounded #2145 leaf. Other cluster header/tab/lifecycle/connection,
+bootstrap, central/ingress-auth and auth-user presentation and feedback remain
+separate concrete translation boundaries. Their source/card/query contracts are
+unchanged; this leaf adds no paging/capacity guarantee and does not close #2145.

@@ -5686,5 +5686,40 @@
         "description": "Tudo o que o titular pode fazer, agora e quando novas permissões forem adicionadas. Prefira escopos restritos."
       }
     }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Agente de pulsação",
+      "description": "Um agente no namespace <namespace>astrolift-system</namespace> envia pulsações assinadas para que a plataforma mostre o estado de pods, nós e recursos e detecte a perda de conexão. As pulsações são enviadas a cada <interval>{seconds, number}</interval> {seconds, plural, one {segundo} other {segundos}}.",
+      "keyIssued": "Chave emitida",
+      "copyNow": "Copie esta chave agora. Ela não será exibida novamente.",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "copyFailed": "Não foi possível copiar. Selecione e copie o texto manualmente.",
+      "installSecret": "Instalar o Secret do agente",
+      "installHelp": "Depois, implante o agente, que lê a chave e a URL desse Secret. Uma pulsação recebida confirma a conexão.",
+      "deploy": "Implantar agente no cluster",
+      "done": "Concluído",
+      "deployHelp": "Aplica o Deployment do agente. Primeiro, crie o Secret <secret>astrolift-agent</secret> com o comando acima.",
+      "rotate": "Rotacionar chave do agente",
+      "issue": "Emitir chave do agente",
+      "rotationHelp": "O Deployment lê a chave e a URL do Secret <secret>astrolift-agent</secret>. A rotação invalida a chave anterior. Atualize esse Secret com a nova chave antes de implantar novamente; a chave anterior não pode mais assinar pulsações válidas.",
+      "feedbackIssued": "Chave do agente emitida. Copie agora; ela não será exibida novamente.",
+      "feedbackRotated": "Chave do agente rotacionada. A chave anterior não funciona mais.",
+      "feedbackDeployed": "Implantação do agente aceita. Uma pulsação recebida confirma a conexão.",
+      "feedbackIssueFailed": "Não foi possível emitir a chave do agente.",
+      "feedbackDeployFailed": "Não foi possível implantar o agente.",
+      "feedbackRefreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual."
+    },
+    "source": {
+      "readFailed": "Não foi possível ler os detalhes do cluster",
+      "cached": "Exibindo os últimos detalhes confirmados do cluster. Atualize a tela para verificar o estado atual.",
+      "retry": "Tentar novamente",
+      "unknown": "Os detalhes do cluster não foram confirmados. Tente consultar novamente.",
+      "notFoundHeader": "Cluster não encontrado",
+      "notFound": "Nenhum cluster visível com o slug {slug}",
+      "notFoundHelp": "O cluster não existe ou você não tem permissão para visualizá-lo.",
+      "back": "Voltar aos clusters"
+    }
   }
 }

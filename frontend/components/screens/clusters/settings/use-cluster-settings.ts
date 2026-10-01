@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import {
   BRING_CLUSTER_INTO_MANAGEMENT,
@@ -33,9 +34,17 @@ const REFETCH_CLUSTER = "GetCluster";
  * ClusterSettingsScreen.
  */
 export function useClusterSettings(slug: string) {
+  const t = useTranslations("clusterSettings.source");
   // One cluster by slug (#2150); the SSR preload answers before the org
   // cookie is set, so the first client read goes to the network.
-  const { data, loading, startPolling, stopPolling } = useQuery<Resp>(GET_CLUSTER, {
+  const {
+    data,
+    error: readError,
+    refetch,
+    loading,
+    startPolling,
+    stopPolling,
+  } = useQuery<Resp>(GET_CLUSTER, {
     variables: { slug },
     fetchPolicy: "cache-and-network",
   });
@@ -50,7 +59,21 @@ export function useClusterSettings(slug: string) {
     users: allow("cluster.users"),
     unregister: allow("cluster.unregister"),
   };
-  const cluster = data?.astroliftCluster ?? null;
+  const observedCluster = data?.astroliftCluster;
+  const cluster = observedCluster?.slug === slug ? observedCluster : null;
+  const error =
+    readError?.message ??
+    (!loading && (observedCluster === undefined || (observedCluster !== null && !cluster))
+      ? t("unknown")
+      : null);
+
+  async function onRetry() {
+    try {
+      await refetch();
+    } catch {
+      /* The query retains its diagnostic. */
+    }
+  }
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
 
   React.useEffect(() => {
@@ -127,6 +150,8 @@ export function useClusterSettings(slug: string) {
   return {
     cluster,
     loading,
+    error,
+    onRetry,
     lifecycle,
     bringing,
     refreshing,

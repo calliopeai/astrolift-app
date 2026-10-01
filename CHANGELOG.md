@@ -24,6 +24,12 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Localize the cluster heartbeat-agent key/deploy/install and clipboard outcomes
+  in all eight locales. Preserve accepted mutations and one-time keys through
+  failed refreshes, distinguish failed cluster reads from confirmed not-found,
+  and retry the real current-target read without changing permission decisions
+  (#2145).
+
 - Localize Team reach and connected access/removal presentation in all eight
   locales. Preserve source identities and server refusals, retain accepted
   removals through failed refreshes, and block old-target confirmations while

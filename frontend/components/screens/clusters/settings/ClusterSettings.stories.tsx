@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -59,6 +61,35 @@ export const Loading: Story = {
 /** No cluster with this slug, or no permission to see it. */
 export const NotFound: Story = {
   render: () => <ClusterSettingsScreen {...SETTINGS} slug="no-such-cluster" cluster={null} />,
+};
+
+/** A failed read is unavailable, not a verified missing cluster. */
+export const ReadFailed: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <ClusterSettingsScreen
+        {...SETTINGS}
+        cluster={null}
+        error="RAW_CLUSTER_READ_ERROR"
+        onRetry={() => {}}
+      />
+    </NextIntlClientProvider>
+  ),
+};
+
+/** A same-target failed refresh retains the last confirmed observation. */
+export const CachedReadFailed: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <ClusterSettingsScreen
+        {...SETTINGS}
+        cards={{ agent: <ClusterAgentView {...AGENT} /> }}
+        error="RAW_CLUSTER_REFRESH_ERROR"
+        onRetry={() => {}}
+        section={{ active: "agent", href: (id) => `?section=${id}`, select: () => {} }}
+      />
+    </NextIntlClientProvider>
+  ),
 };
 
 /** Registered but never brought into management: nothing probed yet. */

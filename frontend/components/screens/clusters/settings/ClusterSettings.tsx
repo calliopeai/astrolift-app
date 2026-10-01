@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
@@ -67,7 +68,12 @@ export interface ClusterSettingsCards {
   bootstrapPlan?: React.ReactNode;
 }
 
-export type ClusterSettingsScreenProps = ReturnType<typeof useClusterSettings> & {
+export type ClusterSettingsScreenProps = Omit<
+  ReturnType<typeof useClusterSettings>,
+  "error" | "onRetry"
+> & {
+  error?: string | null;
+  onRetry?: () => void;
   slug: string;
   cards?: ClusterSettingsCards;
   /** The bootstrap history list, mounted only while its disclosure is open. */
@@ -97,6 +103,8 @@ export function ClusterSettingsScreen({
   slug,
   cluster,
   loading,
+  error,
+  onRetry,
   lifecycle,
   bringing,
   refreshing,
@@ -109,6 +117,7 @@ export function ClusterSettingsScreen({
   restrictedMode,
   section,
 }: ClusterSettingsScreenProps) {
+  const sourceT = useTranslations("clusterSettings.source");
   const fmt = useFormatters();
   const hideRestricted = useRestrictedMode(restrictedMode) === "hide";
 
@@ -122,16 +131,59 @@ export function ClusterSettingsScreen({
     );
   }
 
+  const sourceFailure = error ? (
+    <div
+      role="alert"
+      className="border-danger-border bg-danger/5 flex min-w-0 flex-col gap-2 rounded-md border p-4"
+    >
+      <p className="text-danger-fg text-sm font-medium">{sourceT("readFailed")}</p>
+      {cluster && <p className="text-muted-foreground text-sm">{sourceT("cached")}</p>}
+      <pre className="text-danger-fg font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
+        {error}
+      </pre>
+      {onRetry && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRetry}
+          className="self-start"
+          disabled={loading}
+        >
+          {sourceT("retry")}
+        </Button>
+      )}
+    </div>
+  ) : null;
+
+  if (!cluster && sourceFailure) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        <ClusterHeader
+          slug={slug}
+          cluster={null}
+          active="settings"
+          emptyTitle={sourceT("readFailed")}
+        />
+        {sourceFailure}
+      </div>
+    );
+  }
+
   if (!cluster) {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
-        <ClusterHeader slug={slug} cluster={null} active="settings" />
+        <ClusterHeader
+          slug={slug}
+          cluster={null}
+          active="settings"
+          emptyTitle={sourceT("notFoundHeader")}
+        />
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No cluster with slug ${slug}`}
-          description="The cluster doesn't exist or you don't have permission to view it."
+          title={sourceT("notFound", { slug })}
+          description={sourceT("notFoundHelp")}
           actionHref="/clusters"
-          actionLabel="Back to clusters"
+          actionLabel={sourceT("back")}
         />
       </div>
     );
@@ -156,6 +208,8 @@ export function ClusterSettingsScreen({
         primaryAction={primaryAction}
         menu={menu}
       />
+
+      {sourceFailure}
 
       {lifecycle === "error" && cluster.lastManagementError && (
         <div

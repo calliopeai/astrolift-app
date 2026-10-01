@@ -21,6 +21,8 @@ export interface ClusterHeaderProps {
   /** Null while loading, or when no cluster has this slug. */
   cluster: ClusterHeaderCluster | null;
   loading?: boolean;
+  /** Current source-state title supplied by a caller with read/error knowledge. */
+  emptyTitle?: React.ReactNode;
   /** The tab on screen; read from the pathname when absent. */
   active?: ClusterTabKey;
   /** The lifecycle's one action (Bring into management, Retry, Refresh setup). */
@@ -45,6 +47,7 @@ export function ClusterHeader({
   slug,
   cluster,
   loading = false,
+  emptyTitle,
   active,
   primaryAction,
   menu,
@@ -55,7 +58,7 @@ export function ClusterHeader({
     return (
       <ShellHeader
         crumbs={clusterCrumbs(slug)}
-        title={loading ? <Skeleton className="h-6 w-48" /> : "Cluster not found"}
+        title={loading ? <Skeleton className="h-6 w-48" /> : (emptyTitle ?? "Cluster not found")}
         tabs={loading ? clusterTabs(slug, pathname, active) : undefined}
         tabsAriaLabel="Cluster tabs"
       />

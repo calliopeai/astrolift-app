@@ -5,7 +5,8 @@ import { CheckCircleIcon, CopyIcon, KeyRoundIcon, Loader2Icon, RocketIcon } from
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
-import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { useClusterAgent } from "./use-cluster-agent";
 
@@ -22,16 +23,41 @@ export function ClusterAgentView({
   clusterId,
   provisioned,
   heartbeatIntervalSeconds,
-  issued,
+  issued: receivedIssued,
   issuing,
   deploying,
   onIssue,
   onDeploy,
   onDismissIssued,
 }: ClusterAgentViewProps) {
-  const [keyCopied, copyKey] = useCopyToClipboard();
-  const [snippetCopied, copySnippet] = useCopyToClipboard();
-
+  const t = useTranslations("clusterSettings.agent");
+  const issued = receivedIssued?.clusterId === clusterId ? receivedIssued : null;
+  const [copyState, setCopyState] = React.useState({
+    source: issued,
+    key: false,
+    snippet: false,
+    error: false,
+  });
+  if (copyState.source !== issued) {
+    setCopyState({ source: issued, key: false, snippet: false, error: false });
+  }
+  async function copy(text: string, kind: "key" | "snippet") {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyState((previous) =>
+        previous.source === issued ? { ...previous, [kind]: true, error: false } : previous
+      );
+      setTimeout(() => {
+        setCopyState((previous) =>
+          previous.source === issued ? { ...previous, [kind]: false } : previous
+        );
+      }, 2000);
+    } catch {
+      setCopyState((previous) =>
+        previous.source === issued ? { ...previous, [kind]: false, error: true } : previous
+      );
+    }
+  }
   // Install snippet: a kubectl one-liner that creates the agent's Secret
   // from the issued key + heartbeat URL. The agent Deployment reads both
   // from this Secret. Path-only URL in local dev (no APP_BASE_URL) — the
@@ -48,21 +74,17 @@ export function ClusterAgentView({
 
   return (
     <Section
-      title="Keep-alive agent"
-      description={
-        <>
-          A lightweight agent in the cluster&apos;s{" "}
-          <code className="font-mono text-xs">astrolift-system</code> namespace POSTs a signed
-          heartbeat so the platform can show live pod, node, and resource state, and flag the
-          cluster offline when it stops. Pulses every{" "}
-          <span className="font-mono">{heartbeatIntervalSeconds}s</span>.
-        </>
-      }
+      title={t("title")}
+      description={t.rich("description", {
+        seconds: heartbeatIntervalSeconds,
+        namespace: (chunks) => <code className="font-mono text-xs">{chunks}</code>,
+        interval: (chunks) => <span className="font-mono">{chunks}</span>,
+      })}
       action={
         provisioned && (
           <Badge variant="outline" className="shrink-0 gap-1">
             <CheckCircleIcon className="size-3" />
-            Key issued
+            {t("keyIssued")}
           </Badge>
         )
       }
@@ -72,9 +94,7 @@ export function ClusterAgentView({
         {issued ? (
           <>
             <div className="border-warning-border bg-warning/10 rounded-md border p-3">
-              <p className="text-warning-fg text-xs font-medium">
-                Copy this key now — it won&apos;t be shown again.
-              </p>
+              <p className="text-warning-fg text-xs font-medium">{t("copyNow")}</p>
               <div className="mt-2 flex min-w-0 items-center gap-2">
                 <code className="bg-background/60 min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs">
                   {issued.agentKey}
@@ -82,36 +102,38 @@ export function ClusterAgentView({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => copyKey(issued.agentKey)}
+                  onClick={() => void copy(issued.agentKey, "key")}
                   className="gap-1.5"
                 >
                   <CopyIcon className="size-3.5" />
-                  {keyCopied ? "Copied" : "Copy"}
+                  {copyState.source === issued && copyState.key ? t("copied") : t("copy")}
                 </Button>
               </div>
             </div>
             {snippet && (
               <div className="min-w-0 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium">Install the agent secret</p>
+                  <p className="text-xs font-medium">{t("installSecret")}</p>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => copySnippet(snippet)}
+                    onClick={() => void copy(snippet, "snippet")}
                     className="h-7 gap-1.5"
                   >
                     <CopyIcon className="size-3" />
-                    {snippetCopied ? "Copied" : "Copy"}
+                    {copyState.source === issued && copyState.snippet ? t("copied") : t("copy")}
                   </Button>
                 </div>
                 <pre className="bg-muted/40 overflow-x-auto rounded-md border p-3 font-mono text-xs whitespace-pre">
                   {snippet}
                 </pre>
-                <p className="text-muted-foreground text-xs">
-                  Then deploy the agent (it reads the key + URL from this Secret). The cluster
-                  appears as Connected within a couple of heartbeat intervals.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("installHelp")}</p>
               </div>
+            )}
+            {copyState.source === issued && copyState.error && (
+              <p role="alert" className="text-danger-fg text-xs">
+                {t("copyFailed")}
+              </p>
             )}
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={onDeploy} disabled={deploying} className="gap-1.5">
@@ -120,16 +142,16 @@ export function ClusterAgentView({
                 ) : (
                   <RocketIcon className="size-3.5" />
                 )}
-                Deploy agent to cluster
+                {t("deploy")}
               </Button>
               <Button size="sm" variant="ghost" onClick={onDismissIssued}>
-                Done
+                {t("done")}
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Applies the agent Deployment — make sure you&apos;ve created the{" "}
-              <code className="font-mono text-xs">astrolift-agent</code> Secret first using the
-              snippet above.
+              {t.rich("deployHelp", {
+                secret: (chunks) => <code className="font-mono text-xs">{chunks}</code>,
+              })}
             </p>
           </>
         ) : (
@@ -142,7 +164,7 @@ export function ClusterAgentView({
                   ) : (
                     <RocketIcon className="size-3.5" />
                   )}
-                  Deploy agent to cluster
+                  {t("deploy")}
                 </Button>
               )}
               <Button
@@ -157,15 +179,14 @@ export function ClusterAgentView({
                 ) : (
                   <KeyRoundIcon className="size-3.5" />
                 )}
-                {provisioned ? "Rotate agent key" : "Issue agent key"}
+                {provisioned ? t("rotate") : t("issue")}
               </Button>
             </div>
             {provisioned && (
               <p className="text-muted-foreground text-xs">
-                Deploying applies the agent Deployment — it reads the key + URL from the{" "}
-                <code className="font-mono text-xs">astrolift-agent</code> Secret you created when
-                the key was issued. Rotating the key invalidates the old one, so the running agent
-                will fail its heartbeat until you redeploy with the new key.
+                {t.rich("rotationHelp", {
+                  secret: (chunks) => <code className="font-mono text-xs">{chunks}</code>,
+                })}
               </p>
             )}
           </div>

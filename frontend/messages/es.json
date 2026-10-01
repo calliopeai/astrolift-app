@@ -5689,5 +5689,40 @@
         "description": "Todo lo que puede hacer el titular, ahora y al añadirse permisos nuevos. Prefiere ámbitos limitados."
       }
     }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Agente de latidos",
+      "description": "Un agente en el espacio de nombres <namespace>astrolift-system</namespace> envía latidos firmados para mostrar el estado de pods, nodos y recursos y detectar la pérdida de conexión. Envía un latido cada <interval>{seconds, number}</interval> {seconds, plural, one {segundo} other {segundos}}.",
+      "keyIssued": "Clave emitida",
+      "copyNow": "Copia esta clave ahora: no volverá a mostrarse.",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "copyFailed": "No se pudo copiar. Selecciona y copia el texto manualmente.",
+      "installSecret": "Instalar el Secret del agente",
+      "installHelp": "Después despliega el agente, que lee la clave y la URL de este Secret. Un latido recibido confirma la conexión.",
+      "deploy": "Desplegar el agente en el clúster",
+      "done": "Listo",
+      "deployHelp": "Aplica el Deployment del agente. Primero crea el Secret <secret>astrolift-agent</secret> con el fragmento anterior.",
+      "rotate": "Rotar la clave del agente",
+      "issue": "Emitir la clave del agente",
+      "rotationHelp": "El Deployment lee la clave y la URL del Secret <secret>astrolift-agent</secret>. La rotación invalida la clave anterior. Actualiza este Secret con la nueva clave antes de volver a desplegar; la clave anterior ya no puede firmar latidos válidos.",
+      "feedbackIssued": "Clave del agente emitida. Cópiala ahora: no volverá a mostrarse.",
+      "feedbackRotated": "Clave del agente rotada. La clave anterior ya no funciona.",
+      "feedbackDeployed": "Despliegue del agente aceptado. Un latido recibido confirma la conexión.",
+      "feedbackIssueFailed": "No se pudo emitir la clave del agente.",
+      "feedbackDeployFailed": "No se pudo desplegar el agente.",
+      "feedbackRefreshWarning": "El cambio se aceptó, pero no se pudieron actualizar los detalles del clúster. Actualiza la vista para consultar el estado actual."
+    },
+    "source": {
+      "readFailed": "No se pudieron consultar los detalles del clúster",
+      "cached": "Se muestran los últimos detalles confirmados del clúster. Actualiza la vista para verificar el estado actual.",
+      "retry": "Reintentar",
+      "unknown": "Los detalles del clúster no se han confirmado. Vuelve a consultarlos.",
+      "notFoundHeader": "Clúster no encontrado",
+      "notFound": "No hay un clúster visible con el slug {slug}",
+      "notFoundHelp": "El clúster no existe o no tienes permiso para verlo.",
+      "back": "Volver a los clústeres"
+    }
   }
 }

@@ -5689,5 +5689,40 @@
         "description": "Tout ce que le propriétaire peut faire, maintenant et après l'ajout de permissions. Préférez des portées limitées."
       }
     }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Agent de présence",
+      "description": "Un agent dans l’espace de noms <namespace>astrolift-system</namespace> envoie des signaux de présence signés pour afficher l’état des pods, des nœuds et des ressources et détecter une perte de connexion. Un signal est envoyé à un intervalle de <interval>{seconds, number}</interval> {seconds, plural, one {seconde} other {secondes}}.",
+      "keyIssued": "Clé émise",
+      "copyNow": "Copiez cette clé maintenant : elle ne sera plus affichée.",
+      "copy": "Copier",
+      "copied": "Copié",
+      "copyFailed": "La copie a échoué. Sélectionnez et copiez le texte manuellement.",
+      "installSecret": "Installer le Secret de l’agent",
+      "installHelp": "Déployez ensuite l’agent, qui lit la clé et l’URL dans ce Secret. La réception d’un signal de présence confirme la connexion.",
+      "deploy": "Déployer l’agent dans le cluster",
+      "done": "Terminé",
+      "deployHelp": "Applique le Deployment de l’agent. Créez d’abord le Secret <secret>astrolift-agent</secret> avec la commande ci-dessus.",
+      "rotate": "Renouveler la clé de l’agent",
+      "issue": "Émettre la clé de l’agent",
+      "rotationHelp": "Le Deployment lit la clé et l’URL dans le Secret <secret>astrolift-agent</secret>. Le renouvellement invalide l’ancienne clé. Mettez ce Secret à jour avec la nouvelle clé avant de redéployer ; l’ancienne clé ne peut plus signer de signaux valides.",
+      "feedbackIssued": "Clé de l’agent émise. Copiez-la maintenant : elle ne sera plus affichée.",
+      "feedbackRotated": "Clé de l’agent renouvelée. L’ancienne clé ne fonctionne plus.",
+      "feedbackDeployed": "Déploiement de l’agent accepté. La réception d’un signal de présence confirme la connexion.",
+      "feedbackIssueFailed": "Impossible d’émettre la clé de l’agent.",
+      "feedbackDeployFailed": "Impossible de déployer l’agent.",
+      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
+    },
+    "source": {
+      "readFailed": "Impossible de lire les détails du cluster",
+      "cached": "Les derniers détails confirmés du cluster sont affichés. Actualisez la vue pour vérifier l’état actuel.",
+      "retry": "Réessayer",
+      "unknown": "Les détails du cluster ne sont pas confirmés. Réessayez la lecture.",
+      "notFoundHeader": "Cluster introuvable",
+      "notFound": "Aucun cluster visible avec le slug {slug}",
+      "notFoundHelp": "Le cluster n’existe pas ou vous n’avez pas la permission de le consulter.",
+      "back": "Retour aux clusters"
+    }
   }
 }

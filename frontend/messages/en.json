@@ -5766,5 +5766,40 @@
         "description": "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes."
       }
     }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Keep-alive agent",
+      "description": "An agent in the <namespace>astrolift-system</namespace> namespace sends signed heartbeats so the platform can show pod, node, and resource state and detect a missing connection. Heartbeats are sent every <interval>{seconds, number}</interval> {seconds, plural, one {second} other {seconds}}.",
+      "keyIssued": "Key issued",
+      "copyNow": "Copy this key now — it will not be shown again.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Could not copy. Select and copy the text manually.",
+      "installSecret": "Install the agent Secret",
+      "installHelp": "Then deploy the agent, which reads the key and URL from this Secret. A received heartbeat confirms the connection.",
+      "deploy": "Deploy agent to cluster",
+      "done": "Done",
+      "deployHelp": "Applies the agent Deployment. First create the <secret>astrolift-agent</secret> Secret using the snippet above.",
+      "rotate": "Rotate agent key",
+      "issue": "Issue agent key",
+      "rotationHelp": "The Deployment reads the key and URL from the <secret>astrolift-agent</secret> Secret. Rotating invalidates the previous key. Update this Secret with the new key before deploying again; the old key can no longer sign valid heartbeats.",
+      "feedbackIssued": "Agent key issued — copy it now; it will not be shown again.",
+      "feedbackRotated": "Agent key rotated — the previous key no longer works.",
+      "feedbackDeployed": "Agent deployment accepted. A received heartbeat confirms the connection.",
+      "feedbackIssueFailed": "Could not issue the agent key.",
+      "feedbackDeployFailed": "Could not deploy the agent.",
+      "feedbackRefreshWarning": "The change was accepted, but cluster details could not be refreshed. Refresh to see current state."
+    },
+    "source": {
+      "readFailed": "Could not read cluster details",
+      "cached": "Showing the last confirmed cluster details. Refresh to verify current state.",
+      "retry": "Retry",
+      "unknown": "Cluster details have not been confirmed. Retry the read.",
+      "notFoundHeader": "Cluster not found",
+      "notFound": "No visible cluster with slug {slug}",
+      "notFoundHelp": "The cluster does not exist or you do not have permission to view it.",
+      "back": "Back to clusters"
+    }
   }
 }

@@ -3,10 +3,11 @@
 import { useMutation } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import { DEPLOY_CLUSTER_AGENT, ISSUE_CLUSTER_AGENT_KEY } from "@/graphql/clusters/clusters.queries";
 import type { MutationResult } from "@/graphql/identity/identity.types";
-
 import type { AgentKeyIssuedData, ClusterWithHeartbeat } from "./types";
 
 interface AgentDeployedData {
@@ -16,56 +17,70 @@ interface AgentDeployedData {
   heartbeatStatus: string;
 }
 
-/**
- * Issues (or rotates) the scoped key the in-cluster keep-alive agent signs
- * its heartbeat with, and deploys the agent (#808). The raw key comes back
- * EXACTLY ONCE in the mutation response and is held here until dismissed.
- * The data half of ClusterAgentView.
- */
+/** The scoped heartbeat key is returned once; only keep it for the current cluster. */
 export function useClusterAgent(cluster: ClusterWithHeartbeat) {
+  const t = useTranslations("clusterSettings.agent");
   const [issue, { loading: issuing }] = useMutation<{
     issueClusterAgentKey: MutationResult<AgentKeyIssuedData>;
   }>(ISSUE_CLUSTER_AGENT_KEY, {
-    // The mutation flips agentProvisioned + may change the interval;
-    // refetch so the card's "provisioned" state and the live badge stay
-    // consistent without a reload.
-    refetchQueries: ["GetCluster"],
+    refetchQueries: (result) => (result.data?.issueClusterAgentKey.ok ? ["GetCluster"] : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("feedbackRefreshWarning")),
+    awaitRefetchQueries: true,
   });
   const [deploy, { loading: deploying }] = useMutation<{
     deployClusterAgent: MutationResult<AgentDeployedData>;
   }>(DEPLOY_CLUSTER_AGENT, {
-    // The deploy lands the agent Deployment; the cluster starts pulsing
-    // shortly after, so refetch to let the live badge flip to Connected.
-    refetchQueries: ["GetCluster"],
+    refetchQueries: (result) => (result.data?.deployClusterAgent.ok ? ["GetCluster"] : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("feedbackRefreshWarning")),
+    awaitRefetchQueries: true,
   });
-  const [issued, setIssued] = React.useState<AgentKeyIssuedData | null>(null);
+  const [keyState, setKeyState] = React.useState<{
+    clusterId: string;
+    epoch: number;
+    issued: AgentKeyIssuedData | null;
+  }>({ clusterId: cluster.id, epoch: 0, issued: null });
+  if (keyState.clusterId !== cluster.id) {
+    setKeyState({ clusterId: cluster.id, epoch: keyState.epoch + 1, issued: null });
+  }
+  const issued = keyState.clusterId === cluster.id ? keyState.issued : null;
 
   async function onIssue() {
-    const { data } = await issue({
-      variables: { input: { clusterId: cluster.id } },
-    });
-    if (data?.issueClusterAgentKey.ok && data.issueClusterAgentKey.data) {
-      setIssued(data.issueClusterAgentKey.data);
-      toast.success(
-        data.issueClusterAgentKey.data.rotated
-          ? "Agent key rotated — the previous key no longer works."
-          : "Agent key issued — copy it now, it won't be shown again."
+    const requestedId = cluster.id;
+    const requestedEpoch = keyState.epoch;
+    try {
+      const { data } = await issue({ variables: { input: { clusterId: requestedId } } });
+      const result = data?.issueClusterAgentKey;
+      if (result?.ok && result.data?.clusterId === requestedId) {
+        const issued = result.data;
+        setKeyState((previous) =>
+          previous.clusterId === requestedId && previous.epoch === requestedEpoch
+            ? { ...previous, issued }
+            : previous
+        );
+        toast.success(t(issued.rotated ? "feedbackRotated" : "feedbackIssued"));
+      } else {
+        toast.error(result?.errors?.[0]?.message ?? t("feedbackIssueFailed"));
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message ? error.message : t("feedbackIssueFailed")
       );
-    } else {
-      toast.error(data?.issueClusterAgentKey.errors?.[0]?.message ?? "Failed to issue key");
     }
   }
 
   async function onDeploy() {
-    const { data } = await deploy({
-      variables: { input: { clusterId: cluster.id } },
-    });
-    if (data?.deployClusterAgent.ok) {
-      toast.success(
-        "Agent deployed — the cluster connects within a couple of heartbeat intervals."
+    try {
+      const { data } = await deploy({ variables: { input: { clusterId: cluster.id } } });
+      const result = data?.deployClusterAgent;
+      if (result?.ok) {
+        toast.success(t("feedbackDeployed"));
+      } else {
+        toast.error(result?.errors?.[0]?.message ?? t("feedbackDeployFailed"));
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message ? error.message : t("feedbackDeployFailed")
       );
-    } else {
-      toast.error(data?.deployClusterAgent.errors?.[0]?.message ?? "Failed to deploy agent");
     }
   }
 
@@ -78,6 +93,6 @@ export function useClusterAgent(cluster: ClusterWithHeartbeat) {
     deploying,
     onIssue,
     onDeploy,
-    onDismissIssued: () => setIssued(null),
+    onDismissIssued: () => setKeyState((previous) => ({ ...previous, issued: null })),
   };
 }

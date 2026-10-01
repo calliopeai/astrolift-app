@@ -5689,5 +5689,40 @@
         "description": "Alles, was der Besitzer tun kann, jetzt und mit neuen Berechtigungen. Engere Bereiche bevorzugen."
       }
     }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "Heartbeat-Agent",
+      "description": "Ein Agent im Namespace <namespace>astrolift-system</namespace> sendet signierte Heartbeats, damit die Plattform den Zustand von Pods, Knoten und Ressourcen anzeigen und eine unterbrochene Verbindung erkennen kann. Heartbeats werden alle <interval>{seconds, number}</interval> {seconds, plural, one {Sekunde} other {Sekunden}} gesendet.",
+      "keyIssued": "Schlüssel ausgegeben",
+      "copyNow": "Kopieren Sie diesen Schlüssel jetzt. Er wird nicht erneut angezeigt.",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen. Wählen Sie den Text aus und kopieren Sie ihn manuell.",
+      "installSecret": "Secret für den Agenten installieren",
+      "installHelp": "Stellen Sie anschließend den Agenten bereit. Er liest Schlüssel und URL aus diesem Secret. Ein empfangener Heartbeat bestätigt die Verbindung.",
+      "deploy": "Agent im Cluster bereitstellen",
+      "done": "Fertig",
+      "deployHelp": "Wendet das Deployment des Agenten an. Erstellen Sie zuerst das Secret <secret>astrolift-agent</secret> mit dem obigen Befehl.",
+      "rotate": "Agentenschlüssel erneuern",
+      "issue": "Agentenschlüssel ausgeben",
+      "rotationHelp": "Das Deployment liest Schlüssel und URL aus dem Secret <secret>astrolift-agent</secret>. Eine Erneuerung macht den bisherigen Schlüssel ungültig. Aktualisieren Sie das Secret mit dem neuen Schlüssel, bevor Sie erneut bereitstellen. Der alte Schlüssel kann keine gültigen Heartbeats mehr signieren.",
+      "feedbackIssued": "Agentenschlüssel ausgegeben. Kopieren Sie ihn jetzt. Er wird nicht erneut angezeigt.",
+      "feedbackRotated": "Agentenschlüssel erneuert. Der bisherige Schlüssel funktioniert nicht mehr.",
+      "feedbackDeployed": "Bereitstellung des Agenten angenommen. Ein empfangener Heartbeat bestätigt die Verbindung.",
+      "feedbackIssueFailed": "Agentenschlüssel konnte nicht ausgegeben werden.",
+      "feedbackDeployFailed": "Agent konnte nicht bereitgestellt werden.",
+      "feedbackRefreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
+    },
+    "source": {
+      "readFailed": "Clusterdetails konnten nicht gelesen werden",
+      "cached": "Die zuletzt bestätigten Clusterdetails werden angezeigt. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu prüfen.",
+      "retry": "Erneut versuchen",
+      "unknown": "Die Clusterdetails sind noch nicht bestätigt. Wiederholen Sie die Abfrage.",
+      "notFoundHeader": "Cluster nicht gefunden",
+      "notFound": "Kein sichtbarer Cluster mit dem Slug {slug}",
+      "notFoundHelp": "Der Cluster existiert nicht oder Sie haben keine Berechtigung, ihn anzuzeigen.",
+      "back": "Zurück zu Clustern"
+    }
   }
 }

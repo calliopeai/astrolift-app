@@ -5686,5 +5686,40 @@
         "description": "現在および将来追加される権限を含め、所有者に可能なすべての操作です。限定的なスコープを優先してください。"
       }
     }
+  },
+  "clusterSettings": {
+    "agent": {
+      "title": "ハートビートエージェント",
+      "description": "<namespace>astrolift-system</namespace> 名前空間のエージェントが署名付きハートビートを送信し、プラットフォームが Pod、ノード、リソースの状態を表示して接続断を検出できるようにします。送信間隔は <interval>{seconds, number}</interval> {seconds, plural, one {秒} other {秒}}です。",
+      "keyIssued": "キー発行済み",
+      "copyNow": "今すぐこのキーをコピーしてください。再表示はできません。",
+      "copy": "コピー",
+      "copied": "コピー済み",
+      "copyFailed": "コピーできませんでした。テキストを選択して手動でコピーしてください。",
+      "installSecret": "エージェントの Secret を作成",
+      "installHelp": "続いてエージェントをデプロイします。キーと URL はこの Secret から読み込まれます。ハートビートの受信によって接続を確認できます。",
+      "deploy": "クラスターにエージェントをデプロイ",
+      "done": "完了",
+      "deployHelp": "エージェントの Deployment を適用します。先に上のコマンドで <secret>astrolift-agent</secret> Secret を作成してください。",
+      "rotate": "エージェントキーを更新",
+      "issue": "エージェントキーを発行",
+      "rotationHelp": "Deployment は <secret>astrolift-agent</secret> Secret からキーと URL を読み込みます。キーを更新すると以前のキーは無効になります。新しいキーで Secret を更新してから再デプロイしてください。以前のキーでは有効なハートビートに署名できません。",
+      "feedbackIssued": "エージェントキーを発行しました。今すぐコピーしてください。再表示はできません。",
+      "feedbackRotated": "エージェントキーを更新しました。以前のキーは使用できません。",
+      "feedbackDeployed": "エージェントのデプロイを受け付けました。接続はハートビートの受信によって確認できます。",
+      "feedbackIssueFailed": "エージェントキーを発行できませんでした。",
+      "feedbackDeployFailed": "エージェントをデプロイできませんでした。",
+      "feedbackRefreshWarning": "変更は受け付けましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。"
+    },
+    "source": {
+      "readFailed": "クラスターの詳細を取得できませんでした",
+      "cached": "最後に確認できたクラスターの詳細を表示しています。画面を更新して現在の状態を確認してください。",
+      "retry": "再試行",
+      "unknown": "クラスターの詳細は未確認です。再取得してください。",
+      "notFoundHeader": "クラスターが見つかりません",
+      "notFound": "スラッグ {slug} の表示可能なクラスターはありません",
+      "notFoundHelp": "クラスターが存在しないか、表示する権限がありません。",
+      "back": "クラスター一覧に戻る"
+    }
   }
 }
