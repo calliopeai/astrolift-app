@@ -24,15 +24,24 @@ no_search = cases.no_search
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
+@pytest.fixture
+def real_role_resolver(permission_resolver, monkeypatch):
+    from astrolift_identity.permission_resolver import resolve
+
+    # Restore this patch before permission_resolver restores its own global state.
+    with monkeypatch.context() as patch:
+        patch.setattr("core.permissions._resolver", resolve)
+        yield
+
+
 @pytest.mark.parametrize("change", ["pool", "aba", "credential", "permission", "actor", "role"])
-def test_actual_lock_wait_rechecks_source_and_authority_before_sdk(setup, change, monkeypatch):
+def test_actual_lock_wait_rechecks_source_and_authority_before_sdk(setup, change, request):
     s = setup
     binding = None
     if change == "role":
-        from astrolift_identity.permission_resolver import resolve
         from core.tests.utils.scope_world import bind_role
 
-        monkeypatch.setattr("core.permissions._resolver", resolve)
+        request.getfixturevalue("real_role_resolver")
         binding = bind_role(
             s.actor,
             permissions=[Permission.CLUSTER_USERS],
