@@ -590,3 +590,95 @@ binding dispatch. They do not certify Azure message delivery, live-service data
 persistence or external-race exclusion. The broader #2032/#2098 audits remain open.
 See the actual [topic properties contract](https://learn.microsoft.com/en-us/rest/api/servicebus/controlplane/topics/create-or-update?view=rest-servicebus-controlplane-2026-01-01)
 and [subscription properties contract](https://learn.microsoft.com/en-us/rest/api/servicebus/controlplane/subscriptions/create-or-update?view=rest-servicebus-controlplane-2026-01-01).
+
+
+### Azure Event Hubs owned ARM targets (#2032 / #2098, bounded family)
+
+Both `stream/event_hubs` and `event_stream/event_hubs_kafka` now save
+`kind/arm-v1/subscription-UUID/resource-group/namespace/hub/native-group`.
+Kafka uses the explicit `-` native-group sentinel; Kafka broker consumer groups
+are not ARM consumer groups and are not inventoried or managed here. Subscription
+and resource-group coordinates must still match the current provider installation.
+The complete handle and emitted hub ARM binding must each fit their actual
+512-character storage fields. Validation rejects invalid delimiters/names and
+oversize identities before SDK calls; no target is truncated or reconstructed.
+Existing server-owned placement identities, when present, remain validated by
+central lifecycle dispatch before provider construction.
+
+New default namespace, hub and native managed-group names retain all 32 hex
+characters of the canonical nonzero managed-service UUID. Basic, or an explicit
+operator choice of `$Default`, uses the observed built-in group instead. Only cosmetic operator
+prefixes are bounded; operators must keep them stable until initial provision
+records its handle. Explicit namespace/hub override fields remain available, but
+new override values must contain that same complete UUID hex and satisfy Azure's
+name limits; invalid overrides are refused, never normalized or ignored. Complete
+saved targets preserve exact physical names and selected native groups across
+human-name/prefix changes, even when those saved names use an older convention.
+Legacy short handles omit immutable ARM placement and cannot establish authority:
+they remain stored and return `ownership_unknown`; there is no automatic adoption,
+backfill, migration, or recreation of missing recorded resources.
+
+Every existing namespace requires the current source UUID/platform tags and exact
+returned ARM identity. Each hub and custom ARM consumer group requires a typed
+`userMetadata` JSON envelope naming the same UUID/platform and its exact returned
+ARM identity. Complete bounded hub/group inventories must agree with exact GETs;
+other hubs, unowned/unmarked children, unknown pages or divergent ARM identities
+refuse before namespace/network/hub/group writes or namespace deletion. The
+Azure-created `$Default` group is structural only: its actual list and GET ARM
+identity must match the owned saved parent. The driver never stamps, PUTs, or
+individually deletes it. Microsoft documents automatic creation in its
+[official SDK sample](https://github.com/Azure/azure-sdk-for-net/blob/main/sdk/eventhub/Azure.Messaging.EventHubs.Processor/samples/Sample04_ProcessingEvents.md)
+and exposes it in the [API2024 ARM inventory](https://learn.microsoft.com/en-us/rest/api/eventhub/consumer-groups/list-by-event-hub?view=rest-eventhub-2024-01-01).
+
+Each management observation admits work within a 20-second deadline, with at most
+5-second connect/read timeouts per request, retries/redirects disabled, and complete
+inventories limited to four pages/128 items. Continuations must retain the exact
+trusted ARM collection. A timeout is an unknown/incomplete observation, never
+absence. SDK12 supports `polling=False`/`NoPolling`: namespace create/delete starts
+no background LRO polling; reconciliation checks actual state with subsequent GETs.
+Azure may continue an accepted operation remotely. Connect/read timeouts govern
+transport phases, not a hard cancellation deadline for Azure or an absolute bound
+on an SDK response stream. Partial namespace/hub creation remains retryable and
+incomplete; retries with the same UUID/defaults reconcile the same owned target.
+If the workflow exhausts its finite retries, repair/retry is explicit; pending
+acceptance never skips unfinished child work or claims applied readiness.
+
+Namespace/inherited locks are fully inventoried within those bounds. Any present
+or unknown lock refuses, including under `force_destroy`; namespace ownership does
+not authorize removing independent locks. Operators must resolve locks separately.
+Only actual SDK `ResourceNotFoundError` proves relevant absence. Denial, invalid
+placement, partial inventories and diagnostic text cannot become cleanup success.
+Ownership-refused/unknown outcomes remain structured; failure diagnostics do not
+expose raw provider configuration.
+
+SDK enum values are decoded through `.value`, preserving API2024 wire spellings.
+Naming validation follows the [official Microsoft.EventHub rules](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsofteventhub).
+Only documented `Delete`/`Compact` cleanup policies are advertised. Missing/unknown hub state,
+Creating, Disabled, SendDisabled and ReceiveDisabled observations are not fully
+available. Namespace readiness requires observed Succeeded and no explicitly non-Active
+namespace status. The documented API2024 GET example omits namespace status;
+that remains reported as unknown, rather than invented Active. Hub readiness
+requires observed Active and the selected native group. Whole desired config may
+retain unchanged create-only settings; actual immutable changes and custom-group
+removals explicitly require reprovision. Supported custom-group additions and
+status disable/re-enable updates use exact current owned targets. Existing
+Sender/Receiver workload grants remain at the exact hub ARM scope, with no Data
+Owner or namespace management grant.
+
+Capture still requires the complete destination/identity block and an operator-
+allowlisted, pre-authorized UAMI. This does not certify tenant ownership of the
+external destination, create storage/Key Vault permissions, delete archives, or
+provide an exact stream snapshot. Private-only/perimeter modes still refuse without
+verified dependencies. `delete_data=False` preserves data by refusal (central
+snapshot dispatch also refuses); force cannot bypass it. Explicit destructive
+cleanup requires complete namespace exclusivity, and success requires observed
+namespace absence, rather than merely an accepted DELETE.
+
+The SDK has no atomic ownership compare-and-write/delete across these ARM requests.
+Independent cloud administrators must not replace/retag resources or add children
+between proof and effects. Controlled SDK12 wire/PostgreSQL checks do not certify
+live Azure tiers, data-plane delivery, Capture, or advanced dependency readiness.
+Older Event Hubs drivers cannot interpret new `arm-v1` handles safely: do not resume
+workflows for newly created targets on an older driver. Prefer forward repair or
+explicitly verified compatibility; never automatically rewrite handles on rollback.
+Other families and broader #2032/#2098 acceptance remain open.

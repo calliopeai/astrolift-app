@@ -32,6 +32,14 @@
   through refresh/navigation failure, and invalidate stale observed app reviews.
   Explain saved replica counts without promising a live rollout (#2145).
 
+- Azure native/Kafka Event Hubs uses complete immutable UUID names for new
+  targets and exact saved ARM placement for lifecycle and bindings. Current
+  source/platform/child identities, bounded complete inventories and operator
+  lock refusal gate effects; unknown observations never become cleanup success.
+  Actual SDK12 enum/wire values and NoPolling preserve pending versus observed
+  readiness. Legacy ambiguous handles refuse unchanged; retained-data/Capture
+  limits and exact hub-scoped Sender/Receiver grants remain explicit (#2032, #2098).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,
