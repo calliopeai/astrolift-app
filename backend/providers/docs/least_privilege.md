@@ -519,7 +519,9 @@ Successful handles save the complete target:
 `<kind>/arm-v1/<subscription UUID>/<resource group>/<namespace>/<topic>/<child>`.
 Every encoded coordinate is validated before any SDK request and must agree
 with current operator placement; the stored handle fits the existing 512-character
-column. Reads, binding, updates and cleanup use the saved child exactly rather
+column. The topic alias also validates its complete ARM-ID literal against the
+512-character materialized binding column before any SDK call. Reads, binding,
+updates and cleanup use the saved child exactly rather
 than deriving it again. Valid complete handles retain exact physical names and
 messages across descriptive renames and prefix changes. Unknown/malformed source
 UUIDs, encoded delimiters, unsafe entity coordinates or incompatible placement

@@ -316,3 +316,50 @@ def test_existing_full_desired_snapshot_accepted_only_when_noneditable_values_ma
         not result["ok"] and not result["retryable"] and result["errors"] == [UPDATE_NOT_SUPPORTED_IN_PLACE]
     )
     assert all(verb == "GET" for verb, *_ in cloud.api.calls)
+
+
+def test_topic_arm_literal_storage_limit_is_checked_before_any_production_sdk_call(cloud):
+    if cloud.kind != "topic":
+        pytest.skip("Only topic alias materializes TOPIC_ARN_OR_ID")
+    row = service(cloud, "oversized-topic-binding")
+    cloud.cfg = dataclasses.replace(cloud.cfg, resource_group="r" * 90, namespace_name="n" * 50)
+    row.backend_ref = "/".join(
+        (
+            "topic",
+            "arm-v1",
+            cloud.cfg.subscription_id,
+            cloud.cfg.resource_group,
+            cloud.cfg.namespace_name,
+            "t" * 260,
+            "c" * 50,
+        )
+    )
+    assert len(row.backend_ref) <= row._meta.get_field("backend_ref").max_length
+    row.save(update_fields=["backend_ref"])
+    result = _provision_sync(row.pk)
+    assert not result["ok"] and "ownership_refused" in result["errors"]
+    with pytest.raises(AzureOwnershipError, match="binding storage limit"):
+        _managed_binding_for(row)
+    assert cloud.api.calls == [] and not cloud.api.rows
+
+
+def test_maximum_representable_topic_arm_literal_persists_without_truncation(cloud):
+    if cloud.kind != "topic":
+        pytest.skip("Only topic alias materializes TOPIC_ARN_OR_ID")
+    row, original = owned(cloud, "exact-topic-binding-limit")
+    cloud.cfg = dataclasses.replace(cloud.cfg, resource_group="r" * 85, namespace_name="n" * 50)
+    driver = AzureServiceBusDriver(config=cloud.cfg)
+    exact = driver._coordinates("t" * 260, "c" * 50)
+    assert len(exact.topic_id) == 512 and len(exact.handle("topic")) <= 512
+    for old, current in [(original.topic_id, exact.topic_id), (original.child_id, exact.child_id)]:
+        entity = cloud.api.rows.pop(old)
+        entity["id"] = current
+        cloud.api.rows[current] = entity
+    row.backend_ref = exact.handle("topic")
+    row.save(update_fields=["backend_ref"])
+    result = _provision_sync(row.pk)
+    assert result["ok"] and result["handle"] == row.backend_ref
+    _finalize_provision_sync(row.pk, result["handle"])
+    binding = ManagedServiceBinding.objects.get(managed_service=row, env_key="TOPIC_ARN_OR_ID")
+    assert binding.env_value_ref == exact.topic_id and len(binding.env_value_ref) == 512
+    assert _managed_binding_for(row).env_vars["TOPIC_ARN_OR_ID"].literal == binding.env_value_ref

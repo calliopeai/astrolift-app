@@ -512,3 +512,25 @@ def test_full_snapshot_type_coercion_cannot_report_an_invalid_noneditable_value_
     result = driver.update(UpdateSpec(handle, managed_service_id=OWNER, config=cfg))
     assert not result.ok and "ownership_refused" in result.errors
     assert all(verb == "GET" for verb, *_ in api.calls)
+
+
+def test_complete_handle_can_fit_while_topic_arm_binding_is_unrepresentable_and_must_refuse_before_sdk():
+    api = RecordingTopics()
+    cfg = dataclasses.replace(recording_config(api, kind="topic"), resource_group="r" * 90, namespace_name="n" * 50)
+    driver = AzureServiceBusDriver(config=cfg)
+    topic, child = "t" * 260, "c" * 50
+    handle = "/".join(("topic", "arm-v1", SUBSCRIPTION, cfg.resource_group, cfg.namespace_name, topic, child))
+    assert len(handle) <= 512
+    arm_id = (
+        f"/subscriptions/{SUBSCRIPTION}/resourceGroups/{cfg.resource_group}"
+        f"/providers/Microsoft.ServiceBus/namespaces/{cfg.namespace_name}/topics/{topic}"
+    )
+    assert len(arm_id) > 512
+    try:
+        result = driver.provision(spec(recorded_handle=handle))
+        assert not result.ok and "ownership_refused" in result.errors
+        with pytest.raises(AzureOwnershipError, match="binding storage limit"):
+            driver.binding(ServiceHandle(handle, managed_service_id=OWNER))
+        assert api.calls == []
+    finally:
+        cfg.client.close()

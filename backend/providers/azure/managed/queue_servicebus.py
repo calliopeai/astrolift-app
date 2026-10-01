@@ -756,6 +756,8 @@ class AzureServiceBusDriver(ManagedServiceDriver):
         target = _TopicTarget(subscription, cfg.resource_group, cfg.namespace_name, topic, child)
         if len(target.handle(cfg.handle_kind)) > 512:
             raise AzureOwnershipError("Service Bus saved target exceeds handle storage limit")
+        if cfg.handle_kind == "topic" and len(target.topic_id) > 512:
+            raise AzureOwnershipError("Service Bus topic ARM identity exceeds binding storage limit")
         return target
 
     def _saved_target(self, handle: str, source: object) -> _TopicTarget:
