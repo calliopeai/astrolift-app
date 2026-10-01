@@ -215,10 +215,34 @@ and refuses malformed, repeated or unfinished pages. SQS/DynamoDB bindings also
 verify returned resource ARN/name/region identity; missing DynamoDB ARN never
 becomes an invented `UNKNOWN` grant.
 
-This bounded change does not establish ownership protection for every AWS
-lifecycle operation. SQS/DynamoDB update/teardown, provider status/snapshot
-paths and provisioning name races/legacy adoption remain separately tracked
-acceptance work. Workload tag-mutation authority is addressed below.
+SQS and DynamoDB now use the same live identity proof for updates (including
+no-ops), teardown and provider readiness/status. DynamoDB snapshots check the
+source before `CreateBackup` and require the returned backup ARN to name that
+source. Direct callers must carry the actual source ID on `UpdateSpec` and
+`DeprovisionSpec` as well. Tenant config cannot supply it, force flags cannot
+bypass it, and malformed or incomplete provider metadata fails closed. SQS
+snapshots/restore remain explicitly unsupported, so data-preserving central
+teardown refuses rather than claiming that queue messages have been retained.
+
+Only structured provider not-found outcomes (SQS
+[`GetQueueUrl`](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueUrl.html)
+and DynamoDB
+[`DescribeTable`](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html))
+mean an absent resource. Permission failures containing those words remain
+failures. SQS refuses safe deletion when its requested approximate message
+counts are missing instead of assuming zero; the counts are advisory and do
+not provide an atomic drain/delete guarantee. DynamoDB
+[`CreateBackup`](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_CreateBackup.html)
+returns a backup identity; this bounded change does not certify asynchronous
+backup completion or redesign retention orchestration.
+
+This still does not establish ownership protection for every AWS lifecycle
+operation. Provisioning name races/legacy adoption, DynamoDB restore/adoption,
+other providers' status/snapshot/update/teardown paths and cloud-admin concurrent
+retag/recreate races remain separately tracked acceptance work. Legacy live
+resources without the immutable source tag require verified operator backfill;
+matching tenant slugs alone do not authorize lifecycle operations. Workload
+tag-mutation authority is addressed below.
 
 
 ### SQS workload management excludes ownership and policy administration

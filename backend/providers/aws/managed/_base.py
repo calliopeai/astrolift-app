@@ -23,6 +23,14 @@ class ManagedServiceError(Exception):
     resources)."""
 
 
+class LiveOwnershipError(ManagedServiceError):
+    """Live identity proof failed; diagnostics are never a missing-resource signal."""
+
+    def __init__(self, message: str, *, code: str = "ownership_unknown") -> None:
+        super().__init__(message)
+        self.code = code
+
+
 def handle_for(*, kind: str, resource_id: str) -> str:
     """Canonical service handle. Stored on the
     ManagedServiceBinding row + parsed on every subsequent op."""

@@ -27,8 +27,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws._errors import map_client_error
 from aws.managed._base import (
+    LiveOwnershipError,
     ManagedServiceError,
     adoption_refusal,
     assert_resource_arn,
@@ -40,6 +40,12 @@ from aws.managed._base import (
 from aws.session import aws_client
 
 KIND = "queue"
+
+
+class QueueNotFoundError(ManagedServiceError):
+    """Only the provider's structured not-found result, never a tag/identity refusal."""
+
+    code = "resource_missing"
 
 
 @dataclass(frozen=True)
@@ -181,20 +187,21 @@ class SQSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="queue_sqs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, queue_name = parse_handle(spec.handle)
+        queue_name = self._recorded_queue_name(spec.handle)
         cfg = spec.config or {}
         is_fifo = queue_name.endswith(".fifo")
         error = self._validate_config(cfg, updating=True, fifo=is_fifo)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_sqs_config"])
         try:
-            queue_url = self._queue_url(queue_name=queue_name)
+            queue_url, _ = self._live_queue(queue_name, spec.managed_service_id)
         except ManagedServiceError as exc:
             return UpdateResult(
                 ok=False,
                 handle=spec.handle,
                 message=str(exc),
-                errors=[str(exc)],
+                errors=[getattr(exc, "code", "ownership_unknown")],
+                retryable=False,
             )
 
         attributes = self._attributes(cfg, size=spec.size or "", fifo=is_fifo, creating=False)
@@ -237,14 +244,26 @@ class SQSDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, queue_name = parse_handle(spec.handle)
+        queue_name = self._recorded_queue_name(spec.handle)
         try:
-            queue_url = self._queue_url(queue_name=queue_name)
-        except ManagedServiceError:
+            queue_url, attrs = self._live_queue(
+                queue_name,
+                spec.managed_service_id,
+                attributes=[
+                    "ApproximateNumberOfMessages",
+                    "ApproximateNumberOfMessagesNotVisible",
+                    "ApproximateNumberOfMessagesDelayed",
+                ],
+            )
+        except QueueNotFoundError:
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
                 message=f"queue {queue_name} already gone",
+            )
+        except ManagedServiceError as exc:
+            return DeprovisionResult(
+                False, spec.handle, str(exc), [getattr(exc, "code", "ownership_unknown")], retryable=False
             )
 
         try:
@@ -256,22 +275,25 @@ class SQSDriver(ManagedServiceDriver):
                     ["deletion_protection_enabled"],
                     retryable=False,
                 )
-            attrs = self._sqs.get_queue_attributes(
-                QueueUrl=queue_url,
-                AttributeNames=[
-                    "ApproximateNumberOfMessages",
-                    "ApproximateNumberOfMessagesNotVisible",
-                    "ApproximateNumberOfMessagesDelayed",
-                ],
-            ).get("Attributes", {})
-            messages = sum(
-                int(attrs.get(key, 0) or 0)
+            counts = [
+                attrs.get(key)
                 for key in (
                     "ApproximateNumberOfMessages",
                     "ApproximateNumberOfMessagesNotVisible",
                     "ApproximateNumberOfMessagesDelayed",
                 )
-            )
+            ]
+            if not delete_data and any(
+                not isinstance(value, str) or not value.isascii() or not value.isdigit() for value in counts
+            ):
+                return DeprovisionResult(
+                    False,
+                    spec.handle,
+                    "SQS message inventory is unavailable",
+                    ["message_inventory_unknown"],
+                    retryable=False,
+                )
+            messages = sum(int(value) for value in counts) if not delete_data else 0
             if messages and not delete_data:
                 return DeprovisionResult(
                     False,
@@ -299,27 +321,21 @@ class SQSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="queue_sqs")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, queue_name = parse_handle(handle.handle)
+        queue_name = self._recorded_queue_name(handle.handle)
         try:
-            queue_url = self._queue_url(queue_name=queue_name)
-            attrs = self._sqs.get_queue_attributes(
-                QueueUrl=queue_url,
-                AttributeNames=[
-                    "ApproximateNumberOfMessages",
-                    "ApproximateNumberOfMessagesNotVisible",
-                    "FifoQueue",
-                ],
-            ).get("Attributes", {})
-        except ManagedServiceError:
-            return ServiceStatus(
-                handle=handle.handle,
-                state="deprovisioned",
-                message=f"queue {queue_name} does not exist",
+            _, attrs = self._live_queue(
+                queue_name,
+                handle.managed_service_id,
+                attributes=["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible", "FifoQueue"],
             )
-        except Exception as exc:
-            return ServiceStatus(handle.handle, "error", f"describe SQS queue: {exc}")
-        visible = int(attrs.get("ApproximateNumberOfMessages", 0) or 0)
-        in_flight = int(attrs.get("ApproximateNumberOfMessagesNotVisible", 0) or 0)
+        except QueueNotFoundError:
+            return ServiceStatus(handle.handle, "deprovisioned", f"queue {queue_name} does not exist")
+        except ManagedServiceError as exc:
+            return ServiceStatus(handle.handle, "error", str(exc))
+        counts = [attrs.get("ApproximateNumberOfMessages"), attrs.get("ApproximateNumberOfMessagesNotVisible")]
+        if any(not isinstance(value, str) or not value.isascii() or not value.isdigit() for value in counts):
+            return ServiceStatus(handle.handle, "error", "SQS message inventory is unavailable")
+        visible, in_flight = (int(value) for value in counts)
         mode = "FIFO" if attrs.get("FifoQueue") == "true" else "standard"
         return ServiceStatus(
             handle=handle.handle,
@@ -329,29 +345,12 @@ class SQSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="queue_sqs")
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
-        _, queue_name = parse_handle(handle.handle)
+        queue_name = self._recorded_queue_name(handle.handle)
         cfg = config or {}
         try:
-            queue_url = self._queue_url(queue_name=queue_name)
-            tags = self._sqs.list_queue_tags(QueueUrl=queue_url).get("Tags", {})
-            refusal = live_ownership_refusal(
-                tags, managed_service_id=handle.managed_service_id, resource=f"queue {queue_name}"
-            )
-            if refusal:
-                raise ManagedServiceError(refusal)
-            response = self._sqs.get_queue_attributes(
-                QueueUrl=queue_url,
-                AttributeNames=["QueueArn", "KmsMasterKeyId"],
-            )
-            queue_arn = response["Attributes"]["QueueArn"]
-            assert_resource_arn(
-                queue_arn,
-                service="sqs",
-                region=self._config.region,
-                account=self._config.account_id,
-                resource=queue_name,
-            )
-            kms_key = str(response["Attributes"].get("KmsMasterKeyId") or "")
+            queue_url, attrs = self._live_queue(queue_name, handle.managed_service_id, attributes=["KmsMasterKeyId"])
+            queue_arn = attrs["QueueArn"]
+            kms_key = str(attrs.get("KmsMasterKeyId") or "")
         except Exception as exc:
             raise ManagedServiceError(
                 f"cannot bind SQS queue {queue_name}: {exc}",
@@ -638,16 +637,66 @@ class SQSDriver(ManagedServiceDriver):
             clean = clean.replace("--", "-")
         return clean.strip("-")[:75]  # leaves room for .fifo suffix
 
+    @staticmethod
+    def _recorded_queue_name(handle: str) -> str:
+        kind, name = parse_handle(handle)
+        base = name[:-5] if name.endswith(".fifo") else name
+        if (
+            kind != KIND
+            or not base
+            or len(name) > 80
+            or any(not c.isascii() or not (c.isalnum() or c in "-_") for c in base)
+        ):
+            raise LiveOwnershipError("recorded SQS target is invalid", code="ownership_refused")
+        return name
+
+    def _live_queue(
+        self, queue_name: str, managed_service_id: str, *, attributes: list[str] | None = None
+    ) -> tuple[str, dict[str, str]]:
+        queue_url = self._queue_url(queue_name=queue_name)
+        try:
+            tags = self._sqs.list_queue_tags(QueueUrl=queue_url).get("Tags")
+        except Exception:
+            raise LiveOwnershipError("SQS live ownership tags could not be verified") from None
+        if not isinstance(tags, dict) or len(tags) > 50:
+            raise LiveOwnershipError("SQS live ownership tag inventory is unavailable")
+        refusal = live_ownership_refusal(tags, managed_service_id=managed_service_id, resource="SQS queue")
+        if refusal:
+            raise LiveOwnershipError(refusal, code="ownership_refused")
+        try:
+            attrs = self._sqs.get_queue_attributes(
+                QueueUrl=queue_url, AttributeNames=list(dict.fromkeys(["QueueArn", *(attributes or [])]))
+            )["Attributes"]
+        except Exception:
+            raise LiveOwnershipError("SQS live resource identity could not be verified") from None
+        if not isinstance(attrs, dict):
+            raise LiveOwnershipError("SQS live resource identity is unavailable")
+        try:
+            assert_resource_arn(
+                attrs.get("QueueArn"),
+                service="sqs",
+                region=self._config.region,
+                account=self._config.account_id,
+                resource=queue_name,
+            )
+        except ManagedServiceError:
+            raise LiveOwnershipError(
+                "SQS live resource does not match the recorded target", code="ownership_refused"
+            ) from None
+        return queue_url, attrs
+
     def _queue_url(self, *, queue_name: str) -> str:
         try:
             response = self._sqs.get_queue_url(QueueName=queue_name)
-        except self._sqs.exceptions.QueueDoesNotExist as exc:
-            raise ManagedServiceError(
-                f"queue {queue_name} does not exist",
-            ) from exc
         except Exception as exc:
-            raise map_client_error(exc) from exc
-        return response["QueueUrl"]
+            code = getattr(exc, "response", {}).get("Error", {}).get("Code")
+            if code in {"AWS.SimpleQueueService.NonExistentQueue", "QueueDoesNotExist", "NonExistentQueue"}:
+                raise QueueNotFoundError("SQS queue does not exist") from None
+            raise LiveOwnershipError("SQS live queue lookup could not be verified") from None
+        url = response.get("QueueUrl") if isinstance(response, dict) else None
+        if not isinstance(url, str) or not url:
+            raise LiveOwnershipError("SQS live queue identity is unavailable")
+        return url
 
 
 def _json_document(value: Any, *, field: str) -> str:

@@ -62,6 +62,12 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- SQS and DynamoDB updates, teardown and readiness verify live source identity
+  and exact recorded target before actions. DynamoDB snapshots also verify the
+  source and returned backup identity. Unknown tags/metadata and permission
+  errors cannot masquerade as absent resources; force flags cannot bypass
+  ownership. Queue snapshots remain unsupported (#2098).
+
 - Explicit provider ownership refusal or unavailable ownership proof never
   becomes successful cleanup because a resource name/diagnostic contains a
   not-found marker. Genuine missing-resource teardown still converges (#2098).

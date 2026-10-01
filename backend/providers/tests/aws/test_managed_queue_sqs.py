@@ -220,7 +220,7 @@ def test_binding_lookup_failure_is_not_replaced_with_fabricated_credentials(driv
 
 def test_update_changes_visibility(driver: SQSDriver, sqs_client) -> None:
     result = driver.provision(_spec(size="small"))
-    update = driver.update(UpdateSpec(handle=result.handle, size="large"))
+    update = driver.update(UpdateSpec(handle=result.handle, managed_service_id=MSID, size="large"))
     assert update.ok is True
 
     _, queue_name = parse_handle(result.handle)
@@ -238,6 +238,7 @@ def test_update_accepts_documented_snake_case_attribute_names(driver: SQSDriver,
     update = driver.update(
         UpdateSpec(
             handle=result.handle,
+            managed_service_id=MSID,
             config={
                 "visibility_timeout_seconds": 121,
                 "receive_message_wait_time_seconds": 20,
@@ -258,7 +259,7 @@ def test_update_accepts_documented_snake_case_attribute_names(driver: SQSDriver,
 
 def test_update_no_op_when_no_changes(driver: SQSDriver) -> None:
     result = driver.provision(_spec())
-    update = driver.update(UpdateSpec(handle=result.handle))
+    update = driver.update(UpdateSpec(handle=result.handle, managed_service_id=MSID))
     assert update.ok is True
 
 
@@ -276,7 +277,7 @@ def test_deprovision_deletes_queue(driver: SQSDriver, sqs_client) -> None:
     result = driver.provision(_spec())
     _, queue_name = parse_handle(result.handle)
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle),
+        DeprovisionSpec(handle=result.handle, managed_service_id=MSID),
         delete_data=True,
     )
     assert deprov.ok is True
@@ -299,8 +300,8 @@ def test_safe_deprovision_refuses_to_discard_messages(driver: SQSDriver, sqs_cli
     queue_url = sqs_client.get_queue_url(QueueName=queue_name)["QueueUrl"]
     sqs_client.send_message(QueueUrl=queue_url, MessageBody="important")
 
-    safe = driver.deprovision(DeprovisionSpec(result.handle))
-    destructive = driver.deprovision(DeprovisionSpec(result.handle), delete_data=True)
+    safe = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=MSID))
+    destructive = driver.deprovision(DeprovisionSpec(result.handle, managed_service_id=MSID), delete_data=True)
 
     assert not safe.ok and not safe.retryable
     assert "drain it" in safe.message
@@ -309,7 +310,7 @@ def test_safe_deprovision_refuses_to_discard_messages(driver: SQSDriver, sqs_cli
 
 def test_deletion_protection_requires_force_destroy(driver: SQSDriver) -> None:
     result = driver.provision(_spec())
-    spec = DeprovisionSpec(result.handle, config={"deletion_protection": True})
+    spec = DeprovisionSpec(result.handle, managed_service_id=MSID, config={"deletion_protection": True})
 
     protected = driver.deprovision(spec, delete_data=True)
     forced = driver.deprovision(spec, delete_data=True, force_destroy=True)
