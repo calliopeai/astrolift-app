@@ -27,7 +27,7 @@ from _sdk.managed_service import (
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
 from gcp._service_accounts import unlisted_service_account
-from gcp.managed._ownership import label_adoption_refusal
+from gcp.managed._ownership import is_platform_label_key, label_identity_refusal, reserved_label_keys
 
 KIND = "topic"
 _MUTABLE_TOPIC_FIELDS = {
@@ -102,7 +102,12 @@ class PubSubTopicDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_pubsub_topic_config"])
-        topic_id = self._topic_id(spec)
+        if not spec.managed_service_id:
+            return ProvisionResult(False, "", "managed-service id is required", ["missing_service_identity"])
+        try:
+            topic_id = _parse_handle(spec.recorded_handle) if spec.recorded_handle else self._topic_id(spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_recorded_handle"])
         topic_path = self._topic_path(topic_id)
         topic = self._topic_document(
             topic_path=topic_path,
@@ -111,19 +116,27 @@ class PubSubTopicDriver(ManagedServiceDriver):
         )
         try:
             try:
-                self._pub.create_topic(request=topic)
-            except Exception as exc:
-                if not _already_exists(exc):
-                    raise
-                # Reconciling relabels the topic as this service's: only
-                # adopt one that already is (#1961).
                 existing = self._topic(topic_path)
-                labels = existing.get("labels") if isinstance(existing, dict) else getattr(existing, "labels", None)
-                refusal = label_adoption_refusal(dict(labels or {}), spec, resource=f"Pub/Sub topic {topic_id}")
-                if refusal is not None:
-                    return ProvisionResult(False, "", refusal, [refusal])
+            except Exception as exc:
+                if not _not_found(exc):
+                    raise
+                existing = None
+            if existing is not None:
+                self._assert_topic_owned(
+                    existing,
+                    spec.managed_service_id,
+                    spec.recorded_handle_exclusive and spec.recorded_handle == f"{KIND}/{topic_id}",
+                )
+            self._preflight_subscriptions(topic_id, cfg, spec.managed_service_id)
+            if existing is None:
+                try:
+                    self._pub.create_topic(request=topic)
+                except Exception as exc:
+                    if not _already_exists(exc):
+                        raise
+                    self._assert_topic_owned(self._topic(topic_path), spec.managed_service_id, False)
             self._reconcile_topic(topic_path, cfg, labels=_labels_for(spec, cfg))
-            self._reconcile_subscriptions(topic_id, cfg)
+            self._reconcile_subscriptions(topic_id, cfg, spec.managed_service_id)
         except Exception as exc:
             return ProvisionResult(
                 False,
@@ -150,9 +163,20 @@ class PubSubTopicDriver(ManagedServiceDriver):
             return UpdateResult(False, spec.handle, error, ["invalid_pubsub_topic_config"])
         topic_path = self._topic_path(topic_id)
         try:
-            self._topic(topic_path)
-            self._reconcile_topic(topic_path, cfg, labels=None)
-            self._reconcile_subscriptions(topic_id, cfg)
+            current = self._topic(topic_path)
+            self._assert_topic_owned(current, spec.managed_service_id, spec.recorded_handle_exclusive)
+            self._preflight_subscriptions(topic_id, cfg, spec.managed_service_id)
+            labels = None
+            if "labels" in cfg:
+                # A label update replaces the map; retain platform identity.
+                labels = {
+                    key: value
+                    for key, value in dict(_get(current, "labels", {}) or {}).items()
+                    if is_platform_label_key(key)
+                }
+                labels.update({_label(key): _label(value) for key, value in cfg["labels"].items()})
+            self._reconcile_topic(topic_path, cfg, labels=labels)
+            self._reconcile_subscriptions(topic_id, cfg, spec.managed_service_id)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, f"Pub/Sub topic {topic_id} not found", ["not_found"])
@@ -177,8 +201,12 @@ class PubSubTopicDriver(ManagedServiceDriver):
         except ValueError as exc:
             return DeprovisionResult(False, spec.handle, str(exc), ["invalid_handle"], retryable=False)
         topic_path = self._topic_path(topic_id)
+        error = self._validate_config(dict(spec.config or {}))
+        if error:
+            return DeprovisionResult(False, spec.handle, error, ["invalid_pubsub_topic_config"], retryable=False)
         try:
             topic = self._topic(topic_path)
+            self._assert_topic_owned(topic, spec.managed_service_id, spec.recorded_handle_exclusive)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, f"Pub/Sub topic {topic_id} already gone")
@@ -217,6 +245,12 @@ class PubSubTopicDriver(ManagedServiceDriver):
                     ["foreign_subscriptions_require_force_destroy"],
                     retryable=False,
                 )
+        try:
+            for path in subscriptions:
+                current = self._sub.get_subscription(request={"subscription": path})
+                self._assert_subscription_owned(current, topic_path, spec.managed_service_id)
+        except Exception as exc:
+            return _deprovision_error(spec.handle, "check Pub/Sub subscription ownership", exc)
         for path in subscriptions:
             try:
                 self._sub.delete_subscription(request={"subscription": path})
@@ -287,8 +321,12 @@ class PubSubTopicDriver(ManagedServiceDriver):
     ) -> Binding:
         topic_id = _parse_handle(handle.handle)
         topic_path = self._topic_path(topic_id)
-        self._topic(topic_path)
+        current = self._topic(topic_path)
+        self._assert_topic_owned(current, handle.managed_service_id, handle.recorded_handle_exclusive)
         cfg = dict(config or {})
+        error = self._validate_config(cfg)
+        if error:
+            raise PubSubTopicError(error)
         access_mode = str(cfg.get("access_mode") or "publish")
         subscription_paths = [
             self._subscription_path(topic_id, str(item["name"]))
@@ -297,6 +335,9 @@ class PubSubTopicDriver(ManagedServiceDriver):
         ]
         if access_mode in {"subscribe", "publish_subscribe"} and not subscription_paths:
             raise PubSubTopicError(f"Pub/Sub {access_mode} binding requires at least one declared subscription")
+        for path in subscription_paths:
+            current = self._sub.get_subscription(request={"subscription": path})
+            self._assert_subscription_owned(current, topic_path, handle.managed_service_id)
         env_vars = {
             "TOPIC_ARN_OR_ID": ValueRef(literal=topic_path),
             "TOPIC_NAME": ValueRef(literal=topic_id),
@@ -724,7 +765,53 @@ class PubSubTopicDriver(ManagedServiceDriver):
         rows = self._pub.list_topic_subscriptions(request={"topic": topic_path})
         return sorted(str(_get(item, "name", item)) for item in rows)
 
-    def _reconcile_subscriptions(self, topic_id: str, cfg: dict[str, Any]) -> None:
+    def _assert_topic_owned(self, topic: Any, managed_service_id: str, record_proves: bool) -> None:
+        refusal = label_identity_refusal(
+            dict(_get(topic, "labels", {}) or {}),
+            managed_service_id,
+            record_proves=record_proves,
+            resource="Pub/Sub topic",
+        )
+        if refusal:
+            raise PubSubTopicError(refusal)
+
+    def _assert_subscription_owned(self, subscription: Any, topic_path: str, managed_service_id: str) -> None:
+        if str(_get(subscription, "topic", "")) != topic_path:
+            raise PubSubTopicError("Pub/Sub subscription belongs to another topic")
+        # Old children had no id label. Their immutable topic reference proves
+        # membership only after the parent's actual owner has been checked.
+        refusal = label_identity_refusal(
+            dict(_get(subscription, "labels", {}) or {}),
+            managed_service_id,
+            record_proves=True,
+            resource="Pub/Sub subscription",
+        )
+        if refusal:
+            raise PubSubTopicError(refusal)
+
+    def _preflight_subscriptions(self, topic_id: str, cfg: dict[str, Any], managed_service_id: str) -> None:
+        if "subscriptions" not in cfg:
+            return
+        topic_path = self._topic_path(topic_id)
+        paths = {self._subscription_path(topic_id, str(item["name"])) for item in cfg.get("subscriptions") or []}
+        if cfg.get("prune_subscriptions"):
+            try:
+                attached = self._subscription_paths(topic_path)
+            except Exception as exc:
+                if not _not_found(exc):
+                    raise
+                attached = []
+            paths.update(path for path in attached if self._owns_subscription(topic_id, path))
+        for path in sorted(paths):
+            try:
+                current = self._sub.get_subscription(request={"subscription": path})
+            except Exception as exc:
+                if _not_found(exc):
+                    continue
+                raise
+            self._assert_subscription_owned(current, topic_path, managed_service_id)
+
+    def _reconcile_subscriptions(self, topic_id: str, cfg: dict[str, Any], managed_service_id: str) -> None:
         if "subscriptions" not in cfg:
             return
         topic_path = self._topic_path(topic_id)
@@ -734,6 +821,10 @@ class PubSubTopicDriver(ManagedServiceDriver):
             path = self._subscription_path(topic_id, str(declaration["name"]))
             wanted.add(path)
             document = self._subscription_document(path, topic_path, declaration)
+            document["labels"] = {
+                **dict(document.get("labels") or {}),
+                MANAGED_SERVICE_ID_LABEL: managed_service_id,
+            }
             try:
                 current = self._sub.get_subscription(request={"subscription": path})
             except Exception as exc:
@@ -747,6 +838,7 @@ class PubSubTopicDriver(ManagedServiceDriver):
                     current = self._sub.get_subscription(request={"subscription": path})
                 else:
                     continue
+            self._assert_subscription_owned(current, topic_path, managed_service_id)
             for field in _IMMUTABLE_SUBSCRIPTION_FIELDS.intersection(declaration):
                 if _normalized(_get(current, field, None)) != _normalized(document.get(field)):
                     raise PubSubTopicError(
@@ -767,6 +859,8 @@ class PubSubTopicDriver(ManagedServiceDriver):
             for path in self._subscription_paths(topic_path):
                 if path not in wanted and self._owns_subscription(topic_id, path):
                     try:
+                        current = self._sub.get_subscription(request={"subscription": path})
+                        self._assert_subscription_owned(current, topic_path, managed_service_id)
                         self._sub.delete_subscription(request={"subscription": path})
                     except Exception as exc:
                         if not _not_found(exc):
@@ -790,6 +884,25 @@ class PubSubTopicDriver(ManagedServiceDriver):
 
     def _validate_config(self, cfg: dict[str, Any], *, partial: bool = False) -> str | None:
         del partial
+        subscriptions = cfg.get("subscriptions")
+        if subscriptions is not None and not isinstance(subscriptions, list):
+            return "subscriptions must be an array"
+        for path, labels in [
+            ("labels", cfg.get("labels")),
+            *[
+                (f"subscriptions[{index}].labels", item.get("labels"))
+                for index, item in enumerate(subscriptions or [])
+                if isinstance(item, dict)
+            ],
+        ]:
+            if labels is not None:
+                if not isinstance(labels, dict) or not all(
+                    isinstance(key, str) and isinstance(value, str) for key, value in labels.items()
+                ):
+                    return f"{path} must be a string-to-string object"
+                reserved = reserved_label_keys(labels)
+                if reserved:
+                    return f"{path} cannot override Astrolift ownership labels: {', '.join(reserved)}"
         for path, value in _service_account_fields(cfg):
             account = unlisted_service_account(value, self._config.allowed_service_accounts)
             if account:

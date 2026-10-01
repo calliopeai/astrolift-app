@@ -878,7 +878,16 @@ def test_a_service_named_before_2086_keeps_its_recorded_endpoint(
 
 
 @pytest.mark.parametrize(
-    "key", [MANAGED_SERVICE_ID_LABEL, "astrolift-managed-service-id", "astrolift-io-managed-service-id"]
+    "key",
+    [
+        MANAGED_SERVICE_ID_LABEL,
+        "astrolift-managed-service-id",
+        "astrolift-io-managed-service-id",
+        "astrolift__managed_service_id",
+        "astrolift-new-platform-field",
+        "x-astrolift-service",
+        "Astrolift.IO/Managed_Service_ID",
+    ],
 )
 def test_tenant_labels_cannot_plant_a_managed_service_id(
     driver: PrivateServiceConnectDriver,

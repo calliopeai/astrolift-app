@@ -72,3 +72,28 @@ export function narrowTokens(
     return true;
   });
 }
+
+/** Presentation only; the server query and client-narrowing contract stay unchanged. */
+export function localizedTokensList(
+  t: (key: string, values?: Record<string, number>) => string
+): ListDefinition {
+  return {
+    ...TOKENS_LIST,
+    searchPlaceholder: t("searchPlaceholder"),
+    fields: TOKENS_LIST.fields.map((field) => ({
+      ...field,
+      label: t(field.key),
+      options: field.options?.map((option) => ({ ...option, label: t(option.value) })),
+    })),
+    views: TOKENS_LIST.views.map((view) => ({
+      ...view,
+      label: ["all", "mine", "active", "revoked"].includes(view.key) ? t(view.key) : view.label,
+      note:
+        view.key === "mine"
+          ? t("mineNote", { count: NARROW_LIMIT })
+          : ["active", "revoked"].includes(view.key)
+            ? t("narrowedNote", { count: NARROW_LIMIT })
+            : view.note,
+    })),
+  };
+}

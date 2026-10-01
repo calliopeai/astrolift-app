@@ -2,6 +2,7 @@
 
 import { ClockIcon, RefreshCwIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
+import { useFormatter, useNow, useTranslations } from "next-intl";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -23,13 +24,12 @@ function reviewHref(gate: PendingHumanGate): string {
 /** Org-wide pending human gates (#1820); each row links to its run's observe page. */
 export function PendingGatesScreen({ gates, loading, error, onRefresh }: PendingGatesScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("approvals.pendingGates");
+  const now = useNow();
 
   if (loading && gates.length === 0) {
     return (
-      <PageShell
-        title="Pending Gates"
-        description="Human gates across the organization waiting on a decision."
-      >
+      <PageShell title={t("title")} description={t("loadingDescription")}>
         <Skeleton className="h-24 w-full" />
       </PageShell>
     );
@@ -37,10 +37,7 @@ export function PendingGatesScreen({ gates, loading, error, onRefresh }: Pending
 
   if (error) {
     return (
-      <PageShell
-        title="Pending Gates"
-        description="Human gates across the organization waiting on a decision."
-      >
+      <PageShell title={t("title")} description={t("loadingDescription")}>
         <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-3 text-sm">
           {error}
         </div>
@@ -50,30 +47,25 @@ export function PendingGatesScreen({ gates, loading, error, onRefresh }: Pending
 
   return (
     <PageShell
-      title="Pending Gates"
-      description="Every open human_gate stage across the organization's workflow runs that you may decide, newest first."
+      title={t("title")}
+      description={t("description")}
       actions={
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onRefresh}
-          aria-label="Refresh pending gates"
-        >
+        <Button variant="outline" size="icon" onClick={onRefresh} aria-label={t("refresh")}>
           <RefreshCwIcon className="size-4" />
         </Button>
       }
     >
       {gates.length === 0 ? (
         <EmptyState
-          title="No pending gates"
-          description="Nothing is waiting on your review right now."
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
           icon={<ShieldCheckIcon className="size-6" aria-hidden />}
         />
       ) : (
         <ul className="flex flex-col gap-2">
           {gates.map((gate) => (
             <li key={gate.executionId + gate.runGuid}>
-              <GateRow gate={gate} formatRelative={fmt.formatRelativeTime} />
+              <GateRow gate={gate} formatRelative={(date) => fmt.formatRelativeTime(date, now)} />
             </li>
           ))}
         </ul>
@@ -89,6 +81,8 @@ function GateRow({
   gate: PendingHumanGate;
   formatRelative: (d: Date | string, now?: Date) => string;
 }) {
+  const t = useTranslations("approvals.pendingGates");
+  const fmt = useFormatter();
   return (
     <div className="bg-background flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -108,18 +102,20 @@ function GateRow({
             {gate.startedAt && (
               <span className="inline-flex items-center gap-1">
                 <ClockIcon className="size-3" aria-hidden />
-                Waiting since {formatRelative(gate.startedAt)}
+                {t("waitingSince", { time: formatRelative(gate.startedAt) })}
               </span>
             )}
             {gate.stageApprovers.length > 0 && (
-              <span>Approvers: {gate.stageApprovers.join(", ")}</span>
+              <span>
+                {t("approvers", { names: fmt.list(gate.stageApprovers, { type: "conjunction" }) })}
+              </span>
             )}
           </div>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Button asChild size="sm" variant="outline" className="min-h-11 w-full sm:w-auto">
-          <Link href={reviewHref(gate)}>Review</Link>
+          <Link href={reviewHref(gate)}>{t("review")}</Link>
         </Button>
       </div>
     </div>

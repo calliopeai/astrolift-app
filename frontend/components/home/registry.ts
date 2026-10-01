@@ -317,6 +317,25 @@ export function isHomeLayoutKey(value: unknown): value is HomeLayoutKey {
   return typeof value === "string" && (HOME_LAYOUT_KEYS as readonly string[]).includes(value);
 }
 
+export function homePanelTitle(panel: HomePanelDef, t: (key: string) => string): string {
+  return panel.title === HOME_PANELS[panel.key].title ? t(`panels.${panel.key}`) : panel.title;
+}
+
+export function localizedHomeLayout(
+  layout: HomeLayoutDef,
+  t: (key: string) => string
+): HomeLayoutDef {
+  const original = HOME_LAYOUTS[layout.key];
+  return {
+    ...layout,
+    title: layout.title === original.title ? t(`layouts.${layout.key}.title`) : layout.title,
+    description:
+      layout.description === original.description
+        ? t(`layouts.${layout.key}.description`)
+        : layout.description,
+  };
+}
+
 function moduleMatches(modules: ReadonlySet<ModuleKey>, check: ModuleCheck): boolean {
   if (typeof check === "string") return modules.has(check);
   if ("anyOf" in check) return check.anyOf.some((m) => modules.has(m));

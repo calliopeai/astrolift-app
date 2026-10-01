@@ -24,6 +24,17 @@ export const TEAMS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+export function localizedTeamsList(t: (key: string) => string): ListDefinition {
+  return {
+    ...TEAMS_LIST,
+    searchPlaceholder: t("list.search"),
+    views: TEAMS_LIST.views.map((view) => ({
+      ...view,
+      label: view.key === "all" || view.key === "mine" ? t(`list.${view.key}`) : view.label,
+    })),
+  };
+}
+
 export interface TeamsListFilter {
   mine?: boolean;
 }

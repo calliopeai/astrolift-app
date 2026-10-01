@@ -158,3 +158,92 @@ When standing up a new tenant cluster:
 - Audit logging — k8s audit log + cloud audit log
   (CloudTrail / Cloud Audit Logs / Activity Log) configuration is
   cluster install scope, not per-deploy.
+
+
+## Ownership labels and tenant custom metadata (#2098)
+
+Managed-service IDs come from the lifecycle's persisted service GUID, never
+from a tenant label or a live resource's claimed owner. Eventarc, Managed Kafka,
+Pub/Sub and PSC reject the entire normalized Astrolift label namespace in
+service config, including dot, slash, underscore, hyphen, case and legacy
+`x-astrolift` spellings. Pub/Sub also validates subscription labels. Refusal
+happens before resource writes. Updates retain the platform ownership envelope;
+Pub/Sub verifies the live topic ID and the actual subscription topic reference
+before reconciliation, prune, teardown or returning a binding. A conflicting
+child ID is refused even when its topic or name matches. Legacy unlabelled
+children may be reconciled only under their verified, immutable parent topic.
+
+Unlabelled legacy topics require the internal exclusive recorded-handle proof;
+a conflicting ID always refuses that proof. Reprovision retains the recorded
+physical topic name. Missing source IDs fail closed on mutating/binding paths.
+
+The AWS/Azure audit covers every tenant custom-tag serializer in the managed
+provider trees: AWS `_base.tags_for` prefixes keys with `astrolift.io/extra/`;
+Azure ARM and Files emit `astrolift-extra-<name>-<digest>`; classic Files uses
+that same serializer; legacy Blob metadata uses `astrolift_io_extra_`. These
+keys cannot overwrite platform IDs, binding IDs or parent identity tags.
+Event Grid's separate subscription-label list explicitly rejects its exact
+`astrolift-managed` ownership sentinel and retains the checked parent topic
+scope. Recording-client regressions exercise hostile custom keys and existing
+Azure cross-driver foreign-owner refusals; they do not certify live cloud IAM.
+
+
+### AWS live binding and S3 incarnation checks (#2098)
+
+S3, SQS and DynamoDB bindings require the actual live resource's platform marker
+and exact persisted managed-service ID before returning environment values,
+mounts or IAM grants. An old handle, matching human slugs, a tenant config flag
+or unreadable/unmarked tags cannot authorize a new incarnation. Direct SDK
+callers must supply the source ID on `ServiceHandle`; source lifecycle activities
+already derive it exclusively from the saved service UUID.
+
+The S3 binding-only mount update and all retained/destructive teardown choices
+also check live identity before accepting the operation. `force_destroy` does
+not bypass ownership, and missing buckets still converge without a write. These
+are checks before actions, not atomic cloud compare-and-delete operations;
+independent writers with cloud administration rights must not retag/recreate
+resources during platform operations.
+
+The operator identity must be able to read the protected tags with
+[`s3:GetBucketTagging`](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketTagging.html),
+[`sqs:ListQueueTags`](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ListQueueTags.html)
+and
+[`dynamodb:ListTagsOfResource`](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_ListTagsOfResource.html).
+These reads do not add tag access to the application's returned grants.
+DynamoDB collects complete tag pagination, bounded to ten pages/1,000 tags,
+and refuses malformed, repeated or unfinished pages. SQS/DynamoDB bindings also
+verify returned resource ARN/name/region identity; missing DynamoDB ARN never
+becomes an invented `UNKNOWN` grant.
+
+This bounded change does not establish ownership protection for every AWS
+lifecycle operation. SQS/DynamoDB update/teardown, provider status/snapshot
+paths and provisioning name races/legacy adoption remain separately tracked
+acceptance work. Workload tag-mutation authority is addressed below.
+
+
+### SQS workload management excludes ownership and policy administration
+
+The SQS `manage` binding mode grants publish/consume operations, queue reads and
+`PurgeQueue` on the verified queue only. It does not grant `TagQueue`,
+`UntagQueue`, `SetQueueAttributes`, `AddPermission` or `RemovePermission`.
+This removes the previous workload `TagQueue`/`SetQueueAttributes` authority:
+applications cannot use the issued grant to replace/remove platform identity
+or edit the queue resource policy to grant that authority. Other modes retain
+their existing message-operation scope.
+
+AWS supports tag-key conditions for tag actions in its
+[SQS authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_sqs.html),
+but the current provider SDK `Grant` contract contains only resource/actions;
+the workload compiler renders unconditional `Allow` statements. It cannot
+express a safe custom-tag-only grant, so all workload tag mutation is omitted.
+Unrestricted
+[`SetQueueAttributes`](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SetQueueAttributes.html)
+also accepts the queue's `Policy` attribute; retaining that permission would
+leave a permission-escalation path around simple tag-action omission.
+
+Queue attributes, custom tags and policy changes must instead use platform
+lifecycle administration. This change preserves those driver APIs; their
+broader live-ownership acceptance audit remains open. Reconcile existing app
+workload identities to replace their previous inline grant policies. These
+checks cover the platform-issued policy, not separate administrator-supplied
+IAM/resource policies that already confer additional privileges.

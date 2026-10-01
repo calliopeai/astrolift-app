@@ -3639,7 +3639,141 @@
     "sourceTooltipAria": "通过 {scope} 授予",
     "sourceColumn": "来源",
     "grantRoleRowLabel": "为 {name} 授予角色",
-    "grantRoleRowTooltip": "为 {name} 授予角色"
+    "grantRoleRowTooltip": "为 {name} 授予角色",
+    "people": {
+      "title": "人员",
+      "description": "有权访问此组织的用户和身份提供方群组。",
+      "columns": {
+        "who": "用户或群组",
+        "roles": "角色",
+        "teams": "团队",
+        "status": "状态",
+        "joined": "加入时间"
+      },
+      "actions": {
+        "viewAccess": "查看访问权限",
+        "resend": "重新发送邀请",
+        "revoke": "撤销",
+        "deleteResolved": "删除此已处理的邀请",
+        "grantTo": "向 {name} 授予访问权限",
+        "alreadyAnonymized": "已匿名化",
+        "anonymize": "匿名化用户数据",
+        "invite": "邀请",
+        "grant": "授予访问权限"
+      },
+      "emptyTitle": "暂无人员",
+      "emptyDescription": "邀请用户加入组织，然后授予角色。",
+      "confirm": {
+        "resend": {
+          "title": "重新向 {email} 发送邀请？",
+          "description": "生成新的单次使用链接并尝试发送邮件。旧链接立即失效。若发送失败，请复制新链接。",
+          "label": "重新发送邀请"
+        },
+        "revoke": {
+          "title": "撤销 {email} 的邀请？",
+          "description": "待处理的邀请链接立即失效。必要时可以发送新邀请。",
+          "label": "撤销"
+        },
+        "delete": {
+          "title": "删除 {email} 已处理的邀请？",
+          "description": "从列表中删除此已处理的邀请。成员资格和角色保持不变。",
+          "label": "删除"
+        }
+      },
+      "export": {
+        "actions": "更多列表操作",
+        "working": "正在导出 CSV…",
+        "label": "将 {count, number} 项导出为 CSV"
+      },
+      "grants": "{count, plural, one {# 项授权} other {# 项授权}}",
+      "mappings": "，{count, plural, one {# 项映射} other {# 项映射}}",
+      "idpGroup": "身份提供方群组",
+      "admin": "管理员",
+      "invitationStatus": {
+        "pending": "待处理",
+        "accepted": "已接受",
+        "expired": "已过期",
+        "revoked": "已撤销"
+      },
+      "lifecycle": {
+        "active": "活跃",
+        "invited": "已邀请",
+        "pending_invite": "待邀请",
+        "pending_first_login": "待首次登录",
+        "suspended": "已暂停",
+        "deactivated": "已停用",
+        "anonymized": "已匿名化"
+      },
+      "filters": {
+        "kind": "类型",
+        "role": "角色",
+        "team": "团队",
+        "lifecycle": "生命周期",
+        "active": "最近活动",
+        "status": "邀请状态"
+      },
+      "options": {
+        "kind": {
+          "user": "用户",
+          "group": "群组",
+          "invitation": "邀请"
+        },
+        "active": {
+          "7d": "最近 7 天内",
+          "30d": "最近 30 天内",
+          "90d": "最近 90 天内",
+          "stale": "90 天内无活动",
+          "never": "从未活动"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "与我相关",
+        "invited": "已邀请",
+        "groups": "群组",
+        "admins": "管理员"
+      },
+      "notes": {
+        "mine": "与你同属一个团队的人员。",
+        "invited": "待处理的邀请。使用状态筛选器查看已接受、已过期或已撤销的邀请。",
+        "groups": "从登录、授权和映射中已知的身份提供方群组。群组访问权限适用于身份提供方分配的所有用户。"
+      },
+      "searchPlaceholder": "搜索人员、邮箱、群组…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "导出未返回文件",
+      "noGroups": "导出未返回群组",
+      "groupsChanged": "导出期间群组列表发生变化，请重试",
+      "exportFailed": "导出失败",
+      "refreshWarning": "更改已保存，但列表刷新失败。请刷新视图，不要重复已成功的操作。",
+      "revoked": "邀请已撤销",
+      "revokeFailed": "撤销失败",
+      "resendFailed": "重新发送失败",
+      "resent": "已重新向 {email} 发送邀请",
+      "resendDescription": "旧链接已失效。请复制新链接作为备用发送方式。",
+      "copyLink": "复制链接",
+      "linkCopied": "接受邀请链接已复制",
+      "copyFailed": "复制失败",
+      "deleted": "邀请已删除",
+      "deleteFailed": "删除失败",
+      "anonymizeFailed": "匿名化失败",
+      "anonymized": "用户数据已匿名化。"
+    },
+    "anonymization": {
+      "title": "匿名化 {name}？",
+      "changes": "将更改的内容",
+      "identity": "账户姓名和邮箱将替换为匿名身份信息。",
+      "profile": "个人资料字段、电话、头像、地址和签名将清除或替换。",
+      "account": "登录将禁用，认证群组成员关系将清除。",
+      "memberships": "平台中的成员资格将停用。",
+      "preserves": "将保留的内容",
+      "records": "账户记录以及历史操作中的关联将保留。",
+      "history": "此操作不会清除历史审计内容，也不会删除已存储的角色绑定记录。",
+      "irreversible": "此操作不可撤销，原始个人数据无法恢复。对已匿名化的账户重复执行不会产生进一步更改。",
+      "acknowledge": "我理解此操作不可撤销。",
+      "working": "正在匿名化…",
+      "confirm": "匿名化用户数据"
+    }
   },
   "stepUp": {
     "title": "确认身份",
@@ -3720,6 +3854,17 @@
         "empty": "暂无审批记录。",
         "unknownApprover": "未知"
       }
+    },
+    "pendingGates": {
+      "title": "待审批",
+      "loadingDescription": "组织内等待人工决定的审核。",
+      "description": "按最新优先显示您有权决定的组织工作流审核。",
+      "refresh": "刷新待审批项",
+      "emptyTitle": "没有待审批项",
+      "emptyDescription": "当前没有等待您审核的事项。",
+      "waitingSince": "开始等待：{time}",
+      "approvers": "审批人：{names}",
+      "review": "审核"
     }
   },
   "projectResources": {
@@ -4262,6 +4407,117 @@
           "freshness": "用户在 {minutes, plural, other {# 分钟内}}登录",
           "custom": "自定义条件 <kind>{name}</kind>"
         }
+      },
+      "grant": {
+        "title": "授予访问权限",
+        "admin": "管理",
+        "access": "访问权限",
+        "people": "人员",
+        "steps": "步骤",
+        "step": {
+          "who": "对象",
+          "role": "角色",
+          "scope": "范围",
+          "expiry": "到期",
+          "review": "审核"
+        },
+        "pickPrincipal": "请至少选择一个人员、组或团队。",
+        "pickRole": "请选择角色。",
+        "pickScope": "请选择角色的应用范围。",
+        "pickDate": "请选择日期。",
+        "previewFailed": "无法预览授权",
+        "noGrants": "未创建任何授权。请检查所选对象后再重试。",
+        "grantFailed": "授权失败",
+        "whereHeading": "应用于哪里？",
+        "scopeHelp": "授权覆盖范围内的所有内容：团队授权包含其项目和应用。",
+        "expiryHeading": "何时结束？",
+        "never": "永不过期",
+        "days": "{count, plural, one {#天} other {#天}}",
+        "onDate": "指定日期",
+        "expiryDate": "到期日期",
+        "expiryUnsupported": "此处无法限制授权期限；授权将持续到被移除为止。",
+        "expiryHelp": "授权届时会自动结束，也可以提前移除。",
+        "cancel": "取消",
+        "back": "返回",
+        "continue": "继续",
+        "granting": "正在授权…",
+        "retryCount": "重试{count}项",
+        "grantCount": "向{count}个对象授权",
+        "whoHeading": "谁将获得访问权限？",
+        "picked": "已选择",
+        "searchPlaceholder": "按名称或邮箱搜索人员、组和团队",
+        "searchLabel": "搜索人员、组和团队",
+        "searchFailed": "搜索失败：{message}",
+        "noPeople": "没有与“{query}”匹配的结果。",
+        "searchHelp": "输入内容进行搜索。组授权适用于当前和未来的成员；团队会添加授权时的成员。",
+        "addName": "添加{name}",
+        "add": "添加",
+        "roleHeading": "选择哪个角色？",
+        "rolePlaceholder": "搜索角色或权限，例如 deploy",
+        "roleSearch": "搜索角色",
+        "rolesFailed": "无法加载角色：{message}",
+        "noGrantableRoles": "没有可授予的角色：您必须拥有该角色包含的所有权限。",
+        "noRoles": "没有与“{query}”匹配的角色。",
+        "noRole": "未选择角色",
+        "noScope": "未选择范围",
+        "expiresNever": "永不过期",
+        "expiresDays": "{count, plural, one {#天后到期} other {#天后到期}}",
+        "expiresDate": "于{date}到期",
+        "summary": "<role>{roleName}</role>（{permissions}）应用于{kind} <identifier>{name}</identifier>，{expiry}。",
+        "previewError": "无法预览效果：{message}",
+        "retry": "重试",
+        "effect": "{count, plural, =0 {没有人获得新权限} one {#人获得{what}} other {#人获得{what}}}{where}{already, plural, =0 {} other {；#人已拥有该权限}}。",
+        "where": "（{kind} {name}）",
+        "groupsReach": "适用于{groups}，以及身份提供商日后添加到这些组的人员。",
+        "groupToday": "{name}（{count, plural, one {当前#名成员} other {当前#名成员}}）",
+        "gainAccess": "获得访问权限",
+        "alreadyAccess": "已拥有访问权限",
+        "outcome": "结果",
+        "grantedCount": "已向{count}个对象授权。",
+        "failed": "失败",
+        "groupDetail": "IdP 组 · {count, plural, one {#名成员} other {#名成员}}",
+        "cannotGrant": "您无法在此处授予该角色。",
+        "cannotHold": "类型为{kind}的对象无法拥有角色。",
+        "refreshFailed": "授权已保存，但无法刷新访问权限列表。请刷新视图，不要重复已成功的授权。",
+        "success": "{count, plural, one {已向#人授权} other {已向#人授权}}",
+        "links": {
+          "organization": "组织",
+          "projects": "项目",
+          "teams": "团队",
+          "roles": "角色",
+          "policies": "策略",
+          "check": "检查访问"
+        }
+      },
+      "legacyGrantRole": {
+        "title": "授予角色",
+        "description": "在所选权限范围内，为组织的现有成员分配角色。",
+        "userId": "用户 ID",
+        "targetUser": "向 {name} 授予角色。",
+        "userGuidance": "请输入此组织现有成员的数字 ID。此表单不会创建或邀请用户。",
+        "role": "角色",
+        "selectRole": "选择角色",
+        "scope": "权限范围",
+        "noScope": "没有适用于 {scopeKind} 的权限范围",
+        "selectScope": "选择权限范围",
+        "scopeGuidance": "固定为角色的权限范围级别：<scope></scope>",
+        "cancel": "取消",
+        "granting": "正在授予…",
+        "granted": "已授予角色",
+        "failed": "无法授予角色",
+        "refreshWarning": "无法刷新视图。请刷新以查看当前数据。",
+        "orgReadFailed": "无法确认当前组织。请重新加载页面后重试。",
+        "loadingOrg": "正在确认当前组织…",
+        "noOrg": "没有可用于此次授予的当前组织。",
+        "unsupportedApp": "此选择器不提供 APP 目标。请使用“授予访问权限”选择应用。",
+        "scopeReadFailed": "无法加载权限范围目标。",
+        "retry": "重试",
+        "loadingScopes": "正在加载权限范围目标…",
+        "unknownScopes": "权限范围目标尚未确认。",
+        "rolesReadFailed": "无法加载角色。",
+        "loadingRoles": "正在加载角色…",
+        "unknownRoles": "角色尚未确认。",
+        "emptyRoles": "此列表中没有可用角色。"
       }
     },
     "settings": {
@@ -4288,6 +4544,10 @@
       "today": "今天",
       "yesterday": "昨天",
       "unknownDate": "日期未知"
+    },
+    "shellHeader": {
+      "breadcrumb": "面包屑导航",
+      "switch": "切换{label}"
     }
   },
   "agentSecrets": {
@@ -4814,6 +5074,530 @@
         "subscriptionPolicy": "禁用新订阅不会撤销现有访问权限。",
         "completedUpdate": "请求的资源修订版本已协调完成。这不是实时健康检查。",
         "operationFailed": "已接受的操作失败。执行其他操作前请检查当前部署原因。"
+      }
+    }
+  },
+  "home": {
+    "title": "首页",
+    "titleLayout": "首页 · {layout}",
+    "question": "您主要会在这里做什么？",
+    "noAccessTitle": "首页暂时没有可显示的内容",
+    "noAccessDescription": "您的角色没有此组织中应用或智能体的访问权限。组织管理员可以授予权限。",
+    "layoutMenu": "布局",
+    "layoutLegend": "首页布局",
+    "settings": "首页设置",
+    "changeHint": "您可随时通过首页的布局菜单或设置 › 首页进行更改。",
+    "continue": "继续",
+    "suggested": "推荐",
+    "placeholderTitle": "首页尚未提供",
+    "placeholderDescription": "{panel} 将在首页提供。在此之前，请前往完整页面查看。",
+    "open": "打开",
+    "layouts": {
+      "apps": {
+        "title": "应用",
+        "description": "用于运行应用：失败的部署、您的应用及其流量。"
+      },
+      "agents": {
+        "title": "智能体",
+        "description": "用于构建和运行智能体：失败和进行中的运行、您的智能体及费用。"
+      },
+      "builder": {
+        "title": "开发",
+        "description": "用于操作两者：故障、近期活动、部署和运行。"
+      },
+      "operator": {
+        "title": "运维",
+        "description": "用于维护平台：告警、集群、平台活动和配额。"
+      }
+    },
+    "panels": {
+      "waiting": "等待您处理",
+      "failing": "故障",
+      "my-apps": "我的应用",
+      "recent-deployments": "近期部署",
+      "traffic-errors": "流量与错误",
+      "failed-runs": "失败的运行",
+      "running-now": "正在运行",
+      "my-agents": "我的智能体",
+      "runs-spend": "运行与费用",
+      "activity": "活动",
+      "kpis": "关键指标",
+      "deployments": "部署",
+      "agent-runs": "智能体运行",
+      "alerts": "告警",
+      "clusters": "集群",
+      "platform-activity": "平台活动",
+      "spend-quota": "费用与配额"
+    },
+    "copy": {
+      "auditLog": "审计日志",
+      "noAgentRunsTitle": "暂无智能体运行",
+      "noAgentRunsDescription": "您可查看的智能体运行将显示在这里。",
+      "openAgents": "打开智能体",
+      "firingNow": "当前触发中",
+      "acknowledged": "已确认",
+      "firing": "触发中",
+      "noAlertsTitle": "没有触发中的告警",
+      "noAlertsDescription": "规则触发后，告警即显示在这里。",
+      "alertRules": "告警规则",
+      "noClustersTitle": "暂无集群",
+      "noClustersDescription": "注册集群以运行应用和智能体。",
+      "registerCluster": "注册集群",
+      "agentRun": "智能体运行",
+      "workflowRun": "工作流运行",
+      "noFailedRunsTitle": "没有失败的运行",
+      "noFailedRunsDescription": "失败的智能体和工作流运行将显示在这里，并附上原因。",
+      "deploy": "部署",
+      "run": "运行",
+      "nothingFailingTitle": "没有故障",
+      "nothingFailingDescription": "失败的部署和运行将显示在这里，并附上原因。",
+      "neverDeployed": "从未部署",
+      "noAppsTitle": "暂无您的应用",
+      "noAppsDescription": "您拥有角色的应用将显示在这里。",
+      "browseApps": "浏览应用",
+      "paused": "已暂停",
+      "neverRun": "从未运行",
+      "lastRun": "上次运行：{status}",
+      "runningCount": "{count, plural, other {# 个运行中}}",
+      "agentsMineNote": "此面板显示您直接或通过项目、团队或组织拥有角色的应用中的智能体。",
+      "noAgentsTitle": "暂无您的智能体",
+      "noAgentsDescription": "您拥有角色的应用中的智能体将显示在这里。",
+      "browseAgents": "浏览智能体",
+      "nothingRunningTitle": "没有正在运行的项目",
+      "nothingRunningDescription": "正在运行的智能体将以您的集群视图显示在这里。",
+      "openRuns": "打开运行",
+      "runningSummary": "{agents, plural, other {# 个智能体}}上的{runs, plural, other {# 次运行}}",
+      "noDeploymentsTitle": "暂无部署",
+      "noDeploymentsDescription": "您可查看的部署将显示在这里。",
+      "startDeployment": "开始部署",
+      "noPlatformTitle": "暂无平台活动",
+      "noPlatformDescription": "部署、入驻和集群操作在运行时将显示在这里。",
+      "noWaitingTitle": "没有等待您处理的项目",
+      "noWaitingDescription": "您可决定的审批将显示在这里。",
+      "approveTitle": "批准此部署？",
+      "approveDescription": "批准部署。",
+      "approve": "批准",
+      "review": "审核",
+      "workflowGate": "工作流审批关卡",
+      "secretRequest": "密钥请求",
+      "unknownTime": "时间未知",
+      "unknownValue": "未知",
+      "rolledBack": "已回滚。",
+      "noFailureReason": "未记录此故障的原因。",
+      "noRunReason": "未记录此运行的原因。",
+      "timedOut": "已超时。",
+      "noReason": "未记录原因。",
+      "monthToDate": "本月至今",
+      "ofBudget": "预算 {amount} · {percentage}",
+      "spent": "已花费",
+      "projected": "预计",
+      "budget": "预算",
+      "legend": "图例",
+      "budgetReadFailed": "无法加载预算：{message}",
+      "noBudget": "未设置组织预算，因此没有可用于比较费用的配额。",
+      "spendAgainstBudget": "{panel}：预算使用情况",
+      "spendBudgetValue": "预算 {budget} 中已花费 {spent}",
+      "last24Hours": "过去24小时",
+      "app": "应用",
+      "pickApp": "选择应用",
+      "trafficAppsDescription": "您拥有角色的应用流量将显示在这里。",
+      "openApp": "打开应用",
+      "requests": "请求",
+      "errors": "错误",
+      "now": "当前",
+      "average": "平均 {value}",
+      "notConfiguredTitle": "未配置",
+      "notConfiguredDescription": "此应用的集群没有 Prometheus 端点，因此未收集其流量数据。",
+      "notSupportedTitle": "此提供商不支持",
+      "notSupportedDescription": "此集群的提供商插件未实现此读取功能。其他云平台支持该功能。",
+      "metricErrorTitle": "无法加载",
+      "metricErrorDescription": "加载此面板时出现问题。请重试。",
+      "noRequestsTitle": "暂无请求",
+      "noRequestsDescription": "此时间段没有可显示的数据。有活动后，请求将显示在这里。",
+      "last7Days": "过去7天",
+      "runsPerDay": "每天的智能体运行数",
+      "failedPerDay": "每天失败的运行数",
+      "spendPerDay": "每天的组织费用",
+      "sevenDays": "7天",
+      "spendReadFailed": "无法加载费用：{message}",
+      "cappedRuns": "根据最近的运行统计；本周还有更多运行。",
+      "kpiWindow": "过去 {count, number} 天 · 本月至今的费用",
+      "kpiAria": "{panel}，过去 {count, number} 天",
+      "noKpisTitle": "没有您可访问的指标",
+      "noKpisDescription": "您可查看的区域将显示部署、运行和费用指标。",
+      "noProject": "无项目"
+    },
+    "health": {
+      "error": "设置失败",
+      "offline": "离线",
+      "degraded": "性能下降",
+      "never_seen": "从未检测到",
+      "connected": "已连接"
+    },
+    "severity": {
+      "critical": "严重",
+      "error": "错误",
+      "warn": "警告",
+      "warning": "警告",
+      "info": "信息"
+    },
+    "status": {
+      "running": "运行中",
+      "succeeded": "成功",
+      "failed": "失败",
+      "rolled_back": "已回滚",
+      "timed_out": "已超时",
+      "error": "错误",
+      "cancelled": "已取消",
+      "canceled": "已取消",
+      "terminated": "已终止",
+      "completed": "已完成",
+      "paused": "已暂停",
+      "pending_approval": "等待审批",
+      "approved": "已批准",
+      "deploying": "部署中",
+      "building": "构建中",
+      "provisioning": "配置中",
+      "aborted": "已中止",
+      "stopped": "已停止",
+      "queued": "已排队",
+      "pending": "等待中",
+      "redeploying": "重新部署中",
+      "superseded": "已替代",
+      "waiting": "等待中",
+      "unknown": "未知"
+    },
+    "kpi": {
+      "deploys": "部署",
+      "runs": "运行",
+      "success": "成功率",
+      "p95": "p95",
+      "spend": "费用",
+      "runsHint": "智能体运行",
+      "successHint": "部署占比",
+      "p95Hint": "部署时间",
+      "spendHint": "本月至今"
+    },
+    "period": {
+      "monthly": "每月",
+      "quarterly": "每季度",
+      "yearly": "每年"
+    },
+    "operations": {
+      "everyEnvironment": "所有环境",
+      "noEnvironment": "无环境",
+      "appWide": "整个应用",
+      "deployTitle": "将 {app} 部署到 {environment}",
+      "deployDetail": "{image} · 已批准 {received, number}/{required, number}",
+      "humanGate": "人工审批关卡",
+      "approvers": "审批人：{approvers}",
+      "anyApprover": "任意审批人均可决定",
+      "secretTitle": "{app} 密钥 · {environment}",
+      "secretBy": "{name} 执行 {operation}",
+      "secretDetail": "{operation} · 已批准 {received, number}/{required, number}",
+      "approveFailed": "审批失败",
+      "approved": "已批准：{status}",
+      "stage": "阶段 {order, number}{role}",
+      "failedAt": "在 {stage} 失败。",
+      "timedOutAt": "在 {stage} 超时。",
+      "requestRate": "{value} 请求/秒",
+      "milliseconds": "{value} 毫秒"
+    },
+    "layoutSettings": {
+      "description": "选择首页显示的面板及其顺序。保存成功后，更改会同步到你的账户；浏览器中的副本在离线时仍可使用。",
+      "noAccess": "你的角色无权访问应用或代理，因此没有可供选择的布局。",
+      "resetDefault": "使用与我的访问权限对应的默认布局（{layout}）",
+      "saveFailed": "未能保存首页布局"
+    }
+  },
+  "metrics": {
+    "title": "指标",
+    "description": "部署成功率、耗时和应用状态。",
+    "successRate": "部署成功率",
+    "successRateTrend": "部署成功率趋势",
+    "successRateUnavailable": "部署成功率不可用",
+    "trend": "{label}趋势",
+    "durationSeconds": "{seconds, number}秒",
+    "durationMinutesSeconds": "{minutes, number}分{seconds, number}秒",
+    "columns": {
+      "app": "应用",
+      "environments": "环境",
+      "latestDeploy": "最新部署",
+      "image": "镜像",
+      "lastDeployed": "上次部署时间"
+    },
+    "never": "从未",
+    "recentFailure": "最近失败",
+    "inFlight": "进行中",
+    "inFlightHint": "等待审批、排队中或正在部署",
+    "meanRollout": "平均部署耗时",
+    "meanRolloutHint": "此时间段内已完成部署的平均值",
+    "p95Rollout": "部署耗时 p95",
+    "p95RolloutHint": "此时间段内较慢部署的指标",
+    "noRollouts": "过去{days, number}天没有部署",
+    "succeededWindow": "{days, number}天内共{total, number}次，成功{succeeded, number}次",
+    "outcomes": "结果（{days, number}天）",
+    "succeeded": "成功 {count, number}次",
+    "failed": "失败 {count, number}次",
+    "rolledBack": "已回滚 {count, number}次",
+    "inFlightCount": "进行中 {count, number}次",
+    "total": "共 {count, number}次",
+    "rolloutsWindow": "{days, number}天内的部署",
+    "rolloutsPerDay": "每日部署次数",
+    "apps": "应用",
+    "emptyTitle": "尚无应用",
+    "emptyDescription": "注册应用后，首次部署完成即可显示指标。",
+    "openApps": "打开应用",
+    "rawPrometheus": "Prometheus 原始指标",
+    "temporalUi": "Temporal 工作流界面",
+    "embeddedDashboardsUnavailable": "此视图不提供嵌入式仪表板。",
+    "searchPlaceholder": "搜索应用、标识和镜像标签…",
+    "filters": {
+      "status": "最新部署",
+      "kind": "类型"
+    },
+    "kinds": {
+      "app": "应用",
+      "agent": "智能体"
+    },
+    "views": {
+      "all": "全部",
+      "mine": "我的",
+      "failing": "最近失败",
+      "mineNote": "状态摘要不记录归属，因此此视图为空。"
+    },
+    "staleMetrics": "刷新失败，正在显示上次成功加载的指标。",
+    "metricsUnavailable": "无法加载指标。",
+    "retryMetrics": "重试加载指标"
+  },
+  "teams": {
+    "title": "团队",
+    "context": "团队限定项目、应用及其访问授权的范围。",
+    "newTeam": "新建团队",
+    "columnTeam": "团队",
+    "columnCreated": "创建时间",
+    "edit": "编辑",
+    "delete": "删除",
+    "emptyTitle": "暂无团队",
+    "emptyDescription": "创建团队以开始对项目和应用分组。",
+    "deleteTitle": "删除团队 {slug}？",
+    "deleteGenericTitle": "删除团队？",
+    "deleteDescription": "停用团队并允许重复使用其标识符。这不会重新分配团队的项目或应用。",
+    "confirmDelete": "删除团队",
+    "createDescription": "团队限定项目、成员和令牌的范围。标识符必须唯一，团队停用后可重复使用。",
+    "displayName": "显示名称",
+    "exampleName": "后端团队",
+    "slug": "标识符",
+    "slugHint": "以小写英文字母开头，使用字母、数字和连字符，最多40个字符。以字母或数字结尾。",
+    "descriptionOptional": "描述（可选）",
+    "descriptionPlaceholder": "此团队负责哪些资源？",
+    "cancel": "取消",
+    "creating": "正在创建…",
+    "create": "创建团队",
+    "editTitle": "编辑团队",
+    "editDescription": "重命名团队或更改其标识符。标识符在组织内必须唯一，并用于URL。",
+    "generate": "生成",
+    "saving": "正在保存…",
+    "save": "保存更改",
+    "feedback": {
+      "created": "已创建团队 {slug}",
+      "saved": "团队已保存为 {slug}",
+      "deleted": "已删除 {slug}",
+      "createFailed": "无法创建团队",
+      "saveFailed": "无法保存团队",
+      "deleteFailed": "无法删除团队",
+      "refreshWarning": "无法刷新视图。请刷新以查看最新数据。"
+    },
+    "list": {
+      "search": "搜索团队…",
+      "all": "全部",
+      "mine": "我的团队"
+    },
+    "slugStatus": {
+      "invalid": "使用小写英文字母、数字和连字符，以字母开头，以字母或数字结尾（最多40个字符）。",
+      "checking": "正在检查可用性…",
+      "available": "可用",
+      "taken": "此组织已在使用该标识符。",
+      "unchanged": "当前标识符 — 用于URL。",
+      "empty": "小写英文字母、数字和连字符。用于URL。"
+    }
+  },
+  "apiKeys": {
+    "title": "API 密钥",
+    "name": "名称",
+    "suffix": "后缀",
+    "scopes": "权限范围",
+    "scope": "权限范围",
+    "canDo": "允许的操作",
+    "lastUsed": "上次使用",
+    "created": "创建时间",
+    "expires": "到期时间",
+    "status": "状态",
+    "active": "有效",
+    "revoked": "已撤销",
+    "expired": "已过期",
+    "none": "无",
+    "nothing": "无",
+    "never": "永不",
+    "all": "全部",
+    "mine": "我的",
+    "longLivedAdmin": "长期有效的管理员令牌",
+    "permissionCount": "{count, plural, other {# 项权限}}",
+    "adminExpiryWarning": "管理员令牌不会近期到期。请将其替换为权限范围更小的令牌。",
+    "effectiveGuidance": "权限范围允许且所有者角色授予的权限：",
+    "createdNotice": "已创建令牌 <name></name>",
+    "revealGuidance": "请立即复制此值，以后不会再次显示。仅存储 SHA-256 哈希和最后 4 个字符。",
+    "copy": "复制",
+    "dismissReveal": "已保存 — 关闭",
+    "mcpTitle": "代理远程 MCP",
+    "mcpGuidance": "通过经过身份验证的 Streamable HTTP 连接 CI 或编程客户端。以 <code></code> 形式发送 API 令牌。MCP 权限范围仍需要所有者拥有相应的代理权限；不会暴露机密值。",
+    "copyUrl": "复制 URL",
+    "mcpRead": "{scope} · 查看包和任务",
+    "mcpDispatch": "{scope} · 运行或终止",
+    "mcpWrite": "{scope} · 同步仓库",
+    "context": "用于 CLI、机器人和脚本的 Bearer 凭据。令牌以哈希形式存储；明文仅在创建时显示一次。",
+    "newToken": "新建令牌",
+    "revoke": "撤销",
+    "emptyTitle": "没有 API 密钥",
+    "emptyDescription": "创建密钥以向平台验证 CLI、CI 运行或您的脚本。",
+    "createTitle": "新建 API 令牌",
+    "createDescription": "明文仅在创建后显示一次。请妥善保存，之后无法再次获取。",
+    "nameGuidance": "描述性名称会显示在审计日志中此令牌的操作旁。",
+    "scopeGuidance": "令牌只会缩小您的访问权限：它获得的下列权限必须也由您的角色授予。",
+    "expiresDays": "有效期（天）",
+    "expiryGuidance": "填 0 或留空表示永不过期。默认 {defaultDays} 天，最多 {maxDays} 天。",
+    "cancel": "取消",
+    "creating": "正在创建…",
+    "create": "创建令牌",
+    "revokeNamed": "撤销令牌 {name}？",
+    "revokeTitle": "撤销令牌？",
+    "revokeDescription": "使用此令牌的 CLI 和机器人将立即停止工作。撤销无法取消；请创建新令牌以恢复访问。",
+    "revokeConfirm": "撤销令牌",
+    "refreshWarning": "无法刷新视图。请刷新以查看当前数据。",
+    "pickScope": "请至少选择一个权限范围",
+    "createFailed": "无法创建令牌",
+    "revokedFeedback": "已撤销令牌",
+    "revokeFailed": "无法撤销令牌",
+    "copyFailed": "无法复制。请选中此值并手动复制。",
+    "copied": "已复制到剪贴板",
+    "endpointCopied": "已复制 MCP 端点",
+    "searchPlaceholder": "搜索密钥、所有者、团队、后缀…",
+    "narrowedNote": "在 API 查询支持筛选前，仅显示最新 {count} 个密钥中的匹配项。",
+    "mineNote": "显示最新 {count} 个密钥中属于您的密钥。",
+    "detail": {
+      "token": "令牌",
+      "owner": "所有者",
+      "team": "团队",
+      "lastIp": "上次使用的 IP",
+      "lastAgent": "上次使用的客户端",
+      "orgWide": "—（整个组织）",
+      "shortToken": "令牌 {id}",
+      "overview": "概览",
+      "notFoundTitle": "未找到 API 令牌",
+      "notFoundDescription": "此令牌可能不存在、不在最近列表中，或您没有访问权限。",
+      "back": "返回 API 密钥",
+      "noScopes": "没有权限范围 — 此令牌未获授任何权限。",
+      "readFailed": "无法加载令牌元数据。",
+      "retry": "重试"
+    },
+    "picker": {
+      "loadFailed": "无法加载权限范围列表。请重新加载页面后重试。",
+      "startFrom": "从预设开始",
+      "adminWarning": "Admin 允许此令牌执行所有者可执行的全部操作，包括以后新增的权限。请优先选择较小的权限范围并设置到期时间。",
+      "sensitive": "敏感权限",
+      "unavailable": "您的角色未授予此权限范围所允许的任何权限。",
+      "unlocks": "允许{count, plural, other { # 项权限}}",
+      "surfaces": {
+        "apps": "应用",
+        "clusters": "集群",
+        "secrets": "机密",
+        "agents": "代理",
+        "workflows": "工作流",
+        "administration": "管理"
+      },
+      "presets": {
+        "read_only": "只读",
+        "cli": "CLI 默认",
+        "ci_deploy": "CI 部署",
+        "cluster_operator": "集群操作员"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "读取应用",
+        "description": "列出应用、部署、环境和机密名称。"
+      },
+      "scope1": {
+        "label": "修改应用",
+        "description": "部署、编辑环境变量并管理应用配置。"
+      },
+      "scope2": {
+        "label": "注册应用",
+        "description": "注册应用并设置 CI（Webhook、机密、工作流），不包括部署或删除。"
+      },
+      "scope3": {
+        "label": "读取集群",
+        "description": "列出集群并读取提供商状态。"
+      },
+      "scope4": {
+        "label": "更新集群",
+        "description": "更改集群设置：Ingress 类、身份验证门控、区域和端点。"
+      },
+      "scope5": {
+        "label": "操作集群",
+        "description": "安装集群配方、刷新管理状态并协调 Ingress。"
+      },
+      "scope6": {
+        "label": "管理登录用户",
+        "description": "创建、禁用、删除和重置集群中央身份验证的用户及其组。"
+      },
+      "scope7": {
+        "label": "设置应用访问权限",
+        "description": "选择可以访问中央身份验证保护的应用的用户和组。"
+      },
+      "scope8": {
+        "label": "显示机密值",
+        "description": "显示存储的机密值。仅在必要时授予。"
+      },
+      "scope9": {
+        "label": "修改机密",
+        "description": "设置、轮换和删除机密，不显示其值。"
+      },
+      "scope10": {
+        "label": "MCP 读取",
+        "description": "通过远程 MCP 列出代理包并查看运行。"
+      },
+      "scope11": {
+        "label": "MCP 调度",
+        "description": "根据账户权限运行、引导、强制停止代理，并连接到代理运行环境。"
+      },
+      "scope12": {
+        "label": "MCP 写入",
+        "description": "同步代理仓库和包定义。"
+      },
+      "scope13": {
+        "label": "修改代理环境",
+        "description": "创建、更新和删除代理环境规范。"
+      },
+      "scope14": {
+        "label": "修改工作流",
+        "description": "创建、更新和删除工作流。"
+      },
+      "scope15": {
+        "label": "运行工作流",
+        "description": "启动工作流运行，不编辑工作流。"
+      },
+      "scope16": {
+        "label": "修改项目",
+        "description": "创建、更新和删除项目。"
+      },
+      "scope17": {
+        "label": "修改团队",
+        "description": "创建、更新和删除团队。"
+      },
+      "scope18": {
+        "label": "管理员",
+        "description": "所有者现在以及新增权限后可执行的全部操作。请优先选择较小的权限范围。"
       }
     }
   }

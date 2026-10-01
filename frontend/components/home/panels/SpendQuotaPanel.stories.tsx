@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 
@@ -122,6 +125,26 @@ export const Width768: Story = {
         panel={PANEL["spend-quota"]}
         forecast={FORECAST}
         budget={BUDGET}
+        {...READY}
+      />
+    </Grid>
+  ),
+};
+
+export const GermanBudgetWidth768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <Grid width={768}>
+      <SpendQuotaPanelView
+        panel={PANEL["spend-quota"]}
+        forecast={FORECAST}
+        budget={BUDGET_OVER}
         {...READY}
       />
     </Grid>

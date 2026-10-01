@@ -10,6 +10,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import * as React from "react";
+import { useTranslations, useNow } from "next-intl";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -46,10 +47,10 @@ export type TokensScreenProps = ReturnType<typeof useTokens> & {
 };
 
 /** An admin token with no expiry, or one more than 90 days out (#2120). */
-function isLongLivedAdmin(t: AstroliftApiToken): boolean {
-  if (!t.scopes.includes("admin") || t.isRevoked) return false;
-  if (!t.expiresAt) return true;
-  return new Date(t.expiresAt).getTime() - Date.now() > 90 * 24 * 60 * 60 * 1000;
+function isLongLivedAdmin(tk: AstroliftApiToken, now: Date): boolean {
+  if (!tk.scopes.includes("admin") || tk.isRevoked) return false;
+  if (!tk.expiresAt) return true;
+  return new Date(tk.expiresAt).getTime() - now.getTime() > 90 * 24 * 60 * 60 * 1000;
 }
 
 const DEFAULT_SELECTED_SCOPES: string[] = ["read:apps", "read:clusters", "mcp:read"];
@@ -82,6 +83,8 @@ export function TokensScreen({
   renderScopePicker,
 }: TokensScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("apiKeys");
+  const now = useNow({ updateInterval: 60_000 });
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [expiresInDays, setExpiresInDays] = React.useState("90");
@@ -106,30 +109,30 @@ export function TokensScreen({
   const columns: Column<AstroliftApiToken>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("name"),
       cellClassName: "max-w-64 font-medium",
-      cell: (t) => (
-        <span className="block truncate" title={t.name}>
-          {t.name}
+      cell: (tk) => (
+        <span className="block truncate" title={tk.name}>
+          {tk.name}
         </span>
       ),
     },
     {
       id: "suffix",
-      header: "Suffix",
+      header: t("suffix"),
       width: "w-28",
       cellClassName: "font-mono text-xs",
-      cell: (t) => `…${t.tokenLast4}`,
+      cell: (tk) => `…${tk.tokenLast4}`,
     },
     {
       id: "scopes",
-      header: "Scopes",
-      cell: (t) => (
+      header: t("scopes"),
+      cell: (tk) => (
         <div className="flex flex-wrap gap-1">
-          {t.scopes.length === 0 ? (
-            <span className="text-muted-foreground text-xs">none</span>
+          {tk.scopes.length === 0 ? (
+            <span className="text-muted-foreground text-xs">{t("none")}</span>
           ) : (
-            t.scopes.map((s) => (
+            tk.scopes.map((s) => (
               <Badge key={s} variant="outline" className="text-2xs font-mono">
                 {s}
               </Badge>
@@ -140,32 +143,29 @@ export function TokensScreen({
     },
     {
       id: "canDo",
-      header: "Can do",
+      header: t("canDo"),
       width: "w-36",
-      cell: (t) => (
+      cell: (tk) => (
         <Tooltip>
           {/* Above the row's stretched link, or the overlay eats the hover. */}
           <TooltipTrigger asChild>
             <span className="relative z-10 inline-flex cursor-help items-center gap-1 text-xs">
-              {isLongLivedAdmin(t) && (
+              {isLongLivedAdmin(tk, now) && (
                 <AlertTriangleIcon
                   className="text-warning-fg size-3.5"
-                  aria-label="Long-lived admin token"
+                  aria-label={t("longLivedAdmin")}
                 />
               )}
-              {t.effectivePermissions.length} permission
-              {t.effectivePermissions.length === 1 ? "" : "s"}
+              {t("permissionCount", { count: tk.effectivePermissions.length })}
             </span>
           </TooltipTrigger>
           <TooltipContent className="max-w-sm">
-            {isLongLivedAdmin(t) && (
-              <p className="mb-1 font-medium">
-                Admin with no near expiry. Replace it with a narrower token.
-              </p>
+            {isLongLivedAdmin(tk, now) && (
+              <p className="mb-1 font-medium">{t("adminExpiryWarning")}</p>
             )}
-            <p className="opacity-75">What its scopes allow and its owner&apos;s roles grant:</p>
+            <p className="opacity-75">{t("effectiveGuidance")}</p>
             <p className="text-2xs font-mono [overflow-wrap:anywhere]">
-              {t.effectivePermissions.join(", ") || "nothing"}
+              {tk.effectivePermissions.join(", ") || t("nothing")}
             </p>
           </TooltipContent>
         </Tooltip>
@@ -173,36 +173,36 @@ export function TokensScreen({
     },
     {
       id: "lastUsed",
-      header: "Last used",
+      header: t("lastUsed"),
       cellClassName: "text-muted-foreground text-xs",
-      cell: (t) => <LastUsedCell token={t} />,
+      cell: (tk) => <LastUsedCell token={tk} />,
     },
     {
       id: "created",
-      header: "Created",
+      header: t("created"),
       width: "w-28",
       cellClassName: "text-muted-foreground text-sm",
-      cell: (t) => fmt.formatDate(t.createdAt),
+      cell: (tk) => fmt.formatDate(tk.createdAt),
     },
     {
       id: "expires",
-      header: "Expires",
+      header: t("expires"),
       width: "w-28",
       cellClassName: "text-muted-foreground text-sm",
-      cell: (t) => (t.expiresAt ? fmt.formatDate(t.expiresAt) : "never"),
+      cell: (tk) => (tk.expiresAt ? fmt.formatDate(tk.expiresAt) : t("never")),
     },
     {
       id: "status",
-      header: "Status",
+      header: t("status"),
       width: "w-28",
-      cell: (t) =>
-        t.isRevoked ? (
+      cell: (tk) =>
+        tk.isRevoked ? (
           <Badge variant="destructive" className="gap-1">
             <AlertTriangleIcon className="size-3" />
-            revoked
+            {t("revoked")}
           </Badge>
         ) : (
-          <Badge variant="secondary">active</Badge>
+          <Badge variant="secondary">{t("active")}</Badge>
         ),
     },
   ];
@@ -215,25 +215,24 @@ export function TokensScreen({
             <div className="flex min-w-0 items-center gap-2">
               <CheckCircle2Icon className="text-success-fg size-4 shrink-0" />
               <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
-                Token <span className="font-mono">{createdToken.apiToken.name}</span> created
+                {t.rich("createdNotice", {
+                  name: () => <span className="font-mono">{createdToken.apiToken.name}</span>,
+                })}
               </p>
             </div>
-            <p className="text-muted-foreground text-xs">
-              Copy the value below now — it&apos;s never shown again. We store only the SHA-256 hash
-              and the last 4 characters.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("revealGuidance")}</p>
             <div className="flex min-w-0 items-center gap-2">
               <code className="bg-background min-w-0 flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
                 {createdToken.plaintext}
               </code>
               <Button size="sm" variant="outline" onClick={onCopyPlaintext}>
                 <CopyIcon className="size-4" />
-                Copy
+                {t("copy")}
               </Button>
             </div>
             <div className="flex justify-end">
               <Button size="sm" variant="ghost" onClick={onDismissCreated}>
-                I&apos;ve saved it — dismiss
+                {t("dismissReveal")}
               </Button>
             </div>
           </CardContent>
@@ -244,12 +243,12 @@ export function TokensScreen({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2 font-medium">
-                <CableIcon className="size-4" /> Remote agent MCP
+                <CableIcon className="size-4" /> {t("mcpTitle")}
               </div>
               <p className="text-muted-foreground max-w-3xl text-xs">
-                Connect CI or coding clients over authenticated Streamable HTTP. Send an API token
-                as <code>Authorization: Bearer alft_at_…</code>. MCP scopes still require the token
-                owner&apos;s matching agent permissions; secret values are not exposed.
+                {t.rich("mcpGuidance", {
+                  code: () => <code>Authorization: Bearer alft_at_…</code>,
+                })}
               </p>
             </div>
             <div className="flex min-w-0 items-center gap-2">
@@ -257,14 +256,14 @@ export function TokensScreen({
                 {mcpEndpoint}
               </code>
               <Button size="sm" variant="outline" onClick={onCopyMcpEndpoint}>
-                <CopyIcon className="size-4" /> Copy URL
+                <CopyIcon className="size-4" /> {t("copyUrl")}
               </Button>
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <Badge variant="outline">mcp:read · inspect packages/tasks</Badge>
-            <Badge variant="outline">mcp:dispatch · run/kill</Badge>
-            <Badge variant="outline">mcp:write · sync repos</Badge>
+            <Badge variant="outline">{t("mcpRead", { scope: "mcp:read" })}</Badge>
+            <Badge variant="outline">{t("mcpDispatch", { scope: "mcp:dispatch" })}</Badge>
+            <Badge variant="outline">{t("mcpWrite", { scope: "mcp:write" })}</Badge>
           </div>
         </CardContent>
       </Card>
@@ -275,34 +274,33 @@ export function TokensScreen({
     <TooltipProvider>
       <ListPage<AstroliftApiToken>
         header={{
-          crumbs: adminCrumbs("tokens", "API keys"),
-          title: "API keys",
-          context:
-            "Long-lived bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest — the plaintext is shown exactly once at creation.",
+          crumbs: adminCrumbs("tokens", t("title")),
+          title: t("title"),
+          context: t("context"),
           primaryAction: (
             <Can permission="api_token.create">
               <Button onClick={() => setOpen(true)}>
                 <PlusIcon className="size-4" />
-                New token
+                {t("newToken")}
               </Button>
             </Can>
           ),
         }}
         notice={notice}
         list={list}
-        label="API keys"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(t) => t.id}
         rowHref={(t) => `/tokens/${t.id}`}
-        rowActions={(t) => (
+        rowActions={(tk) => (
           <Can permission="api_token.revoke">
             <DropdownMenuItem
-              disabled={revoking || t.isRevoked}
-              onSelect={() => setRevokeTarget(t)}
+              disabled={revoking || tk.isRevoked}
+              onSelect={() => setRevokeTarget(tk)}
             >
               <Trash2Icon className="size-4" />
-              Revoke
+              {t("revoke")}
             </DropdownMenuItem>
           </Can>
         )}
@@ -314,9 +312,8 @@ export function TokensScreen({
         nextCursor={nextCursor}
         empty={{
           icon: <KeyIcon className="size-5" />,
-          title: "No API keys",
-          description:
-            "Create one to authenticate the CLI, CI runs, or your own scripts against the platform.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
       />
 
@@ -329,15 +326,12 @@ export function TokensScreen({
       >
         <SheetContent className="flex flex-col">
           <SheetHeader>
-            <SheetTitle>New API token</SheetTitle>
-            <SheetDescription>
-              The plaintext is shown exactly once after creation. Save it somewhere secure —
-              there&apos;s no way to retrieve it later.
-            </SheetDescription>
+            <SheetTitle>{t("createTitle")}</SheetTitle>
+            <SheetDescription>{t("createDescription")}</SheetDescription>
           </SheetHeader>
           <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
             <div className="space-y-2">
-              <Label htmlFor="token-name">Name</Label>
+              <Label htmlFor="token-name">{t("name")}</Label>
               <Input
                 id="token-name"
                 value={name}
@@ -346,20 +340,15 @@ export function TokensScreen({
                 autoFocus
                 required
               />
-              <p className="text-muted-foreground text-xs">
-                Descriptive — appears in the audit log next to every action this token takes.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("nameGuidance")}</p>
             </div>
             <div className="space-y-2">
-              <Label>Scopes</Label>
-              <p className="text-muted-foreground text-xs">
-                A token can only narrow what you can do: it gets the permissions below that your
-                roles also grant.
-              </p>
+              <Label>{t("scopes")}</Label>
+              <p className="text-muted-foreground text-xs">{t("scopeGuidance")}</p>
               {renderScopePicker({ value: selectedScopes, onChange: setSelectedScopes })}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="token-expires">Expires in (days)</Label>
+              <Label htmlFor="token-expires">{t("expiresDays")}</Label>
               <Input
                 id="token-expires"
                 type="number"
@@ -369,7 +358,7 @@ export function TokensScreen({
                 onChange={(e) => setExpiresInDays(e.target.value)}
               />
               <p className="text-muted-foreground text-xs">
-                Leave 0 or empty for no expiry. Default 90 days, max 365.
+                {t("expiryGuidance", { defaultDays: 90, maxDays: 365 })}
               </p>
             </div>
             <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
@@ -381,10 +370,10 @@ export function TokensScreen({
                   resetForm();
                 }}
               >
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={creating || !name || selectedScopes.length === 0}>
-                {creating ? "Creating…" : "Create token"}
+                {creating ? t("creating") : t("create")}
               </Button>
             </SheetFooter>
           </form>
@@ -396,9 +385,9 @@ export function TokensScreen({
         onOpenChange={(next) => {
           if (!next) setRevokeTarget(null);
         }}
-        title={revokeTarget ? `Revoke token ${revokeTarget.name}?` : "Revoke token?"}
-        description="Existing CLIs and bots using this token stop working immediately. There's no way to un-revoke — mint a new token if you need to restore access."
-        confirmLabel="Revoke token"
+        title={revokeTarget ? t("revokeNamed", { name: revokeTarget.name }) : t("revokeTitle")}
+        description={t("revokeDescription")}
+        confirmLabel={t("revokeConfirm")}
         destructive
         onConfirm={async () => {
           if (revokeTarget) await onRevoke(revokeTarget);

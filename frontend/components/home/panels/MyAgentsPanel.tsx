@@ -11,10 +11,10 @@ import { BotIcon } from "lucide-react";
 
 import { ListSummary } from "@/components/list/ListSummary";
 import { StatusDot } from "@/components/StatusDot";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
-import { agentHref, statusLabel } from "./apps-agents-model";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
+import { agentHref } from "./apps-agents-model";
 import type { HomeRead } from "./home-reads";
 import { useMyAgents } from "./use-my-agents";
 
@@ -45,13 +45,8 @@ function agentDot(a: MyAgentItem) {
   return a.lastRunStatus ? ("ok" as const) : ("muted" as const);
 }
 
-function agentState(a: MyAgentItem): string {
-  if (a.runningCount > 0) return `${a.runningCount} running`;
-  if (a.paused) return "Paused";
-  return a.lastRunStatus ? `Last run ${statusLabel(a.lastRunStatus).toLowerCase()}` : "Never run";
-}
-
 function MyAgentLine({ item }: { item: MyAgentItem }) {
+  const { t, age, status } = useHomePresentation(true);
   return (
     <span className="flex min-w-0 items-center gap-3">
       <StatusDot status={agentDot(item)} />
@@ -64,10 +59,16 @@ function MyAgentLine({ item }: { item: MyAgentItem }) {
         </span>
       </span>
       <span className="text-muted-foreground hidden shrink-0 text-xs sm:inline">
-        {agentState(item)}
+        {item.runningCount > 0
+          ? t("copy.runningCount", { count: item.runningCount })
+          : item.paused
+            ? t("copy.paused")
+            : item.lastRunStatus
+              ? t("copy.lastRun", { status: status(item.lastRunStatus) })
+              : t("copy.neverRun")}
       </span>
       <span className="text-muted-foreground w-16 shrink-0 text-right font-mono text-xs">
-        {item.lastRunAt ? formatRelativeAge(item.lastRunAt) : ""}
+        {item.lastRunAt ? age(item.lastRunAt) : ""}
       </span>
     </span>
   );
@@ -94,9 +95,10 @@ export function MyAgentsPanelView({
   error,
   onRetry,
 }: MyAgentsPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<BotIcon className="size-4" />}
       description={mineNote}
       span={panel.span}
@@ -111,10 +113,10 @@ export function MyAgentsPanelView({
       onRetry={onRetry}
       empty={{
         icon: <BotIcon />,
-        title: "No agents of yours yet",
-        description: "Agents on apps you hold a role on show up here.",
+        title: t("copy.noAgentsTitle"),
+        description: t("copy.noAgentsDescription"),
         actionHref: "/agents",
-        actionLabel: "Browse agents",
+        actionLabel: t("copy.browseAgents"),
       }}
     />
   );

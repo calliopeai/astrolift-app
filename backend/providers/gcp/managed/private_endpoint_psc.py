@@ -28,7 +28,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL, readable_keys
+from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from gcp.managed._ownership import reserved_label_keys
 
 KIND = "private_endpoint"
 VARIANT = "private_service_connect"
@@ -36,14 +37,6 @@ _API_ROOT = "https://compute.googleapis.com/compute/v1"
 _ID_PATTERN = re.compile(r"[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?")
 _GOOGLE_API_ID_PATTERN = re.compile(r"[a-z][a-z0-9]{0,19}")
 _UUID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-#: Every spelling of the managed-service id is reserved, not just the one this
-#: driver writes, so tenant labels cannot plant one (#2086).
-_RESERVED_LABELS = {
-    "astrolift-managed-by",
-    "astrolift-private-endpoint",
-    "astrolift-adopted",
-    *readable_keys("gcp"),
-}
 _ADDRESS_OWNED_FIELDS = {
     "name",
     "description",
@@ -1160,7 +1153,7 @@ class PrivateServiceConnectDriver(ManagedServiceDriver):
                 isinstance(key, str) and isinstance(value, str) for key, value in labels.items()
             ):
                 return "labels must be a string-to-string object"
-            reserved = sorted(set(labels).intersection(_RESERVED_LABELS))
+            reserved = reserved_label_keys(labels)
             if reserved:
                 return f"labels cannot override Astrolift ownership labels: {', '.join(reserved)}"
             label_error = _validate_labels(labels)

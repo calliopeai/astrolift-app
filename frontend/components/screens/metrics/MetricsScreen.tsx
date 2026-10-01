@@ -10,6 +10,7 @@ import {
   FlameIcon,
   GaugeIcon,
 } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -19,6 +20,7 @@ import type { ListStateController } from "@/components/list/list-state";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MiniBar, RadialGauge, Sparkline } from "@/components/viz";
@@ -29,11 +31,18 @@ import type {
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
-import { METRICS_APPS_SELECT } from "./metrics-apps-list";
+import { localizedMetricsAppsList, METRICS_APPS_SELECT } from "./metrics-apps-list";
 import type { useMetrics } from "./use-metrics";
 
-export type MetricsScreenProps = Omit<ReturnType<typeof useMetrics>, "list"> & {
+export type MetricsScreenProps = Omit<
+  ReturnType<typeof useMetrics>,
+  "list" | "metricsError" | "healthError" | "onRetryMetrics" | "onRetryHealth"
+> & {
   temporalUiUrl?: string;
+  metricsError?: string | null;
+  healthError?: string | null;
+  onRetryMetrics?: () => void;
+  onRetryHealth?: () => void;
 };
 
 const STATUS_DOT: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "pending"> = {
@@ -46,19 +55,6 @@ const STATUS_DOT: Record<DeploymentStatus, "ok" | "warn" | "error" | "muted" | "
   superseded: "muted",
   rolled_back: "muted",
 };
-
-function formatDuration(seconds: number | null): string {
-  if (seconds == null) return "—";
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}m ${s}s`;
-}
-
-function formatPercent(rate: number): string {
-  if (rate < 0) return "—";
-  return `${(rate * 100).toFixed(1)}%`;
-}
 
 // Per-day success rate for the trend line — only days that saw a rollout
 // (the rate is undefined on a zero-deploy day), oldest → newest.
@@ -95,6 +91,7 @@ function MetricCard({
   hint?: string;
   trend?: number[];
 }) {
+  const t = useTranslations("metrics");
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -109,7 +106,7 @@ function MetricCard({
               data={trend}
               variant="area"
               className="text-chart-1 shrink-0"
-              ariaLabel={`${label} trend`}
+              ariaLabel={t("trend", { label })}
             />
           )}
         </div>
@@ -132,6 +129,7 @@ function SuccessRateCard({
   hint?: string;
   trend?: number[];
 }) {
+  const t = useTranslations("metrics");
   const known = rate >= 0;
   const tone = !known
     ? "text-muted-foreground"
@@ -144,25 +142,35 @@ function SuccessRateCard({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-muted-foreground text-sm font-medium">
-          Deployment success rate
+          {t("successRate")}
         </CardTitle>
         <CheckCircle2Icon className="text-muted-foreground size-4" />
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-3">
-          <RadialGauge
-            value={known ? rate : 0}
-            size={56}
-            label={known ? label : "—"}
-            className={tone}
-            ariaLabel="Deployment success rate"
-          />
+          {known ? (
+            <RadialGauge
+              value={rate}
+              size={56}
+              label={label}
+              className={tone}
+              ariaLabel={t("successRate")}
+            />
+          ) : (
+            <span
+              className="inline-flex size-14 items-center justify-center text-sm"
+              role="img"
+              aria-label={t("successRateUnavailable")}
+            >
+              —
+            </span>
+          )}
           {trend && trend.length > 1 && (
             <Sparkline
               data={trend}
               variant="area"
               className={cn("ml-auto shrink-0", tone)}
-              ariaLabel="Deployment success-rate trend"
+              ariaLabel={t("successRateTrend")}
             />
           )}
         </div>
@@ -182,11 +190,26 @@ export function MetricsScreen({
   windowDays,
   metrics,
   metricsLoading,
+  metricsError,
+  healthError,
+  onRetryMetrics,
+  onRetryHealth,
   apps,
   healthLoading,
   list,
 }: MetricsScreenProps & { list: ListStateController }) {
   const fmt = useFormatters();
+  const number = useFormatter();
+  const t = useTranslations("metrics");
+  const status = useTranslations("apps.overview.latestDeploy.status");
+  function formatDuration(seconds: number | null): string {
+    if (seconds == null) return "—";
+    if (seconds < 60) return t("durationSeconds", { seconds: Math.round(seconds) });
+    return t("durationMinutesSeconds", {
+      minutes: Math.floor(seconds / 60),
+      seconds: Math.round(seconds % 60),
+    });
+  }
   const { state } = list;
   const page = selectRows(
     apps,
@@ -203,7 +226,7 @@ export function MetricsScreen({
   const columns: Column<AstroliftAppHealthSummary>[] = [
     {
       id: "app",
-      header: "App",
+      header: t("columns.app"),
       sortKey: "name",
       cellClassName: "max-w-72",
       cell: (a) => (
@@ -225,27 +248,27 @@ export function MetricsScreen({
     },
     {
       id: "envs",
-      header: "Envs",
+      header: t("columns.environments"),
       sortKey: "envs",
       cellClassName: "font-mono text-xs",
-      cell: (a) => a.environmentCount,
+      cell: (a) => fmt.formatNumber(a.environmentCount),
     },
     {
       id: "latest",
-      header: "Latest deploy",
+      header: t("columns.latestDeploy"),
       cell: (a) => (
         <span className="flex min-w-0 flex-wrap items-center gap-2">
           {a.latestDeploymentStatus ? (
             <Badge variant="secondary" className="capitalize">
-              {a.latestDeploymentStatus.replace(/_/g, " ")}
+              {status(a.latestDeploymentStatus)}
             </Badge>
           ) : (
-            <span className="text-muted-foreground text-xs">never</span>
+            <span className="text-muted-foreground text-xs">{t("never")}</span>
           )}
           {a.hasRecentFailure && (
             <Badge variant="outline" className="border-danger-border text-danger-fg gap-1">
               <FlameIcon className="size-3" />
-              recent failure
+              {t("recentFailure")}
             </Badge>
           )}
         </span>
@@ -253,7 +276,7 @@ export function MetricsScreen({
     },
     {
       id: "image",
-      header: "Image",
+      header: t("columns.image"),
       cellClassName: "max-w-56",
       cell: (a) => (
         <span className="block truncate font-mono text-xs" title={a.latestImageTag || undefined}>
@@ -263,7 +286,7 @@ export function MetricsScreen({
     },
     {
       id: "deployed",
-      header: "Last deployed",
+      header: t("columns.lastDeployed"),
       sortKey: "deployed",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (a) => (a.lastDeployedAt ? fmt.formatDateTime(a.lastDeployedAt) : "—"),
@@ -276,18 +299,42 @@ export function MetricsScreen({
     ? rolloutsPerDaySeries(metrics.dailySucceeded, metrics.dailyFailed)
     : [];
 
-  const successRateLabel = metrics ? formatPercent(metrics.successRate) : "—";
+  const successRateLabel =
+    metrics && metrics.successRate >= 0
+      ? number.number(metrics.successRate, {
+          style: "percent",
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })
+      : "—";
   const successRateHint = metrics
     ? metrics.total === 0
-      ? `No rollouts in the last ${windowDays} days`
-      : `${metrics.succeeded}/${metrics.total} succeeded over ${windowDays} days`
+      ? t("noRollouts", { days: windowDays })
+      : t("succeededWindow", {
+          succeeded: metrics.succeeded,
+          total: metrics.total,
+          days: windowDays,
+        })
     : undefined;
 
   return (
-    <PageShell
-      title="Metrics"
-      description="Platform health rollups: deployment success rate, recent rollout durations, per-app status. Raw Prometheus exposition is linked at the bottom."
-    >
+    <PageShell title={t("title")} description={t("description")}>
+      {metricsError && (
+        <div
+          role="alert"
+          className="border-danger-border bg-danger-bg flex flex-wrap items-center gap-3 rounded-md border p-3 text-sm"
+        >
+          <div className="min-w-0 flex-1">
+            <p>{t(metrics ? "staleMetrics" : "metricsUnavailable")}</p>
+            <p className="text-muted-foreground break-words">{metricsError}</p>
+          </div>
+          {onRetryMetrics && (
+            <Button variant="outline" onClick={onRetryMetrics}>
+              {t("retryMetrics")}
+            </Button>
+          )}
+        </div>
+      )}
       {/* Top KPI row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metricsLoading && !metrics ? (
@@ -302,22 +349,22 @@ export function MetricsScreen({
             />
             <MetricCard
               icon={<ActivityIcon className="size-4" />}
-              label="In flight"
-              value={metrics ? String(metrics.inFlight) : "—"}
-              hint="Pending approval, pending, deploying, or redeploying"
+              label={t("inFlight")}
+              value={metrics ? fmt.formatNumber(metrics.inFlight) : "—"}
+              hint={t("inFlightHint")}
             />
             <MetricCard
               icon={<ClockIcon className="size-4" />}
-              label="Mean rollout"
+              label={t("meanRollout")}
               value={formatDuration(metrics?.meanDurationSeconds ?? null)}
-              hint="Average across terminal-state deploys in window"
+              hint={t("meanRolloutHint")}
               trend={durationTrend}
             />
             <MetricCard
               icon={<GaugeIcon className="size-4" />}
-              label="p95 rollout"
+              label={t("p95Rollout")}
               value={formatDuration(metrics?.p95DurationSeconds ?? null)}
-              hint="Slow tail — anything over a couple of minutes warrants a look"
+              hint={t("p95RolloutHint")}
             />
           </>
         )}
@@ -327,36 +374,36 @@ export function MetricsScreen({
       {metrics && metrics.total > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Outcomes ({windowDays}d)</CardTitle>
+            <CardTitle className="text-base">{t("outcomes", { days: windowDays })}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary" className="gap-1">
                 <CheckCircle2Icon className="text-success-fg size-3" />
-                succeeded {metrics.succeeded}
+                {t("succeeded", { count: metrics.succeeded })}
               </Badge>
               <Badge variant="secondary" className="gap-1">
                 <FlameIcon className="text-danger-fg size-3" />
-                failed {metrics.failed}
+                {t("failed", { count: metrics.failed })}
               </Badge>
               <Badge variant="secondary" className="gap-1">
                 <AlertTriangleIcon className="text-warning-fg size-3" />
-                rolled back {metrics.rolledBack}
+                {t("rolledBack", { count: metrics.rolledBack })}
               </Badge>
-              <Badge variant="outline">in flight {metrics.inFlight}</Badge>
-              <Badge variant="outline">total {metrics.total}</Badge>
+              <Badge variant="outline">{t("inFlightCount", { count: metrics.inFlight })}</Badge>
+              <Badge variant="outline">{t("total", { count: metrics.total })}</Badge>
             </div>
             {rolloutsTrend.some((n) => n > 0) && (
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground text-2xs tracking-wide uppercase">
-                  {windowDays}-day rollouts
+                  {t("rolloutsWindow", { days: windowDays })}
                 </span>
                 <MiniBar
                   data={rolloutsTrend}
                   width={180}
                   height={32}
                   className="text-chart-1"
-                  ariaLabel="Rollouts per day"
+                  ariaLabel={t("rolloutsPerDay")}
                 />
               </div>
             )}
@@ -365,12 +412,12 @@ export function MetricsScreen({
       )}
 
       {/* Per-app health: the page's one list */}
-      <section className="flex min-w-0 flex-col gap-3" aria-label="Apps">
-        <h2 className="text-base font-semibold">Apps</h2>
+      <section className="flex min-w-0 flex-col gap-3" aria-label={t("apps")}>
+        <h2 className="text-base font-semibold">{t("apps")}</h2>
         <ListPage<AstroliftAppHealthSummary>
           embedded
-          list={list}
-          label="Apps"
+          list={{ ...list, definition: localizedMetricsAppsList(t, status) }}
+          label={t("apps")}
           columns={columns}
           rows={page.rows}
           getRowId={(a) => a.appSlug}
@@ -378,13 +425,16 @@ export function MetricsScreen({
             `/${a.primitiveKind === "agent" ? "agents" : "apps"}/${encodeURIComponent(a.appSlug)}`
           }
           loading={healthLoading && apps.length === 0}
+          error={healthError ? { message: healthError } : undefined}
+          stale={Boolean(healthError && apps.length > 0)}
+          onRetry={onRetryHealth}
           totalCount={page.totalCount}
           empty={{
             icon: <BarChart3Icon className="size-5" />,
-            title: "No apps yet",
-            description: "Register an app on the Apps page; metrics will populate once it deploys.",
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
             actionHref: "/apps",
-            actionLabel: "Open apps",
+            actionLabel: t("openApps"),
           }}
         />
       </section>
@@ -398,7 +448,7 @@ export function MetricsScreen({
           rel="noreferrer"
         >
           <ExternalLinkIcon className="size-3" />
-          Raw Prometheus exposition
+          {t("rawPrometheus")}
         </a>
         {temporalUiUrl?.trim() && (
           <a
@@ -408,13 +458,10 @@ export function MetricsScreen({
             rel="noreferrer"
           >
             <ExternalLinkIcon className="size-3" />
-            Temporal UI (workflows)
+            {t("temporalUi")}
           </a>
         )}
-        <span className="text-muted-foreground/70">
-          Grafana embeds land in v2 — wire a prometheus + grafana docker profile and these cards
-          become live charts.
-        </span>
+        <span className="text-muted-foreground/70">{t("embeddedDashboardsUnavailable")}</span>
       </div>
     </PageShell>
   );

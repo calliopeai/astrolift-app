@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useQuery } from "@apollo/client/react";
 
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
@@ -24,25 +26,37 @@ interface WorkflowRunsResp {
   workflowDefinitionRuns: WorkflowDefinitionRun[];
 }
 
-export function agentFailedItem(t: HomeAgentTask): FailedRunItem {
+export function agentFailedItem(t: HomeAgentTask, missing?: string): FailedRunItem {
   return {
     key: `agent:${t.id}`,
     kind: "agent",
     subject: t.agentName || t.agentSlug,
     id: t.id,
-    reason: runReason(t.failureMessage),
+    reason: runReason(t.failureMessage, missing),
     at: t.finishedAt ?? t.startedAt ?? t.createdAt,
     href: agentRunHref(t.id),
   };
 }
 
-export function workflowFailedItem(r: WorkflowDefinitionRun): FailedRunItem {
+export function workflowFailedItem(
+  r: WorkflowDefinitionRun,
+  t?: ReturnType<typeof useTranslations<"home">>
+): FailedRunItem {
   return {
     key: `workflow:${r.guid}`,
     kind: "workflow",
     subject: r.definitionName || r.definitionSlug,
     id: r.guid,
-    reason: workflowRunReason(r),
+    reason: t
+      ? r.currentStageOrder == null
+        ? t(r.status === "timed_out" ? "copy.timedOut" : "status.failed")
+        : t(r.status === "timed_out" ? "operations.timedOutAt" : "operations.failedAt", {
+            stage: t("operations.stage", {
+              order: r.currentStageOrder,
+              role: r.currentStageRole ? ` (${r.currentStageRole})` : "",
+            }),
+          })
+      : workflowRunReason(r),
     at: r.endedAt ?? r.startedAt ?? "",
     href: workflowRunHref(r.definitionSlug, r.guid),
   };
@@ -55,6 +69,7 @@ export function workflowFailedItem(r: WorkflowDefinitionRun): FailedRunItem {
  * unless five came back and there may be more.
  */
 export function useFailedRuns(): Omit<FailedRunsPanelViewProps, "panel"> {
+  const t = useTranslations("home");
   const { canView } = usePanelAccess();
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
@@ -67,7 +82,10 @@ export function useFailedRuns(): Omit<FailedRunsPanelViewProps, "panel"> {
     skip: !orgId || !workflowsOn,
   });
   const workflowRuns = workflowsOn ? (workflows.data?.workflowDefinitionRuns ?? []) : [];
-  const items = [...agents.runs.map(agentFailedItem), ...workflowRuns.map(workflowFailedItem)];
+  const items = [
+    ...agents.runs.map((r) => agentFailedItem(r, t("copy.noRunReason"))),
+    ...workflowRuns.map((r) => workflowFailedItem(r, t)),
+  ];
 
   const sources: HomeRead[] = [agents];
   if (workflowsOn) sources.push(readState(workflows, Boolean(workflows.data)));

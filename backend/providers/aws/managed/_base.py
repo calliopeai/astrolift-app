@@ -111,3 +111,51 @@ def tags_for(spec: ProvisionSpec) -> list[dict[str, str]]:
     base.update({f"astrolift.io/extra/{k}": v for k, v in (spec.tags or {}).items()})
     # AWS tag list shape
     return [{"Key": k, "Value": v} for k, v in base.items()]
+
+
+def live_ownership_refusal(existing_tags, *, managed_service_id: str, resource: str) -> str | None:
+    """Live binding/update/teardown never infer an incarnation from slugs.
+
+    Custom tags are namespaced separately. Only the platform marker and exact
+    persisted managed-service identity authorize the current resource.
+    """
+    if not managed_service_id:
+        return f"{resource}: managed-service identity is required to verify live ownership"
+    if isinstance(existing_tags, dict):
+        tags = existing_tags
+    elif isinstance(existing_tags, list):
+        tags = {}
+        for row in existing_tags:
+            if (
+                not isinstance(row, dict)
+                or not isinstance(row.get("Key"), str)
+                or not isinstance(row.get("Value"), str)
+            ):
+                return f"{resource}: live ownership tags are unknown"
+            if row["Key"] in tags:
+                return f"{resource}: duplicate live ownership tags are unknown"
+            tags[row["Key"]] = row["Value"]
+    else:
+        return f"{resource}: live ownership tags are unknown"
+    if tags.get("astrolift.io/managed-by") != "platform":
+        return f"{resource}: platform ownership marker is missing; refusing live access"
+    owner = tags.get("astrolift.io/managed_service_id")
+    if owner != managed_service_id:
+        return f"{resource}: live managed-service ownership does not match; refusing access"
+    return None
+
+
+def assert_resource_arn(arn: str, *, service: str, region: str, resource: str, account: str = "") -> None:
+    parts = arn.split(":", 5) if isinstance(arn, str) else []
+    if (
+        len(parts) != 6
+        or parts[0] != "arn"
+        or not parts[1]
+        or parts[2] != service
+        or parts[3] != region
+        or len(parts[4]) != 12
+        or not parts[4].isdigit()
+        or (account and parts[4] != account)
+        or parts[5] != resource
+    ):
+        raise ManagedServiceError("live AWS resource identity does not match the recorded driver target")

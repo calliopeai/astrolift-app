@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 
@@ -35,39 +37,70 @@ interface ApproveResp {
 }
 
 /** A deploy waiting on approval that the viewer did not trigger (they cannot approve their own). */
-export function deployItem(d: AstroliftDeployment): WaitingItem {
-  const env = d.environmentName || "every environment";
+export function deployItem(
+  d: AstroliftDeployment,
+  t?: ReturnType<typeof useTranslations<"home">>
+): WaitingItem {
+  const env = d.environmentName || (t ? t("operations.everyEnvironment") : "every environment");
   return {
     key: `deploy:${d.id}`,
     kind: "deploy",
-    title: `${d.registeredAppSlug} to ${env}`,
-    detail: `${d.imageTag || deployShort(d)} · ${d.approvalsReceived}/${d.approvalsRequired} approvals`,
+    title: t
+      ? t("operations.deployTitle", { app: d.registeredAppSlug, environment: env })
+      : `${d.registeredAppSlug} to ${env}`,
+    detail: t
+      ? t("operations.deployDetail", {
+          image: d.imageTag || deployShort(d),
+          received: d.approvalsReceived,
+          required: d.approvalsRequired,
+        })
+      : `${d.imageTag || deployShort(d)} · ${d.approvalsReceived}/${d.approvalsRequired} approvals`,
     at: d.createdAt,
     href: deployHref(d.id),
     approveId: d.id,
   };
 }
 
-export function gateItem(g: PendingHumanGate): WaitingItem {
+export function gateItem(
+  g: PendingHumanGate,
+  t?: ReturnType<typeof useTranslations<"home">>
+): WaitingItem {
   return {
     key: `gate:${g.runGuid}:${g.executionId}`,
     kind: "gate",
-    title: `${g.definitionName || g.definitionSlug} · ${g.stageRole || "human gate"}`,
+    title: `${g.definitionName || g.definitionSlug} · ${g.stageRole || (t ? t("operations.humanGate") : "human gate")}`,
     detail: g.stageApprovers.length
-      ? `Approvers: ${g.stageApprovers.join(", ")}`
-      : "Any approver may decide",
+      ? t
+        ? t("operations.approvers", { approvers: g.stageApprovers.join(", ") })
+        : `Approvers: ${g.stageApprovers.join(", ")}`
+      : t
+        ? t("operations.anyApprover")
+        : "Any approver may decide",
     at: g.startedAt ?? "",
     href: workflowRunHref(g.definitionSlug, g.runGuid),
   };
 }
 
-export function secretItem(p: AstroliftSecretChangeProposal): WaitingItem {
-  const env = p.environmentName || "app-wide";
+export function secretItem(
+  p: AstroliftSecretChangeProposal,
+  t?: ReturnType<typeof useTranslations<"home">>
+): WaitingItem {
+  const env = p.environmentName || (t ? t("operations.appWide") : "app-wide");
   return {
     key: `secret:${p.id}`,
     kind: "secret",
-    title: `${p.registeredAppSlug} secrets · ${env}`,
-    detail: `${p.op}${p.proposerDisplayName ? ` by ${p.proposerDisplayName}` : ""} · ${p.approvalsCount}/${p.requiredApproverCount} approvals`,
+    title: t
+      ? t("operations.secretTitle", { app: p.registeredAppSlug, environment: env })
+      : `${p.registeredAppSlug} secrets · ${env}`,
+    detail: t
+      ? t("operations.secretDetail", {
+          operation: p.proposerDisplayName
+            ? t("operations.secretBy", { operation: p.op, name: p.proposerDisplayName })
+            : p.op,
+          received: p.approvalsCount,
+          required: p.requiredApproverCount,
+        })
+      : `${p.op}${p.proposerDisplayName ? ` by ${p.proposerDisplayName}` : ""} · ${p.approvalsCount}/${p.requiredApproverCount} approvals`,
     at: p.createdAt,
     href: `/approvals/secret/${encodeURIComponent(p.id)}`,
   };
@@ -80,6 +113,7 @@ export function secretItem(p: AstroliftSecretChangeProposal): WaitingItem {
  * act on that kind. Tool approvals have no query yet (see needsBackend).
  */
 export function useWaiting(): Omit<WaitingPanelViewProps, "panel"> {
+  const t = useTranslations("home");
   const { canView, can } = usePanelAccess();
   const deploysOn = canView("apps") && can("app.approve_deploy");
   const gatesOn = canView("workflows");
@@ -102,10 +136,12 @@ export function useWaiting(): Omit<WaitingPanelViewProps, "panel"> {
     ...(deploysOn
       ? deploys.deployments
           .filter((d) => d.status === "pending_approval" && !d.triggeredByMe)
-          .map(deployItem)
+          .map((d) => deployItem(d, t))
       : []),
-    ...(gatesOn ? gates.gates.map(gateItem) : []),
-    ...(secretsOn ? (proposals.data?.astroliftSecretChangeProposals ?? []).map(secretItem) : []),
+    ...(gatesOn ? gates.gates.map((g) => gateItem(g, t)) : []),
+    ...(secretsOn
+      ? (proposals.data?.astroliftSecretChangeProposals ?? []).map((p) => secretItem(p, t))
+      : []),
   ];
 
   const sources: HomeRead[] = [];
@@ -120,8 +156,15 @@ export function useWaiting(): Omit<WaitingPanelViewProps, "panel"> {
     onApprove: async (id: string) => {
       const { data } = await approve({ variables: { input: { id } } });
       const result = data?.approveDeployment;
-      if (!result?.ok) throw new Error(result?.errors[0]?.message ?? "Approve failed");
-      toast.success(`Approved: ${result.data?.status ?? "ok"}`);
+      if (!result?.ok) throw new Error(result?.errors[0]?.message ?? t("operations.approveFailed"));
+      const status = result.data?.status;
+      toast.success(
+        status
+          ? t("operations.approved", {
+              status: t.has(`status.${status}`) ? t(`status.${status}`) : status,
+            })
+          : t("status.approved")
+      );
     },
   };
 }

@@ -57,6 +57,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "clusters.adopt",
     "clusters.teardown",
     "clusters.capabilities_probe",
+    "apps.dependency_context",
+    "providers.reference_read",
     # Deploy pipeline (start/promote/rollback/teardown).
     "deploys.start",
     "deploys.promote",

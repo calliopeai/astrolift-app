@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import { renderWithIntl as render } from "@/test/render-with-intl";
 import { ApolloClient, ApolloLink, InMemoryCache, type Operation } from "@apollo/client";
 import { ApolloProvider, useQuery } from "@apollo/client/react";
@@ -110,7 +112,9 @@ const transport = (response: (operation: Operation) => Data | Error) => {
     requests,
     client,
     wrapper: ({ children }: { children: ReactNode }) => (
-      <ApolloProvider client={client}>{children}</ApolloProvider>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+        <ApolloProvider client={client}>{children}</ApolloProvider>
+      </NextIntlClientProvider>
     ),
   };
 };

@@ -2,6 +2,8 @@
 
 import { AlertTriangleIcon, ChevronRightIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
+import { presetLabel, scopePresentation } from "./scope-presentation";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,13 +40,17 @@ export type ScopePickerProps = ReturnType<typeof useScopeCatalog> & {
  * disabled with the reason.
  */
 export function ScopePicker({ catalog, loading, error, value, onChange }: ScopePickerProps) {
+  const t = useTranslations("apiKeys");
   if (loading && !catalog) {
     return <Skeleton className="h-48 w-full" />;
   }
   if (error || !catalog) {
     return (
       <p className="text-destructive text-sm">
-        Couldn&apos;t load the scope list. Reload the page to try again.
+        {t("picker.loadFailed")}
+        {error?.message ? (
+          <span className="block [overflow-wrap:anywhere]">{error.message}</span>
+        ) : null}
       </p>
     );
   }
@@ -61,7 +67,7 @@ export function ScopePicker({ catalog, loading, error, value, onChange }: ScopeP
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground text-xs">Start from</span>
+        <span className="text-muted-foreground text-xs">{t("picker.startFrom")}</span>
         {catalog.presets.map((preset) => (
           <Button
             key={preset.key}
@@ -70,7 +76,7 @@ export function ScopePicker({ catalog, loading, error, value, onChange }: ScopeP
             variant="outline"
             onClick={() => onChange(preset.scopes.filter((s) => usable.has(s)))}
           >
-            {preset.label}
+            {presetLabel(preset.key, preset.label, t)}
           </Button>
         ))}
       </div>
@@ -81,18 +87,14 @@ export function ScopePicker({ catalog, loading, error, value, onChange }: ScopeP
           className="border-warning-border bg-warning-bg text-warning-fg flex gap-2 rounded-md border p-3 text-xs"
         >
           <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
-          <p>
-            <span className="font-medium">Admin</span> lets this token do everything its owner can,
-            including permissions added after today. Pick the narrow scopes above unless the token
-            really needs all of it, and give it an expiry.
-          </p>
+          <p>{t("picker.adminWarning")}</p>
         </div>
       )}
 
       {[...bySurface.entries()].map(([surface, scopes]) => (
         <fieldset key={surface} className="min-w-0 space-y-1.5">
           <legend className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
-            {SURFACE_TITLES[surface] ?? surface}
+            {Object.hasOwn(SURFACE_TITLES, surface) ? t(`picker.surfaces.${surface}`) : surface}
           </legend>
           {scopes.map((scope) => (
             <ScopeRow
@@ -117,6 +119,8 @@ function ScopeRow({
   checked: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations("apiKeys");
+  const presentation = scopePresentation(scope, t);
   const id = `scope-${scope.value.replace(/[^a-z0-9]/gi, "-")}`;
   // A scope already selected stays removable even when it is not usable, so a
   // preset or an older default can always be undone.
@@ -138,24 +142,23 @@ function ScopeRow({
       />
       <div className="min-w-0 flex-1 space-y-1">
         <label htmlFor={id} className="flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
-          {scope.label}
+          {presentation.label}
           <code className="text-muted-foreground font-mono text-xs font-normal">{scope.value}</code>
           {scope.sensitive && (
-            <span className="text-warning-fg text-xs font-normal">sensitive</span>
+            <span className="text-warning-fg text-xs font-normal">{t("picker.sensitive")}</span>
           )}
         </label>
         <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
-          {scope.description}
+          {presentation.description}
         </p>
         {!scope.available && (
-          <p className="text-muted-foreground text-xs italic">{scope.unavailableReason}</p>
+          <p className="text-muted-foreground text-xs italic">{presentation.unavailableReason}</p>
         )}
         {scope.permissions.length > 0 && scope.value !== "admin" && (
           <Collapsible>
             <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group flex items-center gap-1 text-xs">
               <ChevronRightIcon className="size-3 transition group-data-[state=open]:rotate-90" />
-              Unlocks {scope.permissions.length} permission
-              {scope.permissions.length === 1 ? "" : "s"}
+              {t("picker.unlocks", { count: scope.permissions.length })}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <ul className="mt-1 flex flex-wrap gap-1">

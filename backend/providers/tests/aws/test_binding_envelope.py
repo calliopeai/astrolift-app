@@ -22,8 +22,16 @@ from _sdk.managed_service import ServiceHandle
 def test_s3_binding_emits_canonical_object_store_envelope():
     from aws.managed.object_store_s3 import S3Config, S3Driver
 
-    drv = S3Driver(config=S3Config(region="us-west-2"), client=MagicMock())
-    binding = drv.binding(ServiceHandle(handle="object_store/astrolift-acme-bucket"))
+    source_id = "11111111-1111-4111-8111-111111111111"
+    client = MagicMock()
+    client.get_bucket_tagging.return_value = {
+        "TagSet": [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/managed_service_id", "Value": source_id},
+        ]
+    }
+    drv = S3Driver(config=S3Config(region="us-west-2"), client=client)
+    binding = drv.binding(ServiceHandle(handle="object_store/astrolift-acme-bucket", managed_service_id=source_id))
     keys = set(binding.env_vars)
     assert set(envelope_keys_for("object_store")) <= keys, keys
     assert binding.env_vars["BUCKET_NAME"].literal == "astrolift-acme-bucket"

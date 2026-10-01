@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
@@ -81,4 +84,16 @@ export const Width768: Story = {
       </div>
     ),
   ],
+};
+
+export const FrenchCappedWidth768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={fr}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  args: { capped: true },
+  globals: { viewport: { value: "width768" } },
 };

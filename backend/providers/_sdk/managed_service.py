@@ -79,6 +79,10 @@ class ProvisionSpec:
     See ``UpdateSpec.recorded_handle_exclusive``."""
     cluster_model: ClusterModelPlacement | None = None
     """Verified third-owner placement and desired subscriber credential snapshot."""
+    recorded_container_exclusive: bool = False
+    """Internal platform proof that no other live/unreconciled service can occupy
+    this exact driver/project/container. A provider must independently check
+    its actual complete child-resource set before resizing/deleting a container."""
 
 
 @dataclass(frozen=True)
@@ -121,6 +125,10 @@ class UpdateSpec:
     project. ``False`` means "not established", never "contested", so a caller that
     leaves it unset gets a refusal rather than a pass."""
     cluster_model: ClusterModelPlacement | None = None
+
+    organization_id: str = ""
+    recorded_container_exclusive: bool = False
+    """See ProvisionSpec.recorded_container_exclusive. Unknown never grants authority."""
 
 
 @dataclass(frozen=True)
@@ -179,6 +187,10 @@ class DeprovisionSpec:
     recorded_handle_exclusive: bool = False
     """See ``UpdateSpec.recorded_handle_exclusive``."""
 
+    organization_id: str = ""
+    recorded_container_exclusive: bool = False
+    """See ProvisionSpec.recorded_container_exclusive."""
+
 
 @dataclass(frozen=True)
 class DeprovisionResult:
@@ -203,6 +215,9 @@ class ServiceHandle:
     managed_service_id: str = ""
     recorded_handle_exclusive: bool = False
     """See ``UpdateSpec.recorded_handle_exclusive``."""
+
+    organization_id: str = ""
+    recorded_container_exclusive: bool = False
 
 
 @dataclass(frozen=True)
@@ -357,6 +372,10 @@ class SliceSpec:
 
     labels: dict[str, str] = field(default_factory=dict)
     """Provider tags/labels to stamp, so an orphaned slice is attributable."""
+    organization_id: str = ""
+    app_id: str = ""
+    environment_id: str = ""
+    """Immutable consumer ownership for independent credential namespaces."""
 
     def __post_init__(self) -> None:
         if not (self.slice_id or "").strip():

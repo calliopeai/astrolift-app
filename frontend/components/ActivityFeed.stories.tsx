@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { ActivityFeed } from "@/components/ActivityFeed";
@@ -53,4 +56,20 @@ export const Loading: StoryObj = { render: () => <ActivityFeed {...BASE} loading
 export const Empty: StoryObj = { render: () => <ActivityFeed {...BASE} items={[]} /> };
 export const Error: StoryObj = {
   render: () => <ActivityFeed {...BASE} error="upstream timed out" items={[]} />,
+};
+
+export const Japanese: StoryObj = {
+  ...Items,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider
+        locale="ja"
+        messages={ja}
+        timeZone="UTC"
+        now={new Date("2026-09-28T12:00:00Z")}
+      >
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

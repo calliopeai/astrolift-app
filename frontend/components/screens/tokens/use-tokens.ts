@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -17,7 +18,7 @@ import type {
 import { GET_ME } from "@/graphql/user/user.queries";
 import type { MeQueryData } from "@/graphql/user/user.types";
 
-import { narrows, narrowTokens, TOKENS_LIST, tokensVariables } from "./tokens-list";
+import { narrows, narrowTokens, localizedTokensList, tokensVariables } from "./tokens-list";
 
 interface Resp {
   astroliftApiTokensPage: {
@@ -41,6 +42,7 @@ export interface CreateApiTokenInput {
  * MCP endpoint. The data half of TokensScreen.
  */
 export function useTokens() {
+  const t = useTranslations("apiKeys");
   const [createdToken, setCreatedToken] = React.useState<AstroliftApiTokenPlaintext | null>(null);
   const [mcpEndpoint, setMcpEndpoint] = React.useState("/api/mcp/v1/");
 
@@ -48,7 +50,7 @@ export function useTokens() {
     setMcpEndpoint(`${window.location.origin}/api/mcp/v1/`);
   }, []);
 
-  const list = useListState(TOKENS_LIST);
+  const list = useListState(localizedTokensList(t));
   const me = useQuery<MeQueryData>(GET_ME).data?.me?.profile?.username ?? null;
   const query = useQuery<Resp>(LIST_API_TOKENS_PAGE, {
     variables: tokensVariables(list.filters, list.state),
@@ -66,16 +68,16 @@ export function useTokens() {
   const [createToken, { loading: creating }] = useMutation<{
     createApiToken: MutationResult<AstroliftApiTokenPlaintext>;
   }>(CREATE_API_TOKEN, {
-    refetchQueries: refetchPage,
-    onQueryUpdated: refetchAfterMutation,
+    refetchQueries: (result) => (result.data?.createApiToken.ok ? refetchPage : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
     awaitRefetchQueries: true,
   });
 
   const [revokeToken, { loading: revoking }] = useMutation<{
     revokeApiToken: MutationResult<{ id: string; deleted: boolean }>;
   }>(REVOKE_API_TOKEN, {
-    refetchQueries: refetchPage,
-    onQueryUpdated: refetchAfterMutation,
+    refetchQueries: (result) => (result.data?.revokeApiToken.ok ? refetchPage : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
     awaitRefetchQueries: true,
   });
 
@@ -83,7 +85,7 @@ export function useTokens() {
   async function onCreate(input: CreateApiTokenInput): Promise<boolean> {
     try {
       if (input.scopes.length === 0) {
-        toast.error("Pick at least one scope");
+        toast.error(t("pickScope"));
         return false;
       }
       const { data } = await createToken({
@@ -99,33 +101,39 @@ export function useTokens() {
         setCreatedToken(data.createApiToken.data);
         return true;
       }
-      toast.error(data?.createApiToken.errors?.[0]?.message ?? "Create failed");
+      toast.error(data?.createApiToken.errors?.[0]?.message ?? t("createFailed"));
       return false;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Create failed");
+      toast.error(err instanceof Error && err.message ? err.message : t("createFailed"));
       return false;
     }
   }
 
   /** Throws on failure so the confirm dialog stays open and shows the error. */
-  async function onRevoke(t: AstroliftApiToken) {
-    const { data } = await revokeToken({ variables: { input: { id: t.id } } });
+  async function onRevoke(tk: AstroliftApiToken) {
+    const { data } = await revokeToken({ variables: { input: { id: tk.id } } });
     if (data?.revokeApiToken.ok) {
-      toast.success("Revoked");
+      toast.success(t("revokedFeedback"));
     } else {
-      throw new Error(data?.revokeApiToken.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(data?.revokeApiToken.errors?.[0]?.message ?? t("revokeFailed"));
     }
   }
 
-  function onCopyPlaintext() {
-    if (!createdToken) return;
-    navigator.clipboard.writeText(createdToken.plaintext);
-    toast.success("Copied to clipboard");
+  async function copy(value: string, message: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(message);
+    } catch {
+      toast.error(t("copyFailed"));
+    }
   }
 
-  function onCopyMcpEndpoint() {
-    navigator.clipboard.writeText(mcpEndpoint);
-    toast.success("MCP endpoint copied");
+  async function onCopyPlaintext() {
+    if (createdToken) await copy(createdToken.plaintext, t("copied"));
+  }
+
+  async function onCopyMcpEndpoint() {
+    await copy(mcpEndpoint, t("endpointCopied"));
   }
 
   return {

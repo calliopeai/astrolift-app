@@ -32,6 +32,7 @@ from _sdk.managed_service import (
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._secret_refs import shared_namespace_owner_refusal
+from k8s_native.managed._service_dns import service_host
 
 KIND = "event_stream"
 
@@ -173,11 +174,13 @@ class NATSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="event_stream_nats")
     def binding(self, handle: ServiceHandle) -> Binding:
-        name = _unpack_handle(handle.handle).name
+        parsed = _unpack_handle(handle.handle)
+        name = parsed.name
+        host = service_host(parsed, name=name)
         return Binding(
             env_vars={
                 "EVENT_STREAM_BROKERS": ValueRef(
-                    literal=f"nats://{name}:4222",
+                    literal=f"nats://{host}:4222",
                 ),
                 "EVENT_STREAM_TLS": ValueRef(literal="false"),
             },

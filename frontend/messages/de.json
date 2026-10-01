@@ -3639,7 +3639,141 @@
     "sourceTooltipAria": "Vergeben über {scope}",
     "sourceColumn": "Quelle",
     "grantRoleRowLabel": "Rolle an {name} vergeben",
-    "grantRoleRowTooltip": "Rolle an {name} vergeben"
+    "grantRoleRowTooltip": "Rolle an {name} vergeben",
+    "people": {
+      "title": "Personen",
+      "description": "Benutzer und Gruppen des Identitätsanbieters mit Zugriff auf diese Organisation.",
+      "columns": {
+        "who": "Person oder Gruppe",
+        "roles": "Rollen",
+        "teams": "Teams",
+        "status": "Status",
+        "joined": "Beigetreten"
+      },
+      "actions": {
+        "viewAccess": "Zugriff ansehen",
+        "resend": "Einladung erneut senden",
+        "revoke": "Widerrufen",
+        "deleteResolved": "Diese erledigte Einladung löschen",
+        "grantTo": "{name} Zugriff gewähren",
+        "alreadyAnonymized": "Bereits anonymisiert",
+        "anonymize": "Benutzerdaten anonymisieren",
+        "invite": "Einladen",
+        "grant": "Zugriff gewähren"
+      },
+      "emptyTitle": "Noch keine Personen",
+      "emptyDescription": "Laden Sie jemanden in die Organisation ein und weisen Sie eine Rolle zu.",
+      "confirm": {
+        "resend": {
+          "title": "Einladung an {email} erneut senden?",
+          "description": "Erzeugt einen neuen Einmallink und versucht ihn per E-Mail zu senden. Der alte Link wird sofort ungültig. Kopieren Sie den neuen Link, falls der Versand fehlschlägt.",
+          "label": "Einladung erneut senden"
+        },
+        "revoke": {
+          "title": "Einladung für {email} widerrufen?",
+          "description": "Der Link der ausstehenden Einladung wird sofort ungültig. Bei Bedarf können Sie eine neue Einladung senden.",
+          "label": "Widerrufen"
+        },
+        "delete": {
+          "title": "Erledigte Einladung für {email} löschen?",
+          "description": "Entfernt diese erledigte Einladung aus der Liste. Mitgliedschaft und Rollen bleiben erhalten.",
+          "label": "Löschen"
+        }
+      },
+      "export": {
+        "actions": "Weitere Listenaktionen",
+        "working": "CSV wird exportiert…",
+        "label": "{count, number} als CSV exportieren"
+      },
+      "grants": "{count, plural, one {# Zuweisung} other {# Zuweisungen}}",
+      "mappings": ", {count, plural, one {# Zuordnung} other {# Zuordnungen}}",
+      "idpGroup": "Gruppe des Identitätsanbieters",
+      "admin": "Administrator",
+      "invitationStatus": {
+        "pending": "ausstehend",
+        "accepted": "angenommen",
+        "expired": "abgelaufen",
+        "revoked": "widerrufen"
+      },
+      "lifecycle": {
+        "active": "aktiv",
+        "invited": "eingeladen",
+        "pending_invite": "Einladung ausstehend",
+        "pending_first_login": "erste Anmeldung ausstehend",
+        "suspended": "gesperrt",
+        "deactivated": "deaktiviert",
+        "anonymized": "anonymisiert"
+      },
+      "filters": {
+        "kind": "Art",
+        "role": "Rolle",
+        "team": "Team",
+        "lifecycle": "Lebenszyklus",
+        "active": "Zuletzt aktiv",
+        "status": "Einladungsstatus"
+      },
+      "options": {
+        "kind": {
+          "user": "Benutzer",
+          "group": "Gruppe",
+          "invitation": "Einladung"
+        },
+        "active": {
+          "7d": "in den letzten 7 Tagen",
+          "30d": "in den letzten 30 Tagen",
+          "90d": "in den letzten 90 Tagen",
+          "stale": "seit 90 Tagen nicht aktiv",
+          "never": "nie"
+        }
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "invited": "Eingeladene",
+        "groups": "Gruppen",
+        "admins": "Administratoren"
+      },
+      "notes": {
+        "mine": "Personen, die mit Ihnen in einem Team sind.",
+        "invited": "Ausstehende Einladungen. Verwenden Sie den Statusfilter für angenommene, abgelaufene oder widerrufene Einladungen.",
+        "groups": "Bekannte Gruppen des Identitätsanbieters aus Anmeldungen, Zuweisungen und Zuordnungen. Der Gruppenzugriff gilt für alle vom Anbieter zugeordneten Personen."
+      },
+      "searchPlaceholder": "Personen, E-Mails, Gruppen suchen…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "Der Export hat keine Datei geliefert",
+      "noGroups": "Der Export hat keine Gruppen geliefert",
+      "groupsChanged": "Die Gruppenliste wurde während des Exports geändert; exportieren Sie erneut",
+      "exportFailed": "Der Export ist fehlgeschlagen",
+      "refreshWarning": "Die Änderung wurde gespeichert, aber die Liste konnte nicht aktualisiert werden. Aktualisieren Sie die Ansicht, ohne die erfolgreiche Aktion zu wiederholen.",
+      "revoked": "Einladung widerrufen",
+      "revokeFailed": "Widerruf fehlgeschlagen",
+      "resendFailed": "Erneutes Senden fehlgeschlagen",
+      "resent": "Einladung erneut an {email} gesendet",
+      "resendDescription": "Der vorherige Link ist ungültig. Kopieren Sie den neuen Link als Alternative.",
+      "copyLink": "Link kopieren",
+      "linkCopied": "Annahmelink kopiert",
+      "copyFailed": "Kopieren fehlgeschlagen",
+      "deleted": "Einladung gelöscht",
+      "deleteFailed": "Löschen fehlgeschlagen",
+      "anonymizeFailed": "Anonymisierung fehlgeschlagen",
+      "anonymized": "Benutzerdaten anonymisiert."
+    },
+    "anonymization": {
+      "title": "{name} anonymisieren?",
+      "changes": "Diese Änderungen erfolgen",
+      "identity": "Kontonamen und E-Mail werden durch eine anonyme Identität ersetzt.",
+      "profile": "Persönliche Profilfelder, Telefon, Avatar, Adresse und Signatur werden gelöscht oder ersetzt.",
+      "account": "Die Anmeldung wird deaktiviert und Mitgliedschaften in Authentifizierungsgruppen werden entfernt.",
+      "memberships": "Mitgliedschaften auf der gesamten Plattform werden deaktiviert.",
+      "preserves": "Diese Daten bleiben erhalten",
+      "records": "Der Kontodatensatz und Verknüpfungen aus früheren Aktionen bleiben erhalten.",
+      "history": "Diese Aktion löscht weder historische Audit-Inhalte noch gespeicherte Rollenzuweisungen.",
+      "irreversible": "Diese Aktion ist unumkehrbar. Die ursprünglichen personenbezogenen Daten können nicht wiederhergestellt werden. Eine Wiederholung bei einem bereits anonymisierten Konto bewirkt keine weiteren Änderungen.",
+      "acknowledge": "Ich verstehe, dass dies unumkehrbar ist.",
+      "working": "Wird anonymisiert…",
+      "confirm": "Benutzerdaten anonymisieren"
+    }
   },
   "stepUp": {
     "title": "Bestätige deine Identität",
@@ -3723,6 +3857,17 @@
         "empty": "Noch keine Genehmigungen erfasst.",
         "unknownApprover": "unbekannt"
       }
+    },
+    "pendingGates": {
+      "title": "Ausstehende Freigaben",
+      "loadingDescription": "Manuelle Prüfungen der Organisation, die auf eine Entscheidung warten.",
+      "description": "Workflow-Prüfungen der Organisation, über die Sie entscheiden können, neueste zuerst.",
+      "refresh": "Ausstehende Freigaben aktualisieren",
+      "emptyTitle": "Keine ausstehenden Freigaben",
+      "emptyDescription": "Derzeit wartet nichts auf Ihre Prüfung.",
+      "waitingSince": "Wartet · {time}",
+      "approvers": "Prüfer: {names}",
+      "review": "Prüfen"
     }
   },
   "projectResources": {
@@ -4265,6 +4410,117 @@
           "freshness": "die Person meldete sich innerhalb {minutes, plural, one {der letzten Minute} other {der letzten # Minuten}} an",
           "custom": "benutzerdefinierte Bedingung <kind>{name}</kind>"
         }
+      },
+      "grant": {
+        "title": "Zugriff gewähren",
+        "admin": "Verwaltung",
+        "access": "Zugriff",
+        "people": "Personen",
+        "steps": "Schritte",
+        "step": {
+          "who": "Empfänger",
+          "role": "Rolle",
+          "scope": "Bereich",
+          "expiry": "Ablauf",
+          "review": "Prüfung"
+        },
+        "pickPrincipal": "Wähle mindestens eine Person, eine Gruppe oder ein Team aus.",
+        "pickRole": "Wähle eine Rolle aus.",
+        "pickScope": "Wähle aus, wo die Rolle gilt.",
+        "pickDate": "Wähle ein Datum aus.",
+        "previewFailed": "Die Vorschau der Zuweisung konnte nicht geladen werden",
+        "noGrants": "Es wurden keine Zuweisungen erstellt. Prüfe die ausgewählten Empfänger, bevor du es erneut versuchst.",
+        "grantFailed": "Die Zuweisung ist fehlgeschlagen",
+        "whereHeading": "Wo gilt die Rolle?",
+        "scopeHelp": "Eine Zuweisung gilt für den gesamten Bereich: Eine Teamzuweisung umfasst dessen Projekte und Apps.",
+        "expiryHeading": "Wann endet sie?",
+        "never": "Nie",
+        "days": "{count, plural, one {# Tag} other {# Tage}}",
+        "onDate": "An einem Datum",
+        "expiryDate": "Ablaufdatum",
+        "expiryUnsupported": "Diese Zuweisung kann hier nicht zeitlich begrenzt werden; sie gilt bis zu ihrer Entfernung.",
+        "expiryHelp": "Die Zuweisung endet dann automatisch; du kannst sie auch früher entfernen.",
+        "cancel": "Abbrechen",
+        "back": "Zurück",
+        "continue": "Weiter",
+        "granting": "Wird gewährt…",
+        "retryCount": "{count} erneut versuchen",
+        "grantCount": "{count} Zugriff gewähren",
+        "whoHeading": "Wer erhält Zugriff?",
+        "picked": "Ausgewählt",
+        "searchPlaceholder": "Personen, Gruppen und Teams nach Name oder E-Mail suchen",
+        "searchLabel": "Personen, Gruppen und Teams suchen",
+        "searchFailed": "Die Suche ist fehlgeschlagen: {message}",
+        "noPeople": "Keine Übereinstimmung für „{query}“.",
+        "searchHelp": "Tippe zum Suchen. Eine Gruppenzuweisung gilt für aktuelle und zukünftige Mitglieder; ein Team fügt seine Mitglieder zum Zeitpunkt der Zuweisung hinzu.",
+        "addName": "{name} hinzufügen",
+        "add": "Hinzufügen",
+        "roleHeading": "Welche Rolle?",
+        "rolePlaceholder": "Rollen oder eine Berechtigung suchen, z. B. deploy",
+        "roleSearch": "Rollen suchen",
+        "rolesFailed": "Rollen konnten nicht geladen werden: {message}",
+        "noGrantableRoles": "Du kannst keine Rolle zuweisen: Dafür musst du alle Berechtigungen der Rolle besitzen.",
+        "noRoles": "Keine Rolle stimmt mit „{query}“ überein.",
+        "noRole": "Keine Rolle",
+        "noScope": "kein Bereich",
+        "expiresNever": "läuft nie ab",
+        "expiresDays": "{count, plural, one {läuft in # Tag ab} other {läuft in # Tagen ab}}",
+        "expiresDate": "läuft am {date} ab",
+        "summary": "<role>{roleName}</role> ({permissions}) für {kind} <identifier>{name}</identifier>, {expiry}.",
+        "previewError": "Die Wirkung konnte nicht vorab geprüft werden: {message}",
+        "retry": "Erneut versuchen",
+        "effect": "{count, plural, =0 {Niemand erhält etwas Neues} one {# Person erhält {what}} other {# Personen erhalten {what}}}{where}{already, plural, =0 {} other {; # hatten es bereits}}.",
+        "where": " für {kind} {name}",
+        "groupsReach": "Gilt für {groups} und alle Personen, die der Identitätsanbieter diesen Gruppen später hinzufügt.",
+        "groupToday": "{name} ({count, plural, one {derzeit # Mitglied} other {derzeit # Mitglieder}})",
+        "gainAccess": "Erhalten Zugriff",
+        "alreadyAccess": "Haben bereits Zugriff",
+        "outcome": "Ergebnis",
+        "grantedCount": "Zugriff für {count} Empfänger gewährt.",
+        "failed": "Fehlgeschlagen",
+        "groupDetail": "IdP-Gruppe · {count, plural, one {# Mitglied} other {# Mitglieder}}",
+        "cannotGrant": "Du kannst diese Rolle hier nicht zuweisen.",
+        "cannotHold": "Ein Empfänger vom Typ {kind} kann keine Rolle besitzen.",
+        "refreshFailed": "Die Zuweisungen wurden gespeichert, aber die Zugriffsliste konnte nicht aktualisiert werden. Aktualisiere die Ansicht; wiederhole erfolgreiche Zuweisungen nicht.",
+        "success": "{count, plural, one {# Person Zugriff gewährt} other {# Personen Zugriff gewährt}}",
+        "links": {
+          "organization": "Organisation",
+          "projects": "Projekte",
+          "teams": "Teams",
+          "roles": "Rollen",
+          "policies": "Richtlinien",
+          "check": "Zugriff prüfen"
+        }
+      },
+      "legacyGrantRole": {
+        "title": "Rolle gewähren",
+        "description": "Einem bestehenden Organisationsmitglied eine Rolle im ausgewählten Bereich zuweisen.",
+        "userId": "Benutzer-ID",
+        "targetUser": "Rolle für {name} gewähren.",
+        "userGuidance": "Numerische ID eines bestehenden Mitglieds dieser Organisation eingeben. Dieses Formular erstellt keine Benutzer und lädt niemanden ein.",
+        "role": "Rolle",
+        "selectRole": "Rolle auswählen",
+        "scope": "Bereich",
+        "noScope": "Keine Bereiche für {scopeKind} verfügbar",
+        "selectScope": "Bereich auswählen",
+        "scopeGuidance": "Auf die Bereichsebene der Rolle festgelegt: <scope></scope>",
+        "cancel": "Abbrechen",
+        "granting": "Wird gewährt…",
+        "granted": "Rolle gewährt",
+        "failed": "Rolle konnte nicht gewährt werden",
+        "refreshWarning": "Die Ansicht konnte nicht aktualisiert werden. Zum Anzeigen aktueller Daten erneut laden.",
+        "orgReadFailed": "Die aktive Organisation konnte nicht bestätigt werden. Seite erneut laden.",
+        "loadingOrg": "Aktive Organisation wird bestätigt…",
+        "noOrg": "Für diese Zuweisung ist keine aktive Organisation verfügbar.",
+        "unsupportedApp": "Diese Auswahl bietet keine APP-Ziele. Über Zugriff gewähren eine Anwendung auswählen.",
+        "scopeReadFailed": "Bereichsziele konnten nicht geladen werden.",
+        "retry": "Erneut versuchen",
+        "loadingScopes": "Bereichsziele werden geladen…",
+        "unknownScopes": "Bereichsziele sind noch nicht bestätigt.",
+        "rolesReadFailed": "Rollen konnten nicht geladen werden.",
+        "loadingRoles": "Rollen werden geladen…",
+        "unknownRoles": "Rollen sind noch nicht bestätigt.",
+        "emptyRoles": "In dieser Liste sind keine Rollen verfügbar."
       }
     },
     "settings": {
@@ -4291,6 +4547,10 @@
       "today": "Heute",
       "yesterday": "Gestern",
       "unknownDate": "Unbekanntes Datum"
+    },
+    "shellHeader": {
+      "breadcrumb": "Navigationspfad",
+      "switch": "{label}: wechseln"
     }
   },
   "agentSecrets": {
@@ -4817,6 +5077,530 @@
         "subscriptionPolicy": "Neue Abonnements zu deaktivieren widerruft keine bestehenden Zugriffe.",
         "completedUpdate": "Die angeforderte Ressourcenrevision wurde abgeglichen. Dies ist keine Live-Zustandsprüfung.",
         "operationFailed": "Der angenommene Vorgang ist fehlgeschlagen. Vor einer weiteren Aktion den aktuellen Bereitstellungsgrund prüfen."
+      }
+    }
+  },
+  "home": {
+    "title": "Startseite",
+    "titleLayout": "Startseite · {layout}",
+    "question": "Was werden Sie hier hauptsächlich tun?",
+    "noAccessTitle": "Auf der Startseite gibt es noch nichts anzuzeigen",
+    "noAccessDescription": "Ihre Rolle hat keinen Zugriff auf Apps oder Agenten in dieser Organisation. Ein Organisationsadministrator kann ihn gewähren.",
+    "layoutMenu": "Layout",
+    "layoutLegend": "Layout der Startseite",
+    "settings": "Startseiteneinstellungen",
+    "changeHint": "Sie können es jederzeit über Layout auf der Startseite oder unter Einstellungen › Startseite ändern.",
+    "continue": "Weiter",
+    "suggested": "Empfohlen",
+    "placeholderTitle": "Noch nicht auf der Startseite",
+    "placeholderDescription": "{panel} wird bald auf der Startseite verfügbar sein. Bis dahin finden Sie es auf der vollständigen Seite.",
+    "open": "Öffnen",
+    "layouts": {
+      "apps": {
+        "title": "Apps",
+        "description": "Zum Betreiben von Anwendungen: fehlgeschlagene Bereitstellungen, Ihre Apps und ihr Datenverkehr."
+      },
+      "agents": {
+        "title": "Agenten",
+        "description": "Zum Erstellen und Ausführen von Agenten: fehlgeschlagene und laufende Ausführungen, Ihre Agenten und Ausgaben."
+      },
+      "builder": {
+        "title": "Entwicklung",
+        "description": "Für die praktische Arbeit mit beidem: Fehler, aktuelle Aktivitäten, Bereitstellungen und Ausführungen."
+      },
+      "operator": {
+        "title": "Betrieb",
+        "description": "Zum Betreiben der Plattform: Warnungen, Cluster, Plattformaktivität und Kontingent."
+      }
+    },
+    "panels": {
+      "waiting": "Wartet auf Sie",
+      "failing": "Fehler",
+      "my-apps": "Meine Apps",
+      "recent-deployments": "Aktuelle Bereitstellungen",
+      "traffic-errors": "Datenverkehr und Fehler",
+      "failed-runs": "Fehlgeschlagene Ausführungen",
+      "running-now": "Läuft jetzt",
+      "my-agents": "Meine Agenten",
+      "runs-spend": "Ausführungen und Ausgaben",
+      "activity": "Aktivität",
+      "kpis": "Kennzahlen",
+      "deployments": "Bereitstellungen",
+      "agent-runs": "Agentenausführungen",
+      "alerts": "Warnungen",
+      "clusters": "Cluster",
+      "platform-activity": "Plattformaktivität",
+      "spend-quota": "Ausgaben und Kontingent"
+    },
+    "copy": {
+      "auditLog": "Auditprotokoll",
+      "noAgentRunsTitle": "Noch keine Agentenausführungen",
+      "noAgentRunsDescription": "Ausführungen der für Sie sichtbaren Agenten erscheinen hier.",
+      "openAgents": "Agenten öffnen",
+      "firingNow": "Aktuell aktiv",
+      "acknowledged": "bestätigt",
+      "firing": "aktiv",
+      "noAlertsTitle": "Keine aktiven Warnungen",
+      "noAlertsDescription": "Warnungen erscheinen hier, sobald eine Regel ausgelöst wird.",
+      "alertRules": "Warnregeln",
+      "noClustersTitle": "Noch keine Cluster",
+      "noClustersDescription": "Registrieren Sie einen Cluster, um Apps und Agenten darauf auszuführen.",
+      "registerCluster": "Cluster registrieren",
+      "agentRun": "Agentenausführung",
+      "workflowRun": "Workflow-Ausführung",
+      "noFailedRunsTitle": "Keine fehlgeschlagenen Ausführungen",
+      "noFailedRunsDescription": "Fehlgeschlagene Agenten- und Workflow-Ausführungen erscheinen hier mit ihrem Grund.",
+      "deploy": "Bereitstellung",
+      "run": "Ausführung",
+      "nothingFailingTitle": "Keine Fehler",
+      "nothingFailingDescription": "Fehlgeschlagene Bereitstellungen und Ausführungen erscheinen hier mit ihrem Grund.",
+      "neverDeployed": "Nie bereitgestellt",
+      "noAppsTitle": "Noch keine eigenen Apps",
+      "noAppsDescription": "Apps, für die Sie eine Rolle haben, erscheinen hier.",
+      "browseApps": "Apps durchsuchen",
+      "paused": "Pausiert",
+      "neverRun": "Nie ausgeführt",
+      "lastRun": "Letzte Ausführung: {status}",
+      "runningCount": "{count, plural, one {# läuft} other {# laufen}}",
+      "agentsMineNote": "Dieses Panel zeigt Agenten auf Apps, für die Sie direkt oder über deren Projekt, Team oder Organisation eine Rolle haben.",
+      "noAgentsTitle": "Noch keine eigenen Agenten",
+      "noAgentsDescription": "Agenten auf Apps, für die Sie eine Rolle haben, erscheinen hier.",
+      "browseAgents": "Agenten durchsuchen",
+      "nothingRunningTitle": "Nichts läuft",
+      "nothingRunningDescription": "Agenten mit einer laufenden Ausführung erscheinen hier in Ihrer Flottenansicht.",
+      "openRuns": "Ausführungen öffnen",
+      "runningSummary": "{runs, plural, one {# Ausführung} other {# Ausführungen}} auf {agents, plural, one {# Agenten} other {# Agenten}}",
+      "noDeploymentsTitle": "Noch keine Bereitstellungen",
+      "noDeploymentsDescription": "Für Sie sichtbare Bereitstellungen erscheinen hier.",
+      "startDeployment": "Bereitstellung starten",
+      "noPlatformTitle": "Noch keine Plattformaktivität",
+      "noPlatformDescription": "Bereitstellungen, Onboarding und Clusteroperationen erscheinen hier während ihrer Ausführung.",
+      "noWaitingTitle": "Nichts wartet auf Sie",
+      "noWaitingDescription": "Genehmigungen, über die Sie entscheiden können, erscheinen hier.",
+      "approveTitle": "Diese Bereitstellung genehmigen?",
+      "approveDescription": "Genehmigen Sie die Bereitstellung.",
+      "approve": "Genehmigen",
+      "review": "Prüfen",
+      "workflowGate": "Workflow-Freigabe",
+      "secretRequest": "Geheimnisanfrage",
+      "unknownTime": "Unbekannter Zeitpunkt",
+      "unknownValue": "unbekannt",
+      "rolledBack": "Zurückgesetzt.",
+      "noFailureReason": "Für diesen Fehler wurde kein Grund aufgezeichnet.",
+      "noRunReason": "Für diese Ausführung wurde kein Grund aufgezeichnet.",
+      "timedOut": "Zeitüberschreitung.",
+      "noReason": "Es wurde kein Grund aufgezeichnet.",
+      "monthToDate": "Seit Monatsbeginn",
+      "ofBudget": "von {amount} · {percentage}",
+      "spent": "Ausgegeben",
+      "projected": "Prognose",
+      "budget": "Budget",
+      "legend": "Legende",
+      "budgetReadFailed": "Das Budget konnte nicht geladen werden: {message}",
+      "noBudget": "Es ist kein Organisationsbudget festgelegt, daher gibt es kein Kontingent für den Ausgabenvergleich.",
+      "spendAgainstBudget": "{panel}: Ausgaben im Vergleich zum Budget",
+      "spendBudgetValue": "{spent} von {budget}",
+      "last24Hours": "Letzte 24 Stunden",
+      "app": "App",
+      "pickApp": "App auswählen",
+      "trafficAppsDescription": "Der Datenverkehr von Apps, für die Sie eine Rolle haben, erscheint hier.",
+      "openApp": "App öffnen",
+      "requests": "Anfragen",
+      "errors": "Fehler",
+      "now": "jetzt",
+      "average": "Ø {value}",
+      "notConfiguredTitle": "Nicht konfiguriert",
+      "notConfiguredDescription": "Der Cluster dieser App hat keinen Prometheus-Endpunkt, daher werden keine Verkehrsdaten erfasst.",
+      "notSupportedTitle": "Bei diesem Anbieter nicht verfügbar",
+      "notSupportedDescription": "Das Anbieter-Plugin dieses Clusters unterstützt diese Abfrage nicht. Sie ist auf anderen Clouds verfügbar.",
+      "metricErrorTitle": "Laden fehlgeschlagen",
+      "metricErrorDescription": "Beim Laden dieses Panels ist ein Fehler aufgetreten. Versuchen Sie es erneut.",
+      "noRequestsTitle": "Noch keine Anfragen",
+      "noRequestsDescription": "Für diesen Zeitraum gibt es nichts anzuzeigen. Sobald Aktivität vorliegt, erscheinen Anfragen hier.",
+      "last7Days": "Letzte 7 Tage",
+      "runsPerDay": "Agentenausführungen pro Tag",
+      "failedPerDay": "Fehlgeschlagene Ausführungen pro Tag",
+      "spendPerDay": "Organisationsausgaben pro Tag",
+      "sevenDays": "7 Tage",
+      "spendReadFailed": "Ausgaben konnten nicht geladen werden: {message}",
+      "cappedRuns": "Aus den neuesten Ausführungen gezählt; die Woche enthält weitere.",
+      "kpiWindow": "letzte {count, number} Tage · Ausgaben seit Monatsbeginn",
+      "kpiAria": "{panel}, letzte {count, number} Tage",
+      "noKpisTitle": "Keine Kennzahlen für Ihren Zugriff",
+      "noKpisDescription": "Kennzahlen zu Bereitstellungen, Ausführungen und Ausgaben erscheinen für die für Sie sichtbaren Bereiche.",
+      "noProject": "Kein Projekt"
+    },
+    "health": {
+      "error": "Einrichtung fehlgeschlagen",
+      "offline": "Offline",
+      "degraded": "Beeinträchtigt",
+      "never_seen": "Nie gesehen",
+      "connected": "Verbunden"
+    },
+    "severity": {
+      "critical": "kritisch",
+      "error": "Fehler",
+      "warn": "Warnung",
+      "warning": "Warnung",
+      "info": "Information"
+    },
+    "status": {
+      "running": "Läuft",
+      "succeeded": "Erfolgreich",
+      "failed": "Fehlgeschlagen",
+      "rolled_back": "Zurückgesetzt",
+      "timed_out": "Zeitüberschreitung",
+      "error": "Fehler",
+      "cancelled": "Abgebrochen",
+      "canceled": "Abgebrochen",
+      "terminated": "Beendet",
+      "completed": "Abgeschlossen",
+      "paused": "Pausiert",
+      "pending_approval": "Genehmigung ausstehend",
+      "approved": "Genehmigt",
+      "deploying": "Wird bereitgestellt",
+      "building": "Wird gebaut",
+      "provisioning": "Wird eingerichtet",
+      "aborted": "Abgebrochen",
+      "stopped": "Gestoppt",
+      "queued": "In Warteschlange",
+      "pending": "Ausstehend",
+      "redeploying": "Wird erneut bereitgestellt",
+      "superseded": "Ersetzt",
+      "waiting": "Wartet",
+      "unknown": "Unbekannt"
+    },
+    "kpi": {
+      "deploys": "Bereitstellungen",
+      "runs": "Ausführungen",
+      "success": "Erfolg",
+      "p95": "p95",
+      "spend": "Ausgaben",
+      "runsHint": "Agentenausführungen",
+      "successHint": "der Bereitstellungen",
+      "p95Hint": "Bereitstellungsdauer",
+      "spendHint": "seit Monatsbeginn"
+    },
+    "period": {
+      "monthly": "monatlich",
+      "quarterly": "vierteljährlich",
+      "yearly": "jährlich"
+    },
+    "operations": {
+      "everyEnvironment": "jede Umgebung",
+      "noEnvironment": "keine Umgebung",
+      "appWide": "appweit",
+      "deployTitle": "{app} nach {environment}",
+      "deployDetail": "{image} · {received, number}/{required, number} Genehmigungen",
+      "humanGate": "manuelle Freigabe",
+      "approvers": "Genehmigende: {approvers}",
+      "anyApprover": "Jede genehmigungsberechtigte Person kann entscheiden",
+      "secretTitle": "{app}-Geheimnisse · {environment}",
+      "secretBy": "{operation} von {name}",
+      "secretDetail": "{operation} · {received, number}/{required, number} Genehmigungen",
+      "approveFailed": "Genehmigung fehlgeschlagen",
+      "approved": "Genehmigt: {status}",
+      "stage": "Stufe {order, number}{role}",
+      "failedAt": "Bei {stage} fehlgeschlagen.",
+      "timedOutAt": "Zeitüberschreitung bei {stage}.",
+      "requestRate": "{value} Anf./s",
+      "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Wähle die Bereiche auf der Startseite und ihre Reihenfolge. Änderungen werden nach erfolgreichem Speichern mit deinem Konto synchronisiert; eine Kopie im Browser bleibt offline verfügbar.",
+      "noAccess": "Deine Rolle hat keinen Zugriff auf Apps oder Agenten, daher steht kein Layout zur Auswahl.",
+      "resetDefault": "Standardlayout für meinen Zugriff verwenden ({layout})",
+      "saveFailed": "Das Layout der Startseite wurde nicht gespeichert"
+    }
+  },
+  "metrics": {
+    "title": "Messwerte",
+    "description": "Erfolgreiche Bereitstellungen, Dauer und Anwendungszustand.",
+    "successRate": "Erfolgsrate der Bereitstellungen",
+    "successRateTrend": "Verlauf der Bereitstellungserfolge",
+    "successRateUnavailable": "Erfolgsrate nicht verfügbar",
+    "trend": "Verlauf von {label}",
+    "durationSeconds": "{seconds, number} s",
+    "durationMinutesSeconds": "{minutes, number} min {seconds, number} s",
+    "columns": {
+      "app": "Anwendung",
+      "environments": "Umgebungen",
+      "latestDeploy": "Letzte Bereitstellung",
+      "image": "Image",
+      "lastDeployed": "Zuletzt bereitgestellt"
+    },
+    "never": "Nie",
+    "recentFailure": "Kürzlicher Fehler",
+    "inFlight": "In Bearbeitung",
+    "inFlightHint": "Wartet auf Freigabe, eingereiht oder wird bereitgestellt",
+    "meanRollout": "Mittlere Bereitstellungsdauer",
+    "meanRolloutHint": "Durchschnitt abgeschlossener Bereitstellungen im Zeitraum",
+    "p95Rollout": "p95-Bereitstellungsdauer",
+    "p95RolloutHint": "Langsamere Bereitstellungen im Zeitraum",
+    "noRollouts": "Keine Bereitstellungen in den letzten {days, number} Tagen",
+    "succeededWindow": "{succeeded, number}/{total, number} erfolgreich in {days, number} Tagen",
+    "outcomes": "Ergebnisse ({days, number} Tage)",
+    "succeeded": "Erfolgreich {count, number}",
+    "failed": "Fehlgeschlagen {count, number}",
+    "rolledBack": "Zurückgesetzt {count, number}",
+    "inFlightCount": "In Bearbeitung {count, number}",
+    "total": "Insgesamt {count, number}",
+    "rolloutsWindow": "Bereitstellungen über {days, number} Tage",
+    "rolloutsPerDay": "Bereitstellungen pro Tag",
+    "apps": "Anwendungen",
+    "emptyTitle": "Noch keine Anwendungen",
+    "emptyDescription": "Registrieren Sie eine Anwendung. Messwerte erscheinen nach der ersten Bereitstellung.",
+    "openApps": "Anwendungen öffnen",
+    "rawPrometheus": "Prometheus-Rohdaten",
+    "temporalUi": "Temporal-Workflow-Oberfläche",
+    "embeddedDashboardsUnavailable": "Eingebettete Dashboards sind in dieser Ansicht nicht verfügbar.",
+    "searchPlaceholder": "Anwendungen, Kennungen und Image-Tags suchen…",
+    "filters": {
+      "status": "Letzte Bereitstellung",
+      "kind": "Art"
+    },
+    "kinds": {
+      "app": "Anwendung",
+      "agent": "Agent"
+    },
+    "views": {
+      "all": "Alle",
+      "mine": "Meine",
+      "failing": "Kürzlicher Fehler",
+      "mineNote": "Die Zustandsübersicht enthält keine Eigentümer. Daher ist diese Ansicht leer."
+    },
+    "staleMetrics": "Aktualisierung fehlgeschlagen. Die zuletzt geladenen Messwerte werden angezeigt.",
+    "metricsUnavailable": "Messwerte konnten nicht geladen werden.",
+    "retryMetrics": "Messwerte erneut laden"
+  },
+  "teams": {
+    "title": "Teams",
+    "context": "Teams begrenzen Projekte, Apps und die dafür erteilten Berechtigungen.",
+    "newTeam": "Neues Team",
+    "columnTeam": "Team",
+    "columnCreated": "Erstellt",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "emptyTitle": "Noch keine Teams",
+    "emptyDescription": "Erstelle ein Team, um Projekte und Apps zu gruppieren.",
+    "deleteTitle": "Team {slug} löschen?",
+    "deleteGenericTitle": "Team löschen?",
+    "deleteDescription": "Das Team wird stillgelegt und sein Slug kann wiederverwendet werden. Seine Projekte und Anwendungen werden dabei nicht neu zugeordnet.",
+    "confirmDelete": "Team löschen",
+    "createDescription": "Teams begrenzen Projekte, Mitglieder und Tokens. Slugs sind eindeutig und können nach der Stilllegung wiederverwendet werden.",
+    "displayName": "Anzeigename",
+    "exampleName": "Backend-Team",
+    "slug": "Slug",
+    "slugHint": "Beginne mit einem Kleinbuchstaben; verwende Buchstaben, Zahlen und Bindestriche, höchstens 40 Zeichen. Ende mit einem Buchstaben oder einer Zahl.",
+    "descriptionOptional": "Beschreibung (optional)",
+    "descriptionPlaceholder": "Welche Ressourcen gehören diesem Team?",
+    "cancel": "Abbrechen",
+    "creating": "Wird erstellt…",
+    "create": "Team erstellen",
+    "editTitle": "Team bearbeiten",
+    "editDescription": "Benenne dieses Team um oder ändere seinen Slug. Slugs sind innerhalb der Organisation eindeutig und werden in URLs verwendet.",
+    "generate": "Generieren",
+    "saving": "Wird gespeichert…",
+    "save": "Änderungen speichern",
+    "feedback": {
+      "created": "Team {slug} erstellt",
+      "saved": "Team als {slug} gespeichert",
+      "deleted": "{slug} gelöscht",
+      "createFailed": "Das Team konnte nicht erstellt werden",
+      "saveFailed": "Das Team konnte nicht gespeichert werden",
+      "deleteFailed": "Das Team konnte nicht gelöscht werden",
+      "refreshWarning": "Die Ansicht konnte nicht aktualisiert werden. Aktualisiere sie, um die aktuellen Daten zu sehen."
+    },
+    "list": {
+      "search": "Teams suchen…",
+      "all": "Alle",
+      "mine": "Meine Teams"
+    },
+    "slugStatus": {
+      "invalid": "Verwende Kleinbuchstaben, Zahlen und Bindestriche; beginne mit einem Buchstaben und ende mit einem Buchstaben oder einer Zahl (höchstens 40 Zeichen).",
+      "checking": "Verfügbarkeit wird geprüft…",
+      "available": "Verfügbar",
+      "taken": "In dieser Organisation bereits vergeben.",
+      "unchanged": "Aktueller Slug — wird in URLs verwendet.",
+      "empty": "Kleinbuchstaben, Zahlen und Bindestriche. Wird in URLs verwendet."
+    }
+  },
+  "apiKeys": {
+    "title": "API-Schlüssel",
+    "name": "Name",
+    "suffix": "Endung",
+    "scopes": "Berechtigungsbereiche",
+    "scope": "Berechtigungsbereich",
+    "canDo": "Erlaubte Aktionen",
+    "lastUsed": "Zuletzt verwendet",
+    "created": "Erstellt",
+    "expires": "Läuft ab",
+    "status": "Status",
+    "active": "Aktiv",
+    "revoked": "Widerrufen",
+    "expired": "Abgelaufen",
+    "none": "keine",
+    "nothing": "keine",
+    "never": "nie",
+    "all": "Alle",
+    "mine": "Meine",
+    "longLivedAdmin": "Langlebiges Administratortoken",
+    "permissionCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+    "adminExpiryWarning": "Administratortoken ohne baldiges Ablaufdatum. Durch ein Token mit engeren Berechtigungsbereichen ersetzen.",
+    "effectiveGuidance": "Was die Berechtigungsbereiche erlauben und die Rollen des Besitzers gewähren:",
+    "createdNotice": "Token <name></name> erstellt",
+    "revealGuidance": "Den Wert jetzt kopieren; er wird nie wieder angezeigt. Nur der SHA-256-Hash und die letzten 4 Zeichen werden gespeichert.",
+    "copy": "Kopieren",
+    "dismissReveal": "Gespeichert — schließen",
+    "mcpTitle": "Remote-MCP für Agenten",
+    "mcpGuidance": "CI- oder Programmierclients über authentifiziertes Streamable HTTP verbinden. Ein API-Token als <code></code> senden. MCP-Bereiche erfordern weiterhin die passenden Agentenberechtigungen des Besitzers; geheime Werte werden nicht offengelegt.",
+    "copyUrl": "URL kopieren",
+    "mcpRead": "{scope} · Pakete/Aufgaben prüfen",
+    "mcpDispatch": "{scope} · starten/beenden",
+    "mcpWrite": "{scope} · Repositories synchronisieren",
+    "context": "Bearer-Zugangsdaten für CLIs, Bots und Skripte. Token werden als Hash gespeichert; der Klartext wird nur bei der Erstellung angezeigt.",
+    "newToken": "Neues Token",
+    "revoke": "Widerrufen",
+    "emptyTitle": "Keine API-Schlüssel",
+    "emptyDescription": "Einen Schlüssel erstellen, um CLI, CI-Läufe oder eigene Skripte an der Plattform zu authentifizieren.",
+    "createTitle": "Neues API-Token",
+    "createDescription": "Der Klartext wird nach der Erstellung einmal angezeigt. Sicher aufbewahren; er kann später nicht abgerufen werden.",
+    "nameGuidance": "Ein aussagekräftiger Name erscheint im Auditprotokoll neben den Aktionen dieses Tokens.",
+    "scopeGuidance": "Ein Token schränkt Ihren Zugriff ein: Es erhält nur die folgenden Berechtigungen, die auch Ihre Rollen gewähren.",
+    "expiresDays": "Läuft ab in (Tagen)",
+    "expiryGuidance": "Für unbegrenzte Gültigkeit 0 oder leer lassen. Standard: {defaultDays} Tage, höchstens {maxDays}.",
+    "cancel": "Abbrechen",
+    "creating": "Wird erstellt…",
+    "create": "Token erstellen",
+    "revokeNamed": "Token {name} widerrufen?",
+    "revokeTitle": "Token widerrufen?",
+    "revokeDescription": "CLIs und Bots mit diesem Token funktionieren sofort nicht mehr. Ein Widerruf ist endgültig; für erneuten Zugriff ein neues Token erstellen.",
+    "revokeConfirm": "Token widerrufen",
+    "refreshWarning": "Die Ansicht konnte nicht aktualisiert werden. Zum Anzeigen aktueller Daten erneut laden.",
+    "pickScope": "Mindestens einen Berechtigungsbereich auswählen",
+    "createFailed": "Token konnte nicht erstellt werden",
+    "revokedFeedback": "Token widerrufen",
+    "revokeFailed": "Token konnte nicht widerrufen werden",
+    "copyFailed": "Kopieren fehlgeschlagen. Den Wert auswählen und manuell kopieren.",
+    "copied": "In die Zwischenablage kopiert",
+    "endpointCopied": "MCP-Endpunkt kopiert",
+    "searchPlaceholder": "Schlüssel, Besitzer, Teams, Endungen suchen…",
+    "narrowedNote": "Zeigt passende Schlüssel unter den neuesten {count}, bis die API-Abfrage Filter unterstützt.",
+    "mineNote": "Zeigt Ihre Schlüssel unter den neuesten {count}.",
+    "detail": {
+      "token": "Token",
+      "owner": "Besitzer",
+      "team": "Team",
+      "lastIp": "IP der letzten Verwendung",
+      "lastAgent": "Client der letzten Verwendung",
+      "orgWide": "— (organisationsweit)",
+      "shortToken": "Token {id}",
+      "overview": "Übersicht",
+      "notFoundTitle": "API-Token nicht gefunden",
+      "notFoundDescription": "Das Token existiert möglicherweise nicht, liegt außerhalb der aktuellen Liste oder ist für Sie nicht zugänglich.",
+      "back": "Zurück zu API-Schlüsseln",
+      "noScopes": "Keine Berechtigungsbereiche: Diesem Token sind keine Berechtigungen gewährt.",
+      "readFailed": "Token-Metadaten konnten nicht geladen werden.",
+      "retry": "Erneut versuchen"
+    },
+    "picker": {
+      "loadFailed": "Die Berechtigungsbereiche konnten nicht geladen werden. Seite erneut laden.",
+      "startFrom": "Vorlage auswählen",
+      "adminWarning": "Admin erlaubt diesem Token alles, was sein Besitzer tun kann, einschließlich später hinzugefügter Berechtigungen. Engere Bereiche und ein Ablaufdatum bevorzugen.",
+      "sensitive": "sensibel",
+      "unavailable": "Ihre Rollen gewähren keine der Berechtigungen dieses Bereichs.",
+      "unlocks": "Erlaubt {count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+      "surfaces": {
+        "apps": "Apps",
+        "clusters": "Cluster",
+        "secrets": "Secrets",
+        "agents": "Agenten",
+        "workflows": "Workflows",
+        "administration": "Verwaltung"
+      },
+      "presets": {
+        "read_only": "Nur Lesen",
+        "cli": "CLI-Standard",
+        "ci_deploy": "CI-Bereitstellung",
+        "cluster_operator": "Cluster-Operator"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "Apps lesen",
+        "description": "Apps, Bereitstellungen, Umgebungen und Secret-Namen auflisten."
+      },
+      "scope1": {
+        "label": "Apps bearbeiten",
+        "description": "Bereitstellen, Umgebungsvariablen bearbeiten und App-Konfiguration verwalten."
+      },
+      "scope2": {
+        "label": "Apps einbinden",
+        "description": "Apps registrieren und CI einrichten (Webhook, Secrets, Workflow), ohne Bereitstellung oder Löschung."
+      },
+      "scope3": {
+        "label": "Cluster lesen",
+        "description": "Cluster auflisten und Anbieterstatus lesen."
+      },
+      "scope4": {
+        "label": "Cluster aktualisieren",
+        "description": "Cluster-Einstellungen ändern: Ingress-Klasse, Authentifizierung, Region, Endpunkt."
+      },
+      "scope5": {
+        "label": "Cluster betreiben",
+        "description": "Cluster-Rezept installieren, Verwaltungsstatus aktualisieren und Ingress-Ressourcen abgleichen."
+      },
+      "scope6": {
+        "label": "Anmeldebenutzer verwalten",
+        "description": "Benutzer und Gruppen der zentralen Cluster-Authentifizierung erstellen, deaktivieren, löschen und zurücksetzen."
+      },
+      "scope7": {
+        "label": "App-Zugriff festlegen",
+        "description": "Benutzer und Gruppen auswählen, die eine App hinter zentraler Authentifizierung betreten dürfen."
+      },
+      "scope8": {
+        "label": "Secrets anzeigen",
+        "description": "Gespeicherte Secret-Werte anzeigen. Nur bei Bedarf gewähren."
+      },
+      "scope9": {
+        "label": "Secrets bearbeiten",
+        "description": "Secrets festlegen, rotieren und löschen, ohne Werte anzuzeigen."
+      },
+      "scope10": {
+        "label": "MCP lesen",
+        "description": "Agentenpakete auflisten und Läufe über Remote-MCP prüfen."
+      },
+      "scope11": {
+        "label": "MCP-Ausführung",
+        "description": "Agenten ausführen, steuern und sofort beenden; mit Agentenboxen verbinden, gemäß Kontoberechtigungen."
+      },
+      "scope12": {
+        "label": "MCP schreiben",
+        "description": "Agenten-Repositories und Paketdefinitionen synchronisieren."
+      },
+      "scope13": {
+        "label": "Agentenumgebungen bearbeiten",
+        "description": "Spezifikationen für Agentenumgebungen erstellen, aktualisieren und löschen."
+      },
+      "scope14": {
+        "label": "Workflows bearbeiten",
+        "description": "Workflows erstellen, aktualisieren und löschen."
+      },
+      "scope15": {
+        "label": "Workflows ausführen",
+        "description": "Workflow-Läufe starten, ohne sie zu bearbeiten."
+      },
+      "scope16": {
+        "label": "Projekte bearbeiten",
+        "description": "Projekte erstellen, aktualisieren und löschen."
+      },
+      "scope17": {
+        "label": "Teams bearbeiten",
+        "description": "Teams erstellen, aktualisieren und löschen."
+      },
+      "scope18": {
+        "label": "Administration",
+        "description": "Alles, was der Besitzer tun kann, jetzt und mit neuen Berechtigungen. Engere Bereiche bevorzugen."
       }
     }
   }

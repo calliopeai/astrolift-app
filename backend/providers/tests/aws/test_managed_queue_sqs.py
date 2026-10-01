@@ -39,8 +39,12 @@ def driver(sqs_client) -> SQSDriver:
     )
 
 
+MSID = "11111111-1111-4111-8111-111111111111"
+
+
 def _spec(**overrides) -> ProvisionSpec:
     base = dict(
+        managed_service_id=MSID,
         organization_id="1",
         organization_slug="acme",
         app_id="1",
@@ -173,7 +177,7 @@ def test_provision_exposes_full_fifo_encryption_redrive_and_long_poll_surface() 
 
 def test_status_available(driver: SQSDriver) -> None:
     result = driver.provision(_spec())
-    status = driver.status(ServiceHandle(handle=result.handle))
+    status = driver.status(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert status.state == "available"
 
 
@@ -189,7 +193,7 @@ def test_status_deprovisioned_when_missing(driver: SQSDriver) -> None:
 
 def test_binding_emits_env_vars(driver: SQSDriver) -> None:
     result = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(handle=result.handle))
+    binding = driver.binding(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert "SQS_QUEUE_NAME" in binding.env_vars
     assert "SQS_QUEUE_URL" in binding.env_vars
     assert "SQS_QUEUE_ARN" in binding.env_vars
@@ -199,7 +203,7 @@ def test_binding_emits_env_vars(driver: SQSDriver) -> None:
 
 def test_binding_emits_iam_grants(driver: SQSDriver) -> None:
     result = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(handle=result.handle))
+    binding = driver.binding(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert len(binding.iam_grants) == 1
     grant = binding.iam_grants[0]
     assert "sqs:SendMessage" in grant.actions
@@ -343,7 +347,7 @@ def test_snapshot_raises(driver: SQSDriver) -> None:
     value (matches platform-side #87/#127 invariant)."""
     result = driver.provision(_spec())
     with pytest.raises(ManagedServiceError):
-        driver.snapshot(ServiceHandle(handle=result.handle))
+        driver.snapshot(ServiceHandle(handle=result.handle, managed_service_id=MSID))
 
 
 # ---- schemas ---------------------------------------------------

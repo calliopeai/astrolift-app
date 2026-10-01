@@ -3639,7 +3639,141 @@
     "sourceTooltipAria": "{scope} 経由で付与",
     "sourceColumn": "ソース",
     "grantRoleRowLabel": "{name} にロールを付与",
-    "grantRoleRowTooltip": "{name} にロールを付与"
+    "grantRoleRowTooltip": "{name} にロールを付与",
+    "people": {
+      "title": "メンバー",
+      "description": "この組織にアクセスできるユーザーと ID プロバイダーのグループ。",
+      "columns": {
+        "who": "ユーザー・グループ",
+        "roles": "ロール",
+        "teams": "チーム",
+        "status": "状態",
+        "joined": "参加日"
+      },
+      "actions": {
+        "viewAccess": "アクセスを表示",
+        "resend": "招待を再送信",
+        "revoke": "取り消す",
+        "deleteResolved": "処理済みの招待を削除",
+        "grantTo": "{name} にアクセスを許可",
+        "alreadyAnonymized": "匿名化済み",
+        "anonymize": "ユーザーデータを匿名化",
+        "invite": "招待",
+        "grant": "アクセスを許可"
+      },
+      "emptyTitle": "メンバーがいません",
+      "emptyDescription": "組織にユーザーを招待し、ロールを割り当ててください。",
+      "confirm": {
+        "resend": {
+          "title": "{email} に招待を再送信しますか？",
+          "description": "新しいワンタイムリンクを生成し、メール送信を試みます。古いリンクは直ちに無効になります。送信に失敗した場合は新しいリンクをコピーしてください。",
+          "label": "招待を再送信"
+        },
+        "revoke": {
+          "title": "{email} の招待を取り消しますか？",
+          "description": "保留中の招待リンクは直ちに無効になります。必要に応じて新しい招待を送信できます。",
+          "label": "取り消す"
+        },
+        "delete": {
+          "title": "{email} の処理済み招待を削除しますか？",
+          "description": "処理済みの招待を一覧から削除します。メンバーシップとロールは変更されません。",
+          "label": "削除"
+        }
+      },
+      "export": {
+        "actions": "一覧のその他の操作",
+        "working": "CSV をエクスポート中…",
+        "label": "{count, number} 件を CSV にエクスポート"
+      },
+      "grants": "{count, plural, one {# 件の権限付与} other {# 件の権限付与}}",
+      "mappings": "、{count, plural, one {# 件のマッピング} other {# 件のマッピング}}",
+      "idpGroup": "ID プロバイダーのグループ",
+      "admin": "管理者",
+      "invitationStatus": {
+        "pending": "保留中",
+        "accepted": "承認済み",
+        "expired": "期限切れ",
+        "revoked": "取り消し済み"
+      },
+      "lifecycle": {
+        "active": "有効",
+        "invited": "招待済み",
+        "pending_invite": "招待待ち",
+        "pending_first_login": "初回ログイン待ち",
+        "suspended": "停止中",
+        "deactivated": "無効化済み",
+        "anonymized": "匿名化済み"
+      },
+      "filters": {
+        "kind": "種類",
+        "role": "ロール",
+        "team": "チーム",
+        "lifecycle": "ライフサイクル",
+        "active": "最終アクティビティ",
+        "status": "招待の状態"
+      },
+      "options": {
+        "kind": {
+          "user": "ユーザー",
+          "group": "グループ",
+          "invitation": "招待"
+        },
+        "active": {
+          "7d": "過去 7 日間",
+          "30d": "過去 30 日間",
+          "90d": "過去 90 日間",
+          "stale": "90 日以上活動なし",
+          "never": "未活動"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分に関連",
+        "invited": "招待済み",
+        "groups": "グループ",
+        "admins": "管理者"
+      },
+      "notes": {
+        "mine": "自分と同じチームに所属するユーザー。",
+        "invited": "保留中の招待です。承認済み、期限切れ、取り消し済みの招待は状態フィルターで確認できます。",
+        "groups": "ログイン、権限付与、マッピングで確認された ID プロバイダーのグループです。プロバイダーが割り当てた全ユーザーにグループのアクセス権が適用されます。"
+      },
+      "searchPlaceholder": "ユーザー、メール、グループを検索…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "エクスポートでファイルが返されませんでした",
+      "noGroups": "エクスポートでグループが返されませんでした",
+      "groupsChanged": "エクスポート中にグループ一覧が変更されました。再試行してください",
+      "exportFailed": "エクスポートに失敗しました",
+      "refreshWarning": "変更は保存されましたが、一覧を更新できませんでした。画面を更新してください。成功した操作を繰り返さないでください。",
+      "revoked": "招待を取り消しました",
+      "revokeFailed": "招待の取り消しに失敗しました",
+      "resendFailed": "再送信に失敗しました",
+      "resent": "{email} に招待を再送信しました",
+      "resendDescription": "古いリンクは無効になりました。予備の連絡手段として新しいリンクをコピーしてください。",
+      "copyLink": "リンクをコピー",
+      "linkCopied": "招待承認リンクをコピーしました",
+      "copyFailed": "コピーに失敗しました",
+      "deleted": "招待を削除しました",
+      "deleteFailed": "削除に失敗しました",
+      "anonymizeFailed": "匿名化に失敗しました",
+      "anonymized": "ユーザーデータを匿名化しました。"
+    },
+    "anonymization": {
+      "title": "{name} を匿名化しますか？",
+      "changes": "変更される内容",
+      "identity": "アカウント名とメールアドレスは匿名の識別情報に置き換えられます。",
+      "profile": "個人プロフィールの項目、電話番号、アバター、住所、署名は削除または置き換えられます。",
+      "account": "ログインが無効になり、認証グループへの所属が解除されます。",
+      "memberships": "プラットフォーム全体のメンバーシップが無効化されます。",
+      "preserves": "保持される内容",
+      "records": "アカウントの記録と過去の操作からの参照は保持されます。",
+      "history": "この操作では、過去の監査内容や保存されたロール付与の記録は削除されません。",
+      "irreversible": "この操作は取り消せません。元の個人データは復元できません。匿名化済みのアカウントで繰り返しても追加の変更は行われません。",
+      "acknowledge": "この操作を取り消せないことを理解しています。",
+      "working": "匿名化中…",
+      "confirm": "ユーザーデータを匿名化"
+    }
   },
   "stepUp": {
     "title": "本人確認",
@@ -3720,6 +3854,17 @@
         "empty": "まだ承認が記録されていません。",
         "unknownApprover": "不明"
       }
+    },
+    "pendingGates": {
+      "title": "承認待ち",
+      "loadingDescription": "組織全体で判断を待っているレビューです。",
+      "description": "組織内で判断できるワークフローのレビューを新しい順に表示します。",
+      "refresh": "承認待ちを更新",
+      "emptyTitle": "承認待ちはありません",
+      "emptyDescription": "現在、レビューを待っている項目はありません。",
+      "waitingSince": "待機開始：{time}",
+      "approvers": "承認者：{names}",
+      "review": "レビュー"
     }
   },
   "projectResources": {
@@ -4262,6 +4407,117 @@
           "freshness": "{minutes, plural, other {# 分以内}}にログイン",
           "custom": "カスタム条件 <kind>{name}</kind>"
         }
+      },
+      "grant": {
+        "title": "アクセスを付与",
+        "admin": "管理",
+        "access": "アクセス",
+        "people": "ユーザー",
+        "steps": "手順",
+        "step": {
+          "who": "付与先",
+          "role": "ロール",
+          "scope": "範囲",
+          "expiry": "有効期限",
+          "review": "確認"
+        },
+        "pickPrincipal": "ユーザー、グループ、チームを少なくとも1つ選択してください。",
+        "pickRole": "ロールを選択してください。",
+        "pickScope": "ロールを適用する範囲を選択してください。",
+        "pickDate": "日付を選択してください。",
+        "previewFailed": "付与内容をプレビューできませんでした",
+        "noGrants": "アクセスは付与されませんでした。再試行する前に選択した付与先を確認してください。",
+        "grantFailed": "付与に失敗しました",
+        "whereHeading": "どこに適用しますか？",
+        "scopeHelp": "付与は範囲内のすべてに適用されます。チームへの付与は、そのプロジェクトとアプリも対象です。",
+        "expiryHeading": "いつ終了しますか？",
+        "never": "無期限",
+        "days": "{count, plural, one {#日} other {#日}}",
+        "onDate": "日付を指定",
+        "expiryDate": "有効期限の日付",
+        "expiryUnsupported": "ここでは期限を設定できません。削除するまで付与は有効です。",
+        "expiryHelp": "指定した時点で付与は自動的に終了します。それより前に削除することもできます。",
+        "cancel": "キャンセル",
+        "back": "戻る",
+        "continue": "続ける",
+        "granting": "付与中…",
+        "retryCount": "{count}件を再試行",
+        "grantCount": "{count}件に付与",
+        "whoHeading": "誰にアクセスを付与しますか？",
+        "picked": "選択済み",
+        "searchPlaceholder": "名前またはメールでユーザー、グループ、チームを検索",
+        "searchLabel": "ユーザー、グループ、チームを検索",
+        "searchFailed": "検索に失敗しました：{message}",
+        "noPeople": "「{query}」に一致する結果はありません。",
+        "searchHelp": "入力して検索してください。グループへの付与は現在と将来のメンバーに適用されます。チームは付与時点のメンバーを追加します。",
+        "addName": "{name}を追加",
+        "add": "追加",
+        "roleHeading": "どのロールですか？",
+        "rolePlaceholder": "ロールまたは権限を検索（例：deploy）",
+        "roleSearch": "ロールを検索",
+        "rolesFailed": "ロールを読み込めませんでした：{message}",
+        "noGrantableRoles": "付与できるロールがありません。ロールに含まれるすべての権限を持つ必要があります。",
+        "noRoles": "「{query}」に一致するロールはありません。",
+        "noRole": "ロールなし",
+        "noScope": "範囲なし",
+        "expiresNever": "無期限",
+        "expiresDays": "{count, plural, one {#日後に期限切れ} other {#日後に期限切れ}}",
+        "expiresDate": "{date}に期限切れ",
+        "summary": "<role>{roleName}</role>（{permissions}）を{kind} <identifier>{name}</identifier>に適用、{expiry}。",
+        "previewError": "効果をプレビューできませんでした：{message}",
+        "retry": "再試行",
+        "effect": "{count, plural, =0 {新しいアクセスを得るユーザーはいません} one {#人が{what}を取得します} other {#人が{what}を取得します}}{where}{already, plural, =0 {} other {。#人は既に持っています}}。",
+        "where": "（{kind} {name}）",
+        "groupsReach": "{groups}と、IDプロバイダーが後からこれらのグループに追加するユーザーが対象です。",
+        "groupToday": "{name}（{count, plural, one {現在#人} other {現在#人}}）",
+        "gainAccess": "アクセスを取得",
+        "alreadyAccess": "アクセス取得済み",
+        "outcome": "結果",
+        "grantedCount": "{count}件に付与しました。",
+        "failed": "失敗",
+        "groupDetail": "IdPグループ · {count, plural, one {#人} other {#人}}",
+        "cannotGrant": "ここではこのロールを付与できません。",
+        "cannotHold": "種類が{kind}の付与先はロールを持てません。",
+        "refreshFailed": "付与は保存されましたが、アクセス一覧を更新できませんでした。表示を更新してください。成功した付与は繰り返さないでください。",
+        "success": "{count, plural, one {#人に付与しました} other {#人に付与しました}}",
+        "links": {
+          "organization": "組織",
+          "projects": "プロジェクト",
+          "teams": "チーム",
+          "roles": "ロール",
+          "policies": "ポリシー",
+          "check": "アクセスを確認"
+        }
+      },
+      "legacyGrantRole": {
+        "title": "ロールを付与",
+        "description": "選択したスコープで、組織の既存メンバーにロールを付与します。",
+        "userId": "ユーザー ID",
+        "targetUser": "{name} にロールを付与します。",
+        "userGuidance": "この組織の既存メンバーの数値 ID を入力してください。このフォームではユーザーの作成や招待は行いません。",
+        "role": "ロール",
+        "selectRole": "ロールを選択",
+        "scope": "スコープ",
+        "noScope": "{scopeKind} のスコープがありません",
+        "selectScope": "スコープを選択",
+        "scopeGuidance": "ロールのスコープレベルに固定されています：<scope></scope>",
+        "cancel": "キャンセル",
+        "granting": "付与中…",
+        "granted": "ロールを付与しました",
+        "failed": "ロールを付与できませんでした",
+        "refreshWarning": "表示を更新できませんでした。現在のデータを確認するには再読み込みしてください。",
+        "orgReadFailed": "アクティブな組織を確認できませんでした。ページを再読み込みしてください。",
+        "loadingOrg": "アクティブな組織を確認中…",
+        "noOrg": "この付与操作に使用できるアクティブな組織がありません。",
+        "unsupportedApp": "この選択画面では APP の対象を選べません。「アクセスを付与」でアプリを選択してください。",
+        "scopeReadFailed": "スコープの対象を読み込めませんでした。",
+        "retry": "再試行",
+        "loadingScopes": "スコープの対象を読み込み中…",
+        "unknownScopes": "スコープの対象はまだ確認されていません。",
+        "rolesReadFailed": "ロールを読み込めませんでした。",
+        "loadingRoles": "ロールを読み込み中…",
+        "unknownRoles": "ロールはまだ確認されていません。",
+        "emptyRoles": "この一覧にロールはありません。"
       }
     },
     "settings": {
@@ -4288,6 +4544,10 @@
       "today": "今日",
       "yesterday": "昨日",
       "unknownDate": "日付不明"
+    },
+    "shellHeader": {
+      "breadcrumb": "パンくずリスト",
+      "switch": "{label}を切り替え"
     }
   },
   "agentSecrets": {
@@ -4814,6 +5074,530 @@
         "subscriptionPolicy": "新規サブスクリプションを無効にしても、既存のアクセスは取り消されません。",
         "completedUpdate": "要求したリソースのリビジョンが反映されました。これは現在の稼働状態の確認ではありません。",
         "operationFailed": "受け付けた操作が失敗しました。次の操作の前にデプロイの現在の理由を確認してください。"
+      }
+    }
+  },
+  "home": {
+    "title": "ホーム",
+    "titleLayout": "ホーム · {layout}",
+    "question": "ここで主に何を行いますか？",
+    "noAccessTitle": "ホームに表示できる情報はまだありません",
+    "noAccessDescription": "この組織でお持ちのロールにはアプリやエージェントへのアクセス権がありません。組織管理者が権限を付与できます。",
+    "layoutMenu": "レイアウト",
+    "layoutLegend": "ホームのレイアウト",
+    "settings": "ホームの設定",
+    "changeHint": "ホームのレイアウト、または設定 › ホームからいつでも変更できます。",
+    "continue": "続行",
+    "suggested": "おすすめ",
+    "placeholderTitle": "ホームにはまだありません",
+    "placeholderDescription": "{panel} は今後ホームで利用できるようになります。それまでは詳細ページで確認できます。",
+    "open": "開く",
+    "layouts": {
+      "apps": {
+        "title": "アプリ",
+        "description": "アプリの運用向け：デプロイの失敗、自分のアプリとそのトラフィック。"
+      },
+      "agents": {
+        "title": "エージェント",
+        "description": "エージェントの作成と実行向け：失敗した実行と進行中の実行、自分のエージェントと支出。"
+      },
+      "builder": {
+        "title": "開発",
+        "description": "両方を操作する方向け：失敗、最近のアクティビティ、デプロイと実行。"
+      },
+      "operator": {
+        "title": "運用",
+        "description": "プラットフォームの運用向け：アラート、クラスター、プラットフォームのアクティビティと割り当て。"
+      }
+    },
+    "panels": {
+      "waiting": "対応待ち",
+      "failing": "失敗",
+      "my-apps": "自分のアプリ",
+      "recent-deployments": "最近のデプロイ",
+      "traffic-errors": "トラフィックとエラー",
+      "failed-runs": "失敗した実行",
+      "running-now": "実行中",
+      "my-agents": "自分のエージェント",
+      "runs-spend": "実行と支出",
+      "activity": "アクティビティ",
+      "kpis": "主要指標",
+      "deployments": "デプロイ",
+      "agent-runs": "エージェントの実行",
+      "alerts": "アラート",
+      "clusters": "クラスター",
+      "platform-activity": "プラットフォームのアクティビティ",
+      "spend-quota": "支出と割り当て"
+    },
+    "copy": {
+      "auditLog": "監査ログ",
+      "noAgentRunsTitle": "エージェントの実行はまだありません",
+      "noAgentRunsDescription": "閲覧できるエージェントの実行がここに表示されます。",
+      "openAgents": "エージェントを開く",
+      "firingNow": "現在発生中",
+      "acknowledged": "確認済み",
+      "firing": "発生中",
+      "noAlertsTitle": "発生中のアラートはありません",
+      "noAlertsDescription": "ルールが発動するとアラートがここに表示されます。",
+      "alertRules": "アラートルール",
+      "noClustersTitle": "クラスターはまだありません",
+      "noClustersDescription": "アプリやエージェントを実行するクラスターを登録してください。",
+      "registerCluster": "クラスターを登録",
+      "agentRun": "エージェントの実行",
+      "workflowRun": "ワークフローの実行",
+      "noFailedRunsTitle": "失敗した実行はありません",
+      "noFailedRunsDescription": "失敗したエージェントやワークフローの実行が理由とともに表示されます。",
+      "deploy": "デプロイ",
+      "run": "実行",
+      "nothingFailingTitle": "失敗はありません",
+      "nothingFailingDescription": "失敗したデプロイや実行が理由とともに表示されます。",
+      "neverDeployed": "未デプロイ",
+      "noAppsTitle": "自分のアプリはまだありません",
+      "noAppsDescription": "ロールを持つアプリがここに表示されます。",
+      "browseApps": "アプリを参照",
+      "paused": "一時停止中",
+      "neverRun": "未実行",
+      "lastRun": "前回の実行：{status}",
+      "runningCount": "{count, plural, other {# 件実行中}}",
+      "agentsMineNote": "このパネルには、直接、またはプロジェクト、チーム、組織を通じてロールを持つアプリのエージェントが表示されます。",
+      "noAgentsTitle": "自分のエージェントはまだありません",
+      "noAgentsDescription": "ロールを持つアプリのエージェントがここに表示されます。",
+      "browseAgents": "エージェントを参照",
+      "nothingRunningTitle": "実行中の項目はありません",
+      "nothingRunningDescription": "実行中のエージェントがフリート表示でここに表示されます。",
+      "openRuns": "実行を開く",
+      "runningSummary": "{agents, plural, other {# 個のエージェント}}で{runs, plural, other {# 件実行中}}",
+      "noDeploymentsTitle": "デプロイはまだありません",
+      "noDeploymentsDescription": "閲覧できるデプロイがここに表示されます。",
+      "startDeployment": "デプロイを開始",
+      "noPlatformTitle": "プラットフォームのアクティビティはまだありません",
+      "noPlatformDescription": "デプロイ、オンボーディング、クラスター操作が進行中にここに表示されます。",
+      "noWaitingTitle": "対応待ちの項目はありません",
+      "noWaitingDescription": "判断できる承認がここに表示されます。",
+      "approveTitle": "このデプロイを承認しますか？",
+      "approveDescription": "デプロイを承認します。",
+      "approve": "承認",
+      "review": "確認",
+      "workflowGate": "ワークフローの承認ゲート",
+      "secretRequest": "シークレットのリクエスト",
+      "unknownTime": "時刻不明",
+      "unknownValue": "不明",
+      "rolledBack": "ロールバックされました。",
+      "noFailureReason": "この失敗の理由は記録されていません。",
+      "noRunReason": "この実行の理由は記録されていません。",
+      "timedOut": "タイムアウトしました。",
+      "noReason": "理由は記録されていません。",
+      "monthToDate": "今月の累計",
+      "ofBudget": "{amount} のうち · {percentage}",
+      "spent": "支出済み",
+      "projected": "予測",
+      "budget": "予算",
+      "legend": "凡例",
+      "budgetReadFailed": "予算を読み込めませんでした：{message}",
+      "noBudget": "組織の予算が設定されていないため、支出と比較する割り当てはありません。",
+      "spendAgainstBudget": "{panel}：予算に対する支出",
+      "spendBudgetValue": "予算 {budget} に対する支出 {spent}",
+      "last24Hours": "過去24時間",
+      "app": "アプリ",
+      "pickApp": "アプリを選択",
+      "trafficAppsDescription": "ロールを持つアプリのトラフィックがここに表示されます。",
+      "openApp": "アプリを開く",
+      "requests": "リクエスト",
+      "errors": "エラー",
+      "now": "現在",
+      "average": "平均 {value}",
+      "notConfiguredTitle": "未設定",
+      "notConfiguredDescription": "このアプリのクラスターには Prometheus エンドポイントがないため、トラフィックデータは収集されていません。",
+      "notSupportedTitle": "このプロバイダーでは利用できません",
+      "notSupportedDescription": "このクラスターのプロバイダープラグインはこの読み取りに対応していません。他のクラウドでは利用できます。",
+      "metricErrorTitle": "読み込めませんでした",
+      "metricErrorDescription": "このパネルの読み込み中にエラーが発生しました。再試行してください。",
+      "noRequestsTitle": "リクエストはまだありません",
+      "noRequestsDescription": "この期間のデータはありません。アクティビティが発生するとリクエストが表示されます。",
+      "last7Days": "過去7日間",
+      "runsPerDay": "1日あたりのエージェント実行数",
+      "failedPerDay": "1日あたりの失敗した実行数",
+      "spendPerDay": "1日あたりの組織の支出",
+      "sevenDays": "7日間",
+      "spendReadFailed": "支出を読み込めませんでした：{message}",
+      "cappedRuns": "最新の実行から集計しています。この週にはさらに多くの実行があります。",
+      "kpiWindow": "過去 {count, number} 日間 · 今月の累計支出",
+      "kpiAria": "{panel}、過去 {count, number} 日間",
+      "noKpisTitle": "権限内の指標はありません",
+      "noKpisDescription": "閲覧できる領域のデプロイ、実行、支出の指標が表示されます。",
+      "noProject": "プロジェクトなし"
+    },
+    "health": {
+      "error": "設定失敗",
+      "offline": "オフライン",
+      "degraded": "性能低下",
+      "never_seen": "未検出",
+      "connected": "接続済み"
+    },
+    "severity": {
+      "critical": "重大",
+      "error": "エラー",
+      "warn": "警告",
+      "warning": "警告",
+      "info": "情報"
+    },
+    "status": {
+      "running": "実行中",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "rolled_back": "ロールバック済み",
+      "timed_out": "タイムアウト",
+      "error": "エラー",
+      "cancelled": "キャンセル済み",
+      "canceled": "キャンセル済み",
+      "terminated": "終了",
+      "completed": "完了",
+      "paused": "一時停止中",
+      "pending_approval": "承認待ち",
+      "approved": "承認済み",
+      "deploying": "デプロイ中",
+      "building": "ビルド中",
+      "provisioning": "プロビジョニング中",
+      "aborted": "中止",
+      "stopped": "停止",
+      "queued": "キュー待ち",
+      "pending": "待機中",
+      "redeploying": "再デプロイ中",
+      "superseded": "置き換え済み",
+      "waiting": "待機中",
+      "unknown": "不明"
+    },
+    "kpi": {
+      "deploys": "デプロイ",
+      "runs": "実行",
+      "success": "成功率",
+      "p95": "p95",
+      "spend": "支出",
+      "runsHint": "エージェントの実行",
+      "successHint": "デプロイの割合",
+      "p95Hint": "デプロイ時間",
+      "spendHint": "今月の累計"
+    },
+    "period": {
+      "monthly": "月次",
+      "quarterly": "四半期",
+      "yearly": "年次"
+    },
+    "operations": {
+      "everyEnvironment": "すべての環境",
+      "noEnvironment": "環境なし",
+      "appWide": "アプリ全体",
+      "deployTitle": "{app} を {environment} に",
+      "deployDetail": "{image} · 承認 {received, number}/{required, number}",
+      "humanGate": "人による承認ゲート",
+      "approvers": "承認者：{approvers}",
+      "anyApprover": "任意の承認者が判断できます",
+      "secretTitle": "{app} のシークレット · {environment}",
+      "secretBy": "{name} による {operation}",
+      "secretDetail": "{operation} · 承認 {received, number}/{required, number}",
+      "approveFailed": "承認に失敗しました",
+      "approved": "承認済み：{status}",
+      "stage": "ステージ {order, number}{role}",
+      "failedAt": "{stage} で失敗しました。",
+      "timedOutAt": "{stage} でタイムアウトしました。",
+      "requestRate": "{value} リクエスト/秒",
+      "milliseconds": "{value} ミリ秒"
+    },
+    "layoutSettings": {
+      "description": "ホームに表示するパネルとその順序を選びます。保存に成功すると変更はアカウントに同期され、オフラインでもブラウザーのコピーを利用できます。",
+      "noAccess": "現在のロールではアプリやエージェントにアクセスできないため、選択できるレイアウトはありません。",
+      "resetDefault": "自分のアクセス権に応じた既定のレイアウトを使用（{layout}）",
+      "saveFailed": "ホームのレイアウトを保存できませんでした"
+    }
+  },
+  "metrics": {
+    "title": "メトリクス",
+    "description": "デプロイの成功率、所要時間、アプリの状態。",
+    "successRate": "デプロイ成功率",
+    "successRateTrend": "デプロイ成功率の推移",
+    "successRateUnavailable": "デプロイ成功率を取得できません",
+    "trend": "{label}の推移",
+    "durationSeconds": "{seconds, number}秒",
+    "durationMinutesSeconds": "{minutes, number}分{seconds, number}秒",
+    "columns": {
+      "app": "アプリ",
+      "environments": "環境",
+      "latestDeploy": "最新デプロイ",
+      "image": "イメージ",
+      "lastDeployed": "最終デプロイ日時"
+    },
+    "never": "なし",
+    "recentFailure": "最近の失敗",
+    "inFlight": "進行中",
+    "inFlightHint": "承認待ち、待機中、またはデプロイ中",
+    "meanRollout": "平均デプロイ時間",
+    "meanRolloutHint": "この期間に完了したデプロイの平均",
+    "p95Rollout": "デプロイ時間のp95",
+    "p95RolloutHint": "この期間の遅いデプロイの指標",
+    "noRollouts": "過去{days, number}日間にデプロイはありません",
+    "succeededWindow": "{days, number}日間で{total, number}件中{succeeded, number}件成功",
+    "outcomes": "結果（{days, number}日間）",
+    "succeeded": "成功 {count, number}件",
+    "failed": "失敗 {count, number}件",
+    "rolledBack": "ロールバック {count, number}件",
+    "inFlightCount": "進行中 {count, number}件",
+    "total": "合計 {count, number}件",
+    "rolloutsWindow": "{days, number}日間のデプロイ",
+    "rolloutsPerDay": "1日あたりのデプロイ",
+    "apps": "アプリ",
+    "emptyTitle": "アプリはまだありません",
+    "emptyDescription": "アプリを登録してください。最初のデプロイ後にメトリクスが表示されます。",
+    "openApps": "アプリを開く",
+    "rawPrometheus": "Prometheusの生メトリクス",
+    "temporalUi": "Temporalワークフロー画面",
+    "embeddedDashboardsUnavailable": "この画面では埋め込みダッシュボードを利用できません。",
+    "searchPlaceholder": "アプリ、スラッグ、イメージタグを検索…",
+    "filters": {
+      "status": "最新デプロイ",
+      "kind": "種類"
+    },
+    "kinds": {
+      "app": "アプリ",
+      "agent": "エージェント"
+    },
+    "views": {
+      "all": "すべて",
+      "mine": "自分のもの",
+      "failing": "最近の失敗",
+      "mineNote": "状態サマリーには所有者の情報がないため、この表示は空です。"
+    },
+    "staleMetrics": "更新に失敗しました。最後に取得できたメトリクスを表示しています。",
+    "metricsUnavailable": "メトリクスを読み込めませんでした。",
+    "retryMetrics": "メトリクスを再試行"
+  },
+  "teams": {
+    "title": "チーム",
+    "context": "チームはプロジェクト、アプリ、およびそれらへのアクセス権の範囲を定めます。",
+    "newTeam": "新しいチーム",
+    "columnTeam": "チーム",
+    "columnCreated": "作成日",
+    "edit": "編集",
+    "delete": "削除",
+    "emptyTitle": "チームはまだありません",
+    "emptyDescription": "チームを作成して、プロジェクトとアプリをまとめましょう。",
+    "deleteTitle": "チーム {slug} を削除しますか？",
+    "deleteGenericTitle": "チームを削除しますか？",
+    "deleteDescription": "チームを廃止し、スラッグを再利用できるようにします。プロジェクトやアプリの所属先は変更されません。",
+    "confirmDelete": "チームを削除",
+    "createDescription": "チームはプロジェクト、メンバー、トークンの範囲を定めます。スラッグは一意で、チームの廃止後に再利用できます。",
+    "displayName": "表示名",
+    "exampleName": "バックエンドチーム",
+    "slug": "スラッグ",
+    "slugHint": "小文字の英字で始め、英字、数字、ハイフンを使って40文字以内にしてください。末尾は英字または数字にします。",
+    "descriptionOptional": "説明（任意）",
+    "descriptionPlaceholder": "このチームが担当するリソースは？",
+    "cancel": "キャンセル",
+    "creating": "作成中…",
+    "create": "チームを作成",
+    "editTitle": "チームを編集",
+    "editDescription": "チーム名またはスラッグを変更します。スラッグは組織内で一意であり、URLに使用されます。",
+    "generate": "生成",
+    "saving": "保存中…",
+    "save": "変更を保存",
+    "feedback": {
+      "created": "チーム {slug} を作成しました",
+      "saved": "チームを {slug} として保存しました",
+      "deleted": "{slug} を削除しました",
+      "createFailed": "チームを作成できませんでした",
+      "saveFailed": "チームを保存できませんでした",
+      "deleteFailed": "チームを削除できませんでした",
+      "refreshWarning": "表示を更新できませんでした。最新のデータを確認するには表示を更新してください。"
+    },
+    "list": {
+      "search": "チームを検索…",
+      "all": "すべて",
+      "mine": "自分のチーム"
+    },
+    "slugStatus": {
+      "invalid": "小文字の英字、数字、ハイフンを使い、英字で始めて英字または数字で終えてください（40文字以内）。",
+      "checking": "利用可能か確認中…",
+      "available": "利用可能",
+      "taken": "この組織で既に使われています。",
+      "unchanged": "現在のスラッグ — URLに使用されます。",
+      "empty": "小文字の英字、数字、ハイフンを使います。URLに使用されます。"
+    }
+  },
+  "apiKeys": {
+    "title": "API キー",
+    "name": "名前",
+    "suffix": "末尾",
+    "scopes": "スコープ",
+    "scope": "スコープ",
+    "canDo": "可能な操作",
+    "lastUsed": "最終使用",
+    "created": "作成日時",
+    "expires": "有効期限",
+    "status": "状態",
+    "active": "有効",
+    "revoked": "失効済み",
+    "expired": "期限切れ",
+    "none": "なし",
+    "nothing": "なし",
+    "never": "無期限",
+    "all": "すべて",
+    "mine": "自分のキー",
+    "longLivedAdmin": "長期間有効な管理者トークン",
+    "permissionCount": "{count, plural, other {# 件の権限}}",
+    "adminExpiryWarning": "有効期限が近くない管理者トークンです。より限定的なスコープのトークンに置き換えてください。",
+    "effectiveGuidance": "スコープで許可され、所有者のロールでも付与される権限：",
+    "createdNotice": "トークン <name></name> を作成しました",
+    "revealGuidance": "値を今すぐコピーしてください。再表示はできません。保存されるのは SHA-256 ハッシュと末尾 4 文字のみです。",
+    "copy": "コピー",
+    "dismissReveal": "保存しました — 閉じる",
+    "mcpTitle": "エージェントのリモート MCP",
+    "mcpGuidance": "認証付き Streamable HTTP で CI や開発クライアントに接続します。API トークンを <code></code> として送信してください。MCP スコープでも所有者の対応するエージェント権限が必要です。シークレット値は公開されません。",
+    "copyUrl": "URL をコピー",
+    "mcpRead": "{scope} · パッケージ・タスクを確認",
+    "mcpDispatch": "{scope} · 実行・停止",
+    "mcpWrite": "{scope} · リポジトリを同期",
+    "context": "CLI、ボット、スクリプト用の Bearer 認証情報です。トークンはハッシュで保存され、平文は作成時に一度だけ表示されます。",
+    "newToken": "新しいトークン",
+    "revoke": "失効させる",
+    "emptyTitle": "API キーがありません",
+    "emptyDescription": "CLI、CI 実行、スクリプトのプラットフォーム認証用に作成してください。",
+    "createTitle": "新しい API トークン",
+    "createDescription": "平文は作成後に一度だけ表示されます。後から取得できないため、安全な場所に保存してください。",
+    "nameGuidance": "監査ログには、このトークンの操作とともに分かりやすい名前が表示されます。",
+    "scopeGuidance": "トークンはアクセスを限定するだけです。以下の権限のうち、ロールでも付与されている権限のみを取得します。",
+    "expiresDays": "有効期間（日）",
+    "expiryGuidance": "無期限の場合は 0 または空欄にしてください。既定は {defaultDays} 日、最大 {maxDays} 日です。",
+    "cancel": "キャンセル",
+    "creating": "作成中…",
+    "create": "トークンを作成",
+    "revokeNamed": "トークン {name} を失効させますか？",
+    "revokeTitle": "トークンを失効させますか？",
+    "revokeDescription": "このトークンを使用する CLI やボットは直ちに動作しなくなります。失効は取り消せません。アクセスの再開には新しいトークンが必要です。",
+    "revokeConfirm": "トークンを失効",
+    "refreshWarning": "表示を更新できませんでした。現在のデータを確認するには再読み込みしてください。",
+    "pickScope": "スコープを 1 つ以上選択してください",
+    "createFailed": "トークンを作成できませんでした",
+    "revokedFeedback": "トークンを失効させました",
+    "revokeFailed": "トークンを失効させられませんでした",
+    "copyFailed": "コピーできませんでした。値を選択して手動でコピーしてください。",
+    "copied": "クリップボードにコピーしました",
+    "endpointCopied": "MCP エンドポイントをコピーしました",
+    "searchPlaceholder": "キー、所有者、チーム、末尾を検索…",
+    "narrowedNote": "API クエリがフィルターに対応するまで、最新 {count} 件から一致するキーを表示します。",
+    "mineNote": "最新 {count} 件から自分のキーを表示します。",
+    "detail": {
+      "token": "トークン",
+      "owner": "所有者",
+      "team": "チーム",
+      "lastIp": "最終使用 IP",
+      "lastAgent": "最終使用クライアント",
+      "orgWide": "—（組織全体）",
+      "shortToken": "トークン {id}",
+      "overview": "概要",
+      "notFoundTitle": "API トークンが見つかりません",
+      "notFoundDescription": "このトークンは存在しないか、最近の一覧に含まれていないか、アクセス権がない可能性があります。",
+      "back": "API キーに戻る",
+      "noScopes": "スコープがありません。このトークンには権限が付与されていません。",
+      "readFailed": "トークンのメタデータを読み込めませんでした。",
+      "retry": "再試行"
+    },
+    "picker": {
+      "loadFailed": "スコープ一覧を読み込めませんでした。ページを再読み込みしてください。",
+      "startFrom": "プリセット",
+      "adminWarning": "Admin は、後から追加される権限も含め、所有者に可能なすべての操作を許可します。限定的なスコープと有効期限を設定してください。",
+      "sensitive": "機密性の高い権限",
+      "unavailable": "ロールには、このスコープで許可される権限がありません。",
+      "unlocks": "{count, plural, other {# 件の権限を許可}}",
+      "surfaces": {
+        "apps": "アプリ",
+        "clusters": "クラスター",
+        "secrets": "シークレット",
+        "agents": "エージェント",
+        "workflows": "ワークフロー",
+        "administration": "管理"
+      },
+      "presets": {
+        "read_only": "読み取り専用",
+        "cli": "CLI の既定",
+        "ci_deploy": "CI デプロイ",
+        "cluster_operator": "クラスターオペレーター"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "アプリを読み取る",
+        "description": "アプリ、デプロイ、環境、シークレット名を一覧表示します。"
+      },
+      "scope1": {
+        "label": "アプリを書き込む",
+        "description": "デプロイ、環境変数の編集、アプリ設定の管理を行います。"
+      },
+      "scope2": {
+        "label": "アプリを登録する",
+        "description": "アプリを登録し、CI（Webhook、シークレット、ワークフロー）を設定します。デプロイや削除はできません。"
+      },
+      "scope3": {
+        "label": "クラスターを読み取る",
+        "description": "クラスターを一覧表示し、プロバイダーの状態を読み取ります。"
+      },
+      "scope4": {
+        "label": "クラスターを更新する",
+        "description": "クラスターの Ingress クラス、認証ゲート、リージョン、エンドポイントを変更します。"
+      },
+      "scope5": {
+        "label": "クラスターを運用する",
+        "description": "クラスターのレシピをインストールし、管理状態を更新し、Ingress を調整します。"
+      },
+      "scope6": {
+        "label": "サインインユーザーを管理する",
+        "description": "クラスターの中央認証ユーザーとグループの作成、無効化、削除、リセットを行います。"
+      },
+      "scope7": {
+        "label": "アプリへのアクセスを設定する",
+        "description": "中央認証で保護されたアプリにアクセスできるユーザーとグループを選択します。"
+      },
+      "scope8": {
+        "label": "シークレットを表示する",
+        "description": "保存されたシークレット値を表示します。必要な場合のみ付与してください。"
+      },
+      "scope9": {
+        "label": "シークレットを書き込む",
+        "description": "値を表示せずにシークレットの設定、ローテーション、削除を行います。"
+      },
+      "scope10": {
+        "label": "MCP 読み取り",
+        "description": "リモート MCP でエージェントパッケージを一覧表示し、実行を確認します。"
+      },
+      "scope11": {
+        "label": "MCP 実行",
+        "description": "アカウント権限に従い、エージェントの実行、制御、強制停止、エージェントボックスへの接続を行います。"
+      },
+      "scope12": {
+        "label": "MCP 書き込み",
+        "description": "エージェントリポジトリとパッケージ定義を同期します。"
+      },
+      "scope13": {
+        "label": "エージェント環境を書き込む",
+        "description": "エージェント環境仕様の作成、更新、削除を行います。"
+      },
+      "scope14": {
+        "label": "ワークフローを書き込む",
+        "description": "ワークフローの作成、更新、削除を行います。"
+      },
+      "scope15": {
+        "label": "ワークフローを実行する",
+        "description": "ワークフローを編集せずに実行を開始します。"
+      },
+      "scope16": {
+        "label": "プロジェクトを書き込む",
+        "description": "プロジェクトの作成、更新、削除を行います。"
+      },
+      "scope17": {
+        "label": "チームを書き込む",
+        "description": "チームの作成、更新、削除を行います。"
+      },
+      "scope18": {
+        "label": "管理者",
+        "description": "現在および将来追加される権限を含め、所有者に可能なすべての操作です。限定的なスコープを優先してください。"
       }
     }
   }

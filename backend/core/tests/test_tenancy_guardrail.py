@@ -29,6 +29,10 @@ BACKEND = Path(__file__).resolve().parents[2]
 # Resolvers that intentionally do NOT need @tenant_scoped.
 # Each entry must include the qualified name and a why.
 EXEMPT: dict[str, str] = {
+    "ClustersQuery.astrolift_provider_plugin": (
+        "Exact singular reference to the authenticated install-wide provider catalog, "
+        "same public shape as astrolift_provider_plugins; no tenant config or credentials (#2208)."
+    ),
     # Identity self-service: the user reads their own profile and the
     # set of memberships they belong to. The org filter is the user
     # itself; tenant context is the *output*, not the input.

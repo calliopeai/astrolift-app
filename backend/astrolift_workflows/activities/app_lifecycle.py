@@ -13,8 +13,10 @@ durable thing. Provider-specific logic happens behind the
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 from typing import Any
 
+from django.db import transaction
 from temporalio import activity
 
 from astrolift_lifecycle.run_history import observed_phase
@@ -1352,6 +1354,7 @@ async def apply_manifests(deployment_id: int) -> dict[str, list[str]]:
     return summary
 
 
+@transaction.atomic
 def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = None) -> int:
     import base64
 
@@ -1369,10 +1372,35 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
         driver_for_target_cluster,
     )
 
-    d = Deployment.all_objects.select_related(
-        "registered_app__organization",
-        "app_environment__tenant_cluster__provider_plugin",
-    ).get(pk=deployment_id)
+    d = (
+        Deployment.all_objects.select_for_update(of=("self",))
+        .select_related(
+            "registered_app__organization",
+            "app_environment__tenant_cluster__provider_plugin",
+        )
+        .get(pk=deployment_id)
+    )
+    # Admit every persisted preview slice before any secret store/provider call.
+    from astrolift_lifecycle.services.preview_slice_bindings import binding_for_preview
+
+    services = list(_managed_services_for_environment(d.app_environment).order_by("kind", "name"))
+    slice_bindings = {}
+    for svc in services:
+        binding = binding_for_preview(svc, d.app_environment)
+        if binding is not None:
+            if d.registered_app_id != d.app_environment.registered_app_id:
+                raise AppDeployError("preview deployment belongs to another app")
+            if d.deleted_at is not None:
+                raise AppDeployError("preview deployment is retired")
+            slice_bindings[svc.pk] = binding
+            svc.refresh_from_db()
+    if slice_bindings:
+        # Admission locked the current rows; use their current target/namespace
+        # rather than the related objects loaded before those locks were taken.
+        d.app_environment.refresh_from_db()
+        d.registered_app.refresh_from_db()
+        if target_cluster_id is not None and target_cluster_id != d.app_environment.tenant_cluster_id:
+            raise AppDeployError("native preview slices cannot be materialized onto another cluster")
     # The migration workflow passes the cluster it is moving the env to.
     # Only where the Secrets are applied changes: bundle and binding values
     # still come from the secrets backend of the env's bound cluster, which
@@ -1477,9 +1505,6 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
     # or secret_ref) into raw values so workloads see a flat env-var
     # surface — they don't need to know whether DATABASE_PASSWORD came
     # from Secrets Manager or was inlined.
-    services = list(
-        _managed_services_for_environment(d.app_environment).order_by("kind", "name"),
-    )
     if services:
         bindings_by_secret: dict[str, dict[str, str]] = {}
         secrets_backend = driver_for_capability(
@@ -1495,10 +1520,21 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
             )
             for secret_name in secret_names:
                 bindings_by_secret.setdefault(secret_name, {})
-            for binding in ManagedServiceBinding.objects.filter(
-                managed_service=svc,
-                deleted_at__isnull=True,
-            ).order_by("env_key"):
+            bindings = {
+                row.env_key: row
+                for row in ManagedServiceBinding.objects.filter(
+                    managed_service=svc, deleted_at__isnull=True
+                ).order_by("env_key")
+            }
+            slice_binding = slice_bindings.get(svc.pk)
+            if slice_binding is not None:
+                for key, value in slice_binding.env_vars.items():
+                    bindings[key] = SimpleNamespace(
+                        env_key=key,
+                        env_value_ref=value.secret_ref or value.literal,
+                        is_secret=bool(value.secret_ref),
+                    )
+            for binding in bindings.values():
                 env_key = binding.env_key
                 raw_value: str
                 if binding.is_secret:
@@ -2147,6 +2183,7 @@ async def provision_preview_managed_services_activity(preview_environment_id: in
     )
 
 
+@transaction.atomic
 def _provision_preview_managed_services_sync(preview_environment_id: int) -> dict:
     from astrolift_lifecycle.models import PreviewEnvironment
     from astrolift_lifecycle.services.preview_service_provisioning import (
@@ -2154,12 +2191,25 @@ def _provision_preview_managed_services_sync(preview_environment_id: int) -> dic
     )
 
     preview = (
-        PreviewEnvironment.objects.select_related("app_environment")
+        PreviewEnvironment.objects.select_for_update(of=("self",))
+        .select_related("app_environment")
         .filter(pk=preview_environment_id, deleted_at__isnull=True)
         .first()
     )
     if preview is None or preview.app_environment is None:
         return {"attached": [], "sliced": [], "shared_unsliced": [], "skipped": [], "errors": {}}
+
+    if (
+        preview.registered_app_id != preview.app_environment.registered_app_id
+        or preview.status == PreviewEnvironment.Status.TORN_DOWN
+    ):
+        return {
+            "attached": [],
+            "sliced": [],
+            "shared_unsliced": [],
+            "skipped": [],
+            "errors": {"preview": "preview is retired or does not belong to its current app environment"},
+        }
 
     outcome = provision_preview_managed_services(preview.app_environment)
     return {
@@ -2193,6 +2243,7 @@ async def cleanup_preview_managed_services_activity(preview_environment_id: int)
     )
 
 
+@transaction.atomic
 def _cleanup_preview_managed_services_sync(preview_environment_id: int) -> dict:
     from astrolift_lifecycle.models import PreviewEnvironment
     from astrolift_lifecycle.services.preview_service_provisioning import (
@@ -2202,13 +2253,18 @@ def _cleanup_preview_managed_services_sync(preview_environment_id: int) -> dict:
     empty = {"dropped": [], "leaked": [], "no_slice": [], "errors": {}}
 
     preview = (
-        PreviewEnvironment.objects.select_related("app_environment").filter(pk=preview_environment_id).first()
+        PreviewEnvironment.objects.select_for_update(of=("self",))
+        .select_related("app_environment")
+        .filter(pk=preview_environment_id)
+        .first()
     )
-    # No `deleted_at__isnull=True` here, unlike the provision side. A preview
-    # being torn down may already be soft-deleted, and refusing to clean up
-    # its slices because the row is gone is how the leak survives the fix.
+    # The live manager excludes retired rows; automatic cleanup must not
+    # follow a stale or reassigned preview owner to somebody else's slice.
     if preview is None or preview.app_environment is None:
         return empty
+
+    if preview.registered_app_id != preview.app_environment.registered_app_id:
+        return {**empty, "errors": {"preview": "preview does not belong to its current app environment"}}
 
     outcome = deprovision_preview_managed_services(preview.app_environment)
     if outcome.leaked or outcome.errors:

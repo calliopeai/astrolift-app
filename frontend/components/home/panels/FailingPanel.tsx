@@ -10,9 +10,9 @@ import { CircleXIcon, OctagonAlertIcon, PlayIcon, RocketIcon } from "lucide-reac
 import * as React from "react";
 
 import { ListSummary } from "@/components/list/ListSummary";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import type { HomeRead } from "./home-reads";
 import { newestFirst } from "./apps-agents-model";
 import { useFailing } from "./use-failing";
@@ -42,6 +42,7 @@ const KIND_ICON: Record<FailingItem["kind"], React.ReactNode> = {
 };
 
 export function FailingLine({ item }: { item: FailingItem }) {
+  const { t, age } = useHomePresentation(true);
   return (
     <div className="min-w-0">
       <p className="text-danger-fg line-clamp-2 font-mono text-xs [overflow-wrap:anywhere]">
@@ -51,11 +52,11 @@ export function FailingLine({ item }: { item: FailingItem }) {
         <span className="shrink-0" aria-hidden>
           {KIND_ICON[item.kind]}
         </span>
-        <span className="sr-only">{item.kind === "deploy" ? "Deploy" : "Run"}: </span>
+        <span className="sr-only">{t(item.kind === "deploy" ? "copy.deploy" : "copy.run")}: </span>
         <span className="text-foreground min-w-0 flex-1 truncate" title={item.subject}>
           {item.subject}
         </span>
-        <span className="shrink-0 font-mono">{formatRelativeAge(item.at)}</span>
+        <span className="shrink-0 font-mono">{age(item.at)}</span>
       </p>
     </div>
   );
@@ -70,9 +71,10 @@ export function FailingPanelView({
   error,
   onRetry,
 }: FailingPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<OctagonAlertIcon className="size-4" />}
       span={panel.span}
       count={loading || error ? null : count}
@@ -86,8 +88,8 @@ export function FailingPanelView({
       onRetry={onRetry}
       empty={{
         icon: <CircleXIcon />,
-        title: "Nothing failing",
-        description: "Failed deploys and runs show up here with their reason.",
+        title: t("copy.nothingFailingTitle"),
+        description: t("copy.nothingFailingDescription"),
       }}
     />
   );

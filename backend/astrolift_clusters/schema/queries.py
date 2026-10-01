@@ -487,6 +487,22 @@ class ClustersQuery:
         qs = ProviderPlugin.objects.order_by("slug")[:100]
         return [plugin_to_type(p) for p in qs]
 
+    @strawberry.field(
+        description="An authenticated public provider catalog reference without list caps. expectedId refuses a replaced slug; no tenant configuration or credentials are returned."
+    )
+    def astrolift_provider_plugin(
+        self, info: Info, slug: str, expected_id: GUID | None = None
+    ) -> ProviderPluginType | None:
+        # tenancy: authenticated install-wide ProviderPlugin catalog, exactly the
+        # existing public list projection; no organization config or credentials.
+        user = getattr(info.context.request, "user", None)
+        if not user or not user.is_authenticated:
+            return None
+        plugin = ProviderPlugin.objects.filter(slug=slug).first()
+        if plugin is None or (expected_id is not None and str(plugin.guid) != str(expected_id)):
+            return None
+        return plugin_to_type(plugin)
+
     @strawberry.field
     @require_permission(
         Permission.CLUSTER_REGISTER, scope=cluster_catalog_org_scope(Permission.CLUSTER_REGISTER)

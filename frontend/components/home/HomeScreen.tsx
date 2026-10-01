@@ -19,6 +19,7 @@
 
 import { ChevronDownIcon, LayoutDashboardIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { HomeLayoutPicker } from "./HomeLayoutPicker";
+import { localizedHomeLayout } from "./registry";
 import type { HomeLayoutDef, HomeLayoutKey, HomePanelDef } from "./registry";
 
 export const HOME_QUESTION = "What will you mostly do here?";
@@ -69,11 +71,15 @@ export function HomeScreen({
   onLayoutChange,
   onboarding,
 }: HomeScreenProps) {
-  const title = layout && !loading && !firstSignIn ? `Home · ${layout.title}` : "Home";
+  const t = useTranslations("home");
+  layouts = layouts.map((value) => localizedHomeLayout(value, t));
+  layout = layout ? localizedHomeLayout(layout, t) : null;
+  const title =
+    layout && !loading && !firstSignIn ? t("titleLayout", { layout: layout.title }) : t("title");
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <ShellHeader
-        crumbs={[{ label: "Home" }]}
+        crumbs={[{ label: t("title") }]}
         title={title}
         primaryAction={
           !loading &&
@@ -86,8 +92,8 @@ export function HomeScreen({
       ) : !layout ? (
         <EmptyState
           icon={<LayoutDashboardIcon className="size-5" />}
-          title="Nothing for Home to show yet"
-          description="Your role has no access to Apps or Agents in this organization. An organization admin can grant it."
+          title={t("noAccessTitle")}
+          description={t("noAccessDescription")}
         />
       ) : firstSignIn ? (
         <FirstSignIn layouts={layouts} defaultLayout={defaultLayout} onChoose={onLayoutChange} />
@@ -112,16 +118,17 @@ function LayoutMenu({
   layouts: HomeLayoutDef[];
   onLayoutChange: (key: HomeLayoutKey) => void;
 }) {
+  const t = useTranslations("home");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
-          Layout
+          {t("layoutMenu")}
           <ChevronDownIcon className="size-3.5" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 max-w-[calc(100vw-2rem)]">
-        <DropdownMenuLabel>Home layout</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("layoutLegend")}</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={layout.key}
           onValueChange={(key) => onLayoutChange(key as HomeLayoutKey)}
@@ -139,7 +146,7 @@ function LayoutMenu({
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings/home">Home settings</Link>
+          <Link href="/settings/home">{t("settings")}</Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -156,13 +163,14 @@ function FirstSignIn({
   defaultLayout: HomeLayoutKey | null;
   onChoose: (key: HomeLayoutKey) => void;
 }) {
+  const t = useTranslations("home");
   const [picked, setPicked] = React.useState<HomeLayoutKey | null>(
     defaultLayout ?? layouts[0]?.key ?? null
   );
   return (
     <section className="bg-card min-w-0 rounded-md border p-4 md:p-6">
       <HomeLayoutPicker
-        legend={HOME_QUESTION}
+        legend={t("question")}
         showLegend
         layouts={layouts}
         value={picked}
@@ -170,11 +178,9 @@ function FirstSignIn({
         defaultLayout={defaultLayout}
       />
       <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-xs">
-          Change it anytime from Layout on Home or in Settings › Home.
-        </p>
+        <p className="text-muted-foreground text-xs">{t("changeHint")}</p>
         <Button size="sm" disabled={!picked} onClick={() => picked && onChoose(picked)}>
-          Continue
+          {t("continue")}
         </Button>
       </div>
     </section>

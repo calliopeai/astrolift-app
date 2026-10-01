@@ -22,8 +22,8 @@ export const TOKENS_SCREEN: TokensData = {
   mcpEndpoint: "https://astrolift.example.com/api/mcp/v1/",
   onCreate: async () => true,
   onRevoke: async () => {},
-  onCopyPlaintext: noop,
-  onCopyMcpEndpoint: noop,
+  onCopyPlaintext: async () => {},
+  onCopyMcpEndpoint: async () => {},
 };
 
 export const TOKENS_SCREEN_LONG: TokensData = {

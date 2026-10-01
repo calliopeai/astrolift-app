@@ -9,6 +9,9 @@
  */
 
 import { ActivityIcon, BarChart3Icon, LayoutGridIcon, ListIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { homePanelTitle } from "./registry";
+
 import * as React from "react";
 
 import type { EmptyStateSpec } from "@/components/data-table";
@@ -28,17 +31,19 @@ const ICON: Record<HomePanelKind, React.ReactNode> = {
 const NONE: never[] = [];
 
 export function PlaceholderPanel({ panel }: HomePanelProps) {
+  const t = useTranslations("home");
+  const title = homePanelTitle(panel, t);
   const empty: EmptyStateSpec = {
     icon: ICON[panel.kind],
-    title: "Not on Home yet",
-    description: `${panel.title} is on its way to Home. Until then, the full page has it.`,
+    title: t("placeholderTitle"),
+    description: t("placeholderDescription", { panel: title }),
     actionHref: panel.href,
-    actionLabel: "Open",
+    actionLabel: t("open"),
   };
   if (panel.kind === "list") {
     return (
       <ListSummary
-        title={panel.title}
+        title={title}
         icon={ICON.list}
         span={panel.span}
         rows={NONE}
@@ -51,16 +56,10 @@ export function PlaceholderPanel({ panel }: HomePanelProps) {
   }
   if (panel.kind === "feed") {
     return (
-      <Panel title={panel.title} icon={ICON.feed} span={panel.span}>
-        <Feed
-          label={panel.title}
-          items={NONE}
-          keyOf={() => ""}
-          renderItem={() => null}
-          empty={empty}
-        />
+      <Panel title={title} icon={ICON.feed} span={panel.span}>
+        <Feed label={title} items={NONE} keyOf={() => ""} renderItem={() => null} empty={empty} />
       </Panel>
     );
   }
-  return <Panel title={panel.title} icon={ICON[panel.kind]} span={panel.span} empty={empty} />;
+  return <Panel title={title} icon={ICON[panel.kind]} span={panel.span} empty={empty} />;
 }

@@ -1,6 +1,6 @@
 import { ApolloClient, ApolloLink, InMemoryCache, Observable } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
-import { render } from "@testing-library/react";
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import { useFailing } from "./use-failing";

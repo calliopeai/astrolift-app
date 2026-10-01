@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, CheckCircle2Icon, SearchIcon, XCircleIcon } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,12 @@ import {
   type ScopeRef,
   summarizePermissions,
 } from "./access-model";
+import {
+  localizedBindReason,
+  localizedPermissionPresentation,
+  localizedScopeLabel,
+} from "./access-copy";
+import { localizedGrantEffect } from "./grant-copy";
 import { GrantSource } from "./GrantSource";
 import { PrincipalChip } from "./PrincipalChip";
 import { RoleSummary } from "./RoleSummary";
@@ -117,16 +124,10 @@ export interface GrantAccessFlowProps {
 }
 
 type Step = 0 | 1 | 2 | 3 | 4;
-const STEPS = ["Who", "Role", "Scope", "Expiry", "Review"] as const;
+const STEPS = ["who", "role", "scope", "expiry", "review"] as const;
 const EXPIRY_DAYS = [1, 7, 30, 90];
 
 const EMPTY: GrantDraft = { principals: [], roleId: null, scope: null, expiry: { kind: "never" } };
-
-function expiryLabel(e: Expiry): string {
-  if (e.kind === "never") return "never expires";
-  if (e.kind === "days") return `expires in ${e.days} day${e.days === 1 ? "" : "s"}`;
-  return `expires on ${e.date}`;
-}
 
 const principalKey = (p: Principal) => `${p.kind}:${p.id}`;
 
@@ -162,6 +163,8 @@ export function GrantAccessFlow({
   initialPreview = null,
   initialOutcomes = null,
 }: GrantAccessFlowProps) {
+  const t = useTranslations("shared.access.grant");
+  const accessT = useTranslations("shared.access");
   const [step, setStep] = React.useState<Step>(initialStep);
   const [draft, setDraft] = React.useState<GrantDraft>({ ...EMPTY, ...initialDraft });
   const [error, setError] = React.useState<string | null>(null);
@@ -180,17 +183,16 @@ export function GrantAccessFlow({
   };
 
   function problem(at: Step): string | null {
-    if (at === 0 && draft.principals.length === 0)
-      return "Pick at least one person, group or team.";
-    if (at === 1 && !role) return "Pick a role.";
+    if (at === 0 && draft.principals.length === 0) return t("pickPrincipal");
+    if (at === 1 && !role) return t("pickRole");
     if (at === 2) {
-      if (!draft.scope) return "Pick where the role applies.";
+      if (!draft.scope) return t("pickScope");
       if (role) {
-        const ok = canBindAt(role, draft.scope.kind);
+        const ok = canBindAt(role, draft.scope.kind, localizedBindReason(accessT));
         if (ok !== true) return ok;
       }
     }
-    if (at === 3 && draft.expiry.kind === "date" && !draft.expiry.date) return "Pick a date.";
+    if (at === 3 && draft.expiry.kind === "date" && !draft.expiry.date) return t("pickDate");
     return null;
   }
 
@@ -202,7 +204,7 @@ export function GrantAccessFlow({
       setPreviewState({
         data: null,
         loading: false,
-        error: err instanceof Error ? err.message : "Could not preview",
+        error: err instanceof Error ? err.message : t("previewFailed"),
       });
     }
   }
@@ -223,6 +225,9 @@ export function GrantAccessFlow({
   }
 
   async function submit() {
+    if (submitting || previewState.loading || !previewState.data || previewState.data.refusal)
+      return;
+    setError(null);
     setSubmitting(true);
     // A retry sends only who failed; who succeeded stays succeeded.
     const done = outcomes?.filter((o) => o.ok) ?? [];
@@ -233,9 +238,10 @@ export function GrantAccessFlow({
         ...(await onSubmit(retrying?.length ? { ...draft, principals: retrying } : draft)),
       ];
       setOutcomes(result);
-      if (result.every((o) => o.ok)) onDone(result);
+      if (result.length > 0 && result.every((o) => o.ok)) onDone(result);
+      else if (result.length === 0) setError(t("noGrants"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The grant failed");
+      setError(err instanceof Error ? err.message : t("grantFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -246,9 +252,9 @@ export function GrantAccessFlow({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <ShellHeader crumbs={crumbs} title="Grant access" />
+      <ShellHeader crumbs={crumbs} title={t("title")} />
 
-      <ol aria-label="Steps" className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+      <ol aria-label={t("steps")} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
         {STEPS.map((label, i) => (
           <li key={label} className="min-w-0">
             <button
@@ -269,7 +275,7 @@ export function GrantAccessFlow({
               >
                 {i + 1}
               </span>
-              {label}
+              {t(`step.${label}`)}
             </button>
           </li>
         ))}
@@ -290,11 +296,8 @@ export function GrantAccessFlow({
 
         {step === 2 && (
           <div className="flex min-w-0 flex-col gap-2">
-            <h2 className="text-sm font-medium">Where does it apply?</h2>
-            <p className="text-muted-foreground text-sm">
-              A grant reaches everything inside the scope: a team grant covers its projects and
-              apps.
-            </p>
+            <h2 className="text-sm font-medium">{t("whereHeading")}</h2>
+            <p className="text-muted-foreground text-sm">{t("scopeHelp")}</p>
             <ScopePicker
               roots={scopeTree.roots}
               loading={scopeTree.loading}
@@ -303,31 +306,33 @@ export function GrantAccessFlow({
               loadChildren={scopeTree.loadChildren}
               value={draft.scope}
               onChange={(n) => patch({ scope: { kind: n.kind, id: n.id, name: n.name } })}
-              selectable={role ? (n) => canBindAt(role, n.kind) : undefined}
+              selectable={
+                role ? (n) => canBindAt(role, n.kind, localizedBindReason(accessT)) : undefined
+              }
             />
           </div>
         )}
 
         {step === 3 && (
           <fieldset className="flex min-w-0 flex-col gap-3">
-            <legend className="mb-2 text-sm font-medium">When does it end?</legend>
+            <legend className="mb-2 text-sm font-medium">{t("expiryHeading")}</legend>
             <div className="flex min-w-0 flex-wrap gap-2">
               <ExpiryOption
-                label="Never"
+                label={t("never")}
                 on={draft.expiry.kind === "never"}
                 onClick={() => patch({ expiry: { kind: "never" } })}
               />
               {EXPIRY_DAYS.map((days) => (
                 <ExpiryOption
                   key={days}
-                  label={`${days} day${days === 1 ? "" : "s"}`}
+                  label={t("days", { count: days })}
                   on={draft.expiry.kind === "days" && draft.expiry.days === days}
                   disabled={!expirySupported}
                   onClick={() => patch({ expiry: { kind: "days", days } })}
                 />
               ))}
               <ExpiryOption
-                label="On a date"
+                label={t("onDate")}
                 on={draft.expiry.kind === "date"}
                 disabled={!expirySupported}
                 onClick={() => patch({ expiry: { kind: "date", date: "" } })}
@@ -336,21 +341,17 @@ export function GrantAccessFlow({
             {draft.expiry.kind === "date" && (
               <Input
                 type="date"
-                aria-label="Expiry date"
+                aria-label={t("expiryDate")}
                 value={draft.expiry.date}
                 onChange={(e) => patch({ expiry: { kind: "date", date: e.target.value } })}
                 className="w-48 font-mono"
               />
             )}
             {!expirySupported ? (
-              <p className="text-muted-foreground text-xs">
-                This grant cannot be time-boxed here; it lasts until it is removed.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("expiryUnsupported")}</p>
             ) : (
               draft.expiry.kind !== "never" && (
-                <p className="text-muted-foreground text-xs">
-                  The grant ends by itself then; removing it earlier still works.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("expiryHelp")}</p>
               )
             )}
           </fieldset>
@@ -375,28 +376,33 @@ export function GrantAccessFlow({
 
         <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("cancel")}
           </Button>
           {step > 0 && (
             <Button type="button" variant="outline" onClick={() => setStep((step - 1) as Step)}>
-              Back
+              {t("back")}
             </Button>
           )}
           {step < 4 ? (
             <Button type="button" onClick={() => goTo((step + 1) as Step)}>
-              Continue
+              {t("continue")}
             </Button>
           ) : (
             <Button
               type="button"
               onClick={() => void submit()}
-              disabled={submitting || previewState.loading || Boolean(previewState.data?.refusal)}
+              disabled={
+                submitting ||
+                previewState.loading ||
+                !previewState.data ||
+                Boolean(previewState.data.refusal)
+              }
             >
               {submitting
-                ? "Granting…"
+                ? t("granting")
                 : failed.length > 0
-                  ? `Retry ${failed.length}`
-                  : `Grant to ${draft.principals.length}`}
+                  ? t("retryCount", { count: failed.length })
+                  : t("grantCount", { count: draft.principals.length })}
             </Button>
           )}
         </div>
@@ -414,13 +420,14 @@ function WhoStep({
   patch: (next: Partial<GrantDraft>) => void;
   search: PrincipalSearch;
 }) {
+  const t = useTranslations("shared.access.grant");
   const picked = new Set(draft.principals.map(principalKey));
   const results = search.results.filter((p) => !picked.has(principalKey(p)));
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <h2 className="text-sm font-medium">Who gets access?</h2>
+      <h2 className="text-sm font-medium">{t("whoHeading")}</h2>
       {draft.principals.length > 0 && (
-        <ul aria-label="Picked" className="flex min-w-0 flex-wrap gap-2">
+        <ul aria-label={t("picked")} className="flex min-w-0 flex-wrap gap-2">
           {draft.principals.map((p) => (
             <li key={principalKey(p)} className="max-w-full min-w-0">
               <PrincipalChip
@@ -441,15 +448,15 @@ function WhoStep({
           type="search"
           value={search.query}
           onChange={(e) => search.setQuery(e.target.value)}
-          placeholder="Search people, groups and teams by name or email"
-          aria-label="Search people, groups and teams"
+          placeholder={t("searchPlaceholder")}
+          aria-label={t("searchLabel")}
           className="pl-8"
         />
       </div>
       <div className="max-h-72 min-w-0 overflow-auto rounded-md border">
         {search.error ? (
           <p role="alert" className="text-danger-fg p-3 text-sm [overflow-wrap:anywhere]">
-            Search failed: {search.error.message}
+            {t("searchFailed", { message: search.error.message })}
           </p>
         ) : search.loading ? (
           <div className="flex flex-col gap-2 p-3" aria-busy>
@@ -459,9 +466,7 @@ function WhoStep({
           </div>
         ) : results.length === 0 ? (
           <p className="text-muted-foreground p-3 text-sm">
-            {search.query.trim()
-              ? `No one matches "${search.query.trim()}".`
-              : "Type to search. A group grant reaches whoever is in the group, now and later; a team adds its members at the time of the grant."}
+            {search.query.trim() ? t("noPeople", { query: search.query.trim() }) : t("searchHelp")}
           </p>
         ) : (
           <ul className="divide-y">
@@ -477,9 +482,9 @@ function WhoStep({
                   size="sm"
                   variant="outline"
                   onClick={() => patch({ principals: [...draft.principals, p] })}
-                  aria-label={`Add ${p.name}`}
+                  aria-label={t("addName", { name: p.name })}
                 >
-                  Add
+                  {t("add")}
                 </Button>
               </li>
             ))}
@@ -503,6 +508,7 @@ function RoleStep({
   value: string | null;
   onChange: (id: string) => void;
 }) {
+  const t = useTranslations("shared.access.grant");
   const [q, setQ] = React.useState("");
   const needle = q.trim().toLowerCase();
   const shown = needle
@@ -515,18 +521,18 @@ function RoleStep({
     : roles;
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <h2 className="text-sm font-medium">Which role?</h2>
+      <h2 className="text-sm font-medium">{t("roleHeading")}</h2>
       <Input
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search roles or a permission, e.g. deploy"
-        aria-label="Search roles"
+        placeholder={t("rolePlaceholder")}
+        aria-label={t("roleSearch")}
       />
       <div className="max-h-96 min-w-0 overflow-auto rounded-md border">
         {error ? (
           <p role="alert" className="text-danger-fg p-3 text-sm [overflow-wrap:anywhere]">
-            Could not load roles: {error.message}
+            {t("rolesFailed", { message: error.message })}
           </p>
         ) : loading ? (
           <div className="flex flex-col gap-2 p-3" aria-busy>
@@ -536,12 +542,10 @@ function RoleStep({
           </div>
         ) : shown.length === 0 ? (
           <p className="text-muted-foreground p-3 text-sm">
-            {roles.length === 0
-              ? "You cannot grant any role: it takes holding every permission a role carries."
-              : `No role matches "${q.trim()}".`}
+            {roles.length === 0 ? t("noGrantableRoles") : t("noRoles", { query: q.trim() })}
           </p>
         ) : (
-          <div role="radiogroup" aria-label="Role" className="divide-y">
+          <div role="radiogroup" aria-label={t("step.role")} className="divide-y">
             {shown.map((r) => {
               const on = r.id === value;
               return (
@@ -611,18 +615,45 @@ function Review({
   succeeded: GrantOutcome[];
   failed: GrantOutcome[];
 }) {
+  const t = useTranslations("shared.access.grant");
+  const accessT = useTranslations("shared.access");
+  const format = useFormatter();
   const p = preview.data;
   const scope = draft.scope;
+  const expiry = draft.expiry;
+  const date = expiry.kind === "date" ? new Date(`${expiry.date}T00:00:00Z`) : null;
+  const expiryDescription =
+    expiry.kind === "never"
+      ? t("expiresNever")
+      : expiry.kind === "days"
+        ? t("expiresDays", { count: expiry.days })
+        : t("expiresDate", {
+            date:
+              date && !Number.isNaN(date.getTime())
+                ? format.dateTime(date, { dateStyle: "medium", timeZone: "UTC" })
+                : expiry.date,
+          });
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <h2 className="text-sm font-medium">Review</h2>
+      <h2 className="text-sm font-medium">{t("step.review")}</h2>
       <p className="min-w-0 text-sm [overflow-wrap:anywhere]">
-        <span className="font-medium">{role?.name ?? "No role"}</span>{" "}
-        <span className="text-muted-foreground">
-          ({role ? summarizePermissions(role.permissions) : "none"})
-        </span>{" "}
-        on {scope ? SCOPE_NOUN[scope.kind] : "no scope"}{" "}
-        <span className="font-mono">{scope?.name ?? ""}</span>, {expiryLabel(draft.expiry)}.
+        {t.rich("summary", {
+          roleName: role?.name ?? t("noRole"),
+          permissions: role
+            ? summarizePermissions(
+                role.permissions,
+                undefined,
+                localizedPermissionPresentation(accessT, (items) =>
+                  format.list(items, { type: "conjunction" })
+                )
+              )
+            : accessT("presentation.none"),
+          kind: scope ? localizedScopeLabel(scope.kind, accessT) : t("noScope"),
+          name: scope?.name ?? "",
+          expiry: expiryDescription,
+          role: (chunks) => <span className="font-medium">{chunks}</span>,
+          identifier: (chunks) => <span className="font-mono">{chunks}</span>,
+        })}
       </p>
 
       {preview.loading ? (
@@ -637,16 +668,16 @@ function Review({
         >
           <AlertTriangleIcon className="size-4 shrink-0" />
           <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-            Could not preview the effect: {preview.error}
+            {t("previewError", { message: preview.error })}
           </span>
           <Button size="sm" variant="outline" onClick={onRetryPreview}>
-            Retry
+            {t("retry")}
           </Button>
         </div>
       ) : p ? (
         <>
           <p className="text-sm font-medium [overflow-wrap:anywhere]" data-testid="grant-effect">
-            {effectSentence(p, role, scope)}
+            {localizedGrantEffect(p, role, scope, t, accessT)}
           </p>
           {p.refusal && (
             <p
@@ -658,9 +689,14 @@ function Review({
           )}
           {p.groups && p.groups.length > 0 && (
             <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
-              Reaches{" "}
-              {p.groups.map((g) => `${g.groupExternalId} (${g.memberCount} today)`).join(", ")}, and
-              whoever the identity provider adds to {p.groups.length === 1 ? "it" : "them"} later.
+              {t("groupsReach", {
+                groups: format.list(
+                  p.groups.map((g) =>
+                    t("groupToday", { name: g.groupExternalId, count: g.memberCount })
+                  ),
+                  { type: "conjunction" }
+                ),
+              })}
             </p>
           )}
           {p.notes?.map((n) => (
@@ -670,7 +706,9 @@ function Review({
           ))}
           {p.gaining.length > 0 && (
             <section className="flex min-w-0 flex-col gap-2">
-              <h3 className="text-muted-foreground text-xs font-medium uppercase">Gain access</h3>
+              <h3 className="text-muted-foreground text-xs font-medium uppercase">
+                {t("gainAccess")}
+              </h3>
               <ul className="max-h-56 min-w-0 divide-y overflow-auto rounded-md border">
                 {p.gaining.map((g) => (
                   <li
@@ -689,14 +727,21 @@ function Review({
           {p.already.length > 0 && (
             <section className="flex min-w-0 flex-col gap-2">
               <h3 className="text-muted-foreground text-xs font-medium uppercase">
-                Already have it
+                {t("alreadyAccess")}
               </h3>
               <ul className="max-h-40 min-w-0 divide-y overflow-auto rounded-md border">
                 {p.already.map((a) => (
                   <li
                     key={principalKey(a.principal)}
                     className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2"
-                    title={describeSource(a.source)}
+                    title={describeSource(a.source, {
+                      direct: accessT("direct"),
+                      via: (kind, name) =>
+                        accessT("via", { kind: accessT(`principal.${kind}`), name }),
+                      inherited: (kind, name) =>
+                        accessT("inherited", { kind: localizedScopeLabel(kind, accessT), name }),
+                      combined: (via, inherited) => accessT("combined", { via, inherited }),
+                    })}
                   >
                     <PrincipalChip principal={a.principal} />
                     <GrantSource source={a.source} />
@@ -709,11 +754,11 @@ function Review({
       ) : null}
 
       {(succeeded.length > 0 || failed.length > 0) && (
-        <section aria-label="Outcome" className="flex min-w-0 flex-col gap-2">
+        <section aria-label={t("outcome")} className="flex min-w-0 flex-col gap-2">
           {succeeded.length > 0 && (
             <p className="text-success-fg flex items-center gap-2 text-sm">
               <CheckCircle2Icon className="size-4 shrink-0" />
-              Granted to {succeeded.length}.
+              {t("grantedCount", { count: succeeded.length })}
             </p>
           )}
           {failed.length > 0 && (
@@ -728,7 +773,7 @@ function Review({
                     <PrincipalChip principal={f.principal} />
                   </span>
                   <span className="text-danger-fg min-w-0 text-xs [overflow-wrap:anywhere]">
-                    {f.error ?? "Failed"}
+                    {f.error ?? t("failed")}
                   </span>
                 </li>
               ))}
@@ -748,7 +793,7 @@ export function effectSentence(
 ): string {
   const n = p.gainingCount ?? p.gaining.length;
   const already = p.alreadyCount ?? p.already.length;
-  const where = scope ? ` on ${SCOPE_NOUN[scope.kind]} ${scope.name}` : "";
+  const where = scope ? ` on ${SCOPE_NOUN[scope.kind] ?? scope.kind} ${scope.name}` : "";
   const what = role ? ` ${role.name}` : " access";
   const lead =
     n === 0

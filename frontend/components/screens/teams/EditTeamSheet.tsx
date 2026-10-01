@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { Wand2Icon } from "lucide-react";
 import * as React from "react";
 
@@ -38,6 +40,7 @@ export function EditTeamSheet({
   generateSlug,
   save,
 }: EditTeamSheetProps) {
+  const copy = useTranslations("teams");
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (await save()) onOpenChange(false);
@@ -47,20 +50,17 @@ export function EditTeamSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Edit team</SheetTitle>
-          <SheetDescription>
-            Rename this team or change its slug. Slugs are unique within the organization and are
-            used in URLs.
-          </SheetDescription>
+          <SheetTitle>{copy("editTitle")}</SheetTitle>
+          <SheetDescription>{copy("editDescription")}</SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="edit-team-name">Display name</Label>
+            <Label htmlFor="edit-team-name">{copy("displayName")}</Label>
             <Input
               id="edit-team-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Backend"
+              placeholder={copy("exampleName")}
               autoFocus
               required
             />
@@ -68,7 +68,7 @@ export function EditTeamSheet({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="edit-team-slug">Slug</Label>
+              <Label htmlFor="edit-team-slug">{copy("slug")}</Label>
               <Button
                 type="button"
                 size="sm"
@@ -77,7 +77,7 @@ export function EditTeamSheet({
                 onClick={generateSlug}
               >
                 <Wand2Icon className="size-3" />
-                Generate
+                {copy("generate")}
               </Button>
             </div>
             <Input
@@ -89,15 +89,26 @@ export function EditTeamSheet({
               required
               aria-invalid={slugStatus === "invalid" || slugStatus === "taken"}
             />
-            <SlugStatusHint status={slugStatus} kind="team" />
+            <SlugStatusHint
+              status={slugStatus}
+              kind="team"
+              labels={{
+                empty: copy("slugStatus.empty"),
+                invalid: copy("slugStatus.invalid"),
+                unchanged: copy("slugStatus.unchanged"),
+                checking: copy("slugStatus.checking"),
+                available: copy("slugStatus.available"),
+                taken: copy("slugStatus.taken"),
+              }}
+            />
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {copy("cancel")}
             </Button>
             <Button type="submit" disabled={!canSubmit}>
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? copy("saving") : copy("save")}
             </Button>
           </SheetFooter>
         </form>

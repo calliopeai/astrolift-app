@@ -116,28 +116,36 @@ export function formatMoney(cents: number, currency: string): string {
  * Runs counts the window's runs that started in the period; when the window
  * is full and all of it is in the period, the count is a floor ("100+").
  */
-export function kpiFigures({
-  metrics,
-  runs,
-  forecast,
-  windowDays,
-}: {
-  metrics?: AstroliftDeploymentMetrics | null;
-  runs?: {
-    runs: Array<{ startedAt?: string | null; createdAt: string }>;
-    capped: boolean;
-    now: number;
-    loading?: boolean;
-  };
-  forecast?: AstroliftCostForecast | null;
-  windowDays: number;
-}): KpiFigure[] {
+export function kpiFigures(
+  {
+    metrics,
+    runs,
+    forecast,
+    windowDays,
+  }: {
+    metrics?: AstroliftDeploymentMetrics | null;
+    runs?: {
+      runs: Array<{ startedAt?: string | null; createdAt: string }>;
+      capped: boolean;
+      now: number;
+      loading?: boolean;
+    };
+    forecast?: AstroliftCostForecast | null;
+    windowDays: number;
+  },
+  presentation = {
+    number: (value: number) => value.toLocaleString("en-US"),
+    percent: (value: number) => `${(value * 100).toFixed(1)}%`,
+    duration: formatDuration,
+    money: formatMoney,
+  }
+): KpiFigure[] {
   const out: KpiFigure[] = [];
   if (metrics !== undefined) {
     out.push({
       key: "deploys",
       label: "Deploys",
-      value: metrics ? metrics.total.toLocaleString("en-US") : null,
+      value: metrics ? presentation.number(metrics.total) : null,
       href: "/deployments",
     });
   }
@@ -153,7 +161,7 @@ export function kpiFigures({
       value:
         runs.runs.length === 0 && runs.loading
           ? null
-          : `${inPeriod.toLocaleString("en-US")}${floor ? "+" : ""}`,
+          : `${presentation.number(inPeriod)}${floor ? "+" : ""}`,
       hint: "agent runs",
       href: "/tasks?kind=agent",
     });
@@ -164,7 +172,7 @@ export function kpiFigures({
       label: "Success",
       value:
         metrics && metrics.total > 0
-          ? `${(metrics.successRate * 100).toFixed(1)}%`
+          ? presentation.percent(metrics.successRate)
           : metrics
             ? "—"
             : null,
@@ -174,7 +182,7 @@ export function kpiFigures({
     out.push({
       key: "p95",
       label: "p95",
-      value: metrics ? (formatDuration(metrics.p95DurationSeconds) ?? "—") : null,
+      value: metrics ? (presentation.duration(metrics.p95DurationSeconds) ?? "—") : null,
       hint: "deploy time",
       href: "/administration/metrics",
     });
@@ -183,7 +191,7 @@ export function kpiFigures({
     out.push({
       key: "spend",
       label: "Spend",
-      value: forecast ? formatMoney(forecast.mtdCents, forecast.currency) : null,
+      value: forecast ? presentation.money(forecast.mtdCents, forecast.currency) : null,
       hint: "month to date",
       href: "/administration/metrics",
     });
@@ -246,7 +254,10 @@ export function spendMeter(
  * A failed platform run's reason: the failure's `message` (first line), or
  * its first string value. Null for a run that did not fail.
  */
-export function platformRunReason(run: { status: string; failure: unknown }): string | null {
+export function platformRunReason(
+  run: { status: string; failure: unknown },
+  fallback = { timeout: "Timed out.", missing: "No reason was recorded." }
+): string | null {
   if (run.status !== "failed" && run.status !== "timed_out") return null;
   const f = run.failure;
   const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
@@ -260,5 +271,5 @@ export function platformRunReason(run: { status: string; failure: unknown }): st
         null)
       : null);
   const first = text?.split("\n")[0]?.trim();
-  return first || (run.status === "timed_out" ? "Timed out." : "No reason was recorded.");
+  return first || (run.status === "timed_out" ? fallback.timeout : fallback.missing);
 }

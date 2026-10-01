@@ -3639,7 +3639,141 @@
     "sourceTooltipAria": "Otorgado mediante {scope}",
     "sourceColumn": "Origen",
     "grantRoleRowLabel": "Otorgar rol a {name}",
-    "grantRoleRowTooltip": "Otorgar rol a {name}"
+    "grantRoleRowTooltip": "Otorgar rol a {name}",
+    "people": {
+      "title": "Personas",
+      "description": "Usuarios y grupos del proveedor de identidad con acceso a esta organización.",
+      "columns": {
+        "who": "Persona o grupo",
+        "roles": "Roles",
+        "teams": "Equipos",
+        "status": "Estado",
+        "joined": "Se unió"
+      },
+      "actions": {
+        "viewAccess": "Ver acceso",
+        "resend": "Reenviar invitación",
+        "revoke": "Revocar",
+        "deleteResolved": "Eliminar esta invitación resuelta",
+        "grantTo": "Otorgar acceso a {name}",
+        "alreadyAnonymized": "Ya anonimizado",
+        "anonymize": "Anonimizar datos del usuario",
+        "invite": "Invitar",
+        "grant": "Otorgar acceso"
+      },
+      "emptyTitle": "Aún no hay personas",
+      "emptyDescription": "Invita a alguien a la organización y asígnale un rol.",
+      "confirm": {
+        "resend": {
+          "title": "¿Reenviar la invitación a {email}?",
+          "description": "Genera un enlace nuevo de un solo uso e intenta enviarlo por correo. El enlace anterior deja de funcionar de inmediato. Copia el nuevo si el envío falla.",
+          "label": "Reenviar invitación"
+        },
+        "revoke": {
+          "title": "¿Revocar la invitación de {email}?",
+          "description": "El enlace de la invitación pendiente deja de funcionar de inmediato. Puedes enviar una nueva invitación si hace falta.",
+          "label": "Revocar"
+        },
+        "delete": {
+          "title": "¿Eliminar la invitación resuelta de {email}?",
+          "description": "Elimina esta invitación resuelta de la lista. La membresía y los roles se mantienen.",
+          "label": "Eliminar"
+        }
+      },
+      "export": {
+        "actions": "Más acciones de la lista",
+        "working": "Exportando CSV…",
+        "label": "Exportar {count, number} como CSV"
+      },
+      "grants": "{count, plural, one {# concesión} other {# concesiones}}",
+      "mappings": ", {count, plural, one {# asignación} other {# asignaciones}}",
+      "idpGroup": "Grupo del proveedor de identidad",
+      "admin": "administrador",
+      "invitationStatus": {
+        "pending": "pendiente",
+        "accepted": "aceptada",
+        "expired": "vencida",
+        "revoked": "revocada"
+      },
+      "lifecycle": {
+        "active": "activo",
+        "invited": "invitado",
+        "pending_invite": "invitación pendiente",
+        "pending_first_login": "primer inicio de sesión pendiente",
+        "suspended": "suspendido",
+        "deactivated": "desactivado",
+        "anonymized": "anonimizado"
+      },
+      "filters": {
+        "kind": "Tipo",
+        "role": "Rol",
+        "team": "Equipo",
+        "lifecycle": "Ciclo de vida",
+        "active": "Última actividad",
+        "status": "Estado de la invitación"
+      },
+      "options": {
+        "kind": {
+          "user": "usuario",
+          "group": "grupo",
+          "invitation": "invitación"
+        },
+        "active": {
+          "7d": "en los últimos 7 días",
+          "30d": "en los últimos 30 días",
+          "90d": "en los últimos 90 días",
+          "stale": "sin actividad en 90 días",
+          "never": "nunca"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Los míos",
+        "invited": "Invitados",
+        "groups": "Grupos",
+        "admins": "Administradores"
+      },
+      "notes": {
+        "mine": "Personas que comparten un equipo contigo.",
+        "invited": "Invitaciones pendientes. Usa el filtro de estado para ver las aceptadas, vencidas o revocadas.",
+        "groups": "Grupos conocidos del proveedor de identidad a partir de inicios de sesión, concesiones y asignaciones. El acceso del grupo se aplica a todas las personas asignadas por el proveedor."
+      },
+      "searchPlaceholder": "Buscar personas, correos, grupos…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "La exportación no devolvió ningún archivo",
+      "noGroups": "La exportación no devolvió ningún grupo",
+      "groupsChanged": "La lista de grupos cambió durante la exportación; vuelve a intentarlo",
+      "exportFailed": "La exportación falló",
+      "refreshWarning": "El cambio se guardó, pero la lista no pudo actualizarse. Actualiza la vista; no repitas la acción que tuvo éxito.",
+      "revoked": "Invitación revocada",
+      "revokeFailed": "No se pudo revocar",
+      "resendFailed": "No se pudo reenviar",
+      "resent": "Invitación reenviada a {email}",
+      "resendDescription": "El enlace anterior ya no es válido. Copia el nuevo como alternativa.",
+      "copyLink": "Copiar enlace",
+      "linkCopied": "Enlace de aceptación copiado",
+      "copyFailed": "No se pudo copiar",
+      "deleted": "Invitación eliminada",
+      "deleteFailed": "No se pudo eliminar",
+      "anonymizeFailed": "La anonimización falló",
+      "anonymized": "Datos del usuario anonimizados."
+    },
+    "anonymization": {
+      "title": "¿Anonimizar a {name}?",
+      "changes": "Esto cambia",
+      "identity": "Los nombres y el correo de la cuenta se reemplazan por una identidad anónima.",
+      "profile": "Los campos personales del perfil, el teléfono, el avatar, la dirección y la firma se borran o reemplazan.",
+      "account": "Se desactiva el inicio de sesión y se eliminan las membresías de grupos de autenticación.",
+      "memberships": "Se desactivan las membresías en toda la plataforma.",
+      "preserves": "Esto se conserva",
+      "records": "Se conservan el registro de la cuenta y los vínculos de las acciones históricas.",
+      "history": "Esta acción no borra el contenido histórico de auditoría ni elimina los registros de asignación de roles.",
+      "irreversible": "Esta acción es irreversible. Los datos personales originales no se pueden restaurar. Repetirla en una cuenta ya anonimizada no produce más cambios.",
+      "acknowledge": "Entiendo que esto es irreversible.",
+      "working": "Anonimizando…",
+      "confirm": "Anonimizar datos del usuario"
+    }
   },
   "stepUp": {
     "title": "Confirma tu identidad",
@@ -3723,6 +3857,17 @@
         "empty": "Aún no se han registrado aprobaciones.",
         "unknownApprover": "desconocido"
       }
+    },
+    "pendingGates": {
+      "title": "Revisiones pendientes",
+      "loadingDescription": "Revisiones de la organización a la espera de una decisión.",
+      "description": "Revisiones de flujos que puedes decidir en la organización, las más recientes primero.",
+      "refresh": "Actualizar revisiones pendientes",
+      "emptyTitle": "No hay revisiones pendientes",
+      "emptyDescription": "No hay nada que requiera tu revisión ahora.",
+      "waitingSince": "En espera · {time}",
+      "approvers": "Revisores: {names}",
+      "review": "Revisar"
     }
   },
   "projectResources": {
@@ -4265,6 +4410,117 @@
           "freshness": "la persona inició sesión hace {minutes, plural, one {# minuto como máximo} other {# minutos como máximo}}",
           "custom": "condición personalizada <kind>{name}</kind>"
         }
+      },
+      "grant": {
+        "title": "Conceder acceso",
+        "admin": "Administración",
+        "access": "Acceso",
+        "people": "Personas",
+        "steps": "Pasos",
+        "step": {
+          "who": "Destinatarios",
+          "role": "Rol",
+          "scope": "Ámbito",
+          "expiry": "Vencimiento",
+          "review": "Revisión"
+        },
+        "pickPrincipal": "Selecciona al menos una persona, un grupo o un equipo.",
+        "pickRole": "Selecciona un rol.",
+        "pickScope": "Selecciona dónde se aplica el rol.",
+        "pickDate": "Selecciona una fecha.",
+        "previewFailed": "No se pudo obtener la vista previa de la concesión",
+        "noGrants": "No se creó ninguna concesión. Revisa los destinatarios seleccionados antes de volver a intentarlo.",
+        "grantFailed": "La concesión falló",
+        "whereHeading": "¿Dónde se aplica?",
+        "scopeHelp": "La concesión abarca todo lo que hay dentro del ámbito: una concesión al equipo cubre sus proyectos y aplicaciones.",
+        "expiryHeading": "¿Cuándo termina?",
+        "never": "Nunca",
+        "days": "{count, plural, one {# día} other {# días}}",
+        "onDate": "En una fecha",
+        "expiryDate": "Fecha de vencimiento",
+        "expiryUnsupported": "Aquí no se puede limitar la duración de esta concesión; permanece hasta que se elimine.",
+        "expiryHelp": "La concesión termina automáticamente entonces; también puedes eliminarla antes.",
+        "cancel": "Cancelar",
+        "back": "Atrás",
+        "continue": "Continuar",
+        "granting": "Concediendo…",
+        "retryCount": "Reintentar {count}",
+        "grantCount": "Conceder a {count}",
+        "whoHeading": "¿Quién recibe acceso?",
+        "picked": "Seleccionados",
+        "searchPlaceholder": "Busca personas, grupos y equipos por nombre o correo",
+        "searchLabel": "Buscar personas, grupos y equipos",
+        "searchFailed": "La búsqueda falló: {message}",
+        "noPeople": "No hay coincidencias para «{query}».",
+        "searchHelp": "Escribe para buscar. La concesión a un grupo incluye a sus miembros actuales y futuros; un equipo añade a sus miembros en el momento de la concesión.",
+        "addName": "Añadir a {name}",
+        "add": "Añadir",
+        "roleHeading": "¿Qué rol?",
+        "rolePlaceholder": "Busca roles o un permiso, por ejemplo, deploy",
+        "roleSearch": "Buscar roles",
+        "rolesFailed": "No se pudieron cargar los roles: {message}",
+        "noGrantableRoles": "No puedes conceder ningún rol: debes tener todos los permisos que incluye el rol.",
+        "noRoles": "Ningún rol coincide con «{query}».",
+        "noRole": "Sin rol",
+        "noScope": "sin ámbito",
+        "expiresNever": "no vence",
+        "expiresDays": "{count, plural, one {vence en # día} other {vence en # días}}",
+        "expiresDate": "vence el {date}",
+        "summary": "<role>{roleName}</role> ({permissions}) en {kind} <identifier>{name}</identifier>, {expiry}.",
+        "previewError": "No se pudo obtener la vista previa del efecto: {message}",
+        "retry": "Reintentar",
+        "effect": "{count, plural, =0 {Nadie obtiene nada nuevo} one {# persona obtiene {what}} other {# personas obtienen {what}}}{where}{already, plural, =0 {} other {; # ya lo tenían}}.",
+        "where": " en {kind} {name}",
+        "groupsReach": "Incluye a {groups} y a quienes el proveedor de identidad añada a estos grupos más adelante.",
+        "groupToday": "{name} ({count, plural, one {# miembro actualmente} other {# miembros actualmente}})",
+        "gainAccess": "Obtienen acceso",
+        "alreadyAccess": "Ya tienen acceso",
+        "outcome": "Resultado",
+        "grantedCount": "Concedido a {count}.",
+        "failed": "Falló",
+        "groupDetail": "Grupo IdP · {count, plural, one {# miembro} other {# miembros}}",
+        "cannotGrant": "No puedes conceder este rol aquí.",
+        "cannotHold": "Un destinatario de tipo {kind} no puede tener un rol.",
+        "refreshFailed": "Las concesiones se guardaron, pero no se pudo actualizar la lista de acceso. Actualiza la vista; no repitas las concesiones realizadas.",
+        "success": "{count, plural, one {Concedido a # persona} other {Concedido a # personas}}",
+        "links": {
+          "organization": "Organización",
+          "projects": "Proyectos",
+          "teams": "Equipos",
+          "roles": "Roles",
+          "policies": "Políticas",
+          "check": "Comprobar acceso"
+        }
+      },
+      "legacyGrantRole": {
+        "title": "Conceder rol",
+        "description": "Asigna un rol a un miembro existente de la organización en el ámbito elegido.",
+        "userId": "ID de usuario",
+        "targetUser": "Se concederá un rol a {name}.",
+        "userGuidance": "Introduce el ID numérico de un miembro existente de esta organización. Este formulario no crea ni invita usuarios.",
+        "role": "Rol",
+        "selectRole": "Seleccionar un rol",
+        "scope": "Ámbito",
+        "noScope": "No hay ámbitos disponibles para {scopeKind}",
+        "selectScope": "Seleccionar un ámbito",
+        "scopeGuidance": "Fijado al nivel de ámbito del rol: <scope></scope>",
+        "cancel": "Cancelar",
+        "granting": "Concediendo…",
+        "granted": "Rol concedido",
+        "failed": "No se pudo conceder el rol",
+        "refreshWarning": "No se pudo actualizar la vista. Actualiza para ver los datos actuales.",
+        "orgReadFailed": "No se pudo confirmar la organización activa. Recarga la página para reintentar.",
+        "loadingOrg": "Confirmando la organización activa…",
+        "noOrg": "No hay una organización activa para conceder este rol.",
+        "unsupportedApp": "Este selector no ofrece destinos APP. Usa Conceder acceso para elegir una aplicación.",
+        "scopeReadFailed": "No se pudieron cargar los destinos de ámbito.",
+        "retry": "Reintentar",
+        "loadingScopes": "Cargando destinos de ámbito…",
+        "unknownScopes": "Todavía no se han confirmado los destinos de ámbito.",
+        "rolesReadFailed": "No se pudieron cargar los roles.",
+        "loadingRoles": "Cargando roles…",
+        "unknownRoles": "Todavía no se han confirmado los roles.",
+        "emptyRoles": "No hay roles disponibles en esta lista."
       }
     },
     "settings": {
@@ -4291,6 +4547,10 @@
       "today": "Hoy",
       "yesterday": "Ayer",
       "unknownDate": "Fecha desconocida"
+    },
+    "shellHeader": {
+      "breadcrumb": "Ruta de navegación",
+      "switch": "Cambiar: {label}"
     }
   },
   "agentSecrets": {
@@ -4817,6 +5077,530 @@
         "subscriptionPolicy": "Deshabilitar nuevas suscripciones no revoca el acceso existente.",
         "completedUpdate": "La revisión de recursos solicitada se ha conciliado. Esto no es una comprobación de salud en vivo.",
         "operationFailed": "La operación aceptada falló. Revise el motivo actual del despliegue antes de otra acción."
+      }
+    }
+  },
+  "home": {
+    "title": "Inicio",
+    "titleLayout": "Inicio · {layout}",
+    "question": "¿Qué hará principalmente aquí?",
+    "noAccessTitle": "Todavía no hay nada que mostrar en Inicio",
+    "noAccessDescription": "Su rol no tiene acceso a Apps ni Agentes en esta organización. Un administrador de la organización puede concederlo.",
+    "layoutMenu": "Diseño",
+    "layoutLegend": "Diseño de Inicio",
+    "settings": "Configuración de Inicio",
+    "changeHint": "Puede cambiarlo cuando quiera desde Diseño en Inicio o en Configuración › Inicio.",
+    "continue": "Continuar",
+    "suggested": "Sugerido",
+    "placeholderTitle": "Aún no está en Inicio",
+    "placeholderDescription": "{panel} estará disponible en Inicio próximamente. Mientras tanto, puede verlo en la página completa.",
+    "open": "Abrir",
+    "layouts": {
+      "apps": {
+        "title": "Apps",
+        "description": "Para ejecutar aplicaciones: despliegues fallidos, sus apps y su tráfico."
+      },
+      "agents": {
+        "title": "Agentes",
+        "description": "Para crear y ejecutar agentes: ejecuciones fallidas y activas, sus agentes y el gasto."
+      },
+      "builder": {
+        "title": "Desarrollo",
+        "description": "Para trabajar con ambos: fallos, actividad reciente, despliegues y ejecuciones."
+      },
+      "operator": {
+        "title": "Operaciones",
+        "description": "Para mantener la plataforma: alertas, clústeres, actividad de la plataforma y cuota."
+      }
+    },
+    "panels": {
+      "waiting": "Pendiente de usted",
+      "failing": "Fallos",
+      "my-apps": "Mis apps",
+      "recent-deployments": "Despliegues recientes",
+      "traffic-errors": "Tráfico y errores",
+      "failed-runs": "Ejecuciones fallidas",
+      "running-now": "En ejecución",
+      "my-agents": "Mis agentes",
+      "runs-spend": "Ejecuciones y gasto",
+      "activity": "Actividad",
+      "kpis": "Indicadores",
+      "deployments": "Despliegues",
+      "agent-runs": "Ejecuciones de agentes",
+      "alerts": "Alertas",
+      "clusters": "Clústeres",
+      "platform-activity": "Actividad de la plataforma",
+      "spend-quota": "Gasto y cuota"
+    },
+    "copy": {
+      "auditLog": "Registro de auditoría",
+      "noAgentRunsTitle": "Aún no hay ejecuciones de agentes",
+      "noAgentRunsDescription": "Las ejecuciones de los agentes que puede ver aparecen aquí.",
+      "openAgents": "Abrir agentes",
+      "firingNow": "Activas ahora",
+      "acknowledged": "reconocida",
+      "firing": "activa",
+      "noAlertsTitle": "No hay alertas activas",
+      "noAlertsDescription": "Las alertas aparecen aquí cuando se activa una regla.",
+      "alertRules": "Reglas de alerta",
+      "noClustersTitle": "Aún no hay clústeres",
+      "noClustersDescription": "Registre un clúster para ejecutar apps y agentes en él.",
+      "registerCluster": "Registrar un clúster",
+      "agentRun": "Ejecución de agente",
+      "workflowRun": "Ejecución de flujo",
+      "noFailedRunsTitle": "No hay ejecuciones fallidas",
+      "noFailedRunsDescription": "Las ejecuciones fallidas de agentes y flujos aparecen aquí con su motivo.",
+      "deploy": "Despliegue",
+      "run": "Ejecución",
+      "nothingFailingTitle": "No hay fallos",
+      "nothingFailingDescription": "Los despliegues y las ejecuciones fallidos aparecen aquí con su motivo.",
+      "neverDeployed": "Nunca desplegada",
+      "noAppsTitle": "Aún no tiene apps",
+      "noAppsDescription": "Aquí aparecen las apps en las que tiene un rol.",
+      "browseApps": "Explorar apps",
+      "paused": "En pausa",
+      "neverRun": "Nunca ejecutado",
+      "lastRun": "Última ejecución: {status}",
+      "runningCount": "{count, plural, one {# en ejecución} other {# en ejecución}}",
+      "agentsMineNote": "Este panel muestra agentes de apps en las que tiene un rol, directamente o a través de su proyecto, equipo u organización.",
+      "noAgentsTitle": "Aún no tiene agentes",
+      "noAgentsDescription": "Aquí aparecen agentes de apps en las que tiene un rol.",
+      "browseAgents": "Explorar agentes",
+      "nothingRunningTitle": "Nada en ejecución",
+      "nothingRunningDescription": "Los agentes con una ejecución activa aparecen aquí, en su vista de flota.",
+      "openRuns": "Abrir ejecuciones",
+      "runningSummary": "{runs, plural, one {# ejecución} other {# ejecuciones}} en {agents, plural, one {# agente} other {# agentes}}",
+      "noDeploymentsTitle": "Aún no hay despliegues",
+      "noDeploymentsDescription": "Los despliegues que puede ver aparecen aquí.",
+      "startDeployment": "Iniciar un despliegue",
+      "noPlatformTitle": "Aún no hay actividad de la plataforma",
+      "noPlatformDescription": "Los despliegues, la incorporación y las operaciones de clúster aparecen aquí mientras se ejecutan.",
+      "noWaitingTitle": "Nada pendiente de usted",
+      "noWaitingDescription": "Las aprobaciones que puede decidir aparecen aquí.",
+      "approveTitle": "¿Aprobar este despliegue?",
+      "approveDescription": "Apruebe el despliegue.",
+      "approve": "Aprobar",
+      "review": "Revisar",
+      "workflowGate": "Puerta de flujo",
+      "secretRequest": "Solicitud de secreto",
+      "unknownTime": "Hora desconocida",
+      "unknownValue": "desconocido",
+      "rolledBack": "Revertido.",
+      "noFailureReason": "No se registró ningún motivo para este fallo.",
+      "noRunReason": "No se registró ningún motivo para esta ejecución.",
+      "timedOut": "Tiempo agotado.",
+      "noReason": "No se registró ningún motivo.",
+      "monthToDate": "Mes hasta la fecha",
+      "ofBudget": "de {amount} · {percentage}",
+      "spent": "Gastado",
+      "projected": "Proyectado",
+      "budget": "Presupuesto",
+      "legend": "Leyenda",
+      "budgetReadFailed": "No se pudo cargar el presupuesto: {message}",
+      "noBudget": "No hay un presupuesto de organización, por lo que no existe una cuota con la que comparar el gasto.",
+      "spendAgainstBudget": "{panel}: gasto frente al presupuesto",
+      "spendBudgetValue": "{spent} de {budget}",
+      "last24Hours": "Últimas 24 horas",
+      "app": "App",
+      "pickApp": "Elija una app",
+      "trafficAppsDescription": "El tráfico de las apps en las que tiene un rol aparece aquí.",
+      "openApp": "Abrir la app",
+      "requests": "Solicitudes",
+      "errors": "Errores",
+      "now": "ahora",
+      "average": "prom. {value}",
+      "notConfiguredTitle": "Sin configurar",
+      "notConfiguredDescription": "El clúster de esta app no tiene un endpoint de Prometheus, por lo que no se reciben datos de tráfico.",
+      "notSupportedTitle": "No disponible con este proveedor",
+      "notSupportedDescription": "El complemento del proveedor de este clúster no implementa esta consulta. Está disponible en otras nubes.",
+      "metricErrorTitle": "No se pudo cargar",
+      "metricErrorDescription": "Hubo un problema al cargar este panel. Inténtelo de nuevo.",
+      "noRequestsTitle": "Aún no hay solicitudes",
+      "noRequestsDescription": "No hay datos para este intervalo. Las solicitudes aparecerán cuando haya actividad.",
+      "last7Days": "Últimos 7 días",
+      "runsPerDay": "Ejecuciones de agentes por día",
+      "failedPerDay": "Ejecuciones fallidas por día",
+      "spendPerDay": "Gasto de la organización por día",
+      "sevenDays": "7 días",
+      "spendReadFailed": "No se pudo cargar el gasto: {message}",
+      "cappedRuns": "Se cuentan las ejecuciones más recientes; hay más en la semana.",
+      "kpiWindow": "últimos {count, number} días · gasto del mes hasta la fecha",
+      "kpiAria": "{panel}, últimos {count, number} días",
+      "noKpisTitle": "No hay cifras para su acceso",
+      "noKpisDescription": "Las cifras de despliegues, ejecuciones y gasto aparecen para las áreas que puede ver.",
+      "noProject": "Sin proyecto"
+    },
+    "health": {
+      "error": "Configuración fallida",
+      "offline": "Sin conexión",
+      "degraded": "Degradado",
+      "never_seen": "Nunca visto",
+      "connected": "Conectado"
+    },
+    "severity": {
+      "critical": "crítica",
+      "error": "error",
+      "warn": "advertencia",
+      "warning": "advertencia",
+      "info": "información"
+    },
+    "status": {
+      "running": "En ejecución",
+      "succeeded": "Correcta",
+      "failed": "Fallida",
+      "rolled_back": "Revertida",
+      "timed_out": "Tiempo agotado",
+      "error": "Error",
+      "cancelled": "Cancelada",
+      "canceled": "Cancelada",
+      "terminated": "Terminada",
+      "completed": "Completada",
+      "paused": "En pausa",
+      "pending_approval": "Pendiente de aprobación",
+      "approved": "Aprobada",
+      "deploying": "Desplegando",
+      "building": "Compilando",
+      "provisioning": "Aprovisionando",
+      "aborted": "Abortada",
+      "stopped": "Detenida",
+      "queued": "En cola",
+      "pending": "Pendiente",
+      "redeploying": "Redesplegando",
+      "superseded": "Sustituida",
+      "waiting": "En espera",
+      "unknown": "Desconocido"
+    },
+    "kpi": {
+      "deploys": "Despliegues",
+      "runs": "Ejecuciones",
+      "success": "Éxito",
+      "p95": "p95",
+      "spend": "Gasto",
+      "runsHint": "ejecuciones de agentes",
+      "successHint": "de los despliegues",
+      "p95Hint": "duración del despliegue",
+      "spendHint": "mes hasta la fecha"
+    },
+    "period": {
+      "monthly": "mensual",
+      "quarterly": "trimestral",
+      "yearly": "anual"
+    },
+    "operations": {
+      "everyEnvironment": "todos los entornos",
+      "noEnvironment": "sin entorno",
+      "appWide": "toda la app",
+      "deployTitle": "{app} a {environment}",
+      "deployDetail": "{image} · {received, number}/{required, number} aprobaciones",
+      "humanGate": "aprobación humana",
+      "approvers": "Aprobadores: {approvers}",
+      "anyApprover": "Cualquier aprobador puede decidir",
+      "secretTitle": "Secretos de {app} · {environment}",
+      "secretBy": "{operation} por {name}",
+      "secretDetail": "{operation} · {received, number}/{required, number} aprobaciones",
+      "approveFailed": "Error al aprobar",
+      "approved": "Aprobado: {status}",
+      "stage": "etapa {order, number}{role}",
+      "failedAt": "Falló en {stage}.",
+      "timedOutAt": "Tiempo agotado en {stage}.",
+      "requestRate": "{value} solic./s",
+      "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Elige los paneles que muestra Inicio y su orden. Los cambios se sincronizan con tu cuenta cuando se guardan correctamente; una copia en el navegador sigue disponible sin conexión.",
+      "noAccess": "Tu rol no tiene acceso a aplicaciones ni agentes, por lo que no hay ningún diseño que elegir.",
+      "resetDefault": "Usar el diseño predeterminado para mi acceso ({layout})",
+      "saveFailed": "No se guardó el diseño de Inicio"
+    }
+  },
+  "metrics": {
+    "title": "Métricas",
+    "description": "Éxito de despliegues, duración y estado de las aplicaciones.",
+    "successRate": "Tasa de éxito de despliegues",
+    "successRateTrend": "Tendencia de éxito de despliegues",
+    "successRateUnavailable": "Tasa de éxito no disponible",
+    "trend": "Tendencia de {label}",
+    "durationSeconds": "{seconds, number} s",
+    "durationMinutesSeconds": "{minutes, number} min {seconds, number} s",
+    "columns": {
+      "app": "Aplicación",
+      "environments": "Entornos",
+      "latestDeploy": "Último despliegue",
+      "image": "Imagen",
+      "lastDeployed": "Último despliegue realizado"
+    },
+    "never": "Nunca",
+    "recentFailure": "Fallo reciente",
+    "inFlight": "En curso",
+    "inFlightHint": "Pendiente de aprobación, en cola o desplegándose",
+    "meanRollout": "Duración media del despliegue",
+    "meanRolloutHint": "Promedio de despliegues finalizados en este período",
+    "p95Rollout": "Duración p95 del despliegue",
+    "p95RolloutHint": "Los despliegues más lentos de este período",
+    "noRollouts": "Sin despliegues en los últimos {days, number} días",
+    "succeededWindow": "{succeeded, number}/{total, number} correctos en {days, number} días",
+    "outcomes": "Resultados ({days, number} días)",
+    "succeeded": "Correctos {count, number}",
+    "failed": "Fallidos {count, number}",
+    "rolledBack": "Revertidos {count, number}",
+    "inFlightCount": "En curso {count, number}",
+    "total": "Total {count, number}",
+    "rolloutsWindow": "Despliegues en {days, number} días",
+    "rolloutsPerDay": "Despliegues por día",
+    "apps": "Aplicaciones",
+    "emptyTitle": "Aún no hay aplicaciones",
+    "emptyDescription": "Registra una aplicación; sus métricas aparecerán tras el primer despliegue.",
+    "openApps": "Abrir aplicaciones",
+    "rawPrometheus": "Métricas sin procesar de Prometheus",
+    "temporalUi": "Interfaz de flujos de Temporal",
+    "embeddedDashboardsUnavailable": "Los paneles integrados no están disponibles en esta vista.",
+    "searchPlaceholder": "Buscar aplicaciones, identificadores, etiquetas de imagen…",
+    "filters": {
+      "status": "Último despliegue",
+      "kind": "Tipo"
+    },
+    "kinds": {
+      "app": "Aplicación",
+      "agent": "Agente"
+    },
+    "views": {
+      "all": "Todas",
+      "mine": "Mías",
+      "failing": "Fallo reciente",
+      "mineNote": "El resumen de estado no registra propietarios, por lo que esta vista está vacía."
+    },
+    "staleMetrics": "La actualización falló. Se muestran las últimas métricas cargadas correctamente.",
+    "metricsUnavailable": "No se pudieron cargar las métricas.",
+    "retryMetrics": "Reintentar métricas"
+  },
+  "teams": {
+    "title": "Equipos",
+    "context": "Los equipos delimitan proyectos, aplicaciones y sus concesiones de acceso.",
+    "newTeam": "Nuevo equipo",
+    "columnTeam": "Equipo",
+    "columnCreated": "Creado",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "emptyTitle": "Aún no hay equipos",
+    "emptyDescription": "Crea un equipo para empezar a agrupar proyectos y aplicaciones.",
+    "deleteTitle": "¿Eliminar el equipo {slug}?",
+    "deleteGenericTitle": "¿Eliminar el equipo?",
+    "deleteDescription": "Retira el equipo y permite reutilizar su identificador. Esto no reasigna sus proyectos ni aplicaciones.",
+    "confirmDelete": "Eliminar equipo",
+    "createDescription": "Los equipos delimitan proyectos, miembros y tokens. Los identificadores son únicos y pueden reutilizarse tras retirar el equipo.",
+    "displayName": "Nombre visible",
+    "exampleName": "Equipo de backend",
+    "slug": "Identificador",
+    "slugHint": "Empieza con una letra minúscula; usa letras, números y guiones, hasta 40 caracteres. Termina con una letra o un número.",
+    "descriptionOptional": "Descripción (opcional)",
+    "descriptionPlaceholder": "¿Qué recursos pertenecen a este equipo?",
+    "cancel": "Cancelar",
+    "creating": "Creando…",
+    "create": "Crear equipo",
+    "editTitle": "Editar equipo",
+    "editDescription": "Cambia el nombre o el identificador de este equipo. Los identificadores son únicos dentro de la organización y se usan en las URL.",
+    "generate": "Generar",
+    "saving": "Guardando…",
+    "save": "Guardar cambios",
+    "feedback": {
+      "created": "Se creó el equipo {slug}",
+      "saved": "Equipo guardado como {slug}",
+      "deleted": "Se eliminó {slug}",
+      "createFailed": "No se pudo crear el equipo",
+      "saveFailed": "No se pudo guardar el equipo",
+      "deleteFailed": "No se pudo eliminar el equipo",
+      "refreshWarning": "No se pudo actualizar la vista. Actualiza para ver los datos actuales."
+    },
+    "list": {
+      "search": "Buscar equipos…",
+      "all": "Todos",
+      "mine": "Mis equipos"
+    },
+    "slugStatus": {
+      "invalid": "Usa letras minúsculas, números y guiones; empieza con una letra y termina con una letra o un número (hasta 40 caracteres).",
+      "checking": "Comprobando disponibilidad…",
+      "available": "Disponible",
+      "taken": "Ya está en uso en esta organización.",
+      "unchanged": "Identificador actual: se usa en las URL.",
+      "empty": "Letras minúsculas, números y guiones. Se usa en las URL."
+    }
+  },
+  "apiKeys": {
+    "title": "Claves de API",
+    "name": "Nombre",
+    "suffix": "Sufijo",
+    "scopes": "Ámbitos",
+    "scope": "Ámbito",
+    "canDo": "Permite",
+    "lastUsed": "Último uso",
+    "created": "Creación",
+    "expires": "Vencimiento",
+    "status": "Estado",
+    "active": "Activa",
+    "revoked": "Revocada",
+    "expired": "Vencida",
+    "none": "ninguno",
+    "nothing": "nada",
+    "never": "nunca",
+    "all": "Todas",
+    "mine": "Mías",
+    "longLivedAdmin": "Token de administración de larga duración",
+    "permissionCount": "{count, plural, one {# permiso} other {# permisos}}",
+    "adminExpiryWarning": "Administración sin vencimiento próximo. Sustitúyelo por un token de alcance más limitado.",
+    "effectiveGuidance": "Lo que permiten sus ámbitos y conceden los roles de su titular:",
+    "createdNotice": "Token <name></name> creado",
+    "revealGuidance": "Copia el valor ahora: no volverá a mostrarse. Solo se guardan el hash SHA-256 y los últimos 4 caracteres.",
+    "copy": "Copiar",
+    "dismissReveal": "Ya lo guardé: cerrar",
+    "mcpTitle": "MCP remoto de agentes",
+    "mcpGuidance": "Conecta clientes de CI o programación mediante Streamable HTTP autenticado. Envía un token de API como <code></code>. Los ámbitos MCP siguen requiriendo los permisos de agente correspondientes del titular; no se exponen valores secretos.",
+    "copyUrl": "Copiar URL",
+    "mcpRead": "{scope} · consultar paquetes/tareas",
+    "mcpDispatch": "{scope} · ejecutar/detener",
+    "mcpWrite": "{scope} · sincronizar repositorios",
+    "context": "Credenciales de portador para CLI, bots y scripts. Los tokens se guardan como hash; el texto sin cifrar solo se muestra al crearlos.",
+    "newToken": "Nuevo token",
+    "revoke": "Revocar",
+    "emptyTitle": "No hay claves de API",
+    "emptyDescription": "Crea una para autenticar la CLI, ejecuciones de CI o tus scripts en la plataforma.",
+    "createTitle": "Nuevo token de API",
+    "createDescription": "El texto sin cifrar se muestra una sola vez al crear el token. Guárdalo de forma segura; no podrá recuperarse.",
+    "nameGuidance": "Un nombre descriptivo aparece en el registro de auditoría junto a las acciones de este token.",
+    "scopeGuidance": "Un token solo limita tu acceso: recibe los permisos siguientes que tus roles también conceden.",
+    "expiresDays": "Vence en (días)",
+    "expiryGuidance": "Deja 0 o vacío para no tener vencimiento. Por defecto {defaultDays} días, máximo {maxDays}.",
+    "cancel": "Cancelar",
+    "creating": "Creando…",
+    "create": "Crear token",
+    "revokeNamed": "¿Revocar el token {name}?",
+    "revokeTitle": "¿Revocar el token?",
+    "revokeDescription": "Las CLI y los bots que usan este token dejarán de funcionar de inmediato. La revocación no puede deshacerse; crea otro token para recuperar el acceso.",
+    "revokeConfirm": "Revocar token",
+    "refreshWarning": "No se pudo actualizar la vista. Actualiza para ver los datos actuales.",
+    "pickScope": "Elige al menos un ámbito",
+    "createFailed": "No se pudo crear el token",
+    "revokedFeedback": "Token revocado",
+    "revokeFailed": "No se pudo revocar el token",
+    "copyFailed": "No se pudo copiar. Selecciona el valor y cópialo manualmente.",
+    "copied": "Copiado al portapapeles",
+    "endpointCopied": "Endpoint MCP copiado",
+    "searchPlaceholder": "Buscar claves, titulares, equipos, sufijos…",
+    "narrowedNote": "Muestra las claves coincidentes entre las {count} más recientes, hasta que la consulta API admita filtros.",
+    "mineNote": "Muestra tus claves entre las {count} más recientes.",
+    "detail": {
+      "token": "Token",
+      "owner": "Titular",
+      "team": "Equipo",
+      "lastIp": "IP del último uso",
+      "lastAgent": "Agente del último uso",
+      "orgWide": "— (toda la organización)",
+      "shortToken": "Token {id}",
+      "overview": "Resumen",
+      "notFoundTitle": "Token de API no encontrado",
+      "notFoundDescription": "Puede que el token no exista, esté fuera de la lista reciente o no tengas acceso.",
+      "back": "Volver a las claves de API",
+      "noScopes": "Sin ámbitos: este token no tiene permisos concedidos.",
+      "readFailed": "No se pudieron cargar los metadatos del token.",
+      "retry": "Reintentar"
+    },
+    "picker": {
+      "loadFailed": "No se pudo cargar la lista de ámbitos. Recarga la página para reintentar.",
+      "startFrom": "Empezar con",
+      "adminWarning": "Admin permite que el token haga todo lo que pueda su titular, incluidos permisos añadidos después. Prefiere ámbitos limitados y establece un vencimiento.",
+      "sensitive": "sensible",
+      "unavailable": "Tus roles no conceden ninguno de los permisos que habilita este ámbito.",
+      "unlocks": "Habilita {count, plural, one {# permiso} other {# permisos}}",
+      "surfaces": {
+        "apps": "Aplicaciones",
+        "clusters": "Clústeres",
+        "secrets": "Secretos",
+        "agents": "Agentes",
+        "workflows": "Flujos de trabajo",
+        "administration": "Administración"
+      },
+      "presets": {
+        "read_only": "Solo lectura",
+        "cli": "Predeterminado de CLI",
+        "ci_deploy": "Despliegue de CI",
+        "cluster_operator": "Operador de clúster"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "Leer aplicaciones",
+        "description": "Enumerar aplicaciones, despliegues, entornos y nombres de secretos."
+      },
+      "scope1": {
+        "label": "Modificar aplicaciones",
+        "description": "Desplegar, editar variables de entorno y gestionar la configuración de aplicaciones."
+      },
+      "scope2": {
+        "label": "Registrar aplicaciones",
+        "description": "Registrar aplicaciones y configurar CI (webhook, secretos, flujo de trabajo), sin desplegar ni eliminar."
+      },
+      "scope3": {
+        "label": "Leer clústeres",
+        "description": "Enumerar clústeres y consultar el estado del proveedor."
+      },
+      "scope4": {
+        "label": "Actualizar clústeres",
+        "description": "Cambiar la configuración del clúster: clase de ingreso, control de autenticación, región y endpoint."
+      },
+      "scope5": {
+        "label": "Operar clústeres",
+        "description": "Instalar la receta del clúster, actualizar su estado de gestión y reconciliar sus ingresos."
+      },
+      "scope6": {
+        "label": "Gestionar usuarios de acceso",
+        "description": "Crear, deshabilitar, eliminar y restablecer usuarios y grupos de la autenticación central del clúster."
+      },
+      "scope7": {
+        "label": "Configurar acceso a aplicaciones",
+        "description": "Elegir los usuarios y grupos que pueden entrar en una aplicación protegida por autenticación central."
+      },
+      "scope8": {
+        "label": "Revelar secretos",
+        "description": "Revelar valores secretos almacenados. Conceder solo cuando sea necesario."
+      },
+      "scope9": {
+        "label": "Modificar secretos",
+        "description": "Definir, rotar y eliminar secretos sin revelar sus valores."
+      },
+      "scope10": {
+        "label": "Lectura MCP",
+        "description": "Enumerar paquetes de agentes y consultar ejecuciones mediante MCP remoto."
+      },
+      "scope11": {
+        "label": "Ejecución MCP",
+        "description": "Ejecutar, orientar y detener agentes; conectarse a sus cajas según los permisos de la cuenta."
+      },
+      "scope12": {
+        "label": "Escritura MCP",
+        "description": "Sincronizar repositorios de agentes y definiciones de paquetes."
+      },
+      "scope13": {
+        "label": "Modificar entornos de agentes",
+        "description": "Crear, actualizar y eliminar especificaciones de entornos de agentes."
+      },
+      "scope14": {
+        "label": "Modificar flujos de trabajo",
+        "description": "Crear, actualizar y eliminar flujos de trabajo."
+      },
+      "scope15": {
+        "label": "Ejecutar flujos de trabajo",
+        "description": "Iniciar ejecuciones de flujos de trabajo sin editarlos."
+      },
+      "scope16": {
+        "label": "Modificar proyectos",
+        "description": "Crear, actualizar y eliminar proyectos."
+      },
+      "scope17": {
+        "label": "Modificar equipos",
+        "description": "Crear, actualizar y eliminar equipos."
+      },
+      "scope18": {
+        "label": "Administración",
+        "description": "Todo lo que puede hacer el titular, ahora y al añadirse permisos nuevos. Prefiere ámbitos limitados."
       }
     }
   }

@@ -3658,7 +3658,141 @@
     "sourceTooltipAria": "Granted via {scope}",
     "sourceColumn": "Source",
     "grantRoleRowLabel": "Grant role to {name}",
-    "grantRoleRowTooltip": "Grant role to {name}"
+    "grantRoleRowTooltip": "Grant role to {name}",
+    "people": {
+      "title": "People",
+      "description": "Users and IdP groups with access to this organization.",
+      "columns": {
+        "who": "Who",
+        "roles": "Roles",
+        "teams": "Teams",
+        "status": "Status",
+        "joined": "Joined"
+      },
+      "actions": {
+        "viewAccess": "View access",
+        "resend": "Resend invitation",
+        "revoke": "Revoke",
+        "deleteResolved": "Delete this resolved invitation",
+        "grantTo": "Grant access to {name}",
+        "alreadyAnonymized": "Already anonymized",
+        "anonymize": "Anonymize user data",
+        "invite": "Invite",
+        "grant": "Grant access"
+      },
+      "emptyTitle": "No people yet",
+      "emptyDescription": "Invite someone to the organization, then grant them a role.",
+      "confirm": {
+        "resend": {
+          "title": "Re-send invitation to {email}?",
+          "description": "Generate a fresh one-time link and attempt email delivery. The old link stops working immediately. Copy the fresh link if delivery fails.",
+          "label": "Re-send invitation"
+        },
+        "revoke": {
+          "title": "Revoke invitation for {email}?",
+          "description": "The pending invitation link stops working immediately. You can send a new invitation if needed.",
+          "label": "Revoke"
+        },
+        "delete": {
+          "title": "Delete resolved invitation for {email}?",
+          "description": "Remove this resolved invitation from the list. Membership and roles stay unchanged.",
+          "label": "Delete"
+        }
+      },
+      "export": {
+        "actions": "More list actions",
+        "working": "Exporting CSV…",
+        "label": "Export {count, number} as CSV"
+      },
+      "grants": "{count, plural, one {# grant} other {# grants}}",
+      "mappings": ", {count, plural, one {# mapping} other {# mappings}}",
+      "idpGroup": "IdP group",
+      "admin": "admin",
+      "invitationStatus": {
+        "pending": "pending",
+        "accepted": "accepted",
+        "expired": "expired",
+        "revoked": "revoked"
+      },
+      "lifecycle": {
+        "active": "active",
+        "invited": "invited",
+        "pending_invite": "pending invite",
+        "pending_first_login": "pending first login",
+        "suspended": "suspended",
+        "deactivated": "deactivated",
+        "anonymized": "anonymized"
+      },
+      "filters": {
+        "kind": "Kind",
+        "role": "Role",
+        "team": "Team",
+        "lifecycle": "Lifecycle",
+        "active": "Last active",
+        "status": "Invitation status"
+      },
+      "options": {
+        "kind": {
+          "user": "user",
+          "group": "group",
+          "invitation": "invitation"
+        },
+        "active": {
+          "7d": "in the last 7 days",
+          "30d": "in the last 30 days",
+          "90d": "in the last 90 days",
+          "stale": "not in 90 days",
+          "never": "never"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "invited": "Invited",
+        "groups": "Groups",
+        "admins": "Admins"
+      },
+      "notes": {
+        "mine": "People who share a team with you.",
+        "invited": "Pending invitations. Use the status filter for accepted, expired or revoked invitations.",
+        "groups": "Known IdP groups from sign-ins, grants and mappings. Group access applies to everyone assigned by the identity provider."
+      },
+      "searchPlaceholder": "Search people, emails, groups…  role:org_admin  team:payments"
+    },
+    "feedback": {
+      "noExport": "The export returned no file",
+      "noGroups": "The export returned no groups",
+      "groupsChanged": "The group list changed during export; retry the export",
+      "exportFailed": "The export failed",
+      "refreshWarning": "The change was saved, but the list could not refresh. Refresh the view; do not repeat the successful action.",
+      "revoked": "Invitation revoked",
+      "revokeFailed": "Revoke failed",
+      "resendFailed": "Resend failed",
+      "resent": "Invitation re-sent to {email}",
+      "resendDescription": "The previous link is now invalid. Copy the fresh link as a backup channel.",
+      "copyLink": "Copy link",
+      "linkCopied": "Accept link copied",
+      "copyFailed": "Copy failed",
+      "deleted": "Invitation deleted",
+      "deleteFailed": "Delete failed",
+      "anonymizeFailed": "Anonymization failed",
+      "anonymized": "User data anonymized."
+    },
+    "anonymization": {
+      "title": "Anonymize {name}?",
+      "changes": "This changes",
+      "identity": "Account names and email are replaced with an anonymous identity.",
+      "profile": "Personal profile fields, phone, avatar, address and signature are cleared or replaced.",
+      "account": "Sign-in is disabled and authentication group memberships are cleared.",
+      "memberships": "Memberships across the platform are deactivated.",
+      "preserves": "This preserves",
+      "records": "The account row and links from historical actions remain.",
+      "history": "This action does not erase historical audit content or delete stored role-binding records.",
+      "irreversible": "This action is irreversible. The original personal data cannot be restored. Repeating it on an already anonymized account makes no further changes.",
+      "acknowledge": "I understand this is irreversible.",
+      "working": "Anonymizing…",
+      "confirm": "Anonymize user data"
+    }
   },
   "securitySessions": {
     "title": "Active sessions",
@@ -3800,6 +3934,17 @@
         "empty": "No approvals recorded yet.",
         "unknownApprover": "unknown"
       }
+    },
+    "pendingGates": {
+      "title": "Pending gates",
+      "loadingDescription": "Human reviews across the organization awaiting a decision.",
+      "description": "Workflow reviews you can decide across the organization, newest first.",
+      "refresh": "Refresh pending gates",
+      "emptyTitle": "No pending gates",
+      "emptyDescription": "Nothing is waiting on your review right now.",
+      "waitingSince": "Waiting · {time}",
+      "approvers": "Approvers: {names}",
+      "review": "Review"
     }
   },
   "projectResources": {
@@ -4342,6 +4487,117 @@
           "freshness": "person signed in within {minutes, plural, one {# minute} other {# minutes}}",
           "custom": "custom condition <kind>{name}</kind>"
         }
+      },
+      "grant": {
+        "title": "Grant access",
+        "admin": "Admin",
+        "access": "Access",
+        "people": "People",
+        "steps": "Steps",
+        "step": {
+          "who": "Who",
+          "role": "Role",
+          "scope": "Scope",
+          "expiry": "Expiry",
+          "review": "Review"
+        },
+        "pickPrincipal": "Pick at least one person, group or team.",
+        "pickRole": "Pick a role.",
+        "pickScope": "Pick where the role applies.",
+        "pickDate": "Pick a date.",
+        "previewFailed": "Could not preview the grant",
+        "noGrants": "No grants were created. Review the selected holders before trying again.",
+        "grantFailed": "The grant failed",
+        "whereHeading": "Where does it apply?",
+        "scopeHelp": "A grant reaches everything inside the scope: a team grant covers its projects and apps.",
+        "expiryHeading": "When does it end?",
+        "never": "Never",
+        "days": "{count, plural, one {# day} other {# days}}",
+        "onDate": "On a date",
+        "expiryDate": "Expiry date",
+        "expiryUnsupported": "This grant cannot be time-boxed here; it lasts until it is removed.",
+        "expiryHelp": "The grant ends by itself then; removing it earlier still works.",
+        "cancel": "Cancel",
+        "back": "Back",
+        "continue": "Continue",
+        "granting": "Granting…",
+        "retryCount": "Retry {count}",
+        "grantCount": "Grant to {count}",
+        "whoHeading": "Who gets access?",
+        "picked": "Picked",
+        "searchPlaceholder": "Search people, groups and teams by name or email",
+        "searchLabel": "Search people, groups and teams",
+        "searchFailed": "Search failed: {message}",
+        "noPeople": "No one matches “{query}”.",
+        "searchHelp": "Type to search. A group grant reaches whoever is in the group, now and later; a team adds its members at the time of the grant.",
+        "addName": "Add {name}",
+        "add": "Add",
+        "roleHeading": "Which role?",
+        "rolePlaceholder": "Search roles or a permission, e.g. deploy",
+        "roleSearch": "Search roles",
+        "rolesFailed": "Could not load roles: {message}",
+        "noGrantableRoles": "You cannot grant any role: it takes holding every permission a role carries.",
+        "noRoles": "No role matches “{query}”.",
+        "noRole": "No role",
+        "noScope": "no scope",
+        "expiresNever": "never expires",
+        "expiresDays": "{count, plural, one {expires in # day} other {expires in # days}}",
+        "expiresDate": "expires on {date}",
+        "summary": "<role>{roleName}</role> ({permissions}) on {kind} <identifier>{name}</identifier>, {expiry}.",
+        "previewError": "Could not preview the effect: {message}",
+        "retry": "Retry",
+        "effect": "{count, plural, =0 {No one gains anything new} one {# person gains {what}} other {# people gain {what}}}{where}{already, plural, =0 {} other {; # already had it}}.",
+        "where": " on {kind} {name}",
+        "groupsReach": "Reaches {groups}, and whoever the identity provider adds to these groups later.",
+        "groupToday": "{name} ({count, plural, one {# member today} other {# members today}})",
+        "gainAccess": "Gain access",
+        "alreadyAccess": "Already have it",
+        "outcome": "Outcome",
+        "grantedCount": "Granted to {count}.",
+        "failed": "Failed",
+        "groupDetail": "IdP group · {count, plural, one {# member} other {# members}}",
+        "cannotGrant": "You cannot grant this role here.",
+        "cannotHold": "A {kind} cannot hold a role.",
+        "refreshFailed": "Grants were saved, but the access list could not refresh. Refresh the view; do not repeat successful grants.",
+        "success": "{count, plural, one {Granted to # person} other {Granted to # people}}",
+        "links": {
+          "organization": "Organization",
+          "projects": "Projects",
+          "teams": "Teams",
+          "roles": "Roles",
+          "policies": "Policies",
+          "check": "Check access"
+        }
+      },
+      "legacyGrantRole": {
+        "title": "Grant role",
+        "description": "Assign a role to an existing organization member on the chosen scope.",
+        "userId": "User ID",
+        "targetUser": "Granting a role to {name}.",
+        "userGuidance": "Enter the numeric ID of an existing member of this organization. This form does not create or invite users.",
+        "role": "Role",
+        "selectRole": "Select a role",
+        "scope": "Scope",
+        "noScope": "No scopes available for {scopeKind}",
+        "selectScope": "Select a scope",
+        "scopeGuidance": "Fixed to the role's scope level: <scope></scope>",
+        "cancel": "Cancel",
+        "granting": "Granting…",
+        "granted": "Role granted",
+        "failed": "Could not grant the role",
+        "refreshWarning": "Could not refresh the view. Refresh to see current data.",
+        "orgReadFailed": "Could not confirm the active organization. Reload the page to try again.",
+        "loadingOrg": "Confirming the active organization…",
+        "noOrg": "No active organization is available for this grant.",
+        "unsupportedApp": "This picker does not offer APP targets. Use Grant access to choose an application.",
+        "scopeReadFailed": "Could not load scope targets.",
+        "retry": "Retry",
+        "loadingScopes": "Loading scope targets…",
+        "unknownScopes": "Scope targets have not been confirmed yet.",
+        "rolesReadFailed": "Could not load roles.",
+        "loadingRoles": "Loading roles…",
+        "unknownRoles": "Roles have not been confirmed yet.",
+        "emptyRoles": "No roles are available in this list."
       }
     },
     "settings": {
@@ -4368,6 +4624,10 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "unknownDate": "Unknown date"
+    },
+    "shellHeader": {
+      "breadcrumb": "Breadcrumb",
+      "switch": "{label}: switch"
     }
   },
   "agentSecrets": {
@@ -4894,6 +5154,530 @@
         "subscriptionPolicy": "Disabling new subscriptions does not revoke existing access.",
         "completedUpdate": "The requested resource revision has been reconciled. This is not a live health check.",
         "operationFailed": "The accepted operation failed. Review the current deployment reason before another action."
+      }
+    }
+  },
+  "home": {
+    "title": "Home",
+    "titleLayout": "Home · {layout}",
+    "question": "What will you mostly do here?",
+    "noAccessTitle": "Nothing for Home to show yet",
+    "noAccessDescription": "Your role has no access to Apps or Agents in this organization. An organization admin can grant it.",
+    "layoutMenu": "Layout",
+    "layoutLegend": "Home layout",
+    "settings": "Home settings",
+    "changeHint": "Change it anytime from Layout on Home or in Settings › Home.",
+    "continue": "Continue",
+    "suggested": "Suggested",
+    "placeholderTitle": "Not on Home yet",
+    "placeholderDescription": "{panel} is on its way to Home. Until then, the full page has it.",
+    "open": "Open",
+    "layouts": {
+      "apps": {
+        "title": "Apps",
+        "description": "For running applications: failing deploys, your apps and their traffic."
+      },
+      "agents": {
+        "title": "Agents",
+        "description": "For building and running agents: failed and live runs, your agents and spend."
+      },
+      "builder": {
+        "title": "Builder",
+        "description": "For both, hands on: what is failing, what just happened, deploys and runs."
+      },
+      "operator": {
+        "title": "Operator",
+        "description": "For keeping the platform running: alerts, clusters, platform activity and quota."
+      }
+    },
+    "panels": {
+      "waiting": "Waiting on you",
+      "failing": "Failing",
+      "my-apps": "My apps",
+      "recent-deployments": "Recent deployments",
+      "traffic-errors": "Traffic & errors",
+      "failed-runs": "Failed runs",
+      "running-now": "Running now",
+      "my-agents": "My agents",
+      "runs-spend": "Runs & spend",
+      "activity": "Activity",
+      "kpis": "KPIs",
+      "deployments": "Deployments",
+      "agent-runs": "Agent runs",
+      "alerts": "Alerts",
+      "clusters": "Clusters",
+      "platform-activity": "Platform activity",
+      "spend-quota": "Spend & quota"
+    },
+    "copy": {
+      "auditLog": "Audit log",
+      "noAgentRunsTitle": "No agent runs yet",
+      "noAgentRunsDescription": "Runs of the agents you can see show up here.",
+      "openAgents": "Open agents",
+      "firingNow": "Firing now",
+      "acknowledged": "acknowledged",
+      "firing": "firing",
+      "noAlertsTitle": "No alerts firing",
+      "noAlertsDescription": "Alerts show up here the moment a rule fires.",
+      "alertRules": "Alert rules",
+      "noClustersTitle": "No clusters yet",
+      "noClustersDescription": "Register a cluster to run apps and agents on it.",
+      "registerCluster": "Register a cluster",
+      "agentRun": "Agent run",
+      "workflowRun": "Workflow run",
+      "noFailedRunsTitle": "No failed runs",
+      "noFailedRunsDescription": "Agent and workflow runs that fail show up here with their reason.",
+      "deploy": "Deploy",
+      "run": "Run",
+      "nothingFailingTitle": "Nothing failing",
+      "nothingFailingDescription": "Failed deploys and runs show up here with their reason.",
+      "neverDeployed": "Never deployed",
+      "noAppsTitle": "No apps of yours yet",
+      "noAppsDescription": "Apps you hold a role on show up here.",
+      "browseApps": "Browse apps",
+      "paused": "Paused",
+      "neverRun": "Never run",
+      "lastRun": "Last run: {status}",
+      "runningCount": "{count, plural, one {# running} other {# running}}",
+      "agentsMineNote": "This panel shows agents on apps you hold a role on, directly or through their project, team or organization.",
+      "noAgentsTitle": "No agents of yours yet",
+      "noAgentsDescription": "Agents on apps you hold a role on show up here.",
+      "browseAgents": "Browse agents",
+      "nothingRunningTitle": "Nothing running",
+      "nothingRunningDescription": "Agents with a run in flight show up here, in your fleet view.",
+      "openRuns": "Open runs",
+      "runningSummary": "{runs, plural, one {# run} other {# runs}} on {agents, plural, one {# agent} other {# agents}}",
+      "noDeploymentsTitle": "No deployments yet",
+      "noDeploymentsDescription": "Deploys you can see show up here.",
+      "startDeployment": "Start a deployment",
+      "noPlatformTitle": "No platform activity yet",
+      "noPlatformDescription": "Deploys, onboarding and cluster operations show up here as they run.",
+      "noWaitingTitle": "Nothing waiting on you",
+      "noWaitingDescription": "Approvals you can decide show up here.",
+      "approveTitle": "Approve this deploy?",
+      "approveDescription": "Approve the deploy.",
+      "approve": "Approve",
+      "review": "Review",
+      "workflowGate": "Workflow gate",
+      "secretRequest": "Secret request",
+      "unknownTime": "Unknown time",
+      "unknownValue": "unknown",
+      "rolledBack": "Rolled back.",
+      "noFailureReason": "No reason was recorded for this failure.",
+      "noRunReason": "No reason was recorded for this run.",
+      "timedOut": "Timed out.",
+      "noReason": "No reason was recorded.",
+      "monthToDate": "Month to date",
+      "ofBudget": "of {amount} · {percentage}",
+      "spent": "Spent",
+      "projected": "Projected",
+      "budget": "Budget",
+      "legend": "Legend",
+      "budgetReadFailed": "The budget did not load: {message}",
+      "noBudget": "No organization budget is set, so there is no quota to draw spend against.",
+      "spendAgainstBudget": "{panel}: spend against budget",
+      "spendBudgetValue": "{spent} of {budget}",
+      "last24Hours": "Last 24 hours",
+      "app": "App",
+      "pickApp": "Pick an app",
+      "trafficAppsDescription": "Traffic for apps you hold a role on shows up here.",
+      "openApp": "Open the app",
+      "requests": "Requests",
+      "errors": "Errors",
+      "now": "now",
+      "average": "avg {value}",
+      "notConfiguredTitle": "Not configured",
+      "notConfiguredDescription": "This app’s cluster has no Prometheus endpoint, so its traffic is not flowing.",
+      "notSupportedTitle": "Not available on this provider",
+      "notSupportedDescription": "This cluster’s provider plugin does not implement this read. It is supported on other clouds.",
+      "metricErrorTitle": "Could not load",
+      "metricErrorDescription": "Something went wrong loading this panel. Try again.",
+      "noRequestsTitle": "No requests yet",
+      "noRequestsDescription": "Nothing to show for this window. Requests will appear here once there is activity.",
+      "last7Days": "Last 7 days",
+      "runsPerDay": "Agent runs per day",
+      "failedPerDay": "Failed runs per day",
+      "spendPerDay": "Organization spend per day",
+      "sevenDays": "7 days",
+      "spendReadFailed": "Spend did not load: {message}",
+      "cappedRuns": "Counted from the newest runs; the week holds more.",
+      "kpiWindow": "last {count, number} days · spend month to date",
+      "kpiAria": "{panel}, last {count, number} days",
+      "noKpisTitle": "No figures for your access",
+      "noKpisDescription": "Deploy, run and spend figures show for the areas you can see.",
+      "noProject": "No project"
+    },
+    "health": {
+      "error": "Setup failed",
+      "offline": "Offline",
+      "degraded": "Degraded",
+      "never_seen": "Never seen",
+      "connected": "Connected"
+    },
+    "severity": {
+      "critical": "critical",
+      "error": "error",
+      "warn": "warning",
+      "warning": "warning",
+      "info": "info"
+    },
+    "status": {
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "rolled_back": "Rolled back",
+      "timed_out": "Timed out",
+      "error": "Error",
+      "cancelled": "Cancelled",
+      "canceled": "Canceled",
+      "terminated": "Terminated",
+      "completed": "Completed",
+      "paused": "Paused",
+      "pending_approval": "Pending approval",
+      "approved": "Approved",
+      "deploying": "Deploying",
+      "building": "Building",
+      "provisioning": "Provisioning",
+      "aborted": "Aborted",
+      "stopped": "Stopped",
+      "queued": "Queued",
+      "pending": "Pending",
+      "redeploying": "Redeploying",
+      "superseded": "Superseded",
+      "waiting": "Waiting",
+      "unknown": "Unknown"
+    },
+    "kpi": {
+      "deploys": "Deploys",
+      "runs": "Runs",
+      "success": "Success",
+      "p95": "p95",
+      "spend": "Spend",
+      "runsHint": "agent runs",
+      "successHint": "of deploys",
+      "p95Hint": "deploy time",
+      "spendHint": "month to date"
+    },
+    "period": {
+      "monthly": "monthly",
+      "quarterly": "quarterly",
+      "yearly": "yearly"
+    },
+    "operations": {
+      "everyEnvironment": "every environment",
+      "noEnvironment": "no environment",
+      "appWide": "app-wide",
+      "deployTitle": "{app} to {environment}",
+      "deployDetail": "{image} · {received, number}/{required, number} approvals",
+      "humanGate": "human gate",
+      "approvers": "Approvers: {approvers}",
+      "anyApprover": "Any approver may decide",
+      "secretTitle": "{app} secrets · {environment}",
+      "secretBy": "{operation} by {name}",
+      "secretDetail": "{operation} · {received, number}/{required, number} approvals",
+      "approveFailed": "Approve failed",
+      "approved": "Approved: {status}",
+      "stage": "stage {order, number}{role}",
+      "failedAt": "Failed at {stage}.",
+      "timedOutAt": "Timed out at {stage}.",
+      "requestRate": "{value} req/s",
+      "milliseconds": "{value} ms"
+    },
+    "layoutSettings": {
+      "description": "Choose which panels Home shows and their order. Changes sync to your account when saving succeeds; a browser copy remains available offline.",
+      "noAccess": "Your role has no access to Apps or Agents, so there is no layout to choose.",
+      "resetDefault": "Use the default for my access ({layout})",
+      "saveFailed": "Home layout was not saved"
+    }
+  },
+  "metrics": {
+    "title": "Metrics",
+    "description": "Deployment success, rollout duration and application health.",
+    "successRate": "Deployment success rate",
+    "successRateTrend": "Deployment success-rate trend",
+    "successRateUnavailable": "Deployment success rate unavailable",
+    "trend": "{label} trend",
+    "durationSeconds": "{seconds, number}s",
+    "durationMinutesSeconds": "{minutes, number}m {seconds, number}s",
+    "columns": {
+      "app": "App",
+      "environments": "Environments",
+      "latestDeploy": "Latest deployment",
+      "image": "Image",
+      "lastDeployed": "Last deployed"
+    },
+    "never": "Never",
+    "recentFailure": "Recent failure",
+    "inFlight": "In progress",
+    "inFlightHint": "Awaiting approval, queued or deploying",
+    "meanRollout": "Mean rollout duration",
+    "meanRolloutHint": "Average of completed deployments in this window",
+    "p95Rollout": "p95 rollout duration",
+    "p95RolloutHint": "The slower deployments in this window",
+    "noRollouts": "No rollouts in the last {days, number} days",
+    "succeededWindow": "{succeeded, number}/{total, number} succeeded over {days, number} days",
+    "outcomes": "Outcomes ({days, number} days)",
+    "succeeded": "Succeeded {count, number}",
+    "failed": "Failed {count, number}",
+    "rolledBack": "Rolled back {count, number}",
+    "inFlightCount": "In progress {count, number}",
+    "total": "Total {count, number}",
+    "rolloutsWindow": "Rollouts over {days, number} days",
+    "rolloutsPerDay": "Rollouts per day",
+    "apps": "Apps",
+    "emptyTitle": "No apps yet",
+    "emptyDescription": "Register an app; metrics appear after its first deployment.",
+    "openApps": "Open apps",
+    "rawPrometheus": "Raw Prometheus metrics",
+    "temporalUi": "Temporal workflow interface",
+    "embeddedDashboardsUnavailable": "Embedded dashboards are not available in this view.",
+    "searchPlaceholder": "Search apps, slugs, image tags…",
+    "filters": {
+      "status": "Latest deployment",
+      "kind": "Kind"
+    },
+    "kinds": {
+      "app": "App",
+      "agent": "Agent"
+    },
+    "views": {
+      "all": "All",
+      "mine": "Mine",
+      "failing": "Recent failure",
+      "mineNote": "The health summary does not record ownership, so this view is empty."
+    },
+    "staleMetrics": "Refresh failed. Showing the last successfully loaded metrics.",
+    "metricsUnavailable": "Metrics could not be loaded.",
+    "retryMetrics": "Retry metrics"
+  },
+  "teams": {
+    "title": "Teams",
+    "context": "Teams scope projects, apps and the grants on them.",
+    "newTeam": "New team",
+    "columnTeam": "Team",
+    "columnCreated": "Created",
+    "edit": "Edit",
+    "delete": "Delete",
+    "emptyTitle": "No teams yet",
+    "emptyDescription": "Create a team to start grouping projects and apps.",
+    "deleteTitle": "Delete team {slug}?",
+    "deleteGenericTitle": "Delete team?",
+    "deleteDescription": "Retire the team and make its slug reusable. This does not reassign its projects or applications.",
+    "confirmDelete": "Delete team",
+    "createDescription": "Teams scope projects, members and tokens. Slugs are unique and can be reused after retirement.",
+    "displayName": "Display name",
+    "exampleName": "Backend team",
+    "slug": "Slug",
+    "slugHint": "Start with a lowercase letter; use letters, numbers and hyphens, up to 40 characters. End with a letter or number.",
+    "descriptionOptional": "Description (optional)",
+    "descriptionPlaceholder": "What does this team own?",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create team",
+    "editTitle": "Edit team",
+    "editDescription": "Rename this team or change its slug. Slugs are unique within the organization and are used in URLs.",
+    "generate": "Generate",
+    "saving": "Saving…",
+    "save": "Save changes",
+    "feedback": {
+      "created": "Team {slug} created",
+      "saved": "Team saved as {slug}",
+      "deleted": "Deleted {slug}",
+      "createFailed": "Could not create the team",
+      "saveFailed": "Could not save the team",
+      "deleteFailed": "Could not delete the team",
+      "refreshWarning": "Could not refresh the view. Refresh to see current data."
+    },
+    "list": {
+      "search": "Search teams…",
+      "all": "All",
+      "mine": "Mine"
+    },
+    "slugStatus": {
+      "invalid": "Use lowercase letters, numbers and hyphens; start with a letter and end with a letter or number (up to 40 characters).",
+      "checking": "Checking availability…",
+      "available": "Available",
+      "taken": "Already taken in this organization.",
+      "unchanged": "Current slug — used in URLs.",
+      "empty": "Lowercase letters, numbers and hyphens. Used in URLs."
+    }
+  },
+  "apiKeys": {
+    "title": "API keys",
+    "name": "Name",
+    "suffix": "Suffix",
+    "scopes": "Scopes",
+    "scope": "Scope",
+    "canDo": "Can do",
+    "lastUsed": "Last used",
+    "created": "Created",
+    "expires": "Expires",
+    "status": "Status",
+    "active": "Active",
+    "revoked": "Revoked",
+    "expired": "Expired",
+    "none": "none",
+    "nothing": "nothing",
+    "never": "never",
+    "all": "All",
+    "mine": "Mine",
+    "longLivedAdmin": "Long-lived admin token",
+    "permissionCount": "{count, plural, one {# permission} other {# permissions}}",
+    "adminExpiryWarning": "Admin with no near expiry. Replace it with a narrower token.",
+    "effectiveGuidance": "What its scopes allow and its owner's roles grant:",
+    "createdNotice": "Token <name></name> created",
+    "revealGuidance": "Copy the value now — it is never shown again. Only the SHA-256 hash and last 4 characters are stored.",
+    "copy": "Copy",
+    "dismissReveal": "I've saved it — dismiss",
+    "mcpTitle": "Remote agent MCP",
+    "mcpGuidance": "Connect CI or coding clients over authenticated Streamable HTTP. Send an API token as <code></code>. MCP scopes still require the owner's matching agent permissions; secret values are not exposed.",
+    "copyUrl": "Copy URL",
+    "mcpRead": "{scope} · inspect packages/tasks",
+    "mcpDispatch": "{scope} · run/kill",
+    "mcpWrite": "{scope} · sync repos",
+    "context": "Bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest; plaintext is shown exactly once at creation.",
+    "newToken": "New token",
+    "revoke": "Revoke",
+    "emptyTitle": "No API keys",
+    "emptyDescription": "Create one to authenticate CLI, CI runs, or your scripts against the platform.",
+    "createTitle": "New API token",
+    "createDescription": "Plaintext is shown once after creation. Save it securely; it cannot be retrieved later.",
+    "nameGuidance": "A descriptive name appears in the audit log beside this token's actions.",
+    "scopeGuidance": "A token only narrows your access: it gets the permissions below that your roles also grant.",
+    "expiresDays": "Expires in (days)",
+    "expiryGuidance": "Leave 0 or empty for no expiry. Default {defaultDays} days, maximum {maxDays}.",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create token",
+    "revokeNamed": "Revoke token {name}?",
+    "revokeTitle": "Revoke token?",
+    "revokeDescription": "Existing CLIs and bots using this token stop working immediately. Revocation cannot be undone; mint a new token to restore access.",
+    "revokeConfirm": "Revoke token",
+    "refreshWarning": "Could not refresh the view. Refresh to see current data.",
+    "pickScope": "Pick at least one scope",
+    "createFailed": "Could not create the token",
+    "revokedFeedback": "Token revoked",
+    "revokeFailed": "Could not revoke the token",
+    "copyFailed": "Could not copy. Select and copy the value manually.",
+    "copied": "Copied to clipboard",
+    "endpointCopied": "MCP endpoint copied",
+    "searchPlaceholder": "Search keys, owners, teams, suffixes…",
+    "narrowedNote": "Shows matching keys among the newest {count}, until the API query supports filters.",
+    "mineNote": "Shows your keys among the newest {count}.",
+    "detail": {
+      "token": "Token",
+      "owner": "Owner",
+      "team": "Team",
+      "lastIp": "Last used IP",
+      "lastAgent": "Last used agent",
+      "orgWide": "— (organization-wide)",
+      "shortToken": "Token {id}",
+      "overview": "Overview",
+      "notFoundTitle": "API token not found",
+      "notFoundDescription": "This token may not exist, may be outside the recent list, or you may not have access.",
+      "back": "Back to API keys",
+      "noScopes": "No scopes — this token has no granted permissions.",
+      "readFailed": "Could not load token metadata.",
+      "retry": "Retry"
+    },
+    "picker": {
+      "loadFailed": "Could not load the scope list. Reload the page to try again.",
+      "startFrom": "Start from",
+      "adminWarning": "Admin lets this token do everything its owner can, including permissions added later. Prefer narrow scopes and give it an expiry.",
+      "sensitive": "sensitive",
+      "unavailable": "Your roles grant none of what this scope unlocks.",
+      "unlocks": "Unlocks {count, plural, one {# permission} other {# permissions}}",
+      "surfaces": {
+        "apps": "Apps",
+        "clusters": "Clusters",
+        "secrets": "Secrets",
+        "agents": "Agents",
+        "workflows": "Workflows",
+        "administration": "Administration"
+      },
+      "presets": {
+        "read_only": "Read-only",
+        "cli": "CLI default",
+        "ci_deploy": "CI deploy",
+        "cluster_operator": "Cluster operator"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "Read apps",
+        "description": "List apps, deployments, environments and secret names."
+      },
+      "scope1": {
+        "label": "Write apps",
+        "description": "Deploy, edit environment variables and manage app config."
+      },
+      "scope2": {
+        "label": "Onboard apps",
+        "description": "Register apps and run CI setup (webhook, secrets, workflow), without deploy or delete."
+      },
+      "scope3": {
+        "label": "Read clusters",
+        "description": "List clusters and read provider state."
+      },
+      "scope4": {
+        "label": "Update clusters",
+        "description": "Change a cluster's settings: ingress class, auth gate, region, endpoint."
+      },
+      "scope5": {
+        "label": "Operate clusters",
+        "description": "Run a cluster's recipe install, refresh its management state, reconcile its ingresses."
+      },
+      "scope6": {
+        "label": "Manage sign-in users",
+        "description": "Create, disable, delete and reset the users of a cluster's central auth, and their groups."
+      },
+      "scope7": {
+        "label": "Set app access",
+        "description": "Choose which users and groups may enter an app behind central auth."
+      },
+      "scope8": {
+        "label": "Reveal secrets",
+        "description": "Reveal stored secret values. Grant only when required."
+      },
+      "scope9": {
+        "label": "Write secrets",
+        "description": "Set, rotate and delete secrets without revealing them."
+      },
+      "scope10": {
+        "label": "MCP read",
+        "description": "List agent packages and inspect runs through remote MCP."
+      },
+      "scope11": {
+        "label": "MCP dispatch",
+        "description": "Run, steer and hard-stop agents; attach to agent boxes, subject to account permissions."
+      },
+      "scope12": {
+        "label": "MCP write",
+        "description": "Sync agent repositories and package definitions."
+      },
+      "scope13": {
+        "label": "Write agent environments",
+        "description": "Create, update and delete agent environment specs."
+      },
+      "scope14": {
+        "label": "Write workflows",
+        "description": "Create, update and delete workflows."
+      },
+      "scope15": {
+        "label": "Run workflows",
+        "description": "Start workflow runs, without editing them."
+      },
+      "scope16": {
+        "label": "Write projects",
+        "description": "Create, update and delete projects."
+      },
+      "scope17": {
+        "label": "Write teams",
+        "description": "Create, update and delete teams."
+      },
+      "scope18": {
+        "label": "Admin",
+        "description": "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes."
       }
     }
   }

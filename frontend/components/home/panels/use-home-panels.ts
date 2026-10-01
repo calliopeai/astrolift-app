@@ -15,6 +15,7 @@ import * as React from "react";
 
 import type { CursorPage } from "@/components/data-table";
 import { useGrowingLimit } from "@/components/feed/use-growing-limit";
+import { useHomePresentation } from "./use-home-presentation";
 import type { AlertEvent } from "@/components/screens/alerts/use-alerts";
 import type { ClusterRow } from "@/components/screens/clusters/list/use-clusters-list";
 import { GET_COST_FORECAST, LIST_BUDGETS } from "@/graphql/billing/billing.queries";
@@ -76,6 +77,7 @@ interface ForecastResp {
  * left out of the strip.
  */
 export function useKpisPanel(): KpisPanelData {
+  const presentation = useHomePresentation();
   const { canView, can } = usePanelAccess();
   const apps = canView("apps") && can("app.read");
   const agents = canView("agents") && can("agent.read");
@@ -109,19 +111,22 @@ export function useKpisPanel(): KpisPanelData {
 
   return {
     windowDays: KPI_WINDOW_DAYS,
-    figures: kpiFigures({
-      metrics: apps ? m : undefined,
-      runs: agents
-        ? {
-            runs: runs.runs,
-            capped: runs.total !== null && runs.total > runs.runs.length,
-            now,
-            loading: runs.loading,
-          }
-        : undefined,
-      forecast: billing ? f : undefined,
-      windowDays: KPI_WINDOW_DAYS,
-    }),
+    figures: kpiFigures(
+      {
+        metrics: apps ? m : undefined,
+        runs: agents
+          ? {
+              runs: runs.runs,
+              capped: runs.total !== null && runs.total > runs.runs.length,
+              now,
+              loading: runs.loading,
+            }
+          : undefined,
+        forecast: billing ? f : undefined,
+        windowDays: KPI_WINDOW_DAYS,
+      },
+      presentation
+    ),
     loading: pending,
     // Only a strip with nothing to show is an error; one failed source is a dash.
     error: shown > 0 && failed.length === shown ? failed[0]! : null,

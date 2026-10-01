@@ -1,5 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { MoreHorizontalIcon } from "lucide-react";
+import { NextIntlClientProvider } from "next-intl";
+import { expect, userEvent, within } from "storybook/test";
+
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 
 import { Identifier } from "@/components/Identifier";
 import { RunStatusBadge } from "@/components/jobs/RunStatusBadge";
@@ -147,4 +152,62 @@ export const Narrow: StoryObj = {
       />
     </div>
   ),
+};
+
+/** Keyboard navigation uses translated purpose and literal caller-provided labels. */
+export const FrenchBreadcrumbKeyboard: StoryObj = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <ShellHeader
+        title="CLIENT_TITLE <literal>"
+        crumbs={[
+          {
+            label: "CLIENT_PROJECT <literal>",
+            switcher: [
+              { label: "CLIENT_PROJECT <literal>", href: "/projects/actual", active: true },
+              { label: "CLIENT_OTHER <literal>", href: "/projects/other" },
+            ],
+          },
+          { label: "CLIENT_APP <literal>", href: "/apps/actual" },
+          { label: "CLIENT_DETAIL <literal>" },
+        ]}
+      />
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("navigation", { name: "Fil d’Ariane" })).toBeInTheDocument();
+    const trigger = canvas.getByRole("button", { name: "Changer : CLIENT_PROJECT <literal>" });
+    trigger.focus();
+    await userEvent.keyboard("{Enter}");
+    const menu = within(canvasElement.ownerDocument.body);
+    const other = await menu.findByRole("menuitem", { name: "CLIENT_OTHER <literal>" });
+    await expect(other).toHaveAttribute("href", "/projects/other");
+    await expect(menu.getByRole("menuitem", { name: "CLIENT_PROJECT <literal>" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    await userEvent.keyboard("{Escape}");
+    await expect(trigger).toHaveFocus();
+  },
+};
+
+export const JapaneseBreadcrumb: StoryObj = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <ShellHeader
+        title="モデル"
+        crumbs={[
+          { label: "モデル", switcher: [{ label: "モデル", href: "/models", active: true }] },
+          { label: "actual/model:revision" },
+        ]}
+      />
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("navigation", { name: "パンくずリスト" })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "モデルを切り替え" })).toBeInTheDocument();
+    await expect(canvas.getByText("actual/model:revision")).toHaveAttribute("aria-current", "page");
+  },
 };

@@ -10,9 +10,9 @@ import * as React from "react";
 
 import { ListSummary } from "@/components/list/ListSummary";
 import { StatusDot } from "@/components/StatusDot";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import { newestFirst } from "./apps-agents-model";
 import type { HomeRead } from "./home-reads";
 import { useFailedRuns } from "./use-failed-runs";
@@ -43,6 +43,7 @@ const KIND_ICON: Record<FailedRunItem["kind"], React.ReactNode> = {
 };
 
 function FailedRunLine({ item }: { item: FailedRunItem }) {
+  const { t, age } = useHomePresentation(true);
   return (
     <div className="min-w-0">
       <p className="flex min-w-0 items-center gap-2">
@@ -50,13 +51,13 @@ function FailedRunLine({ item }: { item: FailedRunItem }) {
         <span className="text-muted-foreground shrink-0" aria-hidden>
           {KIND_ICON[item.kind]}
         </span>
-        <span className="sr-only">{item.kind === "agent" ? "Agent run" : "Workflow run"}: </span>
+        <span className="sr-only">
+          {t(item.kind === "agent" ? "copy.agentRun" : "copy.workflowRun")}:{" "}
+        </span>
         <span className="min-w-0 flex-1 truncate font-medium" title={item.subject}>
           {item.subject}
         </span>
-        <span className="text-muted-foreground shrink-0 font-mono text-xs">
-          {formatRelativeAge(item.at)}
-        </span>
+        <span className="text-muted-foreground shrink-0 font-mono text-xs">{age(item.at)}</span>
       </p>
       <p
         className="text-muted-foreground mt-0.5 truncate font-mono text-xs"
@@ -77,9 +78,10 @@ export function FailedRunsPanelView({
   error,
   onRetry,
 }: FailedRunsPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<CircleXIcon className="size-4" />}
       span={panel.span}
       count={loading || error ? null : count}
@@ -93,8 +95,8 @@ export function FailedRunsPanelView({
       onRetry={onRetry}
       empty={{
         icon: <CircleXIcon />,
-        title: "No failed runs",
-        description: "Agent and workflow runs that fail show up here with their reason.",
+        title: t("copy.noFailedRunsTitle"),
+        description: t("copy.noFailedRunsDescription"),
       }}
     />
   );

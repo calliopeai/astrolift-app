@@ -36,8 +36,12 @@ def driver(s3_client) -> S3Driver:
     )
 
 
+MSID = "11111111-1111-4111-8111-111111111111"
+
+
 def _spec(**overrides) -> ProvisionSpec:
     base = dict(
+        managed_service_id=MSID,
         organization_id="1",
         organization_slug="acme",
         app_id="1",
@@ -138,7 +142,7 @@ def test_bucket_name_at_most_63_chars(driver: S3Driver) -> None:
 
 def test_status_available_after_provision(driver: S3Driver) -> None:
     result = driver.provision(_spec())
-    status = driver.status(ServiceHandle(handle=result.handle))
+    status = driver.status(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert status.state == "available"
 
 
@@ -154,7 +158,7 @@ def test_status_deprovisioned_when_missing(driver: S3Driver) -> None:
 def test_binding_emits_env_vars(driver: S3Driver) -> None:
     # Canonical object_store envelope (#1003) + the S3_BUCKET_ARN extra.
     result = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(handle=result.handle))
+    binding = driver.binding(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert "BUCKET_NAME" in binding.env_vars
     assert "BUCKET_REGION" in binding.env_vars
     assert "S3_BUCKET_ARN" in binding.env_vars
@@ -165,7 +169,7 @@ def test_binding_emits_env_vars(driver: S3Driver) -> None:
 def test_binding_emits_iam_grants(driver: S3Driver) -> None:
     """Bucket-level grants vs object-level grants split."""
     result = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(handle=result.handle))
+    binding = driver.binding(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert len(binding.iam_grants) == 2
     bucket_grant = next(g for g in binding.iam_grants if not g.resource.endswith("/*"))
     object_grant = next(g for g in binding.iam_grants if g.resource.endswith("/*"))
@@ -190,7 +194,7 @@ def test_update_refuses_instead_of_reporting_a_no_op_success(driver: S3Driver) -
     refusal pointing at reprovision.
     """
     result = driver.provision(_spec())
-    update = driver.update(UpdateSpec(handle=result.handle, size="medium"))
+    update = driver.update(UpdateSpec(handle=result.handle, managed_service_id=MSID, size="medium"))
     assert update.ok is False
     assert update.retryable is False
     assert update.errors == ["update_not_supported_in_place"]
@@ -203,7 +207,11 @@ def test_update_accepts_binding_only_mount_keys(driver: S3Driver) -> None:
     finalize: the binding re-render applies it (#1675)."""
     result = driver.provision(_spec())
     update = driver.update(
-        UpdateSpec(handle=result.handle, config={"mount_path": "/data", "mount_read_only": True}),
+        UpdateSpec(
+            handle=result.handle,
+            managed_service_id=MSID,
+            config={"mount_path": "/data", "mount_read_only": True},
+        ),
     )
     assert update.ok is True
 
@@ -216,7 +224,7 @@ def test_deprovision_keep_data(driver: S3Driver, s3_client) -> None:
     result = driver.provision(_spec())
     _, bucket_name = parse_handle(result.handle)
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle),
+        DeprovisionSpec(handle=result.handle, managed_service_id=MSID),
         delete_data=False,
     )
     assert deprov.ok is True
@@ -231,7 +239,7 @@ def test_deprovision_delete_data(driver: S3Driver, s3_client) -> None:
     # Put an object so we exercise the empty-bucket path
     s3_client.put_object(Bucket=bucket_name, Key="test.txt", Body=b"hi")
     deprov = driver.deprovision(
-        DeprovisionSpec(handle=result.handle),
+        DeprovisionSpec(handle=result.handle, managed_service_id=MSID),
         delete_data=True,
     )
     assert deprov.ok is True
@@ -266,12 +274,12 @@ def test_deprovision_delete_data_idempotent_on_second_run(
         Body=b"y",
     )
     first = driver.deprovision(
-        DeprovisionSpec(handle=result.handle),
+        DeprovisionSpec(handle=result.handle, managed_service_id=MSID),
         delete_data=True,
     )
     assert first.ok is True
     second = driver.deprovision(
-        DeprovisionSpec(handle=result.handle),
+        DeprovisionSpec(handle=result.handle, managed_service_id=MSID),
         delete_data=True,
     )
     assert second.ok is True
@@ -283,7 +291,7 @@ def test_deprovision_delete_data_idempotent_on_second_run(
 
 def test_snapshot_returns_marker(driver: S3Driver) -> None:
     result = driver.provision(_spec())
-    snapshot = driver.snapshot(ServiceHandle(handle=result.handle))
+    snapshot = driver.snapshot(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert snapshot.snapshot_id.startswith("v-")
 
 
@@ -294,7 +302,7 @@ def test_snapshot_requires_versioning(s3_client) -> None:
     )
     result = driver.provision(_spec())
     with pytest.raises(ManagedServiceError, match="versioning"):
-        driver.snapshot(ServiceHandle(handle=result.handle))
+        driver.snapshot(ServiceHandle(handle=result.handle, managed_service_id=MSID))
 
 
 # ---- schemas ---------------------------------------------------
@@ -311,7 +319,7 @@ def test_binding_schema_documents_env_vars(driver: S3Driver) -> None:
 
 def test_binding_without_mount_path_has_no_volumes(driver: S3Driver) -> None:
     result = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(handle=result.handle))
+    binding = driver.binding(ServiceHandle(handle=result.handle, managed_service_id=MSID))
     assert binding.pod_volume_mounts == []
 
 
@@ -322,7 +330,7 @@ def test_binding_mount_path_emits_s3_csi_volume(driver: S3Driver) -> None:
     result = driver.provision(_spec())
     _, bucket_name = parse_handle(result.handle)
     binding = driver.binding(
-        ServiceHandle(handle=result.handle),
+        ServiceHandle(handle=result.handle, managed_service_id=MSID),
         config={"mount_path": "/data/models"},
     )
     assert len(binding.pod_volume_mounts) == 1
@@ -338,7 +346,7 @@ def test_binding_mount_path_emits_s3_csi_volume(driver: S3Driver) -> None:
 def test_binding_mount_read_only_drops_allow_delete(driver: S3Driver) -> None:
     result = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=result.handle),
+        ServiceHandle(handle=result.handle, managed_service_id=MSID),
         config={"mount_path": "/data/models", "mount_read_only": True},
     )
     volume = binding.pod_volume_mounts[0]
@@ -349,7 +357,7 @@ def test_binding_mount_read_only_drops_allow_delete(driver: S3Driver) -> None:
 def test_binding_mount_prefix_scopes_the_mount(driver: S3Driver) -> None:
     result = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=result.handle),
+        ServiceHandle(handle=result.handle, managed_service_id=MSID),
         config={"mount_path": "/data", "mount_prefix": "models/"},
     )
     assert "prefix models/" in binding.pod_volume_mounts[0].mount_options

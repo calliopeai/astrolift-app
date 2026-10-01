@@ -16,9 +16,9 @@ import * as React from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ListSummary } from "@/components/list/ListSummary";
 import { Button } from "@/components/ui/button";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import type { HomeRead } from "./home-reads";
 import { newestFirst } from "./apps-agents-model";
 import { useWaiting } from "./use-waiting";
@@ -48,14 +48,10 @@ export interface WaitingPanelViewProps extends HomeRead {
   onApprove: (deploymentId: string) => Promise<void>;
 }
 
-const KIND: Record<WaitingKind, { label: string; icon: React.ReactNode; action: string }> = {
-  deploy: { label: "Deploy", icon: <RocketIcon className="size-3.5" />, action: "Approve" },
-  gate: { label: "Workflow gate", icon: <GitBranchIcon className="size-3.5" />, action: "Review" },
-  secret: {
-    label: "Secret request",
-    icon: <KeyRoundIcon className="size-3.5" />,
-    action: "Review",
-  },
+const KIND: Record<WaitingKind, React.ReactNode> = {
+  deploy: <RocketIcon className="size-3.5" />,
+  gate: <GitBranchIcon className="size-3.5" />,
+  secret: <KeyRoundIcon className="size-3.5" />,
 };
 
 function WaitingLine({
@@ -67,11 +63,20 @@ function WaitingLine({
   busy: boolean;
   onApprove: () => void;
 }) {
+  const { t, age } = useHomePresentation(true);
   const kind = KIND[item.kind];
+  const kindLabel = t(
+    item.kind === "deploy"
+      ? "copy.deploy"
+      : item.kind === "gate"
+        ? "copy.workflowGate"
+        : "copy.secretRequest"
+  );
+  const action = t(item.kind === "deploy" ? "copy.approve" : "copy.review");
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span className="text-muted-foreground shrink-0" title={kind.label} aria-hidden>
-        {kind.icon}
+      <span className="text-muted-foreground shrink-0" title={kindLabel} aria-hidden>
+        {kind}
       </span>
       <div className="min-w-0 flex-1">
         <Link
@@ -82,12 +87,12 @@ function WaitingLine({
           {item.title}
         </Link>
         <p className="text-muted-foreground truncate text-xs" title={item.detail}>
-          <span className="sr-only">{kind.label}: </span>
+          <span className="sr-only">{kindLabel}: </span>
           {item.detail}
         </p>
       </div>
       <span className="text-muted-foreground hidden shrink-0 font-mono text-xs sm:inline">
-        {formatRelativeAge(item.at)}
+        {age(item.at)}
       </span>
       {item.approveId ? (
         <Button
@@ -98,11 +103,11 @@ function WaitingLine({
           onClick={onApprove}
         >
           <CheckIcon className="size-3.5" aria-hidden />
-          {kind.action}
+          {action}
         </Button>
       ) : (
         <Button asChild size="sm" variant="outline" className="shrink-0">
-          <Link href={item.href}>{kind.action}</Link>
+          <Link href={item.href}>{action}</Link>
         </Button>
       )}
     </div>
@@ -119,12 +124,13 @@ export function WaitingPanelView({
   approving,
   onApprove,
 }: WaitingPanelViewProps) {
+  const { t } = useHomePresentation();
   const [confirming, setConfirming] = React.useState<WaitingItem | null>(null);
   const sorted = newestFirst(items, (i) => i.at);
   return (
     <>
       <ListSummary
-        title={panel.title}
+        title={homePanelTitle(panel, t)}
         icon={<ShieldCheckIcon className="size-4" />}
         span={panel.span}
         count={loading || error ? null : items.length}
@@ -139,8 +145,8 @@ export function WaitingPanelView({
         onRetry={onRetry}
         empty={{
           icon: <ShieldCheckIcon />,
-          title: "Nothing waiting on you",
-          description: "Approvals you can decide show up here.",
+          title: t("copy.noWaitingTitle"),
+          description: t("copy.noWaitingDescription"),
         }}
       />
       <ConfirmDialog
@@ -148,11 +154,11 @@ export function WaitingPanelView({
         onOpenChange={(open) => {
           if (!open) setConfirming(null);
         }}
-        title="Approve this deploy?"
+        title={t("copy.approveTitle")}
         description={
-          confirming ? `${confirming.title}. ${confirming.detail}.` : "Approve the deploy."
+          confirming ? `${confirming.title}. ${confirming.detail}.` : t("copy.approveDescription")
         }
-        confirmLabel="Approve"
+        confirmLabel={t("copy.approve")}
         onConfirm={async () => {
           if (confirming?.approveId) await onApprove(confirming.approveId);
         }}

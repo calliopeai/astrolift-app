@@ -15,7 +15,8 @@ import { FleetView } from "@/components/viz/FleetView";
 import type { FleetSnapshot } from "@/components/viz/core/fleet-model";
 import { cn } from "@/lib/utils";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import type { HomeRead } from "./home-reads";
 import { useRunningNow } from "./use-running-now";
 
@@ -45,10 +46,11 @@ export function RunningNowPanelView({
   onRetry,
   onSelectAgent,
 }: RunningNowPanelViewProps) {
+  const { t } = useHomePresentation();
   if (loading || error || !snapshot || snapshot.agents.length === 0) {
     return (
       <Panel
-        title={panel.title}
+        title={homePanelTitle(panel, t)}
         icon={<ActivityIcon className="size-4" />}
         span={panel.span}
         loading={loading}
@@ -56,10 +58,10 @@ export function RunningNowPanelView({
         onRetry={onRetry}
         empty={{
           icon: <ActivityIcon />,
-          title: "Nothing running",
-          description: "Agents with a run in flight show up here, in your fleet view.",
+          title: t("copy.nothingRunningTitle"),
+          description: t("copy.nothingRunningDescription"),
           actionHref: panel.href,
-          actionLabel: "Open runs",
+          actionLabel: t("copy.openRuns"),
         }}
       />
     );
@@ -70,11 +72,10 @@ export function RunningNowPanelView({
       <FleetView
         snapshot={snapshot}
         onSelectAgent={onSelectAgent}
-        title={panel.title}
+        title={homePanelTitle(panel, t)}
         description={
           <span className="font-mono">
-            {runs} {runs === 1 ? "run" : "runs"} on {snapshot.agents.length}{" "}
-            {snapshot.agents.length === 1 ? "agent" : "agents"}
+            {t("copy.runningSummary", { runs, agents: snapshot.agents.length })}
           </span>
         }
         className="h-full min-w-0"

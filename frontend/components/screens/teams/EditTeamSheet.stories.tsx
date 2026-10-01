@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 
@@ -57,4 +59,15 @@ export const LongStrings: Story = {
       })}
     />
   ),
+};
+
+export const Translated: Story = {
+  ...Taken,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={messages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

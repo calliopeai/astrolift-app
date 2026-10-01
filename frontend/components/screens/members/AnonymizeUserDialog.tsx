@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import {
   AlertDialog,
@@ -26,12 +27,19 @@ export interface AnonymizeUserDialogProps {
  * irreversible" box enables the destructive button, which then has to be
  * clicked. The dialog stays open while the mutation runs, and on failure,
  * so the operator can retry. What is scrubbed and what stays is spelled out
- * so the blast radius is checked before acting (`core/anonymization.py` is
- * the source of truth).
+ * so the operator can assess the effect before acting. The connected
+ * `astrolift_identity/anonymize.py` and `Profile.anonymize_user` define
+ * the actual behavior; unused pure helpers do not establish extra effects.
  */
 export function AnonymizeUserDialog({ name, onOpenChange, onConfirm }: AnonymizeUserDialogProps) {
+  const t = useTranslations("orgMembers.anonymization");
+  const shared = useTranslations("shared.confirmation");
   const [pending, setPending] = React.useState(false);
-  const [acknowledged, setAcknowledged] = React.useState(false);
+  const [acknowledgement, setAcknowledgement] = React.useState<{
+    name: string | null;
+    checked: boolean;
+  }>({ name: null, checked: false });
+  const acknowledged = acknowledgement.name === name && acknowledgement.checked;
   const open = name !== null;
 
   async function handleConfirm(e: React.MouseEvent) {
@@ -50,76 +58,59 @@ export function AnonymizeUserDialog({ name, onOpenChange, onConfirm }: Anonymize
       open={open}
       onOpenChange={(next) => {
         if (pending && !next) return;
-        if (!next) setAcknowledged(false);
+        if (!next) setAcknowledgement({ name: null, checked: false });
         onOpenChange(next);
       }}
     >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="[overflow-wrap:anywhere]">
-            Anonymize {name}?
+            {t("title", { name: name ?? "" })}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-4">
               <div>
                 <p className="text-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
-                  This will scrub
+                  {t("changes")}
                 </p>
                 <ul className="text-muted-foreground list-disc space-y-0.5 pl-5 text-xs">
-                  <li>
-                    <code className="bg-muted rounded px-1 font-mono">email</code> → SHA-256 hash,
-                    not reversible
-                  </li>
-                  <li>
-                    First and last name →{" "}
-                    <code className="bg-muted rounded px-1 font-mono">[redacted]</code>
-                  </li>
-                  <li>Username → deterministic placeholder bound to the user ID</li>
-                  <li>Phone, avatar URL → removed</li>
-                  <li>Past audit-event payloads → IP, user-agent, email scrubbed in place</li>
+                  <li>{t("identity")}</li>
+                  <li>{t("profile")}</li>
+                  <li>{t("account")}</li>
+                  <li>{t("memberships")}</li>
                 </ul>
               </div>
               <div>
                 <p className="text-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
-                  This preserves
+                  {t("preserves")}
                 </p>
                 <ul className="text-muted-foreground list-disc space-y-0.5 pl-5 text-xs">
-                  <li>
-                    Audit-log structural records (timestamps, action types, affected resources)
-                  </li>
-                  <li>FK relationships from past actions, so referential integrity stays intact</li>
-                  <li>
-                    Member <code className="bg-muted rounded px-1 font-mono">lifecycle</code> flips
-                    to <code className="bg-muted rounded px-1 font-mono">anonymized</code>; role
-                    bindings are revoked
-                  </li>
+                  <li>{t("records")}</li>
+                  <li>{t("history")}</li>
                 </ul>
               </div>
-              <p className="text-destructive font-medium">
-                <strong>This action is irreversible.</strong> Re-running it on the same user is a
-                no-op; the original PII cannot be restored.
-              </p>
+              <p className="text-destructive font-medium">{t("irreversible")}</p>
               <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
                 <input
                   type="checkbox"
                   className="mt-0.5 size-4"
                   checked={acknowledged}
-                  onChange={(e) => setAcknowledged(e.target.checked)}
+                  onChange={(e) => setAcknowledgement({ name, checked: e.target.checked })}
                   disabled={pending}
                 />
-                <span>I understand this is irreversible.</span>
+                <span>{t("acknowledge")}</span>
               </label>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{shared("cancel")}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={pending || !acknowledged}
             onClick={handleConfirm}
           >
-            {pending ? "Anonymizing…" : "Anonymize user data"}
+            {t(pending ? "working" : "confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

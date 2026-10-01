@@ -40,6 +40,40 @@ surface and is not the active workflow run list. New real playground copy also
 uses all locales. Catalogue completion and the remaining source-copy work are
 required before this issue closes.
 
+## People list presentation
+
+`MembersScreen` localizes headings, row actions, invitation confirmations, empty
+states, CSV export counts, lifecycle/status labels and group counts in all eight
+locales. Its translated definition keeps role/team labels, filter tokens, sorts,
+pages and routes intact; unknown metadata stays literal. Last-active ages use
+the locale and request clock, and absolute dates use the configured time zone.
+Invalid last-active timestamps remain literal instead of breaking the list.
+
+`people-translations.test.tsx` covers all eight catalogs, ICU contracts,
+current permission gates, exact identity/destination preservation, CSV callbacks,
+refusal retention and hydration. Existing People model tests retain the server
+query contracts; portable stories exercise all declared list states. The wider
+Members item remains incomplete until the connected legacy grant dialog body and
+feedback are translated and verified.
+
+Connected People invitation/anonymization mutations and CSV failures now have
+all-eight-locale feedback. Successful writes retain their accepted result through
+failed list reads; a rejected envelope does not trigger the post-write refresh.
+Original diagnostics stay literal, clipboard success awaits the browser API, and
+self-anonymization honors the actual `requiresLogout` signal. The CSV helper's
+optional fallback preserves other callers' behavior.
+
+The anonymization dialog now states the connected mutation's actual effects:
+account/profile identity replacement, sign-in disabling and membership
+deactivation. It explicitly retains the historical-audit/stored-binding
+limitations tracked in [#2220](https://github.com/calliopeai/astrolift-app/issues/2220).
+Its irreversible acknowledgement belongs to the current account, so switching
+targets disables confirmation again. Real HttpLink tests validate current SDL,
+exact mutation inputs, accepted/refused/missing/transport outcomes, failed refresh,
+logout and clipboard completion in every locale. Dialog/ICU tests and all declared
+anonymization stories pass. This does not establish historical production PII
+scrubbing or role-binding deletion; no live user mutation was run.
+
 ## Shared list and table chrome
 
 `ListPage`, `FilterBar`, `ViewToggle`, `NewRowsPill`, `ListSummary`, the DataTable
@@ -123,3 +157,173 @@ clears its committed plaintext draft after a read retry recovers the view.
 Apollo's callback cache-diff argument retains the existing generic warning;
 it is never interpreted as translated copy. Actual write refusals
 retain the original provider diagnostic and unsuccessful callback result.
+
+## Home layouts
+
+Home's layout menu, first-sign-in question, picker and no-access/placeholder
+states use the `home` namespace in all eight locales. The English registries
+remain compatible with model tests and fixtures; presentation helpers translate
+their canonical titles/descriptions while preserving explicit caller overrides.
+Layout and panel keys, ordering, permissions, module checks, destination links
+and saved preference values remain unchanged. First-sign-in still mounts no
+data panels until the viewer chooses a layout, and lost access still selects
+the same permitted fallback. All-eight-locale interaction and ICU regressions
+cover these boundaries; German and Japanese 768px stories cover the picker and
+operator layout.
+
+## Home panels
+
+Home's message tree covers its four layouts and seventeen registered panel
+presentations. Home-owned titles, default states, actions,
+approval sentences and feedback, known status/severity/health labels, chart
+legends and accessible summaries use those translations. Numbers, money,
+percentages, metric units, durations and relative timestamps use real locale
+formatters. Unknown status IDs, resource names, image identifiers, provider
+labels, keys, destination links, original diagnostics and explicit caller
+presentation overrides are preserved. Invalid timestamps remain explicitly
+unknown. The KPI model retains English default formatting for pure fixtures;
+the actual hook supplies locale formatters from its observed numeric sources.
+
+The My agents panel still joins the authorized fleet to authorized apps on
+which the viewer holds a role. Its new note describes that actual read rather
+than reusing the current agent list's different registered-by-viewer ownership
+note. The My apps hook continues to use `apps.list.views.mineNote` unchanged.
+All query documents, arguments, permission/module admission, result counts,
+ordering, source limits, cursor/paging callbacks and saved preferences remain
+unchanged. No new backend or tenant query is introduced. Missing forecast and
+budget observations show a dash, while observed zero remains a real zero.
+The Prometheus reason states remain distinct; server failures retain their
+original message and read retries remain read retries.
+
+All-eight-locale React/Apollo checks cover the actual approval target, refused
+approval feedback and retry, server query variables and skipped sources,
+observed counts/meter/rates, unknown states and preserved diagnostics, fallback
+sentences and relative times. Portable and Chromium stories cover all Home
+views, including translated 768px and long states.
+
+ActivityFeed now uses the configured next-intl locale and request clock for its
+frame and relative timestamps. The shared Feed supplies localized day headings
+in the request time zone. Invalid event timestamps, actors, action values,
+target labels, original server errors and drill-down destinations stay intact.
+The Load older callback remains the retry for an available older page; the
+Retry callback appears when there is no older page. Clock ticks do not fetch.
+All-eight-locale tests cover loading, empty, paging and original error states,
+fixed-clock server rendering and hydration, and locale/time-zone changes.
+
+FleetView's shared visualization chrome remains a separate follow-up boundary;
+this bounded port does not claim that issue #2145 is closed.
+
+## Home layout settings
+
+The connected Settings › Home consumer translates its heading, available layout
+presentation, access-empty state and reset action in all eight locales. Explicit
+caller layout labels and actual saved/default keys remain data. The description
+reflects account synchronization with an offline browser copy, rather than
+claiming browser-only persistence. Choosing a layout still saves immediately;
+reset still sends an explicit null with the answered flag.
+
+The preferences bridge translates the missing-message refusal fallback only for
+Home layout writes. Original server diagnostics and unrelated preference behavior
+remain unchanged. Actual Apollo/consumer tests verify successful saves and resets,
+server refusals restoring the last account answer, transport failures retaining
+the browser choice, first-read loading and offline fallback, locale changes without
+resubmission, and narrowed access without automatic preference rewrites. German
+768px and Japanese access-empty portable stories exercise the same consumer.
+
+## Team list and create/edit/delete
+
+The connected team list, creation and editing sheets, slug-status guidance,
+retirement confirmation and mutation feedback use genuine translations in all
+eight locales. The localized list factory preserves view/filter/sort/page IDs and
+query arguments; known shared breadcrumb translation remains a separately frozen
+composition dependency. Names, slugs, descriptions, organization/team IDs and
+original server messages remain literal. Existing locale/time-zone date formatters
+remain in place. The retirement copy makes no promise of descendant visibility or
+automatic reassignment.
+
+Creation and editing retain refused drafts. The actual Apollo HTTP path tests
+cover accepted writes, structured refusals, diagnostic-free failure envelopes,
+transport failures and failed post-write refreshes. The shared refresh helper
+keeps committed create/edit/delete outcomes successful and warns only about the
+read, so closing a successful sheet never encourages repeating its write.
+No-organization, invalid-slug and read-only states preserve the existing gates.
+Project slug hints retain their existing default presentation; Teams supplies
+localized labels through an optional presentation argument.
+
+Team detail, members and access panels remain outside this list/create/edit/delete
+leaf. API key screens and scope catalogue presentation are the next bounded slice;
+this leaf does not claim complete #2145 coverage.
+
+## API keys and reviewed scope presentation
+
+The connected API key list, creation/reveal/revocation flow, metadata detail and
+scope picker use genuine translations in all eight locales. `apiKeys` is additive;
+all previously existing locale values remain unchanged. The localized list factory
+preserves query/view/filter/cursor identities and explicitly retains the newest-100
+client-narrowing disclosure. Known stock scope labels/descriptions are localized
+only when both their technical identity and exact reviewed server text match.
+Custom, changed or future metadata, permission IDs, scope strings, user/token/team
+names, suffixes, user agents and server diagnostics remain literal. Presets still
+filter against the actual server `available` values; unavailable selected scopes
+remain removable. This presentation supplies no permission authority.
+
+Creation keeps denied or unavailable drafts. Accepted create/revoke replies retain
+their committed outcome after a failed refresh; rejected envelopes request no
+refresh. Browser copy feedback awaits the clipboard result, catches denied or
+unavailable APIs, and retains the one-time value for manual copy. Dismissal remains
+explicit. Metadata transport errors have a translated read-error frame and actual
+retry, instead of an invented not-found result; cached metadata stays visible on a
+failed refresh. Token detail uses opt-in shared-shell copy and locale/time-zone
+timestamps; other entity-detail consumers retain their prior defaults. Status
+presentation uses the request clock and does not establish token authority.
+
+Focused tests use the real Apollo HttpLink for creation, revocation and retry,
+including all-eight refused, diagnostic-free, transport and refresh failures,
+clipboard completion/denial/unavailability, translated retained confirmation,
+locale changes with draft preservation and keyboard submission, server-directed
+scope admission, unknown metadata, ICU argument/tag parity, request-clock hydration
+and configured time zones. Portable token/detail/picker stories include German,
+French and Japanese states. Existing shared mutation-feedback and date regressions
+remain part of the affected gate. This leaf does not close other #2145 consumers,
+add a singular token API, change server permissions or broaden client-side list
+filtering beyond its disclosed current contract.
+
+### Team refusal and refresh refinement
+
+Create/edit/delete refetch requests now depend on the actual `ok` envelope. Real
+Apollo HTTP regressions combine a refused mutation with a read that would fail:
+no read refresh occurs, no refresh warning or success is shown, and the original
+refusal, edit/create draft or existing list row remains intact. Accepted-write
+refresh-failure behavior is preserved through the same shared helper.
+
+## Connected legacy role-grant sheet
+
+The `GrantRoleDialog`/`GrantRoleSheet` and `useGrantRole` used by the actual
+administration assignments tab now use additive `shared.access.legacyGrantRole`
+copy in all eight locales. The copy asks for the numeric ID of an existing member
+of the active organization, matching the real backend membership contract; it
+makes no future SCIM/search promise. Custom/system role names, scope tokens,
+resource identifiers, member labels and backend diagnostics remain literal.
+
+Role and organization/team/project target reads distinguish loading, unconfirmed
+and failed results from a known empty list. The actual assignments caller forwards
+role read state and retry; a failed role read retains its original diagnostic,
+blocks cached selections, and refreshes the real role query on retry. Known empty
+roles remain distinct from unknown roles. Failed scope reads offer an actual retry;
+unknown organization facts and withdrawn current selections remain disabled.
+This legacy picker has no APP source, which it discloses explicitly rather than
+inventing a target or default. Existing parent permission gating is unchanged;
+backend destination-scope `org.manage_members`, grant ceilings and current actor
+checks remain authoritative. The sheet makes no new client permission assertion.
+
+Real HttpLink tests cover all-eight grants/refusals/no-diagnostic/transport/read
+refresh failures with exact IDs and existing active page variables. Accepted
+writes retain success if their read refresh fails; refusals keep drafts and issue
+no refresh or warning. The actual assignments consumer proves Cancel does no read
+and a committed grant refreshes its active page exactly once. Its former
+unconditional close refetch was redundant and could leave an unhandled read
+failure after commit. Locale/context changes and unsupported/unknown/read-error
+sources, custom metadata, ICU arguments/tags and portable stories are included.
+The legacy flat scope sources are preserved; this leaf does not add pagination,
+a new member picker, APP support or claim complete #2145 coverage. Team detail,
+member and access presentation remains the next independently bounded audit.

@@ -62,7 +62,9 @@ from _sdk.managed_service import (
 from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
+    assert_resource_arn,
     handle_for,
+    live_ownership_refusal,
     parse_handle,
     tags_for,
 )
@@ -465,7 +467,16 @@ class DynamoDBDriver(ManagedServiceDriver):
             raise ManagedServiceError(
                 f"binding requested for missing table {table_name}",
             )
-        table_arn = existing.get("TableArn") or (f"arn:aws:dynamodb:{self._config.region}:UNKNOWN:table/{table_name}")
+        table_arn = existing.get("TableArn")
+        if existing.get("TableName") != table_name:
+            raise ManagedServiceError("live DynamoDB table does not match the recorded driver target")
+        assert_resource_arn(table_arn, service="dynamodb", region=self._config.region, resource=f"table/{table_name}")
+        tags = self._live_tags(table_arn)
+        refusal = live_ownership_refusal(
+            tags, managed_service_id=handle.managed_service_id, resource=f"table {table_name}"
+        )
+        if refusal:
+            raise ManagedServiceError(refusal)
 
         # IRSA pattern (mirrors object_store #1011): the workload assumes
         # an IRSA-backed role we fold the iam_grants below into. We bind
@@ -603,6 +614,31 @@ class DynamoDBDriver(ManagedServiceDriver):
         )
 
     # ---- internals ----------------------------------------------------
+
+    def _live_tags(self, table_arn: str) -> list[dict[str, str]]:
+        """Complete bounded tags before granting access, with no partial proof."""
+        rows = []
+        token = ""
+        seen = set()
+        for _ in range(10):
+            kwargs = {"ResourceArn": table_arn}
+            if token:
+                kwargs["NextToken"] = token
+            try:
+                response = self._ddb.list_tags_of_resource(**kwargs)
+            except Exception:
+                raise ManagedServiceError("DynamoDB live ownership tags could not be verified") from None
+            page = response.get("Tags", [])
+            if not isinstance(page, list) or len(rows) + len(page) > 1000:
+                raise ManagedServiceError("DynamoDB ownership tag inventory is unknown")
+            rows.extend(page)
+            token = response.get("NextToken", "")
+            if not isinstance(token, str) or token in seen:
+                raise ManagedServiceError("DynamoDB ownership tag pagination is unknown")
+            if not token:
+                return rows
+            seen.add(token)
+        raise ManagedServiceError("DynamoDB ownership tag inventory limit exceeded")
 
     def _existing_tags(self, existing: dict[str, Any]) -> list[dict[str, str]]:
         """Tags of a resource found under this service's name; unreadable counts as untagged (#1961)."""

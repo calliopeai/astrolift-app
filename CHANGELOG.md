@@ -2,6 +2,105 @@
 
 ## Unreleased
 
+- Translate connected People mutation/CSV feedback and the anonymization dialog
+  in all eight locales. Describe actual account/profile and membership effects;
+  keep historical-audit and stored-binding limitations explicit (#2220).
+  Preserve accepted writes across failed reads, skip refused-write refreshes,
+  await clipboard success, honor required self-logout, and bind irreversible
+  acknowledgement to the selected account (#2145).
+
+- Translate People list headings, filters, views, group counts, export actions
+  and invitation confirmations in all eight locales. Last-active ages use the
+  request clock and selected locale; identities, role slugs, server query tokens,
+  raw refusals and confirmation requirements remain intact (#2145).
+
+- Translate deployment Metrics and pending human reviews in all eight locales,
+  preserving model/app identities, query/filter values and raw read diagnostics.
+  Failed Metrics reads offer retry and retain the last observed snapshot;
+  unavailable success rates stay distinct from measured zero. Pending review ages
+  use the request clock, and approver names use locale-aware list formatting
+  (#2145).
+
+- Shared header breadcrumb landmarks and switcher accessibility names use all
+  eight locales, preserving caller labels, destinations and keyboard focus
+  through hydration and locale changes (#2145).
+- Localize the connected legacy role-grant sheet and feedback in all eight locales,
+  preserving literal role/scope identities and original backend refusals. Distinguish
+  unknown, failed and unsupported target sources; accepted grants refresh the exact
+  active page once, while cancel and rejected writes trigger no refresh (#2145).
+
+- Refresh Team list/picker reads only after an accepted create/edit/delete reply.
+  Rejected writes retain their original diagnostic and drafts without triggering
+  an unrelated failed-read warning (#2145).
+
+- Translate connected API key list/create/reveal/revoke/detail and reviewed stock
+  scope guidance in all eight locales. Preserve literal identifiers, future server
+  metadata, authority decisions and exact mutation inputs; distinguish metadata
+  read failures from missing keys, and report clipboard success only after the
+  browser completes the copy. Rejected writes do not trigger list refreshes (#2145).
+
+- Translate connected Team list/create/edit/delete presentation and feedback in
+  all eight locales, preserving scope decisions, identifiers and mutation inputs.
+  Keep accepted team writes successful when their list refresh fails; refused
+  or unavailable writes retain drafts and their original diagnostic (#2145).
+
+- Localize connected Home layout settings and Home-specific persistence feedback
+  in all eight locales. Copy reflects account synchronization and offline browser
+  fallback; original refusal diagnostics and exact preference patches remain intact
+  (#2145).
+- Translate Home layouts, panel states, approvals and observed metric presentation
+  in all eight locales while preserving access decisions, resource identities,
+  original diagnostics and cursor callbacks. Activity ages and day headings use
+  the configured locale, request clock and time zone (#2145).
+- Explicit provider ownership refusal or unavailable ownership proof never
+  becomes successful cleanup because a resource name/diagnostic contains a
+  not-found marker. Genuine missing-resource teardown still converges (#2098).
+
+- SQS workload `manage` keeps message operations and queue purging while omitting
+  tag mutation and unrestricted queue-policy editing. Ownership tags and
+  permission administration no longer follow from the app workload grant;
+  existing identities need policy reconciliation (#2098).
+
+- Verify live AWS source ownership before S3/SQS/DynamoDB bindings and S3 mount
+  updates or retained/forced teardown. Refuse unknown or replaced incarnations,
+  incomplete DynamoDB tag pages and missing/mismatched resource identities;
+  never fabricate an `UNKNOWN` table ARN grant (#2098).
+
+- Spanner Graph dedicated containers bind immutable organization ownership,
+  preserve recorded physical names and require persisted contender plus complete
+  cloud database-set proof before capacity changes or empty-container deletion.
+  Operator-shared containers refuse tenant resize/deletion. Server-owned cleanup
+  and observed-placement records distinguish confirmed cleanup from intent and
+  retain original placement across failed reprovision (#2100). See
+  `backend/providers/docs/spanner_ownership.md` for legacy provenance limits.
+
+- Refuse all normalized platform ownership labels in Pub/Sub and PSC tenant
+  config. Verify Pub/Sub source and child ownership before writes or binding,
+  preserve ownership labels during updates and retain recorded topic names.
+  Audit AWS/Azure custom-tag namespace isolation (#2098).
+- Add disposable CNPG operator acceptance through durable consumer Secrets,
+  real host/URI authentication, role/database privilege checks, stable partial
+  retries and physical finalizer-driven cleanup, with credential-free provenance
+  and explicit runtime/integration boundaries (Refs #2092).
+
+- Restrict generated CNPG preview logins to their own database over TLS, ahead
+  of broad operator authentication defaults, and explicitly remove elevated
+  role attributes and inherited memberships (Refs #2092).
+
+- Reobserve immutable CNPG parent ownership and its current complete spec on
+  bounded HTTP 409 role-reconciliation retries. Skip an already matching role,
+  preserve other preview roles and reuse issued credentials (Refs #2092).
+
+- Materialize CNPG preview bindings from durable slice identities with independent
+  retained credentials and namespace-qualified URLs. Recheck current owner/source
+  ancestry before effects, refuse legacy or foreign slice adoption, preserve
+  unrelated binding values, and report pending slice cleanup honestly (Refs #2092).
+
+- Qualify generated native managed-service binding hosts with their recorded
+  namespace, including connection URI aliases. CNPG URLs retain rotating
+  operator credentials through `fqdn-uri`; legacy handles without a namespace
+  refuse refresh instead of guessing a tenant destination (Refs #2092).
+
 - Shared model by-ID reads and locks include current organization constraints
   directly, including exact cluster-scoped provider locks. Install-shared
   placement remains available only within a current tenant context (#2213).
@@ -38,6 +137,12 @@
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
 
+- Grant access uses genuine copy in all eight locales for selection, expiry,
+  review, exact preview counts, partial outcomes and retry feedback. Selected
+  identities, permissions, server diagnostics and expiry payloads remain intact.
+  A failed access-list refresh warns after successful writes without repeating
+  those grants; failed or empty previews/results cannot report success (#2145).
+
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
 - Model prompt relay admission, dispatch and result transitions atomically retain
@@ -45,6 +150,17 @@
   replayed results preserve the first outcome without releasing a newer job.
   Cache failures return generic mutation/result failures while authenticated
   heartbeats remain healthy; admitted jobs may still finish after polling fails.
+- Install discovery advertises `apps.dependency_context` and
+  `providers.reference_read` support while keeping actual dependency/provider
+  data off the curated public schema. Capability flags grant no permissions
+  (#2208).
+
+- Read-only app operators can resolve an exact live environment to redacted
+  cluster/provider identities and persisted heartbeat/domain/certificate
+  observations with `app.read`. Mutation gates remain unchanged. Expected
+  cluster/provider GUIDs refuse replacement or reassignment; authenticated
+  singular provider references remain resolvable past the catalog's 100-row cap
+  (#2208).
 
 - Confirmation dialogs retain handled false outcomes and entered reasons for
   retry without duplicating action diagnostics. Workload restart confirmations

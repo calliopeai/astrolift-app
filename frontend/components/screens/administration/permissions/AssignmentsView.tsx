@@ -8,6 +8,7 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -27,11 +28,14 @@ import { permissionsCrumbs } from "../access/admin-crumbs";
 import { bindingColumns } from "./binding-columns";
 import type { useAssignments } from "./use-assignments";
 
-export type AssignmentsViewProps = Omit<ReturnType<typeof useAssignments>, "roles"> & {
+export type AssignmentsViewProps = Omit<
+  ReturnType<typeof useAssignments>,
+  "roles" | "rolesKnown" | "rolesError" | "onRetryRoles"
+> & {
   /**
    * The grant-role dialog, rendered by the caller (it runs its own
-   * queries). The view owns whether it is open; closing it also refetches
-   * this list's page.
+   * queries). The view owns whether it is open; accepted grants refresh
+   * this active page through the grant hook.
    */
   renderGrantDialog?: (props: {
     open: boolean;
@@ -65,6 +69,7 @@ export function AssignmentsView({
   renderGrantDialog,
 }: AssignmentsViewProps) {
   const fmt = useFormatters();
+  const grantT = useTranslations("shared.access.legacyGrantRole");
 
   const [grantOpen, setGrantOpen] = React.useState(false);
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftRoleBinding | null>(null);
@@ -89,7 +94,7 @@ export function AssignmentsView({
             <Can permission="org.manage_members">
               <Button size="sm" onClick={() => setGrantOpen(true)} disabled={rolesLoading}>
                 <UserPlusIcon className="size-4" />
-                Grant role
+                {grantT("title")}
               </Button>
             </Can>
           ),
@@ -193,14 +198,7 @@ export function AssignmentsView({
 
       {renderGrantDialog?.({
         open: grantOpen,
-        onOpenChange: (next) => {
-          setGrantOpen(next);
-          // GrantRoleDialog refetches the deprecated flat list and exposes
-          // no onGranted hook, so pull this list's page again when it
-          // closes; otherwise a new binding would not appear until the
-          // next fetch.
-          if (!next) page.refetch();
-        },
+        onOpenChange: setGrantOpen,
       })}
     </div>
   );

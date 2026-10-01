@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import * as React from "react";
 
@@ -49,6 +51,7 @@ export function TeamsScreen({
   renderCreateDialog,
   renderEditDialog,
 }: TeamsScreenProps) {
+  const copy = useTranslations("teams");
   const fmt = useFormatters();
   const [open, setOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<AstroliftTeam | null>(null);
@@ -64,7 +67,7 @@ export function TeamsScreen({
   const columns: Column<AstroliftTeam>[] = [
     {
       id: "name",
-      header: "Team",
+      header: copy("columnTeam"),
       sortKey: "name",
       cellClassName: "max-w-96",
       cell: (team) => (
@@ -80,7 +83,7 @@ export function TeamsScreen({
     },
     {
       id: "created",
-      header: "Created",
+      header: copy("columnCreated"),
       sortKey: "created",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (team) => fmt.formatDate(team.createdAt),
@@ -92,19 +95,19 @@ export function TeamsScreen({
       <ListPage<AstroliftTeam>
         header={{
           crumbs: accessCrumbs("teams"),
-          title: "Teams",
-          context: "Teams scope projects, apps and the grants on them.",
+          title: copy("title"),
+          context: copy("context"),
           primaryAction: (
             <Can permission="team.create">
               <Button size="sm" onClick={() => setOpen(true)}>
                 <PlusIcon className="size-4" />
-                New team
+                {copy("newTeam")}
               </Button>
             </Can>
           ),
         }}
         list={list}
-        label="Teams"
+        label={copy("title")}
         columns={columns}
         rows={rows}
         getRowId={(team) => team.id}
@@ -116,7 +119,7 @@ export function TeamsScreen({
                   {canUpdate && (
                     <DropdownMenuItem onSelect={() => setEditTarget(team)}>
                       <PencilIcon className="size-4" />
-                      Edit
+                      {copy("edit")}
                     </DropdownMenuItem>
                   )}
                   {canDelete && (
@@ -126,7 +129,7 @@ export function TeamsScreen({
                       onSelect={() => setDeleteTarget(team)}
                     >
                       <Trash2Icon className="size-4" />
-                      Delete
+                      {copy("delete")}
                     </DropdownMenuItem>
                   )}
                 </>
@@ -140,8 +143,8 @@ export function TeamsScreen({
         totalCount={totalCount}
         empty={{
           icon: <UsersIcon className="size-5" />,
-          title: "No teams yet",
-          description: "Create a team to start grouping projects and apps.",
+          title: copy("emptyTitle"),
+          description: copy("emptyDescription"),
         }}
       />
 
@@ -160,9 +163,13 @@ export function TeamsScreen({
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={deleteTarget ? `Delete team ${deleteTarget.slug}?` : "Delete team?"}
-        description="Soft delete only: the slug becomes reclaimable. Projects under this team stay visible until reassigned."
-        confirmLabel="Delete team"
+        title={
+          deleteTarget
+            ? copy("deleteTitle", { slug: deleteTarget.slug })
+            : copy("deleteGenericTitle")
+        }
+        description={copy("deleteDescription")}
+        confirmLabel={copy("confirmDelete")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await onDelete(deleteTarget);

@@ -36,12 +36,29 @@ export const Loading: Story = {
 /** No apps registered and no rollouts in the window. */
 export const Empty: Story = { render: () => <Screen metrics={NO_ROLLOUTS_METRICS} apps={[]} /> };
 
-/**
- * The screen has no error state: a failed query leaves its data undefined
- * once loading ends, so the KPIs read "—" and the apps list falls back to
- * its empty state. This is what a failure looks like.
- */
-export const QueryFailed: Story = { render: () => <Screen metrics={undefined} apps={[]} /> };
+export const QueryFailed: Story = {
+  render: () => (
+    <Screen
+      metrics={undefined}
+      apps={[]}
+      metricsError="Metrics read refused"
+      healthError="App health read refused"
+      onRetryMetrics={() => {}}
+      onRetryHealth={() => {}}
+    />
+  ),
+};
+
+export const FailedRefresh: Story = {
+  render: () => (
+    <Screen
+      metricsError="Metrics refresh refused"
+      healthError="App health refresh refused"
+      onRetryMetrics={() => {}}
+      onRetryHealth={() => {}}
+    />
+  ),
+};
 
 /** The Recent failure view over the summary in hand. */
 export const RecentFailure: Story = { render: () => <Screen initial={{ view: "failing" }} /> };

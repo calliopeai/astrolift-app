@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
@@ -70,4 +73,16 @@ export const ApproveAsksFirst: Story = {
     await expect(within(dialog).getByText(/checkout-web to production/)).toBeInTheDocument();
     await expect(args.onApprove).not.toHaveBeenCalled();
   },
+};
+
+export const JapaneseLongStrings768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  args: { items: WAITING_LONG },
+  globals: { viewport: { value: "width768" } },
 };

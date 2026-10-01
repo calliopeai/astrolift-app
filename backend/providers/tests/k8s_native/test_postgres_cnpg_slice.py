@@ -15,11 +15,13 @@ reach production data, which is the failure #1578 was filed about.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
 
+from _sdk.cluster import ApplyError, ApplyResult
 from _sdk.managed_service import ServiceHandle, SliceSpec
 from k8s_native.managed._handle import pack as pack_handle
 from k8s_native.managed.postgres_cnpg import CNPGConfig, CNPGPostgresDriver
@@ -45,17 +47,46 @@ class FakeClusterDriver:
     parent: dict | None = None
     applied: list = field(default_factory=list)
     deleted: list = field(default_factory=list)
+    objects: dict = field(default_factory=dict)
+    calls: list = field(default_factory=list)
 
     def get_manifest(self, cluster, namespace, kind, name):
-        return self.parent
+        self.calls.append(("get", cluster, namespace, kind, name))
+        if kind.endswith("/Cluster"):
+            return deepcopy(self.parent)
+        return deepcopy(self.objects.get((kind.rsplit("/", 1)[-1], name)))
 
-    def apply_manifests(self, cluster, namespace, manifests):
-        self.applied.extend(manifests)
+    def apply_manifests(self, cluster, namespace, manifests, **kwargs):
+        self.calls.append(("apply", cluster, namespace, kwargs.get("create_only", False)))
+        self.applied.extend(deepcopy(manifests))
+        for manifest in manifests:
+            obj = deepcopy(manifest)
+            obj["metadata"].setdefault("uid", "test-owned-uid")
+            obj["metadata"].setdefault("resourceVersion", "2")
+            if obj["kind"] == "Cluster":
+                self.parent = obj
+            else:
+                self.objects[(obj["kind"], obj["metadata"]["name"])] = obj
         return FakeApplyResult()
 
     def delete_manifests(self, cluster, namespace, manifests):
-        self.deleted.extend(manifests)
+        self.deleted.extend(deepcopy(manifests))
+        for manifest in manifests:
+            self.objects.pop((manifest["kind"], manifest["metadata"]["name"]), None)
         return FakeApplyResult()
+
+
+class FakeStore:
+    def __init__(self):
+        self.values, self.writes, self.reads = {}, [], []
+
+    def get(self, path):
+        self.reads.append(path)
+        return deepcopy(self.values.get(path))
+
+    def upsert(self, path, value):
+        self.writes.append(path)
+        self.values[path] = deepcopy(value)
 
 
 def _parent_object(roles: list[dict[str, Any]] | None = None) -> dict:
@@ -65,7 +96,17 @@ def _parent_object(roles: list[dict[str, Any]] | None = None) -> dict:
     return {
         "apiVersion": "postgresql.cnpg.io/v1",
         "kind": "Cluster",
-        "metadata": {"name": "pg-main", "namespace": "acme-app"},
+        "metadata": {
+            "name": "pg-main",
+            "namespace": "acme-app",
+            "uid": "parent-uid",
+            "resourceVersion": "1",
+            "labels": {
+                "astrolift.io/managed-by": "platform",
+                "astrolift.io/organization": "acme",
+                "astrolift.io/app": "app",
+            },
+        },
         "spec": spec,
     }
 
@@ -77,17 +118,25 @@ def _handle() -> ServiceHandle:
             cluster_id="cl-1",
             namespace="acme-app",
             name="pg-main",
-        )
+        ),
+        managed_service_id="service-id",
     )
 
 
 def _driver(parent: dict | None = None):
     fake = FakeClusterDriver(parent=parent)
-    return CNPGPostgresDriver(config=CNPGConfig(cluster_driver=fake)), fake
+    return CNPGPostgresDriver(config=CNPGConfig(cluster_driver=fake, secrets_backend=FakeStore())), fake
 
 
 def _spec(slice_id="preview-pr-42") -> SliceSpec:
-    return SliceSpec(slice_id=slice_id, parent=_handle())
+    return SliceSpec(
+        slice_id=slice_id,
+        parent=_handle(),
+        organization_id="org-id",
+        app_id="app-id",
+        environment_id=slice_id,
+        labels={"astrolift.io/organization": "acme", "astrolift.io/app": "app"},
+    )
 
 
 def _of_kind(manifests, kind):
@@ -138,24 +187,143 @@ def test_reprovisioning_the_same_slice_does_not_duplicate_its_role():
     driver.provision_slice(_spec())
     first = _of_kind(fake.applied, "Cluster")[0]["spec"]["managed"]["roles"]
 
-    fake.parent = {**_parent_object(), "spec": {**PARENT_SPEC, "managed": {"roles": first}}}
+    assert len(first) == 1
     fake.applied.clear()
     driver.provision_slice(_spec())
 
-    roles = _of_kind(fake.applied, "Cluster")[0]["spec"]["managed"]["roles"]
-    assert len(roles) == 1
-
-
-def test_an_unreadable_parent_skips_the_role_rather_than_patching_blind():
-    """None from `get_manifest` must not become a partial apply. The slice
-    lands with an owner that does not exist -- visible and repairable --
-    where a pruned parent spec is neither."""
-    driver, fake = _driver(parent=None)
-
-    driver.provision_slice(_spec())
-
     assert _of_kind(fake.applied, "Cluster") == []
-    assert _of_kind(fake.applied, "Database"), "the slice itself still lands"
+    assert len(fake.parent["spec"]["managed"]["roles"]) == 1
+
+
+def test_slice_hba_precedes_broad_rules_preserves_parameters_and_other_preview_access():
+    parent = _parent_object()
+    previous = [
+        "hostssl sibling sibling_owner all scram-sha-256",
+        "host all sibling_owner all reject",
+        "host all all all trust",
+    ]
+    parent["spec"]["postgresql"] = {
+        "pg_hba": previous,
+        "parameters": {"max_connections": "200"},
+        "pg_ident": ["retained-map"],
+    }
+    driver, fake = _driver(parent=parent)
+    driver.provision_slice(_spec())
+    database, role, _ = driver._slice_names(_spec())
+    postgresql = fake.parent["spec"]["postgresql"]
+    assert postgresql["pg_hba"] == [
+        f"hostssl {database} {role} all scram-sha-256",
+        f"host all {role} all reject",
+        *previous,
+    ]
+    assert postgresql["parameters"] == {"max_connections": "200"}
+    assert postgresql["pg_ident"] == ["retained-map"]
+    fake.applied.clear()
+    driver.provision_slice(_spec())
+    assert fake.applied == []
+
+
+def test_owned_slice_role_does_not_preserve_elevated_privileges_or_memberships():
+    driver, fake = _driver(parent=_parent_object())
+    driver.provision_slice(_spec())
+    actual = fake.parent["spec"]["managed"]["roles"][0]
+    actual.update(superuser=True, createdb=True, createrole=True, replication=True, bypassrls=True, inRoles=["app"])
+    fake.applied.clear()
+    driver.provision_slice(_spec())
+    actual = fake.parent["spec"]["managed"]["roles"][0]
+    assert all(actual[key] is False for key in ("superuser", "createdb", "createrole", "replication", "bypassrls"))
+    assert actual["inRoles"] == []
+    assert len(driver._config.secrets_backend.writes) == 1
+
+
+def test_live_operator_conflict_reobserves_parent_version_and_merges_current_roles():
+    driver, fake = _driver(parent=_parent_object())
+    actual_apply = fake.apply_manifests
+    attempts = []
+
+    def conflict_once(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == "Cluster":
+            attempts.append(deepcopy(manifests[0]))
+            if len(attempts) == 1:
+                fake.parent["metadata"]["resourceVersion"] = "operator-new-version"
+                fake.parent["spec"]["instances"] = 4
+                fake.parent["spec"]["managed"] = {"roles": [{"name": "other_owned_preview", "login": True}]}
+                return ApplyResult(
+                    [],
+                    [],
+                    [],
+                    [ApplyError("Cluster", "pg-main", namespace, "ConflictError", "controlled HTTP 409", False)],
+                )
+        return actual_apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = conflict_once
+    driver.provision_slice(_spec())
+    assert len(attempts) == 2
+    assert attempts[1]["metadata"]["uid"] == attempts[0]["metadata"]["uid"] == "parent-uid"
+    assert attempts[1]["metadata"]["resourceVersion"] == "operator-new-version"
+    assert attempts[1]["spec"]["instances"] == 4
+    assert "other_owned_preview" in {entry["name"] for entry in attempts[1]["spec"]["managed"]["roles"]}
+    assert len(driver._config.secrets_backend.writes) == 1
+
+
+@pytest.mark.parametrize("changed", ["parent_uid", "foreign_role", "foreign_secret"])
+def test_operator_conflict_refuses_replaced_parent_role_or_credentials(changed):
+    driver, fake = _driver(parent=_parent_object())
+    actual_apply = fake.apply_manifests
+    attempts = []
+
+    def replaced(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == "Cluster":
+            attempts.append(manifests[0])
+            if changed == "parent_uid":
+                fake.parent["metadata"]["uid"] = "replacement-uid"
+            elif changed == "foreign_role":
+                fake.parent["spec"]["managed"] = {
+                    "roles": [{"name": driver._slice_names(_spec())[1], "passwordSecret": {"name": "foreign"}}]
+                }
+            else:
+                fake.objects[("Secret", driver._slice_names(_spec())[2])]["metadata"]["labels"] = {}
+            return ApplyResult(
+                [], [], [], [ApplyError("Cluster", "pg-main", namespace, "ConflictError", "controlled HTTP 409", False)]
+            )
+        return actual_apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = replaced
+    with pytest.raises(ValueError):
+        driver.provision_slice(_spec())
+    assert len(attempts) == 1
+    assert _of_kind(fake.applied, "Database") == []
+    assert len(driver._config.secrets_backend.writes) == 1
+
+
+@pytest.mark.parametrize("error_type, expected_attempts", [("ConflictError", 3), ("ForbiddenError", 1)])
+def test_role_reconciliation_conflicts_are_bounded_and_other_errors_are_not_retried(error_type, expected_attempts):
+    driver, fake = _driver(parent=_parent_object())
+    actual_apply = fake.apply_manifests
+    attempts = []
+
+    def refused(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == "Cluster":
+            attempts.append(manifests[0])
+            return ApplyResult(
+                [], [], [], [ApplyError("Cluster", "pg-main", namespace, error_type, "controlled refusal", False)]
+            )
+        return actual_apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = refused
+    with pytest.raises(RuntimeError, match="role reconciliation failed"):
+        driver.provision_slice(_spec())
+    assert len(attempts) == expected_attempts
+    assert _of_kind(fake.applied, "Database") == []
+
+
+def test_an_unreadable_parent_refuses_before_credentials_or_apply():
+    driver, fake = _driver(parent=None)
+    with pytest.raises(ValueError, match="parent is unavailable"):
+        driver.provision_slice(_spec())
+    assert fake.applied == []
+    assert driver._config.secrets_backend.reads == []
+    assert driver._config.secrets_backend.writes == []
 
 
 def test_the_role_is_applied_before_the_database():
@@ -208,25 +376,26 @@ def test_database_url_is_replaced_wholesale():
     assert "slice" in result.env_overrides["DATABASE_URL"].secret_ref
 
 
-def test_host_and_port_are_left_to_the_parent():
+def test_host_and_port_name_the_same_authoritative_parent_namespace():
     """It is the same instance. Overriding them would be wrong and would
     also hide a misconfiguration."""
     driver, _ = _driver(parent=_parent_object())
 
     result = driver.provision_slice(_spec())
 
-    assert "POSTGRES_HOST" not in result.env_overrides
-    assert "POSTGRES_PORT" not in result.env_overrides
+    assert result.env_overrides["POSTGRES_HOST"].literal == "pg-main-rw.acme-app.svc"
+    assert result.env_overrides["POSTGRES_PORT"].literal == "5432"
 
 
-def test_no_password_literal_is_ever_rendered():
-    """The one thing this driver must never emit."""
+def test_runtime_credentials_are_independent_durable_and_not_binding_literals():
     driver, fake = _driver(parent=_parent_object())
-
-    driver.provision_slice(_spec())
-
+    result = driver.provision_slice(_spec())
     (secret,) = _of_kind(fake.applied, "Secret")
-    assert set(secret["stringData"]) == {"username"}
+    assert set(secret["stringData"]) == {"username", "password"}
+    path = result.env_overrides["POSTGRES_PASSWORD"].secret_ref.split("#")[0]
+    assert path == "services/org-id/app-id/cnpg-slices/service-id/preview-pr-42"
+    assert secret["stringData"]["password"] == driver._config.secrets_backend.values[path]["password"]
+    assert result.env_overrides["POSTGRES_PASSWORD"].literal is None
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +469,7 @@ def test_a_legacy_parent_handle_is_refused():
     somewhere this driver cannot find it again."""
     driver, _ = _driver(parent=_parent_object())
 
-    with pytest.raises(ValueError, match="legacy"):
+    with pytest.raises(ValueError, match="recorded cluster and namespace"):
         driver.provision_slice(SliceSpec(slice_id="x", parent=ServiceHandle(handle="postgres/pg-main")))
 
 
@@ -312,3 +481,165 @@ def test_the_driver_declares_slicing_support():
     assert driver.supports_slicing() is True
     assert callable(driver.provision_slice)
     assert callable(driver.deprovision_slice)
+
+
+@pytest.mark.parametrize("field", ["name", "namespace", "uid", "resourceVersion", "owner", "platform"])
+def test_parent_authority_refusal_precedes_all_store_reads_and_mutations(field):
+    parent = _parent_object()
+    if field in ("name", "namespace"):
+        parent["metadata"][field] = "foreign"
+    elif field in ("uid", "resourceVersion"):
+        parent["metadata"].pop(field)
+    elif field == "owner":
+        parent["metadata"]["labels"]["astrolift.io/organization"] = "foreign"
+    else:
+        parent["metadata"]["labels"].pop("astrolift.io/managed-by")
+    driver, fake = _driver(parent=parent)
+    with pytest.raises(ValueError):
+        driver.provision_slice(_spec())
+    assert not driver._config.secrets_backend.reads
+    assert not driver._config.secrets_backend.writes
+    assert not fake.applied
+
+
+@pytest.mark.parametrize("kind", ["Secret", "Database"])
+def test_foreign_existing_child_refuses_before_store_or_apply(kind):
+    driver, fake = _driver(parent=_parent_object())
+    driver.provision_slice(_spec())
+    key = next(key for key in fake.objects if key[0] == kind)
+    fake.objects[key]["metadata"]["labels"]["ai.astrolift/app-id"] = "foreign"
+    fake.applied.clear()
+    store = driver._config.secrets_backend
+    store.reads.clear()
+    writes = len(store.writes)
+    with pytest.raises(ValueError):
+        driver.provision_slice(_spec())
+    assert not store.reads
+    assert len(store.writes) == writes
+    assert not fake.applied
+
+
+def test_partial_database_failure_reuses_exact_credentials_and_secret(monkeypatch):
+    driver, fake = _driver(parent=_parent_object())
+    issued = []
+    monkeypatch.setattr(
+        "k8s_native.managed._cnpg_slices.secrets.token_urlsafe",
+        lambda size: issued.append(size) or "test-only-p@ss:word",
+    )
+    apply = fake.apply_manifests
+    failed = []
+
+    def fail_once(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == "Database" and not failed:
+            failed.append(True)
+            return FakeApplyResult(errors=["controlled failure"])
+        return apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = fail_once
+    with pytest.raises(RuntimeError, match="Database creation failed"):
+        driver.provision_slice(_spec())
+    first_secret = deepcopy(_of_kind(fake.applied, "Secret")[0])
+    result = driver.provision_slice(_spec())
+    result_again = driver.provision_slice(_spec())
+    assert result.slice_handle == result_again.slice_handle
+    assert issued == [40]
+    assert len(driver._config.secrets_backend.writes) == 1
+    assert _of_kind(fake.applied, "Secret") == [first_secret]
+    uri = next(iter(driver._config.secrets_backend.values.values()))["uri"]
+    assert "test-only-p%40ss%3Aword@pg-main-rw.acme-app.svc:5432/" in uri
+    assert all(m["metadata"]["resourceVersion"] == "1" for m in _of_kind(fake.applied, "Cluster"))
+
+
+def test_two_services_in_one_namespace_use_distinct_slice_names():
+    driver, _ = _driver(parent=_parent_object())
+    first = _spec()
+    from dataclasses import replace
+
+    second = replace(first, parent=replace(first.parent, managed_service_id="another-service-id"))
+    assert driver._slice_names(first) != driver._slice_names(second)
+    assert all(len(value) <= 63 for value in driver._slice_names(second))
+
+
+def test_render_only_slice_provision_and_removal_are_refused():
+    driver = CNPGPostgresDriver()
+    with pytest.raises(ValueError, match="live cluster"):
+        driver.provision_slice(_spec())
+    with pytest.raises(ValueError, match="live cluster"):
+        driver.deprovision_slice(_spec(), "postgres_slice/cl-1/acme-app/anything")
+
+
+def test_foreign_delete_handle_is_refused_without_cluster_calls():
+    driver, fake = _driver(parent=_parent_object())
+    with pytest.raises(ValueError, match="does not match"):
+        driver.deprovision_slice(_spec(), "postgres_slice/foreign/elsewhere/other")
+    assert not fake.calls
+    assert not fake.deleted
+
+
+def test_database_finalizer_pending_keeps_credentials_and_reports_incomplete():
+    driver, fake = _driver(parent=_parent_object())
+    handle = driver.provision_slice(_spec()).slice_handle
+
+    def pending(cluster, namespace, manifests):
+        fake.deleted.extend(manifests)
+        return FakeApplyResult()
+
+    fake.delete_manifests = pending
+    assert driver.deprovision_slice(_spec(), handle) is False
+    assert [obj["kind"] for obj in fake.deleted] == ["Database"]
+    assert any(kind == "Secret" for kind, _ in fake.objects)
+
+
+@pytest.mark.parametrize("kind", ["Secret", "Database"])
+def test_creation_conflict_never_adopts_a_foreign_object_on_retry(kind):
+    driver, fake = _driver(parent=_parent_object())
+    apply = fake.apply_manifests
+    conflict = []
+
+    def collide(cluster, namespace, manifests, **kwargs):
+        if manifests[0]["kind"] == kind and not conflict:
+            assert kwargs.get("create_only") is True
+            foreign = deepcopy(manifests[0])
+            foreign["metadata"]["labels"]["ai.astrolift/app-id"] = "foreign"
+            key = (kind, foreign["metadata"]["name"])
+            fake.objects[key] = foreign
+            conflict.append(key)
+            return FakeApplyResult(errors=["controlled create conflict"])
+        return apply(cluster, namespace, manifests, **kwargs)
+
+    fake.apply_manifests = collide
+    with pytest.raises(RuntimeError):
+        driver.provision_slice(_spec())
+    preserved = deepcopy(fake.objects[conflict[0]])
+    fake.applied.clear()
+    store = driver._config.secrets_backend
+    store.reads.clear()
+    writes = len(store.writes)
+    with pytest.raises(ValueError):
+        driver.provision_slice(_spec())
+    assert not store.reads and len(store.writes) == writes
+    assert not fake.applied
+    assert fake.objects[conflict[0]] == preserved
+
+
+def test_actual_secret_api_data_recovers_issued_credentials_without_rotation(monkeypatch):
+    import base64
+
+    driver, fake = _driver(parent=_parent_object())
+    first = driver.provision_slice(_spec())
+    key = next(key for key in fake.objects if key[0] == "Secret")
+    obj = fake.objects[key]
+    values = obj.pop("stringData")
+    obj["data"] = {name: base64.b64encode(value.encode()).decode() for name, value in values.items()}
+    store = driver._config.secrets_backend
+    issued = deepcopy(store.values)
+    store.values.clear()
+
+    def refuse_mint(size):
+        raise AssertionError("a retained issued credential must not rotate")
+
+    monkeypatch.setattr("k8s_native.managed._cnpg_slices.secrets.token_urlsafe", refuse_mint)
+    second = driver.provision_slice(_spec())
+    assert first.slice_handle == second.slice_handle
+    assert store.values == issued
+    assert len(_of_kind(fake.applied, "Secret")) == 1

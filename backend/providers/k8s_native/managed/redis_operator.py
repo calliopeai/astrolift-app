@@ -30,6 +30,7 @@ from _sdk.managed_service import (
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed._service_dns import service_host
 
 KIND = "redis"
 
@@ -199,10 +200,11 @@ class RedisOperatorDriver(ManagedServiceDriver):
 
     @driver_op(cloud="k8s_native", driver="redis_operator")
     def binding(self, handle: ServiceHandle) -> Binding:
-        name = _unpack_handle(handle.handle).name
+        parsed = _unpack_handle(handle.handle)
+        name = parsed.name
         # Bitnami Redis operator generates a Service named
         # <cluster>-redis on port 6379.
-        host = f"{name}-redis"
+        host = service_host(parsed, name=f"{name}-redis")
         secret_name = f"{name}-redis"
         return Binding(
             env_vars={

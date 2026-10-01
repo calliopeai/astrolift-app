@@ -1,5 +1,11 @@
 # Cluster and domain access scopes
 
+Read-only app operators can inspect a bounded environment dependency projection
+with `app.read`, without obtaining cluster mutation authority. See
+[read-only dependency context](app-dependency-context.md) for its exact GUID,
+redaction and persisted-observation contract. Organization-level inventory and
+control routes below retain their existing gates.
+
 Tenant clusters, managed domains and per-organization provider configuration
 belong to an organization. Their inventory, detail, live state, bootstrap,
 metrics, lifecycle, identity-user and configuration routes require the declared

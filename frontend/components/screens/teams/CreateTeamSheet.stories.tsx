@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/fr.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 
@@ -23,4 +25,15 @@ export const Creating: Story = {
 /** No active organization resolved yet: the submit stays disabled. */
 export const NoOrganization: Story = {
   render: () => <CreateTeamSheet {...createTeamProps({ hasOrg: false })} />,
+};
+
+export const Translated: Story = {
+  ...Open,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="fr" messages={messages} timeZone="UTC">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

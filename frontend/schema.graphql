@@ -80,6 +80,65 @@ type AlertruledeletedpayloadMutationResult {
   data: Alertruledeletedpayload
 }
 
+type AppDependencyCluster {
+  id: GUID!
+  slug: String!
+  providerId: GUID!
+  providerSlug: String!
+  region: String
+  lifecycle: String!
+  isActive: Boolean!
+  heartbeatSource: String!
+  heartbeatState: DependencyObservationState!
+  heartbeatStatus: String!
+  heartbeatObservedAt: DateTime
+}
+
+type AppDependencyContext {
+  appId: GUID!
+  environmentId: GUID!
+  environmentName: String!
+  readAt: DateTime!
+  permissions: AppDependencyPermissions!
+  cluster: AppDependencyCluster!
+  managedDomain: AppDependencyManagedDomain
+  managedDomainState: DependencyObservationState!
+  domainsScope: String!
+  domains: [AppDependencyDomain!]!
+  domainsState: DependencyObservationState!
+  domainsTruncated: Boolean!
+  domainLimit: Int!
+  liveProviderObservationState: DependencyObservationState!
+  liveProviderObservationReason: String!
+}
+
+type AppDependencyDomain {
+  id: GUID!
+  hostname: String!
+  isActive: Boolean!
+  validationStatus: String!
+  validationObservedAt: DateTime
+  configuredCertificateReferencePresent: Boolean!
+  certificateSource: String!
+  storedCertificateState: String!
+  certificateMetadataState: DependencyObservationState!
+  certificateObservedAt: DateTime
+  storedCertificateExpiresAt: DateTime
+  storedCertificateRenewalStatus: String
+}
+
+type AppDependencyManagedDomain {
+  id: GUID!
+  zone: String!
+}
+
+type AppDependencyPermissions {
+  requiredPermission: String!
+  appReadAllowed: Boolean!
+  appDeployGateAllowed: Boolean!
+  clusterRegisterGateAllowed: Boolean!
+}
+
 type Appdomainremovedpayload {
   id: GUID!
   deleted: Boolean!
@@ -6527,6 +6586,12 @@ input DeleteWebhookSubscriptionInput {
   id: GUID!
 }
 
+enum DependencyObservationState {
+  AVAILABLE
+  NO_DATA
+  UNAVAILABLE
+}
+
 input DeployClusterAgentInput {
   clusterId: GUID!
 }
@@ -8183,6 +8248,11 @@ type Query {
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100, appSlug: String = null): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
   astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertEventPage!
+
+  """
+  Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged.
+  """
+  astroliftAppDependencyContext(appId: GUID!, environmentId: GUID!, expectedClusterId: GUID = null, expectedProviderId: GUID = null): AppDependencyContext
   astroliftPlatformApiUrl: String!
   astroliftApps(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null): [AstroliftRegisteredApp!]!
   astroliftAppsPage(includeFreshness: Boolean! = false, search: String = null, teamSlug: String = null, projectSlug: String = null, status: AstroliftAppListStatusFilter = null, sourceKind: AstroliftAppSourceKindFilter = null, sortBy: AppsListSortKey! = CREATED_DESC, cursor: String = null, limit: Int! = 50, includeArchived: Boolean! = false, filter: AstroliftAppsListFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftRegisteredAppPage!
@@ -8249,6 +8319,11 @@ type Query {
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
+
+  """
+  An authenticated public provider catalog reference without list caps. expectedId refuses a replaced slug; no tenant configuration or credentials are returned.
+  """
+  astroliftProviderPlugin(slug: String!, expectedId: GUID = null): AstroliftProviderPlugin
   astroliftProviderRegions(providerPluginSlug: String!): [AstroliftProviderRegion!]!
   astroliftClusterLifecycleAudit(clusterId: GUID!, limit: Int! = 50): [AstroliftClusterLifecycleAuditEntry!]!
   astroliftRecentClusterWorkflows(clusterId: GUID!, limit: Int! = 10): [AstroliftClusterWorkflowRun!]!

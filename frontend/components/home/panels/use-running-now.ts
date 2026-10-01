@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
@@ -18,14 +20,16 @@ const RUNNING_LIMIT = 25;
  * agents with a run in flight. Picking an agent opens it.
  */
 export function useRunningNow(): Omit<RunningNowPanelViewProps, "panel"> {
+  const t = useTranslations("home");
+  const noProject = t("copy.noProject");
   const router = useRouter();
   const fleet = useHomeFleet();
   const running = useHomeAgentRuns("running", { limit: RUNNING_LIMIT });
   // The clock the views age runs against, read again at the poll's pace.
   const now = useNow(true, RUNS_POLL_MS);
   const snapshot = React.useMemo(
-    () => (fleet.loading ? null : runningSnapshot(fleet.agents, running.runs, now)),
-    [fleet.loading, fleet.agents, running.runs, now]
+    () => (fleet.loading ? null : runningSnapshot(fleet.agents, running.runs, now, noProject)),
+    [fleet.loading, fleet.agents, running.runs, now, noProject]
   );
   const slugById = React.useMemo(
     () => new Map(fleet.agents.map((a) => [a.id, a.slug])),

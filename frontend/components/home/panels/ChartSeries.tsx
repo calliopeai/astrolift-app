@@ -7,6 +7,8 @@
  * inside a Panel. Static SVG, so reduced motion changes nothing. Pure.
  */
 
+import { useTranslations } from "next-intl";
+
 import { MiniBar } from "@/components/viz/mini-bar";
 import { Sparkline } from "@/components/viz/sparkline";
 import { cn } from "@/lib/utils";
@@ -34,8 +36,9 @@ export interface ChartSeriesProps {
 }
 
 export function ChartSeries({ label, value, hint, tone, kind, data, className }: ChartSeriesProps) {
+  const home = useTranslations("home");
   const t = TONE[tone];
-  const aria = `${label}: ${value ?? "unknown"}${hint ? ` ${hint}` : ""}`;
+  const aria = `${label}: ${value ?? home("copy.unknownValue")}${hint ? ` ${hint}` : ""}`;
   return (
     <div className={cn("min-w-0", className)}>
       <div className="flex min-w-0 items-baseline gap-2">

@@ -963,3 +963,16 @@ export const CREATE_CLUSTER_AUTH_GROUP = gql`
     }
   }
 `;
+
+export const GET_PROVIDER_PLUGIN_REFERENCE = gql`
+  query GetProviderPluginReference($slug: String!, $expectedId: GUID) {
+    astroliftProviderPlugin(slug: $slug, expectedId: $expectedId) {
+      id
+      slug
+      name
+      version
+      capabilitiesManifest
+      isEnabled
+    }
+  }
+`;
