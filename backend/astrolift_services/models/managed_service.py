@@ -12,9 +12,10 @@ Temporal workflows that update this row.
 
 from __future__ import annotations
 
+from django.db import models
+
 from astrolift_drivers.isolation import Isolation
 from core.models.base import BaseCoreModel
-from django.db import models
 
 
 class ManagedService(BaseCoreModel):

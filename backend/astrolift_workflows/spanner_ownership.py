@@ -21,8 +21,9 @@ def is_spanner(resolved: Any) -> bool:
 
 
 def target_instance(svc: Any, cfg: Any) -> str:
-    from astrolift_services.secret_ref_config import service_organization
     from gcp.managed.graph_spanner import spanner_instance_id
+
+    from astrolift_services.secret_ref_config import service_organization
 
     return spanner_instance_id(
         managed_service_id=str(svc.guid),
@@ -55,9 +56,9 @@ def placement_config(cluster: Any) -> SimpleNamespace:
 
 
 def resource_identity(svc: Any, resolved: Any, cfg: Any) -> dict[str, str]:
-    from astrolift_services.secret_ref_config import service_organization
     from gcp.managed.graph_spanner import _parse_handle
 
+    from astrolift_services.secret_ref_config import service_organization
     from astrolift_workflows.activities.managed_service_lifecycle import _service_cluster
 
     cluster = _service_cluster(svc)
@@ -85,7 +86,6 @@ def validate_observed_placement(svc: Any, resolved: Any) -> None:
     observation pins only the placement actually checked at that observation.
     """
     from astrolift_services.secret_ref_config import service_organization
-
     from astrolift_workflows.activities.managed_service_lifecycle import _service_cluster
 
     identity = svc.provider_placement_identity
@@ -175,7 +175,6 @@ def clear_cleanup(svc: Any, *, resolved: Any) -> None:
 def container_exclusive(svc: Any, *, resolved: Any, cfg: Any) -> bool:
     from astrolift_drivers.managed_resolution import resolve_managed_driver
     from astrolift_services.models import ManagedService
-
     from astrolift_workflows.activities.managed_service_lifecycle import _service_cluster
 
     if not is_spanner(resolved) or not cfg.project_id:
@@ -243,9 +242,8 @@ def guard_spanner_container(function):
         from astrolift_registry.models import RegisteredApp
         from astrolift_services.models import ManagedService
         from astrolift_services.secret_ref_config import service_organization
-        from core.cluster_observability import managed_config_for
-
         from astrolift_workflows.activities.managed_service_lifecycle import _service_cluster
+        from core.cluster_observability import managed_config_for
 
         svc = ManagedService.all_objects.select_related(
             "registered_app__organization",

@@ -203,6 +203,7 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
 def _cluster_model_placement(svc: Any, *, cluster: Any) -> Any:
     from _sdk.k8s_naming import app_namespace
     from _sdk.managed_service import ClusterModelPlacement, ModelConsumer
+
     from astrolift_clusters.models import TenantCluster
     from astrolift_registry.models import RegisteredApp
     from astrolift_registry.scopes import live_app_owners
@@ -345,9 +346,10 @@ def _assert_email_identity_unclaimed(svc: Any, spec: Any, cluster: Any) -> None:
     if (str(svc.kind), str(getattr(svc, "variant", "") or "")) != ("email", "ses"):
         return
 
-    from astrolift_services.models import ManagedService
     from aws.managed._base import ManagedServiceError, handle_for
     from aws.managed.email_ses import KIND, identity_for
+
+    from astrolift_services.models import ManagedService
 
     pc = cluster.provider_config or {}
     try:
@@ -444,13 +446,14 @@ def _signals_already_gone(*parts: object) -> bool:
 def _run_managed_service_preflight(svc: Any, cluster: Any) -> None:
     """Refresh live capabilities and fail before a Kubernetes-backed driver
     mutates the cluster when its required APIs are absent/incompatible."""
-    from core.cluster_management import probe_cluster_capabilities_dispatch
     from django.utils import timezone
     from k8s_native.preflight import (
         REQUIREMENTS,
         capabilities_from_payload,
         preflight,
     )
+
+    from core.cluster_management import probe_cluster_capabilities_dispatch
 
     variant = str(getattr(svc, "variant", "") or "")
     if (str(svc.kind), variant) not in REQUIREMENTS:
@@ -597,6 +600,7 @@ async def mark_managed_service_deprovisioning(
     managed_service_id: int,
 ) -> None:
     from asgiref.sync import sync_to_async
+
     from astrolift_services.models import ManagedService
 
     await sync_to_async(_mark_status_sync)(
@@ -855,6 +859,7 @@ async def mark_managed_service_provisioning(
     managed_service_id: int,
 ) -> None:
     from asgiref.sync import sync_to_async
+
     from astrolift_services.models import ManagedService
 
     await sync_to_async(_mark_status_sync)(
@@ -1165,8 +1170,9 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> list[int]:
 
 
 def _finalize_update_sync(managed_service_id: int, handle: str) -> list[int]:
-    from astrolift_services.models import ManagedService
     from django.utils import timezone
+
+    from astrolift_services.models import ManagedService
 
     svc = ManagedService.all_objects.get(pk=managed_service_id)
     if handle:
@@ -1272,11 +1278,12 @@ def _sync_binding_rows(svc: Any) -> list[int]:
     endpoint and password must not restart anybody's pods.
     """
     from _sdk.managed_service import VolumeMount
+    from django.db import transaction
+
     from astrolift_services.models import (
         ManagedServiceBinding,
         ManagedServiceVolumeBinding,
     )
-    from django.db import transaction
 
     binding = _managed_binding_for(svc)
     if binding is None:
@@ -1381,8 +1388,9 @@ async def finalize_managed_service_provision(
 
 
 def _mark_failed_sync(managed_service_id: int, error: str) -> None:
-    from astrolift_services.models import ManagedService
     from django.utils import timezone
+
+    from astrolift_services.models import ManagedService
 
     svc = ManagedService.all_objects.get(pk=managed_service_id)
     svc.status = ManagedService.Status.FAILED
@@ -1417,7 +1425,6 @@ def _dependent_app_environment_ids(svc: Any, rebound_binding_ids: list[int]) -> 
     the phase contract these workflows are specified against.
     """
     from astrolift_services.models import ManagedServiceAttachment, ManagedServiceBinding
-
     from astrolift_workflows.managed_service_states import (
         WorkloadBinding,
         workloads_to_redeploy,

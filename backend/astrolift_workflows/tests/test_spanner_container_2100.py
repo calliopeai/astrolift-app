@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from astrolift_services.models import ManagedService
 from django.contrib import admin
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -21,6 +20,7 @@ from gcp.managed.graph_spanner import (
 )
 from tests.gcp.test_managed_graph_spanner import FakeSpannerClient
 
+from astrolift_services.models import ManagedService
 from astrolift_workflows.activities.managed_service_lifecycle import (
     _deprovision_sync,
     _finalize_sync,
@@ -238,9 +238,10 @@ def test_real_lock_wait_rechecks_current_placement_before_any_provider_work(worl
     import hashlib
     import threading
 
+    from django.db import connections, transaction
+
     from astrolift_clusters.models import ProviderPlugin
     from astrolift_identity.models import Organization
-    from django.db import connections, transaction
 
     waiting = threading.Event()
     errors: list[Exception] = []
