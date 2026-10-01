@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Localize ingress-class choices, gate guidance, opt-in deployment review and
+  outcomes in all eight locales. Preserve exact update inputs and raw refusals;
+  accepted changes survive failed reads, rejected changes trigger no refresh,
+  and cluster/source changes discard old reviews (#2145).
+
 - New GCP Pub/Sub topic names retain the full persisted service UUID and reserve
   room for distinct declared subscription suffixes. Recorded topics and child
   mappings stay unchanged; colliding legacy child declarations, invalid IDs

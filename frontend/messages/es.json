@@ -5749,6 +5749,36 @@
       "saveFailed": "No se pudo guardar la autenticación central.",
       "refreshWarning": "La autenticación central se guardó, pero no se pudieron actualizar los detalles del clúster. Actualiza la vista para consultar el estado actual.",
       "secretNotSet": "Sin configurar"
+    },
+    "ingressClass": {
+      "title": "Clase de Ingress",
+      "description": "Qué capa de entrada atiende a las aplicaciones de este clúster. Cada aplicación cambia en su próximo despliegue; cambiar solo la clase no vuelve a desplegar las aplicaciones en ejecución.",
+      "change": "Cambiar clase",
+      "gateHint": "Las aplicaciones usarán {gate}.",
+      "missingAlb": "No hay una autenticación Cognito de ALB configurada, por lo que las aplicaciones con esta clase serían públicas.",
+      "missingCentral": "La autenticación central no está configurada arriba, por lo que las aplicaciones con esta clase serían públicas.",
+      "gateRefusal": "El servidor rechaza un cambio que elimine la autenticación actual. Configura primero la nueva autenticación.",
+      "syncHint": "Solicitar también que se escriba la nueva autenticación en el <file>astrolift.toml</file> de cada aplicación. Cada commit correcto inicia su despliegue, por lo que varias aplicaciones pueden desplegarse a la vez. Las conexiones de código ausentes o los fallos de escritura pueden omitir aplicaciones.",
+      "confirmTitle": "¿Cambiar la clase de Ingress a <target>{className}</target>?",
+      "syncReview": "Solicita un commit de astrolift.toml para las aplicaciones de este clúster. Cada commit correcto inicia el despliegue de la aplicación. Las conexiones de código ausentes o los fallos de escritura pueden omitir aplicaciones.",
+      "nextDeployReview": "Ninguna aplicación se vuelve a desplegar ahora. Cada una pasa a la nueva capa de entrada en su próximo despliegue.",
+      "changed": "Cambio de clase de Ingress a {target} aceptado.",
+      "changeFailed": "No se pudo cambiar la clase de Ingress.",
+      "refreshWarning": "El cambio de clase se aceptó, pero no se pudieron actualizar los detalles del clúster. Actualiza la vista para consultar el estado actual.",
+      "classes": {
+        "envoy": {
+          "label": "Entrada Envoy (autenticación central)",
+          "gate": "autenticación central en un Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (Cognito por aplicación)",
+          "gate": "la autenticación Cognito de ALB"
+        },
+        "nginx": {
+          "label": "ingress-nginx (autenticación central)",
+          "gate": "autenticación central mediante oauth2-proxy; ingress-nginx ya no recibe mantenimiento"
+        }
+      }
     }
   }
 }

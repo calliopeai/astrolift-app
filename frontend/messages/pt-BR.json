@@ -5746,6 +5746,36 @@
       "saveFailed": "Não foi possível salvar a autenticação central.",
       "refreshWarning": "A autenticação central foi salva, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual.",
       "secretNotSet": "Não definido"
+    },
+    "ingressClass": {
+      "title": "Classe de Ingress",
+      "description": "Qual camada de entrada atende aos aplicativos deste cluster. Cada aplicativo muda na próxima implantação; mudar apenas a classe não reimplanta aplicativos em execução.",
+      "change": "Alterar classe",
+      "gateHint": "Os aplicativos usarão {gate}.",
+      "missingAlb": "Nenhuma autenticação Cognito do ALB está configurada, então os aplicativos com esta classe seriam públicos.",
+      "missingCentral": "A autenticação central não está configurada acima, então os aplicativos com esta classe seriam públicos.",
+      "gateRefusal": "O servidor recusa uma mudança que remova a autenticação atual. Configure primeiro a nova autenticação.",
+      "syncHint": "Solicitar também a gravação da nova autenticação no <file>astrolift.toml</file> de cada aplicativo. Cada commit bem-sucedido no repositório inicia sua implantação, então vários aplicativos podem ser reimplantados juntos. A ausência de conexão com o código-fonte ou falhas de gravação podem deixar aplicativos de fora.",
+      "confirmTitle": "Alterar a classe de Ingress para <target>{className}</target>?",
+      "syncReview": "Solicita um commit de astrolift.toml para os aplicativos deste cluster. Cada commit bem-sucedido inicia a implantação correspondente. A ausência de conexão com o código-fonte ou falhas de gravação podem deixar aplicativos de fora.",
+      "nextDeployReview": "Nenhum aplicativo é reimplantado agora. Cada um muda para a nova camada de entrada na próxima implantação.",
+      "changed": "Mudança da classe de Ingress para {target} aceita.",
+      "changeFailed": "Não foi possível alterar a classe de Ingress.",
+      "refreshWarning": "A mudança de classe foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual.",
+      "classes": {
+        "envoy": {
+          "label": "Entrada Envoy (autenticação central)",
+          "gate": "a autenticação central em um Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (Cognito por aplicativo)",
+          "gate": "a autenticação Cognito do ALB"
+        },
+        "nginx": {
+          "label": "ingress-nginx (autenticação central)",
+          "gate": "a autenticação central via oauth2-proxy; a manutenção do ingress-nginx terminou"
+        }
+      }
     }
   }
 }

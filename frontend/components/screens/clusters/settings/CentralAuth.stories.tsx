@@ -3,6 +3,7 @@ import { userEvent, within } from "storybook/test";
 import { NextIntlClientProvider } from "next-intl";
 import de from "@/messages/de.json";
 import es from "@/messages/es.json";
+import fr from "@/messages/fr.json";
 
 import { CentralAuthView, IngressClassView } from "./CentralAuth";
 import { CENTRAL_AUTH, INGRESS_CLASS, LONG } from "./fixtures";
@@ -85,4 +86,45 @@ export const IngressClassNoGate: Story = {
 
 export const IngressClassUnknown: Story = {
   render: () => <IngressClassView {...INGRESS_CLASS} ingressClass={`custom-${LONG}`} />,
+};
+
+export const FrenchIngressReview: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <IngressClassView {...INGRESS_CLASS} />
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement),
+      t = fr.clusterSettings.ingressClass;
+    await userEvent.click(c.getByRole("combobox", { name: t.title }));
+    await userEvent.click(
+      within(document.body).getByRole("option", { name: t.classes.envoy.label })
+    );
+    await userEvent.click(c.getByRole("button", { name: t.change }));
+  },
+};
+
+export const IngressRefused: Story = {
+  render: () => (
+    <IngressClassView
+      {...INGRESS_CLASS}
+      onApply={async () => {
+        throw new Error("RAW_SERVER_REFUSAL");
+      }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole("combobox", { name: "Ingress class" }));
+    await userEvent.click(
+      within(document.body).getByRole("option", { name: "Envoy edge (central auth)" })
+    );
+    await userEvent.click(c.getByRole("button", { name: "Change class" }));
+    await userEvent.click(
+      within(within(document.body).getByRole("alertdialog")).getByRole("button", {
+        name: "Change class",
+      })
+    );
+  },
 };

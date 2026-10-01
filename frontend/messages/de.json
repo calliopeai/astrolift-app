@@ -5749,6 +5749,36 @@
       "saveFailed": "Zentrale Authentifizierung konnte nicht gespeichert werden.",
       "refreshWarning": "Die zentrale Authentifizierung wurde gespeichert, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen.",
       "secretNotSet": "Nicht gesetzt"
+    },
+    "ingressClass": {
+      "title": "Ingress-Klasse",
+      "description": "Welche Eingangsschicht die Apps dieses Clusters bedient. Jede App wechselt bei ihrer nächsten Bereitstellung. Ein Klassenwechsel allein stellt laufende Apps nicht erneut bereit.",
+      "change": "Klasse ändern",
+      "gateHint": "Die Apps verwenden {gate}.",
+      "missingAlb": "Es ist keine ALB-Cognito-Zugangskontrolle eingerichtet. Apps mit dieser Klasse wären daher öffentlich.",
+      "missingCentral": "Die zentrale Authentifizierung ist oben nicht eingerichtet. Apps mit dieser Klasse wären daher öffentlich.",
+      "gateRefusal": "Der Server verweigert einen Wechsel, der die aktuelle Authentifizierung entfernt. Richten Sie zuerst die neue Zugangskontrolle ein.",
+      "syncHint": "Auch das Schreiben der neuen Zugangskontrolle in die <file>astrolift.toml</file> jeder App anfordern. Jeder erfolgreiche Repository-Commit startet die Bereitstellung dieser App; mehrere Apps können gleichzeitig bereitgestellt werden. Fehlende Quellverbindungen oder Schreibfehler können Apps auslassen.",
+      "confirmTitle": "Ingress-Klasse zu <target>{className}</target> ändern?",
+      "syncReview": "Fordert für die Apps dieses Clusters einen astrolift.toml-Commit an. Jeder erfolgreiche Commit startet die zugehörige Bereitstellung. Fehlende Quellverbindungen oder Schreibfehler können Apps auslassen.",
+      "nextDeployReview": "Jetzt wird keine App erneut bereitgestellt. Jede wechselt bei ihrer nächsten Bereitstellung zur neuen Eingangsschicht.",
+      "changed": "Wechsel der Ingress-Klasse zu {target} angenommen.",
+      "changeFailed": "Ingress-Klasse konnte nicht geändert werden.",
+      "refreshWarning": "Der Klassenwechsel wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen.",
+      "classes": {
+        "envoy": {
+          "label": "Envoy-Eingang (zentrale Authentifizierung)",
+          "gate": "zentrale Authentifizierung auf einem Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (Cognito pro App)",
+          "gate": "die ALB-Cognito-Zugangskontrolle"
+        },
+        "nginx": {
+          "label": "ingress-nginx (zentrale Authentifizierung)",
+          "gate": "zentrale Authentifizierung über oauth2-proxy; die Wartung von ingress-nginx ist eingestellt"
+        }
+      }
     }
   }
 }

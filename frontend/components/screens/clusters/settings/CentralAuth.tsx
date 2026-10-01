@@ -201,64 +201,91 @@ export function CentralAuthView({ clusterId, view, saving, onSave }: CentralAuth
   );
 }
 
-const CLASSES: { value: string; label: string; gate: string }[] = [
-  {
-    value: "envoy",
-    label: "Envoy edge (central auth)",
-    gate: "the central auth above, on one Envoy Gateway",
-  },
-  { value: "alb", label: "ALB (per-app Cognito)", gate: "the ALB Cognito gate" },
-  {
-    value: "nginx",
-    label: "ingress-nginx (central auth)",
-    gate: "the central auth above, through oauth2-proxy. ingress-nginx is past end of maintenance",
-  },
-];
+const CLASSES = ["envoy", "alb", "nginx"] as const;
 
 export type IngressClassViewProps = ReturnType<typeof useIngressClass>;
 
-/**
- * The class is the switch that moves apps between edges. The server refuses a
- * flip that would drop the gate (#1616); this says so before the click.
- */
+/** Existing gate decisions remain advisory; the server checks the actual change. */
 export function IngressClassView({
+  clusterId,
+  saving,
   ingressClass,
   albGate,
   centralAuthConfigured,
   onApply,
 }: IngressClassViewProps) {
-  const [target, setTarget] = React.useState(ingressClass);
-  const [syncManifests, setSyncManifests] = React.useState(false);
-  const [confirming, setConfirming] = React.useState(false);
-
+  const t = useTranslations("clusterSettings.ingressClass");
+  const [review, setReview] = React.useState({
+    clusterId,
+    ingressClass,
+    albGate,
+    centralAuthConfigured,
+    epoch: 0,
+    target: ingressClass,
+    syncManifests: false,
+    confirming: false,
+  });
+  if (
+    review.clusterId !== clusterId ||
+    review.ingressClass !== ingressClass ||
+    review.albGate !== albGate ||
+    review.centralAuthConfigured !== centralAuthConfigured
+  ) {
+    setReview({
+      clusterId,
+      ingressClass,
+      albGate,
+      centralAuthConfigured,
+      epoch: review.epoch + 1,
+      target: ingressClass,
+      syncManifests: false,
+      confirming: false,
+    });
+  }
+  const { target, syncManifests, confirming, epoch } = review;
+  function setConfirming(confirming: boolean) {
+    setReview((current) =>
+      current.clusterId === clusterId && current.epoch === epoch
+        ? { ...current, confirming }
+        : current
+    );
+  }
   const targetHasGate = target === "alb" ? albGate : centralAuthConfigured;
   const changing = target !== ingressClass;
-  const chosen = CLASSES.find((c) => c.value === target);
+  const chosen = CLASSES.find((value) => value === target);
 
   return (
     <>
       <SettingsSection
-        title="Ingress class"
-        description="Which edge serves this cluster's apps. Each app moves on its next deploy; running apps are not touched by the change itself."
+        title={t("title")}
+        description={t("description")}
         dirty={changing}
-        saveLabel="Change class"
+        saving={saving}
+        saveLabel={t("change")}
         onSave={() => setConfirming(true)}
-        onCancel={() => {
-          setTarget(ingressClass);
-          setSyncManifests(false);
-        }}
+        onCancel={() =>
+          setReview((current) => ({
+            ...current,
+            target: ingressClass,
+            syncManifests: false,
+            confirming: false,
+          }))
+        }
       >
-        <Select value={target} onValueChange={setTarget}>
-          <SelectTrigger className="w-full max-w-72" aria-label="Ingress class">
+        <Select
+          value={target}
+          onValueChange={(target) => setReview((current) => ({ ...current, target }))}
+        >
+          <SelectTrigger className="w-full max-w-72" aria-label={t("title")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {CLASSES.map((c) => (
-              <SelectItem key={c.value} value={c.value}>
-                {c.label}
+            {CLASSES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {t(`classes.${value}.label`)}
               </SelectItem>
             ))}
-            {!CLASSES.some((c) => c.value === ingressClass) && (
+            {!CLASSES.some((value) => value === ingressClass) && (
               <SelectItem value={ingressClass}>
                 <span className="font-mono">{ingressClass}</span>
               </SelectItem>
@@ -266,27 +293,28 @@ export function IngressClassView({
           </SelectContent>
         </Select>
         {changing && chosen && (
-          <p className="text-muted-foreground text-xs">Apps will be gated by {chosen.gate}.</p>
+          <p className="text-muted-foreground text-xs">
+            {t("gateHint", { gate: t(`classes.${chosen}.gate`) })}
+          </p>
         )}
         {changing && !targetHasGate && (
           <p role="alert" className="text-warning-fg text-xs">
-            {target === "alb"
-              ? "No ALB Cognito gate is set, so apps on this cluster would be public."
-              : "Central auth is not configured above, so apps on this cluster would be public."}{" "}
-            The change is refused while the current class has a gate; set the new one first.
+            {t(target === "alb" ? "missingAlb" : "missingCentral")} {t("gateRefusal")}
           </p>
         )}
         {changing && (
           <label className="flex min-w-0 items-start gap-2 text-xs">
             <Checkbox
               checked={syncManifests}
-              onCheckedChange={(v) => setSyncManifests(v === true)}
+              onCheckedChange={(value) =>
+                setReview((current) => ({ ...current, syncManifests: value === true }))
+              }
               className="mt-0.5"
             />
             <span className="min-w-0">
-              Also write the new gate into every app&apos;s{" "}
-              <code className="font-mono">astrolift.toml</code>. This commits to each app&apos;s
-              repo, and each commit starts that app&apos;s deploy, so every app redeploys at once.
+              {t.rich("syncHint", {
+                file: (chunks) => <code className="font-mono">{chunks}</code>,
+              })}
             </span>
           </label>
         )}
@@ -294,17 +322,12 @@ export function IngressClassView({
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={
-          <>
-            Change the ingress class to <span className="font-mono">{target}</span>?
-          </>
-        }
-        description={
-          syncManifests
-            ? "Every app on this cluster gets a commit to its astrolift.toml and redeploys now."
-            : "No app redeploys now. Each one moves to the new edge on its next deploy."
-        }
-        confirmLabel="Change class"
+        title={t.rich("confirmTitle", {
+          className: target,
+          target: (chunks) => <span className="font-mono">{chunks}</span>,
+        })}
+        description={t(syncManifests ? "syncReview" : "nextDeployReview")}
+        confirmLabel={t("change")}
         onConfirm={() => onApply(target, syncManifests)}
       />
     </>

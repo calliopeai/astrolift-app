@@ -216,3 +216,28 @@ Retry executes that actual read. A refused save keeps the reviewed fields and
 its diagnostic instead of announcing success. The ingress-class change and
 independent custom-host callback/cookie requirements above remain separate
 operations and prerequisites.
+
+
+### Reviewing an ingress-class change in the dashboard
+
+Cluster Settings → Ingress class shows translated guidance while preserving
+`envoy`, `alb`, `nginx` and unknown future class identifiers. The selector's gate
+warning is advisory; the existing backend validates the actual change and
+refuses dropping a configured authentication gate. An empty ALB configuration
+is unconfigured, matching the backend's dictionary-presence check.
+
+The manifest-write checkbox starts unchecked. Leaving it unchecked changes
+cluster metadata without immediately redeploying apps; each app moves on its
+next deployment. Checking it requests best-effort `astrolift.toml` write-back
+for apps on this cluster. Successful repository commits can redeploy those apps
+together. Apps without a source connection may be skipped, and SCM failures
+are logged without rejecting the metadata save. An accepted class-change reply
+therefore proves neither complete manifest write-back nor edge/app readiness.
+
+Cancel discards the selected class and opt-in. A confirmed current cluster,
+class or authentication-source change invalidates an older review. Refusals
+retain the review and original diagnostic without refreshing the read; accepted
+writes retain their accepted outcome if the follow-up read fails, with the
+existing current-target Retry control. Changing the language preserves the
+reviewed technical class and opt-in. Existing cluster permissions and provider
+refusals remain authoritative, including the unsupported fronts above.

@@ -5826,6 +5826,36 @@
       "saveFailed": "Could not save central auth.",
       "refreshWarning": "Central auth was saved, but cluster details could not be refreshed. Refresh to see current state.",
       "secretNotSet": "not set"
+    },
+    "ingressClass": {
+      "title": "Ingress class",
+      "description": "Which edge serves this cluster’s apps. Each app moves on its next deploy; changing the class alone does not redeploy running apps.",
+      "change": "Change class",
+      "gateHint": "Apps will use {gate}.",
+      "missingAlb": "No ALB Cognito gate is set, so apps on this class would be public.",
+      "missingCentral": "Central auth is not configured above, so apps on this class would be public.",
+      "gateRefusal": "The server refuses a change that removes the current authentication gate. Configure the new gate first.",
+      "syncHint": "Also request writing the new gate into each app’s <file>astrolift.toml</file>. Each successful repository commit starts that app’s deploy, so apps may redeploy together. Missing source connections or write-back failures can skip apps.",
+      "confirmTitle": "Change the ingress class to <target>{className}</target>?",
+      "syncReview": "Requests an astrolift.toml commit for apps on this cluster. Each successful commit starts that app’s deploy. Missing source connections or write-back failures can skip apps.",
+      "nextDeployReview": "No app redeploys now. Each one moves to the new edge on its next deploy.",
+      "changed": "Ingress class change to {target} accepted.",
+      "changeFailed": "Could not change the ingress class.",
+      "refreshWarning": "The class change was accepted, but cluster details could not be refreshed. Refresh to see current state.",
+      "classes": {
+        "envoy": {
+          "label": "Envoy edge (central auth)",
+          "gate": "central auth on one Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (per-app Cognito)",
+          "gate": "the ALB Cognito gate"
+        },
+        "nginx": {
+          "label": "ingress-nginx (central auth)",
+          "gate": "central auth through oauth2-proxy; ingress-nginx is past end of maintenance"
+        }
+      }
     }
   }
 }

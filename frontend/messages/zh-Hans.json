@@ -5746,6 +5746,36 @@
       "saveFailed": "无法保存中央认证。",
       "refreshWarning": "中央认证已保存，但无法刷新集群详情。请刷新页面以查看当前状态。",
       "secretNotSet": "未设置"
+    },
+    "ingressClass": {
+      "title": "Ingress 类",
+      "description": "选择为此集群应用提供服务的入口。每个应用在下次部署时切换；仅更改类不会重新部署运行中的应用。",
+      "change": "更改类",
+      "gateHint": "应用将使用{gate}。",
+      "missingAlb": "尚未设置 ALB Cognito 认证，因此使用此类的应用将公开访问。",
+      "missingCentral": "上方尚未配置中央认证，因此使用此类的应用将公开访问。",
+      "gateRefusal": "服务器会拒绝移除现有认证的更改。请先配置新的认证。",
+      "syncHint": "同时请求将新认证写入各应用的 <file>astrolift.toml</file>。每个成功的仓库提交都会触发相应应用部署，因此多个应用可能同时重新部署。未连接源代码或写入失败时，部分应用可能被跳过。",
+      "confirmTitle": "将 Ingress 类更改为 <target>{className}</target>？",
+      "syncReview": "请求为此集群的应用提交 astrolift.toml。每个成功提交都会触发相应应用部署。未连接源代码或写入失败时，部分应用可能被跳过。",
+      "nextDeployReview": "现在不重新部署任何应用。各应用在下次部署时切换到新入口。",
+      "changed": "更改 Ingress 类为 {target} 的请求已接受。",
+      "changeFailed": "无法更改 Ingress 类。",
+      "refreshWarning": "类更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。",
+      "classes": {
+        "envoy": {
+          "label": "Envoy 入口（中央认证）",
+          "gate": "单一 Envoy Gateway 的中央认证"
+        },
+        "alb": {
+          "label": "ALB（各应用 Cognito）",
+          "gate": "ALB Cognito 认证"
+        },
+        "nginx": {
+          "label": "ingress-nginx（中央认证）",
+          "gate": "通过 oauth2-proxy 的中央认证；ingress-nginx 已停止维护"
+        }
+      }
     }
   }
 }

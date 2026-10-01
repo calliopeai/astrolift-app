@@ -5749,6 +5749,36 @@
       "saveFailed": "Impossible d’enregistrer l’authentification centrale.",
       "refreshWarning": "L’authentification centrale a été enregistrée, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
       "secretNotSet": "Non configuré"
+    },
+    "ingressClass": {
+      "title": "Classe Ingress",
+      "description": "La passerelle qui sert les applications de ce cluster. Chaque application bascule lors de son prochain déploiement ; changer uniquement la classe ne redéploie pas les applications en cours d’exécution.",
+      "change": "Changer de classe",
+      "gateHint": "Les applications utiliseront {gate}.",
+      "missingAlb": "Aucune protection Cognito ALB n’est configurée ; les applications utilisant cette classe seraient donc publiques.",
+      "missingCentral": "L’authentification centrale n’est pas configurée ci-dessus ; les applications utilisant cette classe seraient donc publiques.",
+      "gateRefusal": "Le serveur refuse un changement qui supprime la protection d’authentification actuelle. Configurez d’abord la nouvelle protection.",
+      "syncHint": "Demander aussi l’écriture de la nouvelle protection dans le <file>astrolift.toml</file> de chaque application. Chaque commit réussi lance son déploiement ; plusieurs applications peuvent donc être redéployées ensemble. Une connexion au dépôt absente ou un échec d’écriture peut laisser certaines applications inchangées.",
+      "confirmTitle": "Changer la classe Ingress pour <target>{className}</target> ?",
+      "syncReview": "Demande un commit astrolift.toml pour les applications de ce cluster. Chaque commit réussi lance le déploiement correspondant. Une connexion au dépôt absente ou un échec d’écriture peut laisser certaines applications inchangées.",
+      "nextDeployReview": "Aucune application n’est redéployée maintenant. Chacune bascule vers la nouvelle passerelle lors de son prochain déploiement.",
+      "changed": "Changement de classe Ingress pour {target} accepté.",
+      "changeFailed": "Impossible de changer la classe Ingress.",
+      "refreshWarning": "Le changement de classe a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
+      "classes": {
+        "envoy": {
+          "label": "Passerelle Envoy (authentification centrale)",
+          "gate": "l’authentification centrale sur un Envoy Gateway"
+        },
+        "alb": {
+          "label": "ALB (Cognito par application)",
+          "gate": "la protection Cognito ALB"
+        },
+        "nginx": {
+          "label": "ingress-nginx (authentification centrale)",
+          "gate": "l’authentification centrale via oauth2-proxy ; ingress-nginx n’est plus maintenu"
+        }
+      }
     }
   }
 }

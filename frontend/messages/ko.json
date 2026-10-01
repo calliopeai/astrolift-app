@@ -5746,6 +5746,36 @@
       "saveFailed": "중앙 인증을 저장하지 못했습니다.",
       "refreshWarning": "중앙 인증은 저장했지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
       "secretNotSet": "설정되지 않음"
+    },
+    "ingressClass": {
+      "title": "Ingress 클래스",
+      "description": "이 클러스터의 앱을 서비스하는 진입 계층입니다. 각 앱은 다음 배포 때 전환됩니다. 클래스만 변경하면 실행 중인 앱은 다시 배포되지 않습니다.",
+      "change": "클래스 변경",
+      "gateHint": "앱은 {gate}을(를) 사용합니다.",
+      "missingAlb": "ALB Cognito 인증이 설정되지 않아 이 클래스를 사용하는 앱은 공개 상태가 됩니다.",
+      "missingCentral": "위의 중앙 인증이 구성되지 않아 이 클래스를 사용하는 앱은 공개 상태가 됩니다.",
+      "gateRefusal": "서버는 현재 인증을 제거하는 변경을 거부합니다. 먼저 새 인증을 구성하세요.",
+      "syncHint": "각 앱의 <file>astrolift.toml</file>에 새 인증을 기록하도록 요청합니다. 저장소 커밋이 성공하면 해당 앱의 배포가 시작되어 여러 앱이 함께 다시 배포될 수 있습니다. 소스 연결이 없거나 기록에 실패하면 일부 앱이 제외될 수 있습니다.",
+      "confirmTitle": "Ingress 클래스를 <target>{className}</target>(으)로 변경할까요?",
+      "syncReview": "이 클러스터의 앱에 astrolift.toml 커밋을 요청합니다. 커밋이 성공하면 해당 앱의 배포가 시작됩니다. 소스 연결이 없거나 기록에 실패하면 일부 앱이 제외될 수 있습니다.",
+      "nextDeployReview": "지금은 앱을 다시 배포하지 않습니다. 각 앱은 다음 배포 때 새 진입 계층으로 전환됩니다.",
+      "changed": "Ingress 클래스를 {target}(으)로 변경하는 요청이 승인되었습니다.",
+      "changeFailed": "Ingress 클래스를 변경하지 못했습니다.",
+      "refreshWarning": "클래스 변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
+      "classes": {
+        "envoy": {
+          "label": "Envoy 진입 계층(중앙 인증)",
+          "gate": "단일 Envoy Gateway의 중앙 인증"
+        },
+        "alb": {
+          "label": "ALB(앱별 Cognito)",
+          "gate": "ALB Cognito 인증"
+        },
+        "nginx": {
+          "label": "ingress-nginx(중앙 인증)",
+          "gate": "oauth2-proxy를 통한 중앙 인증; ingress-nginx 유지보수는 종료되었습니다"
+        }
+      }
     }
   }
 }

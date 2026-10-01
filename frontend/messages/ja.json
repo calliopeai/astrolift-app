@@ -5746,6 +5746,36 @@
       "saveFailed": "中央認証を保存できませんでした。",
       "refreshWarning": "中央認証は保存しましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。",
       "secretNotSet": "未設定"
+    },
+    "ingressClass": {
+      "title": "Ingress クラス",
+      "description": "このクラスターのアプリに使う入口を選びます。各アプリは次回のデプロイ時に切り替わります。クラスの変更だけでは実行中のアプリは再デプロイされません。",
+      "change": "クラスを変更",
+      "gateHint": "アプリは {gate} を使用します。",
+      "missingAlb": "ALB の Cognito 認証が設定されていないため、このクラスのアプリは公開状態になります。",
+      "missingCentral": "上の中央認証が設定されていないため、このクラスのアプリは公開状態になります。",
+      "gateRefusal": "現在の認証を削除する変更はサーバーが拒否します。先に新しい認証を設定してください。",
+      "syncHint": "各アプリの <file>astrolift.toml</file> に新しい認証を書き込むことも要求します。リポジトリへのコミットが成功すると、そのアプリのデプロイが始まり、複数のアプリが同時に再デプロイされる場合があります。ソース接続がない場合や書き込みに失敗した場合は、アプリが対象から外れることがあります。",
+      "confirmTitle": "Ingress クラスを <target>{className}</target> に変更しますか？",
+      "syncReview": "このクラスターのアプリに astrolift.toml のコミットを要求します。コミットが成功すると対象アプリのデプロイが始まります。ソース接続がない場合や書き込みに失敗した場合は、アプリが対象から外れることがあります。",
+      "nextDeployReview": "今はアプリを再デプロイしません。各アプリは次回のデプロイ時に新しい入口に切り替わります。",
+      "changed": "Ingress クラスを {target} に変更する要求を受け付けました。",
+      "changeFailed": "Ingress クラスを変更できませんでした。",
+      "refreshWarning": "クラスの変更は受け付けましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。",
+      "classes": {
+        "envoy": {
+          "label": "Envoy 入口（中央認証）",
+          "gate": "単一の Envoy Gateway による中央認証"
+        },
+        "alb": {
+          "label": "ALB（アプリごとの Cognito）",
+          "gate": "ALB の Cognito 認証"
+        },
+        "nginx": {
+          "label": "ingress-nginx（中央認証）",
+          "gate": "oauth2-proxy 経由の中央認証。ingress-nginx の保守は終了しています"
+        }
+      }
     }
   }
 }

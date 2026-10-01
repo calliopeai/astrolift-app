@@ -11,13 +11,6 @@ import type { MutationResult } from "@/graphql/identity/identity.types";
 
 import { type CentralAuthDraft, oidcComplete, oidcView } from "./types";
 
-function useUpdateCluster() {
-  return useMutation<{ updateTenantCluster: MutationResult<AstroliftTenantCluster> }>(
-    UPDATE_TENANT_CLUSTER,
-    { refetchQueries: ["GetCluster"], awaitRefetchQueries: true }
-  );
-}
-
 /**
  * The cluster's central auth (``oidcAuthConfig``, #2119). Secrets are
  * write-only: the server reports whether each is set, a blank field keeps
@@ -77,7 +70,14 @@ export function useCentralAuth(cluster: AstroliftTenantCluster) {
  * IngressClassView.
  */
 export function useIngressClass(cluster: AstroliftTenantCluster) {
-  const [update] = useUpdateCluster();
+  const t = useTranslations("clusterSettings.ingressClass");
+  const [update, { loading }] = useMutation<{
+    updateTenantCluster: MutationResult<AstroliftTenantCluster>;
+  }>(UPDATE_TENANT_CLUSTER, {
+    refetchQueries: (result) => (result.data?.updateTenantCluster.ok ? ["GetCluster"] : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
 
   /** Throws on refusal, so the confirm dialog stays open with the error. */
   async function onApply(target: string, syncManifests: boolean) {
@@ -85,14 +85,20 @@ export function useIngressClass(cluster: AstroliftTenantCluster) {
       variables: { input: { id: cluster.id, ingressClass: target, syncManifests } },
     });
     if (!data?.updateTenantCluster.ok) {
-      throw new Error(data?.updateTenantCluster.errors?.[0]?.message ?? "Change failed.");
+      throw new Error(data?.updateTenantCluster.errors?.[0]?.message ?? t("changeFailed"));
     }
-    toast.success(`Ingress class is now ${target}.`);
+    toast.success(t("changed", { target }));
   }
 
   return {
+    clusterId: cluster.id,
+    saving: loading,
     ingressClass: cluster.ingressClass,
-    albGate: Boolean(cluster.albAuthConfig),
+    albGate: Boolean(
+      cluster.albAuthConfig &&
+      typeof cluster.albAuthConfig === "object" &&
+      Object.keys(cluster.albAuthConfig).length
+    ),
     centralAuthConfigured: oidcComplete(oidcView(cluster)),
     onApply,
   };

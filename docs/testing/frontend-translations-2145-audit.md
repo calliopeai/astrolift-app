@@ -525,3 +525,54 @@ ingress-class selector/hook, Cognito ingress-auth card/pickers, auth-user list,
 other cluster header/tab/connection/lifecycle/bootstrap copy and their outcomes
 remain concrete subsequent boundaries. Those forms and their capability limits
 are unchanged; this leaf does not enable unsupported provider authentication.
+
+
+## Connected cluster ingress-class review and outcomes
+
+The ingress-class card and `useIngressClass` use the additive
+`clusterSettings.ingressClass` subtree with 20 genuine message leaves in all
+eight catalogues. Known class labels/guidance, gate warnings, manifest opt-in,
+confirmation and mutation/refresh feedback are translated. Technical class
+values and unknown future class identifiers remain literal; query variables,
+update inputs and existing permission decisions are unchanged. No credential
+configuration, backend/schema or provider-admission contract changes are made.
+
+Reviews are scoped to the current cluster GUID, observed class and authentication
+source facts. Switching the target or withdrawing confirmed source facts clears
+the older selection, opt-in and dialog; late completion cannot close a newer
+review or carry the old opt-in to a different cluster. A locale change preserves
+the reviewed technical target. The ALB advisory now treats an empty dictionary
+as unconfigured, matching the actual backend gate check. It does not introduce
+a new client authority rule.
+
+Only accepted update envelopes refresh active GetCluster queries with their
+existing variables. Original refusal/transport messages remain visible, and
+refused writes retain the review without announcing a committed-write warning.
+An accepted write remains accepted after a failed refresh; the cached source
+and raw read error stay visible with the actual current-target Retry. Confirm
+and Cancel keep their existing keyboard and pending-state semantics.
+
+The opt-in copy reflects best-effort SCM write-back rather than promising every
+app receives a commit. Successful commits may deploy apps together; missing
+source connections and write-back failures can skip apps. An accepted metadata
+change does not prove edge rollout, authentication readiness or complete app
+migration. Existing unsupported provider/capability limits remain explicit in
+central-auth-envoy.md; this card does not add a cluster/app enumeration or new
+paging promise.
+
+Focused proof: 237 current-source checks pass across all-eight real Apollo
+HttpLink ClusterSettingsClient outcomes, exact class/id/sync payloads and read
+variables, simultaneous refusal/read-failure modes, keyboard confirmation,
+Cancel/no-write, initial failed/null source retry, source withdrawal, cached
+target changes, a delayed accepted prior-target HTTP reply, late pure dialog
+completion, existing permission withdrawal, locale changes, ICU/rich-message
+parity, recoverable-error-free hydration and portable central/ingress stories.
+Radix Select legitimately populates its selected text/options after hydration;
+checks preserve request-local heading/copy and the literal hydrated identifier
+without requiring identical post-effect HTML. Existing central OIDC journeys
+also pass; its production view/hook are unchanged. All pre-existing message
+trees exactly match signed base d3528e61 outside the owned ingressClass subtree.
+
+This bounded selector is complete; #2145 remains open. AWS/Cognito ingress-auth
+configuration and source pickers, auth-user lists, cluster header/tab/connection,
+lifecycle/bootstrap settings and their feedback remain separate boundaries.

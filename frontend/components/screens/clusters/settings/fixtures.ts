@@ -234,6 +234,8 @@ export const CENTRAL_AUTH: CentralAuthViewProps = {
 };
 
 export const INGRESS_CLASS: IngressClassViewProps = {
+  clusterId: CLUSTER.id,
+  saving: false,
   ingressClass: "alb",
   albGate: true,
   centralAuthConfigured: true,
