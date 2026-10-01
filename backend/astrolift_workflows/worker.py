@@ -176,6 +176,10 @@ from astrolift_workflows.activities.agent_stage import (
     dispatch_agent_task,
     execute_agent_stage,
 )
+from astrolift_workflows.activities.agent_task_callback import (
+    deliver_agent_task_callback,
+    reconcile_agent_task_callbacks,
+)
 from astrolift_workflows.activities.build_image import build_image
 from astrolift_workflows.activities.command_run_exec import (
     assert_no_concurrent,
@@ -200,6 +204,7 @@ from astrolift_workflows.workflows import (
     AgentLoopTickWorkflow,
     AgentReconcileTickWorkflow,
     AgentScaleTickWorkflow,
+    AgentTaskCallbackReconcileWorkflow,
     AlertEvalTickWorkflow,
     ApplyObservabilityRetentionWorkflow,
     BringClusterIntoManagementWorkflow,
@@ -214,6 +219,7 @@ from astrolift_workflows.workflows import (
     CronDeployTickWorkflow,
     DecommissionClusterWorkflow,
     DeleteSecretBundleFromClustersWorkflow,
+    DeliverAgentTaskCallbackWorkflow,
     DeliverWebhookWorkflow,
     DeployAppWorkflow,
     DeployPromotedAppWorkflow,
@@ -260,6 +266,8 @@ from astrolift_workflows.workflows import (
 )
 
 WORKFLOWS = (
+    AgentTaskCallbackReconcileWorkflow,
+    DeliverAgentTaskCallbackWorkflow,
     SharedModelReconcileWorkflow,
     AgentBoxReapTickWorkflow,
     AgentCronTickWorkflow,
@@ -325,6 +333,8 @@ WORKFLOWS = (
 )
 
 ACTIVITIES = (
+    deliver_agent_task_callback,
+    reconcile_agent_task_callbacks,
     apply_shared_model,
     observe_shared_model,
     activate_shared_model_subscriptions,

@@ -34,6 +34,10 @@ from astrolift_workflows.workflows.cron_deploy_tick import CronDeployTickWorkflo
 from astrolift_workflows.workflows.decommission_cluster import (
     DecommissionClusterWorkflow,
 )
+from astrolift_workflows.workflows.deliver_agent_task_callback import (
+    AgentTaskCallbackReconcileWorkflow,
+    DeliverAgentTaskCallbackWorkflow,
+)
 from astrolift_workflows.workflows.deliver_webhook import DeliverWebhookWorkflow
 from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 from astrolift_workflows.workflows.deprovision_managed_domain import (
@@ -107,6 +111,8 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 from astrolift_workflows.workflows.workflow_run_reconcile_tick import WorkflowRunReconcileTickWorkflow
 
 __all__ = [
+    "AgentTaskCallbackReconcileWorkflow",
+    "DeliverAgentTaskCallbackWorkflow",
     "SharedModelReconcileWorkflow",
     "AgentBoxReapTickWorkflow",
     "AgentCronTickWorkflow",

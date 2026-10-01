@@ -167,6 +167,7 @@ def test_default_allowlist_is_phase_3a_yes_set():
         ScheduleKind.LOOP_TICK,
         ScheduleKind.RECONCILE_CLUSTER_CAPABILITIES,
         ScheduleKind.REHEAL_WEBHOOK_SUBSCRIPTIONS,
+        ScheduleKind.AGENT_TASK_CALLBACK_RECONCILE,
         ScheduleKind.DRIFT_DETECTION,
         ScheduleKind.SECRET_BUNDLE_REFRESH,
         # Uptime-monitoring increment: the synthetic probe joined the

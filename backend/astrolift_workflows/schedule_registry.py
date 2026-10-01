@@ -65,6 +65,9 @@ class ScheduleKind(StrEnum):
     REHEAL_WEBHOOK_SUBSCRIPTIONS = "reheal_webhook_subscriptions"
     """Every 5 min — re-enable backed-off webhook subs."""
 
+    AGENT_TASK_CALLBACK_RECONCILE = "agent_task_callback_reconcile"
+    """Every minute — recover durable completion delivery after worker outages."""
+
     PRUNE_AUDIT_LOG = "prune_audit_log"
     """Daily 02:00 UTC — delete audit log past retention
     (per ObservabilityProfile retention bounds, #9)."""
@@ -353,6 +356,13 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.REHEAL_WEBHOOK_SUBSCRIPTIONS,
         ),
         description="Re-enable backed-off webhook subs",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.AGENT_TASK_CALLBACK_RECONCILE,
+        workflow_name="AgentTaskCallbackReconcileWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(kind=ScheduleKind.AGENT_TASK_CALLBACK_RECONCILE),
+        description="Recover pending agent completion callbacks after delivery outages",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.PRUNE_AUDIT_LOG,
