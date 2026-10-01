@@ -35,10 +35,12 @@ import hmac
 import inspect
 import itertools
 import json
+from datetime import timedelta
 
 import pytest
 from django.core.cache import cache
 from django.test import RequestFactory
+from freezegun import freeze_time
 from prometheus_client import REGISTRY
 
 from astrolift_identity.models import Organization
@@ -181,13 +183,18 @@ def test_the_limiter_counts_atomically(org):
 def test_the_limit_is_enforced(org):
     limit = webhook_security._WEBHOOK_RATE_LIMIT_PER_MINUTE
 
-    for _ in range(limit):
+    with freeze_time("2026-01-01 12:00:59") as clock:
+        for _ in range(limit):
+            webhook_security.check_webhook_rate_limit(org.slug)
+
+        with pytest.raises(webhook_security.WebhookSecurityError):
+            webhook_security.check_webhook_rate_limit(org.slug)
+
+        clock.tick(timedelta(seconds=1))
         webhook_security.check_webhook_rate_limit(org.slug)
 
-    with pytest.raises(webhook_security.WebhookSecurityError):
-        webhook_security.check_webhook_rate_limit(org.slug)
 
-
+@freeze_time("2026-01-01 12:00:30")
 def test_the_limit_is_per_org(org):
     other = Organization.objects.create(name="Other", slug=f"other-rate-{next(_n)}")
     for _ in range(webhook_security._WEBHOOK_RATE_LIMIT_PER_MINUTE):
@@ -219,6 +226,7 @@ def test_a_rate_limited_request_answers_429(org, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+@freeze_time("2026-01-01 12:00:30")
 def test_an_unsigned_request_does_not_spend_the_orgs_rate_budget(org):
     """The security-relevant ordering.
 
