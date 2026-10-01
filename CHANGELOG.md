@@ -14,6 +14,14 @@
   inputs, retain committed writes through later failures, and discard old-cluster
   or withdrawn-source drafts (#2145).
 
+- Azure `queue/servicebus` uses the full immutable managed-service UUID for new
+  names and preserves recorded queue paths. Actual source/platform metadata
+  and ARM target checks now gate lifecycle, readiness and workload bindings;
+  refused or inaccessible cleanup never becomes success from diagnostic text.
+  The Azure extra requires Service Bus SDK 10.0 for its real ARM metadata
+  field. Retained queues and unsupported snapshots remain truthful; sibling
+  topic/subscription drivers are outside this bounded repair (#2032, #2098).
+
 - Privacy review uses the server-confirmed anonymous-state flag and exact current
   user identity. All eight locales distinguish first cleanup, repeated attributed
   history cleanup and retained/unsupported records. Changed targets or withdrawn

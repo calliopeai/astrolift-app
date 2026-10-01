@@ -12,21 +12,15 @@ from _sdk.managed_service import (
     ProvisionSpec,
     ServiceHandle,
 )
+from azure.core.exceptions import ResourceNotFoundError
 from azure.managed.queue_servicebus import (
     ServiceBusConfig,
     ServiceBusDriver,
 )
 
+OWNER = "018f42f0-4420-7000-8000-000000000001"
+SUBSCRIPTION = "018f42f0-4420-7000-8000-000000000002"
 
-class _NotFound(Exception):
-    pass
-
-
-# Module scope, not fixture scope: the driver sniffs this name, so a fake built
-# outside the fixture has to raise the same thing the SDK does.
-_NotFound.__name__ = "ResourceNotFoundError"
-
-OWNER = "managed-service-guid"
 BINDING = "binding-guid"
 
 
@@ -35,6 +29,8 @@ class FakeQueue:
     name: str
     parameters: dict[str, Any] = field(default_factory=dict)
     user_metadata: str = ""
+    id: str = ""
+    status: str = "Active"
 
 
 @dataclass
@@ -47,12 +43,16 @@ class FakeQueues:
         resource_group_name: str,
         namespace_name: str,
         queue_name: str,
-        parameters: dict[str, Any],
+        parameters: Any,
+        **kwargs: Any,
     ) -> FakeQueue:
         q = FakeQueue(
             name=queue_name,
-            parameters=dict(parameters),
-            user_metadata=str(parameters.get("userMetadata", "")),
+            parameters={
+                key: getattr(parameters, key) for key in ("dead_lettering_on_message_expiration", "max_delivery_count")
+            },
+            user_metadata=str(parameters.user_metadata),
+            id=f"/subscriptions/{SUBSCRIPTION}/resourceGroups/{resource_group_name}/providers/Microsoft.ServiceBus/namespaces/{namespace_name}/queues/{queue_name}",
         )
         self.queues[queue_name] = q
         return q
@@ -63,9 +63,10 @@ class FakeQueues:
         resource_group_name: str,
         namespace_name: str,
         queue_name: str,
+        **kwargs: Any,
     ) -> FakeQueue:
         if queue_name not in self.queues:
-            raise _NotFound(queue_name)
+            raise ResourceNotFoundError(queue_name)
         return self.queues[queue_name]
 
     def delete(
@@ -74,9 +75,10 @@ class FakeQueues:
         resource_group_name: str,
         namespace_name: str,
         queue_name: str,
+        **kwargs: Any,
     ) -> None:
         if queue_name not in self.queues:
-            raise _NotFound(queue_name)
+            raise ResourceNotFoundError(queue_name)
         del self.queues[queue_name]
 
 
@@ -98,7 +100,7 @@ def fake_client() -> FakeSBClient:
 def driver(fake_client: FakeSBClient) -> ServiceBusDriver:
     return ServiceBusDriver(
         config=ServiceBusConfig(
-            subscription_id="sub-1",
+            subscription_id=SUBSCRIPTION,
             resource_group="rg",
             namespace_name="acme-prod-sb",
             client=fake_client,
@@ -145,12 +147,12 @@ def test_provision_dead_lettering_enabled(
 
 def test_status_available(driver: ServiceBusDriver) -> None:
     res = driver.provision(_spec())
-    status = driver.status(ServiceHandle(handle=res.handle))
+    status = driver.status(ServiceHandle(handle=res.handle, managed_service_id=OWNER))
     assert status.state == "available"
 
 
 def test_status_deprovisioned(driver: ServiceBusDriver) -> None:
-    status = driver.status(ServiceHandle(handle="queue/never"))
+    status = driver.status(ServiceHandle(handle="queue/never", managed_service_id=OWNER))
     assert status.state == "deprovisioned"
 
 
@@ -191,9 +193,8 @@ def test_deprovision_idempotent_when_already_gone(
 
 
 def test_binding_envs_and_iam_grants(driver: ServiceBusDriver) -> None:
-    binding = driver.binding(
-        ServiceHandle(handle="queue/astrolift-acme-api-prod"),
-    )
+    result = driver.provision(_spec())
+    binding = driver.binding(ServiceHandle(handle=result.handle, managed_service_id=OWNER))
     assert set(binding.env_vars.keys()) == {
         "SERVICEBUS_NAMESPACE",
         "SERVICEBUS_QUEUE",
