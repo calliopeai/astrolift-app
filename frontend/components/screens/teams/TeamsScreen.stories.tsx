@@ -2,7 +2,9 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { TEAMS_LIST } from "./teams-list";
+import { useTranslations, NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import { localizedTeamsList } from "./teams-list";
 import { TEAM_LONG, TEAMS, teamsScreenProps } from "./teams.fixtures";
 import { TeamsScreen, type TeamsScreenProps } from "./TeamsScreen";
 
@@ -24,7 +26,8 @@ function Screen({
   teams?: typeof TEAMS;
   initial?: Partial<ListState>;
 }) {
-  const list = useLocalListState(TEAMS_LIST, initial);
+  const t = useTranslations("teams");
+  const list = useLocalListState(localizedTeamsList(t), initial);
   return (
     <TeamsScreen
       list={list}
@@ -74,4 +77,15 @@ export const Width768: Story = {
       <Screen teams={[TEAM_LONG, ...TEAMS]} />
     </div>
   ),
+};
+
+export const GermanWidth768: Story = {
+  ...Width768,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
 };

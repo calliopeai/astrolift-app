@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import { isValidSlug, type SlugStatus } from "@/components/screens/projects/project-team-slug";
 import { UPDATE_TEAM } from "@/graphql/identity/identity.mutations";
@@ -17,6 +19,7 @@ import { generateFriendlySlug } from "@/lib/friendly-name";
  * update mutation.
  */
 export function useEditTeam({ open, team }: { open: boolean; team: AstroliftTeam | null }) {
+  const t = useTranslations("teams");
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
 
@@ -58,7 +61,11 @@ export function useEditTeam({ open, team }: { open: boolean; team: AstroliftTeam
 
   const [updateTeam, { loading }] = useMutation<{ updateTeam: MutationResult<AstroliftTeam> }>(
     UPDATE_TEAM,
-    { refetchQueries: [{ query: LIST_TEAMS }], awaitRefetchQueries: true }
+    {
+      refetchQueries: [{ query: LIST_TEAMS }],
+      onQueryUpdated: (query) => refetchAfterMutation(query, t("feedback.refreshWarning")),
+      awaitRefetchQueries: true,
+    }
   );
 
   // Derive a single slug status the UI + submit gate both read from.
@@ -88,15 +95,21 @@ export function useEditTeam({ open, team }: { open: boolean; team: AstroliftTeam
   /** Resolves true when the team was saved, so the sheet can close. */
   async function save(): Promise<boolean> {
     if (!team || !canSubmit) return false;
-    const { data } = await updateTeam({
-      variables: { input: { id: team.id, name: name.trim(), slug: trimmedSlug } },
-    });
-    const result = data?.updateTeam;
-    if (result?.ok) {
-      toast.success(`Team saved as ${trimmedSlug}`);
-      return true;
+    try {
+      const { data } = await updateTeam({
+        variables: { input: { id: team.id, name: name.trim(), slug: trimmedSlug } },
+      });
+      const result = data?.updateTeam;
+      if (result?.ok) {
+        toast.success(t("feedback.saved", { slug: trimmedSlug }));
+        return true;
+      }
+      toast.error(result?.errors?.[0]?.message ?? t("feedback.saveFailed"));
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message ? error.message : t("feedback.saveFailed")
+      );
     }
-    toast.error(result?.errors?.[0]?.message ?? "Save failed");
     return false;
   }
 

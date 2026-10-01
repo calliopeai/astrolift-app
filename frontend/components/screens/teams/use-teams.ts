@@ -2,6 +2,8 @@
 
 import { useMutation } from "@apollo/client/react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import type { CursorPage } from "@/components/data-table";
 import { useListState } from "@/components/list/use-list-state";
@@ -11,7 +13,7 @@ import { LIST_TEAMS, LIST_TEAMS_PAGE } from "@/graphql/identity/identity.queries
 import type { AstroliftTeam, MutationResult } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
-import { TEAMS_LIST, teamsFilter } from "./teams-list";
+import { localizedTeamsList, teamsFilter } from "./teams-list";
 
 /**
  * The Teams list: URL list state, one numbered page of `astroliftTeamsPage`
@@ -19,8 +21,9 @@ import { TEAMS_LIST, teamsFilter } from "./teams-list";
  * mutation. The data half of TeamsScreen.
  */
 export function useTeams() {
+  const t = useTranslations("teams");
   const perms = useMyPermissions();
-  const list = useListState(TEAMS_LIST);
+  const list = useListState(localizedTeamsList(t));
   const page = useNumberedListQuery<AstroliftTeam, ReturnType<typeof teamsFilter>>(
     LIST_TEAMS_PAGE,
     list,
@@ -35,6 +38,7 @@ export function useTeams() {
     // LIST_TEAMS still backs the pickers on other surfaces; "ListTeamsPage"
     // is this list's own page.
     refetchQueries: [{ query: LIST_TEAMS }, "ListTeamsPage"],
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("feedback.refreshWarning")),
     awaitRefetchQueries: true,
   });
 
@@ -42,8 +46,8 @@ export function useTeams() {
   async function onDelete(team: AstroliftTeam) {
     const { data } = await softDeleteTeam({ variables: { input: { id: team.id } } });
     const result = data?.softDeleteTeam;
-    if (result?.ok) toast.success(`Deleted ${team.slug}`);
-    else throw new Error(result?.errors?.[0]?.message ?? "Delete failed");
+    if (result?.ok) toast.success(t("feedback.deleted", { slug: team.slug }));
+    else throw new Error(result?.errors?.[0]?.message ?? t("feedback.deleteFailed"));
   }
 
   return {

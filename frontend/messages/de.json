@@ -5308,5 +5308,57 @@
     "staleMetrics": "Aktualisierung fehlgeschlagen. Die zuletzt geladenen Messwerte werden angezeigt.",
     "metricsUnavailable": "Messwerte konnten nicht geladen werden.",
     "retryMetrics": "Messwerte erneut laden"
+  },
+  "teams": {
+    "title": "Teams",
+    "context": "Teams begrenzen Projekte, Apps und die dafür erteilten Berechtigungen.",
+    "newTeam": "Neues Team",
+    "columnTeam": "Team",
+    "columnCreated": "Erstellt",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "emptyTitle": "Noch keine Teams",
+    "emptyDescription": "Erstelle ein Team, um Projekte und Apps zu gruppieren.",
+    "deleteTitle": "Team {slug} löschen?",
+    "deleteGenericTitle": "Team löschen?",
+    "deleteDescription": "Das Team wird stillgelegt und sein Slug kann wiederverwendet werden. Seine Projekte und Anwendungen werden dabei nicht neu zugeordnet.",
+    "confirmDelete": "Team löschen",
+    "createDescription": "Teams begrenzen Projekte, Mitglieder und Tokens. Slugs sind eindeutig und können nach der Stilllegung wiederverwendet werden.",
+    "displayName": "Anzeigename",
+    "exampleName": "Backend-Team",
+    "slug": "Slug",
+    "slugHint": "Beginne mit einem Kleinbuchstaben; verwende Buchstaben, Zahlen und Bindestriche, höchstens 40 Zeichen. Ende mit einem Buchstaben oder einer Zahl.",
+    "descriptionOptional": "Beschreibung (optional)",
+    "descriptionPlaceholder": "Welche Ressourcen gehören diesem Team?",
+    "cancel": "Abbrechen",
+    "creating": "Wird erstellt…",
+    "create": "Team erstellen",
+    "editTitle": "Team bearbeiten",
+    "editDescription": "Benenne dieses Team um oder ändere seinen Slug. Slugs sind innerhalb der Organisation eindeutig und werden in URLs verwendet.",
+    "generate": "Generieren",
+    "saving": "Wird gespeichert…",
+    "save": "Änderungen speichern",
+    "feedback": {
+      "created": "Team {slug} erstellt",
+      "saved": "Team als {slug} gespeichert",
+      "deleted": "{slug} gelöscht",
+      "createFailed": "Das Team konnte nicht erstellt werden",
+      "saveFailed": "Das Team konnte nicht gespeichert werden",
+      "deleteFailed": "Das Team konnte nicht gelöscht werden",
+      "refreshWarning": "Die Ansicht konnte nicht aktualisiert werden. Aktualisiere sie, um die aktuellen Daten zu sehen."
+    },
+    "list": {
+      "search": "Teams suchen…",
+      "all": "Alle",
+      "mine": "Meine Teams"
+    },
+    "slugStatus": {
+      "invalid": "Verwende Kleinbuchstaben, Zahlen und Bindestriche; beginne mit einem Buchstaben und ende mit einem Buchstaben oder einer Zahl (höchstens 40 Zeichen).",
+      "checking": "Verfügbarkeit wird geprüft…",
+      "available": "Verfügbar",
+      "taken": "In dieser Organisation bereits vergeben.",
+      "unchanged": "Aktueller Slug — wird in URLs verwendet.",
+      "empty": "Kleinbuchstaben, Zahlen und Bindestriche. Wird in URLs verwendet."
+    }
   }
 }

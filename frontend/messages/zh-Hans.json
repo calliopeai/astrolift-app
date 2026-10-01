@@ -5305,5 +5305,57 @@
     "staleMetrics": "刷新失败，正在显示上次成功加载的指标。",
     "metricsUnavailable": "无法加载指标。",
     "retryMetrics": "重试加载指标"
+  },
+  "teams": {
+    "title": "团队",
+    "context": "团队限定项目、应用及其访问授权的范围。",
+    "newTeam": "新建团队",
+    "columnTeam": "团队",
+    "columnCreated": "创建时间",
+    "edit": "编辑",
+    "delete": "删除",
+    "emptyTitle": "暂无团队",
+    "emptyDescription": "创建团队以开始对项目和应用分组。",
+    "deleteTitle": "删除团队 {slug}？",
+    "deleteGenericTitle": "删除团队？",
+    "deleteDescription": "停用团队并允许重复使用其标识符。这不会重新分配团队的项目或应用。",
+    "confirmDelete": "删除团队",
+    "createDescription": "团队限定项目、成员和令牌的范围。标识符必须唯一，团队停用后可重复使用。",
+    "displayName": "显示名称",
+    "exampleName": "后端团队",
+    "slug": "标识符",
+    "slugHint": "以小写英文字母开头，使用字母、数字和连字符，最多40个字符。以字母或数字结尾。",
+    "descriptionOptional": "描述（可选）",
+    "descriptionPlaceholder": "此团队负责哪些资源？",
+    "cancel": "取消",
+    "creating": "正在创建…",
+    "create": "创建团队",
+    "editTitle": "编辑团队",
+    "editDescription": "重命名团队或更改其标识符。标识符在组织内必须唯一，并用于URL。",
+    "generate": "生成",
+    "saving": "正在保存…",
+    "save": "保存更改",
+    "feedback": {
+      "created": "已创建团队 {slug}",
+      "saved": "团队已保存为 {slug}",
+      "deleted": "已删除 {slug}",
+      "createFailed": "无法创建团队",
+      "saveFailed": "无法保存团队",
+      "deleteFailed": "无法删除团队",
+      "refreshWarning": "无法刷新视图。请刷新以查看最新数据。"
+    },
+    "list": {
+      "search": "搜索团队…",
+      "all": "全部",
+      "mine": "我的团队"
+    },
+    "slugStatus": {
+      "invalid": "使用小写英文字母、数字和连字符，以字母开头，以字母或数字结尾（最多40个字符）。",
+      "checking": "正在检查可用性…",
+      "available": "可用",
+      "taken": "此组织已在使用该标识符。",
+      "unchanged": "当前标识符 — 用于URL。",
+      "empty": "小写英文字母、数字和连字符。用于URL。"
+    }
   }
 }

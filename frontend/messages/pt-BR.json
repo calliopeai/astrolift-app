@@ -5305,5 +5305,57 @@
     "staleMetrics": "A atualização falhou. Exibindo as últimas métricas carregadas.",
     "metricsUnavailable": "Não foi possível carregar as métricas.",
     "retryMetrics": "Tentar carregar métricas novamente"
+  },
+  "teams": {
+    "title": "Equipes",
+    "context": "As equipes delimitam projetos, aplicativos e suas concessões de acesso.",
+    "newTeam": "Nova equipe",
+    "columnTeam": "Equipe",
+    "columnCreated": "Criada em",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "emptyTitle": "Ainda não há equipes",
+    "emptyDescription": "Crie uma equipe para começar a agrupar projetos e aplicativos.",
+    "deleteTitle": "Excluir a equipe {slug}?",
+    "deleteGenericTitle": "Excluir a equipe?",
+    "deleteDescription": "Desative a equipe e permita reutilizar seu identificador. Isso não reatribui seus projetos nem aplicativos.",
+    "confirmDelete": "Excluir equipe",
+    "createDescription": "As equipes delimitam projetos, membros e tokens. Os identificadores são únicos e podem ser reutilizados após a desativação da equipe.",
+    "displayName": "Nome de exibição",
+    "exampleName": "Equipe de backend",
+    "slug": "Identificador",
+    "slugHint": "Comece com uma letra minúscula; use letras, números e hífens, até 40 caracteres. Termine com uma letra ou um número.",
+    "descriptionOptional": "Descrição (opcional)",
+    "descriptionPlaceholder": "Quais recursos pertencem a esta equipe?",
+    "cancel": "Cancelar",
+    "creating": "Criando…",
+    "create": "Criar equipe",
+    "editTitle": "Editar equipe",
+    "editDescription": "Renomeie esta equipe ou altere seu identificador. Os identificadores são únicos na organização e usados nas URLs.",
+    "generate": "Gerar",
+    "saving": "Salvando…",
+    "save": "Salvar alterações",
+    "feedback": {
+      "created": "Equipe {slug} criada",
+      "saved": "Equipe salva como {slug}",
+      "deleted": "{slug} foi excluída",
+      "createFailed": "Não foi possível criar a equipe",
+      "saveFailed": "Não foi possível salvar a equipe",
+      "deleteFailed": "Não foi possível excluir a equipe",
+      "refreshWarning": "Não foi possível atualizar a visualização. Atualize para ver os dados atuais."
+    },
+    "list": {
+      "search": "Buscar equipes…",
+      "all": "Todas",
+      "mine": "Minhas equipes"
+    },
+    "slugStatus": {
+      "invalid": "Use letras minúsculas, números e hífens; comece com uma letra e termine com uma letra ou um número (até 40 caracteres).",
+      "checking": "Verificando disponibilidade…",
+      "available": "Disponível",
+      "taken": "Já está em uso nesta organização.",
+      "unchanged": "Identificador atual — usado nas URLs.",
+      "empty": "Letras minúsculas, números e hífens. Usado nas URLs."
+    }
   }
 }

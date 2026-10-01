@@ -5308,5 +5308,57 @@
     "staleMetrics": "Actualisation échouée. Les derniers indicateurs chargés restent affichés.",
     "metricsUnavailable": "Impossible de charger les indicateurs.",
     "retryMetrics": "Réessayer les indicateurs"
+  },
+  "teams": {
+    "title": "Équipes",
+    "context": "Les équipes délimitent les projets, les applications et leurs droits d’accès.",
+    "newTeam": "Nouvelle équipe",
+    "columnTeam": "Équipe",
+    "columnCreated": "Créée",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "emptyTitle": "Aucune équipe pour le moment",
+    "emptyDescription": "Créez une équipe pour commencer à regrouper les projets et les applications.",
+    "deleteTitle": "Supprimer l’équipe {slug} ?",
+    "deleteGenericTitle": "Supprimer l’équipe ?",
+    "deleteDescription": "Retirez l’équipe et rendez son identifiant réutilisable. Ses projets et applications ne sont pas réaffectés.",
+    "confirmDelete": "Supprimer l’équipe",
+    "createDescription": "Les équipes délimitent les projets, les membres et les jetons. Les identifiants sont uniques et réutilisables après le retrait d’une équipe.",
+    "displayName": "Nom affiché",
+    "exampleName": "Équipe backend",
+    "slug": "Identifiant",
+    "slugHint": "Commencez par une lettre minuscule ; utilisez des lettres, des chiffres et des tirets, jusqu’à 40 caractères. Terminez par une lettre ou un chiffre.",
+    "descriptionOptional": "Description (facultative)",
+    "descriptionPlaceholder": "Quelles ressources appartiennent à cette équipe ?",
+    "cancel": "Annuler",
+    "creating": "Création…",
+    "create": "Créer l’équipe",
+    "editTitle": "Modifier l’équipe",
+    "editDescription": "Renommez cette équipe ou modifiez son identifiant. Les identifiants sont uniques au sein de l’organisation et figurent dans les URL.",
+    "generate": "Générer",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer les modifications",
+    "feedback": {
+      "created": "Équipe {slug} créée",
+      "saved": "Équipe enregistrée sous {slug}",
+      "deleted": "{slug} a été supprimée",
+      "createFailed": "Impossible de créer l’équipe",
+      "saveFailed": "Impossible d’enregistrer l’équipe",
+      "deleteFailed": "Impossible de supprimer l’équipe",
+      "refreshWarning": "Impossible d’actualiser la vue. Actualisez pour afficher les données actuelles."
+    },
+    "list": {
+      "search": "Rechercher des équipes…",
+      "all": "Toutes",
+      "mine": "Mes équipes"
+    },
+    "slugStatus": {
+      "invalid": "Utilisez des lettres minuscules, des chiffres et des tirets ; commencez par une lettre et terminez par une lettre ou un chiffre (40 caractères maximum).",
+      "checking": "Vérification de la disponibilité…",
+      "available": "Disponible",
+      "taken": "Déjà utilisé dans cette organisation.",
+      "unchanged": "Identifiant actuel — utilisé dans les URL.",
+      "empty": "Lettres minuscules, chiffres et tirets. Utilisé dans les URL."
+    }
   }
 }

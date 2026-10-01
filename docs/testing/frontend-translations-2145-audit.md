@@ -211,3 +211,27 @@ server refusals restoring the last account answer, transport failures retaining
 the browser choice, first-read loading and offline fallback, locale changes without
 resubmission, and narrowed access without automatic preference rewrites. German
 768px and Japanese access-empty portable stories exercise the same consumer.
+
+## Team list and create/edit/delete
+
+The connected team list, creation and editing sheets, slug-status guidance,
+retirement confirmation and mutation feedback use genuine translations in all
+eight locales. The localized list factory preserves view/filter/sort/page IDs and
+query arguments; known shared breadcrumb translation remains a separately frozen
+composition dependency. Names, slugs, descriptions, organization/team IDs and
+original server messages remain literal. Existing locale/time-zone date formatters
+remain in place. The retirement copy makes no promise of descendant visibility or
+automatic reassignment.
+
+Creation and editing retain refused drafts. The actual Apollo HTTP path tests
+cover accepted writes, structured refusals, diagnostic-free failure envelopes,
+transport failures and failed post-write refreshes. The shared refresh helper
+keeps committed create/edit/delete outcomes successful and warns only about the
+read, so closing a successful sheet never encourages repeating its write.
+No-organization, invalid-slug and read-only states preserve the existing gates.
+Project slug hints retain their existing default presentation; Teams supplies
+localized labels through an optional presentation argument.
+
+Team detail, members and access panels remain outside this list/create/edit/delete
+leaf. API key screens and scope catalogue presentation are the next bounded slice;
+this leaf does not claim complete #2145 coverage.

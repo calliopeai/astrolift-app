@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import * as React from "react";
 
 import {
@@ -35,6 +37,7 @@ export function CreateTeamSheet({
   creating,
   createTeam,
 }: CreateTeamSheetProps) {
+  const copy = useTranslations("teams");
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -59,15 +62,12 @@ export function CreateTeamSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>New team</SheetTitle>
-          <SheetDescription>
-            Teams scope projects, members, and tokens. Slugs are unique and reclaimable after
-            soft-delete.
-          </SheetDescription>
+          <SheetTitle>{copy("newTeam")}</SheetTitle>
+          <SheetDescription>{copy("createDescription")}</SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Display name</Label>
+            <Label htmlFor="name">{copy("displayName")}</Label>
             <Input
               id="name"
               value={name}
@@ -75,14 +75,14 @@ export function CreateTeamSheet({
                 setName(e.target.value);
                 if (!slugTouched) setSlug(slugify(e.target.value));
               }}
-              placeholder="Backend"
+              placeholder={copy("exampleName")}
               autoFocus
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="slug">Slug</Label>
+            <Label htmlFor="slug">{copy("slug")}</Label>
             <Input
               id="slug"
               value={slug}
@@ -96,32 +96,29 @@ export function CreateTeamSheet({
               aria-invalid={slug.length > 0 && !isValidSlug(slug)}
               required
             />
-            <p className="text-muted-foreground text-xs">
-              Start with a lowercase letter; use letters, numbers and hyphens, up to 40 characters.
-              End with a letter or number.
-            </p>
+            <p className="text-muted-foreground text-xs">{copy("slugHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
+            <Label htmlFor="description">{copy("descriptionOptional")}</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What does this team own?"
+              placeholder={copy("descriptionPlaceholder")}
               rows={3}
             />
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {copy("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={creating || !name.trim() || !hasOrg || !isValidSlug(slug)}
             >
-              {creating ? "Creating…" : "Create team"}
+              {creating ? copy("creating") : copy("create")}
             </Button>
           </SheetFooter>
         </form>

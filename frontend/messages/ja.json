@@ -5305,5 +5305,57 @@
     "staleMetrics": "更新に失敗しました。最後に取得できたメトリクスを表示しています。",
     "metricsUnavailable": "メトリクスを読み込めませんでした。",
     "retryMetrics": "メトリクスを再試行"
+  },
+  "teams": {
+    "title": "チーム",
+    "context": "チームはプロジェクト、アプリ、およびそれらへのアクセス権の範囲を定めます。",
+    "newTeam": "新しいチーム",
+    "columnTeam": "チーム",
+    "columnCreated": "作成日",
+    "edit": "編集",
+    "delete": "削除",
+    "emptyTitle": "チームはまだありません",
+    "emptyDescription": "チームを作成して、プロジェクトとアプリをまとめましょう。",
+    "deleteTitle": "チーム {slug} を削除しますか？",
+    "deleteGenericTitle": "チームを削除しますか？",
+    "deleteDescription": "チームを廃止し、スラッグを再利用できるようにします。プロジェクトやアプリの所属先は変更されません。",
+    "confirmDelete": "チームを削除",
+    "createDescription": "チームはプロジェクト、メンバー、トークンの範囲を定めます。スラッグは一意で、チームの廃止後に再利用できます。",
+    "displayName": "表示名",
+    "exampleName": "バックエンドチーム",
+    "slug": "スラッグ",
+    "slugHint": "小文字の英字で始め、英字、数字、ハイフンを使って40文字以内にしてください。末尾は英字または数字にします。",
+    "descriptionOptional": "説明（任意）",
+    "descriptionPlaceholder": "このチームが担当するリソースは？",
+    "cancel": "キャンセル",
+    "creating": "作成中…",
+    "create": "チームを作成",
+    "editTitle": "チームを編集",
+    "editDescription": "チーム名またはスラッグを変更します。スラッグは組織内で一意であり、URLに使用されます。",
+    "generate": "生成",
+    "saving": "保存中…",
+    "save": "変更を保存",
+    "feedback": {
+      "created": "チーム {slug} を作成しました",
+      "saved": "チームを {slug} として保存しました",
+      "deleted": "{slug} を削除しました",
+      "createFailed": "チームを作成できませんでした",
+      "saveFailed": "チームを保存できませんでした",
+      "deleteFailed": "チームを削除できませんでした",
+      "refreshWarning": "表示を更新できませんでした。最新のデータを確認するには表示を更新してください。"
+    },
+    "list": {
+      "search": "チームを検索…",
+      "all": "すべて",
+      "mine": "自分のチーム"
+    },
+    "slugStatus": {
+      "invalid": "小文字の英字、数字、ハイフンを使い、英字で始めて英字または数字で終えてください（40文字以内）。",
+      "checking": "利用可能か確認中…",
+      "available": "利用可能",
+      "taken": "この組織で既に使われています。",
+      "unchanged": "現在のスラッグ — URLに使用されます。",
+      "empty": "小文字の英字、数字、ハイフンを使います。URLに使用されます。"
+    }
   }
 }

@@ -5308,5 +5308,57 @@
     "staleMetrics": "La actualización falló. Se muestran las últimas métricas cargadas correctamente.",
     "metricsUnavailable": "No se pudieron cargar las métricas.",
     "retryMetrics": "Reintentar métricas"
+  },
+  "teams": {
+    "title": "Equipos",
+    "context": "Los equipos delimitan proyectos, aplicaciones y sus concesiones de acceso.",
+    "newTeam": "Nuevo equipo",
+    "columnTeam": "Equipo",
+    "columnCreated": "Creado",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "emptyTitle": "Aún no hay equipos",
+    "emptyDescription": "Crea un equipo para empezar a agrupar proyectos y aplicaciones.",
+    "deleteTitle": "¿Eliminar el equipo {slug}?",
+    "deleteGenericTitle": "¿Eliminar el equipo?",
+    "deleteDescription": "Retira el equipo y permite reutilizar su identificador. Esto no reasigna sus proyectos ni aplicaciones.",
+    "confirmDelete": "Eliminar equipo",
+    "createDescription": "Los equipos delimitan proyectos, miembros y tokens. Los identificadores son únicos y pueden reutilizarse tras retirar el equipo.",
+    "displayName": "Nombre visible",
+    "exampleName": "Equipo de backend",
+    "slug": "Identificador",
+    "slugHint": "Empieza con una letra minúscula; usa letras, números y guiones, hasta 40 caracteres. Termina con una letra o un número.",
+    "descriptionOptional": "Descripción (opcional)",
+    "descriptionPlaceholder": "¿Qué recursos pertenecen a este equipo?",
+    "cancel": "Cancelar",
+    "creating": "Creando…",
+    "create": "Crear equipo",
+    "editTitle": "Editar equipo",
+    "editDescription": "Cambia el nombre o el identificador de este equipo. Los identificadores son únicos dentro de la organización y se usan en las URL.",
+    "generate": "Generar",
+    "saving": "Guardando…",
+    "save": "Guardar cambios",
+    "feedback": {
+      "created": "Se creó el equipo {slug}",
+      "saved": "Equipo guardado como {slug}",
+      "deleted": "Se eliminó {slug}",
+      "createFailed": "No se pudo crear el equipo",
+      "saveFailed": "No se pudo guardar el equipo",
+      "deleteFailed": "No se pudo eliminar el equipo",
+      "refreshWarning": "No se pudo actualizar la vista. Actualiza para ver los datos actuales."
+    },
+    "list": {
+      "search": "Buscar equipos…",
+      "all": "Todos",
+      "mine": "Mis equipos"
+    },
+    "slugStatus": {
+      "invalid": "Usa letras minúsculas, números y guiones; empieza con una letra y termina con una letra o un número (hasta 40 caracteres).",
+      "checking": "Comprobando disponibilidad…",
+      "available": "Disponible",
+      "taken": "Ya está en uso en esta organización.",
+      "unchanged": "Identificador actual: se usa en las URL.",
+      "empty": "Letras minúsculas, números y guiones. Se usa en las URL."
+    }
   }
 }

@@ -5385,5 +5385,57 @@
     "staleMetrics": "Refresh failed. Showing the last successfully loaded metrics.",
     "metricsUnavailable": "Metrics could not be loaded.",
     "retryMetrics": "Retry metrics"
+  },
+  "teams": {
+    "title": "Teams",
+    "context": "Teams scope projects, apps and the grants on them.",
+    "newTeam": "New team",
+    "columnTeam": "Team",
+    "columnCreated": "Created",
+    "edit": "Edit",
+    "delete": "Delete",
+    "emptyTitle": "No teams yet",
+    "emptyDescription": "Create a team to start grouping projects and apps.",
+    "deleteTitle": "Delete team {slug}?",
+    "deleteGenericTitle": "Delete team?",
+    "deleteDescription": "Retire the team and make its slug reusable. This does not reassign its projects or applications.",
+    "confirmDelete": "Delete team",
+    "createDescription": "Teams scope projects, members and tokens. Slugs are unique and can be reused after retirement.",
+    "displayName": "Display name",
+    "exampleName": "Backend team",
+    "slug": "Slug",
+    "slugHint": "Start with a lowercase letter; use letters, numbers and hyphens, up to 40 characters. End with a letter or number.",
+    "descriptionOptional": "Description (optional)",
+    "descriptionPlaceholder": "What does this team own?",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create team",
+    "editTitle": "Edit team",
+    "editDescription": "Rename this team or change its slug. Slugs are unique within the organization and are used in URLs.",
+    "generate": "Generate",
+    "saving": "Saving…",
+    "save": "Save changes",
+    "feedback": {
+      "created": "Team {slug} created",
+      "saved": "Team saved as {slug}",
+      "deleted": "Deleted {slug}",
+      "createFailed": "Could not create the team",
+      "saveFailed": "Could not save the team",
+      "deleteFailed": "Could not delete the team",
+      "refreshWarning": "Could not refresh the view. Refresh to see current data."
+    },
+    "list": {
+      "search": "Search teams…",
+      "all": "All",
+      "mine": "Mine"
+    },
+    "slugStatus": {
+      "invalid": "Use lowercase letters, numbers and hyphens; start with a letter and end with a letter or number (up to 40 characters).",
+      "checking": "Checking availability…",
+      "available": "Available",
+      "taken": "Already taken in this organization.",
+      "unchanged": "Current slug — used in URLs.",
+      "empty": "Lowercase letters, numbers and hyphens. Used in URLs."
+    }
   }
 }

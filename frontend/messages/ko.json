@@ -5305,5 +5305,57 @@
     "staleMetrics": "새로고침에 실패했습니다. 마지막으로 불러온 지표를 표시합니다.",
     "metricsUnavailable": "지표를 불러오지 못했습니다.",
     "retryMetrics": "지표 다시 불러오기"
+  },
+  "teams": {
+    "title": "팀",
+    "context": "팀은 프로젝트, 앱 및 해당 접근 권한의 범위를 정합니다.",
+    "newTeam": "새 팀",
+    "columnTeam": "팀",
+    "columnCreated": "생성일",
+    "edit": "편집",
+    "delete": "삭제",
+    "emptyTitle": "아직 팀이 없습니다",
+    "emptyDescription": "팀을 만들어 프로젝트와 앱을 그룹화하세요.",
+    "deleteTitle": "팀 {slug}을(를) 삭제할까요?",
+    "deleteGenericTitle": "팀을 삭제할까요?",
+    "deleteDescription": "팀을 사용 중지하고 슬러그를 다시 사용할 수 있게 합니다. 프로젝트나 앱의 소속은 변경되지 않습니다.",
+    "confirmDelete": "팀 삭제",
+    "createDescription": "팀은 프로젝트, 구성원 및 토큰의 범위를 정합니다. 슬러그는 고유하며 팀을 사용 중지한 후 다시 사용할 수 있습니다.",
+    "displayName": "표시 이름",
+    "exampleName": "백엔드 팀",
+    "slug": "슬러그",
+    "slugHint": "영문 소문자로 시작하고 영문자, 숫자, 하이픈을 사용해 40자 이내로 입력하세요. 마지막 문자는 영문자 또는 숫자여야 합니다.",
+    "descriptionOptional": "설명(선택 사항)",
+    "descriptionPlaceholder": "이 팀이 담당하는 리소스는 무엇인가요?",
+    "cancel": "취소",
+    "creating": "생성 중…",
+    "create": "팀 생성",
+    "editTitle": "팀 편집",
+    "editDescription": "팀 이름이나 슬러그를 변경하세요. 슬러그는 조직 내에서 고유하며 URL에 사용됩니다.",
+    "generate": "생성",
+    "saving": "저장 중…",
+    "save": "변경 사항 저장",
+    "feedback": {
+      "created": "팀 {slug}을(를) 생성했습니다",
+      "saved": "팀을 {slug}(으)로 저장했습니다",
+      "deleted": "{slug}을(를) 삭제했습니다",
+      "createFailed": "팀을 생성하지 못했습니다",
+      "saveFailed": "팀을 저장하지 못했습니다",
+      "deleteFailed": "팀을 삭제하지 못했습니다",
+      "refreshWarning": "화면을 새로 고치지 못했습니다. 최신 데이터를 보려면 새로 고치세요."
+    },
+    "list": {
+      "search": "팀 검색…",
+      "all": "전체",
+      "mine": "내 팀"
+    },
+    "slugStatus": {
+      "invalid": "영문 소문자, 숫자, 하이픈을 사용하고 영문자로 시작해 영문자 또는 숫자로 끝내세요(최대 40자).",
+      "checking": "사용 가능 여부 확인 중…",
+      "available": "사용 가능",
+      "taken": "이 조직에서 이미 사용 중입니다.",
+      "unchanged": "현재 슬러그 — URL에 사용됩니다.",
+      "empty": "영문 소문자, 숫자, 하이픈을 사용하세요. URL에 사용됩니다."
+    }
   }
 }

@@ -17,6 +17,11 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Translate connected Team list/create/edit/delete presentation and feedback in
+  all eight locales, preserving scope decisions, identifiers and mutation inputs.
+  Keep accepted team writes successful when their list refresh fails; refused
+  or unavailable writes retain drafts and their original diagnostic (#2145).
+
 - Localize connected Home layout settings and Home-specific persistence feedback
   in all eight locales. Copy reflects account synchronization and offline browser
   fallback; original refusal diagnostics and exact preference patches remain intact
