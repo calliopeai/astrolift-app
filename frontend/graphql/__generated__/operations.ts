@@ -14093,7 +14093,7 @@ export type ListMembersQueryVariables = Exact<{
 
 export type ListMembersQuery = { astroliftMembers: Array<{ id: string, scopeKind: string, scopeId: string, isActive: boolean, lifecycle: string, joinedAt?: string | null, lastSeenAt?: string | null, lastActiveAt?: string | null, createdAt: string, deletedAt?: string | null, teamId?: string | null, teamSlug?: string | null, teamName?: string | null, user: { id: string, username: string, email: string, isActive: boolean } }> };
 
-export type MemberFieldsFragment = { id: string, scopeKind: string, scopeId: string, isActive: boolean, lifecycle: string, joinedAt?: string | null, lastSeenAt?: string | null, lastActiveAt?: string | null, createdAt: string, deletedAt?: string | null, user: { id: string, username: string, email: string, isActive: boolean } };
+export type MemberFieldsFragment = { id: string, scopeKind: string, scopeId: string, isActive: boolean, lifecycle: string, joinedAt?: string | null, lastSeenAt?: string | null, lastActiveAt?: string | null, createdAt: string, deletedAt?: string | null, user: { id: string, username: string, email: string, isActive: boolean, isAnonymized?: boolean | null } };
 
 export type ListMembersPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
@@ -14106,7 +14106,7 @@ export type ListMembersPageQueryVariables = Exact<{
 }>;
 
 
-export type ListMembersPageQuery = { astroliftMembersPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ teamId?: string | null, teamSlug?: string | null, teamName?: string | null, id: string, scopeKind: string, scopeId: string, isActive: boolean, lifecycle: string, joinedAt?: string | null, lastSeenAt?: string | null, lastActiveAt?: string | null, createdAt: string, deletedAt?: string | null, teams?: Array<{ id: string, slug: string, name: string }> | null, user: { id: string, username: string, email: string, isActive: boolean } }> } };
+export type ListMembersPageQuery = { astroliftMembersPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ teamId?: string | null, teamSlug?: string | null, teamName?: string | null, id: string, scopeKind: string, scopeId: string, isActive: boolean, lifecycle: string, joinedAt?: string | null, lastSeenAt?: string | null, lastActiveAt?: string | null, createdAt: string, deletedAt?: string | null, teams?: Array<{ id: string, slug: string, name: string }> | null, user: { id: string, username: string, email: string, isActive: boolean, isAnonymized?: boolean | null } }> } };
 
 export type ListTeamMembersQueryVariables = Exact<{
   teamId: Scalars['GUID']['input'];
