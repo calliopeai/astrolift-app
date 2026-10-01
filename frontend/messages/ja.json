@@ -1528,6 +1528,24 @@
         "refreshWarning": "変更は受理されましたが、表示を更新できませんでした。再読み込みして現在の状態を確認してください。",
         "navigationWarning": "アーカイブは受理されましたが、画面を移動できませんでした。アプリ一覧を開いて続行してください。",
         "sourceChanged": "確認したアプリまたはアクセス権が変わりました。現在のアプリを確認してから再試行してください。"
+      },
+      "retentionFlow": {
+        "title": "データ保持",
+        "description": "各シグナルの保持期間を保存します。ポリシーが記録されていない場合、このカードには既定値の {days, plural, one {# 日} other {# 日}} が表示されます。ポリシーの保存は、既存データの削除完了を示すものではありません。",
+        "platformDefault": "プラットフォームの既定値",
+        "days": "{days, plural, one {# 日} other {# 日}}",
+        "selectorLabel": "{signal}の保持期間",
+        "saveAccepted": "{slug} の{signal}保持期間を保存しました：{days, plural, one {# 日} other {# 日}}。",
+        "noResponse": "サーバーから応答がありません。",
+        "saveFailed": "保持ポリシーを保存できませんでした。",
+        "refreshWarning": "保持期間の変更は受理されましたが、表示を更新できませんでした。再読み込みして保存されたポリシーを確認してください。",
+        "sourceChanged": "確認したアプリ、ポリシーまたはアクセス権が変わりました。現在のアプリを確認してから再試行してください。",
+        "signals": {
+          "logs": "ログ",
+          "metrics": "メトリクス",
+          "traces": "トレース",
+          "auditEvents": "監査イベント"
+        }
       }
     },
     "common": {

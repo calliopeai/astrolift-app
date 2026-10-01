@@ -72,3 +72,12 @@ replica settings and deployment suppression, not proof of a live rollout.
 Rejected writes do not refresh or navigate. An accepted write survives a failed
 view refresh or navigation, with recovery feedback rather than a false write
 failure. The backend's current owner and permission checks remain authoritative.
+
+The retention settings card keeps the existing `app.update` decision and sends
+only the app slug, technical signal and integer day count. Saving records a
+retention policy; it does not confirm deletion of existing data. Refused writes
+leave the recorded observation intact and trigger no refresh. Accepted changes
+remain accepted through a failed view refresh, with separate recovery feedback.
+Observed GUID/version/policy changes invalidate local selectors and callbacks,
+but the API has no immutable target or version precondition. The backend's
+current owner, permission and signal/day validation remain authoritative.

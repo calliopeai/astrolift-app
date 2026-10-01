@@ -1528,6 +1528,24 @@
         "refreshWarning": "变更已接受，但视图无法刷新。请刷新以检查当前状态。",
         "navigationWarning": "归档已接受，但页面跳转失败。请打开应用列表继续。",
         "sourceChanged": "已观察的应用或访问权限发生变化。请检查当前应用后再重试。"
+      },
+      "retentionFlow": {
+        "title": "数据保留",
+        "description": "为每种信号选择要保存的保留期限。没有已记录的策略时，此卡片显示平台默认值 {days, plural, one {# 天} other {# 天}}。保存策略并不确认现有数据已删除。",
+        "platformDefault": "平台默认值",
+        "days": "{days, plural, one {# 天} other {# 天}}",
+        "selectorLabel": "{signal}保留期限",
+        "saveAccepted": "已为 {slug} 保存{signal}保留期限：{days, plural, one {# 天} other {# 天}}。",
+        "noResponse": "服务器未响应。",
+        "saveFailed": "无法保存保留策略。",
+        "refreshWarning": "保留期限变更已接受，但视图无法刷新。请刷新以检查已保存的策略。",
+        "sourceChanged": "已观察的应用、策略或访问权限发生变化。请检查当前应用后再重试。",
+        "signals": {
+          "logs": "日志",
+          "metrics": "指标",
+          "traces": "追踪",
+          "auditEvents": "审计事件"
+        }
       }
     },
     "common": {

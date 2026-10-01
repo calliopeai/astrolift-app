@@ -1528,6 +1528,24 @@
         "refreshWarning": "변경은 수락되었지만 화면을 새로 고치지 못했습니다. 새로 고침하여 현재 상태를 확인하세요.",
         "navigationWarning": "보관은 수락되었지만 화면 이동에 실패했습니다. 앱 목록을 열어 계속하세요.",
         "sourceChanged": "확인한 앱 또는 접근 권한이 변경되었습니다. 현재 앱을 검토한 후 다시 시도하세요."
+      },
+      "retentionFlow": {
+        "title": "데이터 보존",
+        "description": "각 신호의 보존 기간을 저장합니다. 기록된 정책이 없으면 이 카드에 기본값인 {days, plural, one {#일} other {#일}}이 표시됩니다. 정책을 저장해도 기존 데이터가 삭제되었음을 확인하는 것은 아닙니다.",
+        "platformDefault": "플랫폼 기본값",
+        "days": "{days, plural, one {#일} other {#일}}",
+        "selectorLabel": "{signal} 보존 기간",
+        "saveAccepted": "{slug}의 {signal} 보존 기간을 저장했습니다: {days, plural, one {#일} other {#일}}.",
+        "noResponse": "서버 응답이 없습니다.",
+        "saveFailed": "보존 정책을 저장하지 못했습니다.",
+        "refreshWarning": "보존 기간 변경은 수락되었지만 화면을 새로 고치지 못했습니다. 새로 고침하여 저장된 정책을 확인하세요.",
+        "sourceChanged": "확인한 앱, 정책 또는 접근 권한이 변경되었습니다. 현재 앱을 검토한 후 다시 시도하세요.",
+        "signals": {
+          "logs": "로그",
+          "metrics": "메트릭",
+          "traces": "추적",
+          "auditEvents": "감사 이벤트"
+        }
       }
     },
     "common": {

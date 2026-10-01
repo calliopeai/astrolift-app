@@ -1528,6 +1528,24 @@
         "refreshWarning": "Die Änderung wurde angenommen, aber die Ansicht konnte nicht aktualisiert werden. Aktualisieren Sie sie, um den aktuellen Zustand zu prüfen.",
         "navigationWarning": "Die Archivierung wurde angenommen, aber die Navigation ist fehlgeschlagen. Öffnen Sie Apps, um fortzufahren.",
         "sourceChanged": "Die beobachtete App oder der Zugriff hat sich geändert. Prüfen Sie die aktuelle App vor einem erneuten Versuch."
+      },
+      "retentionFlow": {
+        "title": "Datenaufbewahrung",
+        "description": "Wählen Sie gespeicherte Aufbewahrungszeiten je Signal. Ohne gespeicherte Richtlinie zeigt diese Karte den Plattformstandard von {days, plural, one {# Tag} other {# Tagen}}. Das Speichern bestätigt nicht, dass vorhandene Daten gelöscht wurden.",
+        "platformDefault": "Plattformstandard",
+        "days": "{days, plural, one {# Tag} other {# Tage}}",
+        "selectorLabel": "Aufbewahrung: {signal}",
+        "saveAccepted": "Aufbewahrung für {signal} in {slug} gespeichert: {days, plural, one {# Tag} other {# Tage}}.",
+        "noResponse": "Keine Antwort vom Server.",
+        "saveFailed": "Die Aufbewahrungsrichtlinie konnte nicht gespeichert werden.",
+        "refreshWarning": "Die Änderung wurde angenommen, aber die Ansicht konnte nicht aktualisiert werden. Aktualisieren Sie sie, um die gespeicherte Richtlinie zu prüfen.",
+        "sourceChanged": "Die beobachtete App, Richtlinie oder der Zugriff hat sich geändert. Prüfen Sie die aktuelle App vor einem erneuten Versuch.",
+        "signals": {
+          "logs": "Protokolle",
+          "metrics": "Metriken",
+          "traces": "Traces",
+          "auditEvents": "Audit-Ereignisse"
+        }
       }
     },
     "common": {

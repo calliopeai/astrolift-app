@@ -44,6 +44,12 @@
   soft deletion through failed Apps refresh or navigation; refused writes retain
   their confirmation and exact diagnostics (#2145, bounded item 5 flow).
 
+- Localize the connected app retention-policy settings card and feedback in all
+  eight locales. Preserve signal IDs/day presets and raw refusals, refresh only
+  accepted writes, and retain acceptance after read failure. Bind selectors and
+  pending indicators to the observed app/source without promising data deletion
+  or backend version preconditions (#2145).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

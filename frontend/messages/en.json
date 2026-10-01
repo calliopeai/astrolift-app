@@ -2376,6 +2376,24 @@
         "refreshWarning": "The change was accepted, but the view could not refresh. Refresh to check the current state.",
         "navigationWarning": "The archive was accepted, but navigation failed. Open Apps to continue.",
         "sourceChanged": "The observed app or access changed. Review the current app before trying again."
+      },
+      "retentionFlow": {
+        "title": "Data retention",
+        "description": "Choose saved retention periods for each signal. Without a recorded policy, this card shows the platform default of {days, plural, one {# day} other {# days}}. Saving a policy does not confirm that existing data has been deleted.",
+        "platformDefault": "Platform default",
+        "days": "{days, plural, one {# day} other {# days}}",
+        "selectorLabel": "{signal} retention",
+        "saveAccepted": "Saved {signal} retention for {slug}: {days, plural, one {# day} other {# days}}.",
+        "noResponse": "No response from the server.",
+        "saveFailed": "Could not save the retention policy.",
+        "refreshWarning": "The retention change was accepted, but the view could not refresh. Refresh to check the saved policy.",
+        "sourceChanged": "The observed app, policy or access changed. Review the current app before trying again.",
+        "signals": {
+          "logs": "Logs",
+          "metrics": "Metrics",
+          "traces": "Traces",
+          "auditEvents": "Audit events"
+        }
       }
     },
     "workloadDetail": {

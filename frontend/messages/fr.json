@@ -1528,6 +1528,24 @@
         "refreshWarning": "Le changement a été accepté, mais la vue n’a pas pu être actualisée. Actualisez-la pour vérifier l’état actuel.",
         "navigationWarning": "L’archivage a été accepté, mais la navigation a échoué. Ouvrez Applications pour continuer.",
         "sourceChanged": "L’application observée ou les droits ont changé. Vérifiez l’application actuelle avant de réessayer."
+      },
+      "retentionFlow": {
+        "title": "Conservation des données",
+        "description": "Choisissez les durées de conservation enregistrées pour chaque signal. Sans politique enregistrée, cette carte affiche la valeur par défaut de {days, plural, one {# jour} other {# jours}}. Enregistrer une politique ne confirme pas la suppression des données existantes.",
+        "platformDefault": "Valeur par défaut",
+        "days": "{days, plural, one {# jour} other {# jours}}",
+        "selectorLabel": "Conservation des {signal}",
+        "saveAccepted": "Conservation des {signal} enregistrée pour {slug} : {days, plural, one {# jour} other {# jours}}.",
+        "noResponse": "Aucune réponse du serveur.",
+        "saveFailed": "Impossible d’enregistrer la politique de conservation.",
+        "refreshWarning": "Le changement de conservation a été accepté, mais la vue n’a pas pu être actualisée. Actualisez-la pour vérifier la politique enregistrée.",
+        "sourceChanged": "L’application, la politique observée ou les droits ont changé. Vérifiez l’application actuelle avant de réessayer.",
+        "signals": {
+          "logs": "Journaux",
+          "metrics": "Métriques",
+          "traces": "Traces",
+          "auditEvents": "Événements d’audit"
+        }
       }
     },
     "common": {

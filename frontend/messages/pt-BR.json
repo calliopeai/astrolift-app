@@ -1528,6 +1528,24 @@
         "refreshWarning": "A alteração foi aceita, mas a visualização não pôde ser atualizada. Atualize-a para verificar o estado atual.",
         "navigationWarning": "O arquivamento foi aceito, mas a navegação falhou. Abra Aplicativos para continuar.",
         "sourceChanged": "O aplicativo observado ou o acesso mudou. Revise o aplicativo atual antes de tentar novamente."
+      },
+      "retentionFlow": {
+        "title": "Retenção de dados",
+        "description": "Escolha os períodos de retenção salvos para cada sinal. Sem uma política registrada, este cartão mostra o padrão de {days, plural, one {# dia} other {# dias}}. Salvar uma política não confirma que os dados existentes foram excluídos.",
+        "platformDefault": "Padrão da plataforma",
+        "days": "{days, plural, one {# dia} other {# dias}}",
+        "selectorLabel": "Retenção de {signal}",
+        "saveAccepted": "Retenção de {signal} salva para {slug}: {days, plural, one {# dia} other {# dias}}.",
+        "noResponse": "Nenhuma resposta do servidor.",
+        "saveFailed": "Não foi possível salvar a política de retenção.",
+        "refreshWarning": "A alteração de retenção foi aceita, mas a visualização não pôde ser atualizada. Atualize-a para verificar a política salva.",
+        "sourceChanged": "O aplicativo, a política observada ou o acesso mudou. Revise o aplicativo atual antes de tentar novamente.",
+        "signals": {
+          "logs": "Logs",
+          "metrics": "Métricas",
+          "traces": "Rastreamentos",
+          "auditEvents": "Eventos de auditoria"
+        }
       }
     },
     "common": {

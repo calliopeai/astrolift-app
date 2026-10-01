@@ -819,3 +819,53 @@ does not establish downstream workload teardown, completed browser navigation,
 provider deletion or new lifecycle authority. Archive/restore, other app-frame
 feedback, API/backend/schema and other catalogue subtrees are outside this leaf;
 #2145 remains open for its remaining surfaces. No production or cloud call ran.
+
+## Connected app settings retention policies
+
+`RetentionPolicyView`, its owned `useRetentionPolicy` and the actual settings
+`RetentionPolicyCard` use 14 genuine `apps.settings.retentionFlow` message leaves
+in all eight locales. Signal labels, default guidance, accessible picker names,
+day units and accepted/refused/refresh feedback are translated. ICU plural
+arguments and branches remain equivalent while permitting each language's word
+order. Recorded positive periods outside the card's fixed presets stay visible;
+this adds no new preset. Known human signal labels use an exact mapping; unknown
+technical signal identifiers remain literal in the presentation helper.
+
+The existing technical signals, presets `[7,14,30,60,90,180,365]`, default of 30,
+GetApp query and `{ appSlug, signal, retentionDays }` mutation input are unchanged.
+The existing `app.update` and optimistic-loading fence is preserved, with backend
+owner/permission/validation checks remaining authoritative. No backend, schema,
+generated contract or new authority/pagination behavior is introduced. Copy
+explains that a saved retention policy is not proof that old data was deleted.
+
+Refused, missing and failed writes cause no refresh or accepted-write warning;
+raw diagnostics remain literal and the recorded selected period stays visible.
+Accepted writes refresh the original active GetApp variables through the shared
+safe feedback helper, preserving acceptance if the read fails. A failed same-
+target cached read retains the observed controls. A missing/unavailable initial
+app read does not render a healthy default-retention card. The outer settings
+read/retry presentation remains unchanged and outside this leaf.
+
+The actual card passes observed GUID/version/policies. Changed source facts or
+permissions close old pickers and invalidate stored callbacks, including source
+ABA; language changes alone preserve an open selector. Pending state is tracked
+by app observation and operation identity, so a late app A completion cannot
+clear app B's current save, and one signal's successful refresh cannot clear
+another pending signal on the same app. These are local observed-source
+safeguards, not server immutable-incarnation or compare-and-swap guarantees.
+
+Focused proof on the ec1abcd6-based source: 275 checks pass in two dedicated
+files (267 actual-card/schema-validated Apollo HttpLink/locale/context checks and
+8 portable stories). Every locale and all four signals cover exact inputs,
+accepted/refused/missing/transport/failed-read outcomes, refusal-plus-read-failure
+without a read, keyboard retry, source/permission withdrawal and replacement,
+stored callbacks, concurrent pending ownership, known/unknown literal metadata,
+ICU parity, genuine translations and recoverable-error-free hydration.
+TypeScript, scoped ESLint (zero warnings), source/catalogue formatting and diff
+checks pass. Existing eight catalogue trees are exact outside the owned subtree.
+No broad suite, installation, live call, cloud or publication was performed.
+
+This completes this retention card within original item 13, not the whole item.
+The independently frozen Archive/restore leaf is unchanged. Environment
+settings/overrides, managed-service administration, agent-mode resync and other
+operational-hook feedback remain separate connected translation boundaries.
