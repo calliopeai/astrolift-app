@@ -1546,6 +1546,22 @@
           "traces": "追踪",
           "auditEvents": "审计事件"
         }
+      },
+      "agentResyncFlow": {
+        "title": "从源重新同步智能体包",
+        "description": "读取已登记的源和所选清单，解析技能与工具，并登记不可变包及工作流的变更。这不会启动运行，也不确认部署。",
+        "button": "重新同步包",
+        "buttonTooltip": "重新读取已登记的仓库、引用和清单路径。登记不代表代码已检出、已重新部署或提供商处于正常状态。",
+        "noResponse": "重新同步失败：后端未返回响应。",
+        "failed": "重新同步失败。",
+        "refreshWarning": "已接受 {slug} 的重新同步，但无法刷新其设置。请重试读取以查看当前数据。",
+        "sourceChanged": "当前显示的应用、源或权限已更改。重新同步前请核对当前源。",
+        "acceptedWithoutDetails": "已接受 {slug} 的重新同步，但未返回结果详情。请查看当前登记记录；尚未确认完成。",
+        "agentInSync": "{slug} 的已登记源已同步。未启动运行。",
+        "agentApplied": "已应用 {slug} 的源登记。未启动运行；尚未确认部署。",
+        "inSync": "已同步。",
+        "accepted": "已接受 {slug} 的重新同步。",
+        "reportedState": "已接受 {slug} 的重新同步；报告的状态为：{state}。尚未确认完成。"
       }
     },
     "common": {

@@ -1546,6 +1546,22 @@
           "traces": "Traces",
           "auditEvents": "Audit-Ereignisse"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Agent-Paket erneut aus der Quelle synchronisieren",
+        "description": "Die registrierte Quelle und das ausgewählte Manifest lesen, Skills und Werkzeuge auflösen und unveränderliche Paket- und Workflow-Änderungen registrieren. Dies startet keinen Lauf und bestätigt keine Bereitstellung.",
+        "button": "Paket erneut synchronisieren",
+        "buttonTooltip": "Registriertes Repository, Referenz und Manifest-Pfad erneut lesen. Die Registrierung bestätigt weder den Code-Checkout noch eine erneute Bereitstellung oder den Zustand des Anbieters.",
+        "noResponse": "Synchronisierung fehlgeschlagen: keine Antwort vom Server.",
+        "failed": "Synchronisierung fehlgeschlagen.",
+        "refreshWarning": "Die Synchronisierung für {slug} wurde angenommen, aber die Einstellungen konnten nicht aktualisiert werden. Lesen Sie die aktuellen Daten erneut.",
+        "sourceChanged": "Die beobachtete App, Quelle oder Berechtigung hat sich geändert. Prüfen Sie vor der Synchronisierung die aktuelle Quelle.",
+        "acceptedWithoutDetails": "Die Synchronisierung für {slug} wurde angenommen, aber es wurden keine Ergebnisdetails zurückgegeben. Prüfen Sie die aktuellen Registrierungen; der Abschluss ist unbestätigt.",
+        "agentInSync": "Die registrierte Quelle für {slug} ist bereits synchron. Es wurde kein Lauf gestartet.",
+        "agentApplied": "Die Quellregistrierung für {slug} wurde angewendet. Es wurde kein Lauf gestartet; die Bereitstellung ist unbestätigt.",
+        "inSync": "Bereits synchron.",
+        "accepted": "Synchronisierung für {slug} angenommen.",
+        "reportedState": "Synchronisierung für {slug} angenommen; gemeldeter Status: {state}. Der Abschluss ist unbestätigt."
       }
     },
     "common": {

@@ -2394,6 +2394,22 @@
           "traces": "Traces",
           "auditEvents": "Audit events"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Resync agent package from source",
+        "description": "Read the registered source and selected manifest, resolve skills and tools, and register immutable package and workflow changes. This does not start a run or confirm deployment.",
+        "button": "Resync package",
+        "buttonTooltip": "Read the registered repository, ref and manifest path again. Registration does not confirm checkout, redeployment or provider health.",
+        "noResponse": "Resync failed: no response from the backend.",
+        "failed": "Resync failed.",
+        "refreshWarning": "Resync was accepted for {slug}, but its settings could not refresh. Retry the read to see current data.",
+        "sourceChanged": "The observed app, source or permission changed. Review the current source before resyncing.",
+        "acceptedWithoutDetails": "Resync was accepted for {slug}, but no result details were returned. Check current registration records; completion is unconfirmed.",
+        "agentInSync": "Registered source is already in sync for {slug}. No run was started.",
+        "agentApplied": "Source registration was applied for {slug}. No run was started; deployment is unconfirmed.",
+        "inSync": "Already in sync.",
+        "accepted": "Resync accepted for {slug}.",
+        "reportedState": "Resync accepted for {slug}; reported state: {state}. Completion is unconfirmed."
       }
     },
     "workloadDetail": {

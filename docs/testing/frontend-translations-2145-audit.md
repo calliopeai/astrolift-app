@@ -959,3 +959,25 @@ live request or publication is claimed by this isolated presentation leaf.
 The original item 14 PendingGates presentation was already translated on the
 deployed base. This leaf supplies the remaining specified detail labels, without
 claiming the later settings/lifecycle gaps or downstream secret application.
+
+### Original item 13 — agent source-resync settings (bounded leaf)
+
+- Connected `ResyncSourceView`, `use-resync-source` and `ResyncSourceCard`, including
+  the existing agent settings consumer, use 14 genuine additive
+  `apps.settings.agentResyncFlow` messages in all eight locales. All existing
+  catalogue values, manifest-mode presentation, technical source coordinates,
+  current queries/mutation inputs and raw server diagnostics/summaries remain.
+- Schema-validated actual-card Apollo HttpLink journeys cover all eight locales:
+  applied/in-sync/unknown states, refusal/fallback/transport/missing response,
+  accepted-without-details and accepted-with-failed-read. Refusals cause no refresh;
+  accepted results are retained. Keyboard retries, actual card source/permission
+  withdrawal, callback ABA and late concurrent outcomes preserve exact targets.
+- ICU identity arguments, locale changes, request-clock relative dates/hydration
+  and nine portable stories are covered. Focused TypeScript, lint and source
+  formatting gates apply; no broad suite, backend/schema change or live operation.
+- Agent success reports registration only, not a queued run, completed checkout,
+  redeployment or provider health. Client source observations do not establish a
+  server immutable identity/version precondition or add permission authority.
+- Original item 13 remains partial: EnvironmentSettings/overrides,
+  ManagedServicesAdmin and other operational-hook feedback are separate remaining
+  surfaces. Archive and retention fixes are independently frozen leaves.

@@ -1546,6 +1546,22 @@
           "traces": "Traces",
           "auditEvents": "Événements d’audit"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Resynchroniser le paquet de l’agent depuis la source",
+        "description": "Lire la source enregistrée et le manifeste sélectionné, résoudre les compétences et les outils, puis enregistrer les modifications immuables du paquet et des workflows. Cela ne lance aucune exécution et ne confirme aucun déploiement.",
+        "button": "Resynchroniser le paquet",
+        "buttonTooltip": "Relire le dépôt, la référence et le chemin du manifeste enregistrés. L’enregistrement ne confirme ni la récupération du code, ni le redéploiement, ni l’état du fournisseur.",
+        "noResponse": "Échec de la resynchronisation : aucune réponse du serveur.",
+        "failed": "Échec de la resynchronisation.",
+        "refreshWarning": "La resynchronisation de {slug} a été acceptée, mais ses paramètres n’ont pas pu être actualisés. Réessayez la lecture pour voir les données actuelles.",
+        "sourceChanged": "L’application, la source ou les autorisations observées ont changé. Vérifiez la source actuelle avant de resynchroniser.",
+        "acceptedWithoutDetails": "La resynchronisation de {slug} a été acceptée, mais aucun détail n’a été renvoyé. Consultez les enregistrements actuels ; l’achèvement n’est pas confirmé.",
+        "agentInSync": "La source enregistrée de {slug} est déjà synchronisée. Aucune exécution n’a été lancée.",
+        "agentApplied": "L’enregistrement de la source de {slug} a été appliqué. Aucune exécution n’a été lancée ; le déploiement n’est pas confirmé.",
+        "inSync": "Déjà synchronisé.",
+        "accepted": "Resynchronisation acceptée pour {slug}.",
+        "reportedState": "Resynchronisation acceptée pour {slug} ; état signalé : {state}. L’achèvement n’est pas confirmé."
       }
     },
     "common": {

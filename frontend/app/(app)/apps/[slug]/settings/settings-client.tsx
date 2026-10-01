@@ -210,7 +210,7 @@ export function ResyncSourceCard({
 }) {
   return (
     <ResyncSourceView
-      {...useResyncSource(app.slug)}
+      {...useResyncSource(app.slug, app, agentMode)}
       lastResyncAt={app.lastResyncAt ?? null}
       agentMode={agentMode}
     />

@@ -1546,6 +1546,22 @@
           "traces": "Rastreamentos",
           "auditEvents": "Eventos de auditoria"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Ressincronizar o pacote do agente a partir da origem",
+        "description": "Ler a origem registrada e o manifesto selecionado, resolver habilidades e ferramentas e registrar alterações imutáveis do pacote e dos fluxos de trabalho. Isso não inicia uma execução nem confirma uma implantação.",
+        "button": "Ressincronizar pacote",
+        "buttonTooltip": "Ler novamente o repositório, a referência e o caminho do manifesto registrados. O registro não confirma a obtenção do código, uma nova implantação ou a integridade do provedor.",
+        "noResponse": "Falha na ressincronização: o servidor não respondeu.",
+        "failed": "Falha na ressincronização.",
+        "refreshWarning": "A ressincronização de {slug} foi aceita, mas não foi possível atualizar as configurações. Tente ler novamente para ver os dados atuais.",
+        "sourceChanged": "O aplicativo, a origem ou as permissões observadas mudaram. Confira a origem atual antes de ressincronizar.",
+        "acceptedWithoutDetails": "A ressincronização de {slug} foi aceita, mas nenhum detalhe foi retornado. Confira os registros atuais; a conclusão não foi confirmada.",
+        "agentInSync": "A origem registrada de {slug} já está sincronizada. Nenhuma execução foi iniciada.",
+        "agentApplied": "O registro da origem de {slug} foi aplicado. Nenhuma execução foi iniciada; a implantação não foi confirmada.",
+        "inSync": "Já está sincronizado.",
+        "accepted": "Ressincronização aceita para {slug}.",
+        "reportedState": "Ressincronização aceita para {slug}; estado informado: {state}. A conclusão não foi confirmada."
       }
     },
     "common": {

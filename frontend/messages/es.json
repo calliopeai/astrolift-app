@@ -1546,6 +1546,22 @@
           "traces": "Trazas",
           "auditEvents": "Eventos de auditoría"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Volver a sincronizar el paquete del agente desde el origen",
+        "description": "Leer el origen registrado y el manifiesto seleccionado, resolver habilidades y herramientas, y registrar cambios inmutables del paquete y los flujos de trabajo. Esto no inicia una ejecución ni confirma un despliegue.",
+        "button": "Volver a sincronizar el paquete",
+        "buttonTooltip": "Leer de nuevo el repositorio, la referencia y la ruta del manifiesto registrados. El registro no confirma la descarga del código, un nuevo despliegue ni el estado del proveedor.",
+        "noResponse": "No se pudo sincronizar: el servidor no respondió.",
+        "failed": "No se pudo sincronizar.",
+        "refreshWarning": "Se aceptó la sincronización de {slug}, pero no se pudo actualizar su configuración. Reintenta la lectura para ver los datos actuales.",
+        "sourceChanged": "La aplicación, el origen o los permisos observados cambiaron. Revisa el origen actual antes de sincronizar.",
+        "acceptedWithoutDetails": "Se aceptó la sincronización de {slug}, pero no se devolvieron detalles. Revisa los registros actuales; la finalización no está confirmada.",
+        "agentInSync": "El origen registrado de {slug} ya está sincronizado. No se inició ninguna ejecución.",
+        "agentApplied": "Se aplicó el registro del origen de {slug}. No se inició ninguna ejecución; el despliegue no está confirmado.",
+        "inSync": "Ya está sincronizado.",
+        "accepted": "Se aceptó la sincronización de {slug}.",
+        "reportedState": "Se aceptó la sincronización de {slug}; estado informado: {state}. La finalización no está confirmada."
       }
     },
     "common": {
