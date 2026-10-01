@@ -793,3 +793,82 @@ incarnation token. Recording transport and real PostgreSQL lifecycle checks prov
 the supported source/dispatch/refusal contract, not live Azure persistence or
 delivery. The broader #2032/#2098 audit and this writable-label residual remain
 open.
+
+### Azure Event Grid Standard saved targets (#2032, #2098)
+
+`event_bus/event_grid_namespace` creates a dedicated Standard namespace and one
+CloudEvents topic. New names retain all 32 hex digits of the persisted canonical,
+nonzero service UUID, with exact configured prefixes of at most 17 characters.
+Namespace/topic names fit 50 characters. Generated child names are alphanumeric:
+`astrolift` plus that UUID plus nine hex digits of the case-folded logical-name
+hash, totaling 50 characters. Duplicate logical names and generated collisions
+refuse before effects. Exact saved
+`event_bus/arm-v1/<subscription-UUID>/<resource-group>/<namespace>/<topic>`
+handles and topic ARM bindings fit 512 characters. Current provider coordinates
+must agree; display/prefix renames retain recorded physical names. Historical
+three-part handles are not guessed, adopted, backfilled or rewritten. Missing
+recorded parents and accepted children are not implicitly recreated.
+
+The actual namespace needs matching ARM/name/location, observed Standard SKU,
+TLS 1.2 and unambiguous current platform/source tags under the shared Azure
+ownership verifier. Readiness and binding require the same strict source proof
+as mutation. Namespace topics and subscriptions have no ownership tag field in
+the declared SDK: source identity is checked through exact physical names and
+version-two Key Vault receipts, without invented tags or required systemData.
+Receipts bind the exact source UUID and topic ARM target to full resource IDs
+and serialized desired fields. A reservation is persisted/read back before PUT,
+accepted only after its exact SDK response, and observed only after current
+`Succeeded` GET matches desired fields. Reserved-only entries never authorize
+existing resources. A lost write response or failed acceptance persistence can
+therefore require separate operator investigation; retry does not adopt the
+uncertain resource. Old, foreign, malformed or ambiguous receipt secrets refuse.
+
+The configured Key Vault secret prefix is retained. Receipt/key secret names
+include the complete source UUID and topic-target digest. Credential metadata
+must match the current source/platform/target before reading, replacing or
+deleting a cached key. Pull uses an existing verified key reference and a current
+owned Queue subscription selected by saved logical `subscription_name`.
+Binding never calls listKeys or creates secrets. Publishing emits the exact
+topic-scoped EventGrid Data Sender grant; manage emits the existing topic-scoped
+EventGrid Contributor grant. This does not grant namespace-wide authority or
+create role assignments. Private-only networking, snapshots and restore remain
+unsupported; destination/UAMI preauthorization remains required.
+
+Before effects, complete LIST plus direct GET covers the expected topic and all
+subscriptions; desired children also require direct GET to detect LIST/GET
+collisions. MQTT clients, client groups, topic spaces and permission bindings
+must have complete inventories. The structural `$all` client group is verified
+and never changed or deleted; other MQTT resources/configuration refuse. To
+prove an absent namespace, its typed GET 404 must agree with a successful
+complete resource-group namespace inventory. Denied, partial, contradictory or
+unknown observations remain unknown. Recorded missing children cannot produce
+an available status or binding.
+
+Locks are read at subscription, resource group, namespace, topic and current
+child scopes. The principal needs `Microsoft.Authorization/locks/read` at all
+applicable ancestor scopes and namespace/MQTT/topic/subscription inventory and
+GET access. Applicable or unknown locks refuse even under force; no lock is
+deleted. Key Vault requires get/set/delete on the source-specific secrets, and
+credential publication requires namespace listKeys. No recovery/purge permission
+or automatic soft-deleted secret recovery is introduced. Inventory limits are
+four pages, 128 items and 2 MiB per response, with trusted exact-collection
+continuations. Each operation has a shared 20-second request-admission budget,
+at most five seconds per connect/read phase, no automatic retry or redirect,
+and SDK-supported NoPolling. These are admission/phase bounds, not cancellation
+of an Azure operation or an absolute deadline for streamed response bodies.
+
+Accepted creation/update remains pending until current observed state matches.
+Whole config snapshots can retain unchanged immutable names/schema/TLS/zone
+settings; changes to those settings refuse. Teardown requires `delete_data=True`,
+owned child absence before topic deletion, and owned topic absence before
+namespace deletion, with inventory/lock rechecks between effects. Confirmed
+namespace absence precedes source-specific secret cleanup. An accepted DELETE
+or force flag cannot turn unknown/pending state into successful cleanup.
+
+Tags and Key Vault receipts are writable consistency evidence, not cryptographic
+provenance or immutable cloud incarnation tokens. Separately privileged actors
+can forge them or replace resources between reads and writes. Partial effects
+remain possible; there is no cloud compare-and-swap or exactly-once guarantee.
+Actual SDK transport and installed-wheel PostgreSQL checks cover the source and
+dispatch/refusal contract, without certifying live Azure persistence, delivery,
+archives or inference. Broad #2032/#2098 remain open.

@@ -8,6 +8,15 @@
   observed source/permission changes. Accepted installation starts a workflow;
   it does not certify completed reconciliation (#2145).
 
+- Azure Event Grid Standard saves exact namespace/topic placement with full
+  service UUID names. Current source ownership, complete bounded inventory,
+  ancestor locks and source-bound Key Vault receipts gate lifecycle and bindings.
+  Untaggable children require accepted and observed receipts; pending SDK replies,
+  historical handles, lost write responses and force never authorize adoption or
+  cascade cleanup. Saved pull selectors are supported by the config contract;
+  live Azure delivery and immutable incarnation proof remain outside these checks
+  (#2032, #2098).
+
 - Localize app managed-service administration in all eight languages. Preserve
   unchanged typed configuration when the backend replaces config, expand the
   wildcard editor to existing keys, and refuse nonfinite numbers and ambiguous
