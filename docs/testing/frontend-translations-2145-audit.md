@@ -748,3 +748,44 @@ The extended schema-validated HttpLink/portable/card proof includes unknown
 source/user identity and exact expected-source/subject envelopes in every locale.
 Provider-side conditional CAS remains unsupported; see
 [reviewed-target operator contract](../operators/cluster-auth-user-preconditions.md).
+
+## Connected app settings archive and restore
+
+`ArchiveAppView`, `useArchiveApp` and the actual `ArchiveAppCard` use 14 genuine
+`apps.settings.archiveFlow` messages in every locale. The existing translated
+confirmation title retains the literal app name, and accepted feedback identifies
+the exact requested slug. Relative archival time uses the configured locale,
+request clock and timezone. Copy describes saved replica counts and deployment
+suppression, without claiming an observed live rollout or infrastructure removal.
+
+The exact existing `archiveApp`/`restoreApp` inputs remain `{ appSlug }`; the
+existing `app.update`/optimistic-loading fence and backend checks are unchanged.
+Only accepted envelopes collect the existing active GetApp refresh with its
+original variables. Reads run after acceptance/navigation handling, and the
+shared refresh helper warns without changing a committed result into a write
+failure. Refusals keep the review and raw diagnostic, with no refresh/navigation.
+An accepted archive remains accepted when navigation throws. Mutation replies
+are not normalized into a different review before acceptance is handled.
+
+The actual card passes its observed app GUID/version/archive facts. Target/source
+and permission withdrawal, replacement and ABA transitions invalidate stored
+callbacks and reviews; an old accepted response cannot navigate or close a
+newer review. A language change preserves an otherwise unchanged review. Same-
+target cached observations survive failed reads as before. These are local
+observation safeguards, not server immutable identity/version preconditions:
+the current backend still resolves the slug and remains authoritative.
+
+Focused proof on the ec1abcd6-based leaf: 168 checks pass in four files, including
+130 actual-card/schema-validated Apollo HttpLink/locale/context/review checks,
+10 portable stories and 28 existing operational/recovery regressions. Both
+operations cover every locale and actual payloads, raw refusal/transport/fallback,
+accepted-refresh/navigation failures, keyboard retry, current permission and
+source withdrawal, stale callbacks, late replies, ICU argument parity and
+recoverable-error-free hydration. TypeScript, scoped ESLint (zero warnings),
+source/catalogue formatting and diff checks pass. All existing catalogue trees
+are exact outside the new subtree. No broad suite, backend/schema/cloud change,
+installation or live request was performed.
+
+This completes this card within original item 13, not the whole item. Retention,
+environment overrides, managed-service administration, agent-mode resync and
+remaining operational-hook feedback are separate connected translation gaps.

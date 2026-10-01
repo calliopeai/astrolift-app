@@ -27,6 +27,11 @@
   Persist existing tracking markers on partial cluster/provider source saves;
   Cognito get-to-write races and partial multi-call effects remain explicit (#2225).
 
+- Localize the connected app archive/restore settings card in all eight locales.
+  Preserve refused reviews without reads or navigation, retain accepted writes
+  through refresh/navigation failure, and invalidate stale observed app reviews.
+  Explain saved replica counts without promising a live rollout (#2145).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

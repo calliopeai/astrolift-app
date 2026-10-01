@@ -1512,6 +1512,22 @@
           "close": "Cerrar"
         },
         "loadFailed": "No se pudieron cargar los servicios administrados"
+      },
+      "archiveFlow": {
+        "title": "Archivo de la aplicación",
+        "archived": "Archivada",
+        "archivedAt": "Archivada {at}. Los recuentos guardados de réplicas son cero; los despliegues están suspendidos.",
+        "archivedWithoutTime": "La aplicación está archivada. Los recuentos guardados de réplicas son cero.",
+        "description": "Archivar guarda cero réplicas y suspende los despliegues. Restaurar guarda los recuentos anteriores. Esto no confirma un despliegue en ejecución.",
+        "archive": "Archivar",
+        "restore": "Restaurar",
+        "archiveAccepted": "Archivo aceptado para {slug}. Los recuentos guardados de réplicas son cero.",
+        "restoreAccepted": "Restauración aceptada para {slug}. Los recuentos guardados vuelven a los valores anteriores al archivo.",
+        "archiveFailed": "No se pudo archivar.",
+        "restoreFailed": "No se pudo restaurar.",
+        "refreshWarning": "El cambio fue aceptado, pero no se pudo actualizar la vista. Actualízala para comprobar el estado actual.",
+        "navigationWarning": "El archivo fue aceptado, pero la navegación falló. Abre Aplicaciones para continuar.",
+        "sourceChanged": "La aplicación observada o el acceso cambió. Revisa la aplicación actual antes de volver a intentarlo."
       }
     },
     "common": {

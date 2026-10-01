@@ -1512,6 +1512,22 @@
           "close": "关闭"
         },
         "loadFailed": "无法加载托管服务"
+      },
+      "archiveFlow": {
+        "title": "应用归档",
+        "archived": "已归档",
+        "archivedAt": "于 {at} 归档。保存的副本数为零，部署已暂停。",
+        "archivedWithoutTime": "应用已归档。保存的副本数为零。",
+        "description": "归档会将副本数保存为零并暂停部署。恢复会保存归档前的副本数。这并不确认实际发布已完成。",
+        "archive": "归档",
+        "restore": "恢复",
+        "archiveAccepted": "{slug} 的归档请求已接受。保存的副本数为零。",
+        "restoreAccepted": "{slug} 的恢复请求已接受。保存的副本数恢复为归档前的值。",
+        "archiveFailed": "归档失败。",
+        "restoreFailed": "恢复失败。",
+        "refreshWarning": "变更已接受，但视图无法刷新。请刷新以检查当前状态。",
+        "navigationWarning": "归档已接受，但页面跳转失败。请打开应用列表继续。",
+        "sourceChanged": "已观察的应用或访问权限发生变化。请检查当前应用后再重试。"
       }
     },
     "common": {

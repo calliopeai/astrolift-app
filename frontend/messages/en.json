@@ -2354,6 +2354,22 @@
           "close": "Close"
         },
         "loadFailed": "Could not load managed services"
+      },
+      "archiveFlow": {
+        "title": "App archive",
+        "archived": "Archived",
+        "archivedAt": "Archived {at}. Saved replica counts are zero; deploys are suppressed.",
+        "archivedWithoutTime": "App is archived. Saved replica counts are zero.",
+        "description": "Archive saves zero workload replicas and suppresses deploys. Restore saves pre-archive counts. This does not confirm a live rollout.",
+        "archive": "Archive",
+        "restore": "Restore",
+        "archiveAccepted": "Archive accepted for {slug}. Saved replica counts are zero.",
+        "restoreAccepted": "Restore accepted for {slug}. Saved replica counts return to their pre-archive values.",
+        "archiveFailed": "Archive failed.",
+        "restoreFailed": "Restore failed.",
+        "refreshWarning": "The change was accepted, but the view could not refresh. Refresh to check the current state.",
+        "navigationWarning": "The archive was accepted, but navigation failed. Open Apps to continue.",
+        "sourceChanged": "The observed app or access changed. Review the current app before trying again."
       }
     },
     "workloadDetail": {

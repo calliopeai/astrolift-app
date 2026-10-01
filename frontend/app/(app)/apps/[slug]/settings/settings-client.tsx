@@ -250,7 +250,9 @@ function EnvironmentSettingsCard({ appSlug }: { appSlug: string }) {
 export function ArchiveAppCard({ app }: { app: AstroliftRegisteredApp }) {
   return (
     <ArchiveAppView
-      {...useArchiveApp(app.slug)}
+      {...useArchiveApp(app.slug, app)}
+      appId={app.id}
+      sourceVersion={app.version}
       appName={app.name}
       isArchived={app.isArchived}
       archivedAt={app.archivedAt ?? null}

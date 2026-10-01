@@ -1512,6 +1512,22 @@
           "close": "Fechar"
         },
         "loadFailed": "Não foi possível carregar os serviços gerenciados"
+      },
+      "archiveFlow": {
+        "title": "Arquivamento do aplicativo",
+        "archived": "Arquivado",
+        "archivedAt": "Arquivado {at}. As contagens salvas de réplicas são zero; as implantações estão suspensas.",
+        "archivedWithoutTime": "O aplicativo está arquivado. As contagens salvas de réplicas são zero.",
+        "description": "Arquivar salva zero réplicas e suspende as implantações. Restaurar salva as contagens anteriores. Isso não confirma uma implantação em execução.",
+        "archive": "Arquivar",
+        "restore": "Restaurar",
+        "archiveAccepted": "Arquivamento aceito para {slug}. As contagens salvas de réplicas são zero.",
+        "restoreAccepted": "Restauração aceita para {slug}. As contagens salvas voltam aos valores anteriores ao arquivamento.",
+        "archiveFailed": "Falha ao arquivar.",
+        "restoreFailed": "Falha ao restaurar.",
+        "refreshWarning": "A alteração foi aceita, mas a visualização não pôde ser atualizada. Atualize-a para verificar o estado atual.",
+        "navigationWarning": "O arquivamento foi aceito, mas a navegação falhou. Abra Aplicativos para continuar.",
+        "sourceChanged": "O aplicativo observado ou o acesso mudou. Revise o aplicativo atual antes de tentar novamente."
       }
     },
     "common": {

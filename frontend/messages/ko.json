@@ -1512,6 +1512,22 @@
           "close": "닫기"
         },
         "loadFailed": "관리형 서비스를 불러오지 못했습니다"
+      },
+      "archiveFlow": {
+        "title": "앱 보관",
+        "archived": "보관됨",
+        "archivedAt": "{at} 보관되었습니다. 저장된 복제본 수는 0이며 배포는 중단됩니다.",
+        "archivedWithoutTime": "앱이 보관되었습니다. 저장된 복제본 수는 0입니다.",
+        "description": "보관하면 복제본 수를 0으로 저장하고 배포를 중단합니다. 복원하면 이전 수를 저장합니다. 실제 롤아웃 완료를 확인하는 것은 아닙니다.",
+        "archive": "보관",
+        "restore": "복원",
+        "archiveAccepted": "{slug} 보관 요청이 수락되었습니다. 저장된 복제본 수는 0입니다.",
+        "restoreAccepted": "{slug} 복원 요청이 수락되었습니다. 저장된 복제본 수가 보관 전 값으로 돌아갑니다.",
+        "archiveFailed": "보관에 실패했습니다.",
+        "restoreFailed": "복원에 실패했습니다.",
+        "refreshWarning": "변경은 수락되었지만 화면을 새로 고치지 못했습니다. 새로 고침하여 현재 상태를 확인하세요.",
+        "navigationWarning": "보관은 수락되었지만 화면 이동에 실패했습니다. 앱 목록을 열어 계속하세요.",
+        "sourceChanged": "확인한 앱 또는 접근 권한이 변경되었습니다. 현재 앱을 검토한 후 다시 시도하세요."
       }
     },
     "common": {
