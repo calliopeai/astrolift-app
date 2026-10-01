@@ -450,7 +450,8 @@ function StatusCell({ row }: { row: PeopleRow }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       <DetailStatusBadge
-        status={
+        status={row.lifecycle}
+        label={
           t.has(`lifecycle.${row.lifecycle}`) ? t(`lifecycle.${row.lifecycle}`) : row.lifecycle
         }
         tone={LIFECYCLE_TONE[row.lifecycle] ?? "muted"}

@@ -162,6 +162,9 @@ describe("People presentation and current actions", () => {
       expect(screen.getByText("org_owner")).toBeInTheDocument();
       expect(screen.getByText("platform")).toBeInTheDocument();
       expect(
+        screen.getByText(t(`people.lifecycle.${fixedMembers[0].lifecycle}`))
+      ).toBeInTheDocument();
+      expect(
         screen.getByText(
           new Intl.DateTimeFormat(locale, {
             year: "numeric",
