@@ -176,6 +176,7 @@ def provision_slice(driver: Any, spec: SliceSpec) -> SliceResult:
         spec,
         parsed,
         parent_uid=parent_meta["uid"],
+        database=database,
         role=role,
         secret_name=secret_name,
         labels=labels,
@@ -204,13 +205,26 @@ def _reconcile_role(
     parsed: ParsedHandle,
     *,
     parent_uid: str,
+    database: str,
     role: str,
     secret_name: str,
     labels: dict[str, str],
     password: str,
 ) -> None:
     config = driver._config
-    desired = {"name": role, "ensure": "present", "login": True, "passwordSecret": {"name": secret_name}}
+    desired = {
+        "name": role,
+        "ensure": "present",
+        "login": True,
+        "passwordSecret": {"name": secret_name},
+        "superuser": False,
+        "createdb": False,
+        "createrole": False,
+        "replication": False,
+        "bypassrls": False,
+        "inRoles": [],
+    }
+    owned_hba = [f"hostssl {database} {role} all scram-sha-256", f"host all {role} all reject"]
     for _ in range(3):
         retained = config.cluster_driver.get_manifest(parsed.cluster_id, parsed.namespace, "v1/Secret", secret_name)
         if (
@@ -230,14 +244,23 @@ def _reconcile_role(
         matching = [item for item in previous if item.get("name") == role]
         if any(item.get("passwordSecret", {}).get("name") != secret_name for item in matching):
             raise ValueError("CNPG slice role is already managed with different credentials")
-        if len(matching) == 1 and all(matching[0].get(key) == value for key, value in desired.items()):
+        postgresql = dict(parent["spec"].get("postgresql") or {})
+        previous_hba = postgresql.get("pg_hba", [])
+        hba = owned_hba + [rule for rule in previous_hba if rule not in owned_hba]
+        if (
+            len(matching) == 1
+            and all(matching[0].get(key) == value for key, value in desired.items())
+            and previous_hba == hba
+        ):
             return
         managed["roles"] = [dict(item) for item in previous if item.get("name") != role] + [desired]
+        # CNPG's default HBA allows PUBLIC CONNECT to other databases with this login.
+        postgresql["pg_hba"] = hba
         patch = {
             "apiVersion": parent["apiVersion"],
             "kind": "Cluster",
             "metadata": {key: value for key, value in meta.items() if key != "managedFields"},
-            "spec": {**parent["spec"], "managed": managed},
+            "spec": {**parent["spec"], "managed": managed, "postgresql": postgresql},
         }
         result = config.cluster_driver.apply_manifests(parsed.cluster_id, parsed.namespace, [patch])
         if not result.errors:

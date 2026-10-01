@@ -187,12 +187,53 @@ def test_reprovisioning_the_same_slice_does_not_duplicate_its_role():
     driver.provision_slice(_spec())
     first = _of_kind(fake.applied, "Cluster")[0]["spec"]["managed"]["roles"]
 
-    fake.parent = {**_parent_object(), "spec": {**PARENT_SPEC, "managed": {"roles": first}}}
+    assert len(first) == 1
     fake.applied.clear()
     driver.provision_slice(_spec())
 
     assert _of_kind(fake.applied, "Cluster") == []
     assert len(fake.parent["spec"]["managed"]["roles"]) == 1
+
+
+def test_slice_hba_precedes_broad_rules_preserves_parameters_and_other_preview_access():
+    parent = _parent_object()
+    previous = [
+        "hostssl sibling sibling_owner all scram-sha-256",
+        "host all sibling_owner all reject",
+        "host all all all trust",
+    ]
+    parent["spec"]["postgresql"] = {
+        "pg_hba": previous,
+        "parameters": {"max_connections": "200"},
+        "pg_ident": ["retained-map"],
+    }
+    driver, fake = _driver(parent=parent)
+    driver.provision_slice(_spec())
+    database, role, _ = driver._slice_names(_spec())
+    postgresql = fake.parent["spec"]["postgresql"]
+    assert postgresql["pg_hba"] == [
+        f"hostssl {database} {role} all scram-sha-256",
+        f"host all {role} all reject",
+        *previous,
+    ]
+    assert postgresql["parameters"] == {"max_connections": "200"}
+    assert postgresql["pg_ident"] == ["retained-map"]
+    fake.applied.clear()
+    driver.provision_slice(_spec())
+    assert fake.applied == []
+
+
+def test_owned_slice_role_does_not_preserve_elevated_privileges_or_memberships():
+    driver, fake = _driver(parent=_parent_object())
+    driver.provision_slice(_spec())
+    actual = fake.parent["spec"]["managed"]["roles"][0]
+    actual.update(superuser=True, createdb=True, createrole=True, replication=True, bypassrls=True, inRoles=["app"])
+    fake.applied.clear()
+    driver.provision_slice(_spec())
+    actual = fake.parent["spec"]["managed"]["roles"][0]
+    assert all(actual[key] is False for key in ("superuser", "createdb", "createrole", "replication", "bypassrls"))
+    assert actual["inRoles"] == []
+    assert len(driver._config.secrets_backend.writes) == 1
 
 
 def test_live_operator_conflict_reobserves_parent_version_and_merges_current_roles():

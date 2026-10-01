@@ -139,3 +139,23 @@ checks and five final consumer/cleanup recording checks after fixture refinement
 The explicitly owned `test_astrolift_slice_bindings_2092` database was removed.
 Changed-file Ruff checks and formatting pass. No production operator or tenant
 resource is provisioned by these checks.
+
+## CNPG slice authentication
+
+PostgreSQL's default `PUBLIC CONNECT` privilege and CNPG's default authentication
+rule otherwise let a new preview role log into the parent/default databases even
+when it cannot read protected application tables. Generated slice roles now have
+an explicit TLS/SCRAM allow for their own database followed by a rejection for
+other database connections, ahead of existing user rules. Existing PostgreSQL
+parameters, identity maps, unrelated authentication rules and other roles survive
+the update. Elevated role attributes and inherited role memberships are explicitly
+disabled. See [CNPG authentication rule ordering](https://cloudnative-pg.io/docs/current/postgresql_conf/)
+and [declarative role management](https://cloudnative-pg.io/docs/1.30/declarative_role_management/).
+
+Reconciliation rereads the exact owned credential Secret and the current complete
+parent specification before applying an observed UID/resourceVersion. A confirmed
+HTTP 409 conflict permits at most three fresh observations; a replaced parent,
+foreign credential/role or another error refuses. An already matching role and
+authentication rule set require no write. The retained role, authentication rules
+and portable credential envelope after cleanup still do not constitute credential
+revocation.
