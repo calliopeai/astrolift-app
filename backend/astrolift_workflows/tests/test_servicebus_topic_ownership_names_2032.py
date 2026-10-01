@@ -347,7 +347,14 @@ def test_maximum_representable_topic_arm_literal_persists_without_truncation(clo
     if cloud.kind != "topic":
         pytest.skip("Only topic alias materializes TOPIC_ARN_OR_ID")
     row, original = owned(cloud, "exact-topic-binding-limit")
-    cloud.cfg = dataclasses.replace(cloud.cfg, resource_group="r" * 85, namespace_name="n" * 50)
+    namespace, topic = "n" * 50, "t" * 260
+    without_group = (
+        f"/subscriptions/{cloud.cfg.subscription_id}/resourceGroups/"
+        f"/providers/Microsoft.ServiceBus/namespaces/{namespace}/topics/{topic}"
+    )
+    group_length = 512 - len(without_group)
+    assert 1 <= group_length <= 90
+    cloud.cfg = dataclasses.replace(cloud.cfg, resource_group="r" * group_length, namespace_name=namespace)
     driver = AzureServiceBusDriver(config=cloud.cfg)
     exact = driver._coordinates("t" * 260, "c" * 50)
     assert len(exact.topic_id) == 512 and len(exact.handle("topic")) <= 512
