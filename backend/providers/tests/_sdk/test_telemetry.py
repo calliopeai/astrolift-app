@@ -413,3 +413,29 @@ def test_registry_exposes_counter_for_metrics_view() -> None:
     existing ``backend/config/views.py:metrics_view`` discovers it."""
     found = REGISTRY._names_to_collectors.get("astrolift_provider_driver_op_total")
     assert found is _op_counter
+
+
+def test_context_heartbeat_sink_is_nested_and_restored_without_temporal():
+    from _sdk._telemetry import heartbeat_sink
+
+    seen = []
+    with patch("_sdk._telemetry._TEMPORAL_AVAILABLE", False):
+        with heartbeat_sink(lambda detail: seen.append(("outer", detail))):
+            maybe_heartbeat("before")
+            with heartbeat_sink(lambda detail: seen.append(("inner", detail))):
+                maybe_heartbeat("during")
+            maybe_heartbeat("after")
+        maybe_heartbeat("outside")
+    assert seen == [("outer", "before"), ("inner", "during"), ("outer", "after")]
+
+
+@pytest.mark.asyncio
+async def test_driver_thread_heartbeat_returns_to_caller_event_loop():
+    from _sdk._telemetry import heartbeat_sink
+
+    loop = asyncio.get_running_loop()
+    recorded = []
+    with heartbeat_sink(lambda detail: loop.call_soon_threadsafe(recorded.append, detail)):
+        await asyncio.to_thread(maybe_heartbeat, "from-driver-thread")
+    await asyncio.sleep(0)
+    assert recorded == ["from-driver-thread"]

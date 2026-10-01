@@ -210,23 +210,32 @@ async def run_preflight_job(cluster_id: int) -> str:
 
 
 def _mark_managed_sync(cluster_id: int) -> None:
+    from django.db import transaction
     from django.utils import timezone
 
     from astrolift_clusters.models import TenantCluster
 
-    cluster = TenantCluster.all_objects.get(pk=cluster_id)
-    cluster.lifecycle = TenantCluster.Lifecycle.MANAGED.value
-    cluster.managed_at = timezone.now()
-    cluster.last_management_error = ""
-    cluster.save(
-        update_fields=[
-            "lifecycle",
-            "managed_at",
-            "last_management_error",
-            "updated_at",
-            "version",
-        ]
-    )
+    with transaction.atomic():
+        cluster = TenantCluster.all_objects.select_for_update().get(pk=cluster_id)
+        if cluster.deleted_at is not None or cluster.lifecycle in (
+            TenantCluster.Lifecycle.DECOMMISSIONING.value,
+            TenantCluster.Lifecycle.DECOMMISSIONED.value,
+        ):
+            from core.cluster_management import ClusterManagementError
+
+            raise ClusterManagementError("Retiring clusters cannot return to management.")
+        cluster.lifecycle = TenantCluster.Lifecycle.MANAGED.value
+        cluster.managed_at = timezone.now()
+        cluster.last_management_error = ""
+        cluster.save(
+            update_fields=[
+                "lifecycle",
+                "managed_at",
+                "last_management_error",
+                "updated_at",
+                "version",
+            ]
+        )
 
 
 @activity.defn(name="astrolift.cluster.mark_managed")
@@ -237,23 +246,34 @@ async def mark_managed(cluster_id: int) -> None:
     await sync_to_async(_mark_managed_sync)(cluster_id)
 
 
-def _mark_error_sync(cluster_id: int, message: str) -> None:
+def _mark_error_sync(cluster_id: int, message: str, retirement: bool = False) -> None:
+    from django.db import transaction
+
     from astrolift_clusters.models import TenantCluster
 
-    cluster = TenantCluster.all_objects.get(pk=cluster_id)
-    cluster.lifecycle = TenantCluster.Lifecycle.ERROR.value
-    # Cap the persisted message so a 50-line traceback doesn't blow
-    # up the TextField — workflow callers truncate too, but defend
-    # in depth so a malformed activity error doesn't fail to save.
-    cluster.last_management_error = (message or "unknown error")[:4000]
-    cluster.save(
-        update_fields=[
-            "lifecycle",
-            "last_management_error",
-            "updated_at",
-            "version",
-        ]
-    )
+    with transaction.atomic():
+        cluster = TenantCluster.all_objects.select_for_update().get(pk=cluster_id)
+        if (
+            cluster.deleted_at is not None
+            or cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONED.value
+        ):
+            return
+        if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value and not retirement:
+            # A stale bring/refresh failure cannot reopen placement during retirement.
+            return
+        cluster.lifecycle = TenantCluster.Lifecycle.ERROR.value
+        # Cap the persisted message so a 50-line traceback doesn't blow
+        # up the TextField — workflow callers truncate too, but defend
+        # in depth so a malformed activity error doesn't fail to save.
+        cluster.last_management_error = (message or "unknown error")[:4000]
+        cluster.save(
+            update_fields=[
+                "lifecycle",
+                "last_management_error",
+                "updated_at",
+                "version",
+            ]
+        )
 
 
 @activity.defn(name="astrolift.cluster.mark_error")
@@ -261,28 +281,42 @@ async def mark_error(cluster_id: int, message: str) -> None:
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_mark_error_sync)(cluster_id, message)
+    # Preserve the existing activity signature/history. Trusted workflow
+    # identity distinguishes a real retirement failure from a stale management
+    # workflow trying to overwrite the same cluster's retiring state.
+    retirement = activity.info().workflow_type == "DecommissionClusterWorkflow"
+    await sync_to_async(_mark_error_sync)(cluster_id, message, retirement)
 
 
 def _mark_managing_sync(cluster_id: int) -> None:
+    from django.db import transaction
+
     from astrolift_clusters.models import TenantCluster
 
-    cluster = TenantCluster.all_objects.get(pk=cluster_id)
-    # Idempotent — re-running on a managed cluster (refresh) flips it
-    # back to managing for the duration of the workflow + back to
-    # managed at the end. The UI polls and renders the spinner.
-    if cluster.lifecycle == TenantCluster.Lifecycle.MANAGING.value:
-        return
-    cluster.lifecycle = TenantCluster.Lifecycle.MANAGING.value
-    cluster.last_management_error = ""
-    cluster.save(
-        update_fields=[
-            "lifecycle",
-            "last_management_error",
-            "updated_at",
-            "version",
-        ]
-    )
+    with transaction.atomic():
+        cluster = TenantCluster.all_objects.select_for_update().get(pk=cluster_id)
+        if cluster.deleted_at is not None or cluster.lifecycle in (
+            TenantCluster.Lifecycle.DECOMMISSIONING.value,
+            TenantCluster.Lifecycle.DECOMMISSIONED.value,
+        ):
+            from core.cluster_management import ClusterManagementError
+
+            raise ClusterManagementError("Retiring clusters cannot return to management.")
+        # Idempotent — re-running on a managed cluster (refresh) flips it
+        # back to managing for the duration of the workflow + back to
+        # managed at the end. The UI polls and renders the spinner.
+        if cluster.lifecycle == TenantCluster.Lifecycle.MANAGING.value:
+            return
+        cluster.lifecycle = TenantCluster.Lifecycle.MANAGING.value
+        cluster.last_management_error = ""
+        cluster.save(
+            update_fields=[
+                "lifecycle",
+                "last_management_error",
+                "updated_at",
+                "version",
+            ]
+        )
 
 
 @activity.defn(name="astrolift.cluster.mark_managing")
@@ -313,9 +347,12 @@ def _ensure_cluster_drained_sync(cluster_id: int) -> int:
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_services.cluster_retirement import MODEL_CLEANUP_REQUIRED, has_cluster_owned_models
     from core.cluster_management import ClusterManagementError
 
     cluster = TenantCluster.all_objects.get(pk=cluster_id)
+    if has_cluster_owned_models(cluster.pk):
+        raise ClusterManagementError(MODEL_CLEANUP_REQUIRED)
     bound_count = AppEnvironment.objects.filter(
         tenant_cluster=cluster,
         deleted_at__isnull=True,
@@ -338,14 +375,18 @@ async def ensure_cluster_drained(cluster_id: int) -> int:
 
 
 def _mark_decommissioning_sync(cluster_id: int) -> None:
+    from django.db import transaction
+
     from astrolift_clusters.models import TenantCluster
 
-    cluster = TenantCluster.all_objects.get(pk=cluster_id)
-    if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value:
-        return
-    cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONING.value
-    cluster.last_management_error = ""
-    cluster.save(update_fields=["lifecycle", "last_management_error", "updated_at", "version"])
+    with transaction.atomic():
+        cluster = TenantCluster.all_objects.select_for_update().get(pk=cluster_id)
+        _ensure_cluster_drained_sync(cluster_id)
+        if cluster.lifecycle == TenantCluster.Lifecycle.DECOMMISSIONING.value:
+            return
+        cluster.lifecycle = TenantCluster.Lifecycle.DECOMMISSIONING.value
+        cluster.last_management_error = ""
+        cluster.save(update_fields=["lifecycle", "last_management_error", "updated_at", "version"])
 
 
 @activity.defn(name="astrolift.cluster.mark_decommissioning")
@@ -366,17 +407,28 @@ def _remove_platform_rbac_sync(cluster_id: int) -> str:
     a clean terminal state. Failures bubble up; the workflow flips to
     ERROR and the operator can retry.
     """
+    from django.db import transaction
+
     from astrolift_clusters.models import TenantCluster
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
-    cluster = TenantCluster.all_objects.get(pk=cluster_id)
-    driver = _driver_for_cluster(cluster)
-    ctx = _context_for_cluster(cluster)
-    # delete_namespace(wait=True) blocks until k8s reports the namespace
-    # gone — picking that over wait=False so the workflow's terminal
-    # state reflects a clean cluster rather than a Terminating phase.
-    driver.delete_namespace(ctx.slug, "astrolift-system", wait=True)
-    return "astrolift-system"
+    with transaction.atomic():
+        cluster = TenantCluster.all_objects.select_for_update().get(pk=cluster_id)
+        if (
+            cluster.deleted_at is not None
+            or cluster.lifecycle != TenantCluster.Lifecycle.DECOMMISSIONING.value
+        ):
+            from core.cluster_management import ClusterManagementError
+
+            raise ClusterManagementError("Cluster is no longer retiring; refusing infrastructure removal.")
+        _ensure_cluster_drained_sync(cluster_id)
+        driver = _driver_for_cluster(cluster)
+        ctx = _context_for_cluster(cluster)
+        # delete_namespace(wait=True) blocks until k8s reports the namespace
+        # gone — picking that over wait=False so the workflow's terminal
+        # state reflects a clean cluster rather than a Terminating phase.
+        driver.delete_namespace(ctx.slug, "astrolift-system", wait=True)
+        return "astrolift-system"
 
 
 @activity.defn(name="astrolift.cluster.remove_platform_rbac")
@@ -420,29 +472,37 @@ def _teardown_cluster_infra_sync(cluster_id: int, delete_cloud_infra: bool) -> d
       - azure: managed_clusters.begin_delete (cascades MC resource group)
       - k8s_native: no-op (bare metal is operator-owned)
 
-    Idempotent per driver. The activity itself is idempotent at the DB
-    layer too — re-running on a decommissioned row that's already had
-    its cloud infra deleted just gets a report of "all already gone".
+    Driver retries are allowed only while this retirement remains current.
+    A completed, deleted or reopened cluster refuses before provider access.
     """
+    from django.db import transaction
+
     from astrolift_clusters.models import TenantCluster
     from core.cluster_management import ClusterManagementError, teardown_cluster_dispatch
 
-    cluster = TenantCluster.all_objects.get(pk=cluster_id)
-    try:
-        report = teardown_cluster_dispatch(cluster=cluster, delete_cloud_infra=delete_cloud_infra)
-    except ClusterManagementError as exc:
-        raise RuntimeError(str(exc)) from exc
-    if not report.success:
-        # Driver returned structured failure — raise so Temporal retries
-        # per the activity's RetryPolicy and the workflow can flip to
-        # error if all retries exhaust.
-        raise RuntimeError(report.error or "teardown_cluster reported failure")
-    return {
-        "success": True,
-        "deleted": list(report.deleted),
-        "skipped": list(report.skipped),
-        "messages": list(report.messages),
-    }
+    with transaction.atomic():
+        cluster = TenantCluster.all_objects.select_for_update().get(pk=cluster_id)
+        if (
+            cluster.deleted_at is not None
+            or cluster.lifecycle != TenantCluster.Lifecycle.DECOMMISSIONING.value
+        ):
+            raise ClusterManagementError("Cluster is no longer retiring; refusing infrastructure removal.")
+        _ensure_cluster_drained_sync(cluster_id)
+        try:
+            report = teardown_cluster_dispatch(cluster=cluster, delete_cloud_infra=delete_cloud_infra)
+        except ClusterManagementError as exc:
+            raise RuntimeError(str(exc)) from exc
+        if not report.success:
+            # Driver returned structured failure — raise so Temporal retries
+            # per the activity's RetryPolicy and the workflow can flip to
+            # error if all retries exhaust.
+            raise RuntimeError(report.error or "teardown_cluster reported failure")
+        return {
+            "success": True,
+            "deleted": list(report.deleted),
+            "skipped": list(report.skipped),
+            "messages": list(report.messages),
+        }
 
 
 @activity.defn(name="astrolift.cluster.teardown_cluster_infra")

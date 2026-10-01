@@ -1,0 +1,98 @@
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import ko from "@/messages/ko.json";
+import { SharedModelDeploymentScreen } from "./SharedModelDeploymentScreen";
+import { sharedDeploymentProps } from "./shared-model.fixtures";
+const meta = {
+  title: "Screens/Models/SharedModelDeploymentScreen",
+  component: SharedModelDeploymentScreen,
+  parameters: { layout: "padded" },
+} satisfies Meta<typeof SharedModelDeploymentScreen>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const GPUReview: Story = {
+  args: sharedDeploymentProps,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Review deployment" }));
+    const dialog = within(canvasElement.ownerDocument.body).getByRole("alertdialog");
+    await expect(dialog).toHaveTextContent("Hardware capacity and model fit remain unverified");
+  },
+};
+export const CPU: Story = {
+  args: {
+    ...sharedDeploymentProps,
+    draft: {
+      ...sharedDeploymentProps.draft,
+      computeMode: "cpu",
+      gpuCount: "0",
+      cpuKvCacheGiB: "4",
+    },
+    admission: null,
+  },
+};
+export const NoSelectedModel: Story = {
+  args: { ...sharedDeploymentProps, model: null, admission: null },
+};
+export const RuntimeNotConfigured: Story = {
+  args: {
+    ...sharedDeploymentProps,
+    admission: {
+      ...sharedDeploymentProps.admission!,
+      eligible: false,
+      reason: "No certified CPU runtime is configured",
+    },
+  },
+};
+export const Verifying: Story = {
+  args: { ...sharedDeploymentProps, admission: null, admissionLoading: true },
+};
+export const ReadError: Story = {
+  args: {
+    ...sharedDeploymentProps,
+    admission: null,
+    admissionError: "Admission verification failed",
+  },
+};
+export const DeployRefused: Story = {
+  args: {
+    ...sharedDeploymentProps,
+    onDeploy: async () => ({ accepted: false, message: "Target permission changed" }),
+  },
+  play: GPUReview.play,
+};
+export const German: Story = {
+  args: sharedDeploymentProps,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+export const Korean: Story = {
+  args: sharedDeploymentProps,
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ko" messages={ko}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+};
+export const Width768: Story = {
+  args: {
+    ...sharedDeploymentProps,
+    model: {
+      repoId: "publisher/very-long-production-language-model-name-with-a-complete-immutable-sha",
+      revisionSha: "a".repeat(40),
+    },
+  },
+  render: (args) => (
+    <div style={{ width: 768 }}>
+      <SharedModelDeploymentScreen {...args} />
+    </div>
+  ),
+};

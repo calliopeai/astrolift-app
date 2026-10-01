@@ -6030,6 +6030,13 @@ input CancelDeregisterInput {
   reason: String = null
 }
 
+enum CatalogueState {
+  AVAILABLE
+  NO_DATA
+  UNAVAILABLE
+  RATE_LIMITED
+}
+
 input CiWorkflowSyncActionInput {
   appId: GUID!
 }
@@ -6069,6 +6076,82 @@ type CloudOrphanType {
 input ClusterAuthUserRefInput {
   clusterId: GUID!
   username: String!
+}
+
+type ClusterModelDensity {
+  clusterId: GUID!
+  start: DateTime!
+  end: DateTime!
+  retrievedAt: DateTime!
+  modelCount: Int!
+  returnedCount: Int!
+  items: [SharedModelDensityRow!]!
+  capacity: ModelClusterCapacity!
+  scope: String!
+  source: String!
+  inventoryLimit: Int!
+  truncated: Boolean!
+}
+
+type ClusterModelDeployment {
+  id: GUID!
+  version: Int!
+  name: String!
+  organizationId: GUID!
+  clusterId: GUID!
+  providerId: GUID!
+  clusterSlug: String!
+  clusterName: String!
+  modelRepo: String!
+  revisionSha: String
+  computeMode: String
+  subscriptionsEnabled: Boolean!
+  runtimeSupported: Boolean
+  runtimeReason: String
+  status: String!
+  reason: String
+  ready: Boolean
+  readinessObservedAt: DateTime
+  readinessGeneration: Int
+  desiredSubscriptionRevision: Int!
+  appliedSubscriptionRevision: Int!
+  operationId: String
+  operationStartedAt: DateTime
+  operationCompletedAt: DateTime
+  desiredResources: ModelResources!
+  appliedResources: ModelResources
+}
+
+type ClusterModelDeploymentMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ClusterModelDeployment
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ClusterModelDeploymentPage {
+  items: [ClusterModelDeployment!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+input ClusterModelsFilterInput {
+  clusterId: GUID = null
+  computeMode: String = null
+  status: String = null
+  ready: Boolean = null
+  subscriptionsEnabled: Boolean = null
+  deployedByMe: Boolean = null
 }
 
 type Clusteragentkeyissuedpayload {
@@ -6475,6 +6558,15 @@ type DeploytokenrevokedpayloadMutationResult {
   data: Deploytokenrevokedpayload
 }
 
+input DeprovisionClusterModelInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  deleteData: Boolean! = false
+}
+
 input DeprovisionManagedServiceInput {
   id: GUID!
   deleteData: Boolean! = false
@@ -6717,6 +6809,37 @@ input GroupOperationInput {
   operation: String!
 }
 
+type HuggingFaceModel {
+  repoId: String!
+  revisionSha: String
+  author: String
+  pipelineTag: String
+  library: String
+  license: String
+  gated: ModelGating!
+  architectures: [String!]!
+  downloads: Float
+  likes: Float
+  compatibility: ModelCompatibility!
+}
+
+type HuggingFaceModelResult {
+  state: CatalogueState!
+  observedAt: DateTime!
+  model: HuggingFaceModel
+  source: String!
+  retryAfterSeconds: Int
+}
+
+type HuggingFaceModelsPage {
+  state: CatalogueState!
+  observedAt: DateTime!
+  items: [HuggingFaceModel!]!
+  nextCursor: String
+  retryAfterSeconds: Int
+  source: String!
+}
+
 type ImportGapType {
   code: String!
   message: String!
@@ -6888,6 +7011,203 @@ input MigrateAppInputGql {
   appEnvironmentId: GUID!
   targetClusterId: GUID!
   drainSource: Boolean! = true
+}
+
+type ModelClusterCapacity {
+  state: ModelObservationState!
+  source: String!
+  observedAt: DateTime
+  gpuDevices: [ModelGpuCapacity!]!
+  cpuCores: Float
+  memoryBytes: Float
+  vramBytes: Float
+  freshnessSeconds: Int!
+}
+
+enum ModelCompatibility {
+  UNKNOWN
+}
+
+type ModelDeploymentMetrics {
+  serviceId: GUID!
+  clusterId: GUID!
+  start: DateTime!
+  end: DateTime!
+  retrievedAt: DateTime!
+  stepSeconds: Int!
+  metrics: [ModelMetricObservation!]!
+  scope: String!
+  sampleLimit: Int!
+}
+
+enum ModelGating {
+  NONE
+  AUTO
+  MANUAL
+  UNKNOWN
+}
+
+type ModelGpuCapacity {
+  resource: String!
+  devices: Int!
+}
+
+type ModelMetricObservation {
+  key: String!
+  unit: String!
+  source: String!
+  state: ModelObservationState!
+  observedAt: DateTime
+  value: Float
+  samples: [ModelObservationSample!]!
+  aggregationWindowSeconds: Int!
+}
+
+type ModelObservationSample {
+  timestamp: DateTime!
+  value: Float!
+}
+
+enum ModelObservationState {
+  AVAILABLE
+  NO_DATA
+  STALE
+  UNCONFIGURED
+  UNAVAILABLE
+  UNSUPPORTED
+}
+
+type ModelPlacementCluster {
+  id: GUID!
+  providerId: GUID!
+  name: String!
+  slug: String!
+  region: String
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelPlacementClusterPage {
+  items: [ModelPlacementCluster!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type ModelResourceRequests {
+  source: String!
+  observedAt: DateTime
+  replicas: Int
+  cpuCoresPerReplica: Float
+  memoryBytesPerReplica: Float
+  gpuDevicesPerReplica: Int
+  gpuResource: String
+  totalCpuCores: Float
+  totalMemoryBytes: Float
+  totalGpuDevices: Int
+}
+
+type ModelResources {
+  cpuRequest: String
+  memoryRequest: String
+  gpuCount: Int
+  replicas: Int
+  cpuKvCacheGiB: Int
+}
+
+type ModelRuntimeAdmission {
+  eligible: Boolean!
+  reason: String
+  runtimeVersion: String
+  architecture: String
+  hardwareAdmission: String!
+}
+
+type ModelSubscription {
+  id: GUID!
+  version: Int!
+  modelDeploymentId: GUID!
+  appId: GUID!
+  appSlug: String!
+  appName: String!
+  environmentId: GUID!
+  environmentName: String!
+  alias: String!
+  bindingPrefix: String!
+  status: String!
+  canRevoke: Boolean!
+  desiredEnabled: Boolean!
+  desiredRevision: Int!
+  appliedRevision: Int!
+  reason: String
+  reconcileStartedAt: DateTime
+  reconciledAt: DateTime
+}
+
+type ModelSubscriptionOperation {
+  deployment: ClusterModelDeployment!
+  subscription: ModelSubscription!
+  restartRequired: Boolean!
+}
+
+type ModelSubscriptionOperationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ModelSubscriptionOperation
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelSubscriptionPage {
+  items: [ModelSubscription!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type ModelSubscriptionTarget {
+  environmentId: GUID!
+  environmentVersion: Int!
+  appId: GUID!
+  appSlug: String!
+  appName: String!
+  environmentName: String!
+  clusterId: GUID!
+  eligible: Boolean!
+  reason: String
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelSubscriptionTargetPage {
+  items: [ModelSubscriptionTarget!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 input MoveAppToTeamInput {
@@ -7220,6 +7540,11 @@ type Mutation {
   refreshCiWorkflowSyncStatus(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult!
   openCiWorkflowReconcilePr(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
+  provisionClusterModel(input: ProvisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  subscribeClusterModel(input: SubscribeClusterModelInput!): ModelSubscriptionOperationMutationResult!
+  revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
+  updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
+  deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
@@ -7258,6 +7583,7 @@ type Mutation {
   approveSecretChange(input: ApproveSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   withdrawSecretChange(input: WithdrawSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
+  testSharedModelEndpoint(input: TestSharedModelEndpointInput!): AstroliftModelEndpointTestMutationResult!
   cancelWorkflowInstance(workflowId: String!): MutationResult!
   terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
@@ -7666,6 +7992,21 @@ type ProviderpluginconfigpayloadMutationResult {
   data: Providerpluginconfigpayload
 }
 
+input ProvisionClusterModelInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  name: String!
+  modelRepo: String!
+  revisionSha: String!
+  computeMode: String!
+  cpuRequest: String!
+  memoryRequest: String!
+  gpuCount: Int!
+  allowSubscriptions: Boolean!
+  cpuKvCacheGiB: Int = null
+}
+
 type ProvisionManagedDomainPayload {
   zone: String!
   workflowId: String!
@@ -7938,6 +8279,12 @@ type Query {
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
+  clusterModelPlacementClustersPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelPlacementClusterPage!
+  clusterModelDeploymentsPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25, filter: ClusterModelsFilterInput = null): ClusterModelDeploymentPage!
+  clusterModelDeployment(organizationId: GUID!, id: GUID!): ClusterModelDeployment
+  clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
+  clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
+  clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
   astroliftProjectResourceClusters(projectId: GUID!): [AstroliftTenantCluster!]!
   astroliftProjectManagedServiceCatalog(projectId: GUID!, clusterId: GUID!): [AstroliftManagedServiceCatalogEntry!]!
   astroliftModelEndpoints: [AstroliftManagedService!]!
@@ -7964,6 +8311,11 @@ type Query {
   astroliftEmailEngagementMetrics(managedServiceId: GUID!, days: Int! = 30): AstroliftEmailEngagementMetrics
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
+  astroliftModelDeploymentMetrics(serviceId: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ModelDeploymentMetrics
+  astroliftClusterModelDensity(clusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ClusterModelDensity
+  astroliftHuggingFaceModels(search: String! = "", author: String! = "", pipelineTag: String! = "", library: String! = "", license: String! = "", gated: Boolean = null, sortBy: String! = "downloads", first: Int! = 20, after: String = null): HuggingFaceModelsPage!
+  astroliftHuggingFaceModel(repoId: String!, revision: String = null): HuggingFaceModelResult!
+  astroliftSharedModelPromptReadiness(id: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, expectedVersion: Int!): AstroliftModelPromptReadiness
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
@@ -8385,6 +8737,15 @@ input RevokeMobileDeviceInput {
   id: GUID!
 }
 
+input RevokeModelSubscriptionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  ifMatchDeploymentVersion: Int!
+}
+
 input RevokeRoleBindingInput {
   id: GUID!
 }
@@ -8606,6 +8967,15 @@ type SharedDirectoryType {
   directoryCount: Int!
 }
 
+type SharedModelDensityRow {
+  serviceId: GUID!
+  name: String!
+  status: String!
+  desired: ModelResourceRequests!
+  applied: ModelResourceRequests
+  observations: [ModelMetricObservation!]!
+}
+
 input SkillInput {
   name: String!
   slug: String!
@@ -8663,6 +9033,17 @@ type StartWorkflowResult {
   instanceId: ID
 }
 
+input SubscribeClusterModelInput {
+  organizationId: GUID!
+  modelDeploymentId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  appEnvironmentId: GUID!
+  alias: String!
+  ifMatchVersion: Int!
+  ifMatchEnvironmentVersion: Int!
+}
+
 type Subscription {
   astroliftDeploymentLifecycleStream(appSlug: String = null): AstroliftDeploymentLifecycleEvent!
   notificationReceived: String!
@@ -8697,6 +9078,14 @@ input TestModelEndpointInput {
 input TestNotificationInput {
   id: GUID!
   message: String = null
+}
+
+input TestSharedModelEndpointInput {
+  managedServiceId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  expectedVersion: Int!
+  prompt: String!
 }
 
 input TestWebhookInput {
@@ -8847,6 +9236,19 @@ input UpdateAppInput {
   minimumApprovals: Int = null
   cronPaused: Boolean = null
   ifMatchVersion: Int = null
+}
+
+input UpdateClusterModelInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  allowSubscriptions: Boolean!
+  cpuRequest: String!
+  memoryRequest: String!
+  gpuCount: Int!
+  cpuKvCacheGiB: Int = null
 }
 
 input UpdateEmailTemplateInput {

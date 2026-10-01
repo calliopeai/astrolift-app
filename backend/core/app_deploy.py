@@ -1143,6 +1143,9 @@ def deployment_env_from(deployment: Deployment) -> tuple[list[str], dict]:
     has_managed, workload_env_from = _binding_secret_refs_for_environment(env)
     if has_managed:
         env_from.append(_bindings_secret_name(app.slug))
+    from astrolift_services.model_subscriptions import coherent_subscriptions, subscription_secret_name
+
+    env_from.extend(subscription_secret_name(row) for row in coherent_subscriptions(env))
     return env_from, workload_env_from
 
 
@@ -1278,6 +1281,10 @@ def render_resources_for_deployment(
 
     if literals:
         _stamp_literal_secrets_digest(resources, literals)
+
+    from astrolift_services.model_subscriptions import stamp_binding_revisions
+
+    stamp_binding_revisions(resources, env)
 
     log.info(
         # ``md_id`` read as "managed service id" to more than one person

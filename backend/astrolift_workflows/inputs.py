@@ -78,6 +78,15 @@ class ProvisionManagedServiceInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class SharedModelReconcileInput:
+    managed_service_id: int
+    revision: int
+    actor: Actor
+    action: str = "apply"
+    delete_data: bool = False
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class UpdateManagedServiceInput:
     managed_service_id: int
     actor: Actor

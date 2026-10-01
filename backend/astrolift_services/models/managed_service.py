@@ -69,6 +69,14 @@ class ManagedService(BaseCoreModel):
         blank=True,
         on_delete=models.CASCADE,
     )
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization",
+        related_name="cluster_model_deployments",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        help_text="Explicit tenant owner only for a cluster-owned vLLM model.",
+    )
     app_environment = models.ForeignKey(
         "astrolift_lifecycle.AppEnvironment",
         related_name="managed_services",
@@ -93,6 +101,15 @@ class ManagedService(BaseCoreModel):
         help_text="Provisioning target for a project-owned resource.",
     )
     environment_name = models.CharField(max_length=128, blank=True, default="")
+    subscription_revision = models.PositiveBigIntegerField(default=0, db_default=0)
+    applied_subscription_revision = models.PositiveBigIntegerField(default=0, db_default=0)
+    model_ready_observed_at = models.DateTimeField(null=True, blank=True)
+    model_ready_generation = models.PositiveBigIntegerField(null=True, blank=True)
+    model_ready_auth_revision = models.PositiveBigIntegerField(null=True, blank=True)
+    model_ready_backend_ref = models.CharField(max_length=512, blank=True, default="", db_default="")
+    model_ready_provider_guid = models.UUIDField(null=True, blank=True)
+    model_operation_cluster_guid = models.UUIDField(null=True, blank=True)
+    model_operation_provider_guid = models.UUIDField(null=True, blank=True)
     kind = models.CharField(max_length=32, choices=Kind.choices)
     name = models.CharField(max_length=128, blank=True, default="")
     variant = models.CharField(max_length=64, blank=True, default="")
@@ -159,16 +176,27 @@ class ManagedService(BaseCoreModel):
             models.CheckConstraint(
                 condition=(
                     models.Q(
+                        organization__isnull=True,
                         project__isnull=True,
                         tenant_cluster__isnull=True,
                         registered_app__isnull=False,
                         app_environment__isnull=False,
                     )
                     | models.Q(
+                        organization__isnull=True,
                         project__isnull=False,
                         tenant_cluster__isnull=False,
                         registered_app__isnull=True,
                         app_environment__isnull=True,
+                    )
+                    | models.Q(
+                        organization__isnull=False,
+                        tenant_cluster__isnull=False,
+                        registered_app__isnull=True,
+                        app_environment__isnull=True,
+                        project__isnull=True,
+                        kind="model_endpoint",
+                        variant="vllm",
                     )
                 ),
                 name="msvc_exactly_one_owner_scope",
@@ -183,10 +211,17 @@ class ManagedService(BaseCoreModel):
                 condition=models.Q(project__isnull=False, deleted_at__isnull=True),
                 name="msvc_unique_active_per_project_kind_name",
             ),
+            models.UniqueConstraint(
+                fields=["organization", "tenant_cluster", "kind", "name"],
+                condition=models.Q(organization__isnull=False, deleted_at__isnull=True),
+                name="msvc_unique_active_cluster_model",
+            ),
         ]
 
     @property
     def owner_scope(self) -> str:
+        if self.organization_id:
+            return "cluster"
         return "project" if self.project_id else "app"
 
     @property
@@ -197,6 +232,8 @@ class ManagedService(BaseCoreModel):
 
     @property
     def effective_environment_name(self) -> str:
+        if self.organization_id:
+            return ""
         if self.app_environment_id:
             return self.app_environment.name
         return self.environment_name or "default"
@@ -320,6 +357,21 @@ class ManagedServiceAttachment(BaseCoreModel):
         on_delete=models.CASCADE,
     )
     manifest_managed = models.BooleanField(default=False)
+    model_subscription = models.BooleanField(default=False, db_default=False)
+    binding_alias = models.CharField(max_length=32, blank=True, default="", db_default="")
+    desired_enabled = models.BooleanField(default=True, db_default=True)
+    subscription_status = models.CharField(
+        max_length=16,
+        choices=[(value, value) for value in ("pending", "active", "revoking", "revoked", "failed")],
+        default="active",
+        db_default="active",
+    )
+    desired_revision = models.PositiveBigIntegerField(default=0, db_default=0)
+    applied_revision = models.PositiveBigIntegerField(default=0, db_default=0)
+    credential_ref = models.CharField(max_length=512, blank=True, default="", db_default="")
+    reconcile_error = models.CharField(max_length=256, blank=True, default="", db_default="")
+    reconcile_started_at = models.DateTimeField(null=True, blank=True)
+    reconciled_at = models.DateTimeField(null=True, blank=True)
     workload_names = models.JSONField(
         default=list,
         blank=True,
@@ -349,8 +401,29 @@ class ManagedServiceAttachment(BaseCoreModel):
             ),
             models.UniqueConstraint(
                 fields=["managed_service", "app_environment"],
-                condition=models.Q(app_environment__isnull=False, deleted_at__isnull=True),
+                condition=models.Q(
+                    app_environment__isnull=False, deleted_at__isnull=True, model_subscription=False
+                ),
                 name="msvc_attachment_unique_app_env",
+            ),
+            models.UniqueConstraint(
+                fields=["app_environment", "binding_alias"],
+                condition=models.Q(model_subscription=True, deleted_at__isnull=True),
+                name="msvc_model_alias_unique_app_env",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(model_subscription=False)
+                | models.Q(app_environment__isnull=False, agent_environment_spec__isnull=True),
+                name="msvc_model_subscription_app_env",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(model_subscription=False)
+                | models.Q(binding_alias__regex=r"^[a-z][a-z0-9_]{0,31}$"),
+                name="msvc_model_subscription_alias",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(applied_revision__lte=models.F("desired_revision")),
+                name="msvc_subscription_revision_order",
             ),
             models.UniqueConstraint(
                 fields=["managed_service", "agent_environment_spec"],

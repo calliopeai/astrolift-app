@@ -92,6 +92,7 @@ from astrolift_workflows.workflows.secret_rotation import (
     RotateSecretBundleWorkflow,
     SecretBundleScheduledRefreshWorkflow,
 )
+from astrolift_workflows.workflows.shared_model_reconcile import SharedModelReconcileWorkflow
 from astrolift_workflows.workflows.sync_app_domain import SyncAppDomainWorkflow
 from astrolift_workflows.workflows.tear_down_app import TearDownAppWorkflow
 from astrolift_workflows.workflows.tear_down_preview import TearDownPreviewWorkflow
@@ -106,6 +107,7 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 from astrolift_workflows.workflows.workflow_run_reconcile_tick import WorkflowRunReconcileTickWorkflow
 
 __all__ = [
+    "SharedModelReconcileWorkflow",
     "AgentBoxReapTickWorkflow",
     "AgentCronTickWorkflow",
     "AgentLoopTickWorkflow",

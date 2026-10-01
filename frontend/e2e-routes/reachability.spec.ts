@@ -65,10 +65,22 @@ test("owner can reach every active page from rendered navigation", async ({
       visited.set(path, path);
       continue;
     }
-    const response = await page.goto(path, { waitUntil: "networkidle" });
+    const livePods =
+      /^\/apps\/[^/]+\/logs$/.test(new URL(path, testInfo.project.use.baseURL!).pathname) &&
+      new URL(path, testInfo.project.use.baseURL!).searchParams.get("panel") === "pods";
+    const response = await page.goto(path, {
+      waitUntil: livePods ? "domcontentloaded" : "networkidle",
+    });
     expect(response?.status(), path).toBeLessThan(400);
     const actual = new URL(page.url()).pathname;
     visited.set(path, actual);
+    if (livePods)
+      await expect(
+        page
+          .getByRole("table", { name: "Pods", exact: true })
+          .getByRole("row")
+          .filter({ hasText: "Fixture" })
+      ).toBeVisible();
     await expect(
       page
         .getByRole("navigation", { name: "Main", exact: true })
@@ -261,20 +273,31 @@ test("member navigation keeps Home and reachable self-service settings", async (
   await expect(page.getByText(/This page could not be found|Application error:/)).toHaveCount(0);
 });
 
-test("app Pods panel uses server-safe preloads in the production route", async ({
-  page,
-  context,
-}, testInfo) => {
-  await authenticate(context, "owner", testInfo.project.use.baseURL!);
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  const response = await page.goto("/apps/fixture/logs?section=metrics&panel=pods", {
-    waitUntil: "networkidle",
+for (const selectedPod of [false, true]) {
+  test(`app Pods panel uses server-safe preloads in the production route${selectedPod ? " with a selected pod" : ""}`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    await authenticate(context, "owner", testInfo.project.use.baseURL!);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const response = await page.goto(
+      `/apps/fixture/logs?section=metrics&panel=pods${selectedPod ? "&pod=Fixture" : ""}`,
+      {
+        waitUntil: "domcontentloaded",
+      }
+    );
+    expect(response?.status()).toBeLessThan(400);
+    await expect(page.getByRole("table", { name: "Pods", exact: true })).toBeVisible();
+    await expect(
+      page
+        .getByRole("table", { name: "Pods", exact: true })
+        .getByRole("row")
+        .filter({ hasText: "Fixture" })
+    ).toBeVisible();
+    expect(errors).toEqual([]);
   });
-  expect(response?.status()).toBeLessThan(400);
-  await expect(page.getByRole("table", { name: "Pods", exact: true })).toBeVisible();
-  expect(errors).toEqual([]);
-});
+}
 
 test("cold workflow run link waits for its workflow context", async ({
   page,

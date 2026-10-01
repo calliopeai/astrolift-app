@@ -33,6 +33,7 @@ from astrolift_registry.schema.types import (
     app_to_type,
 )
 from astrolift_registry.scopes import app_scope_by_guid, transfer_destination_scope
+from astrolift_services.model_retirement import retirement_guard
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.optimistic import check_version_match as _check_version_match
@@ -319,6 +320,7 @@ class AppMutations:
         Permission.APP_DELETE, scope=app_scope_by_guid("input.id", permission=Permission.APP_DELETE)
     )
     @tenant_scoped()
+    @retirement_guard(kind="app", field="input.id")
     def soft_delete_app(
         self, info: Info, input: SoftDeleteAppInput
     ) -> MutationResultType[_SoftDeletePayload]:
@@ -341,6 +343,7 @@ class AppMutations:
         Permission.APP_DELETE, scope=app_scope_by_guid("input.id", permission=Permission.APP_DELETE)
     )
     @tenant_scoped()
+    @retirement_guard(kind="app", field="input.id")
     def tear_down_app(self, info: Info, input: TearDownAppInput) -> MutationResultType[_SoftDeletePayload]:
         """Fires ``TearDownAppWorkflow`` (#358) — symmetric inverse
         of onboarding. Fans out per-binding ``DeprovisionManagedService``

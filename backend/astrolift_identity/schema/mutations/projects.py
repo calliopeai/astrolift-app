@@ -33,6 +33,7 @@ from astrolift_identity.schema.types import (
     project_to_type,
 )
 from astrolift_identity.scopes import project_scope_by_guid, team_scope_by_guid
+from astrolift_services.model_retirement import retirement_guard
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.naming import PROJECT_SLUG, NamingViolation
@@ -129,6 +130,7 @@ class ProjectMutations:
         scope=project_scope_by_guid("input.id", permission=Permission.PROJECT_DELETE),
     )
     @tenant_scoped()
+    @retirement_guard(kind="project", field="input.id")
     def soft_delete_project(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:

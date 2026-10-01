@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from _sdk.k8s_naming import app_namespace, dns_label
+from _sdk.k8s_naming import app_namespace, cluster_model_namespace, cluster_model_resource_name, dns_label
 
 
 def test_short_canonical_names_remain_compatible() -> None:
@@ -37,3 +37,27 @@ def test_custom_budget_preserves_suffix_room() -> None:
 def test_invalid_budgets_fail(max_length: int) -> None:
     with pytest.raises(ValueError, match="max_length"):
         dns_label("api", max_length=max_length)
+
+
+def test_cluster_model_placement_is_guid_owned_not_display_named() -> None:
+    identities = {
+        "organization_id": "01920000-0000-7000-8000-000000000001",
+        "cluster_id": "01920000-0000-7000-8000-000000000002",
+        "managed_service_id": "01920000-0000-7000-8000-000000000003",
+    }
+    namespace = cluster_model_namespace(**identities)
+    assert len(namespace) <= 63
+    assert re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", namespace)
+    for field in identities:
+        assert namespace != cluster_model_namespace(**(identities | {field: "01920000-0000-7000-8000-000000000004"}))
+    assert cluster_model_resource_name(identities["managed_service_id"]) == "vllm-01920000-0000-7000-8000-000000000003"
+
+
+@pytest.mark.parametrize("field", ["organization_id", "cluster_id", "managed_service_id"])
+def test_cluster_model_missing_identity_refuses(field: str) -> None:
+    values = {"organization_id": "org", "cluster_id": "cluster", "managed_service_id": "model"}
+    values[field] = ""
+    with pytest.raises(ValueError):
+        cluster_model_namespace(**values)
+    with pytest.raises(ValueError):
+        cluster_model_resource_name("")

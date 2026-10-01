@@ -1,12 +1,17 @@
 import { NextIntlClientProvider } from "next-intl";
 import messages from "@/messages/en.json";
-import { fireEvent, render as rtlRender, screen } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import * as React from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { RUNS, RUNS_LIST, type RunRow } from "./fixtures";
 import { ListPage } from "./ListPage";
-import { type ListState, useLocalListState } from "./use-list-state";
+import {
+  type ListState,
+  useLocalListState,
+  parseListState,
+  serializeListState,
+} from "./use-list-state";
 
 const EMPTY = { icon: null, title: "No runs yet" };
 const COLUMNS = [{ id: "id", header: "Run", cell: (r: RunRow) => r.id }];
@@ -29,6 +34,53 @@ function List({ embedded, initial }: { embedded: boolean; initial?: Partial<List
 }
 
 describe("ListPage", () => {
+  function SearchList({
+    searchable,
+    onSearch,
+  }: {
+    searchable?: boolean;
+    onSearch: (value: string) => void;
+  }) {
+    const list = useLocalListState({ ...RUNS_LIST, searchable });
+    return (
+      <ListPage
+        embedded
+        list={{
+          ...list,
+          setSearch: (value) => {
+            onSearch(value);
+            list.setSearch(value);
+          },
+        }}
+        label="Runs"
+        rows={RUNS.slice(0, 3)}
+        columns={COLUMNS}
+        getRowId={(row) => row.id}
+        empty={EMPTY}
+      />
+    );
+  }
+  it("keeps declared search debounced and interactive by default", async () => {
+    const onSearch = vi.fn();
+    render(<SearchList onSearch={onSearch} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "first" } });
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "last" } });
+    await waitFor(() => expect(onSearch).toHaveBeenCalledExactlyOnceWith("last"));
+  });
+  it("does not advertise or capture search for a bounded source without that contract", () => {
+    const onSearch = vi.fn();
+    render(<SearchList searchable={false} onSearch={onSearch} />);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.getByText(RUNS[0].id)).toBeInTheDocument();
+    const key = new KeyboardEvent("keydown", { key: "/", cancelable: true, bubbles: true });
+    expect(window.dispatchEvent(key)).toBe(true);
+    expect(onSearch).not.toHaveBeenCalled();
+    const definition = { ...RUNS_LIST, searchable: false };
+    const state = parseListState(definition, "q=hidden&status=failed");
+    expect(state.q).toBe("");
+    expect(state.filters.status).toBe("failed");
+    expect(serializeListState(definition, { ...state, q: "hidden" })).not.toContain("q=");
+  });
   it("routed: the views are the header's tabs", () => {
     render(<List embedded={false} />);
     expect(screen.getByRole("heading", { level: 1, name: "Runs" })).toBeInTheDocument();

@@ -302,6 +302,7 @@ class TestModulesPerRole:
             "agents",
             "workflows",
             "admin",
+            "models",
             "chat_studio_integration",
             "agent_live_attach",
             "chat_studio_agent_runs",

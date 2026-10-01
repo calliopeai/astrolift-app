@@ -23,6 +23,7 @@ from _sdk.k8s_dynamic_client import (
     KubernetesDynamicClient,
     NotFoundError,
     PortForwardHandle,
+    PreconditionFailedError,
     _decode_ca_data,
     split_kind,
 )
@@ -471,6 +472,30 @@ def test_hpa_owned_replicas_are_never_written_by_handover(managers) -> None:
     assert request["field_manager"] == "astrolift"
     assert "replicas" not in request["body"]["spec"]
     assert request["body"]["metadata"]["resourceVersion"] == "10"
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("manager", ["astrolift", "horizontal-pod-autoscaler"])
+@pytest.mark.parametrize("field,value", [("uid", "replaced"), ("resourceVersion", "9")])
+def test_hpa_stale_caller_identity_refuses_before_handover_or_full_apply(dry_run, manager, field, value):
+    before = _replica_observation(manager)
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=before)
+    manifest = _hpa_manifest()
+    manifest["metadata"][field] = value
+    with pytest.raises(PreconditionFailedError, match="caller identity precondition"):
+        client.server_side_apply(namespace="ns", manifest=manifest, dry_run=dry_run)
+    resource.server_side_apply.assert_not_called()
+
+
+def test_hpa_matching_caller_identity_survives_handover():
+    before = _replica_observation("astrolift")
+    transferred = _replica_observation("astrolift", "astrolift-hpa-handover", version="11")
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=transferred)
+    resource.server_side_apply.side_effect = [_resource_instance(transferred), _resource_instance(transferred)]
+    manifest = _hpa_manifest()
+    manifest["metadata"].update(uid="observed-deployment-uid", resourceVersion="10")
+    client.server_side_apply(namespace="ns", manifest=manifest, dry_run=False)
+    assert resource.server_side_apply.call_args_list[1].kwargs["body"]["metadata"]["resourceVersion"] == "11"
 
 
 @pytest.mark.parametrize("missing", ["uid", "resourceVersion", "managedFields", "replicas"])

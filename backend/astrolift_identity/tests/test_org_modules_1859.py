@@ -151,6 +151,7 @@ def test_me_modules_keeps_the_entity_modules_enabled(org_b, user):
         "agents",
         "workflows",
         "admin",
+        "models",
         CHAT,
         ATTACH,
         RUNS,

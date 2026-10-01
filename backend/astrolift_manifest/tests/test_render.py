@@ -30,6 +30,30 @@ def _normalized(*workloads: WorkloadManifest) -> NormalizedManifest:
     )
 
 
+def test_extra_labels_cannot_impersonate_another_app_environment_or_workload():
+    resources = render_manifests(
+        _normalized(_deployment_workload()),
+        namespace="acme-chat",
+        app_slug="chat",
+        environment_name="staging",
+        image_tag="v1",
+        image_repository="registry.invalid/chat",
+        labels={
+            "astrolift.dev/app": "other-app",
+            "astrolift.dev/environment": "production",
+            "astrolift.dev/workload": "admin",
+            "team": "custom-preserved",
+        },
+    )
+    deployment = next(resource for resource in resources if resource["kind"] == "Deployment")
+    labels = deployment["spec"]["template"]["metadata"]["labels"]
+    assert labels["astrolift.dev/app"] == "chat"
+    assert labels["astrolift.dev/environment"] == "staging"
+    assert labels["astrolift.dev/workload"] == "web"
+    assert labels["team"] == "custom-preserved"
+    assert deployment["spec"]["selector"]["matchLabels"]["astrolift.dev/app"] == "chat"
+
+
 def _container(
     name: str = "app",
     *,

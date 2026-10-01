@@ -5665,6 +5665,12 @@ export type CancelDeregisterInput = {
   workflowId: Scalars['String']['input'];
 };
 
+export type CatalogueState =
+  | 'AVAILABLE'
+  | 'NO_DATA'
+  | 'RATE_LIMITED'
+  | 'UNAVAILABLE';
+
 export type CiWorkflowSyncActionInput = {
   appId: Scalars['GUID']['input'];
 };
@@ -5704,6 +5710,78 @@ export type CloudOrphanType = {
 export type ClusterAuthUserRefInput = {
   clusterId: Scalars['GUID']['input'];
   username: Scalars['String']['input'];
+};
+
+export type ClusterModelDensity = {
+  capacity: ModelClusterCapacity;
+  clusterId: Scalars['GUID']['output'];
+  end: Scalars['DateTime']['output'];
+  inventoryLimit: Scalars['Int']['output'];
+  items: Array<SharedModelDensityRow>;
+  modelCount: Scalars['Int']['output'];
+  retrievedAt: Scalars['DateTime']['output'];
+  returnedCount: Scalars['Int']['output'];
+  scope: Scalars['String']['output'];
+  source: Scalars['String']['output'];
+  start: Scalars['DateTime']['output'];
+  truncated: Scalars['Boolean']['output'];
+};
+
+export type ClusterModelDeployment = {
+  appliedResources?: Maybe<ModelResources>;
+  appliedSubscriptionRevision: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterName: Scalars['String']['output'];
+  clusterSlug: Scalars['String']['output'];
+  computeMode?: Maybe<Scalars['String']['output']>;
+  desiredResources: ModelResources;
+  desiredSubscriptionRevision: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  modelRepo: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationId?: Maybe<Scalars['String']['output']>;
+  operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  organizationId: Scalars['GUID']['output'];
+  providerId: Scalars['GUID']['output'];
+  readinessGeneration?: Maybe<Scalars['Int']['output']>;
+  readinessObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  ready?: Maybe<Scalars['Boolean']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  revisionSha?: Maybe<Scalars['String']['output']>;
+  runtimeReason?: Maybe<Scalars['String']['output']>;
+  runtimeSupported?: Maybe<Scalars['Boolean']['output']>;
+  status: Scalars['String']['output'];
+  subscriptionsEnabled: Scalars['Boolean']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type ClusterModelDeploymentMutationResult = {
+  data?: Maybe<ClusterModelDeployment>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ClusterModelDeploymentPage = {
+  items: Array<ClusterModelDeployment>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ClusterModelsFilterInput = {
+  clusterId: InputMaybe<Scalars['GUID']['input']>;
+  computeMode: InputMaybe<Scalars['String']['input']>;
+  deployedByMe: InputMaybe<Scalars['Boolean']['input']>;
+  ready: InputMaybe<Scalars['Boolean']['input']>;
+  status: InputMaybe<Scalars['String']['input']>;
+  subscriptionsEnabled: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type Clusteragentkeyissuedpayload = {
@@ -6099,6 +6177,15 @@ export type DeploytokenrevokedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type DeprovisionClusterModelInput = {
+  deleteData: Scalars['Boolean']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type DeprovisionManagedServiceInput = {
   deleteData: Scalars['Boolean']['input'];
   forceDestroy: Scalars['Boolean']['input'];
@@ -6335,6 +6422,37 @@ export type GroupOperationInput = {
   userIds: Array<Scalars['ID']['input']>;
 };
 
+export type HuggingFaceModel = {
+  architectures: Array<Scalars['String']['output']>;
+  author?: Maybe<Scalars['String']['output']>;
+  compatibility: ModelCompatibility;
+  downloads?: Maybe<Scalars['Float']['output']>;
+  gated: ModelGating;
+  library?: Maybe<Scalars['String']['output']>;
+  license?: Maybe<Scalars['String']['output']>;
+  likes?: Maybe<Scalars['Float']['output']>;
+  pipelineTag?: Maybe<Scalars['String']['output']>;
+  repoId: Scalars['String']['output'];
+  revisionSha?: Maybe<Scalars['String']['output']>;
+};
+
+export type HuggingFaceModelResult = {
+  model?: Maybe<HuggingFaceModel>;
+  observedAt: Scalars['DateTime']['output'];
+  retryAfterSeconds?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  state: CatalogueState;
+};
+
+export type HuggingFaceModelsPage = {
+  items: Array<HuggingFaceModel>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  observedAt: Scalars['DateTime']['output'];
+  retryAfterSeconds?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  state: CatalogueState;
+};
+
 export type ImportGapType = {
   code: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -6503,6 +6621,188 @@ export type MigrateAppInputGql = {
   targetClusterId: Scalars['GUID']['input'];
 };
 
+export type ModelClusterCapacity = {
+  cpuCores?: Maybe<Scalars['Float']['output']>;
+  freshnessSeconds: Scalars['Int']['output'];
+  gpuDevices: Array<ModelGpuCapacity>;
+  memoryBytes?: Maybe<Scalars['Float']['output']>;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  source: Scalars['String']['output'];
+  state: ModelObservationState;
+  vramBytes?: Maybe<Scalars['Float']['output']>;
+};
+
+export type ModelCompatibility =
+  | 'UNKNOWN';
+
+export type ModelDeploymentMetrics = {
+  clusterId: Scalars['GUID']['output'];
+  end: Scalars['DateTime']['output'];
+  metrics: Array<ModelMetricObservation>;
+  retrievedAt: Scalars['DateTime']['output'];
+  sampleLimit: Scalars['Int']['output'];
+  scope: Scalars['String']['output'];
+  serviceId: Scalars['GUID']['output'];
+  start: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+};
+
+export type ModelGating =
+  | 'AUTO'
+  | 'MANUAL'
+  | 'NONE'
+  | 'UNKNOWN';
+
+export type ModelGpuCapacity = {
+  devices: Scalars['Int']['output'];
+  resource: Scalars['String']['output'];
+};
+
+export type ModelMetricObservation = {
+  aggregationWindowSeconds: Scalars['Int']['output'];
+  key: Scalars['String']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  samples: Array<ModelObservationSample>;
+  source: Scalars['String']['output'];
+  state: ModelObservationState;
+  unit: Scalars['String']['output'];
+  value?: Maybe<Scalars['Float']['output']>;
+};
+
+export type ModelObservationSample = {
+  timestamp: Scalars['DateTime']['output'];
+  value: Scalars['Float']['output'];
+};
+
+export type ModelObservationState =
+  | 'AVAILABLE'
+  | 'NO_DATA'
+  | 'STALE'
+  | 'UNAVAILABLE'
+  | 'UNCONFIGURED'
+  | 'UNSUPPORTED';
+
+export type ModelPlacementCluster = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  providerId: Scalars['GUID']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  slug: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelPlacementClusterPage = {
+  items: Array<ModelPlacementCluster>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelResourceRequests = {
+  cpuCoresPerReplica?: Maybe<Scalars['Float']['output']>;
+  gpuDevicesPerReplica?: Maybe<Scalars['Int']['output']>;
+  gpuResource?: Maybe<Scalars['String']['output']>;
+  memoryBytesPerReplica?: Maybe<Scalars['Float']['output']>;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  replicas?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  totalCpuCores?: Maybe<Scalars['Float']['output']>;
+  totalGpuDevices?: Maybe<Scalars['Int']['output']>;
+  totalMemoryBytes?: Maybe<Scalars['Float']['output']>;
+};
+
+export type ModelResources = {
+  cpuKvCacheGiB?: Maybe<Scalars['Int']['output']>;
+  cpuRequest?: Maybe<Scalars['String']['output']>;
+  gpuCount?: Maybe<Scalars['Int']['output']>;
+  memoryRequest?: Maybe<Scalars['String']['output']>;
+  replicas?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelRuntimeAdmission = {
+  architecture?: Maybe<Scalars['String']['output']>;
+  eligible: Scalars['Boolean']['output'];
+  hardwareAdmission: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  runtimeVersion?: Maybe<Scalars['String']['output']>;
+};
+
+export type ModelSubscription = {
+  alias: Scalars['String']['output'];
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  appliedRevision: Scalars['Int']['output'];
+  bindingPrefix: Scalars['String']['output'];
+  canRevoke: Scalars['Boolean']['output'];
+  desiredEnabled: Scalars['Boolean']['output'];
+  desiredRevision: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  modelDeploymentId: Scalars['GUID']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  reconcileStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  reconciledAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type ModelSubscriptionOperation = {
+  deployment: ClusterModelDeployment;
+  restartRequired: Scalars['Boolean']['output'];
+  subscription: ModelSubscription;
+};
+
+export type ModelSubscriptionOperationMutationResult = {
+  data?: Maybe<ModelSubscriptionOperation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelSubscriptionPage = {
+  items: Array<ModelSubscription>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelSubscriptionTarget = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterId: Scalars['GUID']['output'];
+  eligible: Scalars['Boolean']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelSubscriptionTargetPage = {
+  items: Array<ModelSubscriptionTarget>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type MoveAppToTeamInput = {
   appId: Scalars['GUID']['input'];
   targetTeamId: Scalars['GUID']['input'];
@@ -6631,6 +6931,7 @@ export type Mutation = {
   /** Soft-delete a stage from a writable definition (spec 40 §6). */
   deleteWorkflowStage: MutationResult;
   deployClusterAgent: AstroliftTenantClusterMutationResult;
+  deprovisionClusterModel: ClusterModelDeploymentMutationResult;
   deprovisionManagedService: ManagedservicedeletedpayloadMutationResult;
   deprovisionProjectManagedService: ManagedservicedeletedpayloadMutationResult;
   deregisterAstroliftApp: AstroliftDeregisterAppPayloadMutationResult;
@@ -6721,6 +7022,7 @@ export type Mutation = {
   profileRequestPwdChange: Scalars['Boolean']['output'];
   promoteDeployment: AstroliftDeploymentMutationResult;
   proposeSecretChange: AstroliftSecretChangeProposalMutationResult;
+  provisionClusterModel: ClusterModelDeploymentMutationResult;
   provisionManagedDomain: ProvisionManagedDomainPayloadMutationResult;
   provisionManagedService: AstroliftManagedServiceMutationResult;
   provisionProjectManagedService: AstroliftManagedServiceMutationResult;
@@ -6786,6 +7088,7 @@ export type Mutation = {
   revokeDeployToken: DeploytokenrevokedpayloadMutationResult;
   revokeInvitation: AstroliftInvitationMutationResult;
   revokeMobileDevice: RevokemobiledevicepayloadMutationResult;
+  revokeModelSubscription: ModelSubscriptionOperationMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   revokeTeamAccessFromApp: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
@@ -6850,6 +7153,7 @@ export type Mutation = {
   /** Start a workflow for an object. */
   startWorkflow: StartWorkflowResult;
   submitForm: AstroliftFormSubmissionMutationResult;
+  subscribeClusterModel: ModelSubscriptionOperationMutationResult;
   /** Switch the active user (impersonation). */
   switchUser: SwitchUserResult;
   syncManifestFromRepo: ManifeststagepayloadMutationResult;
@@ -6858,6 +7162,7 @@ export type Mutation = {
   terminateWorkflowInstance: MutationResult;
   testModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testNotificationChannel: AstroliftNotificationMutationResult;
+  testSharedModelEndpoint: AstroliftModelEndpointTestMutationResult;
   testWebhookSubscription: AstroliftWebhookTestResultMutationResult;
   transferApp: AstroliftRegisteredAppMutationResult;
   /** Transition a workflow instance to a new state. */
@@ -6874,6 +7179,7 @@ export type Mutation = {
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
+  updateClusterModel: ClusterModelDeploymentMutationResult;
   updateEmailTemplate: AstroliftEmailTemplateMutationResult;
   updateFormDefinition: AstroliftFormDefinitionMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
@@ -7521,6 +7827,11 @@ export type MutationDeployClusterAgentArgs = {
 };
 
 
+export type MutationDeprovisionClusterModelArgs = {
+  input: DeprovisionClusterModelInput;
+};
+
+
 export type MutationDeprovisionManagedServiceArgs = {
   input: DeprovisionManagedServiceInput;
 };
@@ -7869,6 +8180,11 @@ export type MutationProposeSecretChangeArgs = {
 };
 
 
+export type MutationProvisionClusterModelArgs = {
+  input: ProvisionClusterModelInput;
+};
+
+
 export type MutationProvisionManagedDomainArgs = {
   clusterId: Scalars['GUID']['input'];
   isPlatformManagedZone?: Scalars['Boolean']['input'];
@@ -8198,6 +8514,11 @@ export type MutationRevokeMobileDeviceArgs = {
 };
 
 
+export type MutationRevokeModelSubscriptionArgs = {
+  input: RevokeModelSubscriptionInput;
+};
+
+
 export type MutationRevokeRoleBindingArgs = {
   input: RevokeRoleBindingInput;
 };
@@ -8499,6 +8820,11 @@ export type MutationSubmitFormArgs = {
 };
 
 
+export type MutationSubscribeClusterModelArgs = {
+  input: SubscribeClusterModelInput;
+};
+
+
 export type MutationSwitchUserArgs = {
   id: Scalars['ID']['input'];
 };
@@ -8532,6 +8858,11 @@ export type MutationTestModelEndpointArgs = {
 
 export type MutationTestNotificationChannelArgs = {
   input: TestNotificationInput;
+};
+
+
+export type MutationTestSharedModelEndpointArgs = {
+  input: TestSharedModelEndpointInput;
 };
 
 
@@ -8615,6 +8946,11 @@ export type MutationUpdateAppArgs = {
 
 export type MutationUpdateAstroliftSecurityPolicyArgs = {
   input: UpdateSecurityPolicyInput;
+};
+
+
+export type MutationUpdateClusterModelArgs = {
+  input: UpdateClusterModelInput;
 };
 
 
@@ -9086,6 +9422,21 @@ export type ProviderpluginconfigpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ProvisionClusterModelInput = {
+  allowSubscriptions: Scalars['Boolean']['input'];
+  clusterId: Scalars['GUID']['input'];
+  computeMode: Scalars['String']['input'];
+  cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
+  cpuRequest: Scalars['String']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  gpuCount: Scalars['Int']['input'];
+  memoryRequest: Scalars['String']['input'];
+  modelRepo: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  revisionSha: Scalars['String']['input'];
+};
+
 export type ProvisionManagedDomainPayload = {
   message: Scalars['String']['output'];
   nameservers: Array<Scalars['String']['output']>;
@@ -9246,6 +9597,7 @@ export type Query = {
   astroliftClusterHealth?: Maybe<AstroliftClusterHealth>;
   astroliftClusterLifecycleAudit: Array<AstroliftClusterLifecycleAuditEntry>;
   astroliftClusterLiveState?: Maybe<AstroliftClusterLiveState>;
+  astroliftClusterModelDensity?: Maybe<ClusterModelDensity>;
   astroliftClusterPrometheusMetrics: AstroliftClusterPrometheusMetrics;
   astroliftClusterPrometheusRangeMetrics: AstroliftClusterPrometheusRangeMetrics;
   astroliftClusterSystemMetrics: AstroliftClusterSystemMetrics;
@@ -9296,6 +9648,8 @@ export type Query = {
   astroliftExecutePromql: AstroliftExecutePromqlResult;
   astroliftGrantPreview: AstroliftGrantPreview;
   astroliftGroupRoleMappingsPage: AstroliftGroupRoleMappingPage;
+  astroliftHuggingFaceModel: HuggingFaceModelResult;
+  astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
@@ -9312,6 +9666,7 @@ export type Query = {
   astroliftMembers: Array<AstroliftMember>;
   astroliftMembersCsv: AstroliftIdentityCsvExport;
   astroliftMembersPage: AstroliftMemberPage;
+  astroliftModelDeploymentMetrics?: Maybe<ModelDeploymentMetrics>;
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
@@ -9391,6 +9746,7 @@ export type Query = {
   astroliftSecretChangeProposals: Array<AstroliftSecretChangeProposal>;
   /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
   astroliftServerInfo: AstroliftServerInfo;
+  astroliftSharedModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage. */
   astroliftSourceConnections: Array<AstroliftSourceConnection>;
   astroliftSourceConnectionsPage: AstroliftSourceConnectionPage;
@@ -9437,6 +9793,12 @@ export type Query = {
   /** Cursor-paginated mutation audit log. Superuser only. */
   auditLogsPage: AuditLogEntryPage;
   brief?: Maybe<AstroliftBrief>;
+  clusterModelDeployment?: Maybe<ClusterModelDeployment>;
+  clusterModelDeploymentsPage: ClusterModelDeploymentPage;
+  clusterModelPlacementClustersPage: ModelPlacementClusterPage;
+  clusterModelRuntimeAdmission: ModelRuntimeAdmission;
+  clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
+  clusterModelSubscriptionsPage: ModelSubscriptionPage;
   dispatchers: Array<AstroliftDispatcherInstance>;
   /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
@@ -10112,6 +10474,14 @@ export type QueryAstroliftClusterLiveStateArgs = {
 };
 
 
+export type QueryAstroliftClusterModelDensityArgs = {
+  clusterId: Scalars['GUID']['input'];
+  end: Scalars['DateTime']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+};
+
+
 export type QueryAstroliftClusterPrometheusMetricsArgs = {
   clusterId: Scalars['GUID']['input'];
 };
@@ -10397,6 +10767,25 @@ export type QueryAstroliftGroupRoleMappingsPageArgs = {
 };
 
 
+export type QueryAstroliftHuggingFaceModelArgs = {
+  repoId: Scalars['String']['input'];
+  revision?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftHuggingFaceModelsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  author?: Scalars['String']['input'];
+  first?: Scalars['Int']['input'];
+  gated?: InputMaybe<Scalars['Boolean']['input']>;
+  library?: Scalars['String']['input'];
+  license?: Scalars['String']['input'];
+  pipelineTag?: Scalars['String']['input'];
+  search?: Scalars['String']['input'];
+  sortBy?: Scalars['String']['input'];
+};
+
+
 export type QueryAstroliftInvitationsArgs = {
   status?: InputMaybe<Scalars['String']['input']>;
 };
@@ -10473,6 +10862,15 @@ export type QueryAstroliftMembersPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftModelDeploymentMetricsArgs = {
+  end: Scalars['DateTime']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  serviceId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
 };
 
 
@@ -10805,6 +11203,14 @@ export type QueryAstroliftSecretChangeProposalsArgs = {
 };
 
 
+export type QueryAstroliftSharedModelPromptReadinessArgs = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftSourceConnectionsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -11022,6 +11428,53 @@ export type QueryAuditLogsPageArgs = {
 
 export type QueryBriefArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryClusterModelDeploymentArgs = {
+  id: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+
+export type QueryClusterModelDeploymentsPageArgs = {
+  filter?: InputMaybe<ClusterModelsFilterInput>;
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelPlacementClustersPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelRuntimeAdmissionArgs = {
+  input: ProvisionClusterModelInput;
+};
+
+
+export type QueryClusterModelSubscriptionTargetsPageArgs = {
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelSubscriptionsPageArgs = {
+  appEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -11564,6 +12017,15 @@ export type RevokeMobileDeviceInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type RevokeModelSubscriptionInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchDeploymentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type RevokeRoleBindingInput = {
   id: Scalars['GUID']['input'];
 };
@@ -11785,6 +12247,15 @@ export type SharedDirectoryType = {
   fileCount: Scalars['Int']['output'];
 };
 
+export type SharedModelDensityRow = {
+  applied?: Maybe<ModelResourceRequests>;
+  desired: ModelResourceRequests;
+  name: Scalars['String']['output'];
+  observations: Array<ModelMetricObservation>;
+  serviceId: Scalars['GUID']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type SkillInput = {
   content: Scalars['String']['input'];
   dependencies: InputMaybe<Scalars['JSON']['input']>;
@@ -11840,6 +12311,17 @@ export type StartWorkflowResult = {
   errors: Array<ValidationError>;
   instanceId?: Maybe<Scalars['ID']['output']>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type SubscribeClusterModelInput = {
+  alias: Scalars['String']['input'];
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type Subscription = {
@@ -11906,6 +12388,14 @@ export type TestModelEndpointInput = {
 export type TestNotificationInput = {
   id: Scalars['GUID']['input'];
   message: InputMaybe<Scalars['String']['input']>;
+};
+
+export type TestSharedModelEndpointInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+  prompt: Scalars['String']['input'];
 };
 
 export type TestWebhookInput = {
@@ -12053,6 +12543,19 @@ export type UpdateAppInput = {
   requiresApproval: InputMaybe<Scalars['Boolean']['input']>;
   sourceUrl: InputMaybe<Scalars['String']['input']>;
   triggerMode: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateClusterModelInput = {
+  allowSubscriptions: Scalars['Boolean']['input'];
+  cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
+  cpuRequest: Scalars['String']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  gpuCount: Scalars['Int']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  memoryRequest: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type UpdateEmailTemplateInput = {

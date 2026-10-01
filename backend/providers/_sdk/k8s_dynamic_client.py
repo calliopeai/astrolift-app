@@ -378,6 +378,10 @@ class KubernetesDynamicClient:
         observed = self._to_dict(current)
         metadata = observed.get("metadata") or {}
         uid, version = metadata.get("uid"), metadata.get("resourceVersion")
+        requested_metadata = manifest.get("metadata") or {}
+        for field, observed_value in (("uid", uid), ("resourceVersion", version)):
+            if field in requested_metadata and requested_metadata[field] != observed_value:
+                raise PreconditionFailedError("HPA deployment caller identity precondition no longer matches")
         replicas = (observed.get("spec") or {}).get("replicas")
         if (
             not isinstance(uid, str)

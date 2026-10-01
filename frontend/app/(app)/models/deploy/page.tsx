@@ -1,8 +1,4 @@
-"use client";
-
-import { DeployModelScreen } from "@/components/screens/models/DeployModelScreen";
-import { useDeployModel } from "@/components/screens/models/use-deploy-model";
-
+import { SharedModelDeploymentClient } from "@/components/screens/models/SharedModelDeploymentClient";
 export default function DeployModelPage() {
-  return <DeployModelScreen {...useDeployModel()} />;
+  return <SharedModelDeploymentClient />;
 }

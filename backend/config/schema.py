@@ -28,6 +28,8 @@ import astrolift_workflows.schema as AstroliftTemporalWorkflowsSchema  # noqa: E
 # ---------------------------------------------------------------------------
 import core.schema.mutations as CoreMutations
 import organization.schema as OrganizationSchema
+from astrolift_services.schema.model_reads import ModelReadsQuery
+from astrolift_services.schema.shared_model_prompt import SharedModelPromptMutations, SharedModelPromptQuery
 from config.features import Feature, is_enabled
 from core.schema.types.audit import AuditLogQuery
 from core.schema.types.permission_analysis import PermissionAnalysisQuery
@@ -49,6 +51,8 @@ _query_bases = [
     AstroliftBillingSchema.BillingQuery,
     AstroliftScmSchema.ScmQuery,
     AstroliftServicesSchema.ServicesQuery,
+    ModelReadsQuery,
+    SharedModelPromptQuery,
     AstroliftObservabilitySchema.GoldenSignalsQuery,
     AstroliftObservabilitySchema.LogHistoryQuery,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsQuery,
@@ -67,6 +71,7 @@ _mutation_bases = [
     AstroliftLifecycleSchema.LifecycleMutation,
     AstroliftScmSchema.ScmMutation,
     AstroliftServicesSchema.ServicesMutation,
+    SharedModelPromptMutations,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsMutation,
     AstroliftBillingSchema.BillingMutation,
     AstroliftFormsSchema.FormsMutation,

@@ -41,6 +41,20 @@ describe("visibleNav", () => {
   it("drops Admin's empty groups with the module", () => {
     expect(visibleNav(NAV, only("apps", "agents")).some((a) => a.key === "admin")).toBe(false);
   });
+  it("shows Models using its own server entitlement without requiring agent read", () => {
+    const nav = visibleNav(NAV, only("models"));
+    expect(nav.map((area) => area.key)).toEqual(["home", "agents"]);
+    expect(
+      nav
+        .find((area) => area.key === "agents")
+        ?.groups.flatMap((group) => group.functions.map((fn) => ({ key: fn.key, href: fn.href })))
+    ).toEqual([{ key: "models", href: "/models" }]);
+    expect(
+      visibleNav(NAV, only("agents"))
+        .flatMap((area) => area.groups.flatMap((group) => group.functions))
+        .some((fn) => fn.key === "models")
+    ).toBe(false);
+  });
 });
 
 describe("activeFor", () => {

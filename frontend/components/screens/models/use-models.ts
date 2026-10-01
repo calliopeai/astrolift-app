@@ -1,11 +1,17 @@
 "use client";
 
+import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useQuery } from "@apollo/client/react";
 
 import { useListState } from "@/components/list/use-list-state";
 import { GET_MODEL_ENDPOINT, LIST_MODEL_ENDPOINTS_PAGE } from "@/graphql/models/models.queries";
 
-import { type ModelEndpoint, MODELS_LIST, modelEndpointsPageVariables } from "./models-list";
+import {
+  type ModelEndpoint,
+  localizedModelEndpointsList,
+  modelEndpointsPageVariables,
+} from "./models-list";
 
 interface ModelEndpointsPageResp {
   astroliftModelEndpointsPage: { items: ModelEndpoint[]; totalCount: number | null };
@@ -20,7 +26,26 @@ interface ModelEndpointResp {
  * sorts and counts. The data half of ModelsScreen.
  */
 export function useModels() {
-  const list = useListState(MODELS_LIST);
+  const t = useTranslations("models.shared.deployments");
+  const definition = useMemo(
+    () =>
+      localizedModelEndpointsList({
+        serving: t("serving"),
+        status: t("status"),
+        owner: t("owner"),
+        app: t("app"),
+        project: t("project"),
+        cluster: t("cluster"),
+        searchLegacy: t("searchLegacy"),
+        all: t("all"),
+        mine: t("mine"),
+        endpoints: t("endpoints"),
+        hosted: t("hosted"),
+        mineLegacyNote: t("mineLegacyNote"),
+      }),
+    [t]
+  );
+  const list = useListState(definition);
   const { state } = list;
   const variables = modelEndpointsPageVariables({
     q: state.q,

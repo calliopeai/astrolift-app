@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
+import { useTranslations } from "next-intl";
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { type ModelEndpoint, MODELS_LIST } from "./models-list";
+import { type ModelEndpoint, localizedModelEndpointsList } from "./models-list";
 import {
   LONG_MODELS,
   MANY_MODELS,
@@ -28,7 +29,22 @@ type Props = Partial<Omit<ModelsScreenProps, "list">> & {
 
 /** The screen over fixture models, filtered and paged the way the server does it. */
 function Models({ models = MODELS, initial, ...patch }: Props) {
-  const list = useLocalListState(MODELS_LIST, initial);
+  const t = useTranslations("models.shared.deployments");
+  const definition = localizedModelEndpointsList({
+    serving: t("serving"),
+    status: t("status"),
+    owner: t("owner"),
+    app: t("app"),
+    project: t("project"),
+    cluster: t("cluster"),
+    searchLegacy: t("searchLegacy"),
+    all: t("all"),
+    mine: t("mine"),
+    endpoints: t("endpoints"),
+    hosted: t("hosted"),
+    mineLegacyNote: t("mineLegacyNote"),
+  });
+  const list = useLocalListState(definition, initial);
   const { rows, totalCount } = serveModels(models, {
     filters: list.filters,
     q: list.state.q,
@@ -55,14 +71,13 @@ export const Full: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("Qwen/Qwen3-8B")).toBeInTheDocument();
-    await expect(canvas.getByText("cloud")).toBeInTheDocument();
-    for (const view of ["All", "Mine", "Endpoints", "Hosted (GPU)"]) {
+    await expect(canvas.getAllByText("Not applicable").length).toBeGreaterThan(0);
+    for (const view of ["All", "Mine", "Cloud endpoints", "Self-hosted runtimes"]) {
       await expect(canvas.getByRole("link", { name: view })).toBeInTheDocument();
     }
-    await expect(canvas.getByRole("link", { name: "Deploy model" })).toHaveAttribute(
-      "href",
-      "/models/deploy"
-    );
+    await expect(
+      canvas.getByRole("link", { name: "Deploy app or cloud endpoint" })
+    ).toHaveAttribute("href", "/models/deploy/legacy");
   },
 };
 
@@ -71,7 +86,7 @@ export const Loading: Story = { render: () => <Models models={[]} loading /> };
 export const Empty: Story = {
   render: () => <Models models={[]} />,
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByText("No models yet")).toBeInTheDocument();
+    await expect(within(canvasElement).getByText("No legacy model endpoints")).toBeInTheDocument();
   },
 };
 

@@ -21,10 +21,277 @@ const permissions = [
   ).matchAll(/^  "([^"]+)",/gm),
 ].map(([_, slug]) => slug);
 const id = "11111111-1111-4111-8111-111111111111";
+const sharedModelId = "22222222-2222-4222-8222-222222222222";
+const sharedClusterId = "33333333-3333-4333-8333-333333333333";
+const sharedProviderId = "44444444-4444-4444-8444-444444444444";
+const createdModelId = "77777777-7777-4777-8777-777777777777";
+const observedAt = "2026-09-30T15:30:00Z";
 const object = (extra = {}) => ({ ...extra });
 const observations = { errors: [], mutations: 0, promptInvocations: [] };
+const modelWriteRequests = [];
+let acceptedModel = null;
+const sharedResources = {
+  cpuRequest: "2",
+  memoryRequest: "8Gi",
+  gpuCount: 0,
+  replicas: 1,
+  cpuKvCacheGiB: 2,
+};
+const sharedModel = {
+  id: sharedModelId,
+  version: 5,
+  name: "Controlled shared CPU model",
+  organizationId: id,
+  clusterId: sharedClusterId,
+  providerId: sharedProviderId,
+  clusterSlug: "shared-fixture",
+  clusterName: "Controlled shared cluster",
+  modelRepo: "Qwen/Qwen3-0.6B",
+  revisionSha: "a".repeat(40),
+  computeMode: "cpu",
+  subscriptionsEnabled: true,
+  runtimeSupported: true,
+  runtimeReason: null,
+  status: "active",
+  reason: null,
+  ready: true,
+  readinessObservedAt: observedAt,
+  readinessGeneration: 3,
+  desiredSubscriptionRevision: 2,
+  appliedSubscriptionRevision: 2,
+  operationId: "controlled-shared-reconcile",
+  operationStartedAt: observedAt,
+  operationCompletedAt: observedAt,
+  desiredResources: sharedResources,
+  appliedResources: sharedResources,
+};
+let currentSharedModel = sharedModel;
+const activeSubscription = {
+  id: "88888888-8888-4888-8888-888888888888",
+  version: 2,
+  modelDeploymentId: sharedModelId,
+  appId: "66666666-6666-4666-8666-666666666666",
+  appSlug: "controlled-app",
+  appName: "Controlled consumer",
+  environmentId: "55555555-5555-4555-8555-555555555555",
+  environmentName: "production",
+  alias: "chat",
+  bindingPrefix: "MODEL_CHAT_",
+  status: "active",
+  canRevoke: true,
+  desiredEnabled: true,
+  desiredRevision: 2,
+  appliedRevision: 2,
+  reason: null,
+  reconcileStartedAt: observedAt,
+  reconciledAt: observedAt,
+};
+const siblingSubscription = {
+  ...activeSubscription,
+  id: "99999999-9999-4999-8999-999999999999",
+  environmentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  environmentName: "staging",
+  alias: "search",
+  bindingPrefix: "MODEL_SEARCH_",
+};
+let subscriptionRows = [activeSubscription, siblingSubscription];
+const hubModel = {
+  repoId: sharedModel.modelRepo,
+  revisionSha: sharedModel.revisionSha,
+  author: "Qwen",
+  pipelineTag: "text-generation",
+  library: "transformers",
+  license: "apache-2.0",
+  gated: "NONE",
+  architectures: ["Qwen3ForCausalLM"],
+  downloads: 0,
+  likes: 0,
+  compatibility: "UNKNOWN",
+};
+const measurement = (key, unit, amount, state = "AVAILABLE") => ({
+  key,
+  unit,
+  value: amount,
+  state,
+  source: state === "UNSUPPORTED" ? "unsupported_device_pod_mapping" : "controlled_prometheus",
+  observedAt: state === "AVAILABLE" ? observedAt : null,
+  aggregationWindowSeconds: 0,
+  samples: [],
+});
 function value(type, field, args, role) {
   if (isNonNullType(type)) return value(type.ofType, field, args, role);
+  if (field === "clusterModelDeploymentsPage")
+    return object({
+      items: acceptedModel ? [currentSharedModel, acceptedModel] : [currentSharedModel],
+      totalCount: acceptedModel ? 2 : 1,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelDeployment")
+    return args.id === sharedModelId
+      ? currentSharedModel
+      : args.id === acceptedModel?.id
+        ? acceptedModel
+        : null;
+  if (field === "clusterModelSubscriptionsPage")
+    return object({
+      items: args.modelDeploymentId === sharedModelId ? subscriptionRows : [],
+      totalCount: args.modelDeploymentId === sharedModelId ? subscriptionRows.length : 0,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelSubscriptionTargetsPage")
+    return object({
+      items:
+        args.modelDeploymentId === sharedModelId
+          ? [
+              object({
+                environmentId: activeSubscription.environmentId,
+                environmentVersion: 4,
+                appId: activeSubscription.appId,
+                appSlug: activeSubscription.appSlug,
+                appName: activeSubscription.appName,
+                environmentName: activeSubscription.environmentName,
+                clusterId: sharedClusterId,
+                eligible: currentSharedModel.ready,
+                reason: currentSharedModel.ready
+                  ? null
+                  : "Controlled reconciliation remains pending.",
+              }),
+            ]
+          : [],
+      totalCount: args.modelDeploymentId === sharedModelId ? 1 : 0,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelPlacementClustersPage")
+    return object({
+      items: [
+        object({
+          id: sharedClusterId,
+          providerId: sharedProviderId,
+          name: sharedModel.clusterName,
+          slug: sharedModel.clusterSlug,
+          region: "us-west-2",
+        }),
+      ],
+      totalCount: 1,
+      nextCursor: null,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
+  if (field === "clusterModelRuntimeAdmission")
+    return object({
+      eligible: role === "owner",
+      reason: null,
+      runtimeVersion: args.input?.computeMode === "gpu" ? "0.15.1" : "0.15.1+cpu",
+      architecture: "amd64",
+      hardwareAdmission: "unknown",
+    });
+  if (field === "astroliftHuggingFaceModels")
+    return object({
+      state: "AVAILABLE",
+      source: "controlled_hub_transport",
+      observedAt,
+      nextCursor: null,
+      retryAfterSeconds: null,
+      items: [hubModel],
+    });
+  if (field === "astroliftHuggingFaceModel")
+    return object({
+      state: "AVAILABLE",
+      source: "controlled_hub_transport",
+      observedAt,
+      retryAfterSeconds: null,
+      model: args.repoId === hubModel.repoId ? hubModel : null,
+    });
+  if (field === "astroliftSharedModelPromptReadiness") {
+    const ready =
+      role === "owner" &&
+      args.id === sharedModelId &&
+      args.expectedVersion === currentSharedModel.version &&
+      currentSharedModel.ready;
+    return object({
+      state: ready ? "READY" : "INACTIVE",
+      eligible: ready,
+      maxPromptChars: 4000,
+      maxOutputTokens: 128,
+      promptsPerMinute: 6,
+      maxWaitSeconds: 40,
+    });
+  }
+  if (field === "astroliftModelDeploymentMetrics")
+    return object({
+      serviceId: args.serviceId,
+      clusterId: args.expectedClusterId,
+      start: args.start,
+      end: args.end,
+      retrievedAt: observedAt,
+      stepSeconds: 30,
+      scope: "deployment_aggregate_not_app_attributed",
+      sampleLimit: 120,
+      metrics: [
+        measurement("requests_waiting", "count", 0),
+        measurement("vram_usage", "bytes", null, "UNSUPPORTED"),
+      ],
+    });
+  if (field === "astroliftClusterModelDensity") {
+    const resourceTotals = (resources) => ({
+      source: "persisted_model_configuration",
+      observedAt,
+      replicas: 1,
+      cpuCoresPerReplica: Number(resources.cpuRequest),
+      memoryBytesPerReplica: 8589934592,
+      gpuDevicesPerReplica: resources.gpuCount,
+      gpuResource: resources.gpuCount > 0 ? "nvidia.com/gpu" : null,
+      totalCpuCores: Number(resources.cpuRequest),
+      totalMemoryBytes: 8589934592,
+      totalGpuDevices: resources.gpuCount,
+    });
+    const models = acceptedModel ? [currentSharedModel, acceptedModel] : [currentSharedModel];
+    return object({
+      clusterId: args.clusterId,
+      start: args.start,
+      end: args.end,
+      retrievedAt: observedAt,
+      modelCount: models.length,
+      returnedCount: models.length,
+      inventoryLimit: 20,
+      truncated: false,
+      scope: "organization_cluster_owned_models",
+      source: "persisted_model_inventory",
+      capacity: object({
+        state: "UNSUPPORTED",
+        source: "unsupported_tenant_node_pool_mapping",
+        observedAt: null,
+        gpuDevices: [],
+        cpuCores: null,
+        memoryBytes: null,
+        vramBytes: null,
+        freshnessSeconds: 1800,
+      }),
+      items: models.map((model) =>
+        object({
+          serviceId: model.id,
+          name: model.name,
+          status: model.status,
+          desired: resourceTotals(model.desiredResources),
+          applied: model.appliedResources ? resourceTotals(model.appliedResources) : null,
+          observations: [
+            measurement(
+              "ready_replicas",
+              "count",
+              model.ready ? 1 : null,
+              model.ready ? "AVAILABLE" : "NO_DATA"
+            ),
+          ],
+        })
+      ),
+    });
+  }
   if (field === "astroliftModelEndpointsPage")
     return object({
       items: [
@@ -88,7 +355,7 @@ function value(type, field, args, role) {
         "admin.quotas_enabled",
       ].map((key) => object({ key, enabled: true }));
     if (field === "modules")
-      return ["apps", "agents", "workflows", "admin"].map((key) => object({ key }));
+      return ["apps", "agents", "workflows", "admin", "models"].map((key) => object({ key }));
     if (field === "astroliftMyPermissions")
       return role === "owner"
         ? permissions
@@ -156,10 +423,19 @@ createServer(async (req, res) => {
     res.end("ok");
     return;
   }
-  if (req.url === "/observations/reset" && req.method === "POST") {
+  if (
+    ["/observations/reset", "/observations/reset?model=unsubscribed"].includes(req.url) &&
+    req.method === "POST"
+  ) {
     observations.errors.length = 0;
     observations.mutations = 0;
     observations.promptInvocations.length = 0;
+    modelWriteRequests.length = 0;
+    acceptedModel = null;
+    currentSharedModel = sharedModel;
+    subscriptionRows = req.url.endsWith("model=unsubscribed")
+      ? []
+      : [activeSubscription, siblingSubscription];
     res.statusCode = 204;
     res.end();
     return;
@@ -167,6 +443,11 @@ createServer(async (req, res) => {
   if (req.url === "/observations") {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(observations));
+    return;
+  }
+  if (req.url === "/observations/model-writes") {
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(modelWriteRequests));
     return;
   }
   let body = "";
@@ -182,6 +463,191 @@ createServer(async (req, res) => {
       rootValue: {},
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
+          const input = args.input;
+          const update = info.fieldName === "updateClusterModel";
+          const deprovision = info.fieldName === "deprovisionClusterModel";
+          if (
+            (update || deprovision) &&
+            role === "owner" &&
+            modelWriteRequests.length === 0 &&
+            input.organizationId === id &&
+            input.id === sharedModelId &&
+            input.expectedClusterId === sharedClusterId &&
+            input.expectedProviderId === sharedProviderId &&
+            input.ifMatchVersion === 5 &&
+            (update
+              ? input.cpuRequest === "3" &&
+                input.memoryRequest === "8Gi" &&
+                input.gpuCount === 0 &&
+                input.cpuKvCacheGiB === 2 &&
+                input.allowSubscriptions === true
+              : input.deleteData === false)
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            if (deprovision && subscriptionRows.length > 0)
+              return object({
+                ok: false,
+                errors: [
+                  object({
+                    code: "CONFLICT",
+                    message:
+                      "Controlled refusal: reconcile all subscription revocations before removal.",
+                    field: null,
+                    resource: null,
+                    retryAfter: null,
+                    currentVersion: null,
+                    requestedVersion: null,
+                  }),
+                ],
+                data: null,
+              });
+            currentSharedModel = {
+              ...sharedModel,
+              version: 7,
+              status: update ? "updating" : "deprovisioning",
+              ready: false,
+              readinessObservedAt: null,
+              readinessGeneration: null,
+              desiredSubscriptionRevision: 3,
+              operationId: update ? "controlled-accepted-update" : "controlled-accepted-delete",
+              operationCompletedAt: null,
+              desiredResources: update
+                ? {
+                    ...sharedModel.desiredResources,
+                    cpuRequest: input.cpuRequest,
+                    memoryRequest: input.memoryRequest,
+                    gpuCount: input.gpuCount,
+                    cpuKvCacheGiB: input.cpuKvCacheGiB,
+                  }
+                : sharedModel.desiredResources,
+            };
+            return object({ ok: true, errors: [], data: currentSharedModel });
+          }
+          const subscribe = info.fieldName === "subscribeClusterModel";
+          const revoke = info.fieldName === "revokeModelSubscription";
+          if (
+            (subscribe || revoke) &&
+            role === "owner" &&
+            modelWriteRequests.length === 0 &&
+            input.organizationId === id &&
+            input.expectedClusterId === sharedClusterId &&
+            input.expectedProviderId === sharedProviderId &&
+            (subscribe
+              ? input.modelDeploymentId === sharedModelId &&
+                input.appEnvironmentId === activeSubscription.environmentId &&
+                input.alias === "assistant" &&
+                input.ifMatchVersion === 5 &&
+                input.ifMatchEnvironmentVersion === 4
+              : input.id === activeSubscription.id &&
+                input.ifMatchVersion === 2 &&
+                input.ifMatchDeploymentVersion === 5)
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            currentSharedModel = {
+              ...sharedModel,
+              version: 7,
+              status: "updating",
+              ready: false,
+              readinessObservedAt: null,
+              readinessGeneration: null,
+              desiredSubscriptionRevision: 3,
+              operationId: "controlled-accepted-subscription",
+              operationCompletedAt: null,
+            };
+            const row = {
+              ...activeSubscription,
+              id: subscribe ? "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" : activeSubscription.id,
+              version: subscribe ? 1 : 3,
+              alias: subscribe ? input.alias : activeSubscription.alias,
+              bindingPrefix: subscribe ? "MODEL_ASSISTANT_" : activeSubscription.bindingPrefix,
+              status: subscribe ? "pending" : "revoking",
+              desiredEnabled: subscribe,
+              desiredRevision: 3,
+              appliedRevision: subscribe ? 0 : 2,
+              reconciledAt: null,
+              canRevoke: false,
+            };
+            subscriptionRows = subscribe
+              ? [...subscriptionRows, row]
+              : subscriptionRows.map((existing) => (existing.id === row.id ? row : existing));
+            return object({
+              ok: true,
+              errors: [],
+              data: object({
+                restartRequired: true,
+                deployment: currentSharedModel,
+                subscription: row,
+              }),
+            });
+          }
+          if (
+            info.fieldName === "provisionClusterModel" &&
+            role === "owner" &&
+            args.input.organizationId === id &&
+            args.input.clusterId === sharedClusterId &&
+            args.input.expectedProviderId === sharedProviderId &&
+            args.input.modelRepo === hubModel.repoId &&
+            args.input.revisionSha === hubModel.revisionSha &&
+            ((args.input.computeMode === "cpu" &&
+              args.input.gpuCount === 0 &&
+              args.input.name === "Controlled newly created CPU model") ||
+              (args.input.computeMode === "gpu" &&
+                args.input.gpuCount === 1 &&
+                args.input.name === "Controlled newly created GPU model")) &&
+            modelWriteRequests.length === 0
+          ) {
+            const input = args.input;
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            acceptedModel = {
+              ...sharedModel,
+              id: createdModelId,
+              version: 3,
+              name: input.name,
+              computeMode: input.computeMode,
+              subscriptionsEnabled: input.allowSubscriptions,
+              status: "updating",
+              ready: false,
+              readinessObservedAt: null,
+              readinessGeneration: null,
+              desiredSubscriptionRevision: 0,
+              appliedSubscriptionRevision: 0,
+              operationId: "controlled-accepted-create",
+              operationCompletedAt: null,
+              appliedResources: null,
+              desiredResources: {
+                cpuRequest: input.cpuRequest,
+                memoryRequest: input.memoryRequest,
+                gpuCount: input.gpuCount,
+                cpuKvCacheGiB: input.cpuKvCacheGiB ?? null,
+                replicas: 1,
+              },
+            };
+            return object({ ok: true, errors: [], data: acceptedModel });
+          }
+          if (
+            info.fieldName === "testSharedModelEndpoint" &&
+            role === "owner" &&
+            args.input.managedServiceId === sharedModelId &&
+            args.input.expectedClusterId === sharedClusterId &&
+            args.input.expectedProviderId === sharedProviderId &&
+            args.input.expectedVersion === 5 &&
+            args.input.prompt === "Answer shared 2 plus 2 for the local browser regression."
+          ) {
+            observations.promptInvocations.push({ ...args.input });
+            return object({
+              ok: true,
+              errors: [],
+              data: object({
+                status: "succeeded",
+                reply: "4",
+                latencyMs: 120,
+                promptTokens: 9,
+                completionTokens: 1,
+                totalTokens: 10,
+                error: "",
+              }),
+            });
+          }
           if (
             info.fieldName === "testModelEndpoint" &&
             role === "owner" &&

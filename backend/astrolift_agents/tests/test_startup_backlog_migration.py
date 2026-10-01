@@ -15,6 +15,10 @@ MERGE = "0041_merge_startup_and_backlog"
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("starting_migration", [BASE, STARTUP, BACKLOG])
 def test_combined_upgrade_preserves_tasks_from_either_branch(starting_migration):
+    # Rolling back the agents branch also reverses dependent migrations in
+    # other apps. Restore the complete current graph, not only this old merge,
+    # so subsequent transaction tests see the schema of their current models.
+    current_targets = MigrationExecutor(connection).loader.graph.leaf_nodes()
     organization = Organization.objects.create(name="Migration integration", slug="migration-integration")
     diagnostic = {"reason": "Unschedulable", "message": "Insufficient cpu"}
     backlog = {"revision": 3, "items": []}
@@ -45,4 +49,4 @@ def test_combined_upgrade_preserves_tasks_from_either_branch(starting_migration)
         assert restored.startup_diagnostic == (diagnostic if starting_migration == STARTUP else {})
         assert restored.backlog_snapshot == (backlog if starting_migration == BACKLOG else None)
     finally:
-        MigrationExecutor(connection).migrate([(APP, MERGE)])
+        MigrationExecutor(connection).migrate(current_targets)

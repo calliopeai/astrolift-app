@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from astrolift_workflows.activities import (
     abort_in_flight_deploys,
+    activate_shared_model_subscriptions,
     aggregate_fan_out,
     apply_manifests,
     apply_platform_rbac,
+    apply_shared_model,
     apply_to_target_cluster,
     bounce_workloads_bound_to_managed_service,
     bounce_workloads_consuming_bundle,
@@ -58,10 +60,12 @@ from astrolift_workflows.activities import (
     evaluate_alerts_tick,
     evaluate_supply_chain_gate,
     expire_pending_approval_deployments,
+    fail_shared_model_reconcile,
     fetch_app_build_strategy,
     finalize_managed_service_deletion,
     finalize_managed_service_provision,
     finalize_managed_service_update,
+    finish_shared_model_reconcile,
     gc_stale_previews,
     get_workflow_stages,
     health_check,
@@ -102,6 +106,7 @@ from astrolift_workflows.activities import (
     mark_running,
     mark_workflow_run,
     materialize_secrets_on_target,
+    observe_shared_model,
     plan_app_domain_sync,
     poll_agent_run_progress,
     poll_agent_run_status,
@@ -242,6 +247,7 @@ from astrolift_workflows.workflows import (
     RunScheduledJobWorkflow,
     RunStatusReconcileTickWorkflow,
     SecretBundleScheduledRefreshWorkflow,
+    SharedModelReconcileWorkflow,
     SyncAppDomainWorkflow,
     SyncDevEnvironmentFilesWorkflow,
     TearDownAppWorkflow,
@@ -254,6 +260,7 @@ from astrolift_workflows.workflows import (
 )
 
 WORKFLOWS = (
+    SharedModelReconcileWorkflow,
     AgentBoxReapTickWorkflow,
     AgentCronTickWorkflow,
     AgentLoopTickWorkflow,
@@ -318,6 +325,11 @@ WORKFLOWS = (
 )
 
 ACTIVITIES = (
+    apply_shared_model,
+    observe_shared_model,
+    activate_shared_model_subscriptions,
+    finish_shared_model_reconcile,
+    fail_shared_model_reconcile,
     abort_in_flight_deploys,
     assert_no_concurrent,
     apply_observability_retention,

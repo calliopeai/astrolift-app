@@ -2,8 +2,42 @@
 
 ## Unreleased
 
+- Shared model by-ID reads and locks include current organization constraints
+  directly, including exact cluster-scoped provider locks. Install-shared
+  placement remains available only within a current tenant context (#2213).
+
+- Add server-side Hugging Face search with bounded filter-bound pagination,
+  immutable revision resolution, source timestamps and honest unavailable or
+  unknown metadata (#2214).
+- Deploy organization-owned shared vLLM models directly to clusters without
+  application/project placeholders, using explicit certified CPU/GPU runtimes,
+  immutable revisions and complete resource admission (#2213).
+- Reconcile named app-environment subscriptions with independent credentials,
+  exact namespace/app/environment network selectors and startup authorization
+  snapshots. Recreate rollouts and observed consumer readiness distinguish
+  accepted requests from applied access and confirmed revocation (#2213).
+- Recheck current actor, bearer scopes, grants, placement identities and versions
+  after locks and upstream reads. Consumer/ancestor retirement requires confirmed
+  revocation; cluster and organization retirement also require shared deployment
+  cleanup. Durable database defaults preserve old inserts during rolling upgrades.
+- Make shared deployments the primary Models catalogue with server search,
+  filters, Mine and paging. Preserve existing app/project/cloud endpoints and
+  deployment routes; missing legacy hardware facts remain unknown (#2215).
+- Connect reviewed deploy, subscribe, revoke, resource-update and retained-data
+  deprovisioning actions to the actual typed APIs in all eight locales. Refusals
+  retain drafts; accepted requests stay pending through read failures without
+  automatic replay or inferred readiness (#2215).
+- Show exact-service observed model metrics and tenant-only density with units,
+  windows, source, timestamps, limits and explicit availability. Separate desired
+  and applied requests from measured use; preserve applied-snapshot provenance
+  across failed updates. Unverified shared hardware capacity and GPU/VRAM
+  attribution remain unknown or unsupported (#2214).
+- Add explicit bounded shared-model tests through the real cluster relay with
+  current owner/version/provider/handle admission and truthful failures. Browser
+  callers cannot supply endpoint URLs or credentials (#2213).
 - Webhook pause confirmation actions wrap inside the dialog for longer localized
   labels, including the French layout found by browser CI.
+
 - Preserve custom or future access scope labels literally instead of requesting
   missing translation keys.
 - Model prompt relay admission, dispatch and result transitions atomically retain

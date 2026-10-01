@@ -188,6 +188,13 @@ from astrolift_workflows.activities.secret_rotation import (
     list_bundles_due_for_refresh,
     refresh_secret_bundle_in_cluster,
 )
+from astrolift_workflows.activities.shared_model_reconcile import (
+    activate_shared_model_subscriptions,
+    apply_shared_model,
+    fail_shared_model_reconcile,
+    finish_shared_model_reconcile,
+    observe_shared_model,
+)
 from astrolift_workflows.activities.static_site import (
     delete_static_dns_records,
     ensure_cloudfront_cert,
@@ -218,6 +225,11 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "apply_shared_model",
+    "observe_shared_model",
+    "activate_shared_model_subscriptions",
+    "finish_shared_model_reconcile",
+    "fail_shared_model_reconcile",
     "abort_in_flight_deploys",
     "aggregate_fan_out",
     "apply_manifests",

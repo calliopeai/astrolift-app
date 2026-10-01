@@ -54,6 +54,77 @@ def prompt_readiness(service):
     cluster = service.app_environment.tenant_cluster if service.app_environment_id else None
     if cluster is None or not cluster.is_active:
         return PromptReadinessState.UNAVAILABLE
+    return _relay_readiness(service, cluster)
+
+
+def shared_prompt_readiness(service):
+    """Shared-owner eligibility without an app placeholder or infrastructure I/O."""
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_services.model_admission import canonical_model_handle
+
+    if (
+        service.organization_id is None
+        or service.registered_app_id is not None
+        or service.project_id is not None
+        or service.app_environment_id is not None
+        or service.kind != ManagedService.Kind.MODEL_ENDPOINT
+        or service.variant != "vllm"
+        or not isinstance(service.config, dict)
+        or service.config.get("task", "generate") != "generate"
+    ):
+        return PromptReadinessState.UNSUPPORTED
+    if (
+        service.status != ManagedService.Status.ACTIVE
+        or service.applied_subscription_revision != service.subscription_revision
+        or service.model_ready_observed_at is None
+        or type(service.model_ready_generation) is not int
+        or service.model_ready_generation <= 0
+        or service.model_ready_auth_revision != service.subscription_revision
+        or not isinstance(service.applied_config, dict)
+        or type(service.applied_config.get("replicas", 1)) is not int
+        or service.applied_config.get("replicas", 1) <= 0
+        or not service.backend_ref
+    ):
+        return PromptReadinessState.INACTIVE
+    cluster = service.tenant_cluster
+    if (
+        cluster is None
+        or not cluster.is_active
+        or cluster.lifecycle != TenantCluster.Lifecycle.MANAGED
+        or not cluster.provider_plugin.is_enabled
+        or cluster.provider_plugin.deleted_at is not None
+    ):
+        return PromptReadinessState.UNAVAILABLE
+    if (
+        service.model_ready_provider_guid != cluster.provider_plugin.guid
+        or not service.model_ready_backend_ref
+        or service.model_ready_backend_ref != service.backend_ref
+        or service.backend_ref != canonical_model_handle(service)
+    ):
+        return PromptReadinessState.INACTIVE
+    return _relay_readiness(service, cluster)
+
+
+def shared_agent_test_target(service):
+    """Derive the internal operator target from persisted UUIDs, never caller URLs."""
+    from _sdk.k8s_naming import cluster_model_namespace, cluster_model_resource_name
+    from k8s_native.managed.model_endpoint_vllm import PORT, ModelTestTarget, VLLMDriver
+
+    namespace = cluster_model_namespace(
+        organization_id=str(service.organization.guid),
+        cluster_id=str(service.tenant_cluster.guid),
+        managed_service_id=str(service.guid),
+    )
+    name = cluster_model_resource_name(str(service.guid))
+    return ModelTestTarget(
+        base_url=f"http://{name}.{namespace}.svc.cluster.local:{PORT}/v1",
+        model=service.config["model"].strip(),
+        api_key_secret_namespace=namespace,
+        api_key_secret_name=VLLMDriver._secret_name(name),
+    )
+
+
+def _relay_readiness(service, cluster):
     heartbeat = resolve(
         last_heartbeat_at=cluster.last_heartbeat_at,
         interval_seconds=cluster.heartbeat_interval_seconds,

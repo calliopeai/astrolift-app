@@ -42,7 +42,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 
-export type ModuleKey = "apps" | "agents" | "workflows" | "admin";
+export type ModuleKey = "apps" | "agents" | "workflows" | "models" | "admin";
 
 export interface NavFunction {
   key: string;
@@ -145,7 +145,7 @@ export const NAV: NavArea[] = [
             label: "Models",
             href: "/models",
             icon: BrainCircuitIcon,
-            module: "agents",
+            module: "models",
           },
           {
             // The runtime units behind agents, workflows and functions

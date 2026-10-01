@@ -1,8 +1,6 @@
 "use client";
-
-import { ModelsScreen } from "@/components/screens/models/ModelsScreen";
-import { useModels } from "@/components/screens/models/use-models";
-
+import { SharedModelsScreen } from "@/components/screens/models/SharedModelsScreen";
+import { useSharedModels } from "@/components/screens/models/use-shared-models";
 export function ModelsClient() {
-  return <ModelsScreen {...useModels()} />;
+  return <SharedModelsScreen {...useSharedModels()} />;
 }

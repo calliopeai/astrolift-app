@@ -33,6 +33,7 @@ from astrolift_identity.schema.types import (
     team_to_type,
 )
 from astrolift_identity.scopes import identity_organization_scope, team_scope_by_guid
+from astrolift_services.model_retirement import retirement_guard
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.naming import TEAM_SLUG, NamingViolation
@@ -120,6 +121,7 @@ class TeamMutations:
         Permission.TEAM_DELETE, scope=team_scope_by_guid("input.id", permission=Permission.TEAM_DELETE)
     )
     @tenant_scoped()
+    @retirement_guard(kind="team", field="input.id")
     def soft_delete_team(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:

@@ -1388,6 +1388,7 @@ def _k8s_managed_config_for(
             model_defaults=dict(pc.get("vllm_model_defaults") or {}),
             metrics=dict(pc.get("vllm_metrics") or {}),
             agent_test=dict(pc.get("vllm_agent_test") or {}),
+            shared_runtimes=dict(pc.get("vllm_shared_runtimes") or {}),
         )
     if pair == ("model_endpoint", "kserve"):
         from k8s_native.managed.model_endpoint_kserve import KServeConfig

@@ -39,6 +39,7 @@ def _managed_services_for_environment(app_environment):
             attachments__deleted_at__isnull=True,
         ),
         deleted_at__isnull=True,
+        organization_id__isnull=True,
     ).distinct()
 
 
@@ -668,6 +669,10 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         env_from_secret_refs=env_from,
         workload_env_from_secret_refs=workload_env_from,
     )
+
+    from astrolift_services.model_subscriptions import stamp_binding_revisions
+
+    await sync_to_async(stamp_binding_revisions)(resources, env)
 
     # Fold in CustomDomain Ingress + TLS Secret resources (#397). Each
     # validated + active/byo domain gets its own Ingress so per-host
@@ -1456,6 +1461,15 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
                     "data": data,
                 },
             )
+
+    # Shared models have independent named app credentials; never materialize
+    # the service's operator envelope through the legacy binding producer.
+    from astrolift_services.model_subscriptions import binding_secret, coherent_subscriptions
+
+    subscriptions = list(coherent_subscriptions(d.app_environment))
+    if subscriptions:
+        subscription_backend = driver_for_capability(d.app_environment.tenant_cluster, "secrets")
+        resources.extend(binding_secret(row, subscription_backend) for row in subscriptions)
 
     # ---- synthesized managed-service bindings Secret --------------
     # One universal Secret plus selector-scoped Secrets where the manifest
