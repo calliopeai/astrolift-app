@@ -58,3 +58,12 @@ uses lightweight HTTP servers behind seven generated Service names and a custom
 `private.test` cluster DNS domain. This proves DNS and TCP/HTTP routing from another
 namespace; it does not certify database operators, authentication or database
 protocols. No customer cluster is contacted by these tests.
+
+Focused checks for the ordinary-host leaf: 129 provider checks passed; the two
+real PostgreSQL synchronization/materialization checks passed; the opt-in kind
+proof passed with all seven generated names reaching the service namespace and
+all seven corresponding short names reaching the deliberately wrong consumer
+namespace. The disposable `astrolift-binding-dns-2092` cluster was then removed.
+Run the proof with `ASTROLIFT_BINDING_DNS_KUBECONFIG` naming that explicitly owned
+cluster's private kubeconfig; it skips by default. Provider and backend changed-file
+Ruff checks pass. This leaf does not close the preview slice limitation above.
