@@ -6297,6 +6297,18 @@
     "canceled": "Abgebrochen",
     "terminated": "Beendet",
     "timedOut": "Zeitüberschreitung",
-    "continuedAsNew": "Als neu fortgesetzt"
+    "continuedAsNew": "Als neu fortgesetzt",
+    "bring": "In Verwaltung aufnehmen",
+    "refresh": "Cluster-Verwaltung aktualisieren",
+    "decommission": "Cluster stilllegen",
+    "prereqs": "Cluster-Voraussetzungen installieren",
+    "drift": "Abweichungen erkennen",
+    "register": "Cluster registrieren",
+    "unregister": "Cluster abmelden",
+    "workflowSummaryHelp": "Letzte Temporal-Ausführungen für diesen Cluster.",
+    "minutes": "{count, plural, one {# Minute} other {# Minuten}}",
+    "hours": "{count, plural, one {# Stunde} other {# Stunden}}",
+    "minutesSeconds": "{minutes} Min. {seconds} Sek.",
+    "hoursMinutes": "{hours} Std. {minutes} Min."
   }
 }

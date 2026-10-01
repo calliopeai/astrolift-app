@@ -9,12 +9,11 @@
  */
 
 import { CheckIcon, ClockIcon, GitBranchIcon, XIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { useFormatters } from "@/lib/i18n/formatters";
+import { useClusterActivity } from "@/lib/i18n/cluster-activity";
 
 import type { AuditRow, WorkflowRun } from "./types";
 import type { useClusterLifecycleAudit } from "./use-cluster-lifecycle-audit";
@@ -41,39 +40,6 @@ export function ClusterActivityBody({ workflows, lifecycle }: ClusterActivityBod
 // ─── Recent workflows card (#394) ────────────────────────────────────────
 // Empty results also cover disabled Temporal; they do not prove a complete census.
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  RUNNING: "secondary",
-  COMPLETED: "default",
-  FAILED: "destructive",
-  CANCELED: "outline",
-  TERMINATED: "destructive",
-  TIMED_OUT: "destructive",
-  CONTINUED_AS_NEW: "outline",
-};
-
-const STATUS_LABELS = {
-  RUNNING: "running",
-  COMPLETED: "completed",
-  FAILED: "failed",
-  CANCELED: "canceled",
-  TERMINATED: "terminated",
-  TIMED_OUT: "timedOut",
-  CONTINUED_AS_NEW: "continuedAsNew",
-} as const;
-
-function observedDate(value: string): Date | null {
-  if (typeof value !== "string" || !value) return null;
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date : null;
-}
-
-function observedDuration(startedAt: string, closedAt: string): number | null {
-  const started = observedDate(startedAt);
-  const closed = observedDate(closedAt);
-  if (!started || !closed || closed.getTime() < started.getTime()) return null;
-  return Math.round((closed.getTime() - started.getTime()) / 1000);
-}
-
 function ActivityWorkflowsCard({
   runs,
   loading,
@@ -81,8 +47,8 @@ function ActivityWorkflowsCard({
   refetch,
   more,
 }: ClusterActivityBodyProps["workflows"]) {
-  const fmt = useFormatters();
-  const t = useTranslations("clusterActivity");
+  const activity = useClusterActivity();
+  const { t } = activity;
 
   return (
     <Panel
@@ -108,32 +74,23 @@ function ActivityWorkflowsCard({
           description: t("noRunsHelp"),
         }}
         renderItem={(r) => {
-          const duration = observedDuration(r.startedAt, r.closedAt);
-          const started = observedDate(r.startedAt);
-          const known = typeof r.status === "string" && Object.hasOwn(STATUS_LABELS, r.status);
-          const label = known
-            ? t(STATUS_LABELS[r.status as keyof typeof STATUS_LABELS])
-            : (typeof r.status === "string" && r.status) || t("unknown");
+          const duration = activity.duration(r.startedAt, r.closedAt);
+          const status = activity.status(r.status);
           return (
             <div className="flex min-w-0 flex-wrap items-baseline gap-2 text-sm">
               <code className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
                 {r.workflowType}
               </code>
               <Badge
-                variant={known ? STATUS_VARIANT[r.status] : "outline"}
+                variant={status.variant}
                 className="text-2xs max-w-full min-w-0 font-mono"
                 title={typeof r.status === "string" ? r.status : undefined}
               >
-                <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere]">{status.label}</span>
               </Badge>
               <span className="text-muted-foreground ml-auto font-mono text-xs" title={r.startedAt}>
-                {started ? fmt.formatDateTime(started) : r.startedAt ? t("unknown") : "—"}
-                {r.closedAt && (
-                  <span className="opacity-60">
-                    {" "}
-                    · {duration !== null ? t("seconds", { count: duration }) : t("unknown")}
-                  </span>
-                )}
+                {activity.date(r.startedAt)}
+                {duration !== null && <span className="opacity-60"> · {duration}</span>}
               </span>
             </div>
           );
@@ -155,8 +112,8 @@ function ActivityLifecycleCard({
   refetch,
   more,
 }: ClusterActivityBodyProps["lifecycle"]) {
-  const fmt = useFormatters();
-  const t = useTranslations("clusterActivity");
+  const activity = useClusterActivity();
+  const { t } = activity;
 
   return (
     <Panel
@@ -206,7 +163,7 @@ function ActivityLifecycleCard({
                   </span>
                 )}
                 <span className="text-muted-foreground ml-auto font-mono text-xs">
-                  {observedDate(e.timestamp) ? fmt.formatDateTime(e.timestamp) : t("unknown")}
+                  {activity.date(e.timestamp)}
                 </span>
               </div>
               {!e.success && e.errors.length > 0 && (

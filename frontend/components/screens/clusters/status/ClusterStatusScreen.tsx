@@ -46,6 +46,7 @@ import {
 } from "@/lib/cluster-heartbeat";
 import { formatRelativeAge } from "@/lib/format";
 import { useClusterHeartbeat } from "@/lib/i18n/cluster-heartbeat";
+import { useClusterActivity } from "@/lib/i18n/cluster-activity";
 
 import {
   type AuditRow,
@@ -129,42 +130,6 @@ const TONE_COLORS = {
 };
 
 type Tone = keyof typeof TONE_COLORS;
-
-// Pretty-print a CamelCase workflow type ("InstallClusterPrereqs" →
-// "Install cluster prereqs"). Keeps acronyms readable by treating
-// runs of caps as a single word.
-function prettyWorkflowType(t: string): string {
-  if (!t) return "—";
-  const spaced = t.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").replace(/([a-z\d])([A-Z])/g, "$1 $2");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
-}
-
-// Pretty-print a GraphQL mutation operation name ("registerCluster"
-// → "Register cluster"). First letter capitalised, the rest lowercased
-// after camel-case splits.
-function prettyOperation(op: string): string {
-  if (!op) return "—";
-  const spaced = op.replace(/([a-z\d])([A-Z])/g, "$1 $2");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
-}
-
-// Duration between two ISO timestamps, formatted as "12s" / "4m 13s"
-// / "1h 7m". Returns null when either timestamp is empty/unparseable
-// (e.g. a workflow that hasn't closed yet).
-function fmtDuration(startedAt: string, closedAt: string): string | null {
-  if (!startedAt || !closedAt) return null;
-  const start = Date.parse(startedAt);
-  const end = Date.parse(closedAt);
-  if (Number.isNaN(start) || Number.isNaN(end)) return null;
-  const seconds = Math.max(0, Math.round((end - start) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remSec = seconds % 60;
-  if (minutes < 60) return remSec ? `${minutes}m ${remSec}s` : `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remMin = minutes % 60;
-  return remMin ? `${hours}h ${remMin}m` : `${hours}h`;
-}
 
 // ─── Status body ──────────────────────────────────────────────────────
 export interface ClusterStatusBodyProps {
@@ -1126,12 +1091,13 @@ export function StatusRecentWorkflowsCard({
   error,
   refetch,
 }: Omit<ReturnType<typeof useRecentClusterWorkflows>, "more"> & { slug: string }) {
+  const { t } = useClusterActivity();
   return (
     <ListSummary<WorkflowRun>
       span={6}
       icon={<GitBranchIcon className="size-4" />}
-      title="Recent workflow runs"
-      description="Temporal runs targeting this cluster — most recent first."
+      title={t("workflowTitle")}
+      description={t("workflowSummaryHelp")}
       rows={runs}
       keyOf={(r) => r.workflowId + r.runId}
       renderRow={(r) => <WorkflowRunRow run={r} />}
@@ -1139,24 +1105,26 @@ export function StatusRecentWorkflowsCard({
       loading={loading}
       error={error}
       onRetry={refetch}
-      empty={{ icon: <GitBranchIcon className="size-5" />, title: "No workflow runs recorded yet" }}
+      empty={{ icon: <GitBranchIcon className="size-5" />, title: t("noRuns") }}
     />
   );
 }
 
 function WorkflowRunRow({ run }: { run: WorkflowRun }) {
-  const { Icon, iconClass, label } = workflowStatusIcon(run.status);
-  const startedAge = run.startedAt ? formatRelativeAge(run.startedAt) : "";
-  const duration = fmtDuration(run.startedAt, run.closedAt);
+  const activity = useClusterActivity();
+  const { Icon, iconClass } = workflowStatusIcon(run.status);
+  const status = activity.status(run.status);
+  const startedAge = activity.relative(run.startedAt);
+  const duration = activity.duration(run.startedAt, run.closedAt, true);
 
   return (
     <div className="flex min-w-0 items-center gap-3 text-sm">
       <Icon className={`size-4 shrink-0 ${iconClass}`} />
       <span className="min-w-0 flex-1 truncate font-medium" title={run.workflowType}>
-        {prettyWorkflowType(run.workflowType)}
+        {activity.operation(run.workflowType)}
       </span>
-      <Badge variant="outline" className="text-2xs shrink-0">
-        {label}
+      <Badge variant="outline" className="text-2xs max-w-40 shrink-0" title={status.token}>
+        <span className="min-w-0 truncate">{status.label}</span>
       </Badge>
       {duration && (
         <span className="text-muted-foreground text-2xs inline-flex shrink-0 items-center gap-1 font-mono">
@@ -1165,7 +1133,7 @@ function WorkflowRunRow({ run }: { run: WorkflowRun }) {
         </span>
       )}
       <span className="text-muted-foreground text-2xs w-20 shrink-0 text-right font-mono">
-        {startedAge || "—"}
+        {startedAge}
       </span>
     </div>
   );
@@ -1174,34 +1142,28 @@ function WorkflowRunRow({ run }: { run: WorkflowRun }) {
 function workflowStatusIcon(status: string): {
   Icon: React.ComponentType<{ className?: string }>;
   iconClass: string;
-  label: string;
 } {
-  const norm = status.toUpperCase();
-  if (norm === "COMPLETED") {
+  if (status === "COMPLETED") {
     return {
       Icon: CheckCircle2Icon,
       iconClass: "text-success-fg",
-      label: "Completed",
     };
   }
-  if (norm === "RUNNING") {
+  if (status === "RUNNING") {
     return {
       Icon: Loader2Icon,
       iconClass: "animate-spin text-warning-fg",
-      label: "Running",
     };
   }
-  if (norm === "FAILED" || norm === "TIMED_OUT" || norm === "TERMINATED") {
+  if (status === "FAILED" || status === "TIMED_OUT" || status === "TERMINATED") {
     return {
       Icon: XCircleIcon,
       iconClass: "text-destructive",
-      label: norm === "FAILED" ? "Failed" : norm === "TIMED_OUT" ? "Timed out" : "Terminated",
     };
   }
   return {
     Icon: CircleDotIcon,
     iconClass: "text-muted-foreground",
-    label: prettyOperation(norm),
   };
 }
 
@@ -1213,12 +1175,13 @@ export function StatusLifecycleCard({
   error,
   refetch,
 }: Omit<ReturnType<typeof useClusterLifecycleAudit>, "more"> & { slug: string }) {
+  const { t } = useClusterActivity();
   return (
     <ListSummary<AuditRow>
       span={6}
       icon={<ClockIcon className="size-4" />}
-      title="Lifecycle events"
-      description="Mutations targeting this cluster — registered → managing → managed transitions, refreshes, decommissions."
+      title={t("lifecycleLabel")}
+      description={t("lifecycleDescription")}
       rows={entries}
       keyOf={(e) => `${e.timestamp}-${e.operation}`}
       renderRow={(e) => <LifecycleRow entry={e} />}
@@ -1226,24 +1189,28 @@ export function StatusLifecycleCard({
       loading={loading}
       error={error}
       onRetry={refetch}
-      empty={{ icon: <ClockIcon className="size-5" />, title: "No lifecycle events recorded yet" }}
+      empty={{ icon: <ClockIcon className="size-5" />, title: t("noEvents") }}
     />
   );
 }
 
 function LifecycleRow({ entry }: { entry: AuditRow }) {
-  const ts = entry.timestamp ? formatRelativeAge(entry.timestamp) : "";
+  const activity = useClusterActivity();
+  const ts = activity.relative(entry.timestamp);
   const dotClass = entry.success ? "text-success" : "text-destructive";
 
   return (
     <div className="flex min-w-0 items-center gap-3 text-sm">
       <span className={`shrink-0 text-base leading-none ${dotClass}`}>●</span>
       <span className="min-w-0 flex-1 truncate font-medium" title={entry.operation}>
-        {prettyOperation(entry.operation)}
+        {activity.operation(entry.operation)}
       </span>
       {entry.actor && (
         <span className="text-muted-foreground text-2xs min-w-0 truncate">
-          by <span className="font-mono">{entry.actor}</span>
+          {activity.t.rich("actor", {
+            name: entry.actor,
+            actor: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </span>
       )}
       {!entry.success && entry.errors.length > 0 && (
@@ -1252,7 +1219,7 @@ function LifecycleRow({ entry }: { entry: AuditRow }) {
         </span>
       )}
       <span className="text-muted-foreground text-2xs w-20 shrink-0 text-right font-mono">
-        {ts || "—"}
+        {ts}
       </span>
     </div>
   );

@@ -8,6 +8,11 @@
   Feed retry and load-older callbacks remain independent. Empty returned feeds
   do not certify a complete workflow or audit census (#2145).
 
+- Share localized workflow/audit presentation with cluster Status summaries.
+  Known operations translate without rewriting unknown identifiers. Ages use
+  the request clock and locale; compact durations keep invalid reports unknown
+  and retain the existing minute/hour boundaries (#2145).
+
 - Localize cluster connection snapshots and shared read recovery in all eight
   locales. Failed, incomplete and wrong-target reads cannot confirm connectivity
   or mount driver cards. Cached reports remain explicitly unconfirmed, unknown

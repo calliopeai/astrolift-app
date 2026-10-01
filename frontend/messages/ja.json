@@ -6294,6 +6294,18 @@
     "canceled": "キャンセル",
     "terminated": "終了",
     "timedOut": "タイムアウト",
-    "continuedAsNew": "新しい実行として継続"
+    "continuedAsNew": "新しい実行として継続",
+    "bring": "管理対象にする",
+    "refresh": "クラスター管理を更新",
+    "decommission": "クラスターを廃止",
+    "prereqs": "クラスターの前提条件をインストール",
+    "drift": "ドリフトを検出",
+    "register": "クラスターを登録",
+    "unregister": "クラスターの登録を解除",
+    "workflowSummaryHelp": "このクラスターの最近のTemporal実行。",
+    "minutes": "{count, plural, other {#分}}",
+    "hours": "{count, plural, other {#時間}}",
+    "minutesSeconds": "{minutes}分{seconds}秒",
+    "hoursMinutes": "{hours}時間{minutes}分"
   }
 }

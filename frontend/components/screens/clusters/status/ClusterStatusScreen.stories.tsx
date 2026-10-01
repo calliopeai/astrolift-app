@@ -148,6 +148,57 @@ export const MalformedReadiness: Story = {
   ),
 };
 
+export const WorkflowUnknownStatusLongStrings: Story = {
+  render: () => (
+    <Screen
+      workflows={
+        <StatusRecentWorkflowsCard
+          slug={CLUSTER.slug}
+          {...WORKFLOWS}
+          runs={[
+            {
+              ...WORKFLOWS.runs[0],
+              workflowType: "RAW_FUTURE_WORKFLOW_IDENTIFIER",
+              status: "RAW_FUTURE_WORKFLOW_STATUS_WITH_LONG_PROVIDER_DETAILS",
+            },
+          ]}
+        />
+      }
+    />
+  ),
+};
+
+export const WorkflowUnknownDuration: Story = {
+  render: () => (
+    <Screen
+      workflows={
+        <StatusRecentWorkflowsCard
+          slug={CLUSTER.slug}
+          {...WORKFLOWS}
+          runs={[{ ...WORKFLOWS.runs[0], closedAt: "RAW_INVALID_TIME" }]}
+        />
+      }
+    />
+  ),
+};
+
+export const AuditUnknownOperationLongStrings: Story = {
+  render: () => (
+    <Screen
+      lifecycle={
+        <StatusLifecycleCard
+          slug={CLUSTER.slug}
+          {...AUDIT_LONG}
+          entries={AUDIT_LONG.entries.map((entry) => ({
+            ...entry,
+            operation: "RAW_FUTURE_MUTATION_IDENTIFIER_WITH_LONG_PROVIDER_DETAILS",
+          }))}
+        />
+      }
+    />
+  ),
+};
+
 /** Prometheus is configured but unreachable / cluster-internal. */
 export const PrometheusError: Story = {
   render: () => (

@@ -6297,6 +6297,18 @@
     "canceled": "Cancelado",
     "terminated": "Terminado",
     "timedOut": "Tiempo agotado",
-    "continuedAsNew": "Continuado como nuevo"
+    "continuedAsNew": "Continuado como nuevo",
+    "bring": "Poner bajo gestión",
+    "refresh": "Actualizar la gestión del clúster",
+    "decommission": "Desmantelar el clúster",
+    "prereqs": "Instalar requisitos del clúster",
+    "drift": "Detectar desviaciones",
+    "register": "Registrar el clúster",
+    "unregister": "Dar de baja el clúster",
+    "workflowSummaryHelp": "Ejecuciones recientes de Temporal para este clúster.",
+    "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+    "hours": "{count, plural, one {# hora} other {# horas}}",
+    "minutesSeconds": "{minutes} min {seconds} s",
+    "hoursMinutes": "{hours} h {minutes} min"
   }
 }

@@ -6294,6 +6294,18 @@
     "canceled": "취소됨",
     "terminated": "종료됨",
     "timedOut": "시간 초과",
-    "continuedAsNew": "새 실행으로 계속"
+    "continuedAsNew": "새 실행으로 계속",
+    "bring": "관리 대상으로 추가",
+    "refresh": "클러스터 관리 새로고침",
+    "decommission": "클러스터 해제",
+    "prereqs": "클러스터 사전 요구 사항 설치",
+    "drift": "드리프트 감지",
+    "register": "클러스터 등록",
+    "unregister": "클러스터 등록 해제",
+    "workflowSummaryHelp": "이 클러스터의 최근 Temporal 실행입니다.",
+    "minutes": "{count, plural, other {#분}}",
+    "hours": "{count, plural, other {#시간}}",
+    "minutesSeconds": "{minutes}분 {seconds}초",
+    "hoursMinutes": "{hours}시간 {minutes}분"
   }
 }

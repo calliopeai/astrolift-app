@@ -3,6 +3,7 @@ import { parse as parseIcu } from "@formatjs/icu-messageformat-parser";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createTranslator, NextIntlClientProvider, useFormatter } from "next-intl";
+import type { ReactNode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -10,12 +11,13 @@ import { locales } from "@/i18n/config";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClusterActivityBody, type ClusterActivityBodyProps } from "./ClusterActivityScreen";
 import { AUDIT, WORKFLOWS } from "./fixtures";
+import { StatusRecentWorkflowsCard, StatusLifecycleCard } from "./ClusterStatusScreen";
 
 const catalogs = Object.fromEntries(
   locales.map((locale) => [locale, JSON.parse(readFileSync(`messages/${locale}.json`, "utf8"))])
 );
 const NOW = new Date("2026-10-01T17:00:00Z");
-function content(locale: string, props: ClusterActivityBodyProps) {
+function wrap(locale: string, children: ReactNode) {
   return (
     <NextIntlClientProvider
       locale={locale}
@@ -23,10 +25,20 @@ function content(locale: string, props: ClusterActivityBodyProps) {
       now={NOW}
       timeZone="America/Costa_Rica"
     >
-      <TooltipProvider>
-        <ClusterActivityBody {...props} />
-      </TooltipProvider>
+      <TooltipProvider>{children}</TooltipProvider>
     </NextIntlClientProvider>
+  );
+}
+function content(locale: string, props: ClusterActivityBodyProps) {
+  return wrap(locale, <ClusterActivityBody {...props} />);
+}
+function summaries(locale: string, props: ClusterActivityBodyProps) {
+  return wrap(
+    locale,
+    <>
+      <StatusRecentWorkflowsCard slug="RAW_CLUSTER_SLUG" {...props.workflows} />
+      <StatusLifecycleCard slug="RAW_CLUSTER_SLUG" {...props.lifecycle} />
+    </>
   );
 }
 function copy(locale: string) {
@@ -269,6 +281,157 @@ describe.each(locales)("cluster Activity in %s", (locale) => {
   });
 });
 
+describe.each(locales)("cluster activity summaries in %s", (locale) => {
+  it.each([
+    ["RUNNING", "running"],
+    ["COMPLETED", "completed"],
+    ["FAILED", "failed"],
+    ["CANCELED", "canceled"],
+    ["TERMINATED", "terminated"],
+    ["TIMED_OUT", "timedOut"],
+    ["CONTINUED_AS_NEW", "continuedAsNew"],
+  ] as const)("translates exact summary status %s without changing its token", (status, key) => {
+    render(summaries(locale, { ...EMPTY, workflows: { ...WORKFLOWS, runs: [run({ status })] } }));
+    expect(screen.getByTitle(status)).toHaveTextContent(copy(locale)(key));
+  });
+
+  it.each(["RAW_FUTURE_STATUS", "__proto__", "constructor", "running", "", undefined, null])(
+    "keeps unknown summary status %j literal and neutral",
+    (status) => {
+      const view = render(
+        summaries(locale, {
+          ...EMPTY,
+          workflows: { ...WORKFLOWS, runs: [run({ status: status as unknown as string })] },
+        })
+      );
+      expect(
+        screen.getByText(typeof status === "string" && status ? status : copy(locale)("unknown"))
+      ).toBeInTheDocument();
+      expect(view.container.querySelector(".text-destructive")).toBeNull();
+      expect(view.container.querySelector(".text-success-fg")).toBeNull();
+    }
+  );
+
+  it.each([
+    [0, "seconds", { count: 0 }],
+    [59, "seconds", { count: 59 }],
+    [60, "minutes", { count: 1 }],
+    [61, "minutesSeconds", { minutes: 1, seconds: 1 }],
+    [120, "minutes", { count: 2 }],
+    [3600, "hours", { count: 1 }],
+    [3660, "hoursMinutes", { hours: 1, minutes: 1 }],
+    [7200, "hours", { count: 2 }],
+  ] as const)("keeps observed %s-second compact durations localized", (seconds, key, values) => {
+    const startedAt = NOW.toISOString();
+    const closedAt = new Date(NOW.getTime() + seconds * 1000).toISOString();
+    render(
+      summaries(locale, {
+        ...EMPTY,
+        workflows: { ...WORKFLOWS, runs: [run({ startedAt, closedAt })] },
+      })
+    );
+    expect(screen.getByText(copy(locale)(key, values))).toBeInTheDocument();
+  });
+
+  it.each(["RAW_INVALID_TIME", "2026-10-01T16:59:59Z"])(
+    "keeps invalid/reversed summary duration %s unknown",
+    (closedAt) => {
+      render(
+        summaries(locale, {
+          ...EMPTY,
+          workflows: { ...WORKFLOWS, runs: [run({ startedAt: NOW.toISOString(), closedAt })] },
+        })
+      );
+      expect(screen.getByText(copy(locale)("unknown"))).toBeInTheDocument();
+      expect(screen.queryByText(copy(locale)("seconds", { count: 0 }))).not.toBeInTheDocument();
+    }
+  );
+
+  it.each([
+    ["bringClusterIntoManagement", "bring"],
+    ["refreshClusterManagement", "refresh"],
+    ["decommissionCluster", "decommission"],
+    ["installClusterPrereqs", "prereqs"],
+    ["registerTenantCluster", "register"],
+    ["unregisterTenantCluster", "unregister"],
+  ] as const)(
+    "translates known audit operation %s while preserving its identity",
+    (operation, key) => {
+      render(
+        summaries(locale, {
+          ...EMPTY,
+          lifecycle: { ...AUDIT, entries: [{ ...AUDIT.entries[0], operation }] },
+        })
+      );
+      expect(screen.getByTitle(operation)).toHaveTextContent(copy(locale)(key));
+    }
+  );
+
+  it("preserves unknown workflow/operation/actor/error values and existing activity routes", () => {
+    render(
+      summaries(locale, {
+        workflows: {
+          ...WORKFLOWS,
+          runs: [run({ workflowType: "RAW_FUTURE_WORKFLOW", status: "RAW_FUTURE_STATUS" })],
+        },
+        lifecycle: {
+          ...AUDIT,
+          entries: [
+            {
+              ...AUDIT.entries[0],
+              operation: "RAW_FUTURE_OPERATION",
+              actor: "RAW_ACTOR@example.invalid",
+              success: false,
+              errors: ["RAW_REFUSAL"],
+            },
+          ],
+        },
+      })
+    );
+    for (const value of [
+      "RAW_FUTURE_WORKFLOW",
+      "RAW_FUTURE_STATUS",
+      "RAW_FUTURE_OPERATION",
+      "RAW_ACTOR@example.invalid",
+      "RAW_REFUSAL",
+    ])
+      expect(screen.getByText(value)).toBeInTheDocument();
+    const links = screen.getAllByRole("link");
+    expect(
+      links.filter((link) => link.getAttribute("href") === "/clusters/RAW_CLUSTER_SLUG/activity")
+    ).toHaveLength(2);
+  });
+
+  it("hydrates summary ages and durations from the same request clock", async () => {
+    const value = summaries(locale, {
+      workflows: {
+        ...WORKFLOWS,
+        runs: [
+          run({
+            startedAt: NOW.toISOString(),
+            closedAt: new Date(NOW.getTime() + 61000).toISOString(),
+          }),
+        ],
+      },
+      lifecycle: AUDIT,
+    });
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(value);
+    document.body.append(container);
+    const errors: unknown[] = [];
+    let root!: ReturnType<typeof hydrateRoot>;
+    await act(async () => {
+      root = hydrateRoot(container, value, { onRecoverableError: (error) => errors.push(error) });
+    });
+    expect(errors).toEqual([]);
+    expect(container.textContent).toContain(
+      copy(locale)("minutesSeconds", { minutes: 1, seconds: 1 })
+    );
+    await act(async () => root.unmount());
+    container.remove();
+  });
+});
+
 it("keeps Activity ICU arguments and rich actor tags identical across all catalogs", () => {
   function contract(message: string) {
     const values = new Set<string>();
@@ -283,7 +446,7 @@ it("keeps Activity ICU arguments and rich actor tags identical across all catalo
     return [...values].sort();
   }
   const base = catalogs.en.clusterActivity;
-  expect(Object.keys(base)).toHaveLength(19);
+  expect(Object.keys(base)).toHaveLength(31);
   for (const locale of locales) {
     expect(Object.keys(catalogs[locale].clusterActivity).sort()).toEqual(Object.keys(base).sort());
     for (const key of Object.keys(base))

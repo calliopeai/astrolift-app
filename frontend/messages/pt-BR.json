@@ -6294,6 +6294,18 @@
     "canceled": "Cancelado",
     "terminated": "Encerrado",
     "timedOut": "Tempo esgotado",
-    "continuedAsNew": "Continuado como novo"
+    "continuedAsNew": "Continuado como novo",
+    "bring": "Colocar sob gestão",
+    "refresh": "Atualizar a gestão do cluster",
+    "decommission": "Desativar o cluster",
+    "prereqs": "Instalar pré-requisitos do cluster",
+    "drift": "Detectar desvio",
+    "register": "Registrar o cluster",
+    "unregister": "Cancelar o registro do cluster",
+    "workflowSummaryHelp": "Execuções recentes do Temporal para este cluster.",
+    "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+    "hours": "{count, plural, one {# hora} other {# horas}}",
+    "minutesSeconds": "{minutes} min {seconds} s",
+    "hoursMinutes": "{hours} h {minutes} min"
   }
 }

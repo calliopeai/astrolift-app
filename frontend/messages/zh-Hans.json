@@ -6294,6 +6294,18 @@
     "canceled": "已取消",
     "terminated": "已终止",
     "timedOut": "已超时",
-    "continuedAsNew": "继续为新运行"
+    "continuedAsNew": "继续为新运行",
+    "bring": "纳入管理",
+    "refresh": "刷新集群管理",
+    "decommission": "退役集群",
+    "prereqs": "安装集群前置条件",
+    "drift": "检测漂移",
+    "register": "注册集群",
+    "unregister": "注销集群",
+    "workflowSummaryHelp": "此集群最近的Temporal运行。",
+    "minutes": "{count, plural, other {#分钟}}",
+    "hours": "{count, plural, other {#小时}}",
+    "minutesSeconds": "{minutes}分{seconds}秒",
+    "hoursMinutes": "{hours}小时{minutes}分"
   }
 }

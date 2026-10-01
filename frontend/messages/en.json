@@ -6374,6 +6374,18 @@
     "canceled": "Canceled",
     "terminated": "Terminated",
     "timedOut": "Timed out",
-    "continuedAsNew": "Continued as new"
+    "continuedAsNew": "Continued as new",
+    "bring": "Bring into management",
+    "refresh": "Refresh cluster management",
+    "decommission": "Decommission cluster",
+    "prereqs": "Install cluster prerequisites",
+    "drift": "Detect drift",
+    "register": "Register cluster",
+    "unregister": "Unregister cluster",
+    "workflowSummaryHelp": "Recent Temporal workflow runs for this cluster.",
+    "minutes": "{count, plural, one {# minute} other {# minutes}}",
+    "hours": "{count, plural, one {# hour} other {# hours}}",
+    "minutesSeconds": "{minutes}m {seconds}s",
+    "hoursMinutes": "{hours}h {minutes}m"
   }
 }
