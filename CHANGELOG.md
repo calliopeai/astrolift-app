@@ -47,6 +47,14 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- Spanner Graph dedicated containers bind immutable organization ownership,
+  preserve recorded physical names and require persisted contender plus complete
+  cloud database-set proof before capacity changes or empty-container deletion.
+  Operator-shared containers refuse tenant resize/deletion. Server-owned cleanup
+  and observed-placement records distinguish confirmed cleanup from intent and
+  retain original placement across failed reprovision (#2100). See
+  `backend/providers/docs/spanner_ownership.md` for legacy provenance limits.
+
 - Refuse all normalized platform ownership labels in Pub/Sub and PSC tenant
   config. Verify Pub/Sub source and child ownership before writes or binding,
   preserve ownership labels during updates and retain recorded topic names.

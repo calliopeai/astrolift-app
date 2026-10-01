@@ -58,6 +58,10 @@ class SpannerGraphError(RuntimeError):
     pass
 
 
+class SpannerOwnershipRefusal(SpannerGraphError):
+    """A permanent source/container identity refusal, before provider mutation."""
+
+
 class SpannerGraphNotFound(SpannerGraphError):
     pass
 
@@ -175,15 +179,27 @@ class SpannerRestClient:
     def _paged(self, resource: str, *, key: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         page_token = ""
-        while True:
+        seen: set[str] = set()
+        for _ in range(10):
             params = {"pageSize": "1000"}
             if page_token:
                 params["pageToken"] = page_token
             payload = self._request("GET", resource, params=params)
-            rows.extend(payload.get(key) or [])
-            page_token = str(payload.get("nextPageToken") or "")
+            page = payload.get(key, [])
+            if not isinstance(page, list) or not all(isinstance(row, dict) for row in page):
+                raise SpannerGraphError("invalid Spanner resource inventory; ownership is unknown")
+            rows.extend(page)
+            if len(rows) > 10000:
+                raise SpannerGraphError("Spanner resource inventory limit exceeded; ownership is unknown")
+            page_token = payload.get("nextPageToken", "")
+            if not isinstance(page_token, str):
+                raise SpannerGraphError("invalid Spanner pagination token; ownership is unknown")
             if not page_token:
                 return rows
+            if page_token in seen:
+                raise SpannerGraphError("repeated Spanner pagination token; ownership is unknown")
+            seen.add(page_token)
+        raise SpannerGraphError("Spanner resource inventory limit exceeded; ownership is unknown")
 
     def _request(
         self,
@@ -240,17 +256,24 @@ class SpannerGraphDriver(ManagedServiceDriver):
         error = self._validate_config(cfg) or _identity_error(spec.managed_service_id)
         if error:
             return ProvisionResult(False, "", error, ["invalid_spanner_graph_config"])
-        instance_id = self._instance_id(spec, cfg)
-        database_id = self._database_id(spec, cfg, instance_id)
-        handle = _handle(instance_id, database_id)
+        handle = spec.recorded_handle
         try:
-            instance = self._ensure_instance(instance_id, cfg)
+            instance_id = self._instance_id(spec, cfg)
+            database_id = (
+                _parse_handle(spec.recorded_handle)[1]
+                if spec.recorded_handle
+                else self._database_id(spec, cfg, instance_id)
+            )
+            self._assert_config_target(cfg, instance_id, database_id)
+            handle = _handle(instance_id, database_id)
+            self._assert_container_intent(instance_id, cfg, spec)
+            instance = self._ensure_instance(instance_id, database_id, cfg, spec)
             self._assert_instance_compatible(instance, cfg)
             database = self._get_database(instance_id, database_id)
             if database is None:
                 body = self._database_create_body(database_id, cfg, spec.managed_service_id)
                 self._wait_operation(self._spanner.create_database(self._instance_name(instance_id), body))
-                database = self._spanner.get_database(self._database_name(instance_id, database_id))
+                database = self._checked_database(instance_id, database_id)
             # Before anything is mutated: a refused provision must leave both
             # the database and the instance it shares exactly as it found them.
             self._ensure_database_owned(
@@ -260,7 +283,7 @@ class SpannerGraphDriver(ManagedServiceDriver):
                 record_proves=spec.recorded_handle_exclusive and spec.recorded_handle == handle,
                 backfill=True,
             )
-            self._reconcile_instance_capacity(instance, cfg)
+            self._reconcile_instance_capacity(instance, cfg, spec, database_id)
             self._reconcile_database(database, cfg)
             self._apply_schema_updates(instance_id, database_id, cfg)
             self._assert_graph_exists(instance_id, database_id, self._graph_name(cfg))
@@ -285,9 +308,13 @@ class SpannerGraphDriver(ManagedServiceDriver):
             return UpdateResult(False, spec.handle, error, ["invalid_spanner_graph_config"])
         try:
             instance = self._spanner.get_instance(self._instance_name(instance_id))
-            self._assert_owned_instance(instance)
+            self._assert_config_target(cfg, instance_id, database_id)
+            self._assert_container_intent(instance_id, cfg, spec)
+            if cfg.get("manage_instance_capacity"):
+                self._assert_exclusive_database_set(instance_id, database_id)
+            self._assert_owned_instance(instance, spec, database_id, backfill=True)
             self._assert_instance_compatible(instance, cfg)
-            database = self._spanner.get_database(self._database_name(instance_id, database_id))
+            database = self._checked_database(instance_id, database_id)
             self._ensure_database_owned(
                 instance_id,
                 database_id,
@@ -295,7 +322,7 @@ class SpannerGraphDriver(ManagedServiceDriver):
                 record_proves=spec.recorded_handle_exclusive,
                 backfill=True,
             )
-            self._reconcile_instance_capacity(instance, cfg)
+            self._reconcile_instance_capacity(instance, cfg, spec, database_id)
             self._reconcile_database(database, cfg)
             self._apply_schema_updates(instance_id, database_id, cfg)
             self._assert_graph_exists(instance_id, database_id, self._graph_name(cfg))
@@ -325,7 +352,19 @@ class SpannerGraphDriver(ManagedServiceDriver):
         cfg = dict(spec.config or {})
         database_name = self._database_name(instance_id, database_id)
         try:
+            self._assert_config_target(cfg, instance_id, database_id)
+            self._assert_container_intent(
+                instance_id,
+                {},
+                spec,
+                deleting=bool(delete_data and force_destroy and cfg.get("delete_empty_instance")),
+            )
             instance = self._spanner.get_instance(self._instance_name(instance_id))
+            self._assert_owned_instance(instance, spec, database_id)
+            if delete_data and force_destroy and cfg.get("delete_empty_instance"):
+                self._assert_exclusive_database_set(instance_id, database_id, allow_empty=True)
+                if self._spanner.list_backups(self._instance_name(instance_id)):
+                    raise SpannerGraphError("Spanner instance still contains backups; refusing instance deletion")
             database = self._get_database(instance_id, database_id)
         except Exception as exc:
             return _deprovision_error(spec.handle, "describe Spanner Graph", exc)
@@ -370,6 +409,8 @@ class SpannerGraphDriver(ManagedServiceDriver):
                         spec.handle,
                         managed_service_id=spec.managed_service_id,
                         recorded_handle_exclusive=spec.recorded_handle_exclusive,
+                        organization_id=spec.organization_id,
+                        recorded_container_exclusive=spec.recorded_container_exclusive,
                     ),
                 ).snapshot_id
             except Exception as exc:
@@ -381,6 +422,8 @@ class SpannerGraphDriver(ManagedServiceDriver):
                     retryable=False,
                 )
         try:
+            if delete_data and force_destroy and cfg.get("delete_empty_instance"):
+                self._assert_owned_instance(instance, spec, database_id, backfill=True)
             if protected:
                 operation = self._spanner.patch_database(
                     database_name,
@@ -390,7 +433,7 @@ class SpannerGraphDriver(ManagedServiceDriver):
                 self._wait_operation(operation)
             self._spanner.drop_database(database_name)
             if delete_data and force_destroy and cfg.get("delete_empty_instance"):
-                self._delete_instance_if_empty(instance_id)
+                self._delete_instance_if_empty(instance_id, spec)
         except SpannerGraphNotFound:
             pass
         except Exception as exc:
@@ -405,7 +448,14 @@ class SpannerGraphDriver(ManagedServiceDriver):
         try:
             instance_id, database_id = _parse_handle(handle.handle)
             instance = self._spanner.get_instance(self._instance_name(instance_id))
-            database = self._spanner.get_database(self._database_name(instance_id, database_id))
+            database = self._checked_database(instance_id, database_id)
+            self._assert_owned_instance(instance, handle, database_id)
+            self._ensure_database_owned(
+                instance_id,
+                database_id,
+                managed_service_id=handle.managed_service_id,
+                record_proves=handle.recorded_handle_exclusive,
+            )
         except SpannerGraphNotFound:
             return ServiceStatus(handle.handle, "deprovisioned", "Spanner Graph database does not exist")
         except Exception as exc:
@@ -427,7 +477,9 @@ class SpannerGraphDriver(ManagedServiceDriver):
         cfg = dict(config or {})
         graph_name = self._graph_name(cfg)
         database_name = self._database_name(instance_id, database_id)
-        self._spanner.get_database(database_name)
+        instance = self._spanner.get_instance(self._instance_name(instance_id))
+        self._assert_owned_instance(instance, handle, database_id)
+        self._checked_database(instance_id, database_id)
         # The grant below is the payoff of a collision, so the database must be
         # this service's before its URL and databaseUser leave the driver.
         self._ensure_database_owned(
@@ -463,7 +515,9 @@ class SpannerGraphDriver(ManagedServiceDriver):
             raise SpannerGraphError("Spanner backup_retention_days must be between 1 and 366")
         instance_id, database_id = _parse_handle(handle.handle)
         database_name = self._database_name(instance_id, database_id)
-        self._spanner.get_database(database_name)
+        instance = self._spanner.get_instance(self._instance_name(instance_id))
+        self._assert_owned_instance(instance, handle, database_id)
+        self._checked_database(instance_id, database_id)
         # A backup is a copy of the data, retained under this service's record.
         # Held to what deprovision accepts, since teardown takes one first.
         self._ensure_database_owned(
@@ -499,13 +553,20 @@ class SpannerGraphDriver(ManagedServiceDriver):
         error = self._validate_config(cfg) or _identity_error(target.managed_service_id)
         if error:
             return ProvisionResult(False, "", error, ["invalid_spanner_graph_config"])
-        instance_id = self._instance_id(target, cfg)
-        database_id = self._database_id(target, cfg, instance_id)
-        handle = _handle(instance_id, database_id)
+        handle = target.recorded_handle
         try:
+            instance_id = self._instance_id(target, cfg)
+            database_id = (
+                _parse_handle(target.recorded_handle)[1]
+                if target.recorded_handle
+                else self._database_id(target, cfg, instance_id)
+            )
+            self._assert_config_target(cfg, instance_id, database_id)
+            self._assert_container_intent(instance_id, cfg, target)
+            handle = _handle(instance_id, database_id)
             if self._get_database(instance_id, database_id) is not None:
                 raise SpannerGraphError(f"restore target {instance_id}/{database_id} already exists")
-            instance = self._ensure_instance(instance_id, cfg)
+            instance = self._ensure_instance(instance_id, database_id, cfg, target)
             self._assert_instance_compatible(instance, cfg)
             body: dict[str, Any] = {"databaseId": database_id, "backup": snapshot.snapshot_id}
             if cfg.get("restore_kms_key_names"):
@@ -514,7 +575,7 @@ class SpannerGraphDriver(ManagedServiceDriver):
                     "kmsKeyNames": list(cfg["restore_kms_key_names"]),
                 }
             self._wait_operation(self._spanner.restore_database(self._instance_name(instance_id), body))
-            database = self._spanner.get_database(self._database_name(instance_id, database_id))
+            database = self._checked_database(instance_id, database_id)
             self._stamp_restored_owner(instance_id, database_id, target.managed_service_id)
             self._reconcile_database(database, cfg)
             self._assert_graph_exists(instance_id, database_id, self._graph_name(cfg))
@@ -571,27 +632,35 @@ class SpannerGraphDriver(ManagedServiceDriver):
             },
         )
 
-    def _ensure_instance(self, instance_id: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    def _ensure_instance(
+        self, instance_id: str, database_id: str, cfg: dict[str, Any], spec: ProvisionSpec
+    ) -> dict[str, Any]:
         name = self._instance_name(instance_id)
         current = self._get_instance(instance_id)
+        if current is not None and cfg.get("manage_instance_capacity"):
+            self._assert_exclusive_database_set(instance_id, database_id, allow_empty=True)
         if current is None:
             operation = self._spanner.create_instance(
                 self._config.project_id,
                 instance_id,
-                self._instance_body(instance_id, cfg),
+                self._instance_body(instance_id, cfg, spec.organization_id),
             )
             self._wait_operation(operation)
-            return self._spanner.get_instance(name)
-        self._assert_owned_instance(current)
+            current = self._spanner.get_instance(name)
+        self._assert_owned_instance(current, spec, database_id, backfill=True)
         return current
 
-    def _instance_body(self, instance_id: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    def _instance_body(self, instance_id: str, cfg: dict[str, Any], organization_id: str) -> dict[str, Any]:
+        if instance_id == self._config.shared_instance_id:
+            cfg = {}  # Shared initial compute is also install-owned.
         body: dict[str, Any] = {
             "name": self._instance_name(instance_id),
             "config": self._instance_config(cfg),
             "displayName": (instance_id if len(instance_id) >= 4 else f"{instance_id}-graph")[:30],
             "edition": str(cfg.get("edition") or self._config.edition),
-            "labels": _labels(),
+            "labels": _labels()
+            if instance_id == self._config.shared_instance_id
+            else {**_labels(), "astrolift-organization-id": _organization_id(organization_id)},
             "defaultBackupScheduleType": (
                 "AUTOMATIC"
                 if bool(cfg.get("automatic_backup_schedule", self._config.automatic_backup_schedule))
@@ -620,9 +689,15 @@ class SpannerGraphDriver(ManagedServiceDriver):
             body["encryptionConfig"] = {"kmsKeyNames": list(cfg["kms_key_names"])}
         return body
 
-    def _reconcile_instance_capacity(self, current: dict[str, Any], cfg: dict[str, Any]) -> None:
+    def _reconcile_instance_capacity(
+        self, current: dict[str, Any], cfg: dict[str, Any], spec: Any, database_id: str
+    ) -> None:
         if not cfg.get("manage_instance_capacity"):
             return
+        instance_id = str(current["name"]).rsplit("/", 1)[-1]
+        self._assert_container_intent(instance_id, cfg, spec)
+        self._assert_owned_instance(self._spanner.get_instance(self._instance_name(instance_id)), spec, database_id)
+        self._assert_exclusive_database_set(instance_id, database_id)
         desired: dict[str, Any] = {}
         mask: list[str] = []
         autoscaling = _autoscaling_config(cfg)
@@ -730,28 +805,97 @@ class SpannerGraphDriver(ManagedServiceDriver):
             if actual and actual != desired:
                 raise SpannerGraphError(f"shared Spanner instance {field} mismatch ({actual!r} != {desired!r})")
 
-    def _assert_owned_instance(self, current: dict[str, Any]) -> None:
-        # An instance with no platform label was never provisioned by
-        # Astrolift. A tenant instance_id outranks spanner_shared_instance_id,
-        # so a per-cluster switch reached any instance a tenant named, not one
-        # the operator chose. Adoption of an existing resource is a separate,
-        # operator-authorized operation (#1365); no config flag may grant it
-        # (#2021).
-        if (current.get("labels") or {}).get("astrolift-managed-by") != "platform":
-            raise SpannerGraphError(
-                "existing Spanner instance carries no Astrolift ownership marker; adoption is a "
-                "separate, operator-authorized operation and cannot be granted by tenant config",
+    def _assert_config_target(self, cfg: dict[str, Any], instance_id: str, database_id: str) -> None:
+        if cfg.get("instance_id") and cfg["instance_id"] != instance_id:
+            raise SpannerOwnershipRefusal("config instance_id disagrees with the recorded physical handle")
+        if cfg.get("database_id") and cfg["database_id"] != database_id:
+            raise SpannerOwnershipRefusal("config database_id disagrees with the recorded physical handle")
+
+    def _assert_container_intent(
+        self, instance_id: str, cfg: dict[str, Any], spec: Any, *, deleting: bool = False
+    ) -> None:
+        _organization_id(spec.organization_id)
+        if cfg.get("manage_instance_capacity") or deleting:
+            if instance_id == self._config.shared_instance_id:
+                raise SpannerOwnershipRefusal(
+                    "operator-shared Spanner instance capacity/deletion is not tenant-manageable"
+                )
+            if not spec.recorded_container_exclusive:
+                raise SpannerOwnershipRefusal(
+                    "no exclusive platform container proof; refusing instance capacity/deletion"
+                )
+
+    def _assert_exclusive_database_set(self, instance_id: str, database_id: str, *, allow_empty: bool = False) -> None:
+        instance_name = self._instance_name(instance_id)
+        expected = self._database_name(instance_id, database_id)
+        rows = self._spanner.list_databases(instance_name)
+        if not isinstance(rows, list) or not all(isinstance(row, dict) and row.get("name") for row in rows):
+            raise SpannerOwnershipRefusal("Spanner database inventory is unknown; refusing container operation")
+        names = [row["name"] for row in rows]
+        if names != [expected] and not (allow_empty and not names):
+            raise SpannerOwnershipRefusal("Spanner instance has other/unknown databases; refusing container operation")
+
+    def _assert_owned_instance(
+        self, current: dict[str, Any], spec: Any, database_id: str, *, backfill: bool = False
+    ) -> None:
+        instance_name = str(current.get("name") or "")
+        instance_id = (
+            self._instance_id(spec, dict(spec.config or {}))
+            if isinstance(spec, ProvisionSpec)
+            else _parse_handle(spec.handle)[0]
+        )
+        if instance_name != self._instance_name(instance_id):
+            raise SpannerOwnershipRefusal("Spanner instance project identity does not match the driver")
+        labels = dict(current.get("labels") or {})
+        if labels.get("astrolift-managed-by") != "platform":
+            raise SpannerOwnershipRefusal(
+                "existing Spanner instance carries no Astrolift ownership marker; "
+                "operator-authorized adoption is required"
+            )
+        organization_id = _organization_id(spec.organization_id)
+        owner = labels.get("astrolift-organization-id")
+        if owner and owner != organization_id:
+            raise SpannerOwnershipRefusal("Spanner instance belongs to another organization")
+        if instance_id == self._config.shared_instance_id:
+            # Only the install-configured container is eligible for multi-org
+            # databases. A tenant instance_id cannot confer that privilege.
+            if owner:
+                raise SpannerOwnershipRefusal("operator-shared Spanner instance unexpectedly carries a tenant owner")
+            return
+        if owner == organization_id:
+            return
+        recorded = spec.recorded_handle if isinstance(spec, ProvisionSpec) else spec.handle
+        if not (
+            spec.recorded_handle_exclusive
+            and spec.recorded_container_exclusive
+            and recorded == _handle(instance_id, database_id)
+        ):
+            raise SpannerOwnershipRefusal(
+                "legacy Spanner instance has no immutable organization owner or exclusive recorded-container proof"
+            )
+        self._assert_exclusive_database_set(instance_id, database_id)
+        self._ensure_database_owned(
+            instance_id, database_id, managed_service_id=spec.managed_service_id, record_proves=True
+        )
+        if backfill:
+            labels["astrolift-organization-id"] = organization_id
+            self._wait_operation(
+                self._spanner.patch_instance(instance_name, {"labels": labels}, update_mask=["labels"])
             )
 
-    def _delete_instance_if_empty(self, instance_id: str) -> None:
+    def _delete_instance_if_empty(self, instance_id: str, spec: DeprovisionSpec) -> None:
         instance_name = self._instance_name(instance_id)
         instance = self._spanner.get_instance(instance_name)
-        if (instance.get("labels") or {}).get("astrolift-managed-by") != "platform":
-            raise SpannerGraphError("refusing to delete an adopted Spanner instance")
+        self._assert_owned_instance(instance, spec, _parse_handle(spec.handle)[1])
+        self._assert_container_intent(instance_id, {}, spec, deleting=True)
+        if (instance.get("labels") or {}).get("astrolift-organization-id") != _organization_id(spec.organization_id):
+            raise SpannerOwnershipRefusal(
+                "refusing to delete Spanner instance without its immutable organization owner"
+            )
         if self._spanner.list_databases(instance_name):
-            raise SpannerGraphError("Spanner instance still contains databases; refusing instance deletion")
+            raise SpannerOwnershipRefusal("Spanner instance still contains databases; refusing instance deletion")
         if self._spanner.list_backups(instance_name):
-            raise SpannerGraphError("Spanner instance still contains backups; refusing instance deletion")
+            raise SpannerOwnershipRefusal("Spanner instance still contains backups; refusing instance deletion")
         self._wait_operation(self._spanner.delete_instance(instance_name))
 
     def _wait_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
@@ -853,18 +997,28 @@ class SpannerGraphDriver(ManagedServiceDriver):
         except SpannerGraphNotFound:
             return None
 
+    def _checked_database(self, instance_id: str, database_id: str) -> dict[str, Any]:
+        expected = self._database_name(instance_id, database_id)
+        database = self._spanner.get_database(expected)
+        if database.get("name") != expected:
+            raise SpannerOwnershipRefusal("Spanner database identity does not match the recorded driver target")
+        return database
+
     def _get_database(self, instance_id: str, database_id: str) -> dict[str, Any] | None:
         try:
-            return self._spanner.get_database(self._database_name(instance_id, database_id))
+            return self._checked_database(instance_id, database_id)
         except SpannerGraphNotFound:
             return None
 
     def _instance_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
-        explicit = str(cfg.get("instance_id") or self._config.shared_instance_id)
-        if explicit:
-            return explicit
-        raw = f"{self._config.instance_name_prefix}-{spec.organization_slug}-{spec.app_slug}-{spec.environment_name}"
-        return _resource_id(raw, maximum=64)
+        return spanner_instance_id(
+            managed_service_id=spec.managed_service_id,
+            organization_id=spec.organization_id,
+            recorded_handle=spec.recorded_handle,
+            instance_id=str(cfg.get("instance_id") or ""),
+            shared_instance_id=self._config.shared_instance_id,
+            instance_name_prefix=self._config.instance_name_prefix,
+        )
 
     def _database_id(self, spec: ProvisionSpec, cfg: dict[str, Any], instance_id: str) -> str:
         explicit = str(cfg.get("database_id") or "")
@@ -960,6 +1114,32 @@ def _backup_id(database_id: str, created: datetime) -> str:
     return _resource_id(f"{database_id}-backup-{created.strftime('%Y%m%d%H%M%S%f')}", maximum=60)
 
 
+def _organization_id(value: str) -> str:
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise SpannerOwnershipRefusal("Spanner Graph needs its immutable organization UUID") from exc
+
+
+def spanner_instance_id(
+    *,
+    managed_service_id: str,
+    organization_id: str,
+    recorded_handle: str,
+    instance_id: str,
+    shared_instance_id: str,
+    instance_name_prefix: str,
+) -> str:
+    """Pure physical target derivation shared with the platform ownership proof."""
+    if recorded_handle:
+        return _parse_handle(recorded_handle)[0]
+    explicit = str(instance_id or shared_instance_id)
+    if explicit:
+        return explicit
+    _organization_id(organization_id)
+    return _resource_id(f"{instance_name_prefix[:20]}-{uuid.UUID(managed_service_id).hex}", maximum=64)
+
+
 def _labels() -> dict[str, str]:
     return {
         "astrolift-managed-by": "platform",
@@ -1034,4 +1214,6 @@ def _ownership_refusal(
 
 
 def _deprovision_error(handle: str, action: str, exc: Exception) -> DeprovisionResult:
-    return DeprovisionResult(False, handle, f"{action}: {exc}", [str(exc)], retryable=True)
+    return DeprovisionResult(
+        False, handle, f"{action}: {exc}", [str(exc)], retryable=not isinstance(exc, SpannerOwnershipRefusal)
+    )

@@ -12,10 +12,9 @@ Temporal workflows that update this row.
 
 from __future__ import annotations
 
-from django.db import models
-
 from astrolift_drivers.isolation import Isolation
 from core.models.base import BaseCoreModel
+from django.db import models
 
 
 class ManagedService(BaseCoreModel):
@@ -149,6 +148,12 @@ class ManagedService(BaseCoreModel):
     # update runs. Keep the last provider-confirmed config separately so the UI,
     # retries, and operators never mistake requested state for applied state.
     applied_config = models.JSONField(null=True, blank=True, default=None)
+    # Server-owned provider confirmation; teardown intent/soft deletion alone
+    # cannot prove an old physical resource stopped occupying a container.
+    provider_cleanup_receipt = models.JSONField(null=True, blank=True, default=None, editable=False)
+    # Last observed physical placement survives failed reprovision and cleanup.
+    # A mutable cluster configuration must never retarget its recorded handle.
+    provider_placement_identity = models.JSONField(null=True, blank=True, default=None, editable=False)
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     status_error = models.TextField(blank=True, default="")
     operation_kind = models.CharField(max_length=32, blank=True, default="")

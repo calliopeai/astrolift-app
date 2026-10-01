@@ -17,6 +17,16 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.spanner_ownership import (
+    clear_cleanup,
+    container_exclusive,
+    guard_spanner_container,
+    is_spanner,
+    record_cleanup,
+    record_placement,
+    validate_observed_placement,
+)
+
 log = logging.getLogger("astrolift_workflows.activities.managed_service")
 
 # Markers a driver error / failed-result carries when the backend resource is
@@ -85,6 +95,15 @@ def _service_identity(svc: Any) -> str:
             f"cannot stamp an identity the next operation could verify"
         )
     return guid
+
+
+def _service_organization_id(svc: Any) -> str:
+    from astrolift_services.secret_ref_config import service_organization
+
+    organization = service_organization(svc)
+    if organization is None:
+        raise ValueError("managed service organization identity is unknown")
+    return str(organization.guid)
 
 
 def _resolve_isolation(svc: Any, *, org: Any, cluster: Any) -> str:
@@ -184,7 +203,6 @@ def build_provision_spec(svc: Any, *, cluster: Any) -> Any:
 def _cluster_model_placement(svc: Any, *, cluster: Any) -> Any:
     from _sdk.k8s_naming import app_namespace
     from _sdk.managed_service import ClusterModelPlacement, ModelConsumer
-
     from astrolift_clusters.models import TenantCluster
     from astrolift_registry.models import RegisteredApp
     from astrolift_registry.scopes import live_app_owners
@@ -327,10 +345,9 @@ def _assert_email_identity_unclaimed(svc: Any, spec: Any, cluster: Any) -> None:
     if (str(svc.kind), str(getattr(svc, "variant", "") or "")) != ("email", "ses"):
         return
 
+    from astrolift_services.models import ManagedService
     from aws.managed._base import ManagedServiceError, handle_for
     from aws.managed.email_ses import KIND, identity_for
-
-    from astrolift_services.models import ManagedService
 
     pc = cluster.provider_config or {}
     try:
@@ -427,14 +444,13 @@ def _signals_already_gone(*parts: object) -> bool:
 def _run_managed_service_preflight(svc: Any, cluster: Any) -> None:
     """Refresh live capabilities and fail before a Kubernetes-backed driver
     mutates the cluster when its required APIs are absent/incompatible."""
+    from core.cluster_management import probe_cluster_capabilities_dispatch
     from django.utils import timezone
     from k8s_native.preflight import (
         REQUIREMENTS,
         capabilities_from_payload,
         preflight,
     )
-
-    from core.cluster_management import probe_cluster_capabilities_dispatch
 
     variant = str(getattr(svc, "variant", "") or "")
     if (str(svc.kind), variant) not in REQUIREMENTS:
@@ -581,7 +597,6 @@ async def mark_managed_service_deprovisioning(
     managed_service_id: int,
 ) -> None:
     from asgiref.sync import sync_to_async
-
     from astrolift_services.models import ManagedService
 
     await sync_to_async(_mark_status_sync)(
@@ -590,6 +605,7 @@ async def mark_managed_service_deprovisioning(
     )
 
 
+@guard_spanner_container
 def _deprovision_sync(
     managed_service_id: int,
     delete_data: bool,
@@ -633,6 +649,7 @@ def _deprovision_sync(
     except DriverNotFound as exc:
         raise RuntimeError(f"cluster {cluster.slug}: {exc}") from exc
 
+    validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
 
@@ -656,6 +673,7 @@ def _deprovision_sync(
     from _sdk.managed_service import DeprovisionSpec, ServiceHandle
 
     exclusive = _recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg)
+    container_proof = container_exclusive(svc, resolved=resolved, cfg=cfg)
     # ``delete_data=False`` is a preservation claim, not just a driver flag.
     # Complete and record a provider-backed snapshot/export before allowing the
     # destructive half of teardown to start. Unsupported snapshot methods fail
@@ -667,6 +685,8 @@ def _deprovision_sync(
                 handle=svc.backend_ref,
                 managed_service_id=_service_identity(svc),
                 recorded_handle_exclusive=exclusive,
+                organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+                recorded_container_exclusive=container_proof,
             )
         )
         snapshot_id = str(getattr(retained, "snapshot_id", "") or "")
@@ -692,6 +712,8 @@ def _deprovision_sync(
         config=deprovision_config,
         managed_service_id=_service_identity(svc),
         recorded_handle_exclusive=exclusive,
+        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        recorded_container_exclusive=container_proof,
     )
     try:
         result = driver.deprovision(
@@ -714,6 +736,10 @@ def _deprovision_sync(
         raise
     ok = bool(getattr(result, "ok", False))
     message = str(getattr(result, "message", ""))
+    if ok and is_spanner(resolved):
+        if str(getattr(result, "handle", "")) != svc.backend_ref:
+            raise ValueError("Spanner cleanup did not confirm the recorded handle")
+        record_cleanup(svc, resolved=resolved, cfg=cfg)
     if dynamic_cleanup_message:
         message = f"{message}; {dynamic_cleanup_message}" if message else dynamic_cleanup_message
     errors = list(getattr(result, "errors", []) or [])
@@ -829,7 +855,6 @@ async def mark_managed_service_provisioning(
     managed_service_id: int,
 ) -> None:
     from asgiref.sync import sync_to_async
-
     from astrolift_services.models import ManagedService
 
     await sync_to_async(_mark_status_sync)(
@@ -838,6 +863,7 @@ async def mark_managed_service_provisioning(
     )
 
 
+@guard_spanner_container
 def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     from astrolift_drivers.managed_resolution import resolve_managed_driver
     from astrolift_drivers.registry import DriverNotFound
@@ -872,12 +898,15 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     except DriverNotFound as exc:
         raise RuntimeError(f"cluster {cluster.slug}: {exc}") from exc
 
+    validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
     spec = dataclasses.replace(
         spec,
         recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+        recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
     )
+    clear_cleanup(svc, resolved=resolved)
 
     if source is not None:
         from _sdk.managed_service import SnapshotHandle
@@ -892,6 +921,8 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
         )
     else:
         result = driver.provision(spec)
+    if is_spanner(resolved) and result.ok and result.ready:
+        record_placement(svc, resolved=resolved, cfg=cfg, handle=str(result.handle))
     return {
         "ok": bool(getattr(result, "ok", False)),
         "handle": str(getattr(result, "handle", "")),
@@ -903,6 +934,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     }
 
 
+@guard_spanner_container
 def _update_sync(managed_service_id: int) -> dict[str, Any]:
     from astrolift_drivers.managed_resolution import resolve_managed_driver
     from astrolift_drivers.registry import DriverNotFound
@@ -932,12 +964,14 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
     except DriverNotFound as exc:
         raise ValueError(f"cluster {cluster.slug}: {exc}") from exc
 
+    validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
 
     from _sdk.managed_service import UpdateSpec
 
     desired = dict(svc.config or {})
+    clear_cleanup(svc, resolved=resolved)
     result = driver.update(
         UpdateSpec(
             handle=svc.backend_ref,
@@ -946,8 +980,12 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
             managed_service_id=_service_identity(svc),
             recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
             cluster_model=_cluster_model_placement(svc, cluster=cluster) if svc.organization_id else None,
+            organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+            recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
         ),
     )
+    if is_spanner(resolved) and result.ok:
+        record_placement(svc, resolved=resolved, cfg=cfg, handle=str(result.handle or svc.backend_ref))
     return {
         "ok": bool(getattr(result, "ok", False)),
         "handle": str(getattr(result, "handle", "") or svc.backend_ref),
@@ -1037,6 +1075,7 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
         )
     except DriverNotFound:
         return "available"
+    validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
     status_method = getattr(driver, "status", None)
@@ -1044,7 +1083,13 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
         return "available"
     from _sdk.managed_service import ServiceHandle
 
-    probe = ServiceHandle(handle=handle, managed_service_id=_service_identity(svc))
+    probe = ServiceHandle(
+        handle=handle,
+        managed_service_id=_service_identity(svc),
+        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+        recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
+    )
     return str(getattr(status_method(probe), "state", "available"))
 
 
@@ -1120,9 +1165,8 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> list[int]:
 
 
 def _finalize_update_sync(managed_service_id: int, handle: str) -> list[int]:
-    from django.utils import timezone
-
     from astrolift_services.models import ManagedService
+    from django.utils import timezone
 
     svc = ManagedService.all_objects.get(pk=managed_service_id)
     if handle:
@@ -1182,6 +1226,7 @@ def _managed_binding_for(svc: Any) -> Any:
         )
     except DriverNotFound:
         return None
+    validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
     driver = resolved.driver_cls(config=cfg)
 
@@ -1194,6 +1239,8 @@ def _managed_binding_for(svc: Any) -> Any:
         handle=svc.backend_ref,
         managed_service_id=_service_identity(svc),
         recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
+        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
     )
     # Thread the operator-supplied ``ManagedService.config`` into the
     # binding so config-driven binding fields render (#1038): the SES
@@ -1225,12 +1272,11 @@ def _sync_binding_rows(svc: Any) -> list[int]:
     endpoint and password must not restart anybody's pods.
     """
     from _sdk.managed_service import VolumeMount
-    from django.db import transaction
-
     from astrolift_services.models import (
         ManagedServiceBinding,
         ManagedServiceVolumeBinding,
     )
+    from django.db import transaction
 
     binding = _managed_binding_for(svc)
     if binding is None:
@@ -1335,9 +1381,8 @@ async def finalize_managed_service_provision(
 
 
 def _mark_failed_sync(managed_service_id: int, error: str) -> None:
-    from django.utils import timezone
-
     from astrolift_services.models import ManagedService
+    from django.utils import timezone
 
     svc = ManagedService.all_objects.get(pk=managed_service_id)
     svc.status = ManagedService.Status.FAILED
@@ -1372,6 +1417,7 @@ def _dependent_app_environment_ids(svc: Any, rebound_binding_ids: list[int]) -> 
     the phase contract these workflows are specified against.
     """
     from astrolift_services.models import ManagedServiceAttachment, ManagedServiceBinding
+
     from astrolift_workflows.managed_service_states import (
         WorkloadBinding,
         workloads_to_redeploy,
