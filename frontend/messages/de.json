@@ -4372,6 +4372,10 @@
       "today": "Heute",
       "yesterday": "Gestern",
       "unknownDate": "Unbekanntes Datum"
+    },
+    "shellHeader": {
+      "breadcrumb": "Navigationspfad",
+      "switch": "{label}: wechseln"
     }
   },
   "agentSecrets": {

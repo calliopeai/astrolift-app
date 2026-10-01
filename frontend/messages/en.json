@@ -4449,6 +4449,10 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "unknownDate": "Unknown date"
+    },
+    "shellHeader": {
+      "breadcrumb": "Breadcrumb",
+      "switch": "{label}: switch"
     }
   },
   "agentSecrets": {

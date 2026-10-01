@@ -4372,6 +4372,10 @@
       "today": "Hoy",
       "yesterday": "Ayer",
       "unknownDate": "Fecha desconocida"
+    },
+    "shellHeader": {
+      "breadcrumb": "Ruta de navegación",
+      "switch": "Cambiar: {label}"
     }
   },
   "agentSecrets": {

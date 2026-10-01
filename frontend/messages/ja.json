@@ -4369,6 +4369,10 @@
       "today": "今日",
       "yesterday": "昨日",
       "unknownDate": "日付不明"
+    },
+    "shellHeader": {
+      "breadcrumb": "パンくずリスト",
+      "switch": "{label}を切り替え"
     }
   },
   "agentSecrets": {

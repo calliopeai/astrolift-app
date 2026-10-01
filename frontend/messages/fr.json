@@ -4372,6 +4372,10 @@
       "today": "Aujourd’hui",
       "yesterday": "Hier",
       "unknownDate": "Date inconnue"
+    },
+    "shellHeader": {
+      "breadcrumb": "Fil d’Ariane",
+      "switch": "Changer : {label}"
     }
   },
   "agentSecrets": {

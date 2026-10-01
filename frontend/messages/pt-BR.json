@@ -4369,6 +4369,10 @@
       "today": "Hoje",
       "yesterday": "Ontem",
       "unknownDate": "Data desconhecida"
+    },
+    "shellHeader": {
+      "breadcrumb": "Caminho de navegação",
+      "switch": "Alternar: {label}"
     }
   },
   "agentSecrets": {

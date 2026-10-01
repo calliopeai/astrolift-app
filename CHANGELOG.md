@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Shared header breadcrumb landmarks and switcher accessibility names use all
+  eight locales, preserving caller labels, destinations and keyboard focus
+  through hydration and locale changes (#2145).
+
 - Shared model by-ID reads and locks include current organization constraints
   directly, including exact cluster-scoped provider locks. Install-shared
   placement remains available only within a current tenant context (#2213).

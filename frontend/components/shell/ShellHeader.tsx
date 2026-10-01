@@ -2,6 +2,7 @@
 
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { type DetailTab, DetailTabRow } from "@/components/DetailPageTabs";
@@ -60,9 +61,10 @@ export function ShellHeader({
   tabsAriaLabel = "Page",
   className,
 }: ShellHeaderProps) {
+  const t = useTranslations("shared.shellHeader");
   return (
     <header className={cn("flex min-w-0 flex-col gap-3", className)}>
-      <nav aria-label="Breadcrumb" className="min-w-0">
+      <nav aria-label={t("breadcrumb")} className="min-w-0">
         <ol className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
           {crumbs.map((crumb, i) => (
             <li key={`${crumb.label}-${i}`} className="flex min-w-0 items-center gap-1.5">
@@ -101,12 +103,13 @@ export function ShellHeader({
 }
 
 function CrumbItem({ crumb, isLast }: { crumb: Crumb; isLast: boolean }) {
+  const t = useTranslations("shared.shellHeader");
   if (crumb.switcher && crumb.switcher.length > 0) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger
           className="hover:text-foreground focus-visible:ring-ring inline-flex min-w-0 items-center gap-1 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-          aria-label={`${crumb.label}: switch`}
+          aria-label={t("switch", { label: crumb.label })}
         >
           <span className="truncate">{crumb.label}</span>
           <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />

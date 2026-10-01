@@ -4369,6 +4369,10 @@
       "today": "今天",
       "yesterday": "昨天",
       "unknownDate": "日期未知"
+    },
+    "shellHeader": {
+      "breadcrumb": "面包屑导航",
+      "switch": "切换{label}"
     }
   },
   "agentSecrets": {
