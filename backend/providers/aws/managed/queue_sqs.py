@@ -31,7 +31,9 @@ from aws._errors import map_client_error
 from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
+    assert_resource_arn,
     handle_for,
+    live_ownership_refusal,
     parse_handle,
     tags_for,
 )
@@ -331,11 +333,24 @@ class SQSDriver(ManagedServiceDriver):
         cfg = config or {}
         try:
             queue_url = self._queue_url(queue_name=queue_name)
+            tags = self._sqs.list_queue_tags(QueueUrl=queue_url).get("Tags", {})
+            refusal = live_ownership_refusal(
+                tags, managed_service_id=handle.managed_service_id, resource=f"queue {queue_name}"
+            )
+            if refusal:
+                raise ManagedServiceError(refusal)
             response = self._sqs.get_queue_attributes(
                 QueueUrl=queue_url,
                 AttributeNames=["QueueArn", "KmsMasterKeyId"],
             )
             queue_arn = response["Attributes"]["QueueArn"]
+            assert_resource_arn(
+                queue_arn,
+                service="sqs",
+                region=self._config.region,
+                account=self._config.account_id,
+                resource=queue_name,
+            )
             kms_key = str(response["Attributes"].get("KmsMasterKeyId") or "")
         except Exception as exc:
             raise ManagedServiceError(

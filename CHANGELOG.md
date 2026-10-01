@@ -47,6 +47,11 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- Verify live AWS source ownership before S3/SQS/DynamoDB bindings and S3 mount
+  updates or retained/forced teardown. Refuse unknown or replaced incarnations,
+  incomplete DynamoDB tag pages and missing/mismatched resource identities;
+  never fabricate an `UNKNOWN` table ARN grant (#2098).
+
 - Spanner Graph dedicated containers bind immutable organization ownership,
   preserve recorded physical names and require persisted contender plus complete
   cloud database-set proof before capacity changes or empty-container deletion.

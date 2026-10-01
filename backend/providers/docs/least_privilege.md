@@ -186,3 +186,36 @@ Event Grid's separate subscription-label list explicitly rejects its exact
 `astrolift-managed` ownership sentinel and retains the checked parent topic
 scope. Recording-client regressions exercise hostile custom keys and existing
 Azure cross-driver foreign-owner refusals; they do not certify live cloud IAM.
+
+
+### AWS live binding and S3 incarnation checks (#2098)
+
+S3, SQS and DynamoDB bindings require the actual live resource's platform marker
+and exact persisted managed-service ID before returning environment values,
+mounts or IAM grants. An old handle, matching human slugs, a tenant config flag
+or unreadable/unmarked tags cannot authorize a new incarnation. Direct SDK
+callers must supply the source ID on `ServiceHandle`; source lifecycle activities
+already derive it exclusively from the saved service UUID.
+
+The S3 binding-only mount update and all retained/destructive teardown choices
+also check live identity before accepting the operation. `force_destroy` does
+not bypass ownership, and missing buckets still converge without a write. These
+are checks before actions, not atomic cloud compare-and-delete operations;
+independent writers with cloud administration rights must not retag/recreate
+resources during platform operations.
+
+The operator identity must be able to read the protected tags with
+[`s3:GetBucketTagging`](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketTagging.html),
+[`sqs:ListQueueTags`](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_ListQueueTags.html)
+and
+[`dynamodb:ListTagsOfResource`](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_ListTagsOfResource.html).
+These reads do not add tag access to the application's returned grants.
+DynamoDB collects complete tag pagination, bounded to ten pages/1,000 tags,
+and refuses malformed, repeated or unfinished pages. SQS/DynamoDB bindings also
+verify returned resource ARN/name/region identity; missing DynamoDB ARN never
+becomes an invented `UNKNOWN` grant.
+
+This bounded change does not establish ownership protection for every AWS
+lifecycle operation. SQS/DynamoDB update/teardown, provider status/snapshot
+paths, provisioning name races/legacy adoption and workload tag-mutation
+permissions remain separately tracked acceptance work.

@@ -40,6 +40,7 @@ from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
     handle_for,
+    live_ownership_refusal,
     parse_handle,
     tags_for,
 )
@@ -212,6 +213,13 @@ class S3Driver(ManagedServiceDriver):
                     f"head_bucket {bucket_name}: {exc}",
                     [str(exc)],
                 )
+            refusal = live_ownership_refusal(
+                self._bucket_tags(bucket_name),
+                managed_service_id=spec.managed_service_id,
+                resource=f"bucket {bucket_name}",
+            )
+            if refusal:
+                return UpdateResult(False, spec.handle, refusal, ["ownership_refused"], retryable=False)
             return UpdateResult(
                 True,
                 spec.handle,
@@ -253,6 +261,23 @@ class S3Driver(ManagedServiceDriver):
           tag the platform owns), then empty + delete.
         """
         _, bucket_name = parse_handle(spec.handle)
+        try:
+            self._s3.head_bucket(Bucket=bucket_name)
+        except Exception as exc:
+            response = getattr(exc, "response", None) or {}
+            code = response.get("Error", {}).get("Code", "")
+            if code in {"404", "NoSuchBucket"} or response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+                return DeprovisionResult(True, spec.handle, f"bucket {bucket_name} already gone")
+            return DeprovisionResult(
+                False, spec.handle, "bucket ownership could not be verified", ["ownership_unknown"]
+            )
+        refusal = live_ownership_refusal(
+            self._bucket_tags(bucket_name),
+            managed_service_id=spec.managed_service_id,
+            resource=f"bucket {bucket_name}",
+        )
+        if refusal:
+            return DeprovisionResult(False, spec.handle, refusal, ["ownership_refused"], retryable=False)
 
         if not delete_data:
             # Safe path. force_destroy without delete_data is a noop
@@ -344,6 +369,14 @@ class S3Driver(ManagedServiceDriver):
     @driver_op(cloud="aws", driver="object_store_s3")
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
         _, bucket_name = parse_handle(handle.handle)
+        self._s3.head_bucket(Bucket=bucket_name)
+        refusal = live_ownership_refusal(
+            self._bucket_tags(bucket_name),
+            managed_service_id=handle.managed_service_id,
+            resource=f"bucket {bucket_name}",
+        )
+        if refusal:
+            raise ManagedServiceError(refusal)
         bucket_arn = f"arn:aws:s3:::{bucket_name}"
         cfg = config or {}
 

@@ -184,8 +184,12 @@ def driver(fake: FakeDDB) -> DynamoDBDriver:
     )
 
 
+MSID = "11111111-1111-4111-8111-111111111111"
+
+
 def _spec(**overrides: Any) -> ProvisionSpec:
     base = dict(
+        managed_service_id=MSID,
         organization_id="1",
         organization_slug="acme",
         app_id="1",
@@ -409,7 +413,7 @@ def test_status_missing_is_deprovisioned(driver: DynamoDBDriver) -> None:
 
 def test_status_active_maps_to_available(driver: DynamoDBDriver) -> None:
     provisioned = driver.provision(_spec())
-    state = driver.status(ServiceHandle(handle=provisioned.handle))
+    state = driver.status(ServiceHandle(handle=provisioned.handle, managed_service_id=MSID))
     assert state.state == "available"
 
 
@@ -420,7 +424,7 @@ def test_binding_env_is_irsa_only_no_static_keys(
     driver: DynamoDBDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(handle=provisioned.handle))
+    binding = driver.binding(ServiceHandle(handle=provisioned.handle, managed_service_id=MSID))
     env = binding.env_vars
     assert "DYNAMODB_TABLE_NAME" in env
     assert env["DYNAMODB_TABLE_NAME"].literal is not None
@@ -436,7 +440,7 @@ def test_binding_env_is_irsa_only_no_static_keys(
 
 def test_binding_iam_grant_covers_item_ops(driver: DynamoDBDriver) -> None:
     provisioned = driver.provision(_spec())
-    binding = driver.binding(ServiceHandle(handle=provisioned.handle))
+    binding = driver.binding(ServiceHandle(handle=provisioned.handle, managed_service_id=MSID))
     actions = {a for grant in binding.iam_grants for a in grant.actions}
     for required in (
         "dynamodb:GetItem",
@@ -462,7 +466,7 @@ def test_binding_for_missing_raises(driver: DynamoDBDriver) -> None:
 
 def test_snapshot_creates_backup(driver: DynamoDBDriver, fake: FakeDDB) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=MSID))
     assert snap.snapshot_id
     assert fake.count("create_backup") == 1
 
@@ -477,7 +481,7 @@ def test_restore_creates_target_table(
     fake: FakeDDB,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=MSID))
     result = driver.restore(snap, _spec(service_handle_hint="restored"))
     assert result.ok
     _, target = parse_handle(result.handle)
