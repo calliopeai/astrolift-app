@@ -857,8 +857,14 @@ export const CLUSTER_AUTH_USERS = gql`
       provider
       reachNote
       groups
+      source {
+        providerPluginId
+        providerPoolId
+        sourceVersion
+      }
       users {
         username
+        providerUserId
         email
         enabled
         status

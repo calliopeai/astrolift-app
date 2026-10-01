@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     import datetime as dt
+    from collections.abc import Callable
+    from contextlib import AbstractContextManager
 
 
 class IdentityUsersError(RuntimeError):
@@ -31,6 +33,8 @@ class IdentityUser:
     """The provider's account state, e.g. CONFIRMED, FORCE_CHANGE_PASSWORD."""
     created_at: dt.datetime | None = None
     groups: tuple[str, ...] = field(default_factory=tuple)
+    provider_user_id: str | None = None
+    """Immutable provider subject, absent when the provider cannot prove it."""
 
 
 class IdentityUsersDriver(Protocol):
@@ -70,3 +74,16 @@ class IdentityUsersDriver(Protocol):
     def add_to_group(self, *, username: str, group: str) -> None: ...
 
     def remove_from_group(self, *, username: str, group: str) -> None: ...
+
+
+class ReviewedIdentityUsersDriver(IdentityUsersDriver, Protocol):
+    """Optional additive extension; existing drivers keep current-target semantics.
+
+    Verification is an observation before a write, never external provider CAS.
+    """
+
+    pool_id: str
+
+    def verify_user(self, *, username: str, expected_user_id: str) -> None: ...
+
+    def guard_writes(self, before_write: Callable[[], None]) -> AbstractContextManager[None]: ...

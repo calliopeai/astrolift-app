@@ -42,6 +42,7 @@ export type AuthUsersViewProps = ReturnType<typeof useAuthUsers>;
  */
 export function AuthUsersView({
   sourceKey,
+  reviewedSource: hasReviewedSource,
   view,
   loading,
   error,
@@ -127,6 +128,7 @@ export function AuthUsersView({
       cell: (u) => (
         <span className="block truncate font-mono text-sm" title={u.email || u.username}>
           {u.email || u.username}
+          {!u.providerUserId && <span className="block text-xs">{t("unknownSource")}</span>}
         </span>
       ),
     },
@@ -153,6 +155,7 @@ export function AuthUsersView({
           key={`${sourceKey}:${u.username}`}
           user={u}
           groups={view.groups}
+          disabled={!hasReviewedSource || !u.providerUserId}
           onChange={(add, remove) => onSetGroups(u.username, add, remove)}
           onCreateGroup={onCreateGroup}
         />
@@ -182,7 +185,8 @@ export function AuthUsersView({
         </>
       }
       action={
-        view.supported && (
+        view.supported &&
+        hasReviewedSource && (
           <Button size="sm" onClick={() => setCreating(true)}>
             <PlusIcon className="size-4" />
             {t("addUser")}
@@ -193,6 +197,7 @@ export function AuthUsersView({
     >
       <div className="min-w-0 space-y-3">
         {sourceFailure}
+        {view.supported && !hasReviewedSource && <p role="status">{t("unknownSource")}</p>}
         <p className="text-muted-foreground text-xs">{t("inventoryLimit")}</p>
         <p className="text-muted-foreground text-xs">{t("operationLimit")}</p>
         {!view.supported ? (
@@ -214,15 +219,25 @@ export function AuthUsersView({
               getRowId={(u) => u.username}
               rowActions={(u) => (
                 <>
-                  <DropdownMenuItem onSelect={() => setPasswordFor({ ...u })}>
+                  <DropdownMenuItem
+                    disabled={!hasReviewedSource || !u.providerUserId}
+                    onSelect={() => setPasswordFor({ ...u })}
+                  >
                     <KeyRoundIcon className="size-4" />
                     {t("password")}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void onToggleEnabled(u)}>
+                  <DropdownMenuItem
+                    disabled={!hasReviewedSource || !u.providerUserId}
+                    onSelect={() => void onToggleEnabled(u)}
+                  >
                     {t(u.enabled ? "disable" : "enable")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onSelect={() => setDeleting({ ...u })}>
+                  <DropdownMenuItem
+                    disabled={!hasReviewedSource || !u.providerUserId}
+                    variant="destructive"
+                    onSelect={() => setDeleting({ ...u })}
+                  >
                     <Trash2Icon className="size-4" />
                     {t("deleteName", { name: u.email || u.username })}
                   </DropdownMenuItem>
@@ -280,11 +295,13 @@ export function AuthUsersView({
 
 function GroupEditor({
   user,
+  disabled,
   groups,
   onChange,
   onCreateGroup,
 }: {
   user: AstroliftClusterAuthUser;
+  disabled: boolean;
   groups: string[];
   onChange: (add: string[], remove: string[]) => Promise<boolean>;
   onCreateGroup: (name: string) => Promise<boolean>;
@@ -302,7 +319,7 @@ function GroupEditor({
             type="button"
             className="hover:text-destructive"
             aria-label={t("removeGroup", { group: g })}
-            disabled={busy}
+            disabled={busy || disabled}
             onClick={() => onChange([], [g])}
           >
             ×
@@ -314,7 +331,7 @@ function GroupEditor({
         onSubmit={async (e) => {
           e.preventDefault();
           const name = adding.trim();
-          if (!name || busy) return;
+          if (!name || busy || disabled) return;
           setBusy(true);
           try {
             if (!groups.includes(name) && !(await onCreateGroup(name))) return;
@@ -330,7 +347,7 @@ function GroupEditor({
           value={adding}
           onChange={(e) => setAdding(e.target.value)}
           placeholder={t("addGroup")}
-          disabled={busy}
+          disabled={busy || disabled}
           className="h-7 w-28 text-xs"
         />
         <datalist id={`groups-${user.username}`}>

@@ -42,11 +42,17 @@ const supported = {
   supported: true,
   reason: "",
   provider: "Amazon Cognito",
+  source: {
+    providerPluginId: "plugin-literal",
+    providerPoolId: "pool-literal",
+    sourceVersion: "revision-literal",
+  },
   reachNote: "A user of this pool can sign in to every app on the cluster.",
   groups: ["veruus"],
   users: [
     {
       username: "u1",
+      providerUserId: "subject-literal",
       email: "veruus-user@example.com",
       enabled: true,
       status: "CONFIRMED",
@@ -93,6 +99,7 @@ describe("AuthUsersCard (#2131)", () => {
     expect(state.sent[0]).toEqual({
       input: {
         clusterId: "c1",
+        expectedSource: supported.source,
         email: "new@example.com",
         password: null,
         permanent: false,
@@ -109,6 +116,14 @@ describe("AuthUsersCard (#2131)", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Disable" }));
 
     await waitFor(() => expect(state.sent).toHaveLength(1));
-    expect(state.sent[0]).toEqual({ input: { clusterId: "c1", username: "u1", enabled: false } });
+    expect(state.sent[0]).toEqual({
+      input: {
+        clusterId: "c1",
+        expectedSource: supported.source,
+        expectedUserId: "subject-literal",
+        username: "u1",
+        enabled: false,
+      },
+    });
   });
 });

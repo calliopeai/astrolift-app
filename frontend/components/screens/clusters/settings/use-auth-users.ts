@@ -43,8 +43,20 @@ export function useAuthUsers(clusterId: string) {
     view?.provider,
     view?.reason,
     view?.reachNote,
+    view?.source,
     view?.users,
   ]);
+  const expectedSource =
+    view?.source &&
+    view.source.providerPluginId &&
+    view.source.providerPoolId &&
+    view.source.sourceVersion
+      ? {
+          providerPluginId: view.source.providerPluginId,
+          providerPoolId: view.source.providerPoolId,
+          sourceVersion: view.source.sourceVersion,
+        }
+      : null;
   const lease = React.useMemo(() => ({ sourceKey }), [sourceKey]);
   const current = React.useRef<typeof lease | null>(lease);
   React.useLayoutEffect(() => {
@@ -81,7 +93,8 @@ export function useAuthUsers(clusterId: string) {
       toast.error(reason);
       return false;
     }
-    if (current.current !== lease || view?.supported !== true) return refused(t("sourceChanged"));
+    if (current.current !== lease || view?.supported !== true || !expectedSource)
+      return refused(t("sourceChanged"));
     let result;
     try {
       result = await call();
@@ -98,7 +111,7 @@ export function useAuthUsers(clusterId: string) {
     return true;
   }
   function knownUser(username: string) {
-    return view?.users.some((user) => user.username === username) === true;
+    return view?.users.find((user) => user.username === username)?.providerUserId || null;
   }
   async function onSetGroups(username: string, add: string[], remove: string[]) {
     if (!knownUser(username)) {
@@ -107,8 +120,20 @@ export function useAuthUsers(clusterId: string) {
     }
     return write(
       async () =>
-        (await setGroups({ variables: { input: { clusterId, username, add, remove } } })).data
-          ?.setClusterAuthUserGroups,
+        (
+          await setGroups({
+            variables: {
+              input: {
+                clusterId,
+                expectedSource,
+                expectedUserId: knownUser(username),
+                username,
+                add,
+                remove,
+              },
+            },
+          })
+        ).data?.setClusterAuthUserGroups,
       t("groupsFailed"),
       t("groupsAccepted"),
       true
@@ -117,7 +142,7 @@ export function useAuthUsers(clusterId: string) {
   async function onCreateGroup(name: string) {
     return write(
       async () =>
-        (await createGroup({ variables: { input: { clusterId, name } } })).data
+        (await createGroup({ variables: { input: { clusterId, expectedSource, name } } })).data
           ?.createClusterAuthGroup,
       t("createGroupFailed"),
       t("groupCreated"),
@@ -133,7 +158,15 @@ export function useAuthUsers(clusterId: string) {
       async () =>
         (
           await setEnabled({
-            variables: { input: { clusterId, username: user.username, enabled: !user.enabled } },
+            variables: {
+              input: {
+                clusterId,
+                expectedSource,
+                expectedUserId: knownUser(user.username),
+                username: user.username,
+                enabled: !user.enabled,
+              },
+            },
           })
         ).data?.setClusterAuthUserEnabled,
       t("enabledFailed"),
@@ -144,7 +177,7 @@ export function useAuthUsers(clusterId: string) {
   async function onCreate(input: NewAuthUser) {
     return write(
       async () =>
-        (await createUser({ variables: { input: { clusterId, ...input } } })).data
+        (await createUser({ variables: { input: { clusterId, expectedSource, ...input } } })).data
           ?.createClusterAuthUser,
       t("createFailed"),
       t(input.password ? "createdPassword" : "createdInvitation"),
@@ -158,8 +191,20 @@ export function useAuthUsers(clusterId: string) {
     }
     return write(
       async () =>
-        (await setPassword({ variables: { input: { clusterId, username, password, permanent } } }))
-          .data?.setClusterAuthUserPassword,
+        (
+          await setPassword({
+            variables: {
+              input: {
+                clusterId,
+                expectedSource,
+                expectedUserId: knownUser(username),
+                username,
+                password,
+                permanent,
+              },
+            },
+          })
+        ).data?.setClusterAuthUserPassword,
       t("passwordFailed"),
       t("passwordAccepted")
     );
@@ -171,8 +216,13 @@ export function useAuthUsers(clusterId: string) {
     }
     return write(
       async () =>
-        (await resetPassword({ variables: { input: { clusterId, username } } })).data
-          ?.resetClusterAuthUserPassword,
+        (
+          await resetPassword({
+            variables: {
+              input: { clusterId, expectedSource, expectedUserId: knownUser(username), username },
+            },
+          })
+        ).data?.resetClusterAuthUserPassword,
       t("resetFailed"),
       t("resetAccepted")
     );
@@ -181,8 +231,13 @@ export function useAuthUsers(clusterId: string) {
     if (!knownUser(username)) throw new Error(t("sourceChanged"));
     await write(
       async () =>
-        (await deleteUser({ variables: { input: { clusterId, username } } })).data
-          ?.deleteClusterAuthUser,
+        (
+          await deleteUser({
+            variables: {
+              input: { clusterId, expectedSource, expectedUserId: knownUser(username), username },
+            },
+          })
+        ).data?.deleteClusterAuthUser,
       t("deleteFailed"),
       t("deleteAccepted"),
       true,
@@ -199,6 +254,7 @@ export function useAuthUsers(clusterId: string) {
   }
   return {
     sourceKey,
+    reviewedSource: expectedSource !== null,
     view,
     loading,
     error:

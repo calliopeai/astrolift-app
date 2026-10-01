@@ -253,6 +253,7 @@ const user = (
   patch: Partial<AstroliftClusterAuthUser> = {}
 ): AstroliftClusterAuthUser => ({
   username,
+  providerUserId: `subject-${username}`,
   email,
   enabled: true,
   status: "CONFIRMED",
@@ -263,6 +264,7 @@ const user = (
 
 export const AUTH_USERS: AuthUsersViewProps = {
   sourceKey: "FIXTURE_AUTH_USERS_SOURCE",
+  reviewedSource: true,
   error: null,
   onRetry: noop,
   loading: false,
@@ -270,6 +272,11 @@ export const AUTH_USERS: AuthUsersViewProps = {
     supported: true,
     reason: "",
     provider: "Amazon Cognito",
+    source: {
+      providerPluginId: "00000000-0000-0000-0000-000000000001",
+      providerPoolId: "us-west-2_fixture",
+      sourceVersion: "fixture-version",
+    },
     reachNote:
       "A user of this pool can sign in to every app on the cluster that has no access rule of its own.",
     groups: ["platform", "finance"],

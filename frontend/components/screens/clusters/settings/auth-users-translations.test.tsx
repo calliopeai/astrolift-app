@@ -47,6 +47,7 @@ const tFor = (locale: string, namespace = "clusterSettings.authUsers") =>
 const user = {
   __typename: "AstroliftClusterAuthUser",
   username: "USERNAME_LITERAL",
+  providerUserId: "SUBJECT_LITERAL",
   email: "literal-user@example.test",
   enabled: true,
   status: "CONFIRMED",
@@ -58,6 +59,12 @@ const observed = {
   supported: true,
   reason: "",
   provider: "Amazon Cognito",
+  source: {
+    __typename: "AstroliftClusterAuthSource",
+    providerPluginId: "00000000-0000-0000-0000-000000000001",
+    providerPoolId: "us-west-2_POOL_LITERAL",
+    sourceVersion: "SOURCE_VERSION_LITERAL",
+  },
   reachNote:
     "A user of this pool can sign in to every app on the cluster that has no access rule of its own.",
   users: [user],
@@ -127,7 +134,11 @@ type Mode =
   | "unsupported"
   | "withdrawn"
   | "replaced-user"
-  | "deferred";
+  | "deferred"
+  | "unknown-source"
+  | "unknown-user"
+  | "replaced-subject"
+  | "source-version";
 type Request = {
   operationName: string;
   variables: { input?: Record<string, unknown>; clusterId?: string; slug?: string };
@@ -172,6 +183,12 @@ function context(locale: string, initialMode: Mode = "ok", selectedAction: Actio
                     }
                   : {
                       ...source,
+                      source:
+                        mode === "unknown-source"
+                          ? null
+                          : mode === "source-version"
+                            ? { ...source.source, sourceVersion: "NEW_SOURCE_VERSION" }
+                            : source.source,
                       users:
                         mode === "withdrawn"
                           ? []
@@ -183,9 +200,13 @@ function context(locale: string, initialMode: Mode = "ok", selectedAction: Actio
                                   email: "next-user@example.test",
                                 },
                               ]
-                            : mode === "replaced-user"
-                              ? [{ ...user, createdAt: "2026-10-01T12:00:00Z" }]
-                              : source.users,
+                            : mode === "unknown-user"
+                              ? [{ ...user, providerUserId: null }]
+                              : mode === "replaced-subject"
+                                ? [{ ...user, providerUserId: "REPLACEMENT_SUBJECT_LITERAL" }]
+                                : mode === "replaced-user"
+                                  ? [{ ...user, createdAt: "2026-10-01T12:00:00Z" }]
+                                  : source.users,
                     },
           };
         } else {
@@ -319,11 +340,18 @@ async function begin(locale: string, action: Action) {
   return () => userEvent.click(screen.getByRole("button", { name: t("setPassword") }));
 }
 function expected(action: Action) {
-  const target = { clusterId: cluster.id, username: user.username };
+  const { __typename: _, ...expectedSource } = observed.source;
+  const target = {
+    clusterId: cluster.id,
+    expectedSource,
+    expectedUserId: user.providerUserId,
+    username: user.username,
+  };
   switch (action) {
     case "create":
       return {
         clusterId: cluster.id,
+        expectedSource,
         email: "new-user@example.test",
         password: "TEST_ONLY_CREATE_PASSWORD",
         permanent: true,
@@ -339,7 +367,7 @@ function expected(action: Action) {
     case "groups":
       return { ...target, add: ["GROUP_B_LITERAL"], remove: [] };
     case "group":
-      return { clusterId: cluster.id, name: "NEW_GROUP_LITERAL" };
+      return { clusterId: cluster.id, expectedSource, name: "NEW_GROUP_LITERAL" };
   }
 }
 function writes(requests: Request[]) {
@@ -352,6 +380,27 @@ beforeEach(() => {
 });
 
 describe.each(locales)("Connected auth-user operations in %s", (locale) => {
+  it("keeps unknown source proof read-only without claiming a read error", async () => {
+    const ctx = mount(locale, "unknown-source"),
+      t = tFor(locale);
+    await screen.findByText(user.email);
+    expect(screen.getByRole("status")).toHaveTextContent(t("unknownSource"));
+    expect(screen.queryByRole("button", { name: t("addUser") })).toBeNull();
+    expect(screen.getByLabelText(t("addToGroup", { name: user.email }))).toBeDisabled();
+    expect(writes(ctx.requests)).toHaveLength(0);
+  });
+  it("keeps a user with unknown immutable subject read-only", async () => {
+    const ctx = mount(locale, "unknown-user"),
+      t = tFor(locale);
+    await screen.findByText(user.email);
+    expect(screen.getByLabelText(t("addToGroup", { name: user.email }))).toBeDisabled();
+    await rowMenu(locale);
+    expect(screen.getByRole("menuitem", { name: t("password") })).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
+    expect(writes(ctx.requests)).toHaveLength(0);
+  });
   it.each(actions)(
     "%s uses exact literal input and honest provider-accepted feedback",
     async (action) => {
@@ -487,40 +536,43 @@ describe.each(locales)("Connected auth-user operations in %s", (locale) => {
 });
 
 describe.each(locales)("Observed source leases in %s", (locale) => {
-  it("rejects old callbacks after same-username replacement and ABA without provider writes", async () => {
-    const ctx = context(locale),
-      t = tFor(locale);
-    const hook = renderHook(({ id }) => useAuthUsers(id), {
-      initialProps: { id: cluster.id },
-      wrapper: ctx.Wrapper,
-    });
-    await waitFor(() => expect(hook.result.current.view?.supported).toBe(true));
-    const stale = hook.result.current.onSetPassword;
-    ctx.setMode("replaced-user");
-    await act(async () => {
-      await ctx.client.refetchQueries({ include: ["ClusterAuthUsers"] });
-    });
-    await act(async () =>
-      expect(await stale(user.username, "TEST_ONLY_STALE_PASSWORD", true)).toBe(false)
-    );
-    ctx.setMode("ok");
-    await act(async () => {
-      await ctx.client.refetchQueries({ include: ["ClusterAuthUsers"] });
-    });
-    await act(async () =>
-      expect(await stale(user.username, "TEST_ONLY_STALE_PASSWORD", true)).toBe(false)
-    );
-    expect(writes(ctx.requests)).toHaveLength(0);
-    expect(state.error).toHaveBeenCalledWith(t("sourceChanged"));
-    hook.rerender({ id: "NEXT_CLUSTER_ID" });
-    await waitFor(() =>
-      expect(hook.result.current.view?.users[0]?.username).toBe("NEXT_USERNAME_LITERAL")
-    );
-    await act(async () =>
-      expect(await stale(user.username, "TEST_ONLY_STALE_PASSWORD", true)).toBe(false)
-    );
-    expect(writes(ctx.requests)).toHaveLength(0);
-  });
+  it.each(["replaced-user", "replaced-subject", "source-version"] as const)(
+    "rejects old callbacks after %s and ABA without provider writes",
+    async (changed) => {
+      const ctx = context(locale),
+        t = tFor(locale);
+      const hook = renderHook(({ id }) => useAuthUsers(id), {
+        initialProps: { id: cluster.id },
+        wrapper: ctx.Wrapper,
+      });
+      await waitFor(() => expect(hook.result.current.view?.supported).toBe(true));
+      const stale = hook.result.current.onSetPassword;
+      ctx.setMode(changed);
+      await act(async () => {
+        await ctx.client.refetchQueries({ include: ["ClusterAuthUsers"] });
+      });
+      await act(async () =>
+        expect(await stale(user.username, "TEST_ONLY_STALE_PASSWORD", true)).toBe(false)
+      );
+      ctx.setMode("ok");
+      await act(async () => {
+        await ctx.client.refetchQueries({ include: ["ClusterAuthUsers"] });
+      });
+      await act(async () =>
+        expect(await stale(user.username, "TEST_ONLY_STALE_PASSWORD", true)).toBe(false)
+      );
+      expect(writes(ctx.requests)).toHaveLength(0);
+      expect(state.error).toHaveBeenCalledWith(t("sourceChanged"));
+      hook.rerender({ id: "NEXT_CLUSTER_ID" });
+      await waitFor(() =>
+        expect(hook.result.current.view?.users[0]?.username).toBe("NEXT_USERNAME_LITERAL")
+      );
+      await act(async () =>
+        expect(await stale(user.username, "TEST_ONLY_STALE_PASSWORD", true)).toBe(false)
+      );
+      expect(writes(ctx.requests)).toHaveLength(0);
+    }
+  );
   it("keeps a newer cluster password review when a previous accepted request completes", async () => {
     const ctx = mount(locale, "deferred", "password"),
       t = tFor(locale);
@@ -579,6 +631,11 @@ describe.each(locales)("Observed source leases in %s", (locale) => {
     expect(writes(ctx.requests)[0].variables).toEqual({
       input: {
         clusterId: cluster.id,
+        expectedSource: {
+          providerPluginId: observed.source.providerPluginId,
+          providerPoolId: observed.source.providerPoolId,
+          sourceVersion: observed.source.sourceVersion,
+        },
         email: "invited@example.test",
         password: null,
         permanent: false,
