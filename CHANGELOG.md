@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Retire the legacy direct-claims session relay with an explicit HTTP 410 and
+  backend login URL. Posted identity claims and the legacy static relay key no
+  longer mint or replace sessions. Existing verified OAuth login/callback,
+  CLI device approval and normal session/bearer admission remain supported;
+  legacy relay clients must migrate to backend login (#2224).
+
 - Privacy review uses the server-confirmed anonymous-state flag and exact current
   user identity. All eight locales distinguish first cleanup, repeated attributed
   history cleanup and retained/unsupported records. Changed targets or withdrawn

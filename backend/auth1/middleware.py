@@ -1,6 +1,7 @@
 """
 auth1.middleware for supporting login with Session token.
 """
+
 from importlib import import_module
 
 from django.conf import settings
@@ -10,7 +11,6 @@ from django.http import HttpResponse
 
 
 class Auth0SessionMiddlewareException(BaseException, HttpResponse):
-
     def __init__(self, content=b"", *args, **kwargs):
         BaseException.__init__(self)
         HttpResponse.__init__(self, content, *args, **kwargs)
@@ -21,42 +21,25 @@ class Auth0SessionMiddleware(SessionMiddleware):
     Session middleware for Session token based authentication.
     """
 
-    AUTHORIZATION = 'Authorization'
-    BEARER = 'Bearer'
-    SESSION = 'Session'
+    AUTHORIZATION = "Authorization"
+    SESSION = "Session"
 
     def __init__(self, get_response):
         super().__init__(get_response)
         engine = import_module(settings.SESSION_ENGINE)
         self.SessionStore = engine.SessionStore
-        self._process_request_chain = [
-            self._pull_from_authorization_session,
-            self._pull_from_authorization_bearer,
-        ]
+        self._process_request_chain = [self._pull_from_authorization_session]
 
     @classmethod
     def _get_authorization_data(cls, request: WSGIRequest, schema) -> str | None:
         if cls.AUTHORIZATION not in request.headers:
             return None
-        parts = request.headers[cls.AUTHORIZATION].split(' ')
+        parts = request.headers[cls.AUTHORIZATION].split(" ")
         if len(parts) != 2:
             return None
         kind, token = parts
         if kind == schema:
             return token
-        return None
-
-    def _pull_from_authorization_bearer(self, request: WSGIRequest) -> bool | None:
-        api_key = self._get_authorization_data(request, self.BEARER)
-        if api_key and settings.CLIENT_SESSION_API_KEY and api_key == settings.CLIENT_SESSION_API_KEY:
-            # Matches the configured session API key — establish a fresh session.
-            request.session = self.SessionStore()
-            request.session.clear()
-            return True
-        # Any other Bearer (API token alft_at_…, deploy token alft_dt_…,
-        # OIDC, etc.) is for a later middleware (#428, #425) to claim;
-        # pass through rather than 401'ing here so the downstream auth
-        # middlewares actually see the request.
         return None
 
     def _pull_from_authorization_session(self, request: WSGIRequest) -> bool | None:
@@ -66,7 +49,7 @@ class Auth0SessionMiddleware(SessionMiddleware):
             if request.session.exists(session_key):
                 return True
             else:
-                raise Auth0SessionMiddlewareException('Unauthorized', status=401)
+                raise Auth0SessionMiddlewareException("Unauthorized", status=401)
 
     def process_request(self, request: WSGIRequest):
         """
@@ -80,7 +63,5 @@ class Auth0SessionMiddleware(SessionMiddleware):
             return response
 
     def process_response(self, request: WSGIRequest, response: HttpResponse):
-        api_key = self._get_authorization_data(request, self.BEARER)
-        if api_key and api_key == settings.CLIENT_SESSION_API_KEY:
-            response.headers[self.AUTHORIZATION] = f'{self.SESSION} {request.session.session_key}'
+        # The preceding Django SessionMiddleware owns cookie persistence.
         return response
