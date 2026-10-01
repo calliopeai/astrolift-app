@@ -1,9 +1,12 @@
 import { ApolloClient, ApolloLink, InMemoryCache } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { act, renderHook } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { Observable } from "rxjs";
 import { expect, it } from "vitest";
+
+import messages from "@/messages/en.json";
 
 import { CLUSTERS } from "./fixtures";
 import { useClusterActions } from "./use-cluster-actions";
@@ -40,7 +43,9 @@ it("sends full preflight explicitly and leaves ordinary refresh lightweight", as
     ),
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <ApolloProvider client={client}>{children}</ApolloProvider>
+    <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+      <ApolloProvider client={client}>{children}</ApolloProvider>
+    </NextIntlClientProvider>
   );
   const { result } = renderHook(useClusterActions, { wrapper });
   await act(() => result.current.onRefresh(CLUSTERS[0], true));
