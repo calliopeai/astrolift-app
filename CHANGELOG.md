@@ -66,6 +66,15 @@
   technical unknowns, diagnostics, masked diff content and action authority
   without changing proposal mutations (#2145, bounded item 14 presentation).
 
+- Azure Event Grid Basic retains the full immutable service UUID in new topic
+  and child names, and preserves complete recorded ARM targets. Current topic,
+  child and inherited-lock observations gate supported lifecycle and bindings;
+  unknown/foreign sources and retained data refuse even under force. SDK
+  NoPolling keeps accepted work pending until actual observations confirm it.
+  Historical ambiguous targets require separate recovery; Standard namespaces
+  and the writable-label/incarnation residual remain outside this repair
+  (#2032, #2098).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

@@ -8,14 +8,16 @@ from typing import Any
 
 import pytest
 
-from _sdk.azure_ownership import AzureOwnershipError
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, SnapshotHandle, UpdateSpec
 from _sdk.managed_service_tags import canonical_key, ownership_key
+from azure.core.exceptions import ResourceNotFoundError
+from azure.core.paging import ItemPaged
 from azure.managed.event_grid import (
     AzureEventGridConfig,
     AzureEventGridDriver,
     AzureEventGridError,
 )
+from azure.mgmt.eventgrid import models
 
 SUBSCRIPTION_ID = "00000000-1111-2222-3333-444444444444"
 RESOURCE_GROUP = "rg-platform"
@@ -37,8 +39,31 @@ UAMI_ID = (
 )
 
 
-class ResourceNotFoundError(Exception):
-    pass
+OWNER = "018f42f0-4420-7000-8000-000000000001"
+
+
+class Resource(SimpleNamespace):
+    def serialize(self):
+        if hasattr(self, "parameters"):
+            return self.parameters.serialize()
+        fields = {
+            name: getattr(self, name, None)
+            for name in (
+                "tags",
+                "identity",
+                "input_schema",
+                "minimum_tls_version_allowed",
+                "public_network_access",
+                "inbound_ip_rules",
+                "disable_local_auth",
+                "data_residency_boundary",
+            )
+        }
+        return models.Topic(location="eastus2", **fields).serialize()
+
+
+def paged(rows):
+    return ItemPaged(lambda _: rows, lambda rows: (None, iter(rows)))
 
 
 class Poller:
@@ -56,17 +81,17 @@ class FakeTopics:
     update_calls: list[dict[str, Any]] = field(default_factory=list)
     delete_calls: list[str] = field(default_factory=list)
 
-    def get(self, resource_group: str, name: str) -> SimpleNamespace:
+    def get(self, resource_group: str, name: str, **kwargs) -> SimpleNamespace:
         assert resource_group == RESOURCE_GROUP
         try:
             return self.values[name]
         except KeyError as exc:
             raise ResourceNotFoundError(name) from exc
 
-    def begin_create_or_update(self, resource_group: str, name: str, parameters: Any) -> Poller:
+    def begin_create_or_update(self, resource_group: str, name: str, parameters: Any, **kwargs) -> Poller:
         assert resource_group == RESOURCE_GROUP
         self.create_calls.append({"name": name, "parameters": parameters})
-        value = SimpleNamespace(
+        value = Resource(
             name=name,
             id=(
                 f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}"
@@ -74,6 +99,7 @@ class FakeTopics:
             ),
             endpoint=f"https://{name}.eastus2-1.eventgrid.azure.net/api/events",
             provisioning_state="Succeeded",
+            location=parameters.location,
             tags=dict(parameters.tags or {}),
             identity=parameters.identity,
             input_schema=parameters.input_schema,
@@ -86,7 +112,7 @@ class FakeTopics:
         self.values[name] = value
         return Poller(value)
 
-    def begin_update(self, resource_group: str, name: str, parameters: Any) -> Poller:
+    def begin_update(self, resource_group: str, name: str, parameters: Any, **kwargs) -> Poller:
         value = self.get(resource_group, name)
         self.update_calls.append({"name": name, "parameters": parameters})
         for field_name in (
@@ -104,7 +130,7 @@ class FakeTopics:
             value.tags = dict(parameters.tags)
         return Poller(value)
 
-    def begin_delete(self, resource_group: str, name: str) -> Poller:
+    def begin_delete(self, resource_group: str, name: str, **kwargs) -> Poller:
         self.get(resource_group, name)
         self.delete_calls.append(name)
         self.values.pop(name)
@@ -123,6 +149,7 @@ class FakeSubscriptions:
         topic_name: str,
         name: str,
         parameters: Any,
+        **kwargs,
     ) -> Poller:
         assert resource_group == RESOURCE_GROUP
         self.create_calls.append(
@@ -132,20 +159,27 @@ class FakeSubscriptions:
                 "parameters": parameters,
             },
         )
-        value = SimpleNamespace(
+        value = Resource(
             name=name,
             provisioning_state="Succeeded",
             labels=list(parameters.labels or []),
             parameters=parameters,
+            id=f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.EventGrid/topics/{topic_name}/eventSubscriptions/{name}",
+            topic=f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.EventGrid/topics/{topic_name}",
         )
         self.values[(topic_name, name)] = value
         return Poller(value)
 
-    def list(self, resource_group: str, topic_name: str) -> list[SimpleNamespace]:
+    def list(self, resource_group: str, topic_name: str, **kwargs):
         assert resource_group == RESOURCE_GROUP
-        return [value for (topic, _), value in self.values.items() if topic == topic_name]
+        return paged([value for (topic, _), value in self.values.items() if topic == topic_name])
 
-    def begin_delete(self, resource_group: str, topic_name: str, name: str) -> Poller:
+    def get(self, resource_group: str, topic_name: str, name: str, **kwargs):
+        if (topic_name, name) not in self.values:
+            raise ResourceNotFoundError("controlled absent child")
+        return self.values[topic_name, name]
+
+    def begin_delete(self, resource_group: str, topic_name: str, name: str, **kwargs) -> Poller:
         assert resource_group == RESOURCE_GROUP
         self.delete_calls.append((topic_name, name))
         self.values.pop((topic_name, name), None)
@@ -166,7 +200,13 @@ class FakeManagementLocks:
     def list_at_resource_level(self, **kwargs: Any) -> list[object]:
         assert kwargs["resource_provider_namespace"] == "Microsoft.EventGrid"
         assert kwargs["resource_type"] == "topics"
-        return list(self.values)
+        return paged(list(self.values))
+
+    def list_at_subscription_level(self, **kwargs):
+        return paged([])
+
+    def list_at_resource_group_level(self, **kwargs):
+        return paged([])
 
     def delete_at_resource_level(self, **kwargs: Any) -> None:
         self.delete_calls.append(str(kwargs["lock_name"]))
@@ -193,7 +233,7 @@ def _spec(**config: Any) -> ProvisionSpec:
         tags={"owner": "platform"},
         isolation="dedicated",
         binding_id="binding-id",
-        managed_service_id="service-id",
+        managed_service_id=OWNER,
     )
 
 
@@ -229,7 +269,7 @@ def test_provision_binding_and_idempotent_reconcile() -> None:
         data_residency_boundary="WithinRegion",
     )
 
-    assert handle.startswith("event_bus/astrolift-eg-triage-events-")
+    assert handle.endswith("/astrolift-eg-" + OWNER.replace("-", ""))
     create = mgmt.topics.create_calls[0]
     payload = create["parameters"]
     assert payload.disable_local_auth is True
@@ -238,7 +278,7 @@ def test_provision_binding_and_idempotent_reconcile() -> None:
     assert payload.tags[ownership_key("azure", "binding")] == "binding-id"
     assert "platform" in {value for key, value in payload.tags.items() if key.startswith("astrolift-extra-owner-")}
 
-    binding = driver.binding(ServiceHandle(handle))
+    binding = driver.binding(ServiceHandle(handle, managed_service_id=OWNER))
     assert binding.env_vars["EVENT_BUS_ENDPOINT"].literal.startswith("https://")
     assert binding.env_vars["EVENT_GRID_INPUT_SCHEMA"].literal == "CloudEventSchemaV1_0"
     assert binding.iam_grants[0].actions == ["EventGrid Data Sender"]
@@ -253,7 +293,7 @@ def test_provision_binding_and_idempotent_reconcile() -> None:
 def test_binding_manage_mode_adds_only_subscription_contributor() -> None:
     driver, _, _ = _driver()
     handle = _provisioned(driver)
-    binding = driver.binding(ServiceHandle(handle), {"access_mode": "manage"})
+    binding = driver.binding(ServiceHandle(handle, managed_service_id=OWNER), {"access_mode": "manage"})
     assert binding.iam_grants[0].actions == [
         "EventGrid Data Sender",
         "EventGrid EventSubscription Contributor",
@@ -399,7 +439,11 @@ def test_update_cannot_attach_an_unlisted_identity() -> None:
     handle = _provisioned(driver)
     updates = len(mgmt.topics.update_calls)
 
-    result = driver.update(UpdateSpec(handle, config={"topic_user_assigned_identity_resource_ids": [FOREIGN_UAMI_ID]}))
+    result = driver.update(
+        UpdateSpec(
+            handle, config={"topic_user_assigned_identity_resource_ids": [FOREIGN_UAMI_ID]}, managed_service_id=OWNER
+        )
+    )
 
     assert not result.ok and "eventgrid_allowed_identity_resource_ids" in result.message
     assert len(mgmt.topics.update_calls) == updates
@@ -634,7 +678,7 @@ def test_prune_is_explicit_and_only_removes_managed_subscriptions() -> None:
             {"name": "remove", "destination": {"type": "webhook", "endpoint_url": "https://example.com/remove"}},
         ],
     )
-    topic_name = handle.split("/", 1)[1]
+    topic_name = handle.rsplit("/", 1)[1]
     external_name = "astrolift-external-looking"
     mgmt.topic_event_subscriptions.values[(topic_name, external_name)] = SimpleNamespace(
         name=external_name,
@@ -651,13 +695,30 @@ def test_prune_is_explicit_and_only_removes_managed_subscriptions() -> None:
                 "prune_subscriptions": True,
                 "confirm_message_loss": True,
             },
-            managed_service_id="service-id",
+            managed_service_id=OWNER,
         ),
+    )
+    assert not result.ok and result.errors == ["ownership_refused"]
+    assert mgmt.topic_event_subscriptions.delete_calls == []
+    assert len(mgmt.topics.update_calls) == 0
+    del mgmt.topic_event_subscriptions.values[topic_name, external_name]
+    result = driver.update(
+        UpdateSpec(
+            handle,
+            managed_service_id=OWNER,
+            config={
+                "subscriptions": [
+                    {"name": "keep", "destination": {"type": "webhook", "endpoint_url": "https://example.com/keep"}}
+                ],
+                "prune_subscriptions": True,
+                "confirm_message_loss": True,
+            },
+        )
     )
     assert result.ok, result
     deleted = {name for _, name in mgmt.topic_event_subscriptions.delete_calls}
     assert external_name not in deleted
-    assert any(name.startswith("astrolift-remove-") for name in deleted)
+    assert driver._subscription_name(OWNER.replace("-", ""), "remove") in deleted
 
 
 def test_deprovision_four_corner_guards_locks_and_external_subscriptions() -> None:
@@ -668,16 +729,20 @@ def test_deprovision_four_corner_guards_locks_and_external_subscriptions() -> No
             {"name": "managed", "destination": {"type": "webhook", "endpoint_url": "https://example.com"}},
         ],
     )
-    topic_name = handle.split("/", 1)[1]
+    topic_name = handle.rsplit("/", 1)[1]
 
-    retained = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"))
+    retained = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER))
     assert not retained.ok and retained.errors == ["delete_data_required"]
 
-    locks.management_locks.values.append(SimpleNamespace(name="protect"))
-    locked = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
+    locks.management_locks.values.append(
+        SimpleNamespace(
+            name="protect", id=driver._target(topic_name).topic_id + "/providers/Microsoft.Authorization/locks/protect"
+        )
+    )
+    locked = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True)
     assert not locked.ok and locked.errors == ["resource_lock_present"]
     forced_with_lock = driver.deprovision(
-        DeprovisionSpec(handle, managed_service_id="service-id"),
+        DeprovisionSpec(handle, managed_service_id=OWNER),
         delete_data=False,
         force_destroy=True,
     )
@@ -689,75 +754,79 @@ def test_deprovision_four_corner_guards_locks_and_external_subscriptions() -> No
         name=external_name,
         labels=[],
     )
-    external = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
-    assert not external.ok and external.errors == ["external_subscriptions_present"]
+    external = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True)
+    assert not external.ok and external.errors == ["ownership_refused"]
 
     deleted = driver.deprovision(
-        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
+        DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True, force_destroy=True
+    )
+    assert not deleted.ok
+    assert locks.management_locks.delete_calls == []
+    assert mgmt.topics.delete_calls == []
+    assert mgmt.topic_event_subscriptions.delete_calls == []
+    # Independent operator fixture remediation, never performed by the driver.
+    locks.management_locks.values.clear()
+    del mgmt.topic_event_subscriptions.values[topic_name, external_name]
+    deleted = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True, force_destroy=True
     )
     assert deleted.ok
-    assert locks.management_locks.delete_calls == ["protect"]
     assert topic_name in mgmt.topics.delete_calls
-    assert (topic_name, external_name) in mgmt.topic_event_subscriptions.delete_calls
-    again = driver.deprovision(DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True)
-    assert again.ok and "already gone" in again.message
+    assert (topic_name, external_name) not in mgmt.topic_event_subscriptions.delete_calls
+    again = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True)
+    assert again.ok and "absent" in again.message
 
 
 def test_collision_and_binding_ownership_are_rejected() -> None:
     driver, mgmt, _ = _driver()
-    spec = _spec(topic_name="shared-topic")
-    mgmt.topics.values["shared-topic"] = SimpleNamespace(
-        name="shared-topic",
+    spec = _spec(topic_name="shared-" + OWNER.replace("-", ""))
+    shared_name = spec.config["topic_name"]
+    mgmt.topics.values[shared_name] = SimpleNamespace(
+        name=shared_name,
+        id=driver._target(shared_name).topic_id,
         tags={"owner": "someone-else"},
         provisioning_state="Succeeded",
         endpoint="https://example.com",
     )
     result = driver.provision(spec)
-    assert not result.ok and "carries no Astrolift astrolift-managed-by=platform" in result.message
+    assert not result.ok and result.errors == ["ownership_refused"]
 
-    mgmt.topics.values["shared-topic"].tags = {
+    mgmt.topics.values[shared_name].tags = {
         ownership_key("azure", "managed_by"): "platform",
-        canonical_key("azure"): "service-id",
+        canonical_key("azure"): OWNER,
         ownership_key("azure", "binding"): "other-binding",
     }
     result = driver.provision(spec)
-    assert not result.ok and "belongs to binding other-binding, not binding-id" in result.message
+    assert not result.ok and result.errors == ["ownership_refused"]
 
 
 def test_forged_handle_cannot_update_delete_or_bind_an_external_topic() -> None:
     driver, mgmt, _ = _driver()
     mgmt.topics.values["external-topic"] = SimpleNamespace(
         name="external-topic",
+        id=driver._target("external-topic").topic_id,
         tags={"owner": "outside"},
         input_schema="CloudEventSchemaV1_0",
         endpoint="https://external.example.com",
         provisioning_state="Succeeded",
     )
-    handle = "event_bus/external-topic"
-    update = driver.update(
-        UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}, managed_service_id="service-id")
-    )
-    assert not update.ok and "carries no Astrolift astrolift-managed-by=platform" in update.message
-    delete = driver.deprovision(
-        DeprovisionSpec(handle, managed_service_id="service-id"), delete_data=True, force_destroy=True
-    )
-    assert not delete.ok and "carries no Astrolift astrolift-managed-by=platform" in delete.message
-    with pytest.raises(AzureOwnershipError, match="carries no Astrolift astrolift-managed-by=platform"):
-        driver.binding(ServiceHandle(handle))
+    handle = driver._target("external-topic").handle
+    update = driver.update(UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}, managed_service_id=OWNER))
+    assert not update.ok and update.errors == ["ownership_refused"]
+    delete = driver.deprovision(DeprovisionSpec(handle, managed_service_id=OWNER), delete_data=True, force_destroy=True)
+    assert not delete.ok and delete.errors == ["ownership_refused"]
+    with pytest.raises(AzureEventGridError, match="source identity is not observed"):
+        driver.binding(ServiceHandle(handle, managed_service_id=OWNER))
 
 
 def test_immutable_schema_drift_and_explicit_identity_removal() -> None:
     driver, mgmt, _ = _driver()
     handle = _provisioned(driver, topic_user_assigned_identity_resource_ids=[UAMI_ID])
-    topic_name = handle.split("/", 1)[1]
-    partial = driver.update(
-        UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}, managed_service_id="service-id")
-    )
+    topic_name = handle.rsplit("/", 1)[1]
+    partial = driver.update(UpdateSpec(handle, config={"minimum_tls_version_allowed": "1.2"}, managed_service_id=OWNER))
     assert partial.ok, partial
-    changed = driver.update(
-        UpdateSpec(handle, config={"input_schema": "EventGridSchema"}, managed_service_id="service-id")
-    )
-    assert not changed.ok and "reprovision required" in changed.message
+    changed = driver.update(UpdateSpec(handle, config={"input_schema": "EventGridSchema"}, managed_service_id=OWNER))
+    assert not changed.ok and changed.errors == ["invalid_event_grid_config"]
 
     removed = driver.update(
         UpdateSpec(
@@ -766,7 +835,7 @@ def test_immutable_schema_drift_and_explicit_identity_removal() -> None:
                 "system_assigned_identity": False,
                 "topic_user_assigned_identity_resource_ids": [],
             },
-            managed_service_id="service-id",
+            managed_service_id=OWNER,
         ),
     )
     assert removed.ok, removed
@@ -782,7 +851,7 @@ def test_full_reconcile_removes_omitted_identity_and_reserves_ownership_label() 
             {"name": "managed", "destination": {"type": "webhook", "endpoint_url": "https://example.com"}},
         ],
     )
-    topic_name = handle.split("/", 1)[1]
+    topic_name = handle.rsplit("/", 1)[1]
 
     reconciled = driver.provision(_spec())
     assert reconciled.ok, reconciled
@@ -806,19 +875,19 @@ def test_full_reconcile_removes_omitted_identity_and_reserves_ownership_label() 
 
 def test_status_update_missing_invalid_handle_and_snapshot_contract() -> None:
     driver, mgmt, _ = _driver()
-    missing = driver.update(UpdateSpec("event_bus/missing-topic", config={}, managed_service_id="service-id"))
-    assert not missing.ok and missing.errors == ["not_found"]
-    invalid = driver.update(UpdateSpec("topic/nope", config={}, managed_service_id="service-id"))
-    assert not invalid.ok and invalid.errors == ["invalid_handle"]
+    missing = driver.update(UpdateSpec("event_bus/missing-topic", config={}, managed_service_id=OWNER))
+    assert not missing.ok and missing.errors == ["ownership_unknown"]
+    invalid = driver.update(UpdateSpec("topic/nope", config={}, managed_service_id=OWNER))
+    assert not invalid.ok and invalid.errors == ["ownership_unknown"]
 
     handle = _provisioned(driver)
-    topic_name = handle.split("/", 1)[1]
+    topic_name = handle.rsplit("/", 1)[1]
     mgmt.topics.values[topic_name].provisioning_state = "Updating"
-    status = driver.status(ServiceHandle(handle))
+    status = driver.status(ServiceHandle(handle, managed_service_id=OWNER))
     assert status.state == "updating"
 
     with pytest.raises(AzureEventGridError, match="no snapshot"):
-        driver.snapshot(ServiceHandle(handle))
+        driver.snapshot(ServiceHandle(handle, managed_service_id=OWNER))
     with pytest.raises(AzureEventGridError, match="cannot be restored"):
         driver.restore(
             SnapshotHandle(handle, "snapshot", "now"),
@@ -845,9 +914,16 @@ def test_generated_names_are_stable_distinct_and_within_azure_limits() -> None:
     first = driver.provision(_spec())
     second = driver.provision(_spec())
     assert first.handle == second.handle
-    assert len(first.handle.split("/", 1)[1]) <= 50
+    assert len(first.handle.rsplit("/", 1)[1]) <= 50
 
-    changed = ProvisionSpec(**{**_spec().__dict__, "environment_id": "other-env", "environment_name": "stage"})
+    changed = ProvisionSpec(
+        **{
+            **_spec().__dict__,
+            "environment_id": "other-env",
+            "environment_name": "stage",
+            "managed_service_id": "018f42f0-4420-7000-8000-000000000002",
+        }
+    )
     third_driver, _, _ = _driver()
     third = third_driver.provision(changed)
     assert third.handle != first.handle
@@ -864,19 +940,19 @@ def test_teardown_refuses_a_topic_another_binding_owns_and_deletes_nothing() -> 
 
     driver, mgmt, _ = _driver()
     provisioned = driver.provision(_spec())
-    topic_name = provisioned.handle.split("/", 1)[1]
+    topic_name = provisioned.handle.rsplit("/", 1)[1]
     mgmt.topics.values[topic_name].tags[ownership_key("azure", "binding")] = "another-binding"
 
     refused = driver.deprovision(
-        DeprovisionSpec(provisioned.handle, binding_id="binding-id", managed_service_id="service-id"),
+        DeprovisionSpec(provisioned.handle, binding_id="binding-id", managed_service_id=OWNER),
         delete_data=True,
         force_destroy=True,
     )
 
     assert not refused.ok
     assert refused.retryable is False
-    assert refused.errors == ["external_resource_collision"]
-    assert "belongs to binding another-binding, not binding-id" in refused.message
+    assert refused.errors == ["ownership_refused"]
+    assert "ownership does not match" in refused.message
     assert mgmt.topics.delete_calls == []
     assert topic_name in mgmt.topics.values
 
@@ -886,7 +962,7 @@ def test_teardown_of_our_own_topic_stays_idempotent_across_retries() -> None:
 
     driver, mgmt, _ = _driver()
     provisioned = driver.provision(_spec())
-    spec = DeprovisionSpec(provisioned.handle, binding_id="binding-id", managed_service_id="service-id")
+    spec = DeprovisionSpec(provisioned.handle, binding_id="binding-id", managed_service_id=OWNER)
 
     first = driver.deprovision(spec, delete_data=True, force_destroy=True)
     second = driver.deprovision(spec, delete_data=True, force_destroy=True)
