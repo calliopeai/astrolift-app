@@ -8,11 +8,11 @@ test("agent replicas and zero concurrency are visible before a save", async ({ p
   await expect(page.getByRole("spinbutton", { name: "Concurrency cap" })).toHaveValue("0");
 });
 
-test("ingress Apply shows busy progress before reconciliation", async ({ page }) => {
+test("ingress reconciliation shows busy progress while its request is pending", async ({ page }) => {
   await page.goto("/iframe.html?id=screens-clusters-settings-ingressauth--saving&viewMode=story");
-  const apply = page.getByRole("button", { name: "Apply to cluster", exact: true });
-  await expect(apply).toBeDisabled();
-  await expect(apply.locator(".animate-spin")).toBeVisible();
+  const reconcile = page.getByRole("button", { name: "Reconcile cluster Ingresses", exact: true });
+  await expect(reconcile).toBeDisabled();
+  await expect(reconcile.locator(".animate-spin")).toBeVisible();
 });
 
 for (const target of ["agents", "apps"] as const) {
