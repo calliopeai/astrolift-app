@@ -13,8 +13,9 @@ from azure.core.pipeline.transport import HttpTransport
 from azure.managed.event_grid_namespace import AzureEventGridNamespaceConfig, AzureEventGridNamespaceDriver
 from azure.mgmt.eventgrid import EventGridManagementClient
 from azure.mgmt.resource.locks import ManagementLockClient
-from tests.azure.test_event_grid_wire_2032 import GROUP, OWNER, SUBSCRIPTION, _Credential, _Response, source
-from tests.azure.test_managed_event_grid_namespace import FakeSecrets
+
+from .test_event_grid_wire_2032 import GROUP, OWNER, SUBSCRIPTION, _Credential, _Response, source
+from .test_managed_event_grid_namespace import FakeSecrets
 
 
 class Transport(HttpTransport):

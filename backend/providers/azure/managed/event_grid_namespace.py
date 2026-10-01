@@ -79,6 +79,7 @@ _STATE_MAP = {
 }
 _TOP_LEVEL_FIELDS = {
     "access_mode",
+    "subscription_name",
     "capacity",
     "confirm_message_loss",
     "inbound_ip_rules",
@@ -599,6 +600,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
                     "type": "string",
                     "enum": ["publish", "pull", "publish_pull", "manage"],
                 },
+                "subscription_name": {"type": "string", "minLength": 3, "maxLength": 50},
             },
         }
 
@@ -623,6 +625,7 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
     def editable_fields(self) -> list[str]:
         return [
             "access_mode",
+            "subscription_name",
             "capacity",
             "confirm_message_loss",
             "inbound_ip_rules",
@@ -688,6 +691,13 @@ class AzureEventGridNamespaceDriver(ManagedServiceDriver):
             return "prune_subscriptions requires confirm_message_loss=true"
         if str(cfg.get("access_mode", "publish")) not in {"publish", "pull", "publish_pull", "manage"}:
             return "Event Grid namespace access_mode must be publish, pull, publish_pull, or manage"
+        if "subscription_name" in cfg:
+            if not isinstance(cfg["subscription_name"], str):
+                return "Event Grid namespace subscription_name must be a logical subscription name"
+            try:
+                _validate_resource_name(cfg["subscription_name"], "subscription_name", max_length=50)
+            except ValueError as exc:
+                return str(exc)
         subscriptions = cfg.get("subscriptions", []) or []
         if not isinstance(subscriptions, list) or len(subscriptions) > 128:
             return "Event Grid namespace subscriptions must be a list of at most 128 entries"
