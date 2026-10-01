@@ -119,6 +119,7 @@ export function ClusterSettingsScreen({
 }: ClusterSettingsScreenProps) {
   const sourceT = useTranslations("clusterSettings.source");
   const ingressAuthT = useTranslations("clusterSettings.ingressAuth");
+  const authUsersT = useTranslations("clusterSettings.authUsers");
   const fmt = useFormatters();
   const hideRestricted = useRestrictedMode(restrictedMode) === "hide";
 
@@ -300,7 +301,7 @@ export function ClusterSettingsScreen({
           },
           {
             id: "users",
-            title: "Users",
+            title: authUsersT("title"),
             content: access.users ? (
               cards.authUsers
             ) : (

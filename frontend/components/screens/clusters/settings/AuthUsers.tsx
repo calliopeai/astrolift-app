@@ -2,6 +2,7 @@
 
 import { KeyRoundIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
@@ -26,7 +27,7 @@ import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftClusterAuthUser } from "@/graphql/__generated__/schema";
 
-import { AUTH_USERS_LIST, AUTH_USERS_SELECT } from "./auth-users-list";
+import { localizedAuthUsersList, AUTH_USERS_SELECT } from "./auth-users-list";
 import type { NewAuthUser } from "./types";
 import type { useAuthUsers } from "./use-auth-users";
 
@@ -40,8 +41,11 @@ export type AuthUsersViewProps = ReturnType<typeof useAuthUsers>;
  * typed here and sent once; nothing the server returns carries one.
  */
 export function AuthUsersView({
+  sourceKey,
   view,
   loading,
+  error,
+  onRetry,
   onSetGroups,
   onCreateGroup,
   onToggleEnabled,
@@ -50,19 +54,57 @@ export function AuthUsersView({
   onResetPassword,
   onDelete,
 }: AuthUsersViewProps) {
+  const t = useTranslations("clusterSettings.authUsers");
   const [creating, setCreating] = React.useState(false);
   const [passwordFor, setPasswordFor] = React.useState<AstroliftClusterAuthUser | null>(null);
   const [deleting, setDeleting] = React.useState<AstroliftClusterAuthUser | null>(null);
-  const list = useLocalListState(AUTH_USERS_LIST);
+  const list = useLocalListState(localizedAuthUsersList(t));
+  const [reviewedSource, setReviewedSource] = React.useState(sourceKey);
+  if (reviewedSource !== sourceKey) {
+    setReviewedSource(sourceKey);
+    setCreating(false);
+    setPasswordFor(null);
+    setDeleting(null);
+  }
+  const lease = React.useMemo(() => ({ sourceKey }), [sourceKey]);
+  const current = React.useRef<typeof lease | null>(lease);
+  React.useLayoutEffect(() => {
+    current.current = lease;
+    return () => {
+      current.current = null;
+    };
+  }, [lease]);
+  const sourceFailure = error ? (
+    <div role="alert" className="space-y-2">
+      <p>{t("readFailed")}</p>
+      {view && <p>{t("cached")}</p>}
+      <pre className="font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">{error}</pre>
+      <Button variant="outline" size="sm" disabled={loading} onClick={onRetry}>
+        {t("retry")}
+      </Button>
+    </div>
+  ) : null;
 
   if (loading && !view) {
     return (
-      <Section title="Sign-in users" divided>
+      <Section title={t("title")} divided>
         <Skeleton className="h-24 w-full" />
       </Section>
     );
   }
-  if (!view) return null;
+  if (!view)
+    return (
+      <Section title={t("title")} divided>
+        {sourceFailure ?? (
+          <div className="space-y-2">
+            <p>{t("unknownSource")}</p>
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              {t("retry")}
+            </Button>
+          </div>
+        )}
+      </Section>
+    );
 
   const page = selectRows(
     view.users,
@@ -79,7 +121,7 @@ export function AuthUsersView({
   const columns: Column<AstroliftClusterAuthUser>[] = [
     {
       id: "user",
-      header: "User",
+      header: t("user"),
       sortKey: "user",
       cellClassName: "max-w-72",
       cell: (u) => (
@@ -90,24 +132,25 @@ export function AuthUsersView({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("status"),
       sortKey: "status",
       cell: (u) => (
         <div className="flex flex-wrap gap-1">
           <Badge variant={u.enabled ? "secondary" : "outline"}>
-            {u.enabled ? "enabled" : "disabled"}
+            {t(u.enabled ? "states.enabled" : "states.disabled")}
           </Badge>
-          <span className="text-muted-foreground text-2xs font-mono">
-            {u.status.toLowerCase().replace(/_/g, " ")}
+          <span className="text-muted-foreground text-2xs font-mono" title={u.status}>
+            {t.has(`providerStatus.${u.status}`) ? t(`providerStatus.${u.status}`) : u.status}
           </span>
         </div>
       ),
     },
     {
       id: "groups",
-      header: "Groups",
+      header: t("groups"),
       cell: (u) => (
         <GroupEditor
+          key={`${sourceKey}:${u.username}`}
           user={u}
           groups={view.groups}
           onChange={(add, remove) => onSetGroups(u.username, add, remove)}
@@ -121,7 +164,7 @@ export function AuthUsersView({
     <Section
       title={
         <span className="flex min-w-0 flex-wrap items-center gap-2">
-          Sign-in users
+          {t("title")}
           {view.provider && (
             <Badge variant="outline" className="text-2xs font-normal">
               {view.provider}
@@ -129,79 +172,105 @@ export function AuthUsersView({
           )}
         </span>
       }
-      description={<>The logins of this cluster&apos;s central auth. {view.reachNote}</>}
+      description={
+        <>
+          {t("description")}{" "}
+          {view.reachNote ===
+          "A user of this pool can sign in to every app on the cluster that has no access rule of its own."
+            ? t("reachNote")
+            : view.reachNote}
+        </>
+      }
       action={
         view.supported && (
           <Button size="sm" onClick={() => setCreating(true)}>
             <PlusIcon className="size-4" />
-            Add user
+            {t("addUser")}
           </Button>
         )
       }
       divided
     >
-      <div className="min-w-0">
+      <div className="min-w-0 space-y-3">
+        {sourceFailure}
+        <p className="text-muted-foreground text-xs">{t("inventoryLimit")}</p>
+        <p className="text-muted-foreground text-xs">{t("operationLimit")}</p>
         {!view.supported ? (
-          <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">{view.reason}</p>
+          <div className="space-y-2">
+            <p>{t("unsupported")}</p>
+            <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">{view.reason}</p>
+            <Button size="sm" variant="outline" disabled={loading} onClick={onRetry}>
+              {t("retry")}
+            </Button>
+          </div>
         ) : (
           <>
             <ListPage<AstroliftClusterAuthUser>
               embedded
               list={list}
-              label="Sign-in users"
+              label={t("title")}
               columns={columns}
               rows={page.rows}
               getRowId={(u) => u.username}
               rowActions={(u) => (
                 <>
-                  <DropdownMenuItem onSelect={() => setPasswordFor(u)}>
+                  <DropdownMenuItem onSelect={() => setPasswordFor({ ...u })}>
                     <KeyRoundIcon className="size-4" />
-                    Password
+                    {t("password")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => void onToggleEnabled(u)}>
-                    {u.enabled ? "Disable" : "Enable"}
+                    {t(u.enabled ? "disable" : "enable")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(u)}>
+                  <DropdownMenuItem variant="destructive" onSelect={() => setDeleting({ ...u })}>
                     <Trash2Icon className="size-4" />
-                    Delete {u.email || u.username}
+                    {t("deleteName", { name: u.email || u.username })}
                   </DropdownMenuItem>
                 </>
               )}
               totalCount={page.totalCount}
-              empty={{ icon: <UsersIcon className="size-5" />, title: "No users yet" }}
+              empty={{ icon: <UsersIcon className="size-5" />, title: t("noUsers") }}
             />
           </>
         )}
       </div>
 
       <CreateUserDialog
+        key={`create:${sourceKey}`}
         open={creating}
-        onOpenChange={setCreating}
+        onOpenChange={(open) => {
+          if (current.current === lease) setCreating(open);
+        }}
         groups={view.groups}
-        onCreate={onCreate}
+        onCreate={(input) => (current.current === lease ? onCreate(input) : Promise.resolve(false))}
       />
 
       <PasswordDialog
+        key={`password:${sourceKey}`}
         user={passwordFor}
-        onClose={() => setPasswordFor(null)}
+        onClose={() => setPasswordFor((active) => (active === passwordFor ? null : active))}
         onSet={async (password, permanent) =>
-          passwordFor ? onSetPassword(passwordFor.username, password, permanent) : false
+          passwordFor && current.current === lease
+            ? onSetPassword(passwordFor.username, password, permanent)
+            : false
         }
-        onReset={async () => (passwordFor ? onResetPassword(passwordFor.username) : false)}
+        onReset={async () =>
+          passwordFor && current.current === lease ? onResetPassword(passwordFor.username) : false
+        }
       />
 
       <ConfirmDialog
+        key={`delete:${sourceKey}`}
         open={deleting !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleting(null);
+          if (!open) setDeleting((active) => (active === deleting ? null : active));
         }}
-        title={`Delete ${deleting?.email || deleting?.username || "user"}?`}
-        description="They can no longer sign in to any app on this cluster. This cannot be undone."
-        confirmLabel="Delete user"
+        title={t("deleteTitle", { name: deleting?.email || deleting?.username || "" })}
+        description={t("deleteDescription")}
+        confirmLabel={t("deleteUser")}
         destructive
         onConfirm={async () => {
-          if (!deleting) return;
+          if (!deleting || current.current !== lease) return false;
           await onDelete(deleting.username);
         }}
       />
@@ -217,10 +286,12 @@ function GroupEditor({
 }: {
   user: AstroliftClusterAuthUser;
   groups: string[];
-  onChange: (add: string[], remove: string[]) => Promise<void>;
+  onChange: (add: string[], remove: string[]) => Promise<boolean>;
   onCreateGroup: (name: string) => Promise<boolean>;
 }) {
+  const t = useTranslations("clusterSettings.authUsers");
   const [adding, setAdding] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
   const others = groups.filter((g) => !user.groups.includes(g));
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1">
@@ -230,7 +301,8 @@ function GroupEditor({
           <button
             type="button"
             className="hover:text-destructive"
-            aria-label={`Remove from ${g}`}
+            aria-label={t("removeGroup", { group: g })}
+            disabled={busy}
             onClick={() => onChange([], [g])}
           >
             ×
@@ -242,18 +314,23 @@ function GroupEditor({
         onSubmit={async (e) => {
           e.preventDefault();
           const name = adding.trim();
-          if (!name) return;
-          if (!groups.includes(name) && !(await onCreateGroup(name))) return;
-          await onChange([name], []);
-          setAdding("");
+          if (!name || busy) return;
+          setBusy(true);
+          try {
+            if (!groups.includes(name) && !(await onCreateGroup(name))) return;
+            if (await onChange([name], [])) setAdding("");
+          } finally {
+            setBusy(false);
+          }
         }}
       >
         <Input
-          aria-label={`Add ${user.email || user.username} to a group`}
+          aria-label={t("addToGroup", { name: user.email || user.username })}
           list={`groups-${user.username}`}
           value={adding}
           onChange={(e) => setAdding(e.target.value)}
-          placeholder="Add group"
+          placeholder={t("addGroup")}
+          disabled={busy}
           className="h-7 w-28 text-xs"
         />
         <datalist id={`groups-${user.username}`}>
@@ -277,6 +354,7 @@ function CreateUserDialog({
   groups: string[];
   onCreate: (input: NewAuthUser) => Promise<boolean>;
 }) {
+  const t = useTranslations("clusterSettings.authUsers");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [permanent, setPermanent] = React.useState(false);
@@ -292,34 +370,46 @@ function CreateUserDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!busy) {
+          if (o) onOpenChange(true);
+          else close();
+        }
+      }}
+    >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add a sign-in user</DialogTitle>
-          <DialogDescription>
-            Leave the password empty and the provider emails a temporary one. A password you type
-            here is sent once and never shown again.
-          </DialogDescription>
+          <DialogTitle>{t("createTitle")}</DialogTitle>
+          <DialogDescription>{t("createDescription")}</DialogDescription>
         </DialogHeader>
         <form
           className="space-y-3"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (busy) return;
             setBusy(true);
-            const ok = await onCreate({
-              email: email.trim(),
-              password: password || null,
-              permanent: Boolean(password) && permanent,
-              groups: chosen,
-            });
-            setBusy(false);
-            if (ok) close();
+            try {
+              if (
+                await onCreate({
+                  email: email.trim(),
+                  password: password || null,
+                  permanent: Boolean(password) && permanent,
+                  groups: chosen,
+                })
+              )
+                close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           <div className="space-y-1.5">
-            <Label htmlFor="auth-user-email">Email</Label>
+            <Label htmlFor="auth-user-email">{t("email")}</Label>
             <Input
               id="auth-user-email"
+              disabled={busy}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -328,9 +418,10 @@ function CreateUserDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="auth-user-password">Password (optional)</Label>
+            <Label htmlFor="auth-user-password">{t("optionalPassword")}</Label>
             <Input
               id="auth-user-password"
+              disabled={busy}
               type="password"
               autoComplete="new-password"
               value={password}
@@ -339,17 +430,22 @@ function CreateUserDialog({
           </div>
           {password && (
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={permanent} onCheckedChange={(v) => setPermanent(v === true)} />
-              Permanent (skip the change-password prompt at first sign-in)
+              <Checkbox
+                disabled={busy}
+                checked={permanent}
+                onCheckedChange={(v) => setPermanent(v === true)}
+              />
+              {t("createPermanent")}
             </label>
           )}
           {groups.length > 0 && (
             <fieldset className="space-y-1.5">
-              <legend className="text-sm font-medium">Groups</legend>
+              <legend className="text-sm font-medium">{t("groups")}</legend>
               <div className="flex flex-wrap gap-3">
                 {groups.map((g) => (
                   <label key={g} className="flex items-center gap-1.5 text-sm">
                     <Checkbox
+                      disabled={busy}
                       checked={chosen.includes(g)}
                       onCheckedChange={(v) =>
                         setChosen((c) => (v === true ? [...c, g] : c.filter((x) => x !== g)))
@@ -362,11 +458,11 @@ function CreateUserDialog({
             </fieldset>
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={close}>
-              Cancel
+            <Button type="button" variant="outline" onClick={close} disabled={busy}>
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !email.trim()}>
-              {busy ? "Adding…" : "Add user"}
+              {t(busy ? "adding" : "addUser")}
             </Button>
           </DialogFooter>
         </form>
@@ -386,37 +482,61 @@ function PasswordDialog({
   onSet: (password: string, permanent: boolean) => Promise<boolean>;
   onReset: () => Promise<boolean>;
 }) {
+  const t = useTranslations("clusterSettings.authUsers");
+  const [reviewedUser, setReviewedUser] = React.useState(user);
   const [password, setPassword] = React.useState("");
   const [permanent, setPermanent] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
+  if (reviewedUser !== user) {
+    setReviewedUser(user);
+    setPassword("");
+    setPermanent(true);
+  }
 
+  const lease = React.useMemo(() => ({ user }), [user]);
+  const current = React.useRef<typeof lease | null>(lease);
+  React.useLayoutEffect(() => {
+    current.current = lease;
+    return () => {
+      current.current = null;
+    };
+  }, [lease]);
   function close() {
+    if (current.current !== lease) return;
     setPassword("");
     setPermanent(true);
     onClose();
   }
 
   return (
-    <Dialog open={user !== null} onOpenChange={(o) => (o ? undefined : close())}>
+    <Dialog
+      open={user !== null}
+      onOpenChange={(o) => {
+        if (!o && !busy) close();
+      }}
+    >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Password for {user?.email || user?.username}</DialogTitle>
-          <DialogDescription>
-            Set one now, or have the provider email the user a reset code.
-          </DialogDescription>
+          <DialogTitle>
+            {t("passwordTitle", { name: user?.email || user?.username || "" })}
+          </DialogTitle>
+          <DialogDescription>{t("passwordDescription")}</DialogDescription>
         </DialogHeader>
         <form
           className="space-y-3"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (busy) return;
             setBusy(true);
-            const ok = await onSet(password, permanent);
-            setBusy(false);
-            if (ok) close();
+            try {
+              if (await onSet(password, permanent)) close();
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           <div className="space-y-1.5">
-            <Label htmlFor="auth-user-new-password">New password</Label>
+            <Label htmlFor="auth-user-new-password">{t("newPassword")}</Label>
             <Input
               id="auth-user-new-password"
               type="password"
@@ -426,8 +546,12 @@ function PasswordDialog({
             />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={permanent} onCheckedChange={(v) => setPermanent(v === true)} />
-            Permanent (no change-password prompt at next sign-in)
+            <Checkbox
+              disabled={busy}
+              checked={permanent}
+              onCheckedChange={(v) => setPermanent(v === true)}
+            />
+            {t("passwordPermanent")}
           </label>
           <DialogFooter className="gap-2 sm:justify-between">
             <Button
@@ -435,16 +559,19 @@ function PasswordDialog({
               variant="outline"
               disabled={busy}
               onClick={async () => {
+                if (busy) return;
                 setBusy(true);
-                const ok = await onReset();
-                setBusy(false);
-                if (ok) close();
+                try {
+                  if (await onReset()) close();
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
-              Email a reset code
+              {t("requestReset")}
             </Button>
             <Button type="submit" disabled={busy || !password}>
-              Set password
+              {t("setPassword")}
             </Button>
           </DialogFooter>
         </form>

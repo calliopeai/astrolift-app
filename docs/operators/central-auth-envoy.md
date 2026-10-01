@@ -260,3 +260,38 @@ observations, show raw diagnostics and offer actual query retry. Changed cluster
 or source context discards old drafts; a same-target failed refresh retains them.
 This localization does not enumerate additional resources, change cloud recipes,
 read write-only central credentials or perform any live gateway change.
+
+## Cluster sign-in user inventory and writes
+
+The auth-users card remains behind the existing cluster-user permission fence.
+All seven provider operations retain their current inputs and the server's
+CLUSTER_USERS/current-organization/shared-cluster operator checks. Passwords are
+write-only typed inputs: queries never read them back. Known Cognito status
+codes receive translated human labels; unknown codes, provider names, usernames,
+emails, group names and diagnostics remain literal.
+
+This is returned-subset inventory. The current Cognito driver requests at most
+60 users and 60 groups and the first 60 group memberships per returned user; it
+does not follow provider pagination tokens. Search, sorting, filters and numbered
+pages operate only on those returned rows. Missing rows or memberships do not
+prove absence, and an unavailable or failed first read grants no UI actions.
+Failed reads retain same-target cached observations with a diagnostic and actual
+Retry. A confirmed source withdrawal clears private drafts and reviews.
+
+Accepted creation/reset replies confirm the provider accepted the request,
+not invitation/reset email delivery. Creation with a typed password does not
+claim an invitation was sent. Group creation and membership editing are separate
+operations; the former can succeed while the latter is refused. Provider writes
+can also make partial changes before returning an error. Refusals preserve the
+reviewed draft without a follow-up refresh; accepted writes retain their accepted
+outcome when the requested refresh fails and offer source-read recovery.
+
+Local review leases bind actions to the current cluster and observed user row
+snapshot. Cluster/source changes, same-username replacement observations and
+A→B→A transitions invalidate old callbacks; a late reply cannot close or clear a
+newer target's credential review. A locale change alone retains the same-target
+draft. These are client safeguards, not an immutable provider precondition:
+the present API accepts clusterId plus username and the server resolves the
+current configured pool at write time. An unseen pool retarget or username
+replacement race remains a backend boundary tracked in APP #2225. No cloud
+calls, pagination extension, new authority gate or backend contract are added.

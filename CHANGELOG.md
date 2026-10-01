@@ -8,6 +8,12 @@
   CLI device approval and normal session/bearer admission remain supported;
   legacy relay clients must migrate to backend login (#2224).
 
+- Localize the connected cluster sign-in user inventory and all seven existing
+  operations in eight locales. Preserve refused drafts, distinguish accepted
+  requests from confirmed delivery, and retain accepted writes through failed
+  reads. Retry actual source reads and invalidate stale cluster/user reviews;
+  provider inventory remains a bounded returned subset (#2145, #2225).
+
 - Localize the connected Cognito ingress-auth card and pool/client source states
   in all eight locales. Distinguish saved configuration from reported Ingress
   reconciliation and actual traffic protection. Keep refused drafts and exact

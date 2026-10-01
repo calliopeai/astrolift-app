@@ -631,3 +631,38 @@ and the prior central/ingress-class source remain preserved.
 This bounded card is complete; #2145 remains open. Auth-user lists, remaining
 cluster header/tab/lifecycle/bootstrap copy and other untranslated settings
 are separate boundaries. Unsupported provider-specific paths remain unsupported.
+
+## Connected cluster sign-in user inventory
+
+AuthUsersView/useAuthUsers and its exact cluster-settings navigation label now
+use 73 genuine `clusterSettings.authUsers` messages in all eight locales. The
+known provider status presentation is mapped explicitly; future metadata, IDs,
+usernames, emails, groups, query/filter/sort values and server diagnostics remain
+literal. Existing CLUSTER_USERS and shared-cluster operator admission stays
+server-authoritative and the actual parent permission fence is unchanged.
+
+The same seven mutation documents/payloads remain in use. Refusals preserve
+private drafts and run no refresh; accepted provider requests stay accepted
+through failed reads. Invitation/reset requests do not claim delivery. A created
+group is reported separately from a later refused membership update. Failed or
+unknown first reads show unavailable/retry rather than healthy empty inventory;
+failed cached reads retain observations. Confirmed withdrawal, changed clusters,
+observed same-username replacements and source ABA transitions invalidate old
+reviews and callbacks. Late accepted password replies cannot clear a newer
+cluster's credential draft, while a language change alone preserves the draft.
+
+Focused proof uses the actual ClusterSettingsClient and schema-validated Apollo
+HttpLink requests for every write in every locale, literal input envelopes,
+refusal/transport/fallback messages, accepted-refresh failures and real source
+retry, plus cached recovery, partial group operations, permission withdrawal,
+source leases, locale changes, ICU parity, SSR hydration and portable stories.
+The three focused files pass 440 checks; TypeScript, scoped ESLint and formatting
+pass on the frozen source. No query, SDL, backend, central/ingress sibling or other catalogue subtree changes.
+
+Inventory remains bounded by the provider's first returned subset (60 users,
+60 groups, first 60 memberships/user for Cognito); local pages/search/filters do
+not enumerate the rest. Client leases cannot prove immutable configured pool or
+provider-user identity. The separate deduplicated backend follow-up is
+[APP #2225](https://github.com/calliopeai/astrolift-app/issues/2225). This card is a
+bounded #2145 leaf, not closure of the remaining cluster header/tab/bootstrap,
+lifecycle or other untranslated settings surfaces.
