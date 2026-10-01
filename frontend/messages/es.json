@@ -5853,6 +5853,42 @@
     }
   },
   "clusterSettings": {
+    "bootstrapPlan": {
+      "title": "Receta de preparación",
+      "empty": "No se devolvieron componentes de la receta para este clúster. Administra los requisitos manualmente o usa <command>astro cluster bootstrap</command>.",
+      "description": "Receta de <provider></provider>. Solicita la instalación de los requisitos seleccionados. Desmarcar un componente instalado por esta receta solicita eliminar su HelmRelease.",
+      "unknown": "desconocido",
+      "installed": "instalado por la receta",
+      "outsideRecipe": "en ejecución fuera de la receta",
+      "requires": "requiere: {requirement}",
+      "selected": "{count, number} de {total, number} seleccionados",
+      "requesting": "Solicitando…",
+      "install": "Solicitar instalación / reconciliación",
+      "loadFailed": "No se pudo cargar la receta de preparación",
+      "retry": "Reintentar",
+      "sourceChanged": "La receta observada o el permiso cambió. Revisa la fuente actual antes de solicitar la instalación.",
+      "invalidOption": "La opción seleccionada no está en la receta actual.",
+      "requested": "Se solicitó la instalación de {count, plural, one {# componente} other {# componentes}}. Aún no se confirmó su finalización. Destino: {clusterId}.",
+      "failed": "Falló la solicitud de instalación",
+      "unavailable": "La receta de preparación no está disponible."
+    },
+    "bootstrapHistory": {
+      "status": "Estado",
+      "succeeded": "Correcto",
+      "failed": "Fallido",
+      "search": "Buscar entre los gráficos y operadores devueltos…",
+      "mineNote": "Estas ejecuciones pertenecen al clúster, por lo que Mías está vacío.",
+      "all": "Todas",
+      "mine": "Mías",
+      "when": "Cuándo",
+      "chart": "Gráfico Helm",
+      "releases": "Versiones instaladas",
+      "operator": "Operador",
+      "unknown": "desconocido",
+      "label": "Preparaciones recientes",
+      "empty": "No se devolvieron ejecuciones de preparación.",
+      "unavailable": "El historial de preparación no está disponible."
+    },
     "agent": {
       "title": "Agente de latidos",
       "description": "Un agente en el espacio de nombres <namespace>astrolift-system</namespace> envía latidos firmados para mostrar el estado de pods, nodos y recursos y detectar la pérdida de conexión. Envía un latido cada <interval>{seconds, number}</interval> {seconds, plural, one {segundo} other {segundos}}.",

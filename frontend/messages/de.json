@@ -5853,6 +5853,42 @@
     }
   },
   "clusterSettings": {
+    "bootstrapPlan": {
+      "title": "Bootstrap-Rezept",
+      "empty": "Für diesen Cluster wurden keine Rezeptkomponenten zurückgegeben. Verwalten Sie Voraussetzungen manuell oder verwenden Sie <command>astro cluster bootstrap</command>.",
+      "description": "Rezept von <provider></provider>. Fordern Sie die Installation der ausgewählten Voraussetzungen an. Das Abwählen einer zuvor durch dieses Rezept installierten Komponente fordert die Entfernung ihres HelmRelease an.",
+      "unknown": "unbekannt",
+      "installed": "durch das Rezept installiert",
+      "outsideRecipe": "außerhalb des Rezepts aktiv",
+      "requires": "benötigt: {requirement}",
+      "selected": "{count, number} von {total, number} ausgewählt",
+      "requesting": "Wird angefordert…",
+      "install": "Installation / Abgleich anfordern",
+      "loadFailed": "Bootstrap-Rezept konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "sourceChanged": "Das beobachtete Rezept oder die Berechtigung hat sich geändert. Prüfen Sie die aktuelle Quelle, bevor Sie die Installation anfordern.",
+      "invalidOption": "Die ausgewählte Option gehört nicht zum aktuellen Rezept.",
+      "requested": "Installation für {count, plural, one {# Komponente} other {# Komponenten}} angefordert. Der Abschluss ist noch nicht bestätigt. Ziel: {clusterId}.",
+      "failed": "Installationsanforderung fehlgeschlagen",
+      "unavailable": "Das Bootstrap-Rezept ist nicht verfügbar."
+    },
+    "bootstrapHistory": {
+      "status": "Status",
+      "succeeded": "Erfolgreich",
+      "failed": "Fehlgeschlagen",
+      "search": "Zurückgegebene Charts und Operatoren suchen…",
+      "mineNote": "Diese Läufe gehören zum Cluster, daher ist Meine leer.",
+      "all": "Alle",
+      "mine": "Meine",
+      "when": "Zeitpunkt",
+      "chart": "Chart",
+      "releases": "Installierte Releases",
+      "operator": "Operator",
+      "unknown": "unbekannt",
+      "label": "Letzte Bootstrap-Läufe",
+      "empty": "Keine Bootstrap-Läufe zurückgegeben.",
+      "unavailable": "Der Bootstrap-Verlauf ist nicht verfügbar."
+    },
     "agent": {
       "title": "Heartbeat-Agent",
       "description": "Ein Agent im Namespace <namespace>astrolift-system</namespace> sendet signierte Heartbeats, damit die Plattform den Zustand von Pods, Knoten und Ressourcen anzeigen und eine unterbrochene Verbindung erkennen kann. Heartbeats werden alle <interval>{seconds, number}</interval> {seconds, plural, one {Sekunde} other {Sekunden}} gesendet.",

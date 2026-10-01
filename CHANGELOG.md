@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize cluster bootstrap recipe controls, request feedback and recent history
+  in all eight locales. Preserve driver-supplied data, show read failures with
+  retry, keep unknown history statuses literal, and invalidate callbacks after
+  observed source/permission changes. Accepted installation starts a workflow;
+  it does not certify completed reconciliation (#2145).
+
 - Azure Event Grid Standard saves exact namespace/topic placement with full
   service UUID names. Current source ownership, complete bounded inventory,
   ancestor locks and source-bound Key Vault receipts gate lifecycle and bindings.

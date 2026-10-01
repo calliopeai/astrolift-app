@@ -302,6 +302,25 @@ export const HistoryEmpty: Story = {
 
 export const History: Story = { render: () => <BootstrapHistoryView {...HISTORY} /> };
 
+export const HistoryReadFailed: Story = {
+  render: () => (
+    <BootstrapHistoryView
+      {...HISTORY}
+      error="LITERAL_HISTORY_READ_DIAGNOSTIC"
+      onRetry={() => undefined}
+    />
+  ),
+};
+
+export const HistoryUnknownStatus: Story = {
+  render: () => (
+    <BootstrapHistoryView
+      {...HISTORY}
+      runs={[{ ...HISTORY.runs[0], status: "LITERAL_UNKNOWN_STATUS" }]}
+    />
+  ),
+};
+
 function Sectioned({ initial }: { initial: string | null }) {
   return (
     <ClusterSettingsScreen

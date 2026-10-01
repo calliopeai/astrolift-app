@@ -5850,6 +5850,42 @@
     }
   },
   "clusterSettings": {
+    "bootstrapPlan": {
+      "title": "引导配置方案",
+      "empty": "未返回此集群的方案组件。请手动管理前置组件，或使用 <command>astro cluster bootstrap</command>。",
+      "description": "来自 <provider></provider> 的方案。请求安装选中的前置组件。取消选择此方案之前安装的组件，会请求删除其 HelmRelease。",
+      "unknown": "未知",
+      "installed": "由此方案安装",
+      "outsideRecipe": "在此方案之外运行",
+      "requires": "需要：{requirement}",
+      "selected": "已选择 {count, number} / {total, number} 项",
+      "requesting": "正在请求…",
+      "install": "请求安装 / 协调",
+      "loadFailed": "无法加载引导配置方案",
+      "retry": "重试",
+      "sourceChanged": "已观察到的方案或权限已改变。请检查当前来源后再请求安装。",
+      "invalidOption": "所选选项不在当前方案中。",
+      "requested": "已请求安装 {count, plural, one {# 个组件} other {# 个组件}}。尚未确认完成。 目标：{clusterId}。",
+      "failed": "安装请求失败",
+      "unavailable": "引导配置方案不可用。"
+    },
+    "bootstrapHistory": {
+      "status": "状态",
+      "succeeded": "成功",
+      "failed": "失败",
+      "search": "搜索返回的 Chart、操作员…",
+      "mineNote": "这些运行属于集群，因此“我的”为空。",
+      "all": "全部",
+      "mine": "我的",
+      "when": "时间",
+      "chart": "Chart",
+      "releases": "已安装发布",
+      "operator": "操作员",
+      "unknown": "未知",
+      "label": "最近的引导运行",
+      "empty": "未返回引导运行记录。",
+      "unavailable": "引导历史不可用。"
+    },
     "agent": {
       "title": "心跳代理",
       "description": "<namespace>astrolift-system</namespace> 命名空间中的代理发送签名心跳，让平台显示 Pod、节点和资源状态并检测连接中断。心跳间隔为 <interval>{seconds, number}</interval> {seconds, plural, one {秒} other {秒}}。",

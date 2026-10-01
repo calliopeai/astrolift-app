@@ -5853,6 +5853,42 @@
     }
   },
   "clusterSettings": {
+    "bootstrapPlan": {
+      "title": "Recette de préparation",
+      "empty": "Aucun composant de recette n’a été renvoyé pour ce cluster. Gérez les prérequis manuellement ou utilisez <command>astro cluster bootstrap</command>.",
+      "description": "Recette de <provider></provider>. Demandez l’installation des prérequis sélectionnés. Décocher un composant installé par cette recette demande la suppression de son HelmRelease.",
+      "unknown": "inconnu",
+      "installed": "installé par la recette",
+      "outsideRecipe": "en cours hors de la recette",
+      "requires": "nécessite : {requirement}",
+      "selected": "{count, number} sur {total, number} sélectionnés",
+      "requesting": "Demande en cours…",
+      "install": "Demander l’installation / réconciliation",
+      "loadFailed": "Impossible de charger la recette de préparation",
+      "retry": "Réessayer",
+      "sourceChanged": "La recette observée ou l’autorisation a changé. Vérifiez la source actuelle avant de demander l’installation.",
+      "invalidOption": "L’option sélectionnée ne figure pas dans la recette actuelle.",
+      "requested": "Installation demandée pour {count, plural, one {# composant} other {# composants}}. La fin n’est pas encore confirmée. Cible : {clusterId}.",
+      "failed": "La demande d’installation a échoué",
+      "unavailable": "La recette de préparation est indisponible."
+    },
+    "bootstrapHistory": {
+      "status": "État",
+      "succeeded": "Réussi",
+      "failed": "Échoué",
+      "search": "Rechercher dans les charts et opérateurs renvoyés…",
+      "mineNote": "Ces exécutions appartiennent au cluster ; Les miennes est donc vide.",
+      "all": "Toutes",
+      "mine": "Les miennes",
+      "when": "Date",
+      "chart": "Chart",
+      "releases": "Versions installées",
+      "operator": "Opérateur",
+      "unknown": "inconnu",
+      "label": "Préparations récentes",
+      "empty": "Aucune exécution de préparation renvoyée.",
+      "unavailable": "L’historique de préparation est indisponible."
+    },
     "agent": {
       "title": "Agent de présence",
       "description": "Un agent dans l’espace de noms <namespace>astrolift-system</namespace> envoie des signaux de présence signés pour afficher l’état des pods, des nœuds et des ressources et détecter une perte de connexion. Un signal est envoyé à un intervalle de <interval>{seconds, number}</interval> {seconds, plural, one {seconde} other {secondes}}.",
