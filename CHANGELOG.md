@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Localize shared cluster headers, tabs and breadcrumb presentation in all eight
+  locales. Preserve technical identities, unknown metadata, navigation targets
+  and caller-owned source titles/actions; lifecycle and bootstrap operations
+  remain separate translation boundaries (#2145).
+
 - Retire the legacy direct-claims session relay with an explicit HTTP 410 and
   backend login URL. Posted identity claims and the legacy static relay key no
   longer mint or replace sessions. Existing verified OAuth login/callback,

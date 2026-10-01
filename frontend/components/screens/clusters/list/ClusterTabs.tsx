@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 
 import { type DetailTab, DetailTabRow } from "@/components/DetailPageTabs";
@@ -51,11 +52,16 @@ const TABS: TabSpec[] = [
  * Activity · Settings), each its own route. `active` wins; otherwise the
  * pathname picks it.
  */
-export function clusterTabs(slug: string, pathname: string, active?: ClusterTabKey): DetailTab[] {
+export function clusterTabs(
+  slug: string,
+  pathname: string,
+  active?: ClusterTabKey,
+  label?: (key: ClusterTabKey) => string
+): DetailTab[] {
   const activeKey = active ?? TABS.find((t) => t.match(pathname, slug))?.key ?? "overview";
   return TABS.map((tab) => ({
     key: tab.key,
-    label: tab.label,
+    label: label?.(tab.key) ?? tab.label,
     href: tab.href(slug),
     active: tab.key === activeKey,
   }));
@@ -72,9 +78,13 @@ interface ClusterTabsProps {
  */
 export function ClusterTabs({ slug, active }: ClusterTabsProps) {
   const pathname = usePathname() ?? "";
+  const t = useTranslations("clusters.chrome");
   return (
     <div className="-mx-6 min-w-0">
-      <DetailTabRow ariaLabel="Cluster tabs" tabs={clusterTabs(slug, pathname, active)} />
+      <DetailTabRow
+        ariaLabel={t("tabsAria")}
+        tabs={clusterTabs(slug, pathname, active, (key) => t(`tabs.${key}`))}
+      />
     </div>
   );
 }

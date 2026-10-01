@@ -5929,5 +5929,47 @@
         "EXTERNAL_PROVIDER": "Fournisseur externe"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "Administration",
+      "clusters": "Clusters",
+      "notFound": "Cluster introuvable",
+      "tabsAria": "Onglets du cluster",
+      "inactive": "inactif",
+      "lifecycle": {
+        "registered": "Enregistré",
+        "managing": "Prise en charge…",
+        "managed": "Géré",
+        "error": "Erreur"
+      },
+      "tabs": {
+        "overview": "Vue d’ensemble",
+        "status": "État",
+        "health": "Santé",
+        "activity": "Activité",
+        "settings": "Paramètres"
+      },
+      "functions": {
+        "organization": "Organisation",
+        "access": "Accès",
+        "projects": "Projets",
+        "clusters": "Clusters",
+        "domains": "Domaines",
+        "providers": "Fournisseurs",
+        "webhooks": "Webhooks",
+        "metrics": "Métriques",
+        "tokens": "Clés API",
+        "audit": "Audit",
+        "run-audit": "Exécutions",
+        "features": "Fonctionnalités",
+        "activity": "Activité de la plateforme",
+        "alerts": "Alertes",
+        "events": "Événements",
+        "logs": "Journaux",
+        "traces": "Traces",
+        "operations": "Opérations"
+      }
+    }
   }
 }

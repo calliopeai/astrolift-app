@@ -5926,5 +5926,47 @@
         "EXTERNAL_PROVIDER": "外部提供商"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "管理",
+      "clusters": "集群",
+      "notFound": "未找到集群",
+      "tabsAria": "集群选项卡",
+      "inactive": "未启用",
+      "lifecycle": {
+        "registered": "已注册",
+        "managing": "正在配置管理…",
+        "managed": "已纳管",
+        "error": "错误"
+      },
+      "tabs": {
+        "overview": "概览",
+        "status": "状态",
+        "health": "健康状况",
+        "activity": "活动",
+        "settings": "设置"
+      },
+      "functions": {
+        "organization": "组织",
+        "access": "访问权限",
+        "projects": "项目",
+        "clusters": "集群",
+        "domains": "域名",
+        "providers": "提供商",
+        "webhooks": "Webhook",
+        "metrics": "指标",
+        "tokens": "API 密钥",
+        "audit": "审计",
+        "run-audit": "运行",
+        "features": "功能",
+        "activity": "平台活动",
+        "alerts": "告警",
+        "events": "事件",
+        "logs": "日志",
+        "traces": "跟踪",
+        "operations": "操作"
+      }
+    }
   }
 }

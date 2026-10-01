@@ -5926,5 +5926,47 @@
         "EXTERNAL_PROVIDER": "외부 공급자"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "관리",
+      "clusters": "클러스터",
+      "notFound": "클러스터를 찾을 수 없음",
+      "tabsAria": "클러스터 탭",
+      "inactive": "비활성",
+      "lifecycle": {
+        "registered": "등록됨",
+        "managing": "관리 설정 중…",
+        "managed": "관리됨",
+        "error": "오류"
+      },
+      "tabs": {
+        "overview": "개요",
+        "status": "상태",
+        "health": "건강 상태",
+        "activity": "활동",
+        "settings": "설정"
+      },
+      "functions": {
+        "organization": "조직",
+        "access": "접근",
+        "projects": "프로젝트",
+        "clusters": "클러스터",
+        "domains": "도메인",
+        "providers": "공급자",
+        "webhooks": "웹훅",
+        "metrics": "메트릭",
+        "tokens": "API 키",
+        "audit": "감사",
+        "run-audit": "실행",
+        "features": "기능",
+        "activity": "플랫폼 활동",
+        "alerts": "알림",
+        "events": "이벤트",
+        "logs": "로그",
+        "traces": "추적",
+        "operations": "작업"
+      }
+    }
   }
 }

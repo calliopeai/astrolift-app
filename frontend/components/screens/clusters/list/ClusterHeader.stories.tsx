@@ -101,3 +101,24 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const FutureMetadata: Story = {
+  render: () => (
+    <ClusterHeader
+      slug="future-cluster"
+      cluster={{
+        ...CLUSTERS[0],
+        name: "NAME_LITERAL",
+        slug: "future-cluster",
+        lifecycle: "FUTURE_LIFECYCLE_LITERAL",
+        providerPluginSlug: "FUTURE_PROVIDER_LITERAL",
+        region: "REGION_LITERAL",
+      }}
+    />
+  ),
+};
+export const CallerSourceTitle: Story = {
+  render: () => (
+    <ClusterHeader slug="missing" cluster={null} emptyTitle="CALLER_SOURCE_TITLE_LITERAL" />
+  ),
+};

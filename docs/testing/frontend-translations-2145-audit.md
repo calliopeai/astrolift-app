@@ -666,3 +666,33 @@ provider-user identity. The separate deduplicated backend follow-up is
 [APP #2225](https://github.com/calliopeai/astrolift-app/issues/2225). This card is a
 bounded #2145 leaf, not closure of the remaining cluster header/tab/bootstrap,
 lifecycle or other untranslated settings surfaces.
+
+## Shared cluster header and navigation
+
+ClusterHeader/ClusterTabs now use 32 genuine `clusters.chrome` messages in all
+eight locales, including their tab/aria labels, known lifecycle descriptions,
+inactive/default missing copy and breadcrumb switcher presentation. The pure
+localizedClusterCrumbs factory is opt-in: the existing static clusterCrumbs,
+list declarations and route/active-tab predicates retain their contracts.
+Names, slugs, regions, provider identities, unknown lifecycle values and future
+navigation labels stay literal. Caller-supplied emptyTitle, primaryAction and
+menu nodes retain their meaning and authority; this header supplies none.
+
+Focused proof covers actual ClusterSettingsClient/GetCluster Apollo HttpLink
+journeys in every locale for all four known lifecycle values. Existing failed
+read versus confirmed-null titles, cached failed-read recovery/current Retry,
+changed observed targets and permission-fenced cards remain intact. Keyboard
+breadcrumb/tab navigation preserves exact hrefs and active marks. ICU parity,
+locale changes, SSR hydration, literal future metadata and 15 portable header/
+tab stories accompany the existing cluster list-variable/declaration tests.
+There are 120 passing focused checks, with TypeScript, scoped ESLint and source
+formatting green. Existing locale trees outside this additive subtree match the
+signed base exactly; query/schema, read/mutation hooks and sibling cards are
+unchanged. No live requests or new permissions are introduced.
+
+This bounded chrome leaf does not close #2145. Remaining connected English
+includes lifecycle action/confirmation/outcome copy in list/detail/settings and
+their mutation hooks, bootstrap recipe and history/release tables, cluster status
+bodies and ClusterTabFrame recovery copy. Their existing mutation acceptance,
+refresh-failure, target-review and recipe source-state risks require separate
+bounded work; no semantic changes to those paths are claimed here.

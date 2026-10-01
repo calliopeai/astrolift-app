@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import type * as React from "react";
 
@@ -9,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
 import { type ClusterTabKey, clusterTabs } from "./ClusterTabs";
-import { clusterCrumbs, LIFECYCLE_LABEL, type Lifecycle, providerLabel } from "./clusters-list";
+import { localizedClusterCrumbs, type Lifecycle, providerLabel } from "./clusters-list";
 
 export type ClusterHeaderCluster = Pick<
   AstroliftTenantCluster,
@@ -53,14 +54,16 @@ export function ClusterHeader({
   menu,
 }: ClusterHeaderProps) {
   const pathname = usePathname() ?? "";
+  const t = useTranslations("clusters.chrome");
+  const tabs = (target: string) => clusterTabs(target, pathname, active, (key) => t(`tabs.${key}`));
 
   if (!cluster) {
     return (
       <ShellHeader
-        crumbs={clusterCrumbs(slug)}
-        title={loading ? <Skeleton className="h-6 w-48" /> : (emptyTitle ?? "Cluster not found")}
-        tabs={loading ? clusterTabs(slug, pathname, active) : undefined}
-        tabsAriaLabel="Cluster tabs"
+        crumbs={localizedClusterCrumbs(t, slug)}
+        title={loading ? <Skeleton className="h-6 w-48" /> : (emptyTitle ?? t("notFound"))}
+        tabs={loading ? tabs(slug) : undefined}
+        tabsAriaLabel={t("tabsAria")}
       />
     );
   }
@@ -68,13 +71,13 @@ export function ClusterHeader({
   const lifecycle = (cluster.lifecycle as Lifecycle) ?? "registered";
   return (
     <ShellHeader
-      crumbs={clusterCrumbs(cluster.name)}
+      crumbs={localizedClusterCrumbs(t, cluster.name)}
       title={<span title={cluster.name}>{cluster.name}</span>}
       status={
         <span className="inline-flex shrink-0 items-center gap-1.5 text-sm">
           <StatusDot status={DOT[lifecycle] ?? "muted"} />
-          {LIFECYCLE_LABEL[lifecycle] ?? lifecycle}
-          {!cluster.isActive && <span className="text-muted-foreground">· inactive</span>}
+          {t.has(`lifecycle.${lifecycle}`) ? t(`lifecycle.${lifecycle}`) : lifecycle}
+          {!cluster.isActive && <span className="text-muted-foreground">· {t("inactive")}</span>}
         </span>
       }
       context={
@@ -90,8 +93,8 @@ export function ClusterHeader({
       }
       primaryAction={primaryAction}
       menu={menu}
-      tabs={clusterTabs(cluster.slug, pathname, active)}
-      tabsAriaLabel="Cluster tabs"
+      tabs={tabs(cluster.slug)}
+      tabsAriaLabel={t("tabsAria")}
     />
   );
 }

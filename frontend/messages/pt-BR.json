@@ -5926,5 +5926,47 @@
         "EXTERNAL_PROVIDER": "Provedor externo"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "Administração",
+      "clusters": "Clusters",
+      "notFound": "Cluster não encontrado",
+      "tabsAria": "Abas do cluster",
+      "inactive": "inativo",
+      "lifecycle": {
+        "registered": "Registrado",
+        "managing": "Configurando gerenciamento…",
+        "managed": "Gerenciado",
+        "error": "Erro"
+      },
+      "tabs": {
+        "overview": "Visão geral",
+        "status": "Estado",
+        "health": "Integridade",
+        "activity": "Atividade",
+        "settings": "Configurações"
+      },
+      "functions": {
+        "organization": "Organização",
+        "access": "Acesso",
+        "projects": "Projetos",
+        "clusters": "Clusters",
+        "domains": "Domínios",
+        "providers": "Provedores",
+        "webhooks": "Webhooks",
+        "metrics": "Métricas",
+        "tokens": "Chaves de API",
+        "audit": "Auditoria",
+        "run-audit": "Execuções",
+        "features": "Funcionalidades",
+        "activity": "Atividade da plataforma",
+        "alerts": "Alertas",
+        "events": "Eventos",
+        "logs": "Logs",
+        "traces": "Rastreamentos",
+        "operations": "Operações"
+      }
+    }
   }
 }

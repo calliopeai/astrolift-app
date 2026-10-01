@@ -5926,5 +5926,47 @@
         "EXTERNAL_PROVIDER": "外部プロバイダー"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "管理",
+      "clusters": "クラスター",
+      "notFound": "クラスターが見つかりません",
+      "tabsAria": "クラスターのタブ",
+      "inactive": "無効",
+      "lifecycle": {
+        "registered": "登録済み",
+        "managing": "管理を設定中…",
+        "managed": "管理対象",
+        "error": "エラー"
+      },
+      "tabs": {
+        "overview": "概要",
+        "status": "状態",
+        "health": "健全性",
+        "activity": "アクティビティ",
+        "settings": "設定"
+      },
+      "functions": {
+        "organization": "組織",
+        "access": "アクセス",
+        "projects": "プロジェクト",
+        "clusters": "クラスター",
+        "domains": "ドメイン",
+        "providers": "プロバイダー",
+        "webhooks": "Webhook",
+        "metrics": "メトリクス",
+        "tokens": "API キー",
+        "audit": "監査",
+        "run-audit": "実行",
+        "features": "機能",
+        "activity": "プラットフォームのアクティビティ",
+        "alerts": "アラート",
+        "events": "イベント",
+        "logs": "ログ",
+        "traces": "トレース",
+        "operations": "操作"
+      }
+    }
   }
 }

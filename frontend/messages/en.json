@@ -6006,5 +6006,47 @@
         "EXTERNAL_PROVIDER": "External provider"
       }
     }
+  },
+  "clusters": {
+    "chrome": {
+      "admin": "Admin",
+      "clusters": "Clusters",
+      "notFound": "Cluster not found",
+      "tabsAria": "Cluster tabs",
+      "inactive": "inactive",
+      "lifecycle": {
+        "registered": "Registered",
+        "managing": "Managing…",
+        "managed": "Managed",
+        "error": "Error"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "status": "Status",
+        "health": "Health",
+        "activity": "Activity",
+        "settings": "Settings"
+      },
+      "functions": {
+        "organization": "Organization",
+        "access": "Access",
+        "projects": "Projects",
+        "clusters": "Clusters",
+        "domains": "Domains",
+        "providers": "Providers",
+        "webhooks": "Webhooks",
+        "metrics": "Metrics",
+        "tokens": "API keys",
+        "audit": "Audit",
+        "run-audit": "Runs",
+        "features": "Features",
+        "activity": "Platform activity",
+        "alerts": "Alerts",
+        "events": "Events",
+        "logs": "Logs",
+        "traces": "Traces",
+        "operations": "Operations"
+      }
+    }
   }
 }

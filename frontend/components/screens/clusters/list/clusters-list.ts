@@ -79,6 +79,26 @@ export function clusterCrumbs(name?: string): Crumb[] {
   return crumbs;
 }
 
+/** Opt-in presentation only: literal identifiers/routes and model visibility stay unchanged. */
+export function localizedClusterCrumbs(
+  t: { (key: string): string; has: (key: string) => boolean },
+  name?: string
+): Crumb[] {
+  const admin = NAV.find((area) => area.key === "admin");
+  const switcher = (admin?.groups ?? []).flatMap((group) =>
+    group.functions.map((item) => ({
+      label: t.has(`functions.${item.key}`) ? t(`functions.${item.key}`) : item.label,
+      href: item.href,
+      active: item.key === "clusters",
+    }))
+  );
+  return [
+    { label: t("admin"), switcher },
+    name === undefined ? { label: t("clusters") } : { label: t("clusters"), href: "/clusters" },
+    ...(name === undefined ? [] : [{ label: name }]),
+  ];
+}
+
 /** The `filter` fields `astroliftClustersPage` declares, by list filter key. */
 const FILTER_KEYS = ["provider", "status", "live", "registeredBy"] as const;
 
