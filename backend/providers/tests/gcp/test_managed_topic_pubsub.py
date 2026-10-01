@@ -709,7 +709,7 @@ def test_deprovision_requires_force_for_foreign_subscription(harness: Harness) -
         delete_data=True,
     )
     assert not result.ok
-    assert result.errors == ["foreign_subscriptions_require_force_destroy"]
+    assert result.errors == ["foreign_subscriptions_require_force_destroy", "ownership_unknown"]
     forced = harness.driver.deprovision(
         DeprovisionSpec(provisioned.handle, managed_service_id=SERVICE_ID),
         delete_data=True,

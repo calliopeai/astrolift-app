@@ -273,6 +273,35 @@ The PostgreSQL lifecycle proof runs the real Google Pub/Sub SDK through a
 bounded local recording gRPC server. It verifies serialized API requests,
 identity and no-write refusals, not GCP IAM, storage or delivery semantics.
 
+### Pub/Sub cleanup outcomes (#2098, bounded scope)
+
+The topic driver reports explicit `ownership_refused` for a current source or
+child owner mismatch, and `ownership_unknown` when SDK reads, subscription
+inventory/pagination or deletion fail without a concrete typed not-found
+outcome. Invalid handle/config and outside-declaration refusals retain their
+existing specific codes and add unknown authority. The central lifecycle
+therefore keeps those operations failed, even if a diagnostic, invalid handle,
+reserved custom label or outside-declaration child name contains `not found`
+or `NoSuchBucket`. Force/delete-data flags cannot bypass current source or
+child ownership. Permanent owner refusal is non-retryable; unavailable provider
+operations retain their retry behavior and never imply completed cleanup.
+
+Inventory must complete and every present child's immutable topic and source
+labels must pass before any destructive call. A failed second SDK page cannot
+produce deletes from a partial first page. A typed parent `NotFound` still
+converges for the parent; it does not assert former subscriptions are absent
+or delete unobserved children. A child with a typed `NotFound` during preflight
+is omitted from the delete plan; one disappearing during deletion is already
+gone. A failed child delete stops before deleting the parent, while a denied
+parent delete after successful child deletions remains failed partial cleanup.
+The retained-message acknowledgement and explicit-force requirements remain.
+
+These checks are current API observations, not atomic cloud replacement guards
+or certification of GCP IAM/delivery. Other drivers, broad #2098 acceptance and
+external resource replacement/retag races remain separate work. Tests use the
+real Google SDK, actual protobuf pagination and controlled localhost responses,
+with real PostgreSQL lifecycle records and no tenant cloud calls.
+
 ### AWS live binding and S3 incarnation checks (#2098)
 
 S3, SQS and DynamoDB bindings require the actual live resource's platform marker

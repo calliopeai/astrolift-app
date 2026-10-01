@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pub/Sub cleanup preserves failed/unknown ownership outcomes across permission
+  errors, incomplete subscription inventory and denied child operations. Error
+  text and caller-controlled names cannot become successful deletion; concrete
+  typed missing-resource outcomes remain idempotent (#2098, bounded scope).
+
 - Localize ingress-class choices, gate guidance, opt-in deployment review and
   outcomes in all eight locales. Preserve exact update inputs and raw refusals;
   accepted changes survive failed reads, rejected changes trigger no refresh,

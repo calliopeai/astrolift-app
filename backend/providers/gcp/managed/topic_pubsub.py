@@ -201,11 +201,15 @@ class PubSubTopicDriver(ManagedServiceDriver):
         try:
             topic_id = _parse_handle(spec.handle)
         except ValueError as exc:
-            return DeprovisionResult(False, spec.handle, str(exc), ["invalid_handle"], retryable=False)
+            return DeprovisionResult(
+                False, spec.handle, str(exc), ["invalid_handle", "ownership_unknown"], retryable=False
+            )
         topic_path = self._topic_path(topic_id)
         error = self._validate_config(dict(spec.config or {}))
         if error:
-            return DeprovisionResult(False, spec.handle, error, ["invalid_pubsub_topic_config"], retryable=False)
+            return DeprovisionResult(
+                False, spec.handle, error, ["invalid_pubsub_topic_config", "ownership_unknown"], retryable=False
+            )
         try:
             topic = self._topic(topic_path)
             self._assert_topic_owned(topic, spec.managed_service_id, spec.recorded_handle_exclusive)
@@ -214,7 +218,10 @@ class PubSubTopicDriver(ManagedServiceDriver):
                 return DeprovisionResult(True, spec.handle, f"Pub/Sub topic {topic_id} already gone")
             return _deprovision_error(spec.handle, "describe Pub/Sub topic", exc)
 
-        subscriptions = self._subscription_paths(topic_path)
+        try:
+            subscriptions = self._subscription_paths(topic_path)
+        except Exception as exc:
+            return _deprovision_error(spec.handle, "inventory Pub/Sub subscriptions", exc)
         has_retention = bool(_get(topic, "message_retention_duration", ""))
         if (subscriptions or has_retention) and not delete_data:
             details = []
@@ -244,16 +251,23 @@ class PubSubTopicDriver(ManagedServiceDriver):
                     spec.handle,
                     "Pub/Sub topic has subscriptions outside this declaration; "
                     "set force_destroy=true to delete them: " + ", ".join(path.rsplit("/", 1)[-1] for path in foreign),
-                    ["foreign_subscriptions_require_force_destroy"],
+                    ["foreign_subscriptions_require_force_destroy", "ownership_unknown"],
                     retryable=False,
                 )
+        owned_subscriptions = []
         try:
             for path in subscriptions:
-                current = self._sub.get_subscription(request={"subscription": path})
+                try:
+                    current = self._sub.get_subscription(request={"subscription": path})
+                except Exception as exc:
+                    if _not_found(exc):
+                        continue
+                    raise
                 self._assert_subscription_owned(current, topic_path, spec.managed_service_id)
+                owned_subscriptions.append(path)
         except Exception as exc:
             return _deprovision_error(spec.handle, "check Pub/Sub subscription ownership", exc)
-        for path in subscriptions:
+        for path in owned_subscriptions:
             try:
                 self._sub.delete_subscription(request={"subscription": path})
             except Exception as exc:
@@ -1151,7 +1165,14 @@ def _duration_seconds(value: Any) -> float:
 
 
 def _deprovision_error(handle: str, operation: str, exc: Exception) -> DeprovisionResult:
-    return DeprovisionResult(False, handle, f"{operation}: {exc}", [str(exc)])
+    refused = isinstance(exc, PubSubTopicError)
+    return DeprovisionResult(
+        False,
+        handle,
+        f"{operation}: {exc}",
+        ["ownership_refused" if refused else "ownership_unknown"],
+        retryable=not refused,
+    )
 
 
 __all__ = ["PubSubTopicConfig", "PubSubTopicDriver", "PubSubTopicError"]

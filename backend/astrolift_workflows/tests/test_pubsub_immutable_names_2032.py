@@ -17,11 +17,15 @@ import pytest
 from gcp.managed.topic_pubsub import PubSubTopicConfig, PubSubTopicDriver
 from google.auth.credentials import AnonymousCredentials
 from google.cloud import pubsub_v1
+from google.protobuf import empty_pb2
 from google.pubsub_v1 import types as messages
 from google.pubsub_v1.services.publisher.transports.grpc import PublisherGrpcTransport
 from google.pubsub_v1.services.subscriber.transports.grpc import SubscriberGrpcTransport
 
-from astrolift_workflows.activities.managed_service_lifecycle import _provision_sync, _update_sync
+from astrolift_workflows.activities.managed_service_lifecycle import (
+    _provision_sync,
+    _update_sync,
+)
 from astrolift_workflows.tests.test_recorded_handle_exclusive_2086 import _service
 
 pytestmark = pytest.mark.django_db
@@ -34,9 +38,16 @@ class RecordingPubSub:
         self.calls = []
         self.payloads = {}
         self.lookup_failure = None
+        self.failures = {}
+        self.partial_inventory_failure = False
+        self.missing_on_get = False
+        self.missing_on_delete = False
+        self.inventory_reads = 0
 
     def dispatch(self, method, request, context):
         self.calls.append((method, request))
+        if method in self.failures:
+            context.abort(*self.failures[method])
         if method == "GetTopic":
             if self.lookup_failure:
                 context.abort(*self.lookup_failure)
@@ -54,10 +65,21 @@ class RecordingPubSub:
                 setattr(current, field, getattr(request.topic, field))
             return current
         if method == "ListTopicSubscriptions":
+            self.inventory_reads += 1
+            if self.partial_inventory_failure:
+                if request.page_token:
+                    context.abort(
+                        grpc.StatusCode.PERMISSION_DENIED, "inventory unavailable: resource not found"
+                    )
+                return messages.ListTopicSubscriptionsResponse(
+                    subscriptions=list(self.subscriptions)[:1], next_page_token="actual-next-page"
+                )
             return messages.ListTopicSubscriptionsResponse(
                 subscriptions=[name for name, row in self.subscriptions.items() if row.topic == request.topic]
             )
         if method == "GetSubscription":
+            if self.missing_on_get:
+                self.subscriptions.pop(request.subscription, None)
             if request.subscription not in self.subscriptions:
                 context.abort(grpc.StatusCode.NOT_FOUND, "subscription missing")
             return self.subscriptions[request.subscription]
@@ -71,6 +93,18 @@ class RecordingPubSub:
             for field in request.update_mask.paths:
                 setattr(current, field, getattr(request.subscription, field))
             return current
+        if method == "DeleteSubscription":
+            if self.missing_on_delete:
+                self.subscriptions.pop(request.subscription, None)
+            if request.subscription not in self.subscriptions:
+                context.abort(grpc.StatusCode.NOT_FOUND, "subscription already gone")
+            del self.subscriptions[request.subscription]
+            return empty_pb2.Empty()
+        if method == "DeleteTopic":
+            if request.topic not in self.topics:
+                context.abort(grpc.StatusCode.NOT_FOUND, "topic already gone")
+            del self.topics[request.topic]
+            return empty_pb2.Empty()
         if method == "Publish":
             assert request.topic in self.topics
             self.payloads.setdefault(request.topic, []).extend(
@@ -95,11 +129,13 @@ def cloud():
             messages.ListTopicSubscriptionsResponse,
         ),
         "Publish": (messages.PublishRequest, messages.PublishResponse),
+        "DeleteTopic": (messages.DeleteTopicRequest, empty_pb2.Empty),
     }
     subscriber_methods = {
         "GetSubscription": (messages.GetSubscriptionRequest, messages.Subscription),
         "CreateSubscription": (messages.Subscription, messages.Subscription),
         "UpdateSubscription": (messages.UpdateSubscriptionRequest, messages.Subscription),
+        "DeleteSubscription": (messages.DeleteSubscriptionRequest, empty_pb2.Empty),
     }
     for service, methods in (("Publisher", publisher_methods), ("Subscriber", subscriber_methods)):
         handlers = {}
@@ -107,7 +143,11 @@ def cloud():
             handlers[method] = grpc.unary_unary_rpc_method_handler(
                 lambda request, context, name=method: api.dispatch(name, request, context),
                 request_deserializer=request_type.deserialize,
-                response_serializer=response_type.serialize,
+                response_serializer=(
+                    response_type.serialize
+                    if hasattr(response_type, "serialize")
+                    else response_type.SerializeToString
+                ),
             )
         server.add_generic_rpc_handlers(
             (grpc.method_handlers_generic_handler(f"google.pubsub.v1.{service}", handlers),)
