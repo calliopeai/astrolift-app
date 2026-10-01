@@ -3800,6 +3800,17 @@
         "empty": "No approvals recorded yet.",
         "unknownApprover": "unknown"
       }
+    },
+    "pendingGates": {
+      "title": "Pending gates",
+      "loadingDescription": "Human reviews across the organization awaiting a decision.",
+      "description": "Workflow reviews you can decide across the organization, newest first.",
+      "refresh": "Refresh pending gates",
+      "emptyTitle": "No pending gates",
+      "emptyDescription": "Nothing is waiting on your review right now.",
+      "waitingSince": "Waiting · {time}",
+      "approvers": "Approvers: {names}",
+      "review": "Review"
     }
   },
   "projectResources": {
@@ -5214,5 +5225,65 @@
       "resetDefault": "Use the default for my access ({layout})",
       "saveFailed": "Home layout was not saved"
     }
+  },
+  "metrics": {
+    "title": "Metrics",
+    "description": "Deployment success, rollout duration and application health.",
+    "successRate": "Deployment success rate",
+    "successRateTrend": "Deployment success-rate trend",
+    "successRateUnavailable": "Deployment success rate unavailable",
+    "trend": "{label} trend",
+    "durationSeconds": "{seconds, number}s",
+    "durationMinutesSeconds": "{minutes, number}m {seconds, number}s",
+    "columns": {
+      "app": "App",
+      "environments": "Environments",
+      "latestDeploy": "Latest deployment",
+      "image": "Image",
+      "lastDeployed": "Last deployed"
+    },
+    "never": "Never",
+    "recentFailure": "Recent failure",
+    "inFlight": "In progress",
+    "inFlightHint": "Awaiting approval, queued or deploying",
+    "meanRollout": "Mean rollout duration",
+    "meanRolloutHint": "Average of completed deployments in this window",
+    "p95Rollout": "p95 rollout duration",
+    "p95RolloutHint": "The slower deployments in this window",
+    "noRollouts": "No rollouts in the last {days, number} days",
+    "succeededWindow": "{succeeded, number}/{total, number} succeeded over {days, number} days",
+    "outcomes": "Outcomes ({days, number} days)",
+    "succeeded": "Succeeded {count, number}",
+    "failed": "Failed {count, number}",
+    "rolledBack": "Rolled back {count, number}",
+    "inFlightCount": "In progress {count, number}",
+    "total": "Total {count, number}",
+    "rolloutsWindow": "Rollouts over {days, number} days",
+    "rolloutsPerDay": "Rollouts per day",
+    "apps": "Apps",
+    "emptyTitle": "No apps yet",
+    "emptyDescription": "Register an app; metrics appear after its first deployment.",
+    "openApps": "Open apps",
+    "rawPrometheus": "Raw Prometheus metrics",
+    "temporalUi": "Temporal workflow interface",
+    "embeddedDashboardsUnavailable": "Embedded dashboards are not available in this view.",
+    "searchPlaceholder": "Search apps, slugs, image tags…",
+    "filters": {
+      "status": "Latest deployment",
+      "kind": "Kind"
+    },
+    "kinds": {
+      "app": "App",
+      "agent": "Agent"
+    },
+    "views": {
+      "all": "All",
+      "mine": "Mine",
+      "failing": "Recent failure",
+      "mineNote": "The health summary does not record ownership, so this view is empty."
+    },
+    "staleMetrics": "Refresh failed. Showing the last successfully loaded metrics.",
+    "metricsUnavailable": "Metrics could not be loaded.",
+    "retryMetrics": "Retry metrics"
   }
 }

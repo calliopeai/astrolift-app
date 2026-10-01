@@ -3720,6 +3720,17 @@
         "empty": "Nenhuma aprovação registrada ainda.",
         "unknownApprover": "desconhecido"
       }
+    },
+    "pendingGates": {
+      "title": "Aprovações pendentes",
+      "loadingDescription": "Revisões da organização aguardando uma decisão.",
+      "description": "Revisões de fluxos da organização que você pode decidir, das mais recentes às mais antigas.",
+      "refresh": "Atualizar aprovações pendentes",
+      "emptyTitle": "Nenhuma aprovação pendente",
+      "emptyDescription": "Nada está aguardando sua revisão no momento.",
+      "waitingSince": "Aguardando · {time}",
+      "approvers": "Aprovadores: {names}",
+      "review": "Revisar"
     }
   },
   "projectResources": {
@@ -5134,5 +5145,65 @@
       "resetDefault": "Usar o layout padrão para meu acesso ({layout})",
       "saveFailed": "O layout do início não foi salvo"
     }
+  },
+  "metrics": {
+    "title": "Métricas",
+    "description": "Sucesso das implantações, duração e estado dos aplicativos.",
+    "successRate": "Taxa de sucesso das implantações",
+    "successRateTrend": "Tendência de sucesso das implantações",
+    "successRateUnavailable": "Taxa de sucesso indisponível",
+    "trend": "Tendência de {label}",
+    "durationSeconds": "{seconds, number} s",
+    "durationMinutesSeconds": "{minutes, number} min {seconds, number} s",
+    "columns": {
+      "app": "Aplicativo",
+      "environments": "Ambientes",
+      "latestDeploy": "Última implantação",
+      "image": "Imagem",
+      "lastDeployed": "Implantado pela última vez"
+    },
+    "never": "Nunca",
+    "recentFailure": "Falha recente",
+    "inFlight": "Em andamento",
+    "inFlightHint": "Aguardando aprovação, na fila ou implantando",
+    "meanRollout": "Duração média das implantações",
+    "meanRolloutHint": "Média das implantações concluídas neste período",
+    "p95Rollout": "Duração p95 das implantações",
+    "p95RolloutHint": "As implantações mais lentas neste período",
+    "noRollouts": "Nenhuma implantação nos últimos {days, number} dias",
+    "succeededWindow": "{succeeded, number}/{total, number} bem-sucedidas em {days, number} dias",
+    "outcomes": "Resultados ({days, number} dias)",
+    "succeeded": "Bem-sucedidas {count, number}",
+    "failed": "Falhas {count, number}",
+    "rolledBack": "Revertidas {count, number}",
+    "inFlightCount": "Em andamento {count, number}",
+    "total": "Total {count, number}",
+    "rolloutsWindow": "Implantações em {days, number} dias",
+    "rolloutsPerDay": "Implantações por dia",
+    "apps": "Aplicativos",
+    "emptyTitle": "Ainda não há aplicativos",
+    "emptyDescription": "Registre um aplicativo. As métricas aparecem após a primeira implantação.",
+    "openApps": "Abrir aplicativos",
+    "rawPrometheus": "Métricas brutas do Prometheus",
+    "temporalUi": "Interface de fluxos do Temporal",
+    "embeddedDashboardsUnavailable": "Os painéis integrados não estão disponíveis nesta visualização.",
+    "searchPlaceholder": "Buscar aplicativos, identificadores e tags de imagem…",
+    "filters": {
+      "status": "Última implantação",
+      "kind": "Tipo"
+    },
+    "kinds": {
+      "app": "Aplicativo",
+      "agent": "Agente"
+    },
+    "views": {
+      "all": "Todos",
+      "mine": "Meus",
+      "failing": "Falha recente",
+      "mineNote": "O resumo de estado não registra proprietários, então esta visualização está vazia."
+    },
+    "staleMetrics": "A atualização falhou. Exibindo as últimas métricas carregadas.",
+    "metricsUnavailable": "Não foi possível carregar as métricas.",
+    "retryMetrics": "Tentar carregar métricas novamente"
   }
 }

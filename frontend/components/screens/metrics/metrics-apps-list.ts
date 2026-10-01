@@ -48,6 +48,30 @@ export const METRICS_APPS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+/** Localize presentation without changing selection, URL state or permission scope. */
+export function localizedMetricsAppsList(
+  t: (key: string) => string,
+  status: (key: string) => string
+): ListDefinition {
+  return {
+    ...METRICS_APPS_LIST,
+    searchPlaceholder: t("searchPlaceholder"),
+    fields: METRICS_APPS_LIST.fields.map((field) => ({
+      ...field,
+      label: t(`filters.${field.key}`),
+      options: field.options?.map((option) => ({
+        ...option,
+        label: field.key === "status" ? status(option.value) : t(`kinds.${option.value}`),
+      })),
+    })),
+    views: METRICS_APPS_LIST.views.map((view) => ({
+      ...view,
+      label: t(`views.${view.key}`),
+      ...(view.key === "mine" ? { note: t("views.mineNote") } : {}),
+    })),
+  };
+}
+
 export const METRICS_APPS_SELECT: SelectRowsSpec<AstroliftAppHealthSummary> = {
   filter: {
     owner: () => false,

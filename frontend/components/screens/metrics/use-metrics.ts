@@ -31,21 +31,26 @@ export function useMetrics() {
   const [windowDays] = React.useState(30);
   const list = useListState(METRICS_APPS_LIST);
 
-  const { data: metricsData, loading: metricsLoading } = useQuery<MetricsResp>(
-    GET_DEPLOYMENT_METRICS,
-    { variables: { windowDays }, pollInterval: 30000 }
-  );
-  const { data: healthData, loading: healthLoading } = useQuery<HealthResp>(
-    LIST_APP_HEALTH_SUMMARY,
-    { pollInterval: 30000 }
-  );
+  const metricsQuery = useQuery<MetricsResp>(GET_DEPLOYMENT_METRICS, {
+    variables: { windowDays },
+    pollInterval: 30000,
+  });
+  const healthQuery = useQuery<HealthResp>(LIST_APP_HEALTH_SUMMARY, { pollInterval: 30000 });
 
   return {
     list,
     windowDays,
-    metrics: metricsData?.astroliftDeploymentMetrics,
-    metricsLoading,
-    apps: healthData?.astroliftAppHealthSummary ?? [],
-    healthLoading,
+    metrics: (metricsQuery.data ?? metricsQuery.previousData)?.astroliftDeploymentMetrics,
+    metricsLoading: metricsQuery.loading,
+    metricsError: metricsQuery.error?.message ?? null,
+    onRetryMetrics: () => {
+      void metricsQuery.refetch().catch(() => undefined);
+    },
+    apps: (healthQuery.data ?? healthQuery.previousData)?.astroliftAppHealthSummary ?? [],
+    healthLoading: healthQuery.loading,
+    healthError: healthQuery.error?.message ?? null,
+    onRetryHealth: () => {
+      void healthQuery.refetch().catch(() => undefined);
+    },
   };
 }

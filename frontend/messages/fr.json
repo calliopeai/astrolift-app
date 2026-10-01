@@ -3723,6 +3723,17 @@
         "empty": "Aucune approbation enregistrée pour l'instant.",
         "unknownApprover": "inconnu"
       }
+    },
+    "pendingGates": {
+      "title": "Validations en attente",
+      "loadingDescription": "Validations humaines de l’organisation en attente de décision.",
+      "description": "Validations de workflows que vous pouvez décider dans l’organisation, les plus récentes en premier.",
+      "refresh": "Actualiser les validations en attente",
+      "emptyTitle": "Aucune validation en attente",
+      "emptyDescription": "Rien ne nécessite votre validation pour le moment.",
+      "waitingSince": "En attente · {time}",
+      "approvers": "Responsables : {names}",
+      "review": "Examiner"
     }
   },
   "projectResources": {
@@ -5137,5 +5148,65 @@
       "resetDefault": "Utiliser la disposition par défaut pour mes accès ({layout})",
       "saveFailed": "La disposition de l’accueil n’a pas été enregistrée"
     }
+  },
+  "metrics": {
+    "title": "Indicateurs",
+    "description": "Réussite des déploiements, durée et état des applications.",
+    "successRate": "Taux de réussite des déploiements",
+    "successRateTrend": "Évolution du taux de réussite",
+    "successRateUnavailable": "Taux de réussite indisponible",
+    "trend": "Évolution de {label}",
+    "durationSeconds": "{seconds, number} s",
+    "durationMinutesSeconds": "{minutes, number} min {seconds, number} s",
+    "columns": {
+      "app": "Application",
+      "environments": "Environnements",
+      "latestDeploy": "Dernier déploiement",
+      "image": "Image",
+      "lastDeployed": "Dernier déploiement effectué"
+    },
+    "never": "Jamais",
+    "recentFailure": "Échec récent",
+    "inFlight": "En cours",
+    "inFlightHint": "En attente d’approbation, en file ou en déploiement",
+    "meanRollout": "Durée moyenne des déploiements",
+    "meanRolloutHint": "Moyenne des déploiements terminés sur cette période",
+    "p95Rollout": "Durée p95 des déploiements",
+    "p95RolloutHint": "Les déploiements les plus lents sur cette période",
+    "noRollouts": "Aucun déploiement sur les {days, number} derniers jours",
+    "succeededWindow": "{succeeded, number}/{total, number} réussis sur {days, number} jours",
+    "outcomes": "Résultats ({days, number} jours)",
+    "succeeded": "Réussis {count, number}",
+    "failed": "Échecs {count, number}",
+    "rolledBack": "Restaurés {count, number}",
+    "inFlightCount": "En cours {count, number}",
+    "total": "Total {count, number}",
+    "rolloutsWindow": "Déploiements sur {days, number} jours",
+    "rolloutsPerDay": "Déploiements par jour",
+    "apps": "Applications",
+    "emptyTitle": "Aucune application",
+    "emptyDescription": "Enregistrez une application ; ses indicateurs apparaîtront après le premier déploiement.",
+    "openApps": "Ouvrir les applications",
+    "rawPrometheus": "Métriques brutes Prometheus",
+    "temporalUi": "Interface des workflows Temporal",
+    "embeddedDashboardsUnavailable": "Les tableaux de bord intégrés ne sont pas disponibles dans cette vue.",
+    "searchPlaceholder": "Rechercher applications, identifiants, tags d’image…",
+    "filters": {
+      "status": "Dernier déploiement",
+      "kind": "Type"
+    },
+    "kinds": {
+      "app": "Application",
+      "agent": "Agent"
+    },
+    "views": {
+      "all": "Toutes",
+      "mine": "Les miennes",
+      "failing": "Échec récent",
+      "mineNote": "Le résumé d’état ne consigne pas les propriétaires ; cette vue est donc vide."
+    },
+    "staleMetrics": "Actualisation échouée. Les derniers indicateurs chargés restent affichés.",
+    "metricsUnavailable": "Impossible de charger les indicateurs.",
+    "retryMetrics": "Réessayer les indicateurs"
   }
 }

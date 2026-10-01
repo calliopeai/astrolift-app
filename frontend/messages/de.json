@@ -3723,6 +3723,17 @@
         "empty": "Noch keine Genehmigungen erfasst.",
         "unknownApprover": "unbekannt"
       }
+    },
+    "pendingGates": {
+      "title": "Ausstehende Freigaben",
+      "loadingDescription": "Manuelle Prüfungen der Organisation, die auf eine Entscheidung warten.",
+      "description": "Workflow-Prüfungen der Organisation, über die Sie entscheiden können, neueste zuerst.",
+      "refresh": "Ausstehende Freigaben aktualisieren",
+      "emptyTitle": "Keine ausstehenden Freigaben",
+      "emptyDescription": "Derzeit wartet nichts auf Ihre Prüfung.",
+      "waitingSince": "Wartet · {time}",
+      "approvers": "Prüfer: {names}",
+      "review": "Prüfen"
     }
   },
   "projectResources": {
@@ -5137,5 +5148,65 @@
       "resetDefault": "Standardlayout für meinen Zugriff verwenden ({layout})",
       "saveFailed": "Das Layout der Startseite wurde nicht gespeichert"
     }
+  },
+  "metrics": {
+    "title": "Messwerte",
+    "description": "Erfolgreiche Bereitstellungen, Dauer und Anwendungszustand.",
+    "successRate": "Erfolgsrate der Bereitstellungen",
+    "successRateTrend": "Verlauf der Bereitstellungserfolge",
+    "successRateUnavailable": "Erfolgsrate nicht verfügbar",
+    "trend": "Verlauf von {label}",
+    "durationSeconds": "{seconds, number} s",
+    "durationMinutesSeconds": "{minutes, number} min {seconds, number} s",
+    "columns": {
+      "app": "Anwendung",
+      "environments": "Umgebungen",
+      "latestDeploy": "Letzte Bereitstellung",
+      "image": "Image",
+      "lastDeployed": "Zuletzt bereitgestellt"
+    },
+    "never": "Nie",
+    "recentFailure": "Kürzlicher Fehler",
+    "inFlight": "In Bearbeitung",
+    "inFlightHint": "Wartet auf Freigabe, eingereiht oder wird bereitgestellt",
+    "meanRollout": "Mittlere Bereitstellungsdauer",
+    "meanRolloutHint": "Durchschnitt abgeschlossener Bereitstellungen im Zeitraum",
+    "p95Rollout": "p95-Bereitstellungsdauer",
+    "p95RolloutHint": "Langsamere Bereitstellungen im Zeitraum",
+    "noRollouts": "Keine Bereitstellungen in den letzten {days, number} Tagen",
+    "succeededWindow": "{succeeded, number}/{total, number} erfolgreich in {days, number} Tagen",
+    "outcomes": "Ergebnisse ({days, number} Tage)",
+    "succeeded": "Erfolgreich {count, number}",
+    "failed": "Fehlgeschlagen {count, number}",
+    "rolledBack": "Zurückgesetzt {count, number}",
+    "inFlightCount": "In Bearbeitung {count, number}",
+    "total": "Insgesamt {count, number}",
+    "rolloutsWindow": "Bereitstellungen über {days, number} Tage",
+    "rolloutsPerDay": "Bereitstellungen pro Tag",
+    "apps": "Anwendungen",
+    "emptyTitle": "Noch keine Anwendungen",
+    "emptyDescription": "Registrieren Sie eine Anwendung. Messwerte erscheinen nach der ersten Bereitstellung.",
+    "openApps": "Anwendungen öffnen",
+    "rawPrometheus": "Prometheus-Rohdaten",
+    "temporalUi": "Temporal-Workflow-Oberfläche",
+    "embeddedDashboardsUnavailable": "Eingebettete Dashboards sind in dieser Ansicht nicht verfügbar.",
+    "searchPlaceholder": "Anwendungen, Kennungen und Image-Tags suchen…",
+    "filters": {
+      "status": "Letzte Bereitstellung",
+      "kind": "Art"
+    },
+    "kinds": {
+      "app": "Anwendung",
+      "agent": "Agent"
+    },
+    "views": {
+      "all": "Alle",
+      "mine": "Meine",
+      "failing": "Kürzlicher Fehler",
+      "mineNote": "Die Zustandsübersicht enthält keine Eigentümer. Daher ist diese Ansicht leer."
+    },
+    "staleMetrics": "Aktualisierung fehlgeschlagen. Die zuletzt geladenen Messwerte werden angezeigt.",
+    "metricsUnavailable": "Messwerte konnten nicht geladen werden.",
+    "retryMetrics": "Messwerte erneut laden"
   }
 }

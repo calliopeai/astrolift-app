@@ -3720,6 +3720,17 @@
         "empty": "まだ承認が記録されていません。",
         "unknownApprover": "不明"
       }
+    },
+    "pendingGates": {
+      "title": "承認待ち",
+      "loadingDescription": "組織全体で判断を待っているレビューです。",
+      "description": "組織内で判断できるワークフローのレビューを新しい順に表示します。",
+      "refresh": "承認待ちを更新",
+      "emptyTitle": "承認待ちはありません",
+      "emptyDescription": "現在、レビューを待っている項目はありません。",
+      "waitingSince": "待機開始：{time}",
+      "approvers": "承認者：{names}",
+      "review": "レビュー"
     }
   },
   "projectResources": {
@@ -5134,5 +5145,65 @@
       "resetDefault": "自分のアクセス権に応じた既定のレイアウトを使用（{layout}）",
       "saveFailed": "ホームのレイアウトを保存できませんでした"
     }
+  },
+  "metrics": {
+    "title": "メトリクス",
+    "description": "デプロイの成功率、所要時間、アプリの状態。",
+    "successRate": "デプロイ成功率",
+    "successRateTrend": "デプロイ成功率の推移",
+    "successRateUnavailable": "デプロイ成功率を取得できません",
+    "trend": "{label}の推移",
+    "durationSeconds": "{seconds, number}秒",
+    "durationMinutesSeconds": "{minutes, number}分{seconds, number}秒",
+    "columns": {
+      "app": "アプリ",
+      "environments": "環境",
+      "latestDeploy": "最新デプロイ",
+      "image": "イメージ",
+      "lastDeployed": "最終デプロイ日時"
+    },
+    "never": "なし",
+    "recentFailure": "最近の失敗",
+    "inFlight": "進行中",
+    "inFlightHint": "承認待ち、待機中、またはデプロイ中",
+    "meanRollout": "平均デプロイ時間",
+    "meanRolloutHint": "この期間に完了したデプロイの平均",
+    "p95Rollout": "デプロイ時間のp95",
+    "p95RolloutHint": "この期間の遅いデプロイの指標",
+    "noRollouts": "過去{days, number}日間にデプロイはありません",
+    "succeededWindow": "{days, number}日間で{total, number}件中{succeeded, number}件成功",
+    "outcomes": "結果（{days, number}日間）",
+    "succeeded": "成功 {count, number}件",
+    "failed": "失敗 {count, number}件",
+    "rolledBack": "ロールバック {count, number}件",
+    "inFlightCount": "進行中 {count, number}件",
+    "total": "合計 {count, number}件",
+    "rolloutsWindow": "{days, number}日間のデプロイ",
+    "rolloutsPerDay": "1日あたりのデプロイ",
+    "apps": "アプリ",
+    "emptyTitle": "アプリはまだありません",
+    "emptyDescription": "アプリを登録してください。最初のデプロイ後にメトリクスが表示されます。",
+    "openApps": "アプリを開く",
+    "rawPrometheus": "Prometheusの生メトリクス",
+    "temporalUi": "Temporalワークフロー画面",
+    "embeddedDashboardsUnavailable": "この画面では埋め込みダッシュボードを利用できません。",
+    "searchPlaceholder": "アプリ、スラッグ、イメージタグを検索…",
+    "filters": {
+      "status": "最新デプロイ",
+      "kind": "種類"
+    },
+    "kinds": {
+      "app": "アプリ",
+      "agent": "エージェント"
+    },
+    "views": {
+      "all": "すべて",
+      "mine": "自分のもの",
+      "failing": "最近の失敗",
+      "mineNote": "状態サマリーには所有者の情報がないため、この表示は空です。"
+    },
+    "staleMetrics": "更新に失敗しました。最後に取得できたメトリクスを表示しています。",
+    "metricsUnavailable": "メトリクスを読み込めませんでした。",
+    "retryMetrics": "メトリクスを再試行"
   }
 }

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Translate deployment Metrics and pending human reviews in all eight locales,
+  preserving model/app identities, query/filter values and raw read diagnostics.
+  Failed Metrics reads offer retry and retain the last observed snapshot;
+  unavailable success rates stay distinct from measured zero. Pending review ages
+  use the request clock, and approver names use locale-aware list formatting
+  (#2145).
+
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).

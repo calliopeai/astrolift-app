@@ -3720,6 +3720,17 @@
         "empty": "暂无审批记录。",
         "unknownApprover": "未知"
       }
+    },
+    "pendingGates": {
+      "title": "待审批",
+      "loadingDescription": "组织内等待人工决定的审核。",
+      "description": "按最新优先显示您有权决定的组织工作流审核。",
+      "refresh": "刷新待审批项",
+      "emptyTitle": "没有待审批项",
+      "emptyDescription": "当前没有等待您审核的事项。",
+      "waitingSince": "开始等待：{time}",
+      "approvers": "审批人：{names}",
+      "review": "审核"
     }
   },
   "projectResources": {
@@ -5134,5 +5145,65 @@
       "resetDefault": "使用与我的访问权限对应的默认布局（{layout}）",
       "saveFailed": "未能保存首页布局"
     }
+  },
+  "metrics": {
+    "title": "指标",
+    "description": "部署成功率、耗时和应用状态。",
+    "successRate": "部署成功率",
+    "successRateTrend": "部署成功率趋势",
+    "successRateUnavailable": "部署成功率不可用",
+    "trend": "{label}趋势",
+    "durationSeconds": "{seconds, number}秒",
+    "durationMinutesSeconds": "{minutes, number}分{seconds, number}秒",
+    "columns": {
+      "app": "应用",
+      "environments": "环境",
+      "latestDeploy": "最新部署",
+      "image": "镜像",
+      "lastDeployed": "上次部署时间"
+    },
+    "never": "从未",
+    "recentFailure": "最近失败",
+    "inFlight": "进行中",
+    "inFlightHint": "等待审批、排队中或正在部署",
+    "meanRollout": "平均部署耗时",
+    "meanRolloutHint": "此时间段内已完成部署的平均值",
+    "p95Rollout": "部署耗时 p95",
+    "p95RolloutHint": "此时间段内较慢部署的指标",
+    "noRollouts": "过去{days, number}天没有部署",
+    "succeededWindow": "{days, number}天内共{total, number}次，成功{succeeded, number}次",
+    "outcomes": "结果（{days, number}天）",
+    "succeeded": "成功 {count, number}次",
+    "failed": "失败 {count, number}次",
+    "rolledBack": "已回滚 {count, number}次",
+    "inFlightCount": "进行中 {count, number}次",
+    "total": "共 {count, number}次",
+    "rolloutsWindow": "{days, number}天内的部署",
+    "rolloutsPerDay": "每日部署次数",
+    "apps": "应用",
+    "emptyTitle": "尚无应用",
+    "emptyDescription": "注册应用后，首次部署完成即可显示指标。",
+    "openApps": "打开应用",
+    "rawPrometheus": "Prometheus 原始指标",
+    "temporalUi": "Temporal 工作流界面",
+    "embeddedDashboardsUnavailable": "此视图不提供嵌入式仪表板。",
+    "searchPlaceholder": "搜索应用、标识和镜像标签…",
+    "filters": {
+      "status": "最新部署",
+      "kind": "类型"
+    },
+    "kinds": {
+      "app": "应用",
+      "agent": "智能体"
+    },
+    "views": {
+      "all": "全部",
+      "mine": "我的",
+      "failing": "最近失败",
+      "mineNote": "状态摘要不记录归属，因此此视图为空。"
+    },
+    "staleMetrics": "刷新失败，正在显示上次成功加载的指标。",
+    "metricsUnavailable": "无法加载指标。",
+    "retryMetrics": "重试加载指标"
   }
 }
