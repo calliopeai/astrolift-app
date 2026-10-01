@@ -217,5 +217,33 @@ becomes an invented `UNKNOWN` grant.
 
 This bounded change does not establish ownership protection for every AWS
 lifecycle operation. SQS/DynamoDB update/teardown, provider status/snapshot
-paths, provisioning name races/legacy adoption and workload tag-mutation
-permissions remain separately tracked acceptance work.
+paths and provisioning name races/legacy adoption remain separately tracked
+acceptance work. Workload tag-mutation authority is addressed below.
+
+
+### SQS workload management excludes ownership and policy administration
+
+The SQS `manage` binding mode grants publish/consume operations, queue reads and
+`PurgeQueue` on the verified queue only. It does not grant `TagQueue`,
+`UntagQueue`, `SetQueueAttributes`, `AddPermission` or `RemovePermission`.
+This removes the previous workload `TagQueue`/`SetQueueAttributes` authority:
+applications cannot use the issued grant to replace/remove platform identity
+or edit the queue resource policy to grant that authority. Other modes retain
+their existing message-operation scope.
+
+AWS supports tag-key conditions for tag actions in its
+[SQS authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_sqs.html),
+but the current provider SDK `Grant` contract contains only resource/actions;
+the workload compiler renders unconditional `Allow` statements. It cannot
+express a safe custom-tag-only grant, so all workload tag mutation is omitted.
+Unrestricted
+[`SetQueueAttributes`](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SetQueueAttributes.html)
+also accepts the queue's `Policy` attribute; retaining that permission would
+leave a permission-escalation path around simple tag-action omission.
+
+Queue attributes, custom tags and policy changes must instead use platform
+lifecycle administration. This change preserves those driver APIs; their
+broader live-ownership acceptance audit remains open. Reconcile existing app
+workload identities to replace their previous inline grant policies. These
+checks cover the platform-issued policy, not separate administrator-supplied
+IAM/resource policies that already confer additional privileges.

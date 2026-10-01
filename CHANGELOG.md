@@ -52,6 +52,11 @@
   in all eight locales while preserving access decisions, resource identities,
   original diagnostics and cursor callbacks. Activity ages and day headings use
   the configured locale, request clock and time zone (#2145).
+- SQS workload `manage` keeps message operations and queue purging while omitting
+  tag mutation and unrestricted queue-policy editing. Ownership tags and
+  permission administration no longer follow from the app workload grant;
+  existing identities need policy reconciliation (#2098).
+
 - Verify live AWS source ownership before S3/SQS/DynamoDB bindings and S3 mount
   updates or retained/forced teardown. Refuse unknown or replaced incarnations,
   incomplete DynamoDB tag pages and missing/mismatched resource identities;

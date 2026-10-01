@@ -372,7 +372,11 @@ class SQSDriver(ManagedServiceDriver):
                 ],
             )
         if access_mode == "manage":
-            actions.extend(["sqs:PurgeQueue", "sqs:SetQueueAttributes", "sqs:TagQueue"])
+            # Grant has no IAM Condition/Deny representation. Tag writes can
+            # replace our live owner; unrestricted SetQueueAttributes also
+            # permits a resource-policy edit that can grant tag authority.
+            # Workload manage retains message operations and queue purging.
+            actions.append("sqs:PurgeQueue")
         grants = [Grant(resource=queue_arn, actions=sorted(set(actions)))]
         if kms_key and not kms_key.startswith("alias/aws/"):
             grants.append(
@@ -394,7 +398,12 @@ class SQSDriver(ManagedServiceDriver):
                 "AWS_REGION": ValueRef(literal=self._config.region),
             },
             iam_grants=grants,
-            notes=f"SQS {access_mode} access",
+            notes=f"SQS {access_mode} access"
+            + (
+                "; manage adds queue purging; tag and permission-policy administration are platform-only"
+                if access_mode == "manage"
+                else ""
+            ),
         )
 
     @driver_op(cloud="aws", driver="queue_sqs")
@@ -421,7 +430,14 @@ class SQSDriver(ManagedServiceDriver):
         return {
             "type": "object",
             "properties": {
-                "access_mode": {"type": "string", "enum": ["send", "consume", "both", "manage"]},
+                "access_mode": {
+                    "type": "string",
+                    "enum": ["send", "consume", "both", "manage"],
+                    "description": (
+                        "Manage adds queue purging to message operations; "
+                        "tags and permission policy stay platform-only."
+                    ),
+                },
                 "fifo": {"type": "boolean", "description": "Provision a FIFO queue."},
                 "content_based_deduplication": {"type": "boolean"},
                 "deduplication_scope": {"type": "string", "enum": ["queue", "messageGroup"]},
