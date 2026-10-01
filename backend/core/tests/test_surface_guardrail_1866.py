@@ -61,6 +61,7 @@ ALLOWED: dict[str, str] = {
     "Query.astroliftHuggingFaceModel": "public Hub metadata only: same refreshed active caller/bearer gate before fixed-host bounded repository/revision lookup, no credentials or model weights (#2214)",
     "Query.astroliftModelDeploymentMetrics": "owner-polymorphic manual gate: coherent live same-org model ancestry, CLUSTER_REGISTER at explicit ORG for cluster-owned models or APP_READ_METRICS at actual app/project, current environment/region policy and credential ceilings before every config/cache/HTTP read (#2214)",
     "Query.astroliftClusterModelDensity": "manual actual-region gate: CLUSTER_REGISTER at explicit live ORG with bearer/team ceilings and coherent exact cluster/provider, only current org cluster-owned inventory before counts/config/cache/HTTP (#2214)",
+    "Query.astroliftProviderPlugin": "exact singular reference to the same authenticated install-wide public provider catalog; no tenant config or credentials (#2208)",
     "Query.formFieldTypes": "the static palette of form widget kinds; no tenant data",
     "Query.agentRuntimes": "install-wide agent runtime catalog, the same for every org; refuses anonymous callers",
     "Query.astroliftServerInfo": "public: install and build metadata the shell renders, no tenant data",

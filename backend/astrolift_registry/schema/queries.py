@@ -17,6 +17,7 @@ from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import (
+    GUID,
     FilterField,
     PageType,
     SortKey,
@@ -29,6 +30,11 @@ from astrolift_graphql import (
 )
 from astrolift_identity.schema.types import ProjectType, project_to_type
 from astrolift_lifecycle.models import AppEnvironment, Deployment
+from astrolift_registry.dependency_context import (
+    AppDependencyContext,
+    dependency_operations,
+    read_dependency_context,
+)
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.types import (
     STALE_DEPLOY_WINDOW_DAYS,
@@ -68,6 +74,7 @@ from astrolift_registry.schema.workload_list import (
     cron_last_runs,
 )
 from astrolift_registry.scopes import (
+    app_scope_by_guid,
     app_scope_by_slug,
     registry_organization_scope,
 )
@@ -1150,6 +1157,31 @@ def _workloads_qs(
 
 @strawberry.type
 class RegistryQuery:
+    @strawberry.field(
+        description="Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged."
+    )
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_guid("app_id", permission=Permission.APP_READ),
+        operation=dependency_operations,
+    )
+    @tenant_scoped()
+    def astrolift_app_dependency_context(
+        self,
+        info: Info,
+        app_id: GUID,
+        environment_id: GUID,
+        expected_cluster_id: GUID | None = None,
+        expected_provider_id: GUID | None = None,
+    ) -> AppDependencyContext | None:
+        """APP_READ snapshot for an exact live app/environment pair; no cluster-control authority.
+
+        Expected immutable identities refuse replaced or reassigned targets. Heartbeat
+        and app-wide domain/certificate metadata are persisted observations, not live
+        health, environment binding, renewal or TLS verification.
+        """
+        return read_dependency_context(app_id, environment_id, expected_cluster_id, expected_provider_id)
+
     @strawberry.field
     def astrolift_platform_api_url(self, info: Info) -> str:
         """Public base URL the platform's REST API answers at.

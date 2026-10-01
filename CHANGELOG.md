@@ -55,6 +55,17 @@
   replayed results preserve the first outcome without releasing a newer job.
   Cache failures return generic mutation/result failures while authenticated
   heartbeats remain healthy; admitted jobs may still finish after polling fails.
+- Install discovery advertises `apps.dependency_context` and
+  `providers.reference_read` support while keeping actual dependency/provider
+  data off the curated public schema. Capability flags grant no permissions
+  (#2208).
+
+- Read-only app operators can resolve an exact live environment to redacted
+  cluster/provider identities and persisted heartbeat/domain/certificate
+  observations with `app.read`. Mutation gates remain unchanged. Expected
+  cluster/provider GUIDs refuse replacement or reassignment; authenticated
+  singular provider references remain resolvable past the catalog's 100-row cap
+  (#2208).
 
 - Confirmation dialogs retain handled false outcomes and entered reasons for
   retry without duplicating action diagnostics. Workload restart confirmations

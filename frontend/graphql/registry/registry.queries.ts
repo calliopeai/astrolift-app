@@ -715,3 +715,68 @@ export const SET_APP_ACCESS = gql`
     }
   }
 `;
+
+export const GET_APP_DEPENDENCY_CONTEXT = gql`
+  query GetAppDependencyContext(
+    $appId: GUID!
+    $environmentId: GUID!
+    $expectedClusterId: GUID
+    $expectedProviderId: GUID
+  ) {
+    astroliftAppDependencyContext(
+      appId: $appId
+      environmentId: $environmentId
+      expectedClusterId: $expectedClusterId
+      expectedProviderId: $expectedProviderId
+    ) {
+      appId
+      environmentId
+      environmentName
+      readAt
+      permissions {
+        requiredPermission
+        appReadAllowed
+        appDeployGateAllowed
+        clusterRegisterGateAllowed
+      }
+      cluster {
+        id
+        slug
+        providerId
+        providerSlug
+        region
+        lifecycle
+        isActive
+        heartbeatSource
+        heartbeatState
+        heartbeatStatus
+        heartbeatObservedAt
+      }
+      managedDomain {
+        id
+        zone
+      }
+      managedDomainState
+      domainsScope
+      domainsState
+      domainsTruncated
+      domainLimit
+      domains {
+        id
+        hostname
+        isActive
+        validationStatus
+        validationObservedAt
+        configuredCertificateReferencePresent
+        certificateSource
+        storedCertificateState
+        certificateMetadataState
+        certificateObservedAt
+        storedCertificateExpiresAt
+        storedCertificateRenewalStatus
+      }
+      liveProviderObservationState
+      liveProviderObservationReason
+    }
+  }
+`;

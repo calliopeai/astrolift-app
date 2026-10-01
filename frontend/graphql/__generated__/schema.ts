@@ -105,6 +105,65 @@ export type AlertruledeletedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AppDependencyCluster = {
+  heartbeatObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  heartbeatSource: Scalars['String']['output'];
+  heartbeatState: DependencyObservationState;
+  heartbeatStatus: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  lifecycle: Scalars['String']['output'];
+  providerId: Scalars['GUID']['output'];
+  providerSlug: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  slug: Scalars['String']['output'];
+};
+
+export type AppDependencyContext = {
+  appId: Scalars['GUID']['output'];
+  cluster: AppDependencyCluster;
+  domainLimit: Scalars['Int']['output'];
+  domains: Array<AppDependencyDomain>;
+  domainsScope: Scalars['String']['output'];
+  domainsState: DependencyObservationState;
+  domainsTruncated: Scalars['Boolean']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  liveProviderObservationReason: Scalars['String']['output'];
+  liveProviderObservationState: DependencyObservationState;
+  managedDomain?: Maybe<AppDependencyManagedDomain>;
+  managedDomainState: DependencyObservationState;
+  permissions: AppDependencyPermissions;
+  readAt: Scalars['DateTime']['output'];
+};
+
+export type AppDependencyDomain = {
+  certificateMetadataState: DependencyObservationState;
+  certificateObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  certificateSource: Scalars['String']['output'];
+  configuredCertificateReferencePresent: Scalars['Boolean']['output'];
+  hostname: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  storedCertificateExpiresAt?: Maybe<Scalars['DateTime']['output']>;
+  storedCertificateRenewalStatus?: Maybe<Scalars['String']['output']>;
+  storedCertificateState: Scalars['String']['output'];
+  validationObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  validationStatus: Scalars['String']['output'];
+};
+
+export type AppDependencyManagedDomain = {
+  id: Scalars['GUID']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type AppDependencyPermissions = {
+  appDeployGateAllowed: Scalars['Boolean']['output'];
+  appReadAllowed: Scalars['Boolean']['output'];
+  clusterRegisterGateAllowed: Scalars['Boolean']['output'];
+  requiredPermission: Scalars['String']['output'];
+};
+
 export type Appdomainremovedpayload = {
   deleted: Scalars['Boolean']['output'];
   id: Scalars['GUID']['output'];
@@ -6146,6 +6205,11 @@ export type DeleteWebhookSubscriptionInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type DependencyObservationState =
+  | 'AVAILABLE'
+  | 'NO_DATA'
+  | 'UNAVAILABLE';
+
 export type DeployClusterAgentInput = {
   clusterId: Scalars['GUID']['input'];
 };
@@ -9555,6 +9619,8 @@ export type Query = {
   astroliftAppAccessPreview?: Maybe<AstroliftAppAccessPreview>;
   astroliftAppCertificates: AstroliftAppCertificatesResult;
   astroliftAppCountForCluster: Scalars['Int']['output'];
+  /** Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged. */
+  astroliftAppDependencyContext?: Maybe<AppDependencyContext>;
   astroliftAppDeployTokenRotationMetadata?: Maybe<AstroliftDeployTokenRotationMetadata>;
   /** @deprecated Caps at 100 rows with no way to reach the 101st. Use astroliftAppDeployTokensPage. */
   astroliftAppDeployTokens: Array<AstroliftDeployToken>;
@@ -9718,6 +9784,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftProjectsPage. */
   astroliftProjects: Array<AstroliftProject>;
   astroliftProjectsPage: AstroliftProjectPage;
+  /** An authenticated public provider catalog reference without list caps. expectedId refuses a replaced slug; no tenant configuration or credentials are returned. */
+  astroliftProviderPlugin?: Maybe<AstroliftProviderPlugin>;
   astroliftProviderPlugins: Array<AstroliftProviderPlugin>;
   astroliftProviderRegions: Array<AstroliftProviderRegion>;
   astroliftQuotaUsageHistory: Array<AstroliftQuotaUsagePoint>;
@@ -10202,6 +10270,14 @@ export type QueryAstroliftAppCertificatesArgs = {
 
 export type QueryAstroliftAppCountForClusterArgs = {
   clusterId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftAppDependencyContextArgs = {
+  appId: Scalars['GUID']['input'];
+  environmentId: Scalars['GUID']['input'];
+  expectedClusterId?: InputMaybe<Scalars['GUID']['input']>;
+  expectedProviderId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -11083,6 +11159,12 @@ export type QueryAstroliftProjectsPageArgs = {
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
   sortBy?: InputMaybe<AstroliftListSortKey>;
+};
+
+
+export type QueryAstroliftProviderPluginArgs = {
+  expectedId?: InputMaybe<Scalars['GUID']['input']>;
+  slug: Scalars['String']['input'];
 };
 
 

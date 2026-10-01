@@ -1,5 +1,10 @@
 # Registry access scopes
 
+The additive [app dependency context](app-dependency-context.md) read requires
+`app.read` on one exact app/environment pair and exposes only redacted,
+source-stamped persisted observations. It grants no cluster-control or deploy
+authority and refuses expected cluster/provider GUID mismatches.
+
 App reads and writes check the named app in the active organization. Workload
 keys resolve through their live app. Missing, foreign, deleted or ambiguous
 keys require an explicit organization grant; selecting a team or project does
