@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NextIntlClientProvider } from "next-intl";
 import de from "@/messages/de.json";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 
 import { RESYNC } from "./app-settings-members.fixtures";
 import { ResyncSourceView } from "./ResyncSource";
@@ -37,3 +39,31 @@ export const GermanWidth768: Story = {
     </NextIntlClientProvider>
   ),
 };
+
+export const AgentFrench: Story = {
+  args: { agentMode: true },
+  render: (args) => (
+    <NextIntlClientProvider
+      locale="fr"
+      messages={fr}
+      timeZone="UTC"
+      now={new Date("2026-10-01T12:00:00Z")}
+    >
+      <ResyncSourceView {...args} />
+    </NextIntlClientProvider>
+  ),
+};
+export const AgentJapanese: Story = {
+  args: { agentMode: true, lastResyncAt: null },
+  render: (args) => (
+    <NextIntlClientProvider
+      locale="ja"
+      messages={ja}
+      timeZone="Asia/Tokyo"
+      now={new Date("2026-10-01T12:00:00Z")}
+    >
+      <ResyncSourceView {...args} />
+    </NextIntlClientProvider>
+  ),
+};
+export const SourceUnavailable: Story = { args: { agentMode: true, unavailable: true } };

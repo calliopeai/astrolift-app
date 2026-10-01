@@ -1546,6 +1546,22 @@
           "traces": "Rastreamentos",
           "auditEvents": "Eventos de auditoria"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Ressincronizar o pacote do agente a partir da origem",
+        "description": "Ler a origem registrada e o manifesto selecionado, resolver habilidades e ferramentas e registrar alterações imutáveis do pacote e dos fluxos de trabalho. Isso não inicia uma execução nem confirma uma implantação.",
+        "button": "Ressincronizar pacote",
+        "buttonTooltip": "Ler novamente o repositório, a referência e o caminho do manifesto registrados. O registro não confirma a obtenção do código, uma nova implantação ou a integridade do provedor.",
+        "noResponse": "Falha na ressincronização: o servidor não respondeu.",
+        "failed": "Falha na ressincronização.",
+        "refreshWarning": "A ressincronização de {slug} foi aceita, mas não foi possível atualizar as configurações. Tente ler novamente para ver os dados atuais.",
+        "sourceChanged": "O aplicativo, a origem ou as permissões observadas mudaram. Confira a origem atual antes de ressincronizar.",
+        "acceptedWithoutDetails": "A ressincronização de {slug} foi aceita, mas nenhum detalhe foi retornado. Confira os registros atuais; a conclusão não foi confirmada.",
+        "agentInSync": "A origem registrada de {slug} já está sincronizada. Nenhuma execução foi iniciada.",
+        "agentApplied": "O registro da origem de {slug} foi aplicado. Nenhuma execução foi iniciada; a implantação não foi confirmada.",
+        "inSync": "Já está sincronizado.",
+        "accepted": "Ressincronização aceita para {slug}.",
+        "reportedState": "Ressincronização aceita para {slug}; estado informado: {state}. A conclusão não foi confirmada."
       }
     },
     "common": {
@@ -2678,6 +2694,46 @@
         "cpu_limit": "Limite de CPU por pod",
         "memory_request": "Solicitação de memória por pod",
         "memory_limit": "Limite de memória por pod"
+      }
+    },
+    "managedServicesAdmin": {
+      "title": "Administração de serviços gerenciados",
+      "description": "Edite os campos compatíveis ou solicite o provisionamento com a configuração atual. O comportamento do provedor depende do driver do serviço.",
+      "loading": "Carregando serviços gerenciados…",
+      "readFailed": "Não foi possível consultar os serviços gerenciados.",
+      "retry": "Tentar novamente",
+      "edit": "Editar",
+      "reprovision": "Reprovisionar",
+      "noEditableTooltip": "Este serviço não expõe campos editáveis atualmente. Consulte a documentação do driver antes de alterar a configuração.",
+      "editTooltip": "Edite os campos atualmente expostos pelo serviço. A API pode recusar alterações não compatíveis.",
+      "reprovisionTooltip": "Solicite o provisionamento com a configuração atual. Isso não confirma a substituição do recurso nem a preservação dos dados.",
+      "reprovisionTitle": "Reprovisionar {name}?",
+      "service": "serviço gerenciado",
+      "reprovisionDescription": "Isso solicita o fluxo de provisionamento com a configuração atual. A aceitação não confirma a conclusão, a substituição do recurso ou a preservação dos dados. Consulte a documentação do driver antes de confirmar.",
+      "cancel": "Cancelar",
+      "editTitle": "Editar {name}",
+      "editDescription": "Somente os campos editáveis disponíveis são exibidos. Salvar solicita uma atualização; a API pode recusar alterações não compatíveis. A conclusão é verificada por consultas posteriores do status.",
+      "noEditable": "Este serviço não expõe campos editáveis atualmente. Consulte a documentação do driver e a origem da configuração antes de solicitar o provisionamento.",
+      "save": "Salvar alterações",
+      "numberHint": "Digite um número finito.",
+      "booleanHint": "Digite true, false, 1 ou 0.",
+      "textHint": "O texto é enviado como digitado; valores estruturados sem alterações mantêm seus tipos originais.",
+      "reprovisionFailed": "A solicitação de provisionamento falhou.",
+      "updateFailed": "A solicitação de atualização falhou.",
+      "reprovisionAccepted": "Provisionamento solicitado para {name}.",
+      "updateAccepted": "Atualização solicitada para {name}.",
+      "refreshWarning": "A solicitação foi aceita, mas não foi possível atualizar os serviços gerenciados.",
+      "noChanges": "Nenhuma alteração para salvar.",
+      "invalidNumber": "{field} exige um número finito.",
+      "invalidBoolean": "{field} exige true, false, 1 ou 0.",
+      "status": {
+        "active": "Ativo",
+        "pending": "Pendente",
+        "provisioning": "Provisionando",
+        "updating": "Atualizando",
+        "deprovisioning": "Desprovisionando",
+        "failed": "Falhou",
+        "deleted": "Excluído"
       }
     }
   },

@@ -210,7 +210,7 @@ export function ResyncSourceCard({
 }) {
   return (
     <ResyncSourceView
-      {...useResyncSource(app.slug)}
+      {...useResyncSource(app.slug, app, agentMode)}
       lastResyncAt={app.lastResyncAt ?? null}
       agentMode={agentMode}
     />
@@ -233,7 +233,7 @@ function IngressControlsCard({ appSlug }: { appSlug: string }) {
   return <IngressControlsView {...useIngressControls(appSlug)} />;
 }
 
-function ManagedServicesAdminCard({ appSlug }: { appSlug: string }) {
+export function ManagedServicesAdminCard({ appSlug }: { appSlug: string }) {
   return <ManagedServicesAdminView {...useManagedServicesAdmin(appSlug)} />;
 }
 

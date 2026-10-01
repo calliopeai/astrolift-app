@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Localize app managed-service administration in all eight languages. Preserve
+  unchanged typed configuration when the backend replaces config, expand the
+  wildcard editor to existing keys, and refuse nonfinite numbers and ambiguous
+  booleans. Keep refused drafts and accepted requests through failed reads;
+  provisioning acceptance does not certify completion or data preservation
+  (#2145).
+
+- Localize agent source-resync settings and feedback in all eight locales. Keep
+  accepted registration results through failed reads, preserve raw refusals without
+  refetching, and invalidate stale observed-source callbacks. Registration does not
+  claim a started run, completed redeployment or provider health (#2145).
+
 - Keep Event Grid Basic child ownership under the shared Azure verifier and
   expose its unchanged binding envelope directly to the cross-driver contract
   checks. Actual observed labels, exact ARM identity and strict source checks

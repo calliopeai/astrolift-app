@@ -1546,6 +1546,22 @@
           "traces": "Traces",
           "auditEvents": "Événements d’audit"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Resynchroniser le paquet de l’agent depuis la source",
+        "description": "Lire la source enregistrée et le manifeste sélectionné, résoudre les compétences et les outils, puis enregistrer les modifications immuables du paquet et des workflows. Cela ne lance aucune exécution et ne confirme aucun déploiement.",
+        "button": "Resynchroniser le paquet",
+        "buttonTooltip": "Relire le dépôt, la référence et le chemin du manifeste enregistrés. L’enregistrement ne confirme ni la récupération du code, ni le redéploiement, ni l’état du fournisseur.",
+        "noResponse": "Échec de la resynchronisation : aucune réponse du serveur.",
+        "failed": "Échec de la resynchronisation.",
+        "refreshWarning": "La resynchronisation de {slug} a été acceptée, mais ses paramètres n’ont pas pu être actualisés. Réessayez la lecture pour voir les données actuelles.",
+        "sourceChanged": "L’application, la source ou les autorisations observées ont changé. Vérifiez la source actuelle avant de resynchroniser.",
+        "acceptedWithoutDetails": "La resynchronisation de {slug} a été acceptée, mais aucun détail n’a été renvoyé. Consultez les enregistrements actuels ; l’achèvement n’est pas confirmé.",
+        "agentInSync": "La source enregistrée de {slug} est déjà synchronisée. Aucune exécution n’a été lancée.",
+        "agentApplied": "L’enregistrement de la source de {slug} a été appliqué. Aucune exécution n’a été lancée ; le déploiement n’est pas confirmé.",
+        "inSync": "Déjà synchronisé.",
+        "accepted": "Resynchronisation acceptée pour {slug}.",
+        "reportedState": "Resynchronisation acceptée pour {slug} ; état signalé : {state}. L’achèvement n’est pas confirmé."
       }
     },
     "common": {
@@ -2678,6 +2694,46 @@
         "cpu_limit": "Limite de CPU par pod",
         "memory_request": "Demande de mémoire par pod",
         "memory_limit": "Limite de mémoire par pod"
+      }
+    },
+    "managedServicesAdmin": {
+      "title": "Administration des services gérés",
+      "description": "Modifiez les champs pris en charge ou demandez le provisionnement avec la configuration actuelle. Le comportement du fournisseur dépend du pilote du service.",
+      "loading": "Chargement des services gérés…",
+      "readFailed": "Impossible de consulter les services gérés.",
+      "retry": "Réessayer",
+      "edit": "Modifier",
+      "reprovision": "Reprovisionner",
+      "noEditableTooltip": "Ce service ne présente aucun champ modifiable actuellement. Consultez la documentation du pilote avant de modifier sa configuration.",
+      "editTooltip": "Modifiez les champs actuellement présentés par le service. L’API peut refuser les changements non pris en charge.",
+      "reprovisionTooltip": "Demandez le provisionnement avec la configuration actuelle. Cela ne confirme ni le remplacement de la ressource ni la conservation des données.",
+      "reprovisionTitle": "Reprovisionner {name} ?",
+      "service": "service géré",
+      "reprovisionDescription": "Cette action demande le processus de provisionnement avec la configuration actuelle. Son acceptation ne confirme ni son achèvement, ni le remplacement de la ressource, ni la conservation des données. Consultez la documentation du pilote avant de confirmer.",
+      "cancel": "Annuler",
+      "editTitle": "Modifier {name}",
+      "editDescription": "Seuls les champs modifiables actuellement disponibles sont affichés. Enregistrer demande une mise à jour ; l’API peut refuser les changements non pris en charge. L’achèvement est vérifié par des lectures ultérieures du statut.",
+      "noEditable": "Ce service ne présente aucun champ modifiable actuellement. Consultez la documentation du pilote et la source de configuration avant de demander le provisionnement.",
+      "save": "Enregistrer les modifications",
+      "numberHint": "Saisissez un nombre fini.",
+      "booleanHint": "Saisissez true, false, 1 ou 0.",
+      "textHint": "Le texte est envoyé tel quel ; les valeurs structurées inchangées conservent leur type d’origine.",
+      "reprovisionFailed": "La demande de provisionnement a échoué.",
+      "updateFailed": "La demande de mise à jour a échoué.",
+      "reprovisionAccepted": "Provisionnement demandé pour {name}.",
+      "updateAccepted": "Mise à jour demandée pour {name}.",
+      "refreshWarning": "La demande a été acceptée, mais les services gérés n’ont pas pu être actualisés.",
+      "noChanges": "Aucune modification à enregistrer.",
+      "invalidNumber": "{field} exige un nombre fini.",
+      "invalidBoolean": "{field} exige true, false, 1 ou 0.",
+      "status": {
+        "active": "Actif",
+        "pending": "En attente",
+        "provisioning": "Provisionnement en cours",
+        "updating": "Mise à jour en cours",
+        "deprovisioning": "Déprovisionnement en cours",
+        "failed": "Échec",
+        "deleted": "Supprimé"
       }
     }
   },

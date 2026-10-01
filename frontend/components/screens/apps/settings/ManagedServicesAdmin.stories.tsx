@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
+import { NextIntlClientProvider } from "next-intl";
+import spanish from "@/messages/es.json";
 
 import { LONG, MANAGED_SERVICES_ADMIN, SERVICES } from "./app-settings-members.fixtures";
 import { ManagedServicesAdminView } from "./ManagedServicesAdmin";
@@ -16,10 +18,7 @@ type Story = StoryObj<typeof ManagedServicesAdminView>;
 /** Active, provisioning (actions disabled) and failed services. */
 export const Full: Story = {};
 
-/**
- * The section hides while loading and when there are no live services, so
- * the Loading and Empty stories render nothing inside the frame.
- */
+/** Unknown reads stay visible; confirmed empty inventories retain the hidden section. */
 export const Loading: Story = { args: { services: [], loading: true } };
 
 export const Empty: Story = { args: { services: [] } };
@@ -40,4 +39,41 @@ export const LongStrings: Story = {
   args: {
     services: [{ ...SERVICES[2], name: LONG, environmentName: LONG, statusError: LONG }],
   },
+};
+
+export const ReadError: Story = {
+  args: { services: [], error: "RAW_MANAGED_READ_DIAGNOSTIC", onRetry: async () => {} },
+};
+export const CachedReadError: Story = {
+  args: { error: "RAW_MANAGED_READ_DIAGNOSTIC", onRetry: async () => {} },
+};
+export const WildcardTypedConfig: Story = {
+  args: {
+    services: [
+      {
+        ...SERVICES[0],
+        editableFields: ["*"],
+        config: {
+          capacity: 4,
+          enabled: true,
+          region: "REGION_LITERAL",
+          nested: { mode: "MODE_LITERAL" },
+        },
+      },
+    ],
+  },
+};
+export const PendingReprovision: Story = { args: { reprovisioning: true } };
+export const PendingUpdate: Story = { args: { updating: true } };
+export const UnknownStatus: Story = {
+  args: { services: [{ ...SERVICES[0], status: "constructor" }] },
+};
+export const SpanishWidth768: Story = {
+  render: (args) => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      <div style={{ width: 768 }}>
+        <ManagedServicesAdminView {...args} />
+      </div>
+    </NextIntlClientProvider>
+  ),
 };

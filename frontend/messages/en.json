@@ -2394,6 +2394,22 @@
           "traces": "Traces",
           "auditEvents": "Audit events"
         }
+      },
+      "agentResyncFlow": {
+        "title": "Resync agent package from source",
+        "description": "Read the registered source and selected manifest, resolve skills and tools, and register immutable package and workflow changes. This does not start a run or confirm deployment.",
+        "button": "Resync package",
+        "buttonTooltip": "Read the registered repository, ref and manifest path again. Registration does not confirm checkout, redeployment or provider health.",
+        "noResponse": "Resync failed: no response from the backend.",
+        "failed": "Resync failed.",
+        "refreshWarning": "Resync was accepted for {slug}, but its settings could not refresh. Retry the read to see current data.",
+        "sourceChanged": "The observed app, source or permission changed. Review the current source before resyncing.",
+        "acceptedWithoutDetails": "Resync was accepted for {slug}, but no result details were returned. Check current registration records; completion is unconfirmed.",
+        "agentInSync": "Registered source is already in sync for {slug}. No run was started.",
+        "agentApplied": "Source registration was applied for {slug}. No run was started; deployment is unconfirmed.",
+        "inSync": "Already in sync.",
+        "accepted": "Resync accepted for {slug}.",
+        "reportedState": "Resync accepted for {slug}; reported state: {state}. Completion is unconfirmed."
       }
     },
     "workloadDetail": {
@@ -2697,6 +2713,46 @@
         "cpu_limit": "Per-pod CPU limit",
         "memory_request": "Per-pod memory request",
         "memory_limit": "Per-pod memory limit"
+      }
+    },
+    "managedServicesAdmin": {
+      "title": "Managed service admin",
+      "description": "Edit supported configuration fields or request provisioning with the current configuration. Provider behavior depends on the service driver.",
+      "loading": "Loading managed services…",
+      "readFailed": "Could not read managed services.",
+      "retry": "Retry",
+      "edit": "Edit",
+      "reprovision": "Re-provision",
+      "noEditableTooltip": "No editable fields are currently exposed for this service. Check its driver documentation before changing its configuration.",
+      "editTooltip": "Edit the fields currently exposed by the service. The API may refuse unsupported changes.",
+      "reprovisionTooltip": "Request provisioning using the current configuration. This does not confirm resource replacement or data preservation.",
+      "reprovisionTitle": "Re-provision {name}?",
+      "service": "managed service",
+      "reprovisionDescription": "This requests the provisioning workflow using the current configuration. Acceptance does not confirm completion, resource replacement, or data preservation. Check the service driver documentation before confirming.",
+      "cancel": "Cancel",
+      "editTitle": "Edit {name}",
+      "editDescription": "Only currently exposed editable fields are shown. Saving requests an update; the API may refuse unsupported changes. Completion is verified through subsequent status reads.",
+      "noEditable": "This service currently exposes no editable fields. Consult its driver documentation and configuration source before requesting provisioning.",
+      "save": "Save changes",
+      "numberHint": "Enter a finite number.",
+      "booleanHint": "Enter true, false, 1, or 0.",
+      "textHint": "Text is sent as entered; unchanged structured values keep their original types.",
+      "reprovisionFailed": "Provisioning request failed.",
+      "updateFailed": "Update request failed.",
+      "reprovisionAccepted": "Provisioning requested for {name}.",
+      "updateAccepted": "Update requested for {name}.",
+      "refreshWarning": "The request was accepted, but managed services could not be refreshed.",
+      "noChanges": "No changes to save.",
+      "invalidNumber": "{field} requires a finite number.",
+      "invalidBoolean": "{field} requires true, false, 1, or 0.",
+      "status": {
+        "active": "Active",
+        "pending": "Pending",
+        "provisioning": "Provisioning",
+        "updating": "Updating",
+        "deprovisioning": "Deprovisioning",
+        "failed": "Failed",
+        "deleted": "Deleted"
       }
     }
   },

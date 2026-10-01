@@ -2,6 +2,9 @@
 
 import { Loader2Icon, PencilIcon, PlugIcon, RefreshCwIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
+
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { Can } from "@/components/Can";
 import { StatusDot } from "@/components/StatusDot";
@@ -32,7 +35,13 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftManagedService } from "@/graphql/services/services.types";
 
-import { configValueToString, type useManagedServicesAdmin } from "./use-managed-services-admin";
+import {
+  configValueToString,
+  configValue,
+  editableConfigKeys,
+  managedServiceObservation,
+  type useManagedServicesAdmin,
+} from "./use-managed-services-admin";
 
 export type ManagedServicesAdminViewProps = ReturnType<typeof useManagedServicesAdmin>;
 
@@ -46,11 +55,14 @@ const SERVICE_STATUS_VARIANT: Record<string, "ok" | "warn" | "error" | "pending"
   deleted: "muted",
 };
 
-/**
- * Managed service admin: edit hot-swappable fields in place, or trigger a
- * full re-provision. Hidden while loading and when the app has no live
- * managed services.
- */
+type Review = {
+  kind: "edit" | "reprovision";
+  service: AstroliftManagedService;
+  source: string;
+  scope: number;
+};
+
+/** Local reviews are invalidated by observed target/authority/config changes, not server CAS. */
 export function ManagedServicesAdminView({
   services,
   loading,
@@ -58,73 +70,149 @@ export function ManagedServicesAdminView({
   updating,
   onReprovision,
   onSave,
+  target = "",
+  error = null,
+  onRetry,
 }: ManagedServicesAdminViewProps) {
-  const [reprovisionTarget, setReprovisionTarget] = React.useState<AstroliftManagedService | null>(
-    null
-  );
-  const [editTarget, setEditTarget] = React.useState<AstroliftManagedService | null>(null);
-
-  if (loading && services.length === 0) {
-    return null;
+  const t = useTranslations("apps.managedServicesAdmin");
+  const perms = useMyPermissions();
+  // Keep Can's existing optimistic loading policy and exact app.deploy gate.
+  const allowed = (perms.loading && perms.granted.size === 0) || perms.can("app.deploy");
+  const fingerprint = JSON.stringify([target, allowed]);
+  const [scope, setScope] = React.useState({ fingerprint, serial: 0 });
+  if (scope.fingerprint !== fingerprint) setScope({ fingerprint, serial: scope.serial + 1 });
+  const [review, setReview] = React.useState<Review | null>(null);
+  if (
+    review &&
+    (review.scope !== scope.serial ||
+      !services.some(
+        (s) => s.id === review.service.id && managedServiceObservation(s) === review.source
+      ))
+  )
+    setReview(null);
+  const currentReview = React.useRef<Review | null>(null);
+  const currentWritable = React.useRef(false);
+  const writable = allowed && !error && !loading;
+  React.useLayoutEffect(() => {
+    currentReview.current = review;
+    currentWritable.current = writable;
+    return () => {
+      currentReview.current = null;
+      currentWritable.current = false;
+    };
+  }, [review, writable]);
+  function open(kind: Review["kind"], service: AstroliftManagedService) {
+    if (!currentWritable.current) return;
+    const next = {
+      kind,
+      service: JSON.parse(JSON.stringify(service)) as AstroliftManagedService,
+      source: managedServiceObservation(service),
+      scope: scope.serial,
+    };
+    currentReview.current = next;
+    setReview(next);
   }
-  if (services.length === 0) {
-    return null;
+  function close() {
+    if (currentReview.current !== review) return;
+    currentReview.current = null;
+    setReview(null);
   }
-
+  async function save(service: AstroliftManagedService, values: Record<string, string>) {
+    if (currentReview.current !== review || !currentWritable.current) return false;
+    return onSave(service, values);
+  }
+  async function reprovision(service: AstroliftManagedService) {
+    if (currentReview.current !== review || !currentWritable.current) return false;
+    return onReprovision(service);
+  }
+  if (!loading && !error && services.length === 0) return null;
   return (
     <Section
       title={
         <span className="flex items-center gap-2">
           <PlugIcon className="text-muted-foreground size-4 shrink-0" />
-          Managed service admin
+          {t("title")}
         </span>
       }
-      description="Edit hot-swappable fields in place; trigger a full re-provision when a config change requires tearing down and recreating the backing cloud resource."
+      description={t("description")}
     >
-      <Card className="overflow-hidden p-0">
-        <ul className="divide-y">
-          {services.map((svc) => (
-            <ManagedServiceAdminRow
-              key={svc.id}
-              svc={svc}
-              onReprovision={() => setReprovisionTarget(svc)}
-              onEdit={() => setEditTarget(svc)}
-            />
-          ))}
-        </ul>
-      </Card>
-
+      {loading && (
+        <p role="status" className="text-muted-foreground text-xs">
+          {t("loading")}
+        </p>
+      )}
+      {error && (
+        <div role="alert" className="space-y-2">
+          <p>{t("readFailed")}</p>
+          {error !== t("readFailed") && (
+            <p className="font-mono text-xs [overflow-wrap:anywhere]">{error}</p>
+          )}
+          {onRetry && (
+            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+              {t("retry")}
+            </Button>
+          )}
+        </div>
+      )}
+      {services.length > 0 && (
+        <Card className="overflow-hidden p-0">
+          <ul className="divide-y">
+            {services.map((svc) => (
+              <ManagedServiceAdminRow
+                key={svc.id}
+                svc={svc}
+                disabled={!writable}
+                onReprovision={() => open("reprovision", svc)}
+                onEdit={() => open("edit", svc)}
+              />
+            ))}
+          </ul>
+        </Card>
+      )}
       <ReprovisionConfirmDialog
-        target={reprovisionTarget}
+        target={review?.kind === "reprovision" ? review.service : null}
         loading={reprovisioning}
-        onConfirm={onReprovision}
+        disabled={!writable}
+        onConfirm={reprovision}
+        error={error}
+        onRetry={onRetry}
         onOpenChange={(open) => {
-          if (!open) setReprovisionTarget(null);
+          if (!open) close();
         }}
       />
-      <ManagedServiceEditSheet
-        target={editTarget}
-        loading={updating}
-        onSave={onSave}
-        onOpenChange={(open) => {
-          if (!open) setEditTarget(null);
-        }}
-      />
+      {review?.kind === "edit" && (
+        <ManagedServiceEditSheet
+          key={review.source + ":" + review.scope}
+          target={review.service}
+          loading={updating}
+          disabled={!writable}
+          onSave={save}
+          error={error}
+          onRetry={onRetry}
+          onOpenChange={(open) => {
+            if (!open) close();
+          }}
+        />
+      )}
     </Section>
   );
 }
 
 function ManagedServiceAdminRow({
   svc,
+  disabled,
   onReprovision,
   onEdit,
 }: {
   svc: AstroliftManagedService;
+  disabled: boolean;
   onReprovision: () => void;
   onEdit: () => void;
 }) {
-  const dotStatus = SERVICE_STATUS_VARIANT[svc.status] ?? "muted";
-  const editableCount = svc.editableFields?.length ?? 0;
+  const t = useTranslations("apps.managedServicesAdmin");
+  const knownStatus = Object.hasOwn(SERVICE_STATUS_VARIANT, svc.status);
+  const dotStatus = knownStatus ? SERVICE_STATUS_VARIANT[svc.status] : "muted";
+  const editableCount = editableConfigKeys(svc).length;
   const inFlight = ["provisioning", "updating", "deprovisioning", "pending"].includes(svc.status);
 
   return (
@@ -141,7 +229,7 @@ function ManagedServiceAdminRow({
             {svc.environmentName}
           </Badge>
           <Badge variant="outline" className="text-2xs capitalize">
-            {svc.status}
+            {knownStatus ? t(`status.${svc.status}`) : svc.status}
           </Badge>
         </div>
         {svc.statusError ? (
@@ -157,10 +245,10 @@ function ManagedServiceAdminRow({
                 size="sm"
                 className="h-8"
                 onClick={onEdit}
-                disabled={editableCount === 0 || inFlight}
+                disabled={disabled || editableCount === 0 || inFlight}
               >
                 <PencilIcon className="size-3.5" />
-                Edit
+                {t("edit")}
                 {editableCount > 0 ? (
                   <Badge variant="secondary" className="text-2xs ml-1">
                     {editableCount}
@@ -170,9 +258,7 @@ function ManagedServiceAdminRow({
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               <p className="text-xs">
-                {editableCount === 0
-                  ? "No fields are editable in place for this kind. Use Re-provision to apply a config change that requires a teardown."
-                  : `Edit hot-swappable fields without tearing down the backing resource.`}
+                {editableCount === 0 ? t("noEditableTooltip") : t("editTooltip")}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -183,17 +269,14 @@ function ManagedServiceAdminRow({
                 size="sm"
                 className="h-8"
                 onClick={onReprovision}
-                disabled={inFlight}
+                disabled={disabled || inFlight}
               >
                 <RefreshCwIcon className="size-3.5" />
-                Re-provision
+                {t("reprovision")}
               </Button>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
-              <p className="text-xs">
-                Tear down and recreate the cloud resource. Use when a config change is not in the
-                editable-fields set.
-              </p>
+              <p className="text-xs">{t("reprovisionTooltip")}</p>
             </TooltipContent>
           </Tooltip>
         </Can>
@@ -205,16 +288,23 @@ function ManagedServiceAdminRow({
 function ReprovisionConfirmDialog({
   target,
   loading,
+  disabled,
+  error,
+  onRetry,
   onConfirm,
   onOpenChange,
 }: {
   target: AstroliftManagedService | null;
   loading: boolean;
+  disabled: boolean;
+  error: string | null;
+  onRetry?: () => void;
   onConfirm: (target: AstroliftManagedService) => Promise<boolean>;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useTranslations("apps.managedServicesAdmin");
   async function handleConfirm() {
-    if (!target) return;
+    if (!target || disabled || loading) return;
     if (await onConfirm(target)) onOpenChange(false);
   }
 
@@ -223,19 +313,17 @@ function ReprovisionConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Re-provision {target ? `${target.kind}/${target.name}` : "managed service"}?
+            {t("reprovisionTitle", {
+              name: target ? `${target.kind}/${target.name}` : t("service"),
+            })}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            The driver tears down the backing cloud resource and recreates it from the current
-            config. The service transitions to <span className="font-mono">pending</span>; the
-            lifecycle workflow picks it up. Persistent data on this kind may or may not survive the
-            teardown — check the kind&apos;s driver docs before confirming.
-          </AlertDialogDescription>
+          <AlertDialogDescription>{t("reprovisionDescription")}</AlertDialogDescription>
         </AlertDialogHeader>
+        <ReviewReadFailure error={error} onRetry={onRetry} />
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{t("cancel")}</AlertDialogCancel>
           <AlertDialogAction
-            disabled={loading}
+            disabled={loading || disabled}
             onClick={(e) => {
               e.preventDefault();
               void handleConfirm();
@@ -246,7 +334,7 @@ function ReprovisionConfirmDialog({
             ) : (
               <RefreshCwIcon className="size-4" />
             )}
-            Re-provision
+            {t("reprovision")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -257,35 +345,38 @@ function ReprovisionConfirmDialog({
 function ManagedServiceEditSheet({
   target,
   loading,
+  disabled,
+  error,
+  onRetry,
   onSave,
   onOpenChange,
 }: {
   target: AstroliftManagedService | null;
   loading: boolean;
+  disabled: boolean;
+  error: string | null;
+  onRetry?: () => void;
   onSave: (target: AstroliftManagedService, values: Record<string, string>) => Promise<boolean>;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [values, setValues] = React.useState<Record<string, string>>({});
-
-  React.useEffect(() => {
-    if (!target) {
-      setValues({});
-      return;
-    }
-    const editable = target.editableFields ?? [];
-    const initial: Record<string, string> = {};
-    for (const field of editable) {
-      initial[field] = configValueToString(target.config?.[field]);
-    }
-    setValues(initial);
-  }, [target]);
-
+  const t = useTranslations("apps.managedServicesAdmin");
+  const editable = target ? editableConfigKeys(target) : [];
+  const [values, setValues] = React.useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      editable.map((field) => [
+        field,
+        configValueToString(target ? configValue(target, field) : undefined),
+      ])
+    )
+  );
+  const revision = React.useRef(0);
   async function handleSave() {
-    if (!target) return;
-    if (await onSave(target, values)) onOpenChange(false);
+    if (!target || disabled || loading) return;
+    const approvedRevision = revision.current;
+    if (await onSave(target, values)) {
+      if (revision.current === approvedRevision) onOpenChange(false);
+    }
   }
-
-  const editable = target?.editableFields ?? [];
 
   return (
     <Sheet open={target !== null} onOpenChange={onOpenChange}>
@@ -293,21 +384,16 @@ function ManagedServiceEditSheet({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <PencilIcon className="size-4" />
-            {target ? `Edit ${target.kind}/${target.name}` : "Edit managed service"}
+            {t("editTitle", { name: target ? `${target.kind}/${target.name}` : t("service") })}
           </SheetTitle>
-          <SheetDescription>
-            Only hot-swappable fields are shown. Changes apply via the driver&apos;s update path —
-            no teardown. For other changes, use Re-provision.
-          </SheetDescription>
+          <SheetDescription>{t("editDescription")}</SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <ReviewReadFailure error={error} onRetry={onRetry} />
           {target && editable.length === 0 ? (
             <div className="bg-muted/40 rounded-md border p-3 text-xs">
-              <p className="text-muted-foreground">
-                This kind exposes no editable fields. Edit via the manifest TOML editor and
-                re-provision, or change here once the driver adds in-place support.
-              </p>
+              <p className="text-muted-foreground">{t("noEditable")}</p>
             </div>
           ) : null}
           {editable.map((field) => (
@@ -318,25 +404,59 @@ function ManagedServiceEditSheet({
               <Input
                 id={`msvc-edit-${field}`}
                 value={values[field] ?? ""}
-                onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value }))}
+                onChange={(e) => {
+                  revision.current++;
+                  setValues((v) => ({ ...v, [field]: e.target.value }));
+                }}
                 className="font-mono text-xs"
               />
+              <p className="text-muted-foreground text-xs">
+                {t(
+                  typeof configValue(target!, field) === "number"
+                    ? "numberHint"
+                    : typeof configValue(target!, field) === "boolean"
+                      ? "booleanHint"
+                      : "textHint"
+                )}
+              </p>
             </div>
           ))}
         </div>
 
         <SheetFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Can permission="app.deploy">
-            <Button onClick={() => void handleSave()} disabled={loading || editable.length === 0}>
+            <Button
+              onClick={() => void handleSave()}
+              disabled={disabled || loading || editable.length === 0}
+            >
               {loading ? <Loader2Icon className="size-4 animate-spin" /> : null}
-              Save changes
+              {t("save")}
             </Button>
           </Can>
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** A retained modal must expose the real read retry without requiring dismissal. */
+function ReviewReadFailure({ error, onRetry }: { error: string | null; onRetry?: () => void }) {
+  const t = useTranslations("apps.managedServicesAdmin");
+  if (!error) return null;
+  return (
+    <div role="alert" className="space-y-2">
+      <p>{t("readFailed")}</p>
+      {error !== t("readFailed") && (
+        <p className="font-mono text-xs [overflow-wrap:anywhere]">{error}</p>
+      )}
+      {onRetry && (
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          {t("retry")}
+        </Button>
+      )}
+    </div>
   );
 }

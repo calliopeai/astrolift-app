@@ -81,3 +81,24 @@ remain accepted through a failed view refresh, with separate recovery feedback.
 Observed GUID/version/policy changes invalidate local selectors and callbacks,
 but the API has no immutable target or version precondition. The backend's
 current owner, permission and signal/day validation remain authoritative.
+
+Agent settings source resync uses the existing
+`resyncAstroliftManifestFromRepo(input: {appSlug})` mutation with the current
+`app.update` check. For an agent workload, the server reads the registered source
+and selected manifest, then registers the package/workflow changes synchronously;
+its successful `applied` response does not mean a run was queued or started,
+checkout/redeployment completed, or a provider is healthy. The UI keeps the raw
+server summary and unknown state tokens literal alongside localized outcome copy.
+An accepted envelope without payload remains accepted with an unconfirmed-details
+warning; an accepted request with a failed settings refresh retains its result and
+shows a separate read-recovery warning. Refusals trigger no read or navigation.
+
+The connected card binds callbacks to its observed app GUID/version, organization,
+project and source coordinates. Source/permission withdrawal or a visible ABA
+change invalidates old callbacks; a late result cannot refresh a replacement
+source or clear another target’s pending action. These are local observation
+checks, not server identity/version preconditions: the mutation still sends only
+`appSlug`, and the backend remains authoritative. Permission-loading presentation
+is unchanged. Existing same-target cached observations remain visible after a
+failed read; the outer settings source-error/retry behavior is unchanged. The
+relative timestamp uses the request’s locale/clock and updates each minute.
