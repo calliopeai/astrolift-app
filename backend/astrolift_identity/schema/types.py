@@ -14,6 +14,7 @@ import datetime as dt
 import strawberry
 
 from astrolift_graphql import GUID
+from astrolift_identity.anonymization_state import is_anonymized_user
 
 
 @strawberry.type(name="AstroliftOrganization")
@@ -167,6 +168,10 @@ class UserType:
     username: str
     email: str
     is_active: bool
+    is_anonymized: bool | None = strawberry.field(
+        default=None,
+        description="Stored anonymous-account state; null when the constructor does not know it.",
+    )
 
 
 @strawberry.type(name="AstroliftRoleLineage")
@@ -324,6 +329,7 @@ def user_to_type(user) -> UserType:
         username=user.get_username(),
         email=user.email or "",
         is_active=user.is_active,
+        is_anonymized=is_anonymized_user(user),
     )
 
 

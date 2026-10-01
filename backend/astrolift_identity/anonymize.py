@@ -33,9 +33,9 @@ Permission model:
 
 Idempotency:
 
-A user that's already anonymized (detected by the marker email suffix
-``@anon-astrolift.net`` that ``Profile.anonymize_user`` writes, or by
-``is_active=False`` plus a matching placeholder username) returns
+A user that's already anonymized (inactive with the marker email
+``@anon-astrolift.net`` that ``Profile.anonymize_user`` writes) receives
+the supported attributed-history cleanup without another identity rewrite and returns
 ``ok=True`` with ``was_self`` reflecting whether the actor *would* be
 anonymizing themselves and ``requires_logout=False`` — there's no
 session to drop on an already-deactivated account.
@@ -61,6 +61,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.anonymization_state import is_anonymized_user
 from astrolift_identity.grants import require_grantable
 from astrolift_identity.models import Member
 from astrolift_identity.permission_resolver import _org_confined_bindings
@@ -76,13 +77,6 @@ from core.permissions import (
     check_platform_operator,
 )
 from core.tenancy import TenantContext, get_current_tenant
-
-# Marker substring written into ``user.email`` by
-# ``Profile.anonymize_user`` (see ``core/models/user.py``). Used here
-# to detect the idempotent "already anonymized" case without adding a
-# new schema column.
-_ANON_EMAIL_MARKER = "@anon-astrolift.net"
-
 
 # ---------------------------------------------------------------------------
 # GraphQL types
@@ -192,7 +186,7 @@ def _is_already_anonymized(user) -> bool:
     (suspended accounts also flip to ``is_active=False`` without
     losing PII).
     """
-    return bool(user.email and _ANON_EMAIL_MARKER in user.email) and not user.is_active
+    return is_anonymized_user(user)
 
 
 NOT_FOUND = "user not found"
@@ -263,9 +257,9 @@ class IdentityAnonymizeUserMutation:
         """Anonymize a user's PII while preserving the row for audit-trail
         referential integrity.
 
-        Returns ``ok=true`` even when the target user was already
-        anonymized — operators (and the FE) treat this as a successful
-        no-op rather than a confusing error.
+        Already-anonymous accounts receive the supported history cleanup
+        without changing their anonymous identity. A clean repeat does no
+        privacy writes.
         """
         viewer = _viewer(info)
         if viewer is None:
@@ -281,11 +275,12 @@ class IdentityAnonymizeUserMutation:
         # the check on the self path too, which we explicitly want to allow.
         target = viewer if is_self else _require_may_anonymize(viewer, target_pk or 0)
 
-        # Idempotency: if the user is already anonymized, return the
-        # current state with ``requires_logout=False``. Don't run the
-        # anonymizer a second time — it would overwrite the existing
-        # short_uuid placeholders and pointlessly churn the row.
+        # Clean newly available historical PII without replacing the
+        # existing anonymous identity; no live session needs logging out.
         if _is_already_anonymized(target):
+            from astrolift_identity.personal_history import redact_personal_history
+
+            redact_personal_history(target)
             return gql_success(
                 AstroliftAnonymizeUserPayload(
                     anonymized_user_id=GUID(str(target.pk)),

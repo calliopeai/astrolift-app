@@ -380,9 +380,11 @@ class MutationAuditExtension(SchemaExtension):
         _mutation_action_local.action = None
         # Judged before the mutation runs, as @mutation_audit does (#1955).
         organization_id = self._attributable_organization_id()
+        context = getattr(self.execution_context, "context", None)
+        original_actor = getattr(context, "user", None)
         try:
             yield  # Let the operation execute
-            self._log(organization_id)
+            self._log(organization_id, original_actor=original_actor)
         finally:
             _mutation_action_local.action = None
 
@@ -400,7 +402,7 @@ class MutationAuditExtension(SchemaExtension):
         except Exception:  # noqa: BLE001 - unparseable document
             return request.query.strip().lower().startswith("mutation")
 
-    def _log(self, organization_id):
+    def _log(self, organization_id, *, original_actor=None):
         # After execution, log if it was a mutation
         try:
             request = self.execution_context
@@ -431,6 +433,16 @@ class MutationAuditExtension(SchemaExtension):
                 req = getattr(context, "request", None)
                 if req:
                     ip_address = _get_client_ip(req)
+            # Self-erasure runs before this post-call insert. Preserve the
+            # existing attribution behavior while preventing the request IP
+            # from returning, including the legacy path that logs out first.
+            from astrolift_identity.anonymization_state import is_anonymized_user
+
+            if any(
+                actor is not None and getattr(actor, "is_authenticated", False) and is_anonymized_user(actor)
+                for actor in (user, original_actor)
+            ):
+                ip_address = None
 
             # A mutation sent with inline literals and no `variables` key
             # leaves `request.variables` as None; `variables` is NOT NULL,

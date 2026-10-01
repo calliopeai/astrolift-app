@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Account anonymization reduces supported, attributable historical PII while
+  retaining structural audit facts, foreign subjects and stored role bindings.
+  Database guards admit only the exact reduction for an inactive anonymous
+  account; failures roll back the account transition. Repeat cleanup preserves
+  the anonymous identity, and a nullable user status supports accurate review.
+  IdP callbacks preserve subject/issuer ownership and refuse inactive accounts
+  before restoring caches or issuing sessions. See
+  `docs/operators/account-anonymization.md` for the source inventory and deliberate
+  exclusions (#2220).
+
 - GCP Pub/Sub queues use full immutable service-ID names for new resources and
   preserve exact recorded paths. Current source/default-child ownership,
   bounded inventory and finite SDK budgets gate operations. Retained-data

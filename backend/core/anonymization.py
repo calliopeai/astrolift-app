@@ -86,10 +86,11 @@ def deterministic_placeholders(user_id: int, *, fields: Iterable[str] = USER_PII
 def scrub_event_payload(payload: dict, *, keys: Iterable[str] = EVENT_PAYLOAD_PII_KEYS) -> dict:
     """Return a new payload with PII keys replaced by ``"[anonymized]"``.
 
-    Walks one level deep; nested dicts are not processed. Event
-    payloads in the platform are flat by convention (spec 17 §2)
-    so this matches reality. Tests that pass nested structures will
-    see only top-level keys scrubbed — by design.
+    This legacy pure helper processes top-level keys only, without user
+    attribution. Actual producers also emit nested/mixed-subject payloads.
+    It is deliberately unused by account erasure: the PostgreSQL projection
+    in operations migration 0028 validates exact subject/actor identities
+    and preserves structural and unknown/foreign-subject data.
     """
     if not isinstance(payload, dict):
         return payload

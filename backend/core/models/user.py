@@ -939,6 +939,12 @@ class Profile(RequiresApproveMixin, Tracking):
     @classmethod
     @transaction.atomic
     def anonymize_user(cls, user):
+        from astrolift_identity.anonymization_state import is_anonymized_user
+        from astrolift_identity.personal_history import redact_personal_history
+
+        if is_anonymized_user(user):
+            redact_personal_history(user)
+            return
         short_uuid = f'anon-{user.id}-{str(uuid.uuid4())[:8]}'
         user.username = short_uuid
         user.first_name = short_uuid
@@ -951,6 +957,7 @@ class Profile(RequiresApproveMixin, Tracking):
 
         if user.profile:
             user.profile.anonymize(short_uuid)
+        redact_personal_history(user)
 
 
 def system_user(user_model: Optional[type[Model]] = None) -> User:

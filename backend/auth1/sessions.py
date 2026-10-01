@@ -17,7 +17,9 @@ from authlib.integrations.requests_client import OAuth2Session
 from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.core.handlers.wsgi import WSGIRequest
+from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect
 from django.shortcuts import redirect
@@ -249,6 +251,7 @@ class Auth1SessionWorkflow:
     )
 
     @classmethod
+    @transaction.atomic
     def session(cls, request: WSGIRequest):
         """
         Authentication Session Start Point
@@ -342,6 +345,7 @@ class Auth1SessionWorkflow:
         return f"{next_url}{separator}token={quote_plus(token)}"
 
     @classmethod
+    @transaction.atomic
     def callback(cls, request: WSGIRequest):
         """
         Callback entrypoint from the Auth0 Tenant with the token authentication.
@@ -611,6 +615,7 @@ class Auth1SessionWorkflow:
         return user
 
     @classmethod
+    @transaction.atomic
     def _register_remote_user(cls, request, auth0_token) -> Authentication:
         """
         Register a user with the given auth0 token.
@@ -651,7 +656,31 @@ class Auth1SessionWorkflow:
             _filtered["email_verified"] = True
 
         user_info = UserInfo(**_filtered)
-        user_info.internal_user = cls._lookup_user(user_info)
+        if not user_info.email_verified:
+            raise EmailNotVerifiedException("Email is not verified.")
+
+        # A known external subject keeps its existing account authority.
+        # In particular, a former email must not unlink an anonymous user
+        # and enter auto-signup. Read first, then lock user before cache:
+        # anonymization follows that order too.
+        observed = UserInfo.objects.filter(pk=user_info.pk).first()
+        if observed is not None and (not observed.iss or observed.iss != user_info.iss):
+            raise PermissionDenied("Remote identity issuer does not match.")
+        linked = observed.internal_user_id if observed is not None else None
+        resolved = User.objects.get(pk=linked) if linked is not None else cls._lookup_user(user_info)
+        if resolved is not None:
+            resolved = User.objects.select_for_update().get(pk=resolved.pk)
+            if not resolved.is_active:
+                raise PermissionDenied("Account is inactive.")
+        current = UserInfo.objects.select_for_update().filter(pk=user_info.pk).first()
+        if current is not None:
+            if not current.iss or current.iss != user_info.iss:
+                raise PermissionDenied("Remote identity issuer does not match.")
+            if current.internal_user_id != linked:
+                raise PermissionDenied("Remote identity link changed; retry sign-in.")
+        elif observed is not None:
+            raise PermissionDenied("Remote identity link changed; retry sign-in.")
+        user_info.internal_user = resolved
         user_info.save()
 
         # Keep the linked Django User's display fields in sync with what
@@ -679,9 +708,6 @@ class Auth1SessionWorkflow:
                     _u.username,
                     _changed,
                 )
-
-        if not user_info.email_verified:
-            raise EmailNotVerifiedException(f"Email not verified for user: {user_info.email}")
 
         # Same filtering logic for the Authentication model — providers
         # ship extras (refresh_token, scope shapes, provider-specific
