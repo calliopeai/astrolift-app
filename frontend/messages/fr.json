@@ -6310,5 +6310,31 @@
     "hours": "{count, plural, one {# heure} other {# heures}}",
     "minutesSeconds": "{minutes} min {seconds} s",
     "hoursMinutes": "{hours} h {minutes} min"
+  },
+  "clusterHealth": {
+    "workloadTitle": "État des charges",
+    "workloadHelp": "Disponibilité des Deployments et redémarrages sur 24 heures signalés, avec le plus grand déficit de réplicas en premier. Actualisation toutes les 30 secondes.",
+    "noDeployments": "Aucune donnée de déploiement",
+    "noDeploymentsHelp": "Aucun déploiement renvoyé. Cela ne confirme ni l’accessibilité de l’apiserver ni l’absence de charges.",
+    "restarts": "{count, plural, one {# redémarrage} other {# redémarrages}}",
+    "noRestarts": "Aucun redémarrage signalé",
+    "liveTitle": "État en direct",
+    "liveHelp": "Phases des pods et avertissements récents signalés par le pilote du cluster. Actualisation toutes les 30 secondes.",
+    "noHealth": "Aucune donnée d’état",
+    "noHealthHelp": "Aucune phase de pod ni événement renvoyé. Cela ne confirme ni l’accessibilité de l’apiserver ni l’état du cluster.",
+    "podPhases": "Phases des pods",
+    "noPods": "Aucun pod renvoyé pour les espaces de noms gérés.",
+    "recentEvents": "Événements récents",
+    "noEvents": "Aucun avertissement renvoyé. Cela ne confirme pas l’état du cluster.",
+    "unknown": "Inconnu",
+    "running": "En cours",
+    "succeeded": "Terminé",
+    "pending": "En attente",
+    "failed": "Échec",
+    "crashLoop": "Boucle de plantages",
+    "phaseUnknown": "Inconnu",
+    "cachedPending": "Rapports en cache affichés pendant l’actualisation. L’état actuel n’est pas confirmé.",
+    "cachedFailed": "Échec de l’actualisation. Rapports en cache affichés ; l’état actuel n’est pas confirmé.",
+    "retry": "Réessayer"
   }
 }

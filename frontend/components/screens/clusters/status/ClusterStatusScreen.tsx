@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 import { ListSummary } from "@/components/list/ListSummary";
@@ -44,7 +44,6 @@ import {
   type ClusterLiveState,
   type HeartbeatStatus,
 } from "@/lib/cluster-heartbeat";
-import { formatRelativeAge } from "@/lib/format";
 import { useClusterHeartbeat } from "@/lib/i18n/cluster-heartbeat";
 import { useClusterActivity } from "@/lib/i18n/cluster-activity";
 
@@ -878,6 +877,7 @@ export function StatusWorkloadHealthCard({
   error,
   refetch,
 }: ReturnType<typeof useClusterWorkloadHealth> & { slug: string }) {
+  const t = useTranslations("clusterHealth");
   // Most broken first; the full list is the Health tab's.
   const sorted = [...rows].sort((a, b) => {
     const deficitA = a.desiredReplicas - a.readyReplicas;
@@ -891,8 +891,15 @@ export function StatusWorkloadHealthCard({
     <ListSummary<WorkloadRow>
       span={6}
       icon={<ServerIcon className="size-4" />}
-      title="Workload health"
-      description="Per-Deployment readiness + 24h restart counts, most broken first. Polls every 30s."
+      title={t("workloadTitle")}
+      description={
+        <>
+          {t("workloadHelp")}
+          {rows.length > 0 && (loading || error) && (
+            <CachedHealthNotice loading={loading} error={error} refetch={refetch} />
+          )}
+        </>
+      }
       count={rows.length}
       rows={sorted}
       keyOf={(r) => `${r.namespace}/${r.workloadName}`}
@@ -903,23 +910,32 @@ export function StatusWorkloadHealthCard({
       onRetry={refetch}
       empty={{
         icon: <ServerOffIcon className="size-5" />,
-        title: "No deployment data",
-        description: "Apiserver unreachable or no workloads running yet.",
+        title: t("noDeployments"),
+        description: t("noDeploymentsHelp"),
       }}
     />
   );
 }
 
 function WorkloadRowItem({ row }: { row: WorkloadRow }) {
+  const t = useTranslations("clusterHealth");
+  const format = useFormatter();
+  const activity = useClusterActivity();
   const deficit = row.desiredReplicas - row.readyReplicas;
+  const knownReadiness =
+    observedCount(row.desiredReplicas) &&
+    observedCount(row.readyReplicas) &&
+    row.readyReplicas <= row.desiredReplicas;
   const readyTone =
-    deficit === 0
-      ? "text-success-fg"
-      : deficit === row.desiredReplicas
-        ? "text-destructive"
-        : "text-warning-fg";
+    !knownReadiness || row.desiredReplicas === 0
+      ? "text-muted-foreground"
+      : deficit === 0
+        ? "text-success-fg"
+        : deficit === row.desiredReplicas
+          ? "text-destructive"
+          : "text-warning-fg";
 
-  const deployedAge = row.lastImageDeployedAt ? formatRelativeAge(row.lastImageDeployedAt) : null;
+  const deployedAge = activity.relative(row.lastImageDeployedAt);
 
   return (
     <div className="flex min-w-0 items-center gap-3 text-sm">
@@ -930,20 +946,24 @@ function WorkloadRowItem({ row }: { row: WorkloadRow }) {
         {row.workloadName}
       </code>
       <span className={`shrink-0 font-mono text-xs tabular-nums ${readyTone}`}>
-        {row.readyReplicas} / {row.desiredReplicas}
+        {knownReadiness
+          ? `${format.number(row.readyReplicas)} / ${format.number(row.desiredReplicas)}`
+          : t("unknown")}
       </span>
-      {row.restartCount24h > 0 ? (
+      {!observedCount(row.restartCount24h) ? (
+        <span className="text-muted-foreground text-2xs shrink-0">{t("unknown")}</span>
+      ) : row.restartCount24h > 0 ? (
         <Badge
           variant="outline"
           className="border-warning-border text-warning-fg shrink-0 font-mono"
         >
-          {row.restartCount24h} restart{row.restartCount24h === 1 ? "" : "s"}
+          {t("restarts", { count: row.restartCount24h })}
         </Badge>
       ) : (
-        <span className="text-muted-foreground/60 text-2xs shrink-0">no restarts</span>
+        <span className="text-muted-foreground/60 text-2xs shrink-0">{t("noRestarts")}</span>
       )}
       <span className="text-muted-foreground text-2xs w-20 shrink-0 text-right font-mono">
-        {deployedAge ?? "—"}
+        {deployedAge}
       </span>
     </div>
   );
@@ -958,6 +978,43 @@ const POD_PHASE_TONE: Record<string, Tone> = {
   CrashLoopBackOff: "bad",
   Unknown: "neutral",
 };
+const POD_PHASE_LABEL = {
+  Running: "running",
+  Succeeded: "succeeded",
+  Pending: "pending",
+  Failed: "failed",
+  CrashLoopBackOff: "crashLoop",
+  Unknown: "phaseUnknown",
+} as const;
+
+function observedCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function CachedHealthNotice({
+  loading,
+  error,
+  refetch,
+}: {
+  loading: boolean;
+  error: string | null;
+  refetch: () => void;
+}) {
+  const t = useTranslations("clusterHealth");
+  return (
+    <span role={error ? "alert" : "status"} className="mt-2 block space-y-1">
+      <span className="block">{t(error ? "cachedFailed" : "cachedPending")}</span>
+      {error && (
+        <>
+          <code className="block font-mono [overflow-wrap:anywhere]">{error}</code>
+          <Button size="sm" variant="outline" disabled={loading} onClick={refetch}>
+            {t("retry")}
+          </Button>
+        </>
+      )}
+    </span>
+  );
+}
 
 export function StatusLiveHealthCard({
   pods,
@@ -966,11 +1023,14 @@ export function StatusLiveHealthCard({
   error,
   refetch,
 }: Omit<ReturnType<typeof useClusterHealth>, "moreEvents">) {
+  const t = useTranslations("clusterHealth");
   // Aggregate pod counts by phase across all namespaces — the live
   // view answers "is the cluster green?" before "where is it red?".
-  const phaseTotals = new Map<string, number>();
+  const phaseTotals = new Map<string, number | null>();
   for (const p of pods) {
-    phaseTotals.set(p.phase, (phaseTotals.get(p.phase) ?? 0) + p.count);
+    const previous = phaseTotals.has(p.phase) ? phaseTotals.get(p.phase)! : 0;
+    const total = previous === null || !observedCount(p.count) ? null : previous + p.count;
+    phaseTotals.set(p.phase, observedCount(total) ? total : null);
   }
   const nothing = pods.length === 0 && events.length === 0;
   const phaseOrder = ["Running", "Pending", "Failed", "CrashLoopBackOff", "Succeeded", "Unknown"];
@@ -982,8 +1042,15 @@ export function StatusLiveHealthCard({
     <Panel
       span={6}
       icon={<ActivityIcon className="size-4" />}
-      title="Live health"
-      description="Pod-phase rollup + recent warning events from the cluster driver. Polls every 30s."
+      title={t("liveTitle")}
+      description={
+        <>
+          {t("liveHelp")}
+          {!nothing && (loading || error) && (
+            <CachedHealthNotice loading={loading} error={error} refetch={refetch} />
+          )}
+        </>
+      }
       loading={loading && nothing}
       skeleton={<Skeleton className="h-24 w-full" />}
       error={nothing ? error : null}
@@ -992,8 +1059,8 @@ export function StatusLiveHealthCard({
         nothing
           ? {
               icon: <ServerOffIcon className="size-5" />,
-              title: "No health data",
-              description: "The driver couldn't reach the apiserver.",
+              title: t("noHealth"),
+              description: t("noHealthHelp"),
             }
           : null
       }
@@ -1001,10 +1068,10 @@ export function StatusLiveHealthCard({
       <div className="space-y-4">
         <div>
           <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
-            Pod phases
+            {t("podPhases")}
           </p>
           {phasesSorted.length === 0 ? (
-            <p className="text-muted-foreground text-xs">No pods in managed namespaces.</p>
+            <p className="text-muted-foreground text-xs">{t("noPods")}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {phasesSorted.map(([phase, count]) => (
@@ -1015,12 +1082,10 @@ export function StatusLiveHealthCard({
         </div>
         <div>
           <p className="text-muted-foreground text-2xs mb-2 font-medium tracking-wider uppercase">
-            Recent events
+            {t("recentEvents")}
           </p>
           {events.length === 0 ? (
-            <p className="text-muted-foreground text-xs">
-              No recent warning events. (A quiet event feed is the expected baseline.)
-            </p>
+            <p className="text-muted-foreground text-xs">{t("noEvents")}</p>
           ) : (
             <div>
               {events.map((e, i) => (
@@ -1034,8 +1099,14 @@ export function StatusLiveHealthCard({
   );
 }
 
-function PodPhasePill({ phase, count }: { phase: string; count: number }) {
-  const tone = POD_PHASE_TONE[phase] ?? "neutral";
+function PodPhasePill({ phase, count }: { phase: string; count: number | null }) {
+  const t = useTranslations("clusterHealth");
+  const format = useFormatter();
+  const known = Object.hasOwn(POD_PHASE_TONE, phase);
+  const tone = count === null || !known ? "neutral" : POD_PHASE_TONE[phase];
+  const label = Object.hasOwn(POD_PHASE_LABEL, phase)
+    ? t(POD_PHASE_LABEL[phase as keyof typeof POD_PHASE_LABEL])
+    : phase || t("unknown");
   const classes: Record<Tone, string> = {
     ok: "bg-success/10 text-success-fg border-success-border",
     warn: "bg-warning/10 text-warning-fg border-warning-border",
@@ -1044,24 +1115,30 @@ function PodPhasePill({ phase, count }: { phase: string; count: number }) {
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${classes[tone]}`}
+      title={phase}
+      className={`inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${classes[tone]}`}
     >
-      <span className="font-medium">{phase}</span>
-      <span className="font-mono tabular-nums opacity-80">{count}</span>
+      <span className="min-w-0 truncate font-medium">{label}</span>
+      <span className="shrink-0 font-mono tabular-nums opacity-80">
+        {count === null ? t("unknown") : format.number(count)}
+      </span>
     </span>
   );
 }
 
 function EventRow({ event }: { event: ClusterEvent }) {
+  const activity = useClusterActivity();
   const isWarning = event.type === "Warning";
   const Icon = isWarning ? AlertTriangleIcon : InfoIcon;
   const iconClass = isWarning ? "text-warning" : "text-muted-foreground";
-  const lastSeen = event.lastSeen ? formatRelativeAge(event.lastSeen) : "";
+  const lastSeen = activity.relative(event.lastSeen);
 
   return (
     <div className="border-border/50 flex min-w-0 items-center gap-3 border-b py-2 text-sm last:border-0">
       <Icon className={`size-3.5 shrink-0 ${iconClass}`} />
-      <code className="text-2xs shrink-0 font-mono">{event.reason}</code>
+      <code className="text-2xs max-w-1/3 shrink-0 truncate font-mono" title={event.reason}>
+        {event.reason}
+      </code>
       <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
         <span className="font-mono">{event.involvedObject}</span>
         {event.message && (

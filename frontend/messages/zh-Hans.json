@@ -6307,5 +6307,31 @@
     "hours": "{count, plural, other {#小时}}",
     "minutesSeconds": "{minutes}分{seconds}秒",
     "hoursMinutes": "{hours}小时{minutes}分"
+  },
+  "clusterHealth": {
+    "workloadTitle": "工作负载状态",
+    "workloadHelp": "报告的Deployment就绪情况及过去24小时的重启次数，按副本缺口从大到小排列。每30秒查询一次。",
+    "noDeployments": "无部署数据",
+    "noDeploymentsHelp": "未返回部署。这不能确认apiserver是否可达，也不能确认没有工作负载。",
+    "restarts": "{count, plural, other {# 次重启}}",
+    "noRestarts": "未报告重启",
+    "liveTitle": "实时状态",
+    "liveHelp": "集群驱动报告的Pod阶段和最近的警告事件。每30秒查询一次。",
+    "noHealth": "无状态数据",
+    "noHealthHelp": "未返回Pod阶段或事件。这不能确认apiserver是否可达或集群是否健康。",
+    "podPhases": "Pod阶段",
+    "noPods": "未返回受管理命名空间中的Pod。",
+    "recentEvents": "最近的事件",
+    "noEvents": "未返回警告事件。这不能确认集群是否健康。",
+    "unknown": "未知",
+    "running": "运行中",
+    "succeeded": "成功",
+    "pending": "待处理",
+    "failed": "失败",
+    "crashLoop": "反复崩溃",
+    "phaseUnknown": "未知",
+    "cachedPending": "刷新期间显示缓存报告。当前状态未经确认。",
+    "cachedFailed": "刷新失败。显示缓存报告，当前状态未经确认。",
+    "retry": "重试"
   }
 }

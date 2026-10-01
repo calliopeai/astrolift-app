@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Localize cluster Status workload and driver-health reports in all eight locales.
+  Retained reports show cached/unconfirmed notices after failed or pending reads,
+  with independent retries and literal diagnostics. Unknown pod phases stay
+  neutral; invalid counts and dates remain unknown. Empty reports do not certify
+  apiserver reachability or cluster health (#2145).
+
 - Localize cluster Activity feeds in all eight locales, retaining workflow IDs,
   audit operations, actors and diagnostics. Unknown statuses stay neutral and
   literal; malformed or reversed timestamps cannot report a zero-second duration.

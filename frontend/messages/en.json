@@ -6387,5 +6387,31 @@
     "hours": "{count, plural, one {# hour} other {# hours}}",
     "minutesSeconds": "{minutes}m {seconds}s",
     "hoursMinutes": "{hours}h {minutes}m"
+  },
+  "clusterHealth": {
+    "workloadTitle": "Workload health",
+    "workloadHelp": "Reported Deployment readiness and 24-hour restarts, largest replica deficit first. Polls every 30 seconds.",
+    "noDeployments": "No deployment data",
+    "noDeploymentsHelp": "No deployments were returned. This does not confirm apiserver reachability or the absence of workloads.",
+    "restarts": "{count, plural, one {# restart} other {# restarts}}",
+    "noRestarts": "No restarts reported",
+    "liveTitle": "Live health",
+    "liveHelp": "Reported pod phases and recent warning events from the cluster driver. Polls every 30 seconds.",
+    "noHealth": "No health data",
+    "noHealthHelp": "No pod phases or events were returned. This does not confirm apiserver reachability or cluster health.",
+    "podPhases": "Pod phases",
+    "noPods": "No pods were returned for managed namespaces.",
+    "recentEvents": "Recent events",
+    "noEvents": "No warning events were returned. This does not confirm cluster health.",
+    "unknown": "Unknown",
+    "running": "Running",
+    "succeeded": "Succeeded",
+    "pending": "Pending",
+    "failed": "Failed",
+    "crashLoop": "Crash loop",
+    "phaseUnknown": "Unknown",
+    "cachedPending": "Showing cached reports while refreshing. Current health is unconfirmed.",
+    "cachedFailed": "Refresh failed. Showing cached reports; current health is unconfirmed.",
+    "retry": "Retry"
   }
 }

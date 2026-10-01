@@ -6307,5 +6307,31 @@
     "hours": "{count, plural, other {#時間}}",
     "minutesSeconds": "{minutes}分{seconds}秒",
     "hoursMinutes": "{hours}時間{minutes}分"
+  },
+  "clusterHealth": {
+    "workloadTitle": "ワークロードの状態",
+    "workloadHelp": "報告されたDeploymentの準備状況と過去24時間の再起動数。レプリカ不足が大きい順に表示し、30秒ごとに確認します。",
+    "noDeployments": "デプロイメントデータなし",
+    "noDeploymentsHelp": "デプロイメントが返されませんでした。apiserverへの接続やワークロードが存在しないことを確認したものではありません。",
+    "restarts": "{count, plural, other {再起動 # 回}}",
+    "noRestarts": "再起動の報告なし",
+    "liveTitle": "稼働状態",
+    "liveHelp": "クラスタードライバーから報告されたPodのフェーズと最近の警告イベント。30秒ごとに確認します。",
+    "noHealth": "状態データなし",
+    "noHealthHelp": "Podのフェーズやイベントが返されませんでした。apiserverへの接続やクラスターの健全性を確認したものではありません。",
+    "podPhases": "Podのフェーズ",
+    "noPods": "管理対象の名前空間からPodが返されませんでした。",
+    "recentEvents": "最近のイベント",
+    "noEvents": "警告イベントが返されませんでした。クラスターの健全性を確認したものではありません。",
+    "unknown": "不明",
+    "running": "実行中",
+    "succeeded": "成功",
+    "pending": "保留中",
+    "failed": "失敗",
+    "crashLoop": "クラッシュループ",
+    "phaseUnknown": "不明",
+    "cachedPending": "更新中はキャッシュされたレポートを表示しています。現在の状態は未確認です。",
+    "cachedFailed": "更新に失敗しました。キャッシュされたレポートを表示しています。現在の状態は未確認です。",
+    "retry": "再試行"
   }
 }

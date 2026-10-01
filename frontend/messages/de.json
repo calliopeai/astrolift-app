@@ -6310,5 +6310,31 @@
     "hours": "{count, plural, one {# Stunde} other {# Stunden}}",
     "minutesSeconds": "{minutes} Min. {seconds} Sek.",
     "hoursMinutes": "{hours} Std. {minutes} Min."
+  },
+  "clusterHealth": {
+    "workloadTitle": "Workload-Zustand",
+    "workloadHelp": "Gemeldete Deployment-Bereitschaft und Neustarts der letzten 24 Stunden, größtes Replikatdefizit zuerst. Abfrage alle 30 Sekunden.",
+    "noDeployments": "Keine Deployment-Daten",
+    "noDeploymentsHelp": "Keine Deployments zurückgegeben. Dies bestätigt weder die Erreichbarkeit des Apiservers noch das Fehlen von Workloads.",
+    "restarts": "{count, plural, one {# Neustart} other {# Neustarts}}",
+    "noRestarts": "Keine Neustarts gemeldet",
+    "liveTitle": "Aktueller Zustand",
+    "liveHelp": "Vom Cluster-Treiber gemeldete Pod-Phasen und aktuelle Warnereignisse. Abfrage alle 30 Sekunden.",
+    "noHealth": "Keine Zustandsdaten",
+    "noHealthHelp": "Keine Pod-Phasen oder Ereignisse zurückgegeben. Dies bestätigt weder die Erreichbarkeit des Apiservers noch den Cluster-Zustand.",
+    "podPhases": "Pod-Phasen",
+    "noPods": "Keine Pods für verwaltete Namespaces zurückgegeben.",
+    "recentEvents": "Aktuelle Ereignisse",
+    "noEvents": "Keine Warnereignisse zurückgegeben. Dies bestätigt den Cluster-Zustand nicht.",
+    "unknown": "Unbekannt",
+    "running": "Läuft",
+    "succeeded": "Erfolgreich",
+    "pending": "Ausstehend",
+    "failed": "Fehlgeschlagen",
+    "crashLoop": "Absturzschleife",
+    "phaseUnknown": "Unbekannt",
+    "cachedPending": "Während der Aktualisierung werden zwischengespeicherte Berichte angezeigt. Der aktuelle Zustand ist unbestätigt.",
+    "cachedFailed": "Aktualisierung fehlgeschlagen. Zwischengespeicherte Berichte werden angezeigt; der aktuelle Zustand ist unbestätigt.",
+    "retry": "Erneut versuchen"
   }
 }

@@ -6310,5 +6310,31 @@
     "hours": "{count, plural, one {# hora} other {# horas}}",
     "minutesSeconds": "{minutes} min {seconds} s",
     "hoursMinutes": "{hours} h {minutes} min"
+  },
+  "clusterHealth": {
+    "workloadTitle": "Salud de las cargas",
+    "workloadHelp": "Disponibilidad de Deployments y reinicios de las últimas 24 horas reportados, con el mayor déficit de réplicas primero. Se consulta cada 30 segundos.",
+    "noDeployments": "Sin datos de despliegues",
+    "noDeploymentsHelp": "No se devolvieron despliegues. Esto no confirma la accesibilidad del apiserver ni la ausencia de cargas.",
+    "restarts": "{count, plural, one {# reinicio} other {# reinicios}}",
+    "noRestarts": "No se reportaron reinicios",
+    "liveTitle": "Salud en vivo",
+    "liveHelp": "Fases de pods y eventos de advertencia recientes reportados por el controlador del clúster. Se consulta cada 30 segundos.",
+    "noHealth": "Sin datos de salud",
+    "noHealthHelp": "No se devolvieron fases de pods ni eventos. Esto no confirma la accesibilidad del apiserver ni la salud del clúster.",
+    "podPhases": "Fases de pods",
+    "noPods": "No se devolvieron pods para los espacios de nombres administrados.",
+    "recentEvents": "Eventos recientes",
+    "noEvents": "No se devolvieron eventos de advertencia. Esto no confirma la salud del clúster.",
+    "unknown": "Desconocido",
+    "running": "En ejecución",
+    "succeeded": "Completado",
+    "pending": "Pendiente",
+    "failed": "Fallido",
+    "crashLoop": "Bucle de fallos",
+    "phaseUnknown": "Desconocido",
+    "cachedPending": "Se muestran informes en caché durante la actualización. La salud actual no está confirmada.",
+    "cachedFailed": "La actualización falló. Se muestran informes en caché; la salud actual no está confirmada.",
+    "retry": "Reintentar"
   }
 }

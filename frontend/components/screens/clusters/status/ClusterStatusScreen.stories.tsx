@@ -199,6 +199,54 @@ export const AuditUnknownOperationLongStrings: Story = {
   ),
 };
 
+export const HealthCachedReadFailed: Story = {
+  render: () => (
+    <Screen
+      workloads={<StatusWorkloadHealthCard slug={CLUSTER.slug} {...WORKLOADS} {...QUERY_FAILED} />}
+      liveHealth={<StatusLiveHealthCard {...HEALTH_LONG} {...QUERY_FAILED} />}
+    />
+  ),
+};
+
+export const HealthCachedReadPending: Story = {
+  render: () => (
+    <Screen
+      workloads={<StatusWorkloadHealthCard slug={CLUSTER.slug} {...WORKLOADS} loading />}
+      liveHealth={<StatusLiveHealthCard {...HEALTH} loading />}
+    />
+  ),
+};
+
+export const HealthUnknownReports: Story = {
+  render: () => (
+    <Screen
+      workloads={
+        <StatusWorkloadHealthCard
+          slug={CLUSTER.slug}
+          {...WORKLOADS}
+          rows={[
+            { ...WORKLOADS.rows[0], readyReplicas: -1, lastImageDeployedAt: "RAW_INVALID_TIME" },
+          ]}
+        />
+      }
+      liveHealth={
+        <StatusLiveHealthCard
+          {...HEALTH}
+          pods={[
+            { namespace: "RAW_NAMESPACE", phase: "__proto__", count: 2 },
+            {
+              namespace: "RAW_NAMESPACE",
+              phase: "RAW_FUTURE_PHASE_WITH_LONG_PROVIDER_DETAILS",
+              count: 1,
+            },
+            { namespace: "RAW_NAMESPACE", phase: "Pending", count: -1 },
+          ]}
+        />
+      }
+    />
+  ),
+};
+
 /** Prometheus is configured but unreachable / cluster-internal. */
 export const PrometheusError: Story = {
   render: () => (
