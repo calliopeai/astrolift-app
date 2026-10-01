@@ -11,7 +11,8 @@ import { CoinsIcon } from "lucide-react";
 
 import { Panel } from "@/components/panel/Panel";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import type { RunDay } from "./apps-agents-model";
 import { ChartSeries } from "./ChartSeries";
 import type { HomeRead } from "./home-reads";
@@ -35,14 +36,6 @@ export interface RunsSpendPanelViewProps extends HomeRead {
   spendError?: string | null;
 }
 
-function money(cents: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
-
 /** Pure. */
 export function RunsSpendPanelView({
   panel,
@@ -54,14 +47,15 @@ export function RunsSpendPanelView({
   error,
   onRetry,
 }: RunsSpendPanelViewProps) {
+  const { t, number, money } = useHomePresentation();
   const runs = days.reduce((n, d) => n + d.runs, 0);
   const failed = days.reduce((n, d) => n + d.failed, 0);
   const plus = capped ? "+" : "";
   return (
     <Panel
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<CoinsIcon className="size-4" />}
-      description="Last 7 days"
+      description={t("copy.last7Days")}
       span={panel.span}
       loading={loading}
       error={error}
@@ -69,26 +63,26 @@ export function RunsSpendPanelView({
     >
       <div className="space-y-4">
         <ChartSeries
-          label="Agent runs per day"
-          value={`${runs.toLocaleString("en-US")}${plus}`}
-          hint="7 days"
+          label={t("copy.runsPerDay")}
+          value={`${number(runs)}${plus}`}
+          hint={t("copy.sevenDays")}
           tone="primary"
           kind="bars"
           data={days.map((d) => d.runs)}
         />
         <ChartSeries
-          label="Failed runs per day"
-          value={`${failed.toLocaleString("en-US")}${plus}`}
-          hint="7 days"
+          label={t("copy.failedPerDay")}
+          value={`${number(failed)}${plus}`}
+          hint={t("copy.sevenDays")}
           tone="danger"
           kind="bars"
           data={days.map((d) => d.failed)}
         />
         {spend ? (
           <ChartSeries
-            label="Organization spend per day"
+            label={t("copy.spendPerDay")}
             value={money(spend.totalCents, spend.currency)}
-            hint="7 days"
+            hint={t("copy.sevenDays")}
             tone="secondary"
             kind="bars"
             data={spend.perDay}
@@ -96,15 +90,11 @@ export function RunsSpendPanelView({
         ) : (
           spendError && (
             <p className="text-muted-foreground font-mono text-xs [overflow-wrap:anywhere]">
-              Spend did not load: {spendError}
+              {t("copy.spendReadFailed", { message: spendError })}
             </p>
           )
         )}
-        {capped && (
-          <p className="text-muted-foreground text-xs">
-            Counted from the newest runs; the week holds more.
-          </p>
-        )}
+        {capped && <p className="text-muted-foreground text-xs">{t("copy.cappedRuns")}</p>}
       </div>
     </Panel>
   );

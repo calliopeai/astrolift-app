@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 
@@ -81,6 +85,35 @@ export const FirstSignIn768: Story = {
   render: () => (
     <div style={{ width: 768 }}>
       <Live access={OPERATOR} saved={null} firstSignIn />
+    </div>
+  ),
+};
+
+export const GermanFirstSignIn768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={de}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Live access={OPERATOR} saved={null} firstSignIn />
+    </div>
+  ),
+};
+export const JapaneseOperator768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="ja" messages={ja}>
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Live access={OPERATOR} saved="operator" />
     </div>
   ),
 };

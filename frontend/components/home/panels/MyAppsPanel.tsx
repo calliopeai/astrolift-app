@@ -11,10 +11,10 @@ import { BoxIcon } from "lucide-react";
 
 import { ListSummary } from "@/components/list/ListSummary";
 import { StatusDot } from "@/components/StatusDot";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
-import { appHref, deployDot, statusLabel } from "./apps-agents-model";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
+import { appHref, deployDot } from "./apps-agents-model";
 import type { HomeRead } from "./home-reads";
 import { useMyApps } from "./use-my-apps";
 
@@ -37,6 +37,7 @@ export interface MyAppsPanelViewProps extends HomeRead {
 }
 
 function MyAppLine({ item }: { item: MyAppItem }) {
+  const { t, age, status } = useHomePresentation(true);
   return (
     <span className="flex min-w-0 items-center gap-3">
       <StatusDot status={deployDot(item.status)} />
@@ -50,7 +51,7 @@ function MyAppLine({ item }: { item: MyAppItem }) {
       </span>
       <span className="text-muted-foreground hidden min-w-0 shrink text-right text-xs sm:block">
         <span className="block truncate">
-          {item.status ? statusLabel(item.status) : "Never deployed"}
+          {item.status ? status(item.status) : t("copy.neverDeployed")}
         </span>
         {item.environment && (
           <span className="block truncate font-mono" title={item.environment}>
@@ -59,7 +60,7 @@ function MyAppLine({ item }: { item: MyAppItem }) {
         )}
       </span>
       <span className="text-muted-foreground w-16 shrink-0 text-right font-mono text-xs">
-        {item.deployedAt ? formatRelativeAge(item.deployedAt) : ""}
+        {item.deployedAt ? age(item.deployedAt) : ""}
       </span>
     </span>
   );
@@ -75,9 +76,10 @@ export function MyAppsPanelView({
   error,
   onRetry,
 }: MyAppsPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<BoxIcon className="size-4" />}
       description={mineNote}
       span={panel.span}
@@ -92,10 +94,10 @@ export function MyAppsPanelView({
       onRetry={onRetry}
       empty={{
         icon: <BoxIcon />,
-        title: "No apps of yours yet",
-        description: "Apps you hold a role on show up here.",
+        title: t("copy.noAppsTitle"),
+        description: t("copy.noAppsDescription"),
         actionHref: "/apps",
-        actionLabel: "Browse apps",
+        actionLabel: t("copy.browseApps"),
       }}
     />
   );

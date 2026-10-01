@@ -19,13 +19,9 @@ import { CoinsIcon } from "lucide-react";
 import { Panel } from "@/components/panel/Panel";
 import { cn } from "@/lib/utils";
 
-import type { HomePanelProps } from "../registry";
-import {
-  formatMoney,
-  type MeterTone,
-  type SpendQuotaData,
-  spendMeter,
-} from "./builder-operator-model";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
+import { type MeterTone, type SpendQuotaData, spendMeter } from "./builder-operator-model";
 import { useSpendQuotaPanel } from "./use-home-panels";
 
 export interface SpendQuotaPanelViewProps extends SpendQuotaData {
@@ -49,14 +45,15 @@ export function SpendQuotaPanelView({
   budgetError,
   onRetry,
 }: SpendQuotaPanelViewProps) {
+  const { t, money, fmt } = useHomePresentation();
   const meter = spendMeter(forecast, budget);
   const currency = forecast?.currency ?? budget?.currency ?? "USD";
-  const spentCents = forecast?.mtdCents ?? budget?.currentSpendCents ?? 0;
+  const spentCents = forecast?.mtdCents ?? budget?.currentSpendCents ?? null;
   return (
     <Panel
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<CoinsIcon className="size-4" />}
-      description="Month to date"
+      description={t("copy.monthToDate")}
       span={panel.span}
       loading={loading && !forecast && !budget}
       error={!forecast && !budget ? error : null}
@@ -64,10 +61,13 @@ export function SpendQuotaPanelView({
     >
       <div className="flex min-w-0 flex-col gap-3">
         <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 font-mono tabular-nums">
-          <span className="text-xl">{formatMoney(spentCents, currency)}</span>
+          <span className="text-xl">{spentCents === null ? "—" : money(spentCents, currency)}</span>
           {meter && budget && (
             <span className="text-muted-foreground text-xs">
-              of {formatMoney(budget.amountCents, budget.currency)} · {pct(meter.ratio)}
+              {t("copy.ofBudget", {
+                amount: money(budget.amountCents, budget.currency),
+                percentage: fmt.number(meter.ratio, { style: "percent", maximumFractionDigits: 0 }),
+              })}
             </span>
           )}
         </p>
@@ -75,11 +75,14 @@ export function SpendQuotaPanelView({
           <>
             <div
               role="meter"
-              aria-label={`${panel.title}: spend against budget`}
+              aria-label={t("copy.spendAgainstBudget", { panel: homePanelTitle(panel, t) })}
               aria-valuemin={0}
               aria-valuemax={budget.amountCents / 100}
-              aria-valuenow={spentCents / 100}
-              aria-valuetext={`${formatMoney(spentCents, currency)} of ${formatMoney(budget.amountCents, budget.currency)}`}
+              aria-valuenow={(spentCents ?? 0) / 100}
+              aria-valuetext={t("copy.spendBudgetValue", {
+                spent: money(spentCents ?? budget.currentSpendCents, currency),
+                budget: money(budget.amountCents, budget.currency),
+              })}
               className="bg-muted relative h-2 w-full min-w-0 overflow-hidden rounded-full"
             >
               <div
@@ -95,40 +98,40 @@ export function SpendQuotaPanelView({
               )}
             </div>
             <ul
-              aria-label="Legend"
+              aria-label={t("copy.legend")}
               className="text-muted-foreground flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs"
             >
               <li className="inline-flex items-center gap-1.5">
                 <span aria-hidden className={cn("size-2 rounded-full", FILL[meter.tone])} />
-                Spent{" "}
+                {t("copy.spent")}{" "}
                 <span className="text-foreground font-mono">
-                  {formatMoney(spentCents, currency)}
+                  {spentCents === null ? "—" : money(spentCents, currency)}
                 </span>
               </li>
               {forecast && (
                 <li className="inline-flex items-center gap-1.5">
                   <span aria-hidden className="bg-foreground h-3 w-0.5" />
-                  Projected{" "}
+                  {t("copy.projected")}{" "}
                   <span className="text-foreground font-mono">
-                    {formatMoney(forecast.projectedMonthlyCents, forecast.currency)}
+                    {money(forecast.projectedMonthlyCents, forecast.currency)}
                   </span>
                 </li>
               )}
               <li className="inline-flex items-center gap-1.5">
                 <span aria-hidden className="bg-muted size-2 rounded-full border" />
-                Budget{" "}
+                {t("copy.budget")}{" "}
                 <span className="text-foreground font-mono">
-                  {formatMoney(budget.amountCents, budget.currency)}
+                  {money(budget.amountCents, budget.currency)}
                 </span>{" "}
-                {budget.period}
+                {t.has(`period.${budget.period}`) ? t(`period.${budget.period}`) : budget.period}
               </li>
             </ul>
           </>
         ) : (
           <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
             {budgetError
-              ? `The budget did not load: ${budgetError}`
-              : "No organization budget is set, so there is no quota to draw spend against."}
+              ? t("copy.budgetReadFailed", { message: budgetError })
+              : t("copy.noBudget")}
           </p>
         )}
       </div>

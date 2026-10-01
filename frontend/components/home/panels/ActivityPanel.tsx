@@ -15,21 +15,23 @@ import { ActivityFeed, type ActivityFeedProps } from "@/components/ActivityFeed"
 import { Panel } from "@/components/panel/Panel";
 import { useRecentActivity } from "@/components/use-recent-activity";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 
 export interface ActivityPanelViewProps extends ActivityFeedProps {
   panel: HomePanelProps["panel"];
 }
 
 export function ActivityPanelView({ panel, ...feed }: ActivityPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <Panel
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<ActivityIcon className="size-4" />}
       span={panel.span}
       actions={
         <Link href={panel.href} className="text-primary text-xs font-medium hover:underline">
-          Audit log
+          {t("copy.auditLog")}
         </Link>
       }
     >

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import { describe, expect, it, vi } from "vitest";
 
 import { BOTH, homeProps, ONLY_APPS } from "./fixtures";

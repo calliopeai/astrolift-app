@@ -14,7 +14,8 @@ import { providerLabel } from "@/components/screens/clusters/list/clusters-list"
 import type { ClusterRow } from "@/components/screens/clusters/list/use-clusters-list";
 import { StatusDot } from "@/components/StatusDot";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import { type ClusterHealth, clusterHealth, healthCounts } from "./builder-operator-model";
 import type { HomeRead } from "./home-reads";
 import { useClustersPanel } from "./use-home-panels";
@@ -26,27 +27,28 @@ export interface ClustersPanelViewProps extends HomeRead {
   count: number | null;
 }
 
-const HEALTH: Record<ClusterHealth, { label: string; dot: "ok" | "warn" | "error" | "muted" }> = {
-  error: { label: "Setup failed", dot: "error" },
-  offline: { label: "Offline", dot: "error" },
-  degraded: { label: "Degraded", dot: "warn" },
-  never_seen: { label: "Never seen", dot: "muted" },
-  connected: { label: "Connected", dot: "ok" },
+const HEALTH: Record<ClusterHealth, "ok" | "warn" | "error" | "muted"> = {
+  error: "error",
+  offline: "error",
+  degraded: "warn",
+  never_seen: "muted",
+  connected: "ok",
 };
 
 const ORDER: ClusterHealth[] = ["error", "offline", "degraded", "never_seen", "connected"];
 
 /** "3 connected · 1 offline", the healths that have any clusters, worst first. */
 function Summary({ rows }: { rows: ClusterRow[] }) {
+  const { t, number } = useHomePresentation();
   const counts = healthCounts(rows);
   const parts = ORDER.filter((h) => counts[h] > 0);
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
       {parts.map((h) => (
         <span key={h} className="inline-flex items-center gap-1.5">
-          <StatusDot status={HEALTH[h].dot} />
-          <span className="font-mono tabular-nums">{counts[h]}</span>
-          <span>{HEALTH[h].label.toLowerCase()}</span>
+          <StatusDot status={HEALTH[h]} />
+          <span className="font-mono tabular-nums">{number(counts[h])}</span>
+          <span>{t(`health.${h}`)}</span>
         </span>
       ))}
     </span>
@@ -54,17 +56,20 @@ function Summary({ rows }: { rows: ClusterRow[] }) {
 }
 
 function ClusterLine({ cluster }: { cluster: ClusterRow }) {
+  const { t } = useHomePresentation();
   const health = HEALTH[clusterHealth(cluster)];
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <StatusDot status={health.dot} />
+      <StatusDot status={health} />
       <span className="min-w-0 flex-1 truncate" title={cluster.name}>
         {cluster.name}
       </span>
       <span className="text-muted-foreground hidden shrink-0 font-mono text-xs sm:inline">
         {providerLabel(cluster.providerPluginSlug)} · {cluster.region}
       </span>
-      <span className="text-muted-foreground shrink-0 text-xs">{health.label}</span>
+      <span className="text-muted-foreground shrink-0 text-xs">
+        {t(`health.${clusterHealth(cluster)}`)}
+      </span>
     </span>
   );
 }
@@ -77,9 +82,10 @@ export function ClustersPanelView({
   error,
   onRetry,
 }: ClustersPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<ServerIcon className="size-4" />}
       description={rows.length > 0 ? <Summary rows={rows} /> : undefined}
       span={panel.span}
@@ -94,10 +100,10 @@ export function ClustersPanelView({
       onRetry={onRetry}
       empty={{
         icon: <ServerIcon />,
-        title: "No clusters yet",
-        description: "Register a cluster to run apps and agents on it.",
+        title: t("copy.noClustersTitle"),
+        description: t("copy.noClustersDescription"),
         actionHref: "/clusters/new",
-        actionLabel: "Register a cluster",
+        actionLabel: t("copy.registerCluster"),
       }}
     />
   );

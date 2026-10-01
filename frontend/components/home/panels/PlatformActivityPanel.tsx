@@ -15,9 +15,9 @@ import { Feed } from "@/components/feed/Feed";
 import { Panel } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import type { AstroliftWorkflowRun } from "@/graphql/operations/operations.types";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import { platformRunReason } from "./builder-operator-model";
 import { usePlatformActivityPanel } from "./use-home-panels";
 
@@ -44,7 +44,11 @@ const STATUS_DOT: Record<string, "ok" | "warn" | "error" | "muted" | "pending"> 
 const BY_DAY = { day: (r: AstroliftWorkflowRun) => r.startedAt ?? r.endedAt ?? "" };
 
 function RunItem({ run }: { run: AstroliftWorkflowRun }) {
-  const reason = platformRunReason(run);
+  const { t, age, status } = useHomePresentation(true);
+  const reason = platformRunReason(run, {
+    timeout: t("copy.timedOut"),
+    missing: t("copy.noReason"),
+  });
   return (
     <div className="flex min-w-0 items-start gap-2 px-1">
       <StatusDot status={STATUS_DOT[run.status] ?? "muted"} className="mt-1.5" />
@@ -53,15 +57,13 @@ function RunItem({ run }: { run: AstroliftWorkflowRun }) {
           <span className="min-w-0 flex-1 truncate font-mono" title={run.workflowKind}>
             {run.workflowKind}
           </span>
-          <span className="text-muted-foreground shrink-0 text-xs">
-            {run.status.replace(/_/g, " ")}
-          </span>
+          <span className="text-muted-foreground shrink-0 text-xs">{status(run.status)}</span>
           {run.startedAt && (
             <time
               dateTime={run.startedAt}
               className="text-muted-foreground shrink-0 font-mono text-xs"
             >
-              {formatRelativeAge(run.startedAt)}
+              {age(run.startedAt)}
             </time>
           )}
         </p>
@@ -88,9 +90,10 @@ export function PlatformActivityPanelView({
   loadingMore,
   onLoadMore,
 }: PlatformActivityPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <Panel
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<ActivityIcon className="size-4" />}
       span={panel.span}
       actions={
@@ -100,7 +103,7 @@ export function PlatformActivityPanelView({
       }
     >
       <Feed
-        label={panel.title}
+        label={homePanelTitle(panel, t)}
         items={items}
         keyOf={(r) => r.id}
         renderItem={(r) => <RunItem run={r} />}
@@ -115,8 +118,8 @@ export function PlatformActivityPanelView({
         dense
         empty={{
           icon: <ActivityIcon className="size-5" />,
-          title: "No platform activity yet",
-          description: "Deploys, onboarding and cluster operations show up here as they run.",
+          title: t("copy.noPlatformTitle"),
+          description: t("copy.noPlatformDescription"),
         }}
       />
     </Panel>

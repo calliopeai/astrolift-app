@@ -11,7 +11,7 @@ import {
   SettingsIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useFormatter, useNow, useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import type { AstroliftActivityItem } from "@/graphql/operations/operations.types";
@@ -57,12 +57,23 @@ export function ActivityFeed({
   maxHeight,
 }: ActivityFeedProps) {
   const t = useTranslations("overview.activity");
+  const format = useFormatter();
+  const now = useNow({ updateInterval: 60_000 });
   return (
     <Feed
-      label="Activity"
+      label={t("title")}
       items={items}
       keyOf={(item) => item.id}
-      renderItem={(item) => <ActivityRow item={item} />}
+      renderItem={(item) => (
+        <ActivityRow
+          item={item}
+          timestamp={
+            Number.isFinite(Date.parse(item.occurredAt))
+              ? format.relativeTime(new Date(item.occurredAt), now)
+              : item.occurredAt
+          }
+        />
+      )}
       groupBy={BY_DAY}
       loading={loading}
       error={error}
@@ -87,11 +98,11 @@ const BY_DAY = { day: (item: AstroliftActivityItem) => item.occurredAt };
 
 interface ActivityRowProps {
   item: AstroliftActivityItem;
+  timestamp: string;
 }
 
-function ActivityRow({ item }: ActivityRowProps) {
+function ActivityRow({ item, timestamp }: ActivityRowProps) {
   const Icon = iconForEventType(item.eventType);
-  const timestamp = formatRelative(item.occurredAt);
 
   const body = (
     <div className="flex min-w-0 items-start gap-3">
@@ -158,39 +169,4 @@ function iconForEventType(eventType: string) {
     default:
       return ActivityIcon;
   }
-}
-
-const RELATIVE_DIVISIONS: ReadonlyArray<{
-  amount: number;
-  unit: Intl.RelativeTimeFormatUnit;
-}> = [
-  { amount: 60, unit: "second" },
-  { amount: 60, unit: "minute" },
-  { amount: 24, unit: "hour" },
-  { amount: 7, unit: "day" },
-  { amount: 4.34524, unit: "week" },
-  { amount: 12, unit: "month" },
-  { amount: Number.POSITIVE_INFINITY, unit: "year" },
-];
-
-/**
- * Format an ISO timestamp as "3m ago" / "yesterday" / "2y ago".
- *
- * Uses ``Intl.RelativeTimeFormat`` with the browser locale so the
- * label respects the user's preference. Falls back to the raw ISO
- * string if the input fails to parse — better that than crashing
- * the row.
- */
-function formatRelative(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  let duration = (date.getTime() - Date.now()) / 1000;
-  for (const division of RELATIVE_DIVISIONS) {
-    if (Math.abs(duration) < division.amount) {
-      return rtf.format(Math.round(duration), division.unit);
-    }
-    duration /= division.amount;
-  }
-  return iso;
 }

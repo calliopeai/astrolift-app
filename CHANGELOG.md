@@ -5,6 +5,10 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Translate Home layouts, panel states, approvals and observed metric presentation
+  in all eight locales while preserving access decisions, resource identities,
+  original diagnostics and cursor callbacks. Activity ages and day headings use
+  the configured locale, request clock and time zone (#2145).
 
 - Shared model by-ID reads and locks include current organization constraints
   directly, including exact cluster-scoped provider locks. Install-shared

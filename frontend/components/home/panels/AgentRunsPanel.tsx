@@ -9,11 +9,14 @@
 import { PlayIcon } from "lucide-react";
 
 import { ListSummary } from "@/components/list/ListSummary";
-import { outcomeOf } from "@/components/screens/administration/insights/combined-runs";
-import { RunOutcomeCell } from "@/components/screens/tasks/RunsScreen";
-import { formatRelativeAge } from "@/lib/format";
+import {
+  outcomeOf,
+  type RunOutcome,
+} from "@/components/screens/administration/insights/combined-runs";
+import { StatusDot } from "@/components/StatusDot";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import { agentRunHref } from "./apps-agents-model";
 import type { HomeAgentTask, HomeRead } from "./home-reads";
 import { useAgentRunsPanel } from "./use-home-panels";
@@ -24,7 +27,18 @@ export interface AgentRunsPanelViewProps extends HomeRead {
   count: number | null;
 }
 
+const OUTCOME_DOT: Record<RunOutcome, "ok" | "warn" | "error" | "muted" | "pending"> = {
+  running: "pending",
+  waiting: "warn",
+  succeeded: "ok",
+  failed: "error",
+  cancelled: "muted",
+  unknown: "muted",
+};
+
 function RunLine({ run }: { run: HomeAgentTask }) {
+  const { age, status } = useHomePresentation(true);
+  const outcome = outcomeOf("agent", run.status);
   return (
     <span className="flex min-w-0 items-center gap-3">
       <span className="w-12 shrink-0 font-mono text-xs" title={run.id}>
@@ -34,10 +48,18 @@ function RunLine({ run }: { run: HomeAgentTask }) {
         {run.agentSlug || run.agentName}
       </span>
       <span className="min-w-0 shrink-0">
-        <RunOutcomeCell run={{ outcome: outcomeOf("agent", run.status), status: run.status }} />
+        <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs">
+          <StatusDot status={OUTCOME_DOT[outcome]} />
+          <span>{status(outcome)}</span>
+          {run.status && run.status !== outcome && (
+            <span className="text-muted-foreground truncate" title={run.status}>
+              · {status(run.status)}
+            </span>
+          )}
+        </span>
       </span>
       <span className="text-muted-foreground w-16 shrink-0 text-right font-mono text-xs">
-        {formatRelativeAge(run.startedAt ?? run.createdAt)}
+        {age(run.startedAt ?? run.createdAt)}
       </span>
     </span>
   );
@@ -52,9 +74,10 @@ export function AgentRunsPanelView({
   error,
   onRetry,
 }: AgentRunsPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<PlayIcon className="size-4" />}
       span={panel.span}
       count={loading || error ? null : count}
@@ -68,10 +91,10 @@ export function AgentRunsPanelView({
       onRetry={onRetry}
       empty={{
         icon: <PlayIcon />,
-        title: "No agent runs yet",
-        description: "Runs of the agents you can see show up here.",
+        title: t("copy.noAgentRunsTitle"),
+        description: t("copy.noAgentRunsDescription"),
         actionHref: "/agents",
-        actionLabel: "Open agents",
+        actionLabel: t("copy.openAgents"),
       }}
     />
   );

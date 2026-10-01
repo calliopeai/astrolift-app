@@ -62,12 +62,9 @@ vi.mock("next-intl", async (importOriginal) => {
   return {
     ...actual,
     useTranslations: (namespace?: string) =>
-      namespace?.startsWith("shared.") ? actual.useTranslations(namespace) : (key: string) => key,
-    useFormatter: () => ({
-      dateTime: (d: Date) => d.toISOString(),
-      relativeTime: (d: Date) => d.toISOString(),
-      number: (n: number) => String(n),
-    }),
+      namespace === "home" || namespace?.startsWith("shared.")
+        ? actual.useTranslations(namespace)
+        : (key: string) => key,
     useLocale: () => "en",
   };
 });

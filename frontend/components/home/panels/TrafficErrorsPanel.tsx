@@ -19,13 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatSignalValue } from "@/components/observability/golden-signals-types";
-import {
-  type ObservabilityPanelReason,
-  panelEmptyState,
-} from "@/components/observability/panel-reason";
+import { type ObservabilityPanelReason } from "@/components/observability/panel-reason";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import { appHref, seriesFigures } from "./apps-agents-model";
 import { ChartSeries } from "./ChartSeries";
 import type { HomeRead } from "./home-reads";
@@ -49,9 +46,6 @@ export interface TrafficErrorsPanelViewProps extends HomeRead {
   reason: ObservabilityPanelReason | null;
 }
 
-const fmt = (s: SignalSeries | null, n: number | null) =>
-  s && n !== null ? formatSignalValue(n, s.unit) : null;
-
 /** Pure. */
 export function TrafficErrorsPanelView({
   panel,
@@ -65,20 +59,25 @@ export function TrafficErrorsPanelView({
   error,
   onRetry,
 }: TrafficErrorsPanelViewProps) {
+  const { t, signal } = useHomePresentation();
   const noApps = !loading && !error && apps.length === 0;
   const flat = !traffic?.values.length && !errors?.values.length;
   const quiet = !loading && !error && !noApps && (flat || (reason !== null && reason !== "OK"));
-  const why = panelEmptyState(reason ?? "NO_DATA_YET", {
-    thing: "requests",
-    notConfigured: "This app's cluster has no Prometheus endpoint, so its traffic is not flowing.",
-  });
-  const t = seriesFigures(traffic?.values ?? []);
+  const why =
+    reason === "NOT_CONFIGURED"
+      ? { title: t("copy.notConfiguredTitle"), description: t("copy.notConfiguredDescription") }
+      : reason === "NOT_SUPPORTED_BY_PROVIDER"
+        ? { title: t("copy.notSupportedTitle"), description: t("copy.notSupportedDescription") }
+        : reason === "ERROR"
+          ? { title: t("copy.metricErrorTitle"), description: t("copy.metricErrorDescription") }
+          : { title: t("copy.noRequestsTitle"), description: t("copy.noRequestsDescription") };
+  const trafficFigures = seriesFigures(traffic?.values ?? []);
   const e = seriesFigures(errors?.values ?? []);
   return (
     <Panel
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<ActivityIcon className="size-4" />}
-      description="Last 24 hours"
+      description={t("copy.last24Hours")}
       span={panel.span}
       loading={loading}
       error={error}
@@ -86,8 +85,8 @@ export function TrafficErrorsPanelView({
       actions={
         apps.length > 0 && (
           <Select value={appSlug ?? undefined} onValueChange={onAppChange}>
-            <SelectTrigger size="sm" className="w-40 min-w-0" aria-label="App">
-              <SelectValue placeholder="Pick an app" />
+            <SelectTrigger size="sm" className="w-40 min-w-0" aria-label={t("copy.app")}>
+              <SelectValue placeholder={t("copy.pickApp")} />
             </SelectTrigger>
             <SelectContent>
               {apps.map((a) => (
@@ -103,10 +102,10 @@ export function TrafficErrorsPanelView({
         noApps
           ? {
               icon: <ActivityIcon />,
-              title: "No apps of yours yet",
-              description: "Traffic for apps you hold a role on shows up here.",
+              title: t("copy.noAppsTitle"),
+              description: t("copy.trafficAppsDescription"),
               actionHref: panel.href,
-              actionLabel: "Browse apps",
+              actionLabel: t("copy.browseApps"),
             }
           : quiet
             ? {
@@ -114,25 +113,31 @@ export function TrafficErrorsPanelView({
                 title: why.title,
                 description: why.description,
                 actionHref: appSlug ? appHref(appSlug) : panel.href,
-                actionLabel: "Open the app",
+                actionLabel: t("copy.openApp"),
               }
             : null
       }
     >
       <div className="space-y-4">
         <ChartSeries
-          label="Requests"
-          value={fmt(traffic, t.last)}
-          hint="now"
+          label={t("copy.requests")}
+          value={
+            traffic && trafficFigures.last !== null
+              ? signal(trafficFigures.last, traffic.unit)
+              : null
+          }
+          hint={t("copy.now")}
           tone="primary"
           kind="line"
           data={traffic?.values ?? []}
         />
         <ChartSeries
-          label="Errors"
-          value={fmt(errors, e.last)}
+          label={t("copy.errors")}
+          value={errors && e.last !== null ? signal(e.last, errors.unit) : null}
           hint={
-            e.mean !== null && errors ? `avg ${formatSignalValue(e.mean, errors.unit)}` : undefined
+            e.mean !== null && errors
+              ? t("copy.average", { value: signal(e.mean, errors.unit) })
+              : undefined
           }
           tone="danger"
           kind="line"

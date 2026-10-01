@@ -10,10 +10,10 @@ import { RocketIcon } from "lucide-react";
 
 import { ListSummary } from "@/components/list/ListSummary";
 import { StatusDot } from "@/components/StatusDot";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
-import { deployDot, deployHref, statusLabel } from "./apps-agents-model";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
+import { deployDot, deployHref } from "./apps-agents-model";
 import type { HomeRead } from "./home-reads";
 import { useRecentDeployments } from "./use-recent-deployments";
 
@@ -35,6 +35,7 @@ export interface RecentDeploymentsPanelViewProps extends HomeRead {
 }
 
 function DeployLine({ item }: { item: RecentDeployItem }) {
+  const { age, status } = useHomePresentation(true);
   return (
     <span className="flex min-w-0 items-center gap-3">
       <StatusDot status={deployDot(item.status)} />
@@ -46,10 +47,10 @@ function DeployLine({ item }: { item: RecentDeployItem }) {
         <span className="text-muted-foreground font-mono text-xs"> · {item.environment}</span>
       </span>
       <span className="text-muted-foreground hidden shrink-0 text-xs sm:inline">
-        {statusLabel(item.status)}
+        {status(item.status)}
       </span>
       <span className="text-muted-foreground w-16 shrink-0 text-right font-mono text-xs">
-        {formatRelativeAge(item.at)}
+        {age(item.at)}
       </span>
     </span>
   );
@@ -64,9 +65,10 @@ export function RecentDeploymentsPanelView({
   error,
   onRetry,
 }: RecentDeploymentsPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<RocketIcon className="size-4" />}
       span={panel.span}
       count={count}
@@ -80,10 +82,10 @@ export function RecentDeploymentsPanelView({
       onRetry={onRetry}
       empty={{
         icon: <RocketIcon />,
-        title: "No deployments yet",
-        description: "Deploys you can see show up here.",
+        title: t("copy.noDeploymentsTitle"),
+        description: t("copy.noDeploymentsDescription"),
         actionHref: "/deployments/new",
-        actionLabel: "Start a deployment",
+        actionLabel: t("copy.startDeployment"),
       }}
     />
   );

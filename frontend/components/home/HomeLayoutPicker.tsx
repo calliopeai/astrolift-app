@@ -8,12 +8,20 @@
  * Pure: the value and the save are the caller's.
  */
 
+import { useTranslations } from "next-intl";
+
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-import { HOME_PANELS, type HomeLayoutDef, type HomeLayoutKey } from "./registry";
+import {
+  HOME_PANELS,
+  homePanelTitle,
+  localizedHomeLayout,
+  type HomeLayoutDef,
+  type HomeLayoutKey,
+} from "./registry";
 
 export interface HomeLayoutPickerProps {
   /** The offered layouts, in registry order. */
@@ -40,6 +48,8 @@ export function HomeLayoutPicker({
   disabled = false,
   className,
 }: HomeLayoutPickerProps) {
+  const t = useTranslations("home");
+  layouts = layouts.map((layout) => localizedHomeLayout(layout, t));
   const name = React.useId();
   return (
     <fieldset disabled={disabled} className={cn("min-w-0", className)}>
@@ -70,7 +80,7 @@ export function HomeLayoutPicker({
                 </span>
                 {defaultLayout === layout.key && (
                   <Badge variant="outline" className="text-2xs">
-                    Suggested
+                    {t("suggested")}
                   </Badge>
                 )}
               </span>
@@ -78,7 +88,7 @@ export function HomeLayoutPicker({
                 {layout.description}
               </span>
               <span className="text-muted-foreground/80 text-2xs mt-1 block [overflow-wrap:anywhere]">
-                {layout.panels.map((k) => HOME_PANELS[k].title).join(" · ")}
+                {layout.panels.map((k) => homePanelTitle(HOME_PANELS[k], t)).join(" · ")}
               </span>
             </span>
           </label>

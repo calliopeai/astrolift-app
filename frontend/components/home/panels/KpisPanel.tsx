@@ -17,7 +17,8 @@ import Link from "next/link";
 import { Panel } from "@/components/panel/Panel";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import type { KpiFigure, KpisPanelData } from "./builder-operator-model";
 import { useKpisPanel } from "./use-home-panels";
 
@@ -26,6 +27,23 @@ export interface KpisPanelViewProps extends KpisPanelData {
 }
 
 function Figure({ figure }: { figure: KpiFigure }) {
+  const { t } = useHomePresentation();
+  const labels = {
+    deploys: "Deploys",
+    runs: "Runs",
+    success: "Success",
+    p95: "p95",
+    spend: "Spend",
+  };
+  const hints: Partial<Record<KpiFigure["key"], string>> = {
+    runs: "agent runs",
+    success: "of deploys",
+    p95: "deploy time",
+    spend: "month to date",
+  };
+  const label = figure.label === labels[figure.key] ? t(`kpi.${figure.key}`) : figure.label;
+  const hint =
+    figure.hint && figure.hint === hints[figure.key] ? t(`kpi.${figure.key}Hint`) : figure.hint;
   return (
     <li className="min-w-0">
       <Link
@@ -33,15 +51,15 @@ function Figure({ figure }: { figure: KpiFigure }) {
         className="hover:bg-accent/40 focus-visible:ring-ring block min-w-0 rounded-sm px-2 py-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
       >
         <span className="text-muted-foreground block text-xs">
-          {figure.label}
-          {figure.hint && <span className="sr-only"> ({figure.hint})</span>}
+          {label}
+          {hint && <span className="sr-only"> ({hint})</span>}
         </span>
-        <span className="block truncate font-mono text-xl tabular-nums" title={figure.hint}>
+        <span className="block truncate font-mono text-xl tabular-nums" title={hint}>
           {figure.value ?? "—"}
         </span>
-        {figure.hint && (
+        {hint && (
           <span className="text-muted-foreground text-2xs block truncate" aria-hidden>
-            {figure.hint}
+            {hint}
           </span>
         )}
       </Link>
@@ -57,12 +75,13 @@ export function KpisPanelView({
   error,
   onRetry,
 }: KpisPanelViewProps) {
+  const { t } = useHomePresentation();
   const nothingYet = figures.every((f) => f.value === null);
   return (
     <Panel
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<GaugeIcon className="size-4" />}
-      description={<span className="font-mono">last {windowDays} days · spend month to date</span>}
+      description={<span className="font-mono">{t("copy.kpiWindow", { count: windowDays })}</span>}
       span={panel.span}
       loading={loading && nothingYet}
       skeleton={
@@ -78,14 +97,14 @@ export function KpisPanelView({
         figures.length === 0
           ? {
               icon: <GaugeIcon className="size-5" />,
-              title: "No figures for your access",
-              description: "Deploy, run and spend figures show for the areas you can see.",
+              title: t("copy.noKpisTitle"),
+              description: t("copy.noKpisDescription"),
             }
           : null
       }
     >
       <ul
-        aria-label={`${panel.title}, last ${windowDays} days`}
+        aria-label={t("copy.kpiAria", { panel: homePanelTitle(panel, t), count: windowDays })}
         className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-5"
       >
         {figures.map((f) => (

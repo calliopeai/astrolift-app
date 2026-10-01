@@ -49,12 +49,13 @@ const FAILED_DEPLOY = new Set(["failed", "rolled_back"]);
  * deploy page has the rest.
  */
 export function deployReason(
-  d: Pick<AstroliftDeployment, "status" | "abortedReason" | "statusReason" | "buildError">
+  d: Pick<AstroliftDeployment, "status" | "abortedReason" | "statusReason" | "buildError">,
+  fallback = { rolledBack: "Rolled back.", missing: "No reason was recorded for this failure." }
 ): string {
   const reason = d.abortedReason || d.statusReason || d.buildError;
   const first = reason?.split("\n")[0]?.trim();
   if (first) return first;
-  return d.status === "rolled_back" ? "Rolled back." : "No reason was recorded for this failure.";
+  return d.status === "rolled_back" ? fallback.rolledBack : fallback.missing;
 }
 
 /**
@@ -76,9 +77,12 @@ export function failingDeploys<
 }
 
 /** A failed run's reason, or what to say when the run gave none. */
-export function runReason(message: string | null | undefined): string {
+export function runReason(
+  message: string | null | undefined,
+  fallback = "No reason was recorded for this run."
+): string {
   const first = message?.split("\n")[0]?.trim();
-  return first || "No reason was recorded for this run.";
+  return first || fallback;
 }
 
 /**
@@ -200,7 +204,8 @@ const NO_PROJECT = "__none";
 export function runningSnapshot(
   agents: (FleetAgentRow & { slug: string })[],
   running: RunningTaskRow[],
-  now: number
+  now: number,
+  noProject = "No project"
 ): FleetSnapshot {
   const bySlug = new Map(agents.map((a) => [a.slug, a]));
   const perAgent = new Map<string, number>();
@@ -212,7 +217,7 @@ export function runningSnapshot(
     if (active === 0) continue;
     const key = a.projectSlug || NO_PROJECT;
     if (!groups.has(key))
-      groups.set(key, { id: key, name: a.projectSlug || "No project", health: "ok" });
+      groups.set(key, { id: key, name: a.projectSlug || noProject, health: "ok" });
     fleet.push({
       id: a.id,
       name: a.name,

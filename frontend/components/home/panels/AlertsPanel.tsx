@@ -12,9 +12,9 @@ import { BellIcon, BellOffIcon } from "lucide-react";
 import { ListSummary } from "@/components/list/ListSummary";
 import type { AlertEvent } from "@/components/screens/alerts/use-alerts";
 import { StatusDot } from "@/components/StatusDot";
-import { formatRelativeAge } from "@/lib/format";
 
-import type { HomePanelProps } from "../registry";
+import { homePanelTitle, type HomePanelProps } from "../registry";
+import { useHomePresentation } from "./use-home-presentation";
 import type { HomeRead } from "./home-reads";
 import { useAlertsPanel } from "./use-home-panels";
 
@@ -35,6 +35,7 @@ const SEVERITY_DOT: Record<string, "ok" | "warn" | "error" | "muted"> = {
 };
 
 function AlertLine({ alert }: { alert: AlertEvent }) {
+  const { t, age } = useHomePresentation(true);
   return (
     <span className="flex min-w-0 items-start gap-2">
       <StatusDot status={SEVERITY_DOT[alert.severity] ?? "muted"} className="mt-1.5" />
@@ -43,13 +44,13 @@ function AlertLine({ alert }: { alert: AlertEvent }) {
           {alert.summary}
         </span>
         <span className="text-muted-foreground flex min-w-0 items-center gap-2 text-xs">
-          <span className="font-mono">{alert.severity}</span>
-          <span>{alert.acknowledgedAt ? "acknowledged" : "firing"}</span>
+          <span className="font-mono">
+            {t.has(`severity.${alert.severity}`) ? t(`severity.${alert.severity}`) : alert.severity}
+          </span>
+          <span>{t(alert.acknowledgedAt ? "copy.acknowledged" : "copy.firing")}</span>
         </span>
       </span>
-      <span className="text-muted-foreground shrink-0 font-mono text-xs">
-        {formatRelativeAge(alert.firedAt)}
-      </span>
+      <span className="text-muted-foreground shrink-0 font-mono text-xs">{age(alert.firedAt)}</span>
     </span>
   );
 }
@@ -62,11 +63,12 @@ export function AlertsPanelView({
   error,
   onRetry,
 }: AlertsPanelViewProps) {
+  const { t } = useHomePresentation();
   return (
     <ListSummary
-      title={panel.title}
+      title={homePanelTitle(panel, t)}
       icon={<BellIcon className="size-4" />}
-      description="Firing now"
+      description={t("copy.firingNow")}
       span={panel.span}
       count={loading || error ? null : count}
       rows={rows}
@@ -79,10 +81,10 @@ export function AlertsPanelView({
       onRetry={onRetry}
       empty={{
         icon: <BellOffIcon />,
-        title: "No alerts firing",
-        description: "Alerts show up here the moment a rule fires.",
+        title: t("copy.noAlertsTitle"),
+        description: t("copy.noAlertsDescription"),
         actionHref: "/alerts",
-        actionLabel: "Alert rules",
+        actionLabel: t("copy.alertRules"),
       }}
     />
   );
