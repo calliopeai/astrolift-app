@@ -1,3 +1,7 @@
+import en from "@/messages/en.json";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import de from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { userEvent, within } from "storybook/test";
 
@@ -5,17 +9,32 @@ import { type ListState, useLocalListState } from "@/components/list/use-list-st
 import { SCOPE_PICKER, TOKEN_CREATED } from "@/components/screens/teams/teams-tokens.fixtures";
 
 import { ScopePicker } from "./ScopePicker";
-import { TOKENS_LIST } from "./tokens-list";
+import { useTranslations } from "next-intl";
+import { localizedTokensList } from "./tokens-list";
 import { type TokensData, TOKENS_SCREEN, TOKENS_SCREEN_LONG } from "./tokens.fixtures";
 import { TokensScreen } from "./TokensScreen";
 
-const meta: Meta = { title: "Screens/Tokens/TokensScreen" };
+const meta: Meta = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider
+        locale="en"
+        messages={en}
+        timeZone="UTC"
+        now={new Date("2026-09-30T12:00:00Z")}
+      >
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  title: "Screens/Tokens/TokensScreen",
+};
 export default meta;
 
 type Story = StoryObj;
 
 function Screen({ initial, ...props }: TokensData & { initial?: Partial<ListState> }) {
-  const list = useLocalListState(TOKENS_LIST, initial);
+  const list = useLocalListState(localizedTokensList(useTranslations("apiKeys")), initial);
   return (
     <TokensScreen
       {...props}
@@ -75,4 +94,42 @@ export const Width768: Story = {
       <Screen {...TOKENS_SCREEN_LONG} />
     </div>
   ),
+};
+
+export const GermanReveal768: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider
+        locale="de"
+        messages={de}
+        timeZone="Europe/Berlin"
+        now={new Date("2026-09-30T12:00:00Z")}
+      >
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => (
+    <div style={{ width: 768 }}>
+      <Screen {...TOKENS_SCREEN_LONG} />
+    </div>
+  ),
+};
+export const FrenchCreate: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider
+        locale="fr"
+        messages={fr}
+        timeZone="Europe/Berlin"
+        now={new Date("2026-09-30T12:00:00Z")}
+      >
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => <Screen {...TOKENS_SCREEN} />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Nouveau jeton" }));
+  },
 };

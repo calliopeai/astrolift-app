@@ -5394,5 +5394,184 @@
       "unchanged": "Identifiant actuel — utilisé dans les URL.",
       "empty": "Lettres minuscules, chiffres et tirets. Utilisé dans les URL."
     }
+  },
+  "apiKeys": {
+    "title": "Clés API",
+    "name": "Nom",
+    "suffix": "Suffixe",
+    "scopes": "Portées",
+    "scope": "Portée",
+    "canDo": "Actions autorisées",
+    "lastUsed": "Dernière utilisation",
+    "created": "Création",
+    "expires": "Expiration",
+    "status": "État",
+    "active": "Active",
+    "revoked": "Révoquée",
+    "expired": "Expirée",
+    "none": "aucune",
+    "nothing": "aucune",
+    "never": "jamais",
+    "all": "Toutes",
+    "mine": "Les miennes",
+    "longLivedAdmin": "Jeton administrateur de longue durée",
+    "permissionCount": "{count, plural, one {# permission} other {# permissions}}",
+    "adminExpiryWarning": "Jeton administrateur sans expiration proche. Remplacez-le par un jeton aux portées plus limitées.",
+    "effectiveGuidance": "Ce que ses portées autorisent et que les rôles de son propriétaire accordent :",
+    "createdNotice": "Jeton <name></name> créé",
+    "revealGuidance": "Copiez la valeur maintenant : elle ne sera plus affichée. Seuls le hachage SHA-256 et les 4 derniers caractères sont conservés.",
+    "copy": "Copier",
+    "dismissReveal": "Je l'ai enregistré — fermer",
+    "mcpTitle": "MCP distant des agents",
+    "mcpGuidance": "Connectez les clients CI ou de programmation via Streamable HTTP authentifié. Envoyez un jeton API sous la forme <code></code>. Les portées MCP exigent toujours les permissions d'agent correspondantes du propriétaire ; les valeurs secrètes ne sont pas exposées.",
+    "copyUrl": "Copier l'URL",
+    "mcpRead": "{scope} · consulter les paquets/tâches",
+    "mcpDispatch": "{scope} · exécuter/arrêter",
+    "mcpWrite": "{scope} · synchroniser les dépôts",
+    "context": "Identifiants porteurs pour CLI, bots et scripts. Les jetons sont conservés sous forme de hachage ; leur valeur n'est affichée qu'à la création.",
+    "newToken": "Nouveau jeton",
+    "revoke": "Révoquer",
+    "emptyTitle": "Aucune clé API",
+    "emptyDescription": "Créez-en une pour authentifier la CLI, les exécutions CI ou vos scripts auprès de la plateforme.",
+    "createTitle": "Nouveau jeton API",
+    "createDescription": "La valeur n'est affichée qu'une fois après la création. Conservez-la en lieu sûr ; elle ne pourra pas être récupérée.",
+    "nameGuidance": "Un nom descriptif apparaît dans le journal d'audit à côté des actions de ce jeton.",
+    "scopeGuidance": "Un jeton ne fait que restreindre votre accès : il reçoit les permissions ci-dessous également accordées par vos rôles.",
+    "expiresDays": "Expire dans (jours)",
+    "expiryGuidance": "Laissez 0 ou vide pour ne pas expirer. Par défaut {defaultDays} jours, maximum {maxDays}.",
+    "cancel": "Annuler",
+    "creating": "Création…",
+    "create": "Créer le jeton",
+    "revokeNamed": "Révoquer le jeton {name} ?",
+    "revokeTitle": "Révoquer le jeton ?",
+    "revokeDescription": "Les CLI et bots utilisant ce jeton cessent immédiatement de fonctionner. La révocation est irréversible ; créez un nouveau jeton pour rétablir l'accès.",
+    "revokeConfirm": "Révoquer le jeton",
+    "refreshWarning": "Impossible d'actualiser la vue. Actualisez pour voir les données actuelles.",
+    "pickScope": "Choisissez au moins une portée",
+    "createFailed": "Impossible de créer le jeton",
+    "revokedFeedback": "Jeton révoqué",
+    "revokeFailed": "Impossible de révoquer le jeton",
+    "copyFailed": "Impossible de copier. Sélectionnez et copiez la valeur manuellement.",
+    "copied": "Copié dans le presse-papiers",
+    "endpointCopied": "Point d'accès MCP copié",
+    "searchPlaceholder": "Rechercher clés, propriétaires, équipes, suffixes…",
+    "narrowedNote": "Affiche les clés correspondantes parmi les {count} plus récentes, en attendant les filtres de la requête API.",
+    "mineNote": "Affiche vos clés parmi les {count} plus récentes.",
+    "detail": {
+      "token": "Jeton",
+      "owner": "Propriétaire",
+      "team": "Équipe",
+      "lastIp": "IP de la dernière utilisation",
+      "lastAgent": "Agent de la dernière utilisation",
+      "orgWide": "— (toute l'organisation)",
+      "shortToken": "Jeton {id}",
+      "overview": "Vue d'ensemble",
+      "notFoundTitle": "Jeton API introuvable",
+      "notFoundDescription": "Ce jeton peut ne pas exister, ne plus figurer dans la liste récente ou ne pas vous être accessible.",
+      "back": "Retour aux clés API",
+      "noScopes": "Aucune portée : ce jeton n'a aucune permission accordée.",
+      "readFailed": "Impossible de charger les métadonnées du jeton.",
+      "retry": "Réessayer"
+    },
+    "picker": {
+      "loadFailed": "Impossible de charger les portées. Rechargez la page pour réessayer.",
+      "startFrom": "Partir de",
+      "adminWarning": "Admin permet à ce jeton de faire tout ce que son propriétaire peut faire, y compris les permissions ajoutées plus tard. Préférez des portées limitées et fixez une expiration.",
+      "sensitive": "sensible",
+      "unavailable": "Vos rôles n'accordent aucune des permissions de cette portée.",
+      "unlocks": "Autorise {count, plural, one {# permission} other {# permissions}}",
+      "surfaces": {
+        "apps": "Applications",
+        "clusters": "Clusters",
+        "secrets": "Secrets",
+        "agents": "Agents",
+        "workflows": "Workflows",
+        "administration": "Administration"
+      },
+      "presets": {
+        "read_only": "Lecture seule",
+        "cli": "CLI par défaut",
+        "ci_deploy": "Déploiement CI",
+        "cluster_operator": "Opérateur de cluster"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "Lire les applications",
+        "description": "Lister les applications, déploiements, environnements et noms de secrets."
+      },
+      "scope1": {
+        "label": "Modifier les applications",
+        "description": "Déployer, modifier les variables d'environnement et gérer la configuration des applications."
+      },
+      "scope2": {
+        "label": "Enregistrer les applications",
+        "description": "Enregistrer les applications et configurer la CI (webhook, secrets, workflow), sans déployer ni supprimer."
+      },
+      "scope3": {
+        "label": "Lire les clusters",
+        "description": "Lister les clusters et consulter l'état du fournisseur."
+      },
+      "scope4": {
+        "label": "Mettre à jour les clusters",
+        "description": "Modifier les paramètres d'un cluster : classe d'ingress, contrôle d'authentification, région, point d'accès."
+      },
+      "scope5": {
+        "label": "Exploiter les clusters",
+        "description": "Installer la recette d'un cluster, actualiser son état de gestion et réconcilier ses ingress."
+      },
+      "scope6": {
+        "label": "Gérer les utilisateurs de connexion",
+        "description": "Créer, désactiver, supprimer et réinitialiser les utilisateurs et groupes de l'authentification centrale du cluster."
+      },
+      "scope7": {
+        "label": "Définir l'accès aux applications",
+        "description": "Choisir les utilisateurs et groupes pouvant accéder à une application derrière l'authentification centrale."
+      },
+      "scope8": {
+        "label": "Révéler les secrets",
+        "description": "Révéler les valeurs secrètes stockées. N'accorder que si nécessaire."
+      },
+      "scope9": {
+        "label": "Modifier les secrets",
+        "description": "Définir, renouveler et supprimer les secrets sans les révéler."
+      },
+      "scope10": {
+        "label": "Lecture MCP",
+        "description": "Lister les paquets d'agents et consulter les exécutions via MCP distant."
+      },
+      "scope11": {
+        "label": "Exécution MCP",
+        "description": "Exécuter, orienter et arrêter les agents ; se connecter à leurs boxes selon les permissions du compte."
+      },
+      "scope12": {
+        "label": "Écriture MCP",
+        "description": "Synchroniser les dépôts d'agents et les définitions de paquets."
+      },
+      "scope13": {
+        "label": "Modifier les environnements d'agents",
+        "description": "Créer, mettre à jour et supprimer les spécifications d'environnements d'agents."
+      },
+      "scope14": {
+        "label": "Modifier les workflows",
+        "description": "Créer, mettre à jour et supprimer les workflows."
+      },
+      "scope15": {
+        "label": "Exécuter les workflows",
+        "description": "Démarrer les workflows sans les modifier."
+      },
+      "scope16": {
+        "label": "Modifier les projets",
+        "description": "Créer, mettre à jour et supprimer les projets."
+      },
+      "scope17": {
+        "label": "Modifier les équipes",
+        "description": "Créer, mettre à jour et supprimer les équipes."
+      },
+      "scope18": {
+        "label": "Administration",
+        "description": "Tout ce que le propriétaire peut faire, maintenant et après l'ajout de permissions. Préférez des portées limitées."
+      }
+    }
   }
 }

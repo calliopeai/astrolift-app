@@ -98,12 +98,16 @@ export const TOKEN_CREATED: AstroliftApiTokenPlaintext = {
 };
 
 export const TOKEN_DETAIL: TokenDetailScreenProps = {
+  error: null,
+  onRetry: async () => {},
   id: TOKENS[0]!.id,
   token: TOKENS[0]!,
   loading: false,
 };
 
 export const TOKEN_DETAIL_LONG: TokenDetailScreenProps = {
+  error: null,
+  onRetry: async () => {},
   id: TOKEN_LONG.id,
   token: TOKEN_LONG,
   loading: false,
@@ -117,7 +121,7 @@ export const SCOPE_CATALOG: AstroliftApiTokenScopeCatalog = {
       value: "read:apps",
       label: "Read apps",
       surface: "apps",
-      description: "List apps and read their settings.",
+      description: "List apps, deployments, environments and secret names.",
       sensitive: false,
       permissions: ["app.read"],
       available: true,
@@ -127,7 +131,7 @@ export const SCOPE_CATALOG: AstroliftApiTokenScopeCatalog = {
       value: "read:clusters",
       label: "Read clusters",
       surface: "clusters",
-      description: "List clusters.",
+      description: "List clusters and read provider state.",
       sensitive: false,
       permissions: ["provider_plugin.read"],
       available: true,
@@ -137,7 +141,7 @@ export const SCOPE_CATALOG: AstroliftApiTokenScopeCatalog = {
       value: "write:clusters",
       label: "Update clusters",
       surface: "clusters",
-      description: "Change a cluster's settings.",
+      description: "Change a cluster's settings: ingress class, auth gate, region, endpoint.",
       sensitive: false,
       permissions: ["cluster.update"],
       available: true,
@@ -147,7 +151,8 @@ export const SCOPE_CATALOG: AstroliftApiTokenScopeCatalog = {
       value: "manage:clusters",
       label: "Operate clusters",
       surface: "clusters",
-      description: "Run a cluster's recipe.",
+      description:
+        "Run a cluster's recipe install, refresh its management state, reconcile its ingresses.",
       sensitive: false,
       permissions: ["cluster.manage", "cluster.bootstrap"],
       available: false,
@@ -157,7 +162,7 @@ export const SCOPE_CATALOG: AstroliftApiTokenScopeCatalog = {
       value: "mcp:read",
       label: "MCP read",
       surface: "agents",
-      description: "Inspect packages and tasks over MCP.",
+      description: "List agent packages and inspect runs through remote MCP.",
       sensitive: false,
       permissions: ["agent.read"],
       available: true,
@@ -167,7 +172,8 @@ export const SCOPE_CATALOG: AstroliftApiTokenScopeCatalog = {
       value: "admin",
       label: "Admin",
       surface: "administration",
-      description: "Everything its owner can do.",
+      description:
+        "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes.",
       sensitive: true,
       permissions: ["cluster.update", "cluster.manage"],
       available: true,
@@ -180,7 +186,7 @@ export const SCOPE_CATALOG: AstroliftApiTokenScopeCatalog = {
       label: "Cluster operator",
       scopes: ["read:clusters", "write:clusters", "manage:clusters"],
     },
-    { key: "read_only", label: "Read only", scopes: ["read:apps", "read:clusters", "mcp:read"] },
+    { key: "read_only", label: "Read-only", scopes: ["read:apps", "read:clusters", "mcp:read"] },
   ],
 };
 

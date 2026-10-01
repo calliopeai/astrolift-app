@@ -5391,5 +5391,184 @@
       "unchanged": "Identificador atual — usado nas URLs.",
       "empty": "Letras minúsculas, números e hífens. Usado nas URLs."
     }
+  },
+  "apiKeys": {
+    "title": "Chaves de API",
+    "name": "Nome",
+    "suffix": "Sufixo",
+    "scopes": "Escopos",
+    "scope": "Escopo",
+    "canDo": "Ações permitidas",
+    "lastUsed": "Último uso",
+    "created": "Criação",
+    "expires": "Expiração",
+    "status": "Estado",
+    "active": "Ativa",
+    "revoked": "Revogada",
+    "expired": "Expirada",
+    "none": "nenhum",
+    "nothing": "nenhuma",
+    "never": "nunca",
+    "all": "Todas",
+    "mine": "Minhas",
+    "longLivedAdmin": "Token de administrador de longa duração",
+    "permissionCount": "{count, plural, one {# permissão} other {# permissões}}",
+    "adminExpiryWarning": "Token de administrador sem expiração próxima. Substitua-o por um token com escopos mais restritos.",
+    "effectiveGuidance": "O que os escopos permitem e os papéis do titular concedem:",
+    "createdNotice": "Token <name></name> criado",
+    "revealGuidance": "Copie o valor agora: ele não será exibido novamente. Apenas o hash SHA-256 e os últimos 4 caracteres são armazenados.",
+    "copy": "Copiar",
+    "dismissReveal": "Já salvei — fechar",
+    "mcpTitle": "MCP remoto de agentes",
+    "mcpGuidance": "Conecte clientes de CI ou programação por Streamable HTTP autenticado. Envie um token de API como <code></code>. Os escopos MCP ainda exigem as permissões de agente correspondentes do titular; valores secretos não são expostos.",
+    "copyUrl": "Copiar URL",
+    "mcpRead": "{scope} · consultar pacotes/tarefas",
+    "mcpDispatch": "{scope} · executar/encerrar",
+    "mcpWrite": "{scope} · sincronizar repositórios",
+    "context": "Credenciais Bearer para CLIs, bots e scripts. Os tokens são armazenados como hash; o valor é exibido apenas na criação.",
+    "newToken": "Novo token",
+    "revoke": "Revogar",
+    "emptyTitle": "Nenhuma chave de API",
+    "emptyDescription": "Crie uma para autenticar a CLI, execuções de CI ou seus scripts na plataforma.",
+    "createTitle": "Novo token de API",
+    "createDescription": "O valor é exibido uma vez após a criação. Guarde-o com segurança; não será possível recuperá-lo.",
+    "nameGuidance": "Um nome descritivo aparece no log de auditoria ao lado das ações deste token.",
+    "scopeGuidance": "Um token apenas restringe seu acesso: recebe as permissões abaixo que seus papéis também concedem.",
+    "expiresDays": "Expira em (dias)",
+    "expiryGuidance": "Deixe 0 ou vazio para não expirar. Padrão de {defaultDays} dias, máximo de {maxDays}.",
+    "cancel": "Cancelar",
+    "creating": "Criando…",
+    "create": "Criar token",
+    "revokeNamed": "Revogar o token {name}?",
+    "revokeTitle": "Revogar o token?",
+    "revokeDescription": "CLIs e bots que usam este token param imediatamente. A revogação não pode ser desfeita; crie outro token para restaurar o acesso.",
+    "revokeConfirm": "Revogar token",
+    "refreshWarning": "Não foi possível atualizar a tela. Atualize para ver os dados atuais.",
+    "pickScope": "Escolha pelo menos um escopo",
+    "createFailed": "Não foi possível criar o token",
+    "revokedFeedback": "Token revogado",
+    "revokeFailed": "Não foi possível revogar o token",
+    "copyFailed": "Não foi possível copiar. Selecione e copie o valor manualmente.",
+    "copied": "Copiado para a área de transferência",
+    "endpointCopied": "Endpoint MCP copiado",
+    "searchPlaceholder": "Buscar chaves, titulares, equipes, sufixos…",
+    "narrowedNote": "Mostra as chaves correspondentes entre as {count} mais recentes, até a consulta API aceitar filtros.",
+    "mineNote": "Mostra suas chaves entre as {count} mais recentes.",
+    "detail": {
+      "token": "Token",
+      "owner": "Titular",
+      "team": "Equipe",
+      "lastIp": "IP do último uso",
+      "lastAgent": "Agente do último uso",
+      "orgWide": "— (toda a organização)",
+      "shortToken": "Token {id}",
+      "overview": "Visão geral",
+      "notFoundTitle": "Token de API não encontrado",
+      "notFoundDescription": "Este token pode não existir, estar fora da lista recente ou não estar acessível a você.",
+      "back": "Voltar às chaves de API",
+      "noScopes": "Sem escopos: este token não tem permissões concedidas.",
+      "readFailed": "Não foi possível carregar os metadados do token.",
+      "retry": "Tentar novamente"
+    },
+    "picker": {
+      "loadFailed": "Não foi possível carregar os escopos. Recarregue a página para tentar novamente.",
+      "startFrom": "Começar com",
+      "adminWarning": "Admin permite que o token faça tudo o que seu titular pode fazer, incluindo permissões adicionadas depois. Prefira escopos restritos e defina uma expiração.",
+      "sensitive": "sensível",
+      "unavailable": "Seus papéis não concedem nenhuma das permissões deste escopo.",
+      "unlocks": "Permite {count, plural, one {# permissão} other {# permissões}}",
+      "surfaces": {
+        "apps": "Aplicativos",
+        "clusters": "Clusters",
+        "secrets": "Segredos",
+        "agents": "Agentes",
+        "workflows": "Fluxos de trabalho",
+        "administration": "Administração"
+      },
+      "presets": {
+        "read_only": "Somente leitura",
+        "cli": "Padrão da CLI",
+        "ci_deploy": "Implantação de CI",
+        "cluster_operator": "Operador de cluster"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "Ler aplicativos",
+        "description": "Listar aplicativos, implantações, ambientes e nomes de segredos."
+      },
+      "scope1": {
+        "label": "Modificar aplicativos",
+        "description": "Implantar, editar variáveis de ambiente e gerenciar a configuração dos aplicativos."
+      },
+      "scope2": {
+        "label": "Registrar aplicativos",
+        "description": "Registrar aplicativos e configurar CI (webhook, segredos, fluxo de trabalho), sem implantar ou excluir."
+      },
+      "scope3": {
+        "label": "Ler clusters",
+        "description": "Listar clusters e consultar o estado do provedor."
+      },
+      "scope4": {
+        "label": "Atualizar clusters",
+        "description": "Alterar as configurações de um cluster: classe de ingress, controle de autenticação, região e endpoint."
+      },
+      "scope5": {
+        "label": "Operar clusters",
+        "description": "Instalar a receita de um cluster, atualizar seu estado de gerenciamento e reconciliar seus ingressos."
+      },
+      "scope6": {
+        "label": "Gerenciar usuários de acesso",
+        "description": "Criar, desativar, excluir e redefinir usuários e grupos da autenticação central do cluster."
+      },
+      "scope7": {
+        "label": "Definir acesso a aplicativos",
+        "description": "Escolher os usuários e grupos que podem acessar um aplicativo protegido pela autenticação central."
+      },
+      "scope8": {
+        "label": "Revelar segredos",
+        "description": "Revelar valores secretos armazenados. Conceder apenas quando necessário."
+      },
+      "scope9": {
+        "label": "Modificar segredos",
+        "description": "Definir, rotacionar e excluir segredos sem revelar seus valores."
+      },
+      "scope10": {
+        "label": "Leitura MCP",
+        "description": "Listar pacotes de agentes e consultar execuções por MCP remoto."
+      },
+      "scope11": {
+        "label": "Execução MCP",
+        "description": "Executar, orientar e interromper agentes; conectar-se às suas boxes conforme as permissões da conta."
+      },
+      "scope12": {
+        "label": "Escrita MCP",
+        "description": "Sincronizar repositórios de agentes e definições de pacotes."
+      },
+      "scope13": {
+        "label": "Modificar ambientes de agentes",
+        "description": "Criar, atualizar e excluir especificações de ambientes de agentes."
+      },
+      "scope14": {
+        "label": "Modificar fluxos de trabalho",
+        "description": "Criar, atualizar e excluir fluxos de trabalho."
+      },
+      "scope15": {
+        "label": "Executar fluxos de trabalho",
+        "description": "Iniciar execuções de fluxos de trabalho sem editá-los."
+      },
+      "scope16": {
+        "label": "Modificar projetos",
+        "description": "Criar, atualizar e excluir projetos."
+      },
+      "scope17": {
+        "label": "Modificar equipes",
+        "description": "Criar, atualizar e excluir equipes."
+      },
+      "scope18": {
+        "label": "Administração",
+        "description": "Tudo o que o titular pode fazer, agora e quando novas permissões forem adicionadas. Prefira escopos restritos."
+      }
+    }
   }
 }

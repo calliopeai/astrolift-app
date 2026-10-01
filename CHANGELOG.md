@@ -24,6 +24,12 @@
 - Shared header breadcrumb landmarks and switcher accessibility names use all
   eight locales, preserving caller labels, destinations and keyboard focus
   through hydration and locale changes (#2145).
+- Translate connected API key list/create/reveal/revoke/detail and reviewed stock
+  scope guidance in all eight locales. Preserve literal identifiers, future server
+  metadata, authority decisions and exact mutation inputs; distinguish metadata
+  read failures from missing keys, and report clipboard success only after the
+  browser completes the copy. Rejected writes do not trigger list refreshes (#2145).
+
 - Translate connected Team list/create/edit/delete presentation and feedback in
   all eight locales, preserving scope decisions, identifiers and mutation inputs.
   Keep accepted team writes successful when their list refresh fails; refused

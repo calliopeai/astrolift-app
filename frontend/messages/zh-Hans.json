@@ -5391,5 +5391,184 @@
       "unchanged": "当前标识符 — 用于URL。",
       "empty": "小写英文字母、数字和连字符。用于URL。"
     }
+  },
+  "apiKeys": {
+    "title": "API 密钥",
+    "name": "名称",
+    "suffix": "后缀",
+    "scopes": "权限范围",
+    "scope": "权限范围",
+    "canDo": "允许的操作",
+    "lastUsed": "上次使用",
+    "created": "创建时间",
+    "expires": "到期时间",
+    "status": "状态",
+    "active": "有效",
+    "revoked": "已撤销",
+    "expired": "已过期",
+    "none": "无",
+    "nothing": "无",
+    "never": "永不",
+    "all": "全部",
+    "mine": "我的",
+    "longLivedAdmin": "长期有效的管理员令牌",
+    "permissionCount": "{count, plural, other {# 项权限}}",
+    "adminExpiryWarning": "管理员令牌不会近期到期。请将其替换为权限范围更小的令牌。",
+    "effectiveGuidance": "权限范围允许且所有者角色授予的权限：",
+    "createdNotice": "已创建令牌 <name></name>",
+    "revealGuidance": "请立即复制此值，以后不会再次显示。仅存储 SHA-256 哈希和最后 4 个字符。",
+    "copy": "复制",
+    "dismissReveal": "已保存 — 关闭",
+    "mcpTitle": "代理远程 MCP",
+    "mcpGuidance": "通过经过身份验证的 Streamable HTTP 连接 CI 或编程客户端。以 <code></code> 形式发送 API 令牌。MCP 权限范围仍需要所有者拥有相应的代理权限；不会暴露机密值。",
+    "copyUrl": "复制 URL",
+    "mcpRead": "{scope} · 查看包和任务",
+    "mcpDispatch": "{scope} · 运行或终止",
+    "mcpWrite": "{scope} · 同步仓库",
+    "context": "用于 CLI、机器人和脚本的 Bearer 凭据。令牌以哈希形式存储；明文仅在创建时显示一次。",
+    "newToken": "新建令牌",
+    "revoke": "撤销",
+    "emptyTitle": "没有 API 密钥",
+    "emptyDescription": "创建密钥以向平台验证 CLI、CI 运行或您的脚本。",
+    "createTitle": "新建 API 令牌",
+    "createDescription": "明文仅在创建后显示一次。请妥善保存，之后无法再次获取。",
+    "nameGuidance": "描述性名称会显示在审计日志中此令牌的操作旁。",
+    "scopeGuidance": "令牌只会缩小您的访问权限：它获得的下列权限必须也由您的角色授予。",
+    "expiresDays": "有效期（天）",
+    "expiryGuidance": "填 0 或留空表示永不过期。默认 {defaultDays} 天，最多 {maxDays} 天。",
+    "cancel": "取消",
+    "creating": "正在创建…",
+    "create": "创建令牌",
+    "revokeNamed": "撤销令牌 {name}？",
+    "revokeTitle": "撤销令牌？",
+    "revokeDescription": "使用此令牌的 CLI 和机器人将立即停止工作。撤销无法取消；请创建新令牌以恢复访问。",
+    "revokeConfirm": "撤销令牌",
+    "refreshWarning": "无法刷新视图。请刷新以查看当前数据。",
+    "pickScope": "请至少选择一个权限范围",
+    "createFailed": "无法创建令牌",
+    "revokedFeedback": "已撤销令牌",
+    "revokeFailed": "无法撤销令牌",
+    "copyFailed": "无法复制。请选中此值并手动复制。",
+    "copied": "已复制到剪贴板",
+    "endpointCopied": "已复制 MCP 端点",
+    "searchPlaceholder": "搜索密钥、所有者、团队、后缀…",
+    "narrowedNote": "在 API 查询支持筛选前，仅显示最新 {count} 个密钥中的匹配项。",
+    "mineNote": "显示最新 {count} 个密钥中属于您的密钥。",
+    "detail": {
+      "token": "令牌",
+      "owner": "所有者",
+      "team": "团队",
+      "lastIp": "上次使用的 IP",
+      "lastAgent": "上次使用的客户端",
+      "orgWide": "—（整个组织）",
+      "shortToken": "令牌 {id}",
+      "overview": "概览",
+      "notFoundTitle": "未找到 API 令牌",
+      "notFoundDescription": "此令牌可能不存在、不在最近列表中，或您没有访问权限。",
+      "back": "返回 API 密钥",
+      "noScopes": "没有权限范围 — 此令牌未获授任何权限。",
+      "readFailed": "无法加载令牌元数据。",
+      "retry": "重试"
+    },
+    "picker": {
+      "loadFailed": "无法加载权限范围列表。请重新加载页面后重试。",
+      "startFrom": "从预设开始",
+      "adminWarning": "Admin 允许此令牌执行所有者可执行的全部操作，包括以后新增的权限。请优先选择较小的权限范围并设置到期时间。",
+      "sensitive": "敏感权限",
+      "unavailable": "您的角色未授予此权限范围所允许的任何权限。",
+      "unlocks": "允许{count, plural, other { # 项权限}}",
+      "surfaces": {
+        "apps": "应用",
+        "clusters": "集群",
+        "secrets": "机密",
+        "agents": "代理",
+        "workflows": "工作流",
+        "administration": "管理"
+      },
+      "presets": {
+        "read_only": "只读",
+        "cli": "CLI 默认",
+        "ci_deploy": "CI 部署",
+        "cluster_operator": "集群操作员"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "读取应用",
+        "description": "列出应用、部署、环境和机密名称。"
+      },
+      "scope1": {
+        "label": "修改应用",
+        "description": "部署、编辑环境变量并管理应用配置。"
+      },
+      "scope2": {
+        "label": "注册应用",
+        "description": "注册应用并设置 CI（Webhook、机密、工作流），不包括部署或删除。"
+      },
+      "scope3": {
+        "label": "读取集群",
+        "description": "列出集群并读取提供商状态。"
+      },
+      "scope4": {
+        "label": "更新集群",
+        "description": "更改集群设置：Ingress 类、身份验证门控、区域和端点。"
+      },
+      "scope5": {
+        "label": "操作集群",
+        "description": "安装集群配方、刷新管理状态并协调 Ingress。"
+      },
+      "scope6": {
+        "label": "管理登录用户",
+        "description": "创建、禁用、删除和重置集群中央身份验证的用户及其组。"
+      },
+      "scope7": {
+        "label": "设置应用访问权限",
+        "description": "选择可以访问中央身份验证保护的应用的用户和组。"
+      },
+      "scope8": {
+        "label": "显示机密值",
+        "description": "显示存储的机密值。仅在必要时授予。"
+      },
+      "scope9": {
+        "label": "修改机密",
+        "description": "设置、轮换和删除机密，不显示其值。"
+      },
+      "scope10": {
+        "label": "MCP 读取",
+        "description": "通过远程 MCP 列出代理包并查看运行。"
+      },
+      "scope11": {
+        "label": "MCP 调度",
+        "description": "根据账户权限运行、引导、强制停止代理，并连接到代理运行环境。"
+      },
+      "scope12": {
+        "label": "MCP 写入",
+        "description": "同步代理仓库和包定义。"
+      },
+      "scope13": {
+        "label": "修改代理环境",
+        "description": "创建、更新和删除代理环境规范。"
+      },
+      "scope14": {
+        "label": "修改工作流",
+        "description": "创建、更新和删除工作流。"
+      },
+      "scope15": {
+        "label": "运行工作流",
+        "description": "启动工作流运行，不编辑工作流。"
+      },
+      "scope16": {
+        "label": "修改项目",
+        "description": "创建、更新和删除项目。"
+      },
+      "scope17": {
+        "label": "修改团队",
+        "description": "创建、更新和删除团队。"
+      },
+      "scope18": {
+        "label": "管理员",
+        "description": "所有者现在以及新增权限后可执行的全部操作。请优先选择较小的权限范围。"
+      }
+    }
   }
 }

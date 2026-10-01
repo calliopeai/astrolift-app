@@ -65,7 +65,15 @@ export function titleCase(value: string): string {
     .join(" ");
 }
 
-export function DetailStatusBadge({ status, tone }: { status: string; tone?: Dot }) {
+export function DetailStatusBadge({
+  status,
+  tone,
+  label,
+}: {
+  status: string;
+  tone?: Dot;
+  label?: string;
+}) {
   // `tone` lets a caller pin the dot colour when the shared vocabulary map is
   // wrong for that entity — e.g. a preview env's "running" is healthy (ok),
   // not in-flight (pending) as it means for a job run.
@@ -73,14 +81,20 @@ export function DetailStatusBadge({ status, tone }: { status: string; tone?: Dot
   return (
     <Badge variant={dot === "error" ? "destructive" : "secondary"} className="gap-1.5">
       <StatusDot status={dot} />
-      {titleCase(status)}
+      {label ?? titleCase(status)}
     </Badge>
   );
 }
 
-export function DetailTimestamp({ iso }: { iso: string | null | undefined }) {
+export function DetailTimestamp({
+  iso,
+  format,
+}: {
+  iso: string | null | undefined;
+  format?: (iso: string) => string;
+}) {
   if (!iso) return <span className="text-muted-foreground">—</span>;
-  return <span title={iso}>{formatRelativeAge(iso)}</span>;
+  return <span title={iso}>{format ? format(iso) : formatRelativeAge(iso)}</span>;
 }
 
 export interface EntityDetailShellProps {
@@ -107,6 +121,16 @@ export interface EntityDetailShellProps {
   overview: DefinitionListItem[];
   /** Entity-specific extra cards (output, logs, related resources). */
   children?: React.ReactNode;
+  /** Opt-in presentation; other detail surfaces retain their existing defaults. */
+  presentation?: {
+    overview: string;
+    created: string;
+    statusLabel?: string;
+    formatTimestamp: (iso: string) => string;
+    notFoundTitle: string;
+    notFoundDescription: string;
+    back: string;
+  };
 }
 
 export function EntityDetailShell({
@@ -121,6 +145,7 @@ export function EntityDetailShell({
   notFoundLabel,
   overview,
   children,
+  presentation,
 }: EntityDetailShellProps) {
   if (loading && notFound) {
     return (
@@ -132,13 +157,16 @@ export function EntityDetailShell({
 
   if (notFound) {
     return (
-      <PageShell title={`${titleCase(notFoundLabel)} not found`}>
+      <PageShell title={presentation?.notFoundTitle ?? `${titleCase(notFoundLabel)} not found`}>
         <EmptyState
           icon={<SearchXIcon className="size-5" />}
-          title={`${titleCase(notFoundLabel)} not found`}
-          description={`This ${notFoundLabel} may not exist, may have aged out of the recent list, or you may not have access to it.`}
+          title={presentation?.notFoundTitle ?? `${titleCase(notFoundLabel)} not found`}
+          description={
+            presentation?.notFoundDescription ??
+            `This ${notFoundLabel} may not exist, may have aged out of the recent list, or you may not have access to it.`
+          }
           actionHref={breadcrumb.href}
-          actionLabel={`Back to ${breadcrumb.label}`}
+          actionLabel={presentation?.back ?? `Back to ${breadcrumb.label}`}
         />
       </PageShell>
     );
@@ -161,10 +189,17 @@ export function EntityDetailShell({
       description={
         status || createdAt ? (
           <span className="flex flex-wrap items-center gap-2">
-            {status ? <DetailStatusBadge status={status} tone={statusTone} /> : null}
+            {status ? (
+              <DetailStatusBadge
+                status={status}
+                tone={statusTone}
+                label={presentation?.statusLabel}
+              />
+            ) : null}
             {createdAt ? (
               <span className="text-muted-foreground text-xs">
-                created <DetailTimestamp iso={createdAt} />
+                {presentation?.created ?? "created"}{" "}
+                <DetailTimestamp iso={createdAt} format={presentation?.formatTimestamp} />
               </span>
             ) : null}
           </span>
@@ -175,7 +210,7 @@ export function EntityDetailShell({
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Overview</CardTitle>
+            <CardTitle className="text-base">{presentation?.overview ?? "Overview"}</CardTitle>
           </CardHeader>
           <CardContent>
             <DefinitionList items={overview} />

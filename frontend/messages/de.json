@@ -5394,5 +5394,184 @@
       "unchanged": "Aktueller Slug — wird in URLs verwendet.",
       "empty": "Kleinbuchstaben, Zahlen und Bindestriche. Wird in URLs verwendet."
     }
+  },
+  "apiKeys": {
+    "title": "API-Schlüssel",
+    "name": "Name",
+    "suffix": "Endung",
+    "scopes": "Berechtigungsbereiche",
+    "scope": "Berechtigungsbereich",
+    "canDo": "Erlaubte Aktionen",
+    "lastUsed": "Zuletzt verwendet",
+    "created": "Erstellt",
+    "expires": "Läuft ab",
+    "status": "Status",
+    "active": "Aktiv",
+    "revoked": "Widerrufen",
+    "expired": "Abgelaufen",
+    "none": "keine",
+    "nothing": "keine",
+    "never": "nie",
+    "all": "Alle",
+    "mine": "Meine",
+    "longLivedAdmin": "Langlebiges Administratortoken",
+    "permissionCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+    "adminExpiryWarning": "Administratortoken ohne baldiges Ablaufdatum. Durch ein Token mit engeren Berechtigungsbereichen ersetzen.",
+    "effectiveGuidance": "Was die Berechtigungsbereiche erlauben und die Rollen des Besitzers gewähren:",
+    "createdNotice": "Token <name></name> erstellt",
+    "revealGuidance": "Den Wert jetzt kopieren; er wird nie wieder angezeigt. Nur der SHA-256-Hash und die letzten 4 Zeichen werden gespeichert.",
+    "copy": "Kopieren",
+    "dismissReveal": "Gespeichert — schließen",
+    "mcpTitle": "Remote-MCP für Agenten",
+    "mcpGuidance": "CI- oder Programmierclients über authentifiziertes Streamable HTTP verbinden. Ein API-Token als <code></code> senden. MCP-Bereiche erfordern weiterhin die passenden Agentenberechtigungen des Besitzers; geheime Werte werden nicht offengelegt.",
+    "copyUrl": "URL kopieren",
+    "mcpRead": "{scope} · Pakete/Aufgaben prüfen",
+    "mcpDispatch": "{scope} · starten/beenden",
+    "mcpWrite": "{scope} · Repositories synchronisieren",
+    "context": "Bearer-Zugangsdaten für CLIs, Bots und Skripte. Token werden als Hash gespeichert; der Klartext wird nur bei der Erstellung angezeigt.",
+    "newToken": "Neues Token",
+    "revoke": "Widerrufen",
+    "emptyTitle": "Keine API-Schlüssel",
+    "emptyDescription": "Einen Schlüssel erstellen, um CLI, CI-Läufe oder eigene Skripte an der Plattform zu authentifizieren.",
+    "createTitle": "Neues API-Token",
+    "createDescription": "Der Klartext wird nach der Erstellung einmal angezeigt. Sicher aufbewahren; er kann später nicht abgerufen werden.",
+    "nameGuidance": "Ein aussagekräftiger Name erscheint im Auditprotokoll neben den Aktionen dieses Tokens.",
+    "scopeGuidance": "Ein Token schränkt Ihren Zugriff ein: Es erhält nur die folgenden Berechtigungen, die auch Ihre Rollen gewähren.",
+    "expiresDays": "Läuft ab in (Tagen)",
+    "expiryGuidance": "Für unbegrenzte Gültigkeit 0 oder leer lassen. Standard: {defaultDays} Tage, höchstens {maxDays}.",
+    "cancel": "Abbrechen",
+    "creating": "Wird erstellt…",
+    "create": "Token erstellen",
+    "revokeNamed": "Token {name} widerrufen?",
+    "revokeTitle": "Token widerrufen?",
+    "revokeDescription": "CLIs und Bots mit diesem Token funktionieren sofort nicht mehr. Ein Widerruf ist endgültig; für erneuten Zugriff ein neues Token erstellen.",
+    "revokeConfirm": "Token widerrufen",
+    "refreshWarning": "Die Ansicht konnte nicht aktualisiert werden. Zum Anzeigen aktueller Daten erneut laden.",
+    "pickScope": "Mindestens einen Berechtigungsbereich auswählen",
+    "createFailed": "Token konnte nicht erstellt werden",
+    "revokedFeedback": "Token widerrufen",
+    "revokeFailed": "Token konnte nicht widerrufen werden",
+    "copyFailed": "Kopieren fehlgeschlagen. Den Wert auswählen und manuell kopieren.",
+    "copied": "In die Zwischenablage kopiert",
+    "endpointCopied": "MCP-Endpunkt kopiert",
+    "searchPlaceholder": "Schlüssel, Besitzer, Teams, Endungen suchen…",
+    "narrowedNote": "Zeigt passende Schlüssel unter den neuesten {count}, bis die API-Abfrage Filter unterstützt.",
+    "mineNote": "Zeigt Ihre Schlüssel unter den neuesten {count}.",
+    "detail": {
+      "token": "Token",
+      "owner": "Besitzer",
+      "team": "Team",
+      "lastIp": "IP der letzten Verwendung",
+      "lastAgent": "Client der letzten Verwendung",
+      "orgWide": "— (organisationsweit)",
+      "shortToken": "Token {id}",
+      "overview": "Übersicht",
+      "notFoundTitle": "API-Token nicht gefunden",
+      "notFoundDescription": "Das Token existiert möglicherweise nicht, liegt außerhalb der aktuellen Liste oder ist für Sie nicht zugänglich.",
+      "back": "Zurück zu API-Schlüsseln",
+      "noScopes": "Keine Berechtigungsbereiche: Diesem Token sind keine Berechtigungen gewährt.",
+      "readFailed": "Token-Metadaten konnten nicht geladen werden.",
+      "retry": "Erneut versuchen"
+    },
+    "picker": {
+      "loadFailed": "Die Berechtigungsbereiche konnten nicht geladen werden. Seite erneut laden.",
+      "startFrom": "Vorlage auswählen",
+      "adminWarning": "Admin erlaubt diesem Token alles, was sein Besitzer tun kann, einschließlich später hinzugefügter Berechtigungen. Engere Bereiche und ein Ablaufdatum bevorzugen.",
+      "sensitive": "sensibel",
+      "unavailable": "Ihre Rollen gewähren keine der Berechtigungen dieses Bereichs.",
+      "unlocks": "Erlaubt {count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+      "surfaces": {
+        "apps": "Apps",
+        "clusters": "Cluster",
+        "secrets": "Secrets",
+        "agents": "Agenten",
+        "workflows": "Workflows",
+        "administration": "Verwaltung"
+      },
+      "presets": {
+        "read_only": "Nur Lesen",
+        "cli": "CLI-Standard",
+        "ci_deploy": "CI-Bereitstellung",
+        "cluster_operator": "Cluster-Operator"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "Apps lesen",
+        "description": "Apps, Bereitstellungen, Umgebungen und Secret-Namen auflisten."
+      },
+      "scope1": {
+        "label": "Apps bearbeiten",
+        "description": "Bereitstellen, Umgebungsvariablen bearbeiten und App-Konfiguration verwalten."
+      },
+      "scope2": {
+        "label": "Apps einbinden",
+        "description": "Apps registrieren und CI einrichten (Webhook, Secrets, Workflow), ohne Bereitstellung oder Löschung."
+      },
+      "scope3": {
+        "label": "Cluster lesen",
+        "description": "Cluster auflisten und Anbieterstatus lesen."
+      },
+      "scope4": {
+        "label": "Cluster aktualisieren",
+        "description": "Cluster-Einstellungen ändern: Ingress-Klasse, Authentifizierung, Region, Endpunkt."
+      },
+      "scope5": {
+        "label": "Cluster betreiben",
+        "description": "Cluster-Rezept installieren, Verwaltungsstatus aktualisieren und Ingress-Ressourcen abgleichen."
+      },
+      "scope6": {
+        "label": "Anmeldebenutzer verwalten",
+        "description": "Benutzer und Gruppen der zentralen Cluster-Authentifizierung erstellen, deaktivieren, löschen und zurücksetzen."
+      },
+      "scope7": {
+        "label": "App-Zugriff festlegen",
+        "description": "Benutzer und Gruppen auswählen, die eine App hinter zentraler Authentifizierung betreten dürfen."
+      },
+      "scope8": {
+        "label": "Secrets anzeigen",
+        "description": "Gespeicherte Secret-Werte anzeigen. Nur bei Bedarf gewähren."
+      },
+      "scope9": {
+        "label": "Secrets bearbeiten",
+        "description": "Secrets festlegen, rotieren und löschen, ohne Werte anzuzeigen."
+      },
+      "scope10": {
+        "label": "MCP lesen",
+        "description": "Agentenpakete auflisten und Läufe über Remote-MCP prüfen."
+      },
+      "scope11": {
+        "label": "MCP-Ausführung",
+        "description": "Agenten ausführen, steuern und sofort beenden; mit Agentenboxen verbinden, gemäß Kontoberechtigungen."
+      },
+      "scope12": {
+        "label": "MCP schreiben",
+        "description": "Agenten-Repositories und Paketdefinitionen synchronisieren."
+      },
+      "scope13": {
+        "label": "Agentenumgebungen bearbeiten",
+        "description": "Spezifikationen für Agentenumgebungen erstellen, aktualisieren und löschen."
+      },
+      "scope14": {
+        "label": "Workflows bearbeiten",
+        "description": "Workflows erstellen, aktualisieren und löschen."
+      },
+      "scope15": {
+        "label": "Workflows ausführen",
+        "description": "Workflow-Läufe starten, ohne sie zu bearbeiten."
+      },
+      "scope16": {
+        "label": "Projekte bearbeiten",
+        "description": "Projekte erstellen, aktualisieren und löschen."
+      },
+      "scope17": {
+        "label": "Teams bearbeiten",
+        "description": "Teams erstellen, aktualisieren und löschen."
+      },
+      "scope18": {
+        "label": "Administration",
+        "description": "Alles, was der Besitzer tun kann, jetzt und mit neuen Berechtigungen. Engere Bereiche bevorzugen."
+      }
+    }
   }
 }

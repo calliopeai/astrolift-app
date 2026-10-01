@@ -253,3 +253,37 @@ localized labels through an optional presentation argument.
 Team detail, members and access panels remain outside this list/create/edit/delete
 leaf. API key screens and scope catalogue presentation are the next bounded slice;
 this leaf does not claim complete #2145 coverage.
+
+## API keys and reviewed scope presentation
+
+The connected API key list, creation/reveal/revocation flow, metadata detail and
+scope picker use genuine translations in all eight locales. `apiKeys` is additive;
+all previously existing locale values remain unchanged. The localized list factory
+preserves query/view/filter/cursor identities and explicitly retains the newest-100
+client-narrowing disclosure. Known stock scope labels/descriptions are localized
+only when both their technical identity and exact reviewed server text match.
+Custom, changed or future metadata, permission IDs, scope strings, user/token/team
+names, suffixes, user agents and server diagnostics remain literal. Presets still
+filter against the actual server `available` values; unavailable selected scopes
+remain removable. This presentation supplies no permission authority.
+
+Creation keeps denied or unavailable drafts. Accepted create/revoke replies retain
+their committed outcome after a failed refresh; rejected envelopes request no
+refresh. Browser copy feedback awaits the clipboard result, catches denied or
+unavailable APIs, and retains the one-time value for manual copy. Dismissal remains
+explicit. Metadata transport errors have a translated read-error frame and actual
+retry, instead of an invented not-found result; cached metadata stays visible on a
+failed refresh. Token detail uses opt-in shared-shell copy and locale/time-zone
+timestamps; other entity-detail consumers retain their prior defaults. Status
+presentation uses the request clock and does not establish token authority.
+
+Focused tests use the real Apollo HttpLink for creation, revocation and retry,
+including all-eight refused, diagnostic-free, transport and refresh failures,
+clipboard completion/denial/unavailability, translated retained confirmation,
+locale changes with draft preservation and keyboard submission, server-directed
+scope admission, unknown metadata, ICU argument/tag parity, request-clock hydration
+and configured time zones. Portable token/detail/picker stories include German,
+French and Japanese states. Existing shared mutation-feedback and date regressions
+remain part of the affected gate. This leaf does not close other #2145 consumers,
+add a singular token API, change server permissions or broaden client-side list
+filtering beyond its disclosed current contract.

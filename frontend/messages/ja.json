@@ -5391,5 +5391,184 @@
       "unchanged": "現在のスラッグ — URLに使用されます。",
       "empty": "小文字の英字、数字、ハイフンを使います。URLに使用されます。"
     }
+  },
+  "apiKeys": {
+    "title": "API キー",
+    "name": "名前",
+    "suffix": "末尾",
+    "scopes": "スコープ",
+    "scope": "スコープ",
+    "canDo": "可能な操作",
+    "lastUsed": "最終使用",
+    "created": "作成日時",
+    "expires": "有効期限",
+    "status": "状態",
+    "active": "有効",
+    "revoked": "失効済み",
+    "expired": "期限切れ",
+    "none": "なし",
+    "nothing": "なし",
+    "never": "無期限",
+    "all": "すべて",
+    "mine": "自分のキー",
+    "longLivedAdmin": "長期間有効な管理者トークン",
+    "permissionCount": "{count, plural, other {# 件の権限}}",
+    "adminExpiryWarning": "有効期限が近くない管理者トークンです。より限定的なスコープのトークンに置き換えてください。",
+    "effectiveGuidance": "スコープで許可され、所有者のロールでも付与される権限：",
+    "createdNotice": "トークン <name></name> を作成しました",
+    "revealGuidance": "値を今すぐコピーしてください。再表示はできません。保存されるのは SHA-256 ハッシュと末尾 4 文字のみです。",
+    "copy": "コピー",
+    "dismissReveal": "保存しました — 閉じる",
+    "mcpTitle": "エージェントのリモート MCP",
+    "mcpGuidance": "認証付き Streamable HTTP で CI や開発クライアントに接続します。API トークンを <code></code> として送信してください。MCP スコープでも所有者の対応するエージェント権限が必要です。シークレット値は公開されません。",
+    "copyUrl": "URL をコピー",
+    "mcpRead": "{scope} · パッケージ・タスクを確認",
+    "mcpDispatch": "{scope} · 実行・停止",
+    "mcpWrite": "{scope} · リポジトリを同期",
+    "context": "CLI、ボット、スクリプト用の Bearer 認証情報です。トークンはハッシュで保存され、平文は作成時に一度だけ表示されます。",
+    "newToken": "新しいトークン",
+    "revoke": "失効させる",
+    "emptyTitle": "API キーがありません",
+    "emptyDescription": "CLI、CI 実行、スクリプトのプラットフォーム認証用に作成してください。",
+    "createTitle": "新しい API トークン",
+    "createDescription": "平文は作成後に一度だけ表示されます。後から取得できないため、安全な場所に保存してください。",
+    "nameGuidance": "監査ログには、このトークンの操作とともに分かりやすい名前が表示されます。",
+    "scopeGuidance": "トークンはアクセスを限定するだけです。以下の権限のうち、ロールでも付与されている権限のみを取得します。",
+    "expiresDays": "有効期間（日）",
+    "expiryGuidance": "無期限の場合は 0 または空欄にしてください。既定は {defaultDays} 日、最大 {maxDays} 日です。",
+    "cancel": "キャンセル",
+    "creating": "作成中…",
+    "create": "トークンを作成",
+    "revokeNamed": "トークン {name} を失効させますか？",
+    "revokeTitle": "トークンを失効させますか？",
+    "revokeDescription": "このトークンを使用する CLI やボットは直ちに動作しなくなります。失効は取り消せません。アクセスの再開には新しいトークンが必要です。",
+    "revokeConfirm": "トークンを失効",
+    "refreshWarning": "表示を更新できませんでした。現在のデータを確認するには再読み込みしてください。",
+    "pickScope": "スコープを 1 つ以上選択してください",
+    "createFailed": "トークンを作成できませんでした",
+    "revokedFeedback": "トークンを失効させました",
+    "revokeFailed": "トークンを失効させられませんでした",
+    "copyFailed": "コピーできませんでした。値を選択して手動でコピーしてください。",
+    "copied": "クリップボードにコピーしました",
+    "endpointCopied": "MCP エンドポイントをコピーしました",
+    "searchPlaceholder": "キー、所有者、チーム、末尾を検索…",
+    "narrowedNote": "API クエリがフィルターに対応するまで、最新 {count} 件から一致するキーを表示します。",
+    "mineNote": "最新 {count} 件から自分のキーを表示します。",
+    "detail": {
+      "token": "トークン",
+      "owner": "所有者",
+      "team": "チーム",
+      "lastIp": "最終使用 IP",
+      "lastAgent": "最終使用クライアント",
+      "orgWide": "—（組織全体）",
+      "shortToken": "トークン {id}",
+      "overview": "概要",
+      "notFoundTitle": "API トークンが見つかりません",
+      "notFoundDescription": "このトークンは存在しないか、最近の一覧に含まれていないか、アクセス権がない可能性があります。",
+      "back": "API キーに戻る",
+      "noScopes": "スコープがありません。このトークンには権限が付与されていません。",
+      "readFailed": "トークンのメタデータを読み込めませんでした。",
+      "retry": "再試行"
+    },
+    "picker": {
+      "loadFailed": "スコープ一覧を読み込めませんでした。ページを再読み込みしてください。",
+      "startFrom": "プリセット",
+      "adminWarning": "Admin は、後から追加される権限も含め、所有者に可能なすべての操作を許可します。限定的なスコープと有効期限を設定してください。",
+      "sensitive": "機密性の高い権限",
+      "unavailable": "ロールには、このスコープで許可される権限がありません。",
+      "unlocks": "{count, plural, other {# 件の権限を許可}}",
+      "surfaces": {
+        "apps": "アプリ",
+        "clusters": "クラスター",
+        "secrets": "シークレット",
+        "agents": "エージェント",
+        "workflows": "ワークフロー",
+        "administration": "管理"
+      },
+      "presets": {
+        "read_only": "読み取り専用",
+        "cli": "CLI の既定",
+        "ci_deploy": "CI デプロイ",
+        "cluster_operator": "クラスターオペレーター"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "アプリを読み取る",
+        "description": "アプリ、デプロイ、環境、シークレット名を一覧表示します。"
+      },
+      "scope1": {
+        "label": "アプリを書き込む",
+        "description": "デプロイ、環境変数の編集、アプリ設定の管理を行います。"
+      },
+      "scope2": {
+        "label": "アプリを登録する",
+        "description": "アプリを登録し、CI（Webhook、シークレット、ワークフロー）を設定します。デプロイや削除はできません。"
+      },
+      "scope3": {
+        "label": "クラスターを読み取る",
+        "description": "クラスターを一覧表示し、プロバイダーの状態を読み取ります。"
+      },
+      "scope4": {
+        "label": "クラスターを更新する",
+        "description": "クラスターの Ingress クラス、認証ゲート、リージョン、エンドポイントを変更します。"
+      },
+      "scope5": {
+        "label": "クラスターを運用する",
+        "description": "クラスターのレシピをインストールし、管理状態を更新し、Ingress を調整します。"
+      },
+      "scope6": {
+        "label": "サインインユーザーを管理する",
+        "description": "クラスターの中央認証ユーザーとグループの作成、無効化、削除、リセットを行います。"
+      },
+      "scope7": {
+        "label": "アプリへのアクセスを設定する",
+        "description": "中央認証で保護されたアプリにアクセスできるユーザーとグループを選択します。"
+      },
+      "scope8": {
+        "label": "シークレットを表示する",
+        "description": "保存されたシークレット値を表示します。必要な場合のみ付与してください。"
+      },
+      "scope9": {
+        "label": "シークレットを書き込む",
+        "description": "値を表示せずにシークレットの設定、ローテーション、削除を行います。"
+      },
+      "scope10": {
+        "label": "MCP 読み取り",
+        "description": "リモート MCP でエージェントパッケージを一覧表示し、実行を確認します。"
+      },
+      "scope11": {
+        "label": "MCP 実行",
+        "description": "アカウント権限に従い、エージェントの実行、制御、強制停止、エージェントボックスへの接続を行います。"
+      },
+      "scope12": {
+        "label": "MCP 書き込み",
+        "description": "エージェントリポジトリとパッケージ定義を同期します。"
+      },
+      "scope13": {
+        "label": "エージェント環境を書き込む",
+        "description": "エージェント環境仕様の作成、更新、削除を行います。"
+      },
+      "scope14": {
+        "label": "ワークフローを書き込む",
+        "description": "ワークフローの作成、更新、削除を行います。"
+      },
+      "scope15": {
+        "label": "ワークフローを実行する",
+        "description": "ワークフローを編集せずに実行を開始します。"
+      },
+      "scope16": {
+        "label": "プロジェクトを書き込む",
+        "description": "プロジェクトの作成、更新、削除を行います。"
+      },
+      "scope17": {
+        "label": "チームを書き込む",
+        "description": "チームの作成、更新、削除を行います。"
+      },
+      "scope18": {
+        "label": "管理者",
+        "description": "現在および将来追加される権限を含め、所有者に可能なすべての操作です。限定的なスコープを優先してください。"
+      }
+    }
   }
 }

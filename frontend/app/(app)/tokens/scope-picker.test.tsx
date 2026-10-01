@@ -1,4 +1,6 @@
 import * as React from "react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -73,10 +75,10 @@ vi.mock("@apollo/client/react", () => ({
 function Harness({ initial = [] as string[] }) {
   const [value, setValue] = React.useState<string[]>(initial);
   return (
-    <>
+    <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
       <ScopePicker value={value} onChange={setValue} />
       <output data-testid="value">{value.join(",")}</output>
-    </>
+    </NextIntlClientProvider>
   );
 }
 

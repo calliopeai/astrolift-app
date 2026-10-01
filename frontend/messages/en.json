@@ -5471,5 +5471,184 @@
       "unchanged": "Current slug — used in URLs.",
       "empty": "Lowercase letters, numbers and hyphens. Used in URLs."
     }
+  },
+  "apiKeys": {
+    "title": "API keys",
+    "name": "Name",
+    "suffix": "Suffix",
+    "scopes": "Scopes",
+    "scope": "Scope",
+    "canDo": "Can do",
+    "lastUsed": "Last used",
+    "created": "Created",
+    "expires": "Expires",
+    "status": "Status",
+    "active": "Active",
+    "revoked": "Revoked",
+    "expired": "Expired",
+    "none": "none",
+    "nothing": "nothing",
+    "never": "never",
+    "all": "All",
+    "mine": "Mine",
+    "longLivedAdmin": "Long-lived admin token",
+    "permissionCount": "{count, plural, one {# permission} other {# permissions}}",
+    "adminExpiryWarning": "Admin with no near expiry. Replace it with a narrower token.",
+    "effectiveGuidance": "What its scopes allow and its owner's roles grant:",
+    "createdNotice": "Token <name></name> created",
+    "revealGuidance": "Copy the value now — it is never shown again. Only the SHA-256 hash and last 4 characters are stored.",
+    "copy": "Copy",
+    "dismissReveal": "I've saved it — dismiss",
+    "mcpTitle": "Remote agent MCP",
+    "mcpGuidance": "Connect CI or coding clients over authenticated Streamable HTTP. Send an API token as <code></code>. MCP scopes still require the owner's matching agent permissions; secret values are not exposed.",
+    "copyUrl": "Copy URL",
+    "mcpRead": "{scope} · inspect packages/tasks",
+    "mcpDispatch": "{scope} · run/kill",
+    "mcpWrite": "{scope} · sync repos",
+    "context": "Bearer credentials for CLIs, bots, and scripts. Tokens are hashed at rest; plaintext is shown exactly once at creation.",
+    "newToken": "New token",
+    "revoke": "Revoke",
+    "emptyTitle": "No API keys",
+    "emptyDescription": "Create one to authenticate CLI, CI runs, or your scripts against the platform.",
+    "createTitle": "New API token",
+    "createDescription": "Plaintext is shown once after creation. Save it securely; it cannot be retrieved later.",
+    "nameGuidance": "A descriptive name appears in the audit log beside this token's actions.",
+    "scopeGuidance": "A token only narrows your access: it gets the permissions below that your roles also grant.",
+    "expiresDays": "Expires in (days)",
+    "expiryGuidance": "Leave 0 or empty for no expiry. Default {defaultDays} days, maximum {maxDays}.",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create token",
+    "revokeNamed": "Revoke token {name}?",
+    "revokeTitle": "Revoke token?",
+    "revokeDescription": "Existing CLIs and bots using this token stop working immediately. Revocation cannot be undone; mint a new token to restore access.",
+    "revokeConfirm": "Revoke token",
+    "refreshWarning": "Could not refresh the view. Refresh to see current data.",
+    "pickScope": "Pick at least one scope",
+    "createFailed": "Could not create the token",
+    "revokedFeedback": "Token revoked",
+    "revokeFailed": "Could not revoke the token",
+    "copyFailed": "Could not copy. Select and copy the value manually.",
+    "copied": "Copied to clipboard",
+    "endpointCopied": "MCP endpoint copied",
+    "searchPlaceholder": "Search keys, owners, teams, suffixes…",
+    "narrowedNote": "Shows matching keys among the newest {count}, until the API query supports filters.",
+    "mineNote": "Shows your keys among the newest {count}.",
+    "detail": {
+      "token": "Token",
+      "owner": "Owner",
+      "team": "Team",
+      "lastIp": "Last used IP",
+      "lastAgent": "Last used agent",
+      "orgWide": "— (organization-wide)",
+      "shortToken": "Token {id}",
+      "overview": "Overview",
+      "notFoundTitle": "API token not found",
+      "notFoundDescription": "This token may not exist, may be outside the recent list, or you may not have access.",
+      "back": "Back to API keys",
+      "noScopes": "No scopes — this token has no granted permissions.",
+      "readFailed": "Could not load token metadata.",
+      "retry": "Retry"
+    },
+    "picker": {
+      "loadFailed": "Could not load the scope list. Reload the page to try again.",
+      "startFrom": "Start from",
+      "adminWarning": "Admin lets this token do everything its owner can, including permissions added later. Prefer narrow scopes and give it an expiry.",
+      "sensitive": "sensitive",
+      "unavailable": "Your roles grant none of what this scope unlocks.",
+      "unlocks": "Unlocks {count, plural, one {# permission} other {# permissions}}",
+      "surfaces": {
+        "apps": "Apps",
+        "clusters": "Clusters",
+        "secrets": "Secrets",
+        "agents": "Agents",
+        "workflows": "Workflows",
+        "administration": "Administration"
+      },
+      "presets": {
+        "read_only": "Read-only",
+        "cli": "CLI default",
+        "ci_deploy": "CI deploy",
+        "cluster_operator": "Cluster operator"
+      }
+    },
+    "catalog": {
+      "scope0": {
+        "label": "Read apps",
+        "description": "List apps, deployments, environments and secret names."
+      },
+      "scope1": {
+        "label": "Write apps",
+        "description": "Deploy, edit environment variables and manage app config."
+      },
+      "scope2": {
+        "label": "Onboard apps",
+        "description": "Register apps and run CI setup (webhook, secrets, workflow), without deploy or delete."
+      },
+      "scope3": {
+        "label": "Read clusters",
+        "description": "List clusters and read provider state."
+      },
+      "scope4": {
+        "label": "Update clusters",
+        "description": "Change a cluster's settings: ingress class, auth gate, region, endpoint."
+      },
+      "scope5": {
+        "label": "Operate clusters",
+        "description": "Run a cluster's recipe install, refresh its management state, reconcile its ingresses."
+      },
+      "scope6": {
+        "label": "Manage sign-in users",
+        "description": "Create, disable, delete and reset the users of a cluster's central auth, and their groups."
+      },
+      "scope7": {
+        "label": "Set app access",
+        "description": "Choose which users and groups may enter an app behind central auth."
+      },
+      "scope8": {
+        "label": "Reveal secrets",
+        "description": "Reveal stored secret values. Grant only when required."
+      },
+      "scope9": {
+        "label": "Write secrets",
+        "description": "Set, rotate and delete secrets without revealing them."
+      },
+      "scope10": {
+        "label": "MCP read",
+        "description": "List agent packages and inspect runs through remote MCP."
+      },
+      "scope11": {
+        "label": "MCP dispatch",
+        "description": "Run, steer and hard-stop agents; attach to agent boxes, subject to account permissions."
+      },
+      "scope12": {
+        "label": "MCP write",
+        "description": "Sync agent repositories and package definitions."
+      },
+      "scope13": {
+        "label": "Write agent environments",
+        "description": "Create, update and delete agent environment specs."
+      },
+      "scope14": {
+        "label": "Write workflows",
+        "description": "Create, update and delete workflows."
+      },
+      "scope15": {
+        "label": "Run workflows",
+        "description": "Start workflow runs, without editing them."
+      },
+      "scope16": {
+        "label": "Write projects",
+        "description": "Create, update and delete projects."
+      },
+      "scope17": {
+        "label": "Write teams",
+        "description": "Create, update and delete teams."
+      },
+      "scope18": {
+        "label": "Admin",
+        "description": "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes."
+      }
+    }
   }
 }

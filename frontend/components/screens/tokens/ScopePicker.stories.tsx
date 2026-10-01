@@ -1,3 +1,7 @@
+import en from "@/messages/en.json";
+import { NextIntlClientProvider } from "next-intl";
+import de from "@/messages/de.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 
@@ -5,7 +9,21 @@ import { SCOPE_CATALOG_LONG, SCOPE_PICKER } from "@/components/screens/teams/tea
 
 import { ScopePicker, type ScopePickerProps } from "./ScopePicker";
 
-const meta: Meta = { title: "Screens/Tokens/ScopePicker" };
+const meta: Meta = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider
+        locale="en"
+        messages={en}
+        timeZone="UTC"
+        now={new Date("2026-09-30T12:00:00Z")}
+      >
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  title: "Screens/Tokens/ScopePicker",
+};
 export default meta;
 
 type Story = StoryObj;
@@ -45,4 +63,35 @@ export const LoadFailed: Story = {
 
 export const LongStrings: Story = {
   render: () => <Picker {...SCOPE_PICKER} catalog={SCOPE_CATALOG_LONG} />,
+};
+
+export const JapaneseAdmin: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider
+        locale="ja"
+        messages={ja}
+        timeZone="Europe/Berlin"
+        now={new Date("2026-09-30T12:00:00Z")}
+      >
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => <Picker {...SCOPE_PICKER} initial={["admin"]} />,
+};
+export const GermanUnavailable: Story = {
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider
+        locale="de"
+        messages={de}
+        timeZone="Europe/Berlin"
+        now={new Date("2026-09-30T12:00:00Z")}
+      >
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  render: () => <Picker {...SCOPE_PICKER} />,
 };

@@ -15,14 +15,27 @@ interface Resp {
  * The data half of TokenDetailScreen.
  */
 export function useTokenDetail(id: string) {
-  const { data, loading } = useQuery<Resp>(LIST_API_TOKENS, {
+  const query = useQuery<Resp>(LIST_API_TOKENS, {
     fetchPolicy: "cache-and-network",
   });
 
+  const data = query.data ?? query.previousData;
   const token = React.useMemo(
     () => (data?.astroliftApiTokens ?? []).find((row) => row.id === id) ?? null,
     [data, id]
   );
 
-  return { id, token, loading };
+  return {
+    id,
+    token,
+    loading: query.loading && !data,
+    error: query.error ?? null,
+    onRetry: async () => {
+      try {
+        await query.refetch();
+      } catch {
+        /* Apollo retains the actual read error. */
+      }
+    },
+  };
 }
