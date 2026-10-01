@@ -731,3 +731,20 @@ settings decommissioning, general list/detail labels and read-state gaps,
 bootstrap recipe/history, status bodies and other untranslated cluster settings
 remain separate #2145 boundaries. No backend/cloud actions or full-suite proof
 are claimed for this leaf.
+
+## Reviewed auth-user source and subject preconditions (#2225)
+
+The subsequent #2225 contract adds authoritative nullable provider pool/source
+proof and immutable provider-user subjects to the connected inventory and
+optional expected-target fields to all seven existing writes. The web hook sends
+literal observed proofs, includes source revision in its source lease, and
+refuses missing proof. The view retains observations while disabling source/user
+operations with unknown proof; unknown identity is not reported as a failed read.
+Existing presentation keys cover these states in all eight locales; no locale
+catalogue or sibling settings changes are needed.
+
+The original 440-check presentation proof above describes its frozen source.
+The extended schema-validated HttpLink/portable/card proof includes unknown
+source/user identity and exact expected-source/subject envelopes in every locale.
+Provider-side conditional CAS remains unsupported; see
+[reviewed-target operator contract](../operators/cluster-auth-user-preconditions.md).
