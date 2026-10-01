@@ -496,17 +496,6 @@ _VALUE_PROVENANCE_DIVERGENCE: dict[tuple[str, str], dict[str, tuple[frozenset[st
             "know the value at binding time.",
         ),
     },
-    ("postgres", "DATABASE_HOST"): {
-        "literal": (
-            frozenset({"azure/postgres/azure_pg_flex"}),
-            "The ARM response carries the FQDN, so the driver knows the value.",
-        ),
-        "secret_ref": (
-            frozenset({"k8s_native/postgres/cnpg"}),
-            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
-            "what keeps the binding correct across a rotation.",
-        ),
-    },
     ("postgres", "DATABASE_NAME"): {
         "literal": (
             frozenset({"azure/postgres/azure_pg_flex"}),
@@ -556,26 +545,6 @@ _VALUE_PROVENANCE_DIVERGENCE: dict[tuple[str, str], dict[str, tuple[frozenset[st
                 }
             ),
             "The driver created the database and knows its name.",
-        ),
-        "secret_ref": (
-            frozenset({"k8s_native/postgres/cnpg"}),
-            "CNPG owns the generated -app Secret and rotates it; reading through the reference is "
-            "what keeps the binding correct across a rotation.",
-        ),
-    },
-    ("postgres", "POSTGRES_HOST"): {
-        "literal": (
-            frozenset(
-                {
-                    "aws/postgres/aurora_postgres",
-                    "aws/postgres/aurora_postgres_serverless_v2",
-                    "aws/postgres/rds",
-                    "azure/postgres/azure_pg_flex",
-                    "gcp/postgres/alloydb",
-                    "gcp/postgres/cloudsql",
-                }
-            ),
-            "The provisioning response carries the endpoint, so the driver knows it.",
         ),
         "secret_ref": (
             frozenset({"k8s_native/postgres/cnpg"}),
