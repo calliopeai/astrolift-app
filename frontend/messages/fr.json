@@ -2695,6 +2695,46 @@
         "memory_request": "Demande de mémoire par pod",
         "memory_limit": "Limite de mémoire par pod"
       }
+    },
+    "managedServicesAdmin": {
+      "title": "Administration des services gérés",
+      "description": "Modifiez les champs pris en charge ou demandez le provisionnement avec la configuration actuelle. Le comportement du fournisseur dépend du pilote du service.",
+      "loading": "Chargement des services gérés…",
+      "readFailed": "Impossible de consulter les services gérés.",
+      "retry": "Réessayer",
+      "edit": "Modifier",
+      "reprovision": "Reprovisionner",
+      "noEditableTooltip": "Ce service ne présente aucun champ modifiable actuellement. Consultez la documentation du pilote avant de modifier sa configuration.",
+      "editTooltip": "Modifiez les champs actuellement présentés par le service. L’API peut refuser les changements non pris en charge.",
+      "reprovisionTooltip": "Demandez le provisionnement avec la configuration actuelle. Cela ne confirme ni le remplacement de la ressource ni la conservation des données.",
+      "reprovisionTitle": "Reprovisionner {name} ?",
+      "service": "service géré",
+      "reprovisionDescription": "Cette action demande le processus de provisionnement avec la configuration actuelle. Son acceptation ne confirme ni son achèvement, ni le remplacement de la ressource, ni la conservation des données. Consultez la documentation du pilote avant de confirmer.",
+      "cancel": "Annuler",
+      "editTitle": "Modifier {name}",
+      "editDescription": "Seuls les champs modifiables actuellement disponibles sont affichés. Enregistrer demande une mise à jour ; l’API peut refuser les changements non pris en charge. L’achèvement est vérifié par des lectures ultérieures du statut.",
+      "noEditable": "Ce service ne présente aucun champ modifiable actuellement. Consultez la documentation du pilote et la source de configuration avant de demander le provisionnement.",
+      "save": "Enregistrer les modifications",
+      "numberHint": "Saisissez un nombre fini.",
+      "booleanHint": "Saisissez true, false, 1 ou 0.",
+      "textHint": "Le texte est envoyé tel quel ; les valeurs structurées inchangées conservent leur type d’origine.",
+      "reprovisionFailed": "La demande de provisionnement a échoué.",
+      "updateFailed": "La demande de mise à jour a échoué.",
+      "reprovisionAccepted": "Provisionnement demandé pour {name}.",
+      "updateAccepted": "Mise à jour demandée pour {name}.",
+      "refreshWarning": "La demande a été acceptée, mais les services gérés n’ont pas pu être actualisés.",
+      "noChanges": "Aucune modification à enregistrer.",
+      "invalidNumber": "{field} exige un nombre fini.",
+      "invalidBoolean": "{field} exige true, false, 1 ou 0.",
+      "status": {
+        "active": "Actif",
+        "pending": "En attente",
+        "provisioning": "Provisionnement en cours",
+        "updating": "Mise à jour en cours",
+        "deprovisioning": "Déprovisionnement en cours",
+        "failed": "Échec",
+        "deleted": "Supprimé"
+      }
     }
   },
   "settingsIndex": {

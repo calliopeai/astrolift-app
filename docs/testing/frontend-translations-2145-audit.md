@@ -981,3 +981,49 @@ claiming the later settings/lifecycle gaps or downstream secret application.
 - Original item 13 remains partial: EnvironmentSettings/overrides,
   ManagedServicesAdmin and other operational-hook feedback are separate remaining
   surfaces. Archive and retention fixes are independently frozen leaves.
+
+
+## App settings: managed service administration (#2145)
+
+The connected ManagedServicesAdminCard, pure view and owned hook use 36 human
+message leaves in each of the eight locale catalogs. Known statuses translate;
+unknown statuses, field names, service identifiers and provider diagnostics stay
+literal. Re-provision requests the current ProvisionManagedServiceWorkflow;
+it does not promise teardown/recreation, convergence or data preservation.
+
+The update input remains `{id, config}`. The backend replaces config rather than
+merging a patch, so the reviewed full config is preserved and only supported
+edited fields are overlaid. `editableFields=["*"]` exposes existing own keys,
+not a literal wildcard or new arbitrary fields. Numbers must remain finite;
+boolean edits explicitly accept true/false/1/0. Unchanged nested values retain
+their types; edited JSON-shaped values keep the existing raw-text semantics.
+The UI retains its existing app.deploy/optimistic Can gate; both backend writes
+require APP_UPDATE. This leaf does not grant permissions or alter that mismatch.
+
+Failed or unconfirmed inventory reads expose real retry. Cached failed reads
+keep reviews disabled through retry until an actual successful observation.
+Refused/transport/empty-message replies retain drafts and trigger no automatic
+read; accepted writes remain accepted when the list refresh fails. The backend
+can persist desired state or pending status before workflow dispatch fails, so a
+refused/failed response does not prove server state was rolled back.
+
+Observed app/source/config/editable-fields/authority transitions invalidate
+local reviews. Late callbacks cannot close a newer review, refresh a different
+app or clear a newer draft. These observations and leases are not backend CAS
+or immutable cloud incarnation proof. The existing flat list is a returned
+inventory, not a new complete fleet enumeration.
+
+Focused proof uses the actual exported card, schema-validated Apollo HttpLink,
+all eight catalogs, exact full-config input and unchanged nested values,
+wildcard number/bool/text edits, refused parsing and draft retention, accepted
+read failure, retry/pending ownership, source/authority ABA, old callbacks,
+locale changes, ICU contracts and portable stories: 216 checks pass. Production
+GraphQL queries, mutations, generated SDL and shared Apollo code are unchanged.
+The actual transport proof preserves observed own `constructor` keys and
+ordinary unknown keys. Apollo 4's development JSON-scalar cloning can discard an
+own `__proto__` key before this hook observes the config; end-to-end preservation
+of that wire key is not claimed by these tests or this leaf.
+
+This remains a bounded leaf of #2145; it has no live provisioning or deployment
+receipt yet. Other hooks, shared query-error copy and remaining cluster/lifecycle
+surfaces remain outside this leaf.

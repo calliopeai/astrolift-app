@@ -2695,6 +2695,46 @@
         "memory_request": "Pod별 메모리 요청량",
         "memory_limit": "Pod별 메모리 한도"
       }
+    },
+    "managedServicesAdmin": {
+      "title": "관리형 서비스 관리",
+      "description": "지원되는 설정 필드를 편집하거나 현재 설정으로 프로비저닝을 요청합니다. 공급자의 동작은 서비스 드라이버에 따라 달라집니다.",
+      "loading": "관리형 서비스 불러오는 중…",
+      "readFailed": "관리형 서비스를 조회할 수 없습니다.",
+      "retry": "다시 시도",
+      "edit": "편집",
+      "reprovision": "다시 프로비저닝",
+      "noEditableTooltip": "이 서비스에는 현재 편집 가능한 필드가 없습니다. 설정을 변경하기 전에 드라이버 문서를 확인하세요.",
+      "editTooltip": "서비스가 현재 제공하는 필드를 편집합니다. API가 지원되지 않는 변경을 거부할 수 있습니다.",
+      "reprovisionTooltip": "현재 설정으로 프로비저닝을 요청합니다. 리소스 교체나 데이터 보존을 확인하는 것은 아닙니다.",
+      "reprovisionTitle": "{name}을(를) 다시 프로비저닝할까요?",
+      "service": "관리형 서비스",
+      "reprovisionDescription": "현재 설정으로 프로비저닝 워크플로를 요청합니다. 요청 수락은 완료, 리소스 교체 또는 데이터 보존을 확인하지 않습니다. 확인하기 전에 서비스 드라이버 문서를 확인하세요.",
+      "cancel": "취소",
+      "editTitle": "{name} 편집",
+      "editDescription": "현재 제공되는 편집 가능한 필드만 표시합니다. 저장은 업데이트 요청이며, API가 지원되지 않는 변경을 거부할 수 있습니다. 완료 여부는 이후 상태 조회로 확인합니다.",
+      "noEditable": "이 서비스에는 현재 편집 가능한 필드가 없습니다. 프로비저닝을 요청하기 전에 드라이버 문서와 설정 원본을 확인하세요.",
+      "save": "변경 사항 저장",
+      "numberHint": "유한한 숫자를 입력하세요.",
+      "booleanHint": "true, false, 1 또는 0을 입력하세요.",
+      "textHint": "텍스트는 입력한 대로 전송되며 변경되지 않은 구조화된 값은 원래 유형을 유지합니다.",
+      "reprovisionFailed": "프로비저닝 요청에 실패했습니다.",
+      "updateFailed": "업데이트 요청에 실패했습니다.",
+      "reprovisionAccepted": "{name}의 프로비저닝을 요청했습니다.",
+      "updateAccepted": "{name}의 업데이트를 요청했습니다.",
+      "refreshWarning": "요청은 수락되었지만 관리형 서비스를 새로 조회하지 못했습니다.",
+      "noChanges": "저장할 변경 사항이 없습니다.",
+      "invalidNumber": "{field}에는 유한한 숫자가 필요합니다.",
+      "invalidBoolean": "{field}에는 true, false, 1 또는 0이 필요합니다.",
+      "status": {
+        "active": "활성",
+        "pending": "대기 중",
+        "provisioning": "프로비저닝 중",
+        "updating": "업데이트 중",
+        "deprovisioning": "프로비저닝 해제 중",
+        "failed": "실패",
+        "deleted": "삭제됨"
+      }
     }
   },
   "settingsIndex": {

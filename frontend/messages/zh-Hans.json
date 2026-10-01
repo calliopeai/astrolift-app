@@ -2695,6 +2695,46 @@
         "memory_request": "每个 Pod 的内存请求量",
         "memory_limit": "每个 Pod 的内存上限"
       }
+    },
+    "managedServicesAdmin": {
+      "title": "托管服务管理",
+      "description": "编辑支持的配置字段，或使用当前配置请求预配。提供商的行为取决于服务驱动程序。",
+      "loading": "正在加载托管服务…",
+      "readFailed": "无法读取托管服务。",
+      "retry": "重试",
+      "edit": "编辑",
+      "reprovision": "重新预配",
+      "noEditableTooltip": "此服务目前没有可编辑字段。更改配置前请查阅驱动程序文档。",
+      "editTooltip": "编辑服务当前提供的字段。API 可能拒绝不支持的更改。",
+      "reprovisionTooltip": "使用当前配置请求预配。这并不确认资源替换或数据保留。",
+      "reprovisionTitle": "重新预配 {name}？",
+      "service": "托管服务",
+      "reprovisionDescription": "此操作使用当前配置请求预配工作流。请求获接受并不确认完成、资源替换或数据保留。确认前请查阅服务驱动程序文档。",
+      "cancel": "取消",
+      "editTitle": "编辑 {name}",
+      "editDescription": "仅显示当前提供的可编辑字段。保存会请求更新；API 可能拒绝不支持的更改。是否完成需通过后续状态读取确认。",
+      "noEditable": "此服务目前没有可编辑字段。请求预配前请查阅驱动程序文档和配置来源。",
+      "save": "保存更改",
+      "numberHint": "请输入有限数值。",
+      "booleanHint": "请输入 true、false、1 或 0。",
+      "textHint": "文本将按原样发送；未更改的结构化值保留原始类型。",
+      "reprovisionFailed": "预配请求失败。",
+      "updateFailed": "更新请求失败。",
+      "reprovisionAccepted": "已请求预配 {name}。",
+      "updateAccepted": "已请求更新 {name}。",
+      "refreshWarning": "请求已获接受，但无法刷新托管服务。",
+      "noChanges": "没有需要保存的更改。",
+      "invalidNumber": "{field} 需要有限数值。",
+      "invalidBoolean": "{field} 需要 true、false、1 或 0。",
+      "status": {
+        "active": "活动",
+        "pending": "待处理",
+        "provisioning": "预配中",
+        "updating": "更新中",
+        "deprovisioning": "取消预配中",
+        "failed": "失败",
+        "deleted": "已删除"
+      }
     }
   },
   "settingsIndex": {

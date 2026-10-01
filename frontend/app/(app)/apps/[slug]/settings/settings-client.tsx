@@ -233,7 +233,7 @@ function IngressControlsCard({ appSlug }: { appSlug: string }) {
   return <IngressControlsView {...useIngressControls(appSlug)} />;
 }
 
-function ManagedServicesAdminCard({ appSlug }: { appSlug: string }) {
+export function ManagedServicesAdminCard({ appSlug }: { appSlug: string }) {
   return <ManagedServicesAdminView {...useManagedServicesAdmin(appSlug)} />;
 }
 

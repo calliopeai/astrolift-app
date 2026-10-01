@@ -2695,6 +2695,46 @@
         "memory_request": "Speicheranforderung pro Pod",
         "memory_limit": "Speicherlimit pro Pod"
       }
+    },
+    "managedServicesAdmin": {
+      "title": "Verwaltung verwalteter Dienste",
+      "description": "Bearbeiten Sie unterstützte Konfigurationsfelder oder fordern Sie eine Bereitstellung mit der aktuellen Konfiguration an. Das Anbieterverhalten hängt vom Diensttreiber ab.",
+      "loading": "Verwaltete Dienste werden geladen…",
+      "readFailed": "Verwaltete Dienste konnten nicht gelesen werden.",
+      "retry": "Erneut versuchen",
+      "edit": "Bearbeiten",
+      "reprovision": "Neu bereitstellen",
+      "noEditableTooltip": "Dieser Dienst stellt derzeit keine bearbeitbaren Felder bereit. Lesen Sie die Treiberdokumentation, bevor Sie die Konfiguration ändern.",
+      "editTooltip": "Bearbeiten Sie die derzeit vom Dienst bereitgestellten Felder. Die API kann nicht unterstützte Änderungen ablehnen.",
+      "reprovisionTooltip": "Fordern Sie eine Bereitstellung mit der aktuellen Konfiguration an. Dies bestätigt weder den Ressourcenaustausch noch den Datenerhalt.",
+      "reprovisionTitle": "{name} neu bereitstellen?",
+      "service": "verwalteter Dienst",
+      "reprovisionDescription": "Dies fordert den Bereitstellungsablauf mit der aktuellen Konfiguration an. Eine Annahme bestätigt weder den Abschluss noch den Ressourcenaustausch oder Datenerhalt. Lesen Sie vor der Bestätigung die Diensttreiberdokumentation.",
+      "cancel": "Abbrechen",
+      "editTitle": "{name} bearbeiten",
+      "editDescription": "Es werden nur derzeit verfügbare bearbeitbare Felder angezeigt. Speichern fordert eine Aktualisierung an; die API kann nicht unterstützte Änderungen ablehnen. Der Abschluss wird durch spätere Statusabfragen geprüft.",
+      "noEditable": "Dieser Dienst stellt derzeit keine bearbeitbaren Felder bereit. Prüfen Sie vor der Bereitstellungsanforderung die Treiberdokumentation und Konfigurationsquelle.",
+      "save": "Änderungen speichern",
+      "numberHint": "Geben Sie eine endliche Zahl ein.",
+      "booleanHint": "Geben Sie true, false, 1 oder 0 ein.",
+      "textHint": "Text wird wie eingegeben gesendet; unveränderte strukturierte Werte behalten ihren ursprünglichen Typ.",
+      "reprovisionFailed": "Die Bereitstellungsanforderung ist fehlgeschlagen.",
+      "updateFailed": "Die Aktualisierungsanforderung ist fehlgeschlagen.",
+      "reprovisionAccepted": "Bereitstellung für {name} angefordert.",
+      "updateAccepted": "Aktualisierung für {name} angefordert.",
+      "refreshWarning": "Die Anforderung wurde angenommen, aber die verwalteten Dienste konnten nicht aktualisiert werden.",
+      "noChanges": "Keine Änderungen zu speichern.",
+      "invalidNumber": "{field} erfordert eine endliche Zahl.",
+      "invalidBoolean": "{field} erfordert true, false, 1 oder 0.",
+      "status": {
+        "active": "Aktiv",
+        "pending": "Ausstehend",
+        "provisioning": "Wird bereitgestellt",
+        "updating": "Wird aktualisiert",
+        "deprovisioning": "Wird entfernt",
+        "failed": "Fehlgeschlagen",
+        "deleted": "Gelöscht"
+      }
     }
   },
   "settingsIndex": {

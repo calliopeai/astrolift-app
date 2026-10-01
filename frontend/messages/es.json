@@ -2695,6 +2695,46 @@
         "memory_request": "Solicitud de memoria por pod",
         "memory_limit": "Límite de memoria por pod"
       }
+    },
+    "managedServicesAdmin": {
+      "title": "Administración de servicios gestionados",
+      "description": "Edita los campos admitidos o solicita el aprovisionamiento con la configuración actual. El comportamiento del proveedor depende del controlador del servicio.",
+      "loading": "Cargando servicios gestionados…",
+      "readFailed": "No se pudieron consultar los servicios gestionados.",
+      "retry": "Reintentar",
+      "edit": "Editar",
+      "reprovision": "Reaprovisionar",
+      "noEditableTooltip": "Este servicio no expone campos editables actualmente. Consulta la documentación del controlador antes de cambiar su configuración.",
+      "editTooltip": "Edita los campos que expone actualmente el servicio. La API puede rechazar cambios no admitidos.",
+      "reprovisionTooltip": "Solicita el aprovisionamiento con la configuración actual. Esto no confirma la sustitución del recurso ni la conservación de los datos.",
+      "reprovisionTitle": "¿Reaprovisionar {name}?",
+      "service": "servicio gestionado",
+      "reprovisionDescription": "Se solicita el flujo de aprovisionamiento con la configuración actual. La aceptación no confirma la finalización, la sustitución del recurso ni la conservación de los datos. Consulta la documentación del controlador antes de confirmar.",
+      "cancel": "Cancelar",
+      "editTitle": "Editar {name}",
+      "editDescription": "Solo se muestran los campos editables disponibles. Guardar solicita una actualización; la API puede rechazar cambios no admitidos. La finalización se verifica consultando el estado posteriormente.",
+      "noEditable": "Este servicio no expone campos editables actualmente. Consulta la documentación del controlador y la fuente de configuración antes de solicitar el aprovisionamiento.",
+      "save": "Guardar cambios",
+      "numberHint": "Introduce un número finito.",
+      "booleanHint": "Introduce true, false, 1 o 0.",
+      "textHint": "El texto se envía tal como se escribe; los valores estructurados sin cambios conservan su tipo original.",
+      "reprovisionFailed": "Falló la solicitud de aprovisionamiento.",
+      "updateFailed": "Falló la solicitud de actualización.",
+      "reprovisionAccepted": "Se solicitó el aprovisionamiento de {name}.",
+      "updateAccepted": "Se solicitó la actualización de {name}.",
+      "refreshWarning": "La solicitud fue aceptada, pero no se pudieron actualizar los servicios gestionados.",
+      "noChanges": "No hay cambios que guardar.",
+      "invalidNumber": "{field} requiere un número finito.",
+      "invalidBoolean": "{field} requiere true, false, 1 o 0.",
+      "status": {
+        "active": "Activo",
+        "pending": "Pendiente",
+        "provisioning": "Aprovisionando",
+        "updating": "Actualizando",
+        "deprovisioning": "Desaprovisionando",
+        "failed": "Fallido",
+        "deleted": "Eliminado"
+      }
     }
   },
   "settingsIndex": {

@@ -2695,6 +2695,46 @@
         "memory_request": "Podごとのメモリ要求",
         "memory_limit": "Podごとのメモリ上限"
       }
+    },
+    "managedServicesAdmin": {
+      "title": "マネージドサービスの管理",
+      "description": "対応する設定項目を編集するか、現在の設定でプロビジョニングを要求します。プロバイダーの動作はサービスドライバーに依存します。",
+      "loading": "マネージドサービスを読み込み中…",
+      "readFailed": "マネージドサービスを取得できませんでした。",
+      "retry": "再試行",
+      "edit": "編集",
+      "reprovision": "再プロビジョニング",
+      "noEditableTooltip": "このサービスには現在編集可能な項目がありません。設定を変更する前にドライバーのドキュメントを確認してください。",
+      "editTooltip": "サービスが現在公開している項目を編集します。未対応の変更は API に拒否される場合があります。",
+      "reprovisionTooltip": "現在の設定でプロビジョニングを要求します。リソースの置き換えやデータの保持を確認するものではありません。",
+      "reprovisionTitle": "{name} を再プロビジョニングしますか？",
+      "service": "マネージドサービス",
+      "reprovisionDescription": "現在の設定でプロビジョニングワークフローを要求します。受理されても、完了、リソースの置き換え、データの保持は確認されません。確認する前にサービスドライバーのドキュメントを確認してください。",
+      "cancel": "キャンセル",
+      "editTitle": "{name} を編集",
+      "editDescription": "現在公開されている編集可能な項目のみ表示します。保存は更新を要求する操作です。未対応の変更は API に拒否される場合があります。完了は後続の状態取得で確認します。",
+      "noEditable": "このサービスには現在編集可能な項目がありません。プロビジョニングを要求する前にドライバーのドキュメントと設定元を確認してください。",
+      "save": "変更を保存",
+      "numberHint": "有限の数値を入力してください。",
+      "booleanHint": "true、false、1、0 のいずれかを入力してください。",
+      "textHint": "テキストは入力したまま送信されます。変更のない構造化値は元の型を保持します。",
+      "reprovisionFailed": "プロビジョニング要求に失敗しました。",
+      "updateFailed": "更新要求に失敗しました。",
+      "reprovisionAccepted": "{name} のプロビジョニングを要求しました。",
+      "updateAccepted": "{name} の更新を要求しました。",
+      "refreshWarning": "要求は受理されましたが、マネージドサービスを再取得できませんでした。",
+      "noChanges": "保存する変更はありません。",
+      "invalidNumber": "{field} には有限の数値が必要です。",
+      "invalidBoolean": "{field} には true、false、1、0 のいずれかが必要です。",
+      "status": {
+        "active": "有効",
+        "pending": "保留中",
+        "provisioning": "プロビジョニング中",
+        "updating": "更新中",
+        "deprovisioning": "プロビジョニング解除中",
+        "failed": "失敗",
+        "deleted": "削除済み"
+      }
     }
   },
   "settingsIndex": {
