@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
@@ -24,24 +25,26 @@ export function useDispatchAgent(
   agent: Pick<AstroliftAgentListItem, "slug" | "name">,
   onDispatched?: (runId: string) => Promise<unknown> | void
 ) {
+  const t = useTranslations("agentRecovery.feedback");
   const [runAgent, { loading: dispatching }] = useMutation<RunAgentResp>(RUN_AGENT);
 
   async function dispatch(): Promise<string | null> {
     try {
       const { data: res } = await runAgent({ variables: { input: { agentSlug: agent.slug } } });
       const result = res?.runAstroliftAgent;
-      if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
-      toast.success(`Dispatched ${agent.name}`);
-      const id = result.data?.id ?? "";
+      if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? t("dispatchFailed"));
+      if (!result.data?.id?.trim()) throw new Error(t("dispatchUnconfirmed"));
+      const id = result.data.id;
+      toast.success(t("dispatched", { name: agent.name }));
       try {
         await onDispatched?.(id);
       } catch {
-        toast.warning("Run started, but the view could not refresh. Refresh to see the run.");
+        toast.warning(t("dispatchRefreshFailed"));
       }
       return id;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Couldn't dispatch ${agent.name}`, { description: message });
+      toast.error(t("couldNotDispatch", { name: agent.name }), { description: message });
       return null;
     }
   }
