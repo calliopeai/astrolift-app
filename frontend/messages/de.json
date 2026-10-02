@@ -810,6 +810,49 @@
         "toastReadyTruncated": "Protokollexport bereit · {rows} Zeilen · {format} (gekürzt)",
         "toastDownload": "Herunterladen",
         "toastFailure": "Protokollexport fehlgeschlagen"
+      },
+      "signalMeasurement": {
+        "unreported": "Messbereich nicht angegeben.",
+        "scope": "Bereich: {scope}",
+        "source": "Quelle: {source}",
+        "since": "Aktuelle Container gemessen ab {timestamp}",
+        "identities": "Kanonische Identitäten",
+        "app": "App",
+        "environment": "Umgebung",
+        "cluster": "Cluster",
+        "workload": "Workload",
+        "scopes": {
+          "APP_ENVIRONMENT": "App-Umgebung",
+          "WORKLOAD": "Workload",
+          "UNRESOLVED": "Nicht aufgelöst"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "App-Instrumentierung",
+          "EDGE_PROMETHEUS": "Ingress-Metriken",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "Keine"
+        },
+        "reasons": {
+          "target": "Ausgewähltes Ziel nicht verfügbar.",
+          "partial": "Unvollständige oder mehrdeutige Messung; kein Verhältnis angezeigt.",
+          "noData": "Keine verifizierten Nutzungsdaten in diesem Zeitraum.",
+          "readError": "Messquelle konnte nicht gelesen werden.",
+          "MISSING_LIMITS": "Ressourcenlimits fehlen; Sättigung ist nicht verfügbar.",
+          "OWNERSHIP_UNVERIFIED": "Laufzeitzuordnung nicht verifiziert. Erneut deployen, um aktuelle Identitäten zu setzen.",
+          "PERMISSION_DENIED": "Leseberechtigung für diese Messung verweigert.",
+          "NOT_SUPPORTED_BY_PROVIDER": "Provider unterstützt diese Messung nicht.",
+          "NOT_CONFIGURED": "Messquelle ist nicht konfiguriert.",
+          "NOT_INSTRUMENTED": "Anfragemetriken sind für dieses Ziel nicht instrumentiert."
+        },
+        "organization": "Organisation",
+        "bases": {
+          "SOURCE_LABELS": "Logische Instrumentierungslabels",
+          "NAMESPACE": "Namespace-Aggregat; physische Zuordnung nicht verifiziert",
+          "VERIFIED_RUNTIME": "Verifizierte aktuelle physische Container",
+          "UNRESOLVED": "Laufzeitidentität nicht aufgelöst"
+        },
+        "observed": "Laufzeitzuordnung beobachtet um {timestamp}"
       }
     },
     "tokens": {

@@ -810,6 +810,49 @@
         "toastReadyTruncated": "ログエクスポート完了 · {rows} 行 · {format}（切り詰め済み）",
         "toastDownload": "ダウンロード",
         "toastFailure": "ログエクスポートに失敗しました"
+      },
+      "signalMeasurement": {
+        "unreported": "測定範囲が報告されていません。",
+        "scope": "範囲: {scope}",
+        "source": "ソース: {source}",
+        "since": "現在のコンテナの測定開始: {timestamp}",
+        "identities": "正規の識別情報",
+        "app": "アプリ",
+        "environment": "環境",
+        "cluster": "クラスター",
+        "workload": "ワークロード",
+        "scopes": {
+          "APP_ENVIRONMENT": "アプリ環境",
+          "WORKLOAD": "ワークロード",
+          "UNRESOLVED": "未解決"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "アプリ計装",
+          "EDGE_PROMETHEUS": "Ingress メトリクス",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "なし"
+        },
+        "reasons": {
+          "target": "選択した対象は利用できません。",
+          "partial": "測定が不完全または曖昧なため、比率は表示されません。",
+          "noData": "この期間には検証済みの使用量データがありません。",
+          "readError": "測定ソースを読み取れませんでした。",
+          "MISSING_LIMITS": "リソース上限がないため、飽和度は利用できません。",
+          "OWNERSHIP_UNVERIFIED": "実行時の所有関係が未検証です。再デプロイして現在の識別情報を付与してください。",
+          "PERMISSION_DENIED": "この測定の読み取り権限が拒否されました。",
+          "NOT_SUPPORTED_BY_PROVIDER": "プロバイダーはこの測定に対応していません。",
+          "NOT_CONFIGURED": "測定ソースが設定されていません。",
+          "NOT_INSTRUMENTED": "この対象にはリクエストの計装がありません。"
+        },
+        "organization": "組織",
+        "bases": {
+          "SOURCE_LABELS": "計装の論理ラベル",
+          "NAMESPACE": "名前空間の集計。物理的な所属は未検証",
+          "VERIFIED_RUNTIME": "現在の物理コンテナを検証済み",
+          "UNRESOLVED": "実行時の識別情報は未解決"
+        },
+        "observed": "実行時の所属の確認時刻: {timestamp}"
       }
     },
     "tokens": {

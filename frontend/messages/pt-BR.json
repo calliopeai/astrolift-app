@@ -810,6 +810,49 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "signalMeasurement": {
+        "unreported": "Âmbito de medição não informado.",
+        "scope": "Âmbito: {scope}",
+        "source": "Fonte: {source}",
+        "since": "Contêineres atuais medidos desde {timestamp}",
+        "identities": "Identidades canônicas",
+        "app": "App",
+        "environment": "Ambiente",
+        "cluster": "Cluster",
+        "workload": "Carga de trabalho",
+        "scopes": {
+          "APP_ENVIRONMENT": "Ambiente da app",
+          "WORKLOAD": "Carga de trabalho",
+          "UNRESOLVED": "Não resolvido"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "Instrumentação da app",
+          "EDGE_PROMETHEUS": "Métricas de ingresso",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "Nenhuma"
+        },
+        "reasons": {
+          "target": "Destino selecionado indisponível.",
+          "partial": "Medição incompleta ou ambígua; nenhuma proporção é exibida.",
+          "noData": "Não há dados de uso verificados neste intervalo.",
+          "readError": "Não foi possível ler a fonte de medição.",
+          "MISSING_LIMITS": "Faltam limites de recursos; a saturação está indisponível.",
+          "OWNERSHIP_UNVERIFIED": "Propriedade de execução não verificada. Reimplante para registrar as identidades atuais.",
+          "PERMISSION_DENIED": "Permissão de leitura desta medição negada.",
+          "NOT_SUPPORTED_BY_PROVIDER": "O provedor não oferece esta medição.",
+          "NOT_CONFIGURED": "Fonte de medição não configurada.",
+          "NOT_INSTRUMENTED": "As métricas de solicitações não estão instrumentadas para este destino."
+        },
+        "organization": "Organização",
+        "bases": {
+          "SOURCE_LABELS": "Rótulos lógicos de instrumentação",
+          "NAMESPACE": "Total do namespace; pertencimento físico não verificado",
+          "VERIFIED_RUNTIME": "Contêineres físicos atuais verificados",
+          "UNRESOLVED": "Identidade de execução não resolvida"
+        },
+        "observed": "Pertencimento de execução observado em {timestamp}"
       }
     },
     "tokens": {

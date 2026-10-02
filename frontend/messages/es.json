@@ -810,6 +810,49 @@
         "toastReadyTruncated": "Exportación lista · {rows} filas · {format} (truncado)",
         "toastDownload": "Descargar",
         "toastFailure": "Exportación de registros fallida"
+      },
+      "signalMeasurement": {
+        "unreported": "Ámbito de medición no informado.",
+        "scope": "Ámbito: {scope}",
+        "source": "Fuente: {source}",
+        "since": "Contenedores actuales medidos desde {timestamp}",
+        "identities": "Identidades canónicas",
+        "app": "App",
+        "environment": "Entorno",
+        "cluster": "Clúster",
+        "workload": "Carga de trabajo",
+        "scopes": {
+          "APP_ENVIRONMENT": "Entorno de la app",
+          "WORKLOAD": "Carga de trabajo",
+          "UNRESOLVED": "Sin resolver"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "Instrumentación de la app",
+          "EDGE_PROMETHEUS": "Métricas de ingreso",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "Ninguna"
+        },
+        "reasons": {
+          "target": "Destino seleccionado no disponible.",
+          "partial": "Medición incompleta o ambigua; no se muestra una proporción.",
+          "noData": "No hay datos de uso verificados en este intervalo.",
+          "readError": "No se pudo leer la fuente de medición.",
+          "MISSING_LIMITS": "Faltan límites de recursos; la saturación no está disponible.",
+          "OWNERSHIP_UNVERIFIED": "Propiedad de ejecución no verificada. Vuelve a desplegar para registrar las identidades actuales.",
+          "PERMISSION_DENIED": "Se denegó el permiso para leer esta medición.",
+          "NOT_SUPPORTED_BY_PROVIDER": "El proveedor no admite esta medición.",
+          "NOT_CONFIGURED": "La fuente de medición no está configurada.",
+          "NOT_INSTRUMENTED": "Las métricas de solicitudes no están instrumentadas para este destino."
+        },
+        "organization": "Organización",
+        "bases": {
+          "SOURCE_LABELS": "Etiquetas lógicas de instrumentación",
+          "NAMESPACE": "Total del espacio de nombres; pertenencia física no verificada",
+          "VERIFIED_RUNTIME": "Contenedores físicos actuales verificados",
+          "UNRESOLVED": "Identidad de ejecución sin resolver"
+        },
+        "observed": "Pertenencia de ejecución observada a las {timestamp}"
       }
     },
     "tokens": {

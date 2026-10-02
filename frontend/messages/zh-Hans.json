@@ -810,6 +810,49 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "signalMeasurement": {
+        "unreported": "未报告测量范围。",
+        "scope": "范围：{scope}",
+        "source": "来源：{source}",
+        "since": "当前容器的测量起点：{timestamp}",
+        "identities": "规范身份标识",
+        "app": "应用",
+        "environment": "环境",
+        "cluster": "集群",
+        "workload": "工作负载",
+        "scopes": {
+          "APP_ENVIRONMENT": "应用环境",
+          "WORKLOAD": "工作负载",
+          "UNRESOLVED": "未解析"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "应用埋点",
+          "EDGE_PROMETHEUS": "入口指标",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "无"
+        },
+        "reasons": {
+          "target": "所选目标不可用。",
+          "partial": "测量不完整或有歧义，因此不显示比率。",
+          "noData": "此时间段内没有经过验证的使用量数据。",
+          "readError": "无法读取测量来源。",
+          "MISSING_LIMITS": "缺少资源上限，无法提供饱和度。",
+          "OWNERSHIP_UNVERIFIED": "运行时所有权尚未验证。请重新部署以添加当前身份标识。",
+          "PERMISSION_DENIED": "读取此测量的权限被拒绝。",
+          "NOT_SUPPORTED_BY_PROVIDER": "提供商不支持此测量。",
+          "NOT_CONFIGURED": "未配置测量来源。",
+          "NOT_INSTRUMENTED": "此目标尚未配置请求指标埋点。"
+        },
+        "organization": "组织",
+        "bases": {
+          "SOURCE_LABELS": "埋点的逻辑标签",
+          "NAMESPACE": "命名空间汇总，物理成员关系未经验证",
+          "VERIFIED_RUNTIME": "已验证当前物理容器",
+          "UNRESOLVED": "运行时身份未解析"
+        },
+        "observed": "运行时成员关系观察时间：{timestamp}"
       }
     },
     "tokens": {

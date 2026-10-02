@@ -35,6 +35,22 @@ export const GET_APP_GOLDEN_SIGNALS = gql`
         unit
         promql
         reason
+        measurement {
+          effectiveScope
+          source
+          identityBasis
+          available
+          unavailableReason
+          membershipObservedAt
+          measurementStart
+          target {
+            organizationId appId appSlug environmentId environmentName clusterId namespace workloadId workloadSlug
+          }
+          containers { podName podUid containerName containerId }
+          usageUnit
+          usageSamples { ${TIME_SERIES_POINT_FIELDS} }
+          limitSamples { ${TIME_SERIES_POINT_FIELDS} }
+        }
         samples {
           ${TIME_SERIES_POINT_FIELDS}
         }

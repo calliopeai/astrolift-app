@@ -810,6 +810,49 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "signalMeasurement": {
+        "unreported": "Périmètre de mesure non indiqué.",
+        "scope": "Périmètre : {scope}",
+        "source": "Source : {source}",
+        "since": "Conteneurs actuels mesurés depuis {timestamp}",
+        "identities": "Identités canoniques",
+        "app": "App",
+        "environment": "Environnement",
+        "cluster": "Cluster",
+        "workload": "Charge de travail",
+        "scopes": {
+          "APP_ENVIRONMENT": "Environnement de l’app",
+          "WORKLOAD": "Charge de travail",
+          "UNRESOLVED": "Non résolu"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "Instrumentation de l’app",
+          "EDGE_PROMETHEUS": "Métriques ingress",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "Aucune"
+        },
+        "reasons": {
+          "target": "Cible sélectionnée indisponible.",
+          "partial": "Mesure incomplète ou ambiguë ; aucun ratio affiché.",
+          "noData": "Aucune donnée d’utilisation vérifiée dans cette période.",
+          "readError": "Impossible de lire la source de mesure.",
+          "MISSING_LIMITS": "Limites de ressources manquantes ; saturation indisponible.",
+          "OWNERSHIP_UNVERIFIED": "Propriété à l’exécution non vérifiée. Redéployez pour inscrire les identités actuelles.",
+          "PERMISSION_DENIED": "Autorisation de lecture de cette mesure refusée.",
+          "NOT_SUPPORTED_BY_PROVIDER": "Le fournisseur ne prend pas en charge cette mesure.",
+          "NOT_CONFIGURED": "Source de mesure non configurée.",
+          "NOT_INSTRUMENTED": "Les métriques de requêtes ne sont pas instrumentées pour cette cible."
+        },
+        "organization": "Organisation",
+        "bases": {
+          "SOURCE_LABELS": "Étiquettes logiques d’instrumentation",
+          "NAMESPACE": "Agrégat du namespace ; appartenance physique non vérifiée",
+          "VERIFIED_RUNTIME": "Conteneurs physiques actuels vérifiés",
+          "UNRESOLVED": "Identité d’exécution non résolue"
+        },
+        "observed": "Appartenance à l’exécution observée à {timestamp}"
       }
     },
     "tokens": {

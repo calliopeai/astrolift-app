@@ -1094,6 +1094,49 @@
         "toastReadyTruncated": "Log export ready · {rows} rows · {format} (truncated)",
         "toastDownload": "Download",
         "toastFailure": "Log export failed"
+      },
+      "signalMeasurement": {
+        "unreported": "Measurement scope unreported.",
+        "scope": "Scope: {scope}",
+        "source": "Source: {source}",
+        "since": "Current containers measured from {timestamp}",
+        "identities": "Canonical identities",
+        "app": "App",
+        "environment": "Environment",
+        "cluster": "Cluster",
+        "workload": "Workload",
+        "scopes": {
+          "APP_ENVIRONMENT": "App environment",
+          "WORKLOAD": "Workload",
+          "UNRESOLVED": "Unresolved"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "App instrumentation",
+          "EDGE_PROMETHEUS": "Ingress metrics",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "None"
+        },
+        "reasons": {
+          "target": "Selected target unavailable.",
+          "partial": "Incomplete or ambiguous measurement; no ratio is shown.",
+          "noData": "No verified usage data in this window.",
+          "readError": "Measurement source could not be read.",
+          "MISSING_LIMITS": "Resource limits are missing; saturation is unavailable.",
+          "OWNERSHIP_UNVERIFIED": "Runtime ownership is unverified. Redeploy to stamp current identities.",
+          "PERMISSION_DENIED": "Permission to read this measurement was denied.",
+          "NOT_SUPPORTED_BY_PROVIDER": "Provider does not support this measurement.",
+          "NOT_CONFIGURED": "Measurement source is not configured.",
+          "NOT_INSTRUMENTED": "Request metrics are not instrumented for this target."
+        },
+        "organization": "Organization",
+        "bases": {
+          "SOURCE_LABELS": "Logical instrumentation labels",
+          "NAMESPACE": "Namespace aggregate; physical membership unverified",
+          "VERIFIED_RUNTIME": "Verified current physical containers",
+          "UNRESOLVED": "Runtime identity unresolved"
+        },
+        "observed": "Runtime membership observed at {timestamp}"
       }
     },
     "topology": {

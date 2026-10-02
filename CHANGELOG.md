@@ -20,6 +20,13 @@
   with translated request feedback and unchanged provider/auth identifiers,
   target routes and server diagnostics (#2145).
 
+- Report per-signal golden-metric scope, source and canonical identities.
+  Bind workload CPU/memory usage and limits to verified current pod/controller
+  ownership, pod UIDs and runtime container IDs. Require canonical GUID labels
+  for workload request metrics; refuse missing, partial or ambiguous data instead
+  of reporting healthy zeros. Keep mixed measurements visible and publish
+  collector/redeploy requirements and authenticated CLI examples (#2219).
+
 - Bind reviewed workload restart and scale requests to an explicit environment,
   cluster and namespace with version preconditions and current credential checks.
   Publish exact-target review metadata and accepted-versus-completed outcomes;

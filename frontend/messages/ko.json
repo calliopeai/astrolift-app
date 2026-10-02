@@ -810,6 +810,49 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "signalMeasurement": {
+        "unreported": "측정 범위가 보고되지 않았습니다.",
+        "scope": "범위: {scope}",
+        "source": "출처: {source}",
+        "since": "현재 컨테이너 측정 시작: {timestamp}",
+        "identities": "정규 식별 정보",
+        "app": "앱",
+        "environment": "환경",
+        "cluster": "클러스터",
+        "workload": "워크로드",
+        "scopes": {
+          "APP_ENVIRONMENT": "앱 환경",
+          "WORKLOAD": "워크로드",
+          "UNRESOLVED": "미확정"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "앱 계측",
+          "EDGE_PROMETHEUS": "인그레스 지표",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "없음"
+        },
+        "reasons": {
+          "target": "선택한 대상이 사용 불가능합니다.",
+          "partial": "측정이 불완전하거나 모호하여 비율을 표시하지 않습니다.",
+          "noData": "이 기간에 검증된 사용량 데이터가 없습니다.",
+          "readError": "측정 출처를 읽을 수 없습니다.",
+          "MISSING_LIMITS": "리소스 제한이 없어 포화도를 사용할 수 없습니다.",
+          "OWNERSHIP_UNVERIFIED": "런타임 소유권이 검증되지 않았습니다. 다시 배포하여 현재 식별 정보를 기록하세요.",
+          "PERMISSION_DENIED": "이 측정의 읽기 권한이 거부되었습니다.",
+          "NOT_SUPPORTED_BY_PROVIDER": "공급자가 이 측정을 지원하지 않습니다.",
+          "NOT_CONFIGURED": "측정 출처가 구성되지 않았습니다.",
+          "NOT_INSTRUMENTED": "이 대상의 요청 지표가 계측되지 않았습니다."
+        },
+        "organization": "조직",
+        "bases": {
+          "SOURCE_LABELS": "계측의 논리 레이블",
+          "NAMESPACE": "네임스페이스 집계, 물리적 소속은 미검증",
+          "VERIFIED_RUNTIME": "현재 물리적 컨테이너 검증됨",
+          "UNRESOLVED": "런타임 식별 정보 미확정"
+        },
+        "observed": "런타임 소속 확인 시각: {timestamp}"
       }
     },
     "tokens": {
