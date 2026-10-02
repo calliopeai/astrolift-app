@@ -280,8 +280,8 @@ export function useDeploymentDetail(id: string) {
       // here, so bounce back to the list.
       toast.success(t("confirmDelete.success"));
       router.push("/deployments");
-    } else if (result) {
-      throw new Error(result.errors[0]?.message ?? t("confirmDelete.failed"));
+    } else {
+      throw new Error(result?.errors[0]?.message ?? t("confirmDelete.failed"));
     }
   }
 
