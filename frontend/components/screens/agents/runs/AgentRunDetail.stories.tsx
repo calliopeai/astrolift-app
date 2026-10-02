@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { AgentRunDetail } from "./AgentRunDetail";
@@ -112,5 +116,27 @@ export const Width768: Story = {
         interactions={{ ...INTERACTION_MAP, interactions: LONG_INTERACTIONS }}
       />
     </div>
+  ),
+};
+
+export const FrenchRecovery: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AgentRunDetail {...RUN_DETAIL} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseFailure: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <AgentRunDetail {...RUN_DETAIL} task={FAILED_TASK} terminal logs={[]} />
+    </NextIntlClientProvider>
+  ),
+};
+export const FrenchNotFound: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AgentRunDetail {...RUN_DETAIL} task={null} />
+    </NextIntlClientProvider>
   ),
 };

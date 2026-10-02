@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
 import {
+  execution,
   ARN,
   FAILED_EXECUTIONS,
   FAILED_RUN,
@@ -61,7 +62,7 @@ export const Looped: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByText("Round 2").length).toBeGreaterThan(0);
+    await expect(canvas.getAllByText("Round 2 of 5").length).toBeGreaterThan(0);
     await expect(
       canvas.getAllByText(/tester failed: 3 specs failed in checkout/).length
     ).toBeGreaterThan(0);
@@ -128,4 +129,32 @@ export const Width768: Story = {
       <WorkflowRunScreen {...args} />
     </div>
   ),
+};
+
+export const SerialCollection: Story = {
+  args: {
+    plan: [],
+    viewerGateIds: [],
+    history: [],
+    executions: [
+      execution("collection-parent", 0, "collection", { status: "completed" }),
+      execution("collection-item-one", 1, "checkpoint", {
+        status: "completed",
+        collectionParentExecutionGuid: "collection-parent",
+        collectionStageId: "collection-stage",
+        collectionIndex: 0,
+      }),
+      execution("collection-item-two", 1, "checkpoint", {
+        status: "completed",
+        collectionParentExecutionGuid: "collection-parent",
+        collectionStageId: "collection-stage",
+        collectionIndex: 1,
+      }),
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Collection item 1")).toBeInTheDocument();
+    await expect(canvas.getByText("Collection item 2")).toBeInTheDocument();
+  },
 };

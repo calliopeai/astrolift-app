@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,7 +25,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import ManagedServiceError, handle_for, live_ownership_refusal, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "event_bus"
@@ -86,46 +88,48 @@ class EventBridgeDriver(ManagedServiceDriver):
         if error:
             return ProvisionResult(False, "", error, ["invalid_eventbridge_config"])
         bus_name = self._bus_name(spec)
-        create = self._bus_request(bus_name, cfg, creating=True)
-        create["Tags"] = tags_for(spec)
         try:
-            response = self._events.create_event_bus(**create)
-            bus_arn = str(response.get("EventBusArn") or "")
-        except Exception as exc:
-            if not _already_exists(exc):
-                return ProvisionResult(False, "", f"create EventBridge bus: {exc}", [str(exc)])
             try:
-                bus_arn = str(self._bus(bus_name)["Arn"])
-                existing_tags = self._events.list_tags_for_resource(ResourceARN=bus_arn).get("Tags") or []
-            except Exception as describe_exc:
-                return ProvisionResult(
-                    False,
-                    "",
-                    f"EventBridge bus exists but lookup failed: {describe_exc}",
-                    [str(describe_exc)],
-                )
-            # Reconcile (rules, policy, tags) only this service's bus (#1961).
-            refusal = adoption_refusal(existing_tags, spec, resource=f"EventBridge bus {bus_name}")
-            if refusal is not None:
-                return ProvisionResult(False, "", refusal, [refusal])
+                existing = self._bus(spec.recorded_handle.partition("/")[2] if spec.recorded_handle else bus_name)
+            except Exception as exc:
+                if not _not_found(exc):
+                    raise
+                if spec.recorded_handle:
+                    raise ManagedServiceError("recorded EventBridge bus is missing; refusing a replacement") from None
+                existing = None
+            if existing is None:
+                create = self._bus_request(bus_name, cfg, creating=True)
+                create["Tags"] = tags_for(spec)
+                try:
+                    response = self._events.create_event_bus(**create)
+                    bus_arn = str(response.get("EventBusArn") or "")
+                except Exception as exc:
+                    if not _already_exists(exc):
+                        raise
+                    bus_arn = str(self._bus(bus_name)["Arn"])
+            else:
+                bus_arn = str(existing["Arn"])
+            self._assert_owned_bus(bus_arn, bus_name, spec.managed_service_id)
+        except Exception as exc:
+            return ProvisionResult(False, "", f"resolve owned EventBridge bus: {exc}", [str(exc)])
         handle = handle_for(kind=KIND, resource_id=bus_arn)
         try:
-            self._reconcile_bus(bus_name, bus_arn, cfg, spec=spec)
+            self._reconcile_bus(bus_name, bus_arn, cfg, spec=spec, identity=spec.managed_service_id)
         except Exception as exc:
             return ProvisionResult(False, handle, f"reconcile EventBridge bus: {exc}", [str(exc)])
         return ProvisionResult(True, handle, f"EventBridge bus {bus_name} available", ready=True)
 
     @driver_op(cloud="aws", driver="eventbridge")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, bus_arn = parse_handle(spec.handle)
+        bus_arn = self._handle_arn(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg, partial=True)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_eventbridge_config"])
         bus_name = _bus_name_from_arn(bus_arn)
         try:
-            self._bus(bus_arn)
-            self._reconcile_bus(bus_name, bus_arn, cfg)
+            self._assert_owned_bus(bus_arn, bus_name, spec.managed_service_id)
+            self._reconcile_bus(bus_name, bus_arn, cfg, identity=spec.managed_service_id)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, f"EventBridge bus {bus_name} not found", ["not_found"])
@@ -145,10 +149,10 @@ class EventBridgeDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, bus_arn = parse_handle(spec.handle)
+        bus_arn = self._handle_arn(spec.handle)
         bus_name = _bus_name_from_arn(bus_arn)
         try:
-            self._bus(bus_arn)
+            self._assert_owned_bus(bus_arn, bus_name, spec.managed_service_id)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, f"EventBridge bus {bus_name} already gone")
@@ -177,7 +181,11 @@ class EventBridgeDriver(ManagedServiceDriver):
                     ["retained_archives_require_delete_data"],
                     retryable=False,
                 )
-            configured_archive = _archive_name(bus_name, spec.config["archive"]) if "archive" in spec.config else ""
+            configured_archive = (
+                self._archive_target(bus_name, bus_arn, spec.config["archive"], spec.managed_service_id)[0]
+                if "archive" in spec.config
+                else ""
+            )
             external = [archive for archive in archives if str(archive.get("ArchiveName") or "") != configured_archive]
             if external and not force_destroy:
                 return DeprovisionResult(
@@ -188,7 +196,13 @@ class EventBridgeDriver(ManagedServiceDriver):
                     retryable=False,
                 )
             rules = self._rules(bus_name)
-            external_rules = [rule for rule in rules if not self._is_managed(str(rule.get("Arn") or ""))]
+            archive_rules = {f"Events-Archive-{archive['ArchiveName']}" for archive in archives}
+            external_rules = [
+                rule
+                for rule in rules
+                if not self._is_managed(str(rule.get("Arn") or ""), spec.managed_service_id)
+                and not (rule.get("ManagedBy") and rule.get("Name") in archive_rules)
+            ]
             if external_rules and not force_destroy:
                 return DeprovisionResult(
                     False,
@@ -198,8 +212,10 @@ class EventBridgeDriver(ManagedServiceDriver):
                     retryable=False,
                 )
             for archive in archives:
+                self._assert_archive_parent(str(archive["ArchiveName"]), bus_arn)
+            for archive in archives:
                 self._events.delete_archive(ArchiveName=str(archive["ArchiveName"]))
-            self._delete_rules(bus_name, managed_only=False)
+            self._delete_rules(bus_name, managed_only=False, identity=spec.managed_service_id)
             self._events.delete_event_bus(Name=bus_name)
         except Exception as exc:
             return _deprovision_error(spec.handle, "delete EventBridge bus", exc)
@@ -362,6 +378,7 @@ class EventBridgeDriver(ManagedServiceDriver):
         cfg: dict[str, Any],
         *,
         spec: ProvisionSpec | None = None,
+        identity: str,
     ) -> None:
         update = self._bus_request(bus_name, cfg, creating=False)
         if len(update) > 1:
@@ -370,9 +387,9 @@ class EventBridgeDriver(ManagedServiceDriver):
             self._events.tag_resource(ResourceARN=bus_arn, Tags=tags_for(spec))
         self._reconcile_permissions(bus_name, cfg)
         if "rules" in cfg:
-            self._reconcile_rules(bus_name, cfg, spec=spec)
+            self._reconcile_rules(bus_name, cfg, spec=spec, identity=identity)
         if "archive" in cfg:
-            self._reconcile_archive(bus_name, bus_arn, cfg["archive"])
+            self._reconcile_archive(bus_name, bus_arn, cfg["archive"], identity=identity)
 
     def _reconcile_permissions(self, bus_name: str, cfg: dict[str, Any]) -> None:
         if "resource_policy" in cfg:
@@ -415,13 +432,14 @@ class EventBridgeDriver(ManagedServiceDriver):
         cfg: dict[str, Any],
         *,
         spec: ProvisionSpec | None,
+        identity: str,
     ) -> None:
         current = {str(rule["Name"]): rule for rule in self._rules(bus_name)}
         desired: set[str] = set()
         for rule in cfg.get("rules") or []:
             name = _name(str(rule["name"]), limit=64)
             existing = current.get(name)
-            if existing is not None and not self._is_managed(str(existing.get("Arn") or "")):
+            if existing is not None and not self._is_managed(str(existing.get("Arn") or ""), identity):
                 raise ManagedServiceError(
                     f"rule {name} already exists outside this resource declaration",
                 )
@@ -437,17 +455,28 @@ class EventBridgeDriver(ManagedServiceDriver):
                     request[aws_key] = str(rule[key])
             if "event_pattern" in rule:
                 request["EventPattern"] = _json_document(rule["event_pattern"], field="event_pattern")
-            if spec is not None and name not in current:
-                request["Tags"] = tags_for(spec)
+            if name not in current:
+                request["Tags"] = (
+                    tags_for(spec)
+                    if spec
+                    else [
+                        {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                        {"Key": "astrolift.io/managed_service_id", "Value": identity},
+                    ]
+                )
             response = self._events.put_rule(**request)
             rule_arn = str(response.get("RuleArn") or (existing or {}).get("Arn") or "")
+            if rule_arn != self._rule_arn(bus_name, name):
+                raise ManagedServiceError("EventBridge rule response does not match the exact bus and rule name")
+            if not self._is_managed(rule_arn, identity):
+                raise ManagedServiceError("EventBridge rule is not owned by this managed-service identity")
             if spec is not None and rule_arn:
                 self._events.tag_resource(ResourceARN=rule_arn, Tags=tags_for(spec))
             if "targets" in rule:
                 self._reconcile_targets(bus_name, name, list(rule.get("targets") or []))
         if cfg.get("prune_rules", True):
             for name, rule in current.items():
-                if name not in desired and self._is_managed(str(rule.get("Arn") or "")):
+                if name not in desired and self._is_managed(str(rule.get("Arn") or ""), identity):
                     self._delete_rule(bus_name, name)
 
     def _reconcile_targets(self, bus_name: str, rule_name: str, desired: list[dict[str, Any]]) -> None:
@@ -476,10 +505,11 @@ class EventBridgeDriver(ManagedServiceDriver):
                     f"remove targets for rule {rule_name} partially failed: {response.get('FailedEntries') or []}",
                 )
 
-    def _reconcile_archive(self, bus_name: str, bus_arn: str, config: Any) -> None:
+    def _reconcile_archive(self, bus_name: str, bus_arn: str, config: Any, *, identity: str) -> None:
         archive = dict(config or {})
-        archive_name = _archive_name(bus_name, archive)
-        existing = self._archive(archive_name)
+        archive_name, existing = self._archive_target(bus_name, bus_arn, archive, identity)
+        if existing is not None:
+            self._assert_archive_parent(archive_name, bus_arn, current=existing)
         enabled = bool(archive.get("enabled", True))
         if not enabled:
             if existing is None:
@@ -530,23 +560,70 @@ class EventBridgeDriver(ManagedServiceDriver):
         return request
 
     def _bus_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            "-".join(
-                part
-                for part in (
-                    self._config.event_bus_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "events",
-                )
-                if part
-            ),
-            limit=256,
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _bus_name_from_arn(self._handle_arn(spec.recorded_handle))
+        return physical_name(spec.managed_service_id, prefix=self._config.event_bus_name_prefix, max_length=40)
+
+    def _handle_arn(self, handle: str) -> str:
+        from botocore.session import get_session
+
+        kind, arn = parse_handle(handle)
+        expected = (
+            f"arn:{get_session().get_partition_for_region(self._config.region)}:events:"
+            f"{self._config.region}:{self._config.account_id}:event-bus/"
         )
+        if (
+            re.fullmatch(r"[0-9]{12}", self._config.account_id) is None
+            or kind != KIND
+            or not arn.startswith(expected)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,256}", arn[len(expected) :])
+        ):
+            raise ManagedServiceError("recorded EventBridge handle does not match the configured driver target")
+        return arn
+
+    def _assert_owned_bus(self, arn: str, name: str, identity: str) -> None:
+        self._handle_arn(handle_for(kind=KIND, resource_id=arn))
+        current = self._bus(arn)
+        if current.get("Arn") != arn or current.get("Name") != name:
+            raise ManagedServiceError("live EventBridge bus does not match the exact recorded ARN and name")
+        if not self._is_managed(arn, identity):
+            raise ManagedServiceError("EventBridge bus is not owned by this managed-service identity")
+
+    def _assert_archive_parent(self, name: str, arn: str, *, current: dict[str, Any] | None = None) -> None:
+        current = current if current is not None else self._archive(name)
+        if current is None or current.get("ArchiveName") != name or current.get("EventSourceArn") != arn:
+            raise ManagedServiceError("EventBridge archive does not belong to this exact bus")
+
+    def _archive_target(
+        self, bus_name: str, bus_arn: str, config: Any, identity: str
+    ) -> tuple[str, dict[str, Any] | None]:
+        archive = dict(config or {})
+        legacy_name = _archive_name(bus_name, archive)
+        existing = self._archive(legacy_name)
+        if archive.get("name"):
+            return legacy_name, existing
+        if existing is not None:
+            if existing.get("ArchiveName") != legacy_name or not existing.get("EventSourceArn"):
+                raise ManagedServiceError("legacy EventBridge archive source cannot be verified")
+            if existing["EventSourceArn"] == bus_arn:
+                return legacy_name, existing
+        # Only a proven existing legacy archive is retained. New defaults use a
+        # stable service identity even when the recorded parent has a human name.
+        name = physical_name(identity, prefix="archive", max_length=48)
+        return name, self._archive(name)
 
     def _bus(self, name: str) -> dict[str, Any]:
         return dict(self._events.describe_event_bus(Name=name))
+
+    def _rule_arn(self, bus: str, name: str) -> str:
+        from botocore.session import get_session
+
+        parent = "" if bus == "default" else bus + "/"
+        return (
+            f"arn:{get_session().get_partition_for_region(self._config.region)}:events:"
+            f"{self._config.region}:{self._config.account_id}:rule/{parent}{name}"
+        )
 
     def _rules(self, bus_name: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
@@ -556,7 +633,11 @@ class EventBridgeDriver(ManagedServiceDriver):
             if token:
                 request["NextToken"] = token
             response = self._events.list_rules(**request)
-            rows.extend(response.get("Rules") or [])
+            for rule in response.get("Rules") or []:
+                name = str(rule.get("Name") or "")
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", name) or rule.get("Arn") != self._rule_arn(bus_name, name):
+                    raise ManagedServiceError("listed EventBridge rule does not belong to the exact bus")
+                rows.append(rule)
             token = str(response.get("NextToken") or "")
             if not token:
                 return rows
@@ -595,16 +676,26 @@ class EventBridgeDriver(ManagedServiceDriver):
                 return None
             raise
 
-    def _is_managed(self, arn: str) -> bool:
+    def _is_managed(self, arn: str, identity: str) -> bool:
         if not arn:
             return False
         tags = self._events.list_tags_for_resource(ResourceARN=arn).get("Tags") or []
-        return any(tag.get("Key") == "astrolift.io/managed-by" and tag.get("Value") == "platform" for tag in tags)
+        parsed = {}
+        for tag in tags:
+            if (
+                not isinstance(tag, dict)
+                or not isinstance(tag.get("Key"), str)
+                or not isinstance(tag.get("Value"), str)
+                or tag["Key"] in parsed
+            ):
+                raise ManagedServiceError("live EventBridge ownership tags cannot be verified")
+            parsed[tag["Key"]] = tag["Value"]
+        return live_ownership_refusal(parsed, managed_service_id=identity, resource="EventBridge resource") is None
 
-    def _delete_rules(self, bus_name: str, *, managed_only: bool) -> None:
+    def _delete_rules(self, bus_name: str, *, managed_only: bool, identity: str) -> None:
         rules = self._rules(bus_name)
         if managed_only:
-            external = [rule for rule in rules if not self._is_managed(str(rule.get("Arn") or ""))]
+            external = [rule for rule in rules if not self._is_managed(str(rule.get("Arn") or ""), identity)]
             if external:
                 raise ManagedServiceError(
                     f"event bus still contains external rule {external[0].get('Name')}; force_destroy is required",

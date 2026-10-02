@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,7 +25,16 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import (
+    ManagedServiceError,
+    assert_resource_arn,
+    handle_for,
+    live_ownership_refusal,
+    parse_handle,
+    tags_for,
+)
+from aws.managed._sns_children import assert_listed_subscription_parent, assert_subscription_parent
 from aws.session import aws_client
 
 KIND = "topic"
@@ -81,22 +91,32 @@ class SNSTopicDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_sns_config"])
-        topic_name = self._topic_name(spec)
-        attributes = self._topic_attributes(cfg, creating=True)
-        request: dict[str, Any] = {
-            "Name": topic_name,
-            "Attributes": attributes,
-            "Tags": tags_for(spec),
-        }
-        if cfg.get("data_protection_policy") not in (None, "", {}):
-            request["DataProtectionPolicy"] = _json_document(
-                cfg["data_protection_policy"],
-                field="data_protection_policy",
+        if not self._config.account_id:
+            return ProvisionResult(
+                False, "", "SNS requires an AWS account_id for exact topic identity", ["missing_account_id"]
             )
+        topic_name = self._topic_name(spec)
+        topic_arn = self._topic_arn(topic_name)
         try:
-            topic_arn = str(self._sns.create_topic(**request)["TopicArn"])
+            try:
+                self._topic(topic_arn)
+            except Exception as exc:
+                if not _not_found(exc):
+                    raise
+                # CreateTopic is idempotent and tags only new topics. Keep its
+                # attributes to the required FIFO mode until live ownership is proven.
+                response = self._sns.create_topic(
+                    Name=topic_name,
+                    Attributes={"FifoTopic": "true"} if self.FIFO else {},
+                    Tags=tags_for(spec),
+                )
+                if str(response.get("TopicArn") or "") != topic_arn:
+                    raise ManagedServiceError("SNS creation response does not match the exact topic target") from None
+                self._topic(topic_arn)
+            self._assert_owner(topic_arn, spec.managed_service_id)
+            subscriptions = self._subscriptions(topic_arn) if "subscriptions" in cfg else []
             self._reconcile_topic(topic_arn, cfg)
-            pending = self._reconcile_subscriptions(topic_arn, cfg)
+            pending = self._reconcile_subscriptions(topic_arn, cfg, existing=subscriptions)
         except Exception as exc:
             return ProvisionResult(False, "", f"provision SNS topic: {exc}", [str(exc)])
         message = f"SNS {'FIFO' if self.FIFO else 'standard'} topic {topic_name} available"
@@ -106,13 +126,14 @@ class SNSTopicDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="topic_sns")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, topic_arn = parse_handle(spec.handle)
+        topic_arn = self._handle_arn(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg, partial=True)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_sns_config"])
         try:
             current = self._topic(topic_arn)
+            self._assert_owner(topic_arn, spec.managed_service_id)
             if (
                 self.FIFO
                 and current.get("FifoThroughputScope") == "MessageGroup"
@@ -124,8 +145,11 @@ class SNSTopicDriver(ManagedServiceDriver):
                     "SNS FIFO high-throughput scope cannot be reverted from MessageGroup to Topic",
                     ["irreversible_fifo_throughput_scope"],
                 )
+            subscriptions = self._subscriptions(topic_arn) if "subscriptions" in cfg else []
             self._reconcile_topic(topic_arn, cfg)
-            pending = self._reconcile_subscriptions(topic_arn, cfg)
+            pending = self._reconcile_subscriptions(topic_arn, cfg, existing=subscriptions)
+        except ManagedServiceError as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, f"SNS topic {topic_arn} not found", ["not_found"])
@@ -149,9 +173,12 @@ class SNSTopicDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del force_destroy
-        _, topic_arn = parse_handle(spec.handle)
+        topic_arn = self._handle_arn(spec.handle)
         try:
             attrs = self._topic(topic_arn)
+            self._assert_owner(topic_arn, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, f"SNS topic {topic_arn} already gone")
@@ -321,22 +348,46 @@ class SNSTopicDriver(ManagedServiceDriver):
         ]
 
     def _topic_name(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.topic_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "topic",
-            )
-            if part
-        )
-        clean = "".join(char if char.isalnum() or char in "-_" else "-" for char in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return self._handle_arn(spec.recorded_handle).rsplit(":", 1)[1]
         suffix = ".fifo" if self.FIFO else ""
-        return f"{clean.strip('-_')[: 256 - len(suffix)]}{suffix}"
+        return (
+            physical_name(
+                spec.managed_service_id,
+                prefix=self._config.topic_name_prefix,
+                max_length=256 - len(suffix),
+            )
+            + suffix
+        )
+
+    def _topic_arn(self, name: str) -> str:
+        from botocore.session import get_session
+
+        partition = get_session().get_partition_for_region(self._config.region)
+        return f"arn:{partition}:sns:{self._config.region}:{self._config.account_id}:{name}"
+
+    def _handle_arn(self, handle: str) -> str:
+        kind, arn = parse_handle(handle)
+        name = arn.rsplit(":", 1)[-1]
+        pattern = r"[A-Za-z0-9_-]{1,251}\.fifo" if self.FIFO else r"[A-Za-z0-9_-]{1,256}"
+        if kind != KIND or re.fullmatch(pattern, name) is None:
+            raise ManagedServiceError("recorded SNS handle does not match the topic driver variant")
+        assert_resource_arn(
+            arn, service="sns", region=self._config.region, account=self._config.account_id, resource=name
+        )
+        if arn != self._topic_arn(name):
+            raise ManagedServiceError("recorded SNS ARN partition does not match the configured region")
+        return arn
+
+    def _assert_owner(self, topic_arn: str, identity: str) -> None:
+        refusal = live_ownership_refusal(
+            self._sns.list_tags_for_resource(ResourceArn=topic_arn).get("Tags"),
+            managed_service_id=identity,
+            resource="SNS topic",
+        )
+        if refusal:
+            raise ManagedServiceError(refusal)
 
     def _topic_attributes(self, cfg: dict[str, Any], *, creating: bool) -> dict[str, str]:
         attrs: dict[str, str] = {}
@@ -375,11 +426,14 @@ class SNSTopicDriver(ManagedServiceDriver):
                 DataProtectionPolicy=document,
             )
 
-    def _reconcile_subscriptions(self, topic_arn: str, cfg: dict[str, Any]) -> int:
+    def _reconcile_subscriptions(
+        self, topic_arn: str, cfg: dict[str, Any], *, existing: list[dict[str, Any]] | None = None
+    ) -> int:
         if "subscriptions" not in cfg:
             return 0
         desired = list(cfg.get("subscriptions") or [])
-        existing = self._subscriptions(topic_arn)
+        if existing is None:
+            existing = self._subscriptions(topic_arn)
         by_identity = {(str(item.get("Protocol") or ""), str(item.get("Endpoint") or "")): item for item in existing}
         wanted: set[tuple[str, str]] = set()
         pending = 0
@@ -400,6 +454,8 @@ class SNSTopicDriver(ManagedServiceDriver):
                     ReturnSubscriptionArn=True,
                 )
                 subscription_arn = str(response.get("SubscriptionArn") or "")
+                if subscription_arn:
+                    assert_subscription_parent(subscription_arn, topic_arn)
             if not subscription_arn or _pending_subscription(subscription_arn):
                 pending += 1
                 continue
@@ -424,13 +480,20 @@ class SNSTopicDriver(ManagedServiceDriver):
             if token:
                 request["NextToken"] = token
             response = self._sns.list_subscriptions_by_topic(**request)
-            rows.extend(response.get("Subscriptions") or [])
+            for item in response.get("Subscriptions") or []:
+                assert_listed_subscription_parent(item, topic_arn)
+                rows.append(item)
             token = str(response.get("NextToken") or "")
             if not token:
                 return rows
 
     def _topic(self, topic_arn: str) -> dict[str, str]:
-        return dict(self._sns.get_topic_attributes(TopicArn=topic_arn).get("Attributes") or {})
+        attrs = dict(self._sns.get_topic_attributes(TopicArn=topic_arn).get("Attributes") or {})
+        if str(attrs.get("TopicArn") or "") != topic_arn:
+            raise ManagedServiceError("live SNS topic identity does not match the exact target")
+        if (str(attrs.get("FifoTopic") or "false").lower() == "true") != self.FIFO:
+            raise ManagedServiceError("live SNS topic mode does not match the driver variant")
+        return attrs
 
     def _validate_config(self, cfg: dict[str, Any], *, partial: bool = False) -> str:
         del partial

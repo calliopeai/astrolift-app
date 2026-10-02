@@ -1,3 +1,4 @@
+import { readBackEdge } from "./back-edge";
 import type {
   WorkflowLine,
   WorkflowLoop,
@@ -11,12 +12,7 @@ import type {
  * list's card glyph show the shape the backend runs: ordered stages, fan-out
  * merged by an aggregation, human gates, nested child workflows, and retries.
  *
- * Only what the definition says is drawn. A fanned agent stage is a fanout
- * (or, in a supervisor_worker definition, a supervisor handing work to its
- * workers; the backend runs both as the same fan-out); an aggregation after it
- * is the join that waits on it; `on_failure = "retry"` is a retry loop bounded
- * by the backend's attempt limit. Back-edges to an earlier stage are not in
- * the stage model yet, so none is drawn.
+ * Return tracks and retry ceilings come from the authored stage contract.
  */
 
 /** What the line needs of a stage; the list's topology stage and the builder's stage both have it. */
@@ -30,6 +26,9 @@ export interface LineStage {
   /** The branch count is decided per run. Topology stages only. */
   fanOutDynamic?: boolean;
   onFailure: string;
+  maxAttempts?: number;
+  backEdge?: unknown;
+  outputKey?: string;
   /** The agent the stage dispatches, when its role is blank. */
   agentName?: string | null;
 }
@@ -70,7 +69,6 @@ export function definitionLine(
   stages: readonly LineStage[]
 ): WorkflowLine {
   const ordered = [...stages].sort((a, b) => a.order - b.order);
-  const supervised = definition.patternKind === "supervisor_worker";
   const stations: WorkflowStation[] = [];
   const loops: WorkflowLoop[] = [];
   let openFanout: number | null = null;
@@ -79,19 +77,7 @@ export function definitionLine(
     const id = stage.guid;
     const name = stationName(stage);
     const count = (stage.fanOutCount ?? 0) > 1 ? (stage.fanOutCount ?? 0) : 0;
-    if (stage.kind === "agent_dispatch" && fanned(stage) && supervised) {
-      stations.push({
-        id,
-        name,
-        kind: "supervisor",
-        workers: Array.from({ length: count }, (_, w) => ({
-          id: `${id}-w${w}`,
-          label: `Worker ${w + 1}`,
-          busy: false,
-          load: 0,
-        })),
-      });
-    } else if (stage.kind === "agent_dispatch" && fanned(stage)) {
+    if (stage.kind === "agent_dispatch" && fanned(stage)) {
       stations.push({
         id,
         name,
@@ -112,16 +98,41 @@ export function definitionLine(
     } else {
       stations.push({ id, name, kind: stage.kind === "human_gate" ? "gate" : "stage" });
     }
-    if (stage.onFailure === "retry") {
+    if (stage.onFailure === "retry" && ["agent_dispatch", "workflow"].includes(stage.kind)) {
       loops.push({
         id: `${id}-retry`,
         from: i,
         to: i,
         trigger: stage.kind === "human_gate" ? "rejected" : "failed",
-        maxRounds: STAGE_MAX_ATTEMPTS,
+        maxRounds: stage.maxAttempts ?? STAGE_MAX_ATTEMPTS,
         kind: "retry",
       });
     }
+  });
+
+  ordered.forEach((stage, from) => {
+    const edge = readBackEdge(stage.backEdge);
+    if (!edge || !stage.outputKey) return;
+    const to = ordered.findIndex((target) => target.outputKey === edge.to);
+    if (to < 0 || to >= from) return;
+    loops.push({
+      id: `${stage.outputKey}->${edge.to}`,
+      from,
+      to,
+      trigger:
+        edge.when === "gate_rejected"
+          ? "rejected"
+          : edge.when === "stage_failed"
+            ? "failed"
+            : "condition",
+      ...(edge.when === "output_equals"
+        ? { condition: `${edge.path} = ${JSON.stringify(edge.value)}` }
+        : edge.when === "always"
+          ? { condition: "always" }
+          : {}),
+      maxRounds: edge.max_rounds,
+      kind: "back-edge",
+    });
   });
 
   return {
@@ -152,7 +163,9 @@ export function lineShape(line: WorkflowLine): string {
   add(count("supervisor"), "supervisor");
   add(count("gate"), "gate");
   add(count("workflow"), "nested workflow");
-  const retries = line.loops?.length ?? 0;
+  const retries = line.loops?.filter((loop) => loop.kind === "retry").length ?? 0;
+  const returns = line.loops?.filter((loop) => loop.kind === "back-edge").length ?? 0;
+  if (returns > 0) parts.push(`${returns} ${returns === 1 ? "return edge" : "return edges"}`);
   if (retries > 0) parts.push(`${retries} ${retries === 1 ? "retry" : "retries"}`);
   const head = `${n} ${n === 1 ? "stage" : "stages"}`;
   return parts.length > 0 ? `${head}: ${parts.join(", ")}` : head;

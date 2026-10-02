@@ -263,8 +263,15 @@ class TemporalWorkflowsMutation:
                 if refusal is not None:
                     return _failure("payload", refusal)
                 payload = {**payload, "decided_by_user_id": getattr(info.context.user, "pk", None)}
+        target_workflow_id = workflow_id
+        if signal_name in _EXECUTION_SIGNALS and isinstance(payload, dict):
+            target_workflow_id = _execution_signal_target(
+                payload["execution_id"], workflow_id, organization_id=_run_owner_org_id(workflow_id)
+            )
+            if target_workflow_id is None:
+                return _failure("payload", "stage execution signal target is unavailable")
         args: list = [payload] if payload is not None else []
-        delivered = signal_workflow(workflow_id, signal_name, *args)
+        delivered = signal_workflow(target_workflow_id, signal_name, *args)
         if not delivered:
             return _failure("signal_name", "signal could not be delivered")
         return MutationResult.success()
@@ -275,6 +282,48 @@ class TemporalWorkflowsMutation:
 # signal carrying the execution's ``guid`` was accepted by Temporal and then
 # ignored forever (#1786). Resolve either spelling here and refuse the rest.
 _EXECUTION_SIGNALS = frozenset({"human_gate_decision", "escalation_cleared"})
+
+
+def _execution_signal_target(
+    execution_id: str, workflow_id: str, *, organization_id: int | None
+) -> str | None:
+    from workflows.collections import collection_binding
+    from workflows.models import WorkflowStageExecution
+
+    row = (
+        WorkflowStageExecution.objects.select_related(
+            "collection_parent_execution__stage", "workflow_run", "stage"
+        )
+        .filter(
+            pk=execution_id,
+            workflow_run__workflow_id=workflow_id,
+            workflow_run__organization_id=organization_id,
+        )
+        .first()
+    )
+    if row is None:
+        return None
+    if row.collection_parent_execution_id is None:
+        return workflow_id if not row.collection_workflow_id else None
+    parent = row.collection_parent_execution
+    binding = collection_binding(parent.output)
+    if (
+        binding is None
+        or type(row.collection_index) is not int
+        or not 0 <= row.collection_index < binding["item_count"]
+    ):
+        return None
+    expected = f"WorkflowDefinitionRunWorkflow-{row.workflow_run_id}:collection:{binding.get('owner_order')}:{row.collection_index}-parent-{parent.pk}"
+    if (
+        parent.status != "running"
+        or parent.stage.kind != "collection"
+        or parent.workflow_run_id != row.workflow_run_id
+        or parent.stage.definition_id != row.stage.definition_id
+        or str(row.stage_id) not in binding.get("body_stage_ids", [])
+        or row.collection_workflow_id != expected
+    ):
+        return None
+    return expected
 
 
 def _gate_approver_refusal(user, execution_id: str, workflow_id: str) -> str | None:
@@ -408,6 +457,18 @@ class WorkflowsMutation:
                     ValidationError(
                         field="definition_slug",
                         messages=[f'Workflow definition "{definition_slug}" not visible'],
+                    )
+                ],
+            )
+
+        from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
+
+        if definition.pattern_kind not in SUPPORTED_EXECUTOR_PATTERNS:
+            return CreateWorkflowResult(
+                ok=False,
+                errors=[
+                    ValidationError(
+                        field="definition_slug", messages=["This workflow pattern has no supported executor"]
                     )
                 ],
             )
@@ -671,6 +732,9 @@ class WorkflowsMutation:
         role: str | None = None,
         on_failure: str | None = None,
         timeout_seconds: int | None = None,
+        max_attempts: int | None = None,
+        back_edge: JSON | None = None,
+        iteration: JSON | None = None,
         agent_definition_guid: str | None = None,
         agent_ref: str | None = None,
         workflow_ref: str | None = None,
@@ -704,6 +768,27 @@ class WorkflowsMutation:
             if on_failure not in {c[0] for c in WorkflowStage.OnFailure.choices}:
                 return _failure("on_failure", f'Invalid on_failure "{on_failure}"')
             stage.on_failure = on_failure
+        if max_attempts is not None:
+            from workflows.stage_limits import validate_stage_attempts
+
+            try:
+                stage.max_attempts = validate_stage_attempts(max_attempts)
+            except ValueError as exc:
+                return _failure("max_attempts", str(exc))
+        if iteration is not None:
+            from workflows.collections import validate_iteration
+
+            try:
+                stage.iteration = validate_iteration(iteration, kind=stage.kind)
+            except ValueError as exc:
+                return _failure("iteration", str(exc))
+        if back_edge is not None:
+            from workflows.back_edges import validate_back_edge
+
+            try:
+                stage.back_edge = validate_back_edge(back_edge, kind=stage.kind)
+            except ValueError as exc:
+                return _failure("back_edge", str(exc))
         if role is not None:
             stage.role = role
         if timeout_seconds is not None:
@@ -776,7 +861,14 @@ class WorkflowsMutation:
 
         stage.deleted_at = timezone.now()
         stage.deleted_by = info.context.user
-        stage.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
+        try:
+            with transaction.atomic():
+                stage.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
+                from workflows.composition import validate_workflow_composition
+
+                validate_workflow_composition(stage.definition)
+        except ValueError as exc:
+            return _failure("back_edge", str(exc))
         return MutationResult.success()
 
     @strawberry.mutation(
@@ -807,8 +899,31 @@ class WorkflowsMutation:
 
         stages = {str(s.guid): s for s in definition.stages.filter(deleted_at__isnull=True)}
         requested = [str(g) for g in stage_guids]
-        if set(requested) != set(stages):
+        if len(requested) != len(stages) or set(requested) != set(stages):
             return _failure("stage_guids", "stage_guids must list exactly the definition's stages")
+
+        from workflows.back_edges import validate_loop_plan
+
+        try:
+            validate_loop_plan(
+                [
+                    {
+                        "order": index,
+                        "kind": stages[guid].kind,
+                        "output_key": stages[guid].output_key,
+                        "max_attempts": stages[guid].max_attempts,
+                        "fan_out_count": stages[guid].fan_out_count,
+                        "fan_out_dynamic": stages[guid].fan_out_dynamic,
+                        "back_edge": stages[guid].back_edge,
+                        "iteration": stages[guid].iteration,
+                    }
+                    for index, guid in enumerate(requested)
+                ],
+                pattern_kind=definition.pattern_kind,
+                require_review_loop=False,
+            )
+        except ValueError as exc:
+            return _failure("back_edge", str(exc))
 
         # Two-phase to dodge the (definition, order) unique constraint: park
         # stages at negative orders, then assign final positions.

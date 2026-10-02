@@ -106,7 +106,9 @@ def execution_stages(run, *, limit: int = 100, after: str | None = None) -> dict
             workflow_run__workflow_id=run.workflow_id,
             workflow_run__run_id=run.run_id,
             workflow_run__deleted_at__isnull=True,
-        ).select_related("stage", "agent_run", "child_workflow_run__workflow_definition"),
+        ).select_related(
+            "stage", "agent_run", "child_workflow_run__workflow_definition", "fanout_parent_execution__stage"
+        ),
         cursor=after,
         limit=limit,
         default_limit=100,

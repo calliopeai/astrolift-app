@@ -117,7 +117,7 @@ const providerCiMeta: Record<string, ProviderCiMeta> = {
 
 /** Unbound providers retain familiar secret labels; no AWS workflow is invented. */
 export function resolveProviderCiMeta(slug: string): ProviderCiMeta {
-  return providerCiMeta[slug] ?? providerCiMeta.aws;
+  return Object.hasOwn(providerCiMeta, slug) ? providerCiMeta[slug] : providerCiMeta.aws;
 }
 
 /** Badge presentation per drift state. Unknown states fall back to the
@@ -165,7 +165,7 @@ export function renderWorkflowYaml(
     deployBranch,
   }: { providerSlug: string; renderedText?: string | null; deployBranch?: string | null }
 ): string | null {
-  if (providerSlug === "aws" || !(providerSlug in providerCiMeta)) {
+  if (providerSlug === "aws" || !Object.hasOwn(providerCiMeta, providerSlug)) {
     return renderedText?.trim() ? renderedText : null;
   }
   return `name: astrolift deploy
@@ -211,18 +211,23 @@ ${meta.renderWorkflowSteps()}
  * "props in, JSX out" boundary the section component aims for. A
  * local helper keeps this fragment self-contained.
  */
-export function formatRelativeWebhookInstall(iso: string): string {
+export function formatRelativeWebhookInstall(
+  iso: string,
+  translate?: (key: string, values?: { count: number }) => string
+): string {
   const diff = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(diff)) return "just now";
+  if (Number.isNaN(diff)) return translate ? translate("justNow") : "just now";
   const seconds = Math.max(0, Math.floor(diff / 1000));
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return translate ? translate("justNow") : "just now";
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return translate ? translate("minutes", { count: minutes }) : `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return translate ? translate("hours", { count: hours }) : `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return translate ? translate("days", { count: days }) : `${days}d ago`;
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  if (months < 12) return translate ? translate("months", { count: months }) : `${months}mo ago`;
+  return translate
+    ? translate("years", { count: Math.floor(days / 365) })
+    : `${Math.floor(days / 365)}y ago`;
 }

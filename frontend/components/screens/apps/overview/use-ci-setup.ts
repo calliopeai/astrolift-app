@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -70,7 +71,7 @@ interface ReconcileResp {
 }
 
 /** A toast body with a trailing "View PR" link (a .ts file, so no JSX). */
-function prToast(text: string, prUrl: string) {
+function prToast(text: string, prUrl: string, label: string) {
   return React.createElement(
     "span",
     null,
@@ -79,12 +80,13 @@ function prToast(text: string, prUrl: string) {
     React.createElement(
       Link,
       { href: prUrl, target: "_blank", rel: "noreferrer", className: "underline" },
-      "View PR"
+      label
     )
   );
 }
 
 function useWorkflowSync(appId: string) {
+  const t = useTranslations("apps.overview.ciWorkflow");
   const [push, { loading: pushing }] = useMutation<PushResp>(RESYNC_CI_WORKFLOW, {
     refetchQueries: ["GetApp"],
     awaitRefetchQueries: true,
@@ -107,13 +109,15 @@ function useWorkflowSync(appId: string) {
       const { data } = await refresh({ variables: { input: { appId } } });
       const payload = data?.refreshCiWorkflowSyncStatus;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't recompute drift.");
+        toast.error(payload?.errors?.[0]?.message ?? t("feedback.refreshFailed"));
         return;
       }
-      const label = DRIFT_BADGE[payload.data.state]?.label ?? payload.data.state;
-      toast.success(`Drift re-checked — ${label}.`);
+      const label = Object.hasOwn(DRIFT_BADGE, payload.data.state)
+        ? t(`states.${payload.data.state}.label`)
+        : payload.data.state;
+      toast.success(t("feedback.refreshed", { state: label }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't recompute drift.");
+      toast.error(err instanceof Error ? err.message : t("feedback.refreshFailed"));
     }
   }
 
@@ -122,18 +126,16 @@ function useWorkflowSync(appId: string) {
       const { data } = await push({ variables: { input: { appId } } });
       const payload = data?.resyncAstroliftCiWorkflow;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't push the workflow file.");
+        toast.error(payload?.errors?.[0]?.message ?? t("feedback.pushFailed"));
         return;
       }
       if (payload.data.prUrl) {
-        toast.success(
-          prToast("Opened a PR rather than overwriting the repo's file.", payload.data.prUrl)
-        );
+        toast.success(prToast(t("feedback.pushPr"), payload.data.prUrl, t("viewPr")));
         return;
       }
-      toast.success("Pushed the current template to the repo.");
+      toast.success(t("feedback.pushed"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't push the workflow file.");
+      toast.error(err instanceof Error ? err.message : t("feedback.pushFailed"));
     }
   }
 
@@ -142,21 +144,16 @@ function useWorkflowSync(appId: string) {
       const { data } = await openReconcile({ variables: { input: { appId } } });
       const payload = data?.openCiWorkflowReconcilePr;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't open the reconcile PR.");
+        toast.error(payload?.errors?.[0]?.message ?? t("feedback.reconcileFailed"));
         return;
       }
       if (payload.data.prUrl) {
-        toast.success(
-          prToast(
-            "Opened a reconcile PR to overwrite the drifted file with the template.",
-            payload.data.prUrl
-          )
-        );
+        toast.success(prToast(t("feedback.reconciled"), payload.data.prUrl, t("viewPr")));
         return;
       }
-      toast.success("Opened a reconcile PR to overwrite the drifted file with the template.");
+      toast.success(t("feedback.reconciled"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't open the reconcile PR.");
+      toast.error(err instanceof Error ? err.message : t("feedback.reconcileFailed"));
     }
   }
 
@@ -165,9 +162,9 @@ function useWorkflowSync(appId: string) {
     const { data } = await pull({ variables: { input: { appId } } });
     const payload = data?.pullCiWorkflowFromRepo;
     if (!payload?.ok || !payload.data) {
-      throw new Error(payload?.errors?.[0]?.message ?? "Couldn't pull the repo's file.");
+      throw new Error(payload?.errors?.[0]?.message ?? t("feedback.pullFailed"));
     }
-    toast.success("Pulled the repo's workflow file. It's now the baseline.");
+    toast.success(t("feedback.pulled"));
   }
 
   return {
@@ -211,6 +208,7 @@ interface PushCiSecretsResp {
 
 /** The "Push & rotate" mutation. Shared with the Secrets tab (#681). */
 export function usePushAndRotate(appSlug: string) {
+  const t = useTranslations("apps.overview.ciSetup.feedback");
   const [push, { loading }] = useMutation<PushCiSecretsResp>(PUSH_CI_SECRETS_TO_REPO);
 
   /** Throws on failure so the ConfirmDialog stays open and shows the error. */
@@ -218,12 +216,10 @@ export function usePushAndRotate(appSlug: string) {
     const { data } = await push({ variables: { input: { appSlug } } });
     const payload = data?.pushAstroliftCiSecretsToRepo;
     if (!payload?.ok || !payload.data) {
-      throw new Error(payload?.errors?.[0]?.message ?? "Couldn't push CI secrets.");
+      throw new Error(payload?.errors?.[0]?.message ?? t("pushFailed"));
     }
     const { secretNames, rotatedTokenLast4, repo } = payload.data;
-    toast.success(
-      `Pushed ${secretNames.length} secrets to ${repo} — new token's last 4: ${rotatedTokenLast4}`
-    );
+    toast.success(t("pushed", { count: secretNames.length, repo, last4: rotatedTokenLast4 }));
   }
 
   return { pushing: loading, onPushAndRotate };
@@ -254,6 +250,7 @@ interface ValidateCiSecretsResp {
 export type CiSecretsValidation = ValidateCiSecretsResp["validateAstroliftCiSecrets"]["data"];
 
 function useValidateCiSecrets(appSlug: string) {
+  const t = useTranslations("apps.overview.ciSetup.feedback");
   const [validate, { loading }] = useMutation<ValidateCiSecretsResp>(VALIDATE_CI_SECRETS);
   const [results, setResults] = React.useState<CiSecretsValidation | null>(null);
 
@@ -266,7 +263,7 @@ function useValidateCiSecrets(appSlug: string) {
         // PRECONDITION bucket means an upstream wiring problem rather
         // than a per-secret state — surface the message + clear any
         // stale results from a prior good run.
-        toast.error(err?.message ?? "Couldn't validate CI secrets.");
+        toast.error(err?.message ?? t("validateFailed"));
         setResults(null);
         return;
       }
@@ -274,9 +271,11 @@ function useValidateCiSecrets(appSlug: string) {
       const okCount = payload.data.results.filter((r) => r.isSet && r.isCurrent).length;
       const total = payload.data.results.length;
       if (okCount === total) {
-        toast.success(`All ${total} secrets are set and current on ${payload.data.repo}.`);
+        toast.success(t("validated", { count: total, repo: payload.data.repo }));
       } else {
-        toast.warning(`${okCount}/${total} secrets healthy on ${payload.data.repo}.`);
+        toast.warning(
+          t("partiallyValidated", { healthy: okCount, total, repo: payload.data.repo })
+        );
       }
     } catch (err) {
       toast.error((err as Error).message);
@@ -311,6 +310,7 @@ interface PushCiWorkflowResp {
 }
 
 function useSyncWorkflowFile(appSlug: string, workflowPath: string) {
+  const t = useTranslations("apps.overview.ciSetup.feedback");
   const [sync, { loading }] = useMutation<PushCiWorkflowResp>(PUSH_CI_WORKFLOW_TO_REPO);
 
   async function onSync() {
@@ -318,30 +318,33 @@ function useSyncWorkflowFile(appSlug: string, workflowPath: string) {
       const { data } = await sync({ variables: { input: { appSlug } } });
       const payload = data?.pushAstroliftCiWorkflowToRepo;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't sync the workflow file.");
+        toast.error(payload?.errors?.[0]?.message ?? t("syncFailed"));
         return;
       }
       const { status, commitSha, prUrl } = payload.data;
       if (status === "in_sync") {
-        toast.success("Already up to date.");
+        toast.success(t("inSync"));
         return;
       }
       if (status === "pr_opened") {
         if (prUrl) {
-          toast.success(prToast("Branch is protected — opened a PR.", prUrl));
+          toast.success(prToast(t("protectedPr"), prUrl, t("viewPr")));
         } else {
-          toast.success("Branch is protected — opened a PR.");
+          toast.success(t("protectedPr"));
         }
         return;
       }
-      const verb = status === "created" ? "Created" : "Updated";
+      const verb =
+        status === "created" ? t("created") : status === "updated" ? t("updated") : status;
       const shortSha = (commitSha ?? "").slice(0, 7);
       const fileName = workflowPath.split("/").at(-1) ?? workflowPath;
       toast.success(
-        shortSha ? `${verb} ${fileName} (commit ${shortSha}).` : `${verb} ${fileName}.`
+        shortSha
+          ? t("syncedCommit", { verb, filename: fileName, commit: shortSha })
+          : t("synced", { verb, filename: fileName })
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't sync the workflow file.");
+      toast.error(err instanceof Error ? err.message : t("syncFailed"));
     }
   }
 
@@ -372,6 +375,7 @@ interface InstallSourceWebhookResp {
 }
 
 function useInstallSourceWebhook(appSlug: string) {
+  const t = useTranslations("apps.overview.ciSetup.feedback");
   const [install, { loading }] = useMutation<InstallSourceWebhookResp>(INSTALL_SOURCE_WEBHOOK, {
     // Re-read the app so the chip + timestamp converge after install.
     refetchQueries: ["GetApp"],
@@ -383,16 +387,17 @@ function useInstallSourceWebhook(appSlug: string) {
       const { data } = await install({ variables: { input: { appSlug } } });
       const payload = data?.installAstroliftSourceWebhook;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't install the source webhook.");
+        toast.error(payload?.errors?.[0]?.message ?? t("webhookFailed"));
         return;
       }
       const { status, receiverUrl } = payload.data;
-      const verb = status === "created" ? "Installed" : "Refreshed";
+      const verb =
+        status === "created" ? t("installed") : status === "refreshed" ? t("refreshed") : status;
       toast.success(
-        receiverUrl ? `${verb} push webhook → ${receiverUrl}` : `${verb} push webhook.`
+        receiverUrl ? t("webhookUrl", { verb, url: receiverUrl }) : t("webhook", { verb })
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't install the source webhook.");
+      toast.error(err instanceof Error ? err.message : t("webhookFailed"));
     }
   }
 

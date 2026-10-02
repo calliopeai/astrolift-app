@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -80,5 +84,53 @@ export const AgentMode: Story = {
 export const PushAndRotateButton: Story = {
   render: () => (
     <PushAndRotateButtonView {...CI_SETUP.pushAndRotate} variant="outline" label="Push to GitHub" />
+  ),
+};
+
+export const FrenchValidation: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="Asia/Tokyo">
+      <CiSetupSectionView {...CI_SETUP_PROBLEMS} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const JapaneseRotate: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="Asia/Tokyo">
+      <CiSetupSectionView {...CI_SETUP} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const JapaneseAgent: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="Asia/Tokyo">
+      <CiSetupSectionView {...CI_SETUP_AGENT} />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const FrenchMalformedDate: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="Asia/Tokyo">
+      <CiSetupSectionView
+        {...CI_SETUP_PROBLEMS}
+        validate={{
+          ...CI_SETUP_PROBLEMS.validate,
+          results: {
+            ...CI_SETUP_PROBLEMS.validate.results!,
+            results: [
+              {
+                secretName: "LITERAL_SECRET_NAME",
+                isSet: false,
+                isCurrent: false,
+                updatedAt: "not-a-date",
+              },
+            ],
+          },
+        }}
+      />
+    </NextIntlClientProvider>
   ),
 };

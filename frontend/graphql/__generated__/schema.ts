@@ -8089,9 +8089,12 @@ export type MutationCreateWorkflowStageArgs = {
   agentDefinitionGuid?: InputMaybe<Scalars['String']['input']>;
   agentRef?: InputMaybe<Scalars['String']['input']>;
   approvers?: InputMaybe<Scalars['JSON']['input']>;
+  backEdge?: InputMaybe<Scalars['JSON']['input']>;
   environmentSpecSlug?: InputMaybe<Scalars['String']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
+  iteration?: InputMaybe<Scalars['JSON']['input']>;
   kind: Scalars['String']['input'];
+  maxAttempts?: Scalars['Int']['input'];
   onFailure?: Scalars['String']['input'];
   order?: InputMaybe<Scalars['Int']['input']>;
   outputKey?: InputMaybe<Scalars['String']['input']>;
@@ -9570,9 +9573,12 @@ export type MutationUpdateWorkflowStageArgs = {
   agentDefinitionGuid?: InputMaybe<Scalars['String']['input']>;
   agentRef?: InputMaybe<Scalars['String']['input']>;
   approvers?: InputMaybe<Scalars['JSON']['input']>;
+  backEdge?: InputMaybe<Scalars['JSON']['input']>;
   environmentSpecSlug?: InputMaybe<Scalars['String']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
+  iteration?: InputMaybe<Scalars['JSON']['input']>;
   kind?: InputMaybe<Scalars['String']['input']>;
+  maxAttempts?: InputMaybe<Scalars['Int']['input']>;
   onFailure?: InputMaybe<Scalars['String']['input']>;
   outputKey?: InputMaybe<Scalars['String']['input']>;
   prompt?: InputMaybe<Scalars['String']['input']>;
@@ -13699,6 +13705,13 @@ export type WorkflowInstanceType = {
   workflowSlug: Scalars['String']['output'];
 };
 
+export type WorkflowLoopCause = {
+  edge: Scalars['String']['output'];
+  edgeRound: Scalars['Int']['output'];
+  maxRounds: Scalars['Int']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type WorkflowManifestDefinitionType = {
   description: Scalars['String']['output'];
   name: Scalars['String']['output'];
@@ -13725,9 +13738,12 @@ export type WorkflowManifestPreviewType = {
 export type WorkflowManifestStageType = {
   agent?: Maybe<Scalars['String']['output']>;
   approvers: Array<Scalars['String']['output']>;
+  backEdge: Scalars['JSON']['output'];
   environmentSpecSlug?: Maybe<Scalars['String']['output']>;
   fanOut: Scalars['String']['output'];
+  iteration: Scalars['JSON']['output'];
   kind: Scalars['String']['output'];
+  maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
   outputKey?: Maybe<Scalars['String']['output']>;
@@ -13751,18 +13767,26 @@ export type WorkflowRun = {
 export type WorkflowStageExecutionType = {
   agentRunGuid?: Maybe<Scalars['String']['output']>;
   attemptNumber: Scalars['Int']['output'];
+  causedBy?: Maybe<WorkflowLoopCause>;
   childWorkflowDefinitionSlug?: Maybe<Scalars['String']['output']>;
   childWorkflowRunGuid?: Maybe<Scalars['String']['output']>;
   childWorkflowStatus?: Maybe<Scalars['String']['output']>;
+  collectionIndex?: Maybe<Scalars['Int']['output']>;
+  collectionParentExecutionGuid?: Maybe<Scalars['String']['output']>;
+  collectionStageId?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   errorMessage: Scalars['String']['output'];
   executionId: Scalars['String']['output'];
   failure?: Maybe<Scalars['JSON']['output']>;
+  fanoutIndex?: Maybe<Scalars['Int']['output']>;
+  fanoutParentExecutionGuid?: Maybe<Scalars['String']['output']>;
+  fanoutStageId?: Maybe<Scalars['String']['output']>;
   guid: Scalars['ID']['output'];
   humanGateNote: Scalars['String']['output'];
   humanGateState: Scalars['String']['output'];
   output?: Maybe<Scalars['JSON']['output']>;
+  roundNumber: Scalars['Int']['output'];
   stageApprovers: Array<Scalars['String']['output']>;
   stageGuid: Scalars['String']['output'];
   stageKind: Scalars['String']['output'];
@@ -13790,11 +13814,14 @@ export type WorkflowStageType = {
   agentDefinitionName?: Maybe<Scalars['String']['output']>;
   agentRef: Scalars['String']['output'];
   approvers: Scalars['JSON']['output'];
+  backEdge: Scalars['JSON']['output'];
   createdAt: Scalars['DateTime']['output'];
   environmentSpecSlug: Scalars['String']['output'];
   fanOutCount?: Maybe<Scalars['Int']['output']>;
   guid: Scalars['ID']['output'];
+  iteration: Scalars['JSON']['output'];
   kind: Scalars['String']['output'];
+  maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
   outputKey: Scalars['String']['output'];
@@ -13810,12 +13837,15 @@ export type WorkflowTopologyStage = {
   agentName: Scalars['String']['output'];
   agentRef: Scalars['String']['output'];
   agentSlug: Scalars['String']['output'];
+  backEdge: Scalars['JSON']['output'];
   environmentSpecSlug: Scalars['String']['output'];
   fanOutCount?: Maybe<Scalars['Int']['output']>;
   fanOutDynamic: Scalars['Boolean']['output'];
   guid: Scalars['String']['output'];
   hasPrompt: Scalars['Boolean']['output'];
+  iteration: Scalars['JSON']['output'];
   kind: Scalars['String']['output'];
+  maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
   outputKey: Scalars['String']['output'];

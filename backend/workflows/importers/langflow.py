@@ -78,6 +78,11 @@ class LangflowImporter(FlowImporter):
         if not isinstance(raw_nodes, list) or not isinstance(raw_edges, list):
             raise FlowImportError("not a Langflow export: 'data.nodes'/'data.edges' must be lists")
 
+        if any(isinstance(node, dict) and "loop" in _node_type(node).lower() for node in raw_nodes):
+            from workflows.importers.langflow_collections import import_collection
+
+            return import_collection(payload, raw_nodes, raw_edges)
+
         nodes: list[ClassifiedNode] = []
         for n in raw_nodes:
             if not isinstance(n, dict) or not n.get("id"):

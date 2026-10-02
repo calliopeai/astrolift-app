@@ -21,7 +21,11 @@ import logging
 
 from django.db import transaction
 
-from workflows.services.dsl_parser import DslParseError, parse_workflows_dsl, validate_workflow_dsl
+from workflows.services.dsl_parser import (
+    DslParseError,
+    parse_workflows_dsl,
+    validate_workflow_dsl,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -188,9 +192,16 @@ def _upsert_definition(defn: dict) -> bool:
                 definition=obj,
                 order=stage["order"],
                 kind=stage["kind"],
+                **{field: stage[field] for field in (
+                    "agent_ref", "workflow_ref", "environment_spec_slug", "role",
+                    "prompt", "output_key", "approvers", "fan_out_dynamic",
+                )},
                 skill_refs=stage["skill_refs"],
                 fan_out_count=stage["fan_out_count"],
                 on_failure=stage["on_failure"],
+                max_attempts=stage["max_attempts"],
+                back_edge=stage["back_edge"],
+                iteration=stage["iteration"],
                 timeout_seconds=stage["timeout_seconds"],
             )
 

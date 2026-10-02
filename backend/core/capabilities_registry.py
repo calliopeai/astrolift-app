@@ -79,6 +79,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "workflows.reviewed_definition_starts",
     "workflows.definition_input_contracts",
     "workflows.definition_start_recovery",
+    "workflows.bounded_review_loops",
+    "workflows.serial_collections",
     "pipelines.reviewed_starts",
     "pipelines.versioned_start_requests",
     "pipelines.start_request_recovery",
