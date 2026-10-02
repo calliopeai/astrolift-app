@@ -843,6 +843,7 @@ def delete_github_file(
     path: str,
     branch: str,
     commit_message: str,
+    expected_sha: str | None = None,
 ) -> bool:
     """Delete ``path`` on ``branch`` via the GitHub Contents API.
 
@@ -854,23 +855,30 @@ def delete_github_file(
     qualifying as an agent package its managed workflow moves from
     ``astrolift-agent-<slug>.yml`` back to ``astrolift-ci.yml``, and the
     file left at the old path keeps running and keeps failing. Only ever
-    called on a file the platform stamped, never on operator content.
+    called on a file with verified platform ownership and unchanged content.
+    ``expected_sha`` binds deletion to the inspected blob; GitHub refuses a
+    concurrent change rather than deleting a replacement discovered later.
     """
     token = _token(connection)
     base = _api_base(connection)
     is_app_install = connection.kind == "github_app_install"
     auth_header = f"Bearer {token}" if is_app_install else f"token {token}"
 
-    existing_sha = _github_existing_sha(
-        token=token,
-        base=base,
-        repo_full_name=repo_full_name,
-        path=path,
-        branch=branch,
-        connection_kind=connection.kind,
-        operation="delete the superseded managed CI workflow",
-        permission="Contents: write",
-    )
+    if expected_sha is not None:
+        if len(expected_sha) != 40 or any(char not in "0123456789abcdef" for char in expected_sha):
+            raise ValueError("conditional file deletion requires an exact git blob SHA")
+        existing_sha = expected_sha
+    else:
+        existing_sha = _github_existing_sha(
+            token=token,
+            base=base,
+            repo_full_name=repo_full_name,
+            path=path,
+            branch=branch,
+            connection_kind=connection.kind,
+            operation="delete the superseded managed CI workflow",
+            permission="Contents: write",
+        )
     if not existing_sha:
         return False
 

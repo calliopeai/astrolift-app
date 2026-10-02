@@ -53,6 +53,12 @@ def _golden_app() -> SimpleNamespace:
     TEMPLATE body actually changes.
     """
     return SimpleNamespace(
+        guid="11111111-1111-4111-8111-111111111111",
+        organization_id=1,
+        build_mode="ci_pushed",
+        dockerfile_path="Dockerfile",
+        build_context=".",
+        build_args={},
         slug="hello-app",
         deploy_branch="main",
         registry_repo_uri="123456789012.dkr.ecr.us-west-2.amazonaws.com/hello-app",
@@ -73,7 +79,7 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 8
+PINNED_TEMPLATE_VERSION = 9
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
@@ -84,7 +90,7 @@ PINNED_TEMPLATE_VERSION = 8
 # skip-if-built ECR probe. The deploy-only render (blank registry_repo_uri)
 # is covered by ``test_deploy_only_workflow.py`` instead.
 PINNED_CONTENT_HASHES = {
-    "github": "1466cc4eca191941e73e0b9feda2e15fdf615b341c5c7c6e1c6107f9843a2180",
+    "github": "abb1f0c4a693f9c8bada57595415974169773b744f5e0543cb510ff6ffecaa4b",
     "gitlab": "77f0d228c7b159e6040b7ec10a348b039f94ef188a565ea901b7c422b6dbcbc8",
     "gitea": "d370f2cf4f0080e7c04ad7e00ee735163c688a4222f8415114d894f6a9b83170",
     "bitbucket": "7821f3ac5724b4b30b3e48473652c39eb3f1edff8d771dcdad7e89b10e43e213",
@@ -163,7 +169,7 @@ def test_agent_github_workflow_validates_package_without_app_build_or_deploy(set
     body = render_astrolift_ci_workflow(app)
 
     assert "name: astrolift agent package" in body
-    assert "group: astrolift-hello-app" in body
+    assert "group: astrolift-11111111111141118111111111111111" in body
     assert "cancel-in-progress: true" in body
     assert "agents/emr-bug-triage/**" in body
     # v7 (#1697): at least one agent workload, not exactly one workload in

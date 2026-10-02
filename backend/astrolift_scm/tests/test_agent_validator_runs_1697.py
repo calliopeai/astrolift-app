@@ -88,6 +88,9 @@ kind = "agent"
 
 def _app():
     return SimpleNamespace(
+        guid="11111111-1111-4111-8111-111111111111",
+        organization_id=1,
+        source_repo="example/agent",
         slug="hello-app",
         name="Hello App",
         registry_repo_uri="",

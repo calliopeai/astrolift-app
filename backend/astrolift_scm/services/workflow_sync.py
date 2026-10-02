@@ -25,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import posixpath
 import re
 import urllib.error
 import urllib.parse
@@ -36,11 +37,16 @@ from django.conf import settings
 from django.utils import timezone
 
 from astrolift_registry.models import RegisteredApp
+from astrolift_scm.ci_identity import (
+    github_ci_identity,
+    github_ci_owner_line,
+    github_ci_secret_name,
+    owns_unchanged_github_workflow,
+)
 from astrolift_scm.ci_templates import (
     TEMPLATE_VERSION,
     content_hash,
     git_blob_sha,
-    parse_stamp,
     stamp_workflow,
 )
 from astrolift_scm.models import SourceConnection
@@ -204,20 +210,20 @@ def _superseded_workflow_path(app: RegisteredApp) -> str:
 
     An app changes shape -- an agent workload is added to an app, or split
     out of one -- and its managed workflow moves between
-    ``astrolift-ci.yml`` and ``astrolift-agent-<slug>.yml``. The file at
+    ``astrolift-app-<guid>.yml`` and ``astrolift-agent-<slug>.yml``. The file at
     the old path keeps running on every push and keeps failing, because it
     validates a manifest that no longer matches it (#1697).
     """
     if _is_agent_app(app):
-        return WORKFLOW_PATH
+        return f".github/workflows/astrolift-app-{github_ci_identity(app)}.yml"
     return f".github/workflows/astrolift-agent-{app.slug}.yml"
 
 
 def _remove_superseded_workflow(connection, app: RegisteredApp, *, branch: str) -> str | None:
     """Delete the app's other managed workflow file when we wrote it.
 
-    Only deletes a file carrying the platform's stamp: an operator's own
-    workflow that happens to sit at that path is theirs. Never raises --
+    Requires matching app/org/repository provenance and an intact body stamp.
+    Legacy or edited files remain for explicit operator review. Never raises --
     a failed cleanup must not fail the sync that just succeeded; the stale
     file is a nuisance, the sync is the point.
     """
@@ -231,9 +237,8 @@ def _remove_superseded_workflow(connection, app: RegisteredApp, *, branch: str) 
         )
     except ProviderError:
         return None
-    if existing is None or parse_stamp(existing).version is None:
-        # No stamp: the operator authored whatever is there. Not ours to
-        # delete, however inconvenient it is.
+    if existing is None or not owns_unchanged_github_workflow(app, existing):
+        # Legacy stamps cannot establish app/repository ownership.
         return None
     from astrolift_scm.providers.github import delete_github_file
 
@@ -244,6 +249,7 @@ def _remove_superseded_workflow(connection, app: RegisteredApp, *, branch: str) 
             path=path,
             branch=branch,
             commit_message=f"chore(astrolift): remove superseded CI workflow for {app.slug}",
+            expected_sha=git_blob_sha(existing.encode("utf-8")),
         )
     except Exception:  # noqa: BLE001 -- cleanup is best-effort by design
         logger.warning(
@@ -288,7 +294,7 @@ def render_astrolift_agent_ci_workflow(app: RegisteredApp) -> str:
         "  contents: read\n"
         "\n"
         "concurrency:\n"
-        f"  group: astrolift-{app.slug}\n"
+        f"  group: astrolift-{github_ci_identity(app)}\n"
         "  cancel-in-progress: true\n"
         "\n"
         "jobs:\n"
@@ -325,6 +331,7 @@ def render_astrolift_agent_ci_workflow(app: RegisteredApp) -> str:
         "      - name: Package delivery contract\n"
         "        run: echo 'Astrolift freezes this source slice from the signed push webhook; this workflow does not deploy a standing app.'\n"
     )
+    body = github_ci_owner_line(app) + body
     return stamp_workflow(body, version=TEMPLATE_VERSION, digest=content_hash(body))
 
 
@@ -333,11 +340,11 @@ def github_workflow_path_for(app: RegisteredApp) -> str:
 
     A repository can contain many independently registered agents. Their
     validators must not overwrite the ordinary app workflow or one another.
-    App repos retain the established path for backward compatibility.
+    Ordinary app workflows use the immutable registration identity.
     """
     if _is_agent_app(app):
         return f".github/workflows/astrolift-agent-{app.slug}.yml"
-    return WORKFLOW_PATH
+    return f".github/workflows/astrolift-app-{github_ci_identity(app)}.yml"
 
 
 _PRIVATE_ECR_URI = re.compile(
@@ -397,10 +404,9 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     asserts a 2xx status — a redirect from an auth layer in front of the
     platform must fail the run, not masquerade as success.
 
-    **Deploy-only mode.** When the app has no platform-built image —
-    ``registry_repo_uri`` is empty/blank — the workflow is rendered
-    WITHOUT the ECR-login + build-and-push steps (the image is built by
-    a separate pipeline; there is nothing for this workflow to build).
+    **Deploy-only mode.** An explicit ``none`` or ``platform_build`` mode
+    renders the workflow without the ECR-login + build-and-push steps. The
+    image is supplied externally or built by the platform rather than this job.
     Checkout and the Astrolift notify step are kept. OIDC credentials are
     included only with a known AWS region; deploy-only needs no AWS access.
     """
@@ -409,9 +415,51 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     template = _load_template()
     api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
     ecr_uri = (app.registry_repo_uri or "").strip()
-    # A non-empty registry_repo_uri is the signal that the platform builds
-    # and pushes this app's image; empty ⇒ deploy-only (built elsewhere).
-    platform_built = bool(ecr_uri.strip())
+    # Missing image metadata must not silently change the authored build mode.
+    mode = app.build_mode
+    if mode not in {
+        RegisteredApp.BuildMode.CI_PUSHED,
+        RegisteredApp.BuildMode.PLATFORM_BUILD,
+        RegisteredApp.BuildMode.NONE,
+    }:
+        raise ValueError("Managed CI requires an explicit supported app build mode.")
+    platform_built = mode == RegisteredApp.BuildMode.CI_PUSHED
+    if platform_built and not ecr_uri:
+        raise ValueError(
+            "ci_pushed requires a registry repository URI; configure image publishing before syncing CI."
+        )
+    dockerfile = (app.dockerfile_path or "").strip()
+    context = (app.build_context or "").strip()
+    if platform_built and (not dockerfile or not context):
+        raise ValueError(
+            "ci_pushed requires a Dockerfile path and build context; configure the selected app's build inputs."
+        )
+    if platform_built:
+        from astrolift_manifest.path_safety import resolve_repo_relative
+
+        context_path = resolve_repo_relative(".", context)
+        relative_dockerfile = resolve_repo_relative(".", dockerfile)
+        if (
+            context_path is None
+            or relative_dockerfile in {None, "."}
+            or any("\x00" in value or "\\" in value for value in (context, dockerfile))
+            or context_path.startswith("-")
+            or relative_dockerfile.startswith("-")
+        ):
+            raise ValueError(
+                "ci_pushed requires a safe repository build context and context-relative Dockerfile path."
+            )
+        context = context_path
+        dockerfile = posixpath.normpath(posixpath.join(context, relative_dockerfile))
+    build_args = {} if app.build_args is None else app.build_args
+    if not isinstance(build_args, dict) or any(
+        not isinstance(key, str)
+        or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) is None
+        or not isinstance(value, str)
+        or "\x00" in value
+        for key, value in build_args.items()
+    ):
+        raise ValueError("Managed CI build arguments must have valid names and string values.")
     aws_region = _github_aws_region(app, ecr_uri)
     values = {
         "app_slug": app.slug,
@@ -421,8 +469,12 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
         "push_role_arn": app.push_role_ref or "",
         "api_url": api_url,
         "aws_region": aws_region,
-        "concurrency_group": f"astrolift-{app.slug}",
+        "concurrency_group": f"astrolift-{github_ci_identity(app)}",
         "image": f"{ecr_uri}:${{{{ github.sha }}}}",
+        "dockerfile": dockerfile,
+        "build_context": context,
+        "build_args": json.dumps(build_args, sort_keys=True),
+        "token_secret": github_ci_secret_name(app, "ASTROLIFT_DEPLOY_TOKEN"),
     }
     if any("${{" in values[key] for key in values if key != "image"):
         raise ValueError("Managed CI configuration cannot contain GitHub Actions expressions.")
@@ -439,6 +491,7 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
 
     template = _apply_blocks(template, {"platform_built": platform_built, "aws_auth": bool(aws_region)})
     rendered = _VAR_RE.sub(_replace, template)
+    rendered = github_ci_owner_line(app) + f"# astrolift-app-id: {app.guid}\n" + rendered
     return stamp_workflow(rendered, version=TEMPLATE_VERSION, digest=content_hash(rendered))
 
 
@@ -1434,7 +1487,7 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
     )
 
     if route_via_pr:
-        side_branch = _side_branch_for(app.slug)
+        side_branch = _side_branch_for(github_ci_identity(app))
         try:
             head_sha = _github_get_branch_sha(
                 connection,

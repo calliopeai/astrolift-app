@@ -21,7 +21,6 @@ from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_scm.services import workflow_sync
 from astrolift_scm.services.workflow_sync import (
-    WORKFLOW_PATH,
     _is_agent_app,
     _remove_superseded_workflow,
     _superseded_workflow_path,
@@ -64,7 +63,7 @@ def test_an_app_with_an_agent_among_its_workloads_is_an_app(app):
     _workload(app, "brief", Workload.Kind.AGENT)
 
     assert _is_agent_app(app) is False
-    assert github_workflow_path_for(app) == WORKFLOW_PATH
+    assert github_workflow_path_for(app) == f".github/workflows/astrolift-app-{app.guid.hex}.yml"
 
 
 def test_an_app_with_no_agent_is_an_app(app):
@@ -89,7 +88,7 @@ def test_the_superseded_path_is_the_other_one(app):
     """Whichever workflow the app uses now, the other one is the file that
     keeps running and keeps failing until it is removed."""
     _workload(app, "brief", Workload.Kind.AGENT)
-    assert _superseded_workflow_path(app) == WORKFLOW_PATH
+    assert _superseded_workflow_path(app) == f".github/workflows/astrolift-app-{app.guid.hex}.yml"
 
     _workload(app, "web", Workload.Kind.DEPLOYMENT)
     assert _superseded_workflow_path(app) == ".github/workflows/astrolift-agent-emr-1697.yml"
@@ -124,16 +123,15 @@ def _serve(monkeypatch, body):
     monkeypatch.setattr(workflow_sync, "fetch_file", lambda *a, **kw: body)
 
 
-def test_a_stamped_superseded_workflow_is_removed(app, monkeypatch, deletes):
+def test_a_legacy_stamped_superseded_workflow_is_retained(app, monkeypatch, deletes):
     _workload(app, "web", Workload.Kind.DEPLOYMENT)
     _workload(app, "brief", Workload.Kind.AGENT)
     _serve(monkeypatch, _STAMPED)
 
     removed = _remove_superseded_workflow(object(), app, branch="main")
 
-    assert removed == ".github/workflows/astrolift-agent-emr-1697.yml"
-    assert deletes[0]["path"] == removed
-    assert deletes[0]["branch"] == "main"
+    assert removed is None
+    assert deletes == []
 
 
 def test_an_operator_authored_file_at_that_path_is_left_alone(app, monkeypatch, deletes):
@@ -160,7 +158,7 @@ def test_a_failed_cleanup_does_not_fail_the_sync(app, monkeypatch):
     point."""
     _workload(app, "web", Workload.Kind.DEPLOYMENT)
     _workload(app, "brief", Workload.Kind.AGENT)
-    _serve(monkeypatch, _STAMPED)
+    _serve(monkeypatch, workflow_sync.render_astrolift_agent_ci_workflow(app))
 
     def _boom(connection, **kw):
         raise RuntimeError("github said no")

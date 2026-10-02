@@ -249,6 +249,11 @@ def test_rendered_notify_urls_resolve_to_real_routes(settings):
     settings.PLATFORM_API_URL = "https://platform.astrolift.test"
     body = render_astrolift_ci_workflow(
         SimpleNamespace(
+            guid="11111111-1111-4111-8111-111111111111",
+            build_mode="ci_pushed",
+            dockerfile_path="Dockerfile",
+            build_context=".",
+            build_args={},
             slug="hello-app",
             deploy_branch="main",
             registry_repo_uri="123456789012.dkr.ecr.us-west-2.amazonaws.com/hello-app",
@@ -278,6 +283,11 @@ def test_rendered_workflow_never_references_the_fictional_endpoint(settings):
     for uri in ("123456789012.dkr.ecr.us-west-2.amazonaws.com/hello-app", ""):
         body = render_astrolift_ci_workflow(
             SimpleNamespace(
+                guid="11111111-1111-4111-8111-111111111111",
+                build_mode="ci_pushed" if uri else "none",
+                dockerfile_path="Dockerfile",
+                build_context=".",
+                build_args={},
                 slug="hello-app",
                 deploy_branch="main",
                 registry_repo_uri=uri,
