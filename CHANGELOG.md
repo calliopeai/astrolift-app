@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Preserve actual shared-model deletion outcomes while an independent resource
+  admission check completes. Target, version and authority changes still invalidate
+  deletion reviews; resource drafts and admission observations gate updates (#2148).
+
+- Offer public CLI archives and checksum downloads without GitHub login, with
+  platform-specific curl commands and public repository changelog links (#2148).
+
 - Localize cluster saturation metrics, windows and recovery copy in all eight
   locales. Label CPU/memory ratios as requests against allocatable resources;
   retain custom labels and unknown reasons without diagnosing unreachable

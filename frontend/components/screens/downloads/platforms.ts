@@ -1,16 +1,18 @@
 import { AppleIcon, MonitorIcon, TerminalIcon } from "lucide-react";
 import type * as React from "react";
 
-// The private CLI repo's GitHub Releases is the source of truth for binaries.
-// Use authenticated `gh release download` commands rather than anonymous asset
-// URLs: GitHub deliberately returns 404 for private release assets otherwise.
+// Public release assets and their checksum manifest travel together.
 export const CLI_REPO = "calliopeai/astrolift-cli";
 export const CLI_BINARY = "astro";
 export const RELEASES_URL = `https://github.com/${CLI_REPO}/releases`;
 export const LATEST_URL = `${RELEASES_URL}/latest`;
 export const CHECKSUMS_FILENAME = `${CLI_BINARY}-checksums.txt`;
-const authenticatedDownload = (asset: string) =>
-  `gh release download --repo ${CLI_REPO} --pattern '${asset}' --pattern '${CHECKSUMS_FILENAME}'`;
+const download = (asset: string, windows = false) => {
+  const curl = windows ? "curl.exe" : "curl";
+  return [asset, CHECKSUMS_FILENAME]
+    .map((file) => `${curl} -fL '${LATEST_URL}/download/${file}' -o '${file}'`)
+    .join(windows ? "; " : " && ");
+};
 
 export interface PlatformAsset {
   id: string;
@@ -30,7 +32,7 @@ export const PLATFORMS: PlatformAsset[] = [
     label: "macOS · Apple Silicon",
     filename: `${CLI_BINARY}-darwin-arm64.tar.gz`,
     icon: AppleIcon,
-    installLine: authenticatedDownload(`${CLI_BINARY}-darwin-arm64.tar.gz`),
+    installLine: download(`${CLI_BINARY}-darwin-arm64.tar.gz`),
   },
   {
     id: "macos-x64",
@@ -39,7 +41,7 @@ export const PLATFORMS: PlatformAsset[] = [
     label: "macOS · Intel",
     filename: `${CLI_BINARY}-darwin-amd64.tar.gz`,
     icon: AppleIcon,
-    installLine: authenticatedDownload(`${CLI_BINARY}-darwin-amd64.tar.gz`),
+    installLine: download(`${CLI_BINARY}-darwin-amd64.tar.gz`),
   },
   {
     id: "linux-x64",
@@ -48,7 +50,7 @@ export const PLATFORMS: PlatformAsset[] = [
     label: "Linux · amd64",
     filename: `${CLI_BINARY}-linux-amd64.tar.gz`,
     icon: TerminalIcon,
-    installLine: authenticatedDownload(`${CLI_BINARY}-linux-amd64.tar.gz`),
+    installLine: download(`${CLI_BINARY}-linux-amd64.tar.gz`),
   },
   {
     id: "linux-arm64",
@@ -57,7 +59,7 @@ export const PLATFORMS: PlatformAsset[] = [
     label: "Linux · arm64",
     filename: `${CLI_BINARY}-linux-arm64.tar.gz`,
     icon: TerminalIcon,
-    installLine: authenticatedDownload(`${CLI_BINARY}-linux-arm64.tar.gz`),
+    installLine: download(`${CLI_BINARY}-linux-arm64.tar.gz`),
   },
   {
     id: "windows-x64",
@@ -66,7 +68,7 @@ export const PLATFORMS: PlatformAsset[] = [
     label: "Windows · amd64",
     filename: `${CLI_BINARY}-windows-amd64.zip`,
     icon: MonitorIcon,
-    installLine: authenticatedDownload(`${CLI_BINARY}-windows-amd64.zip`),
+    installLine: download(`${CLI_BINARY}-windows-amd64.zip`, true),
   },
   {
     id: "windows-arm64",
@@ -75,7 +77,7 @@ export const PLATFORMS: PlatformAsset[] = [
     label: "Windows · arm64",
     filename: `${CLI_BINARY}-windows-arm64.zip`,
     icon: MonitorIcon,
-    installLine: authenticatedDownload(`${CLI_BINARY}-windows-arm64.zip`),
+    installLine: download(`${CLI_BINARY}-windows-arm64.zip`, true),
   },
 ];
 
