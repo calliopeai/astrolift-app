@@ -7213,5 +7213,59 @@
       "canceled": "Cancelado"
     },
     "graphLabel": "Mapa de interacciones del agente"
+  },
+  "agentObservation": {
+    "session": {
+      "loading": "Cargando sesión",
+      "loadFailed": "No se pudo cargar la sesión",
+      "notFound": "Agente no encontrado",
+      "notFoundDescription": "Esta tarea del agente no existe o no tienes acceso a ella.",
+      "unavailable": "Sesión no disponible",
+      "notCapable": "Este agente no tiene una sesión compatible con VNC en ejecución.",
+      "ended": "Este agente ya no está en ejecución y su sesión en directo se ha cerrado.",
+      "back": "Volver al teatro",
+      "title": "Sesión del agente en directo",
+      "theatre": "Teatro"
+    },
+    "viewer": {
+      "fitTitle": "Ajustar a la ventana",
+      "fit": "Ajustar la sesión a la ventana",
+      "actualTitle": "Tamaño real (1:1)",
+      "actual": "Mostrar la sesión a tamaño real",
+      "exitFullscreen": "Salir de pantalla completa",
+      "fullscreen": "Pantalla completa",
+      "enterFullscreen": "Entrar en pantalla completa",
+      "title": "Sesión del agente en directo",
+      "connecting": "Conectando a la sesión en directo…",
+      "closed": "Sesión cerrada.",
+      "denied": "Acceso denegado.",
+      "error": "Error de conexión."
+    },
+    "logs": {
+      "log": "Registro",
+      "noRuns": "Aún no hay ejecuciones",
+      "noRunsDescription": "Usa Ejecutar ahora arriba. Aquí se muestra el registro de la ejecución más reciente; todas las ejecuciones están en la pestaña Ejecuciones.",
+      "runs": "Ejecuciones",
+      "temporary": "La salida del pod es temporal y puede desaparecer cuando se elimine el pod.",
+      "live": "Registros del pod en directo",
+      "window": "Ventana de registros recientes",
+      "loadingEarlier": "Cargando anteriores…",
+      "loadEarlier": "Cargar anteriores",
+      "refresh": "Actualizar registro",
+      "runTitle": "Registro · ejecución {id}",
+      "openRun": "Abrir ejecución",
+      "spawnFailed": "La ejecución falló antes de iniciar un pod",
+      "emptyOutput": "No hay salida del pod disponible. La ejecución quizá aún no haya escrito registros o puede que se haya eliminado su pod.",
+      "refreshFailed": "No se pudieron actualizar los registros.",
+      "earlierFailed": "No se pudieron cargar los registros anteriores."
+    }
+  },
+  "runLog": {
+    "title": "Registro",
+    "empty": "Aún no hay salida.",
+    "follow": "Seguir",
+    "download": "Descargar registro",
+    "jump": "Ir al más reciente",
+    "newLines": "{count, plural, one {# nueva} other {# nuevas}}"
   }
 }

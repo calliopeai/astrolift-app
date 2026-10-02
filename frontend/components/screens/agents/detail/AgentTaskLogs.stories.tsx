@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
 
@@ -68,5 +71,22 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <AgentTaskLogsView {...args} />
     </div>
+  ),
+};
+
+export const FrenchEarlier: Story = {
+  args: { hasMore: true, windowLimited: true },
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AgentTaskLogsView {...args} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseSpawnFailed: Story = {
+  args: { task: FAILED_TASK, lines: [] },
+  render: (args) => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <AgentTaskLogsView {...args} />
+    </NextIntlClientProvider>
   ),
 };

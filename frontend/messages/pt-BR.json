@@ -7210,5 +7210,59 @@
       "canceled": "Cancelado"
     },
     "graphLabel": "Mapa de interações do agente"
+  },
+  "agentObservation": {
+    "session": {
+      "loading": "Carregando sessão",
+      "loadFailed": "Não foi possível carregar a sessão",
+      "notFound": "Agente não encontrado",
+      "notFoundDescription": "Esta tarefa do agente não existe ou você não tem acesso a ela.",
+      "unavailable": "Sessão indisponível",
+      "notCapable": "Este agente não está executando uma sessão compatível com VNC.",
+      "ended": "Este agente não está mais em execução, então sua sessão ao vivo foi encerrada.",
+      "back": "Voltar ao teatro",
+      "title": "Sessão ao vivo do agente",
+      "theatre": "Teatro"
+    },
+    "viewer": {
+      "fitTitle": "Ajustar à janela",
+      "fit": "Ajustar a sessão à janela",
+      "actualTitle": "Tamanho real (1:1)",
+      "actual": "Mostrar a sessão em tamanho real",
+      "exitFullscreen": "Sair da tela cheia",
+      "fullscreen": "Tela cheia",
+      "enterFullscreen": "Entrar em tela cheia",
+      "title": "Sessão ao vivo do agente",
+      "connecting": "Conectando à sessão ao vivo…",
+      "closed": "Sessão encerrada.",
+      "denied": "Acesso negado.",
+      "error": "Erro de conexão."
+    },
+    "logs": {
+      "log": "Log",
+      "noRuns": "Ainda não há execuções",
+      "noRunsDescription": "Use Executar agora acima. O log da execução mais recente aparece aqui; todas as execuções estão na aba Execuções.",
+      "runs": "Execuções",
+      "temporary": "A saída do pod é temporária e pode desaparecer depois que o pod for removido.",
+      "live": "Logs do pod ao vivo",
+      "window": "Janela de logs recentes",
+      "loadingEarlier": "Carregando anteriores…",
+      "loadEarlier": "Carregar anteriores",
+      "refresh": "Atualizar log",
+      "runTitle": "Log · execução {id}",
+      "openRun": "Abrir execução",
+      "spawnFailed": "A execução falhou antes de iniciar um pod",
+      "emptyOutput": "Nenhuma saída do pod disponível. A execução pode ainda não ter escrito logs ou seu pod pode ter sido removido.",
+      "refreshFailed": "Não foi possível atualizar os logs.",
+      "earlierFailed": "Não foi possível carregar os logs anteriores."
+    }
+  },
+  "runLog": {
+    "title": "Log",
+    "empty": "Ainda não há saída.",
+    "follow": "Acompanhar",
+    "download": "Baixar log",
+    "jump": "Ir ao mais recente",
+    "newLines": "{count, plural, one {# nova} other {# novas}}"
   }
 }

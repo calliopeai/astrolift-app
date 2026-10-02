@@ -1,8 +1,11 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 
 import { FAILED_LINES, LONG_LINES, makeLines, RUN_LINES } from "./fixtures";
-import { LogView } from "./LogView";
+import { LogView, type LogLevel } from "./LogView";
 
 /** The one log pane (spec 44 §5.5): follows the end until the reader scrolls up. */
 const meta: Meta = { title: "Run/LogView", parameters: { layout: "padded" } };
@@ -59,5 +62,39 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <LogView lines={[...LONG_LINES, ...RUN_LINES]} onDownload={() => {}} />
     </div>
+  ),
+};
+
+export const FrenchDefault: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <LogView lines={[]} onDownload={() => {}} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseLog: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <LogView
+        lines={[{ ts: "2026-10-02T00:00:00Z", message: "RAW_LOG_BODY", level: "warn" }]}
+        onDownload={() => {}}
+      />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const JapaneseUnknownWireLevel: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <LogView
+        lines={[
+          {
+            ts: "2026-10-02T00:00:00Z",
+            message: "RAW_FUTURE_LEVEL_BODY",
+            level: "future_level_v2" as LogLevel,
+          },
+        ]}
+      />
+    </NextIntlClientProvider>
   ),
 };

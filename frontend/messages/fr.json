@@ -7213,5 +7213,59 @@
       "canceled": "Annulé"
     },
     "graphLabel": "Carte des interactions de l’agent"
+  },
+  "agentObservation": {
+    "session": {
+      "loading": "Chargement de la session",
+      "loadFailed": "Impossible de charger la session",
+      "notFound": "Agent introuvable",
+      "notFoundDescription": "Cette tâche d’agent n’existe pas ou vous n’y avez pas accès.",
+      "unavailable": "Session indisponible",
+      "notCapable": "Cet agent n’exécute pas de session compatible avec VNC.",
+      "ended": "Cet agent ne s’exécute plus ; sa session en direct est fermée.",
+      "back": "Retour au théâtre",
+      "title": "Session de l’agent en direct",
+      "theatre": "Théâtre"
+    },
+    "viewer": {
+      "fitTitle": "Adapter à la fenêtre",
+      "fit": "Adapter la session à la fenêtre",
+      "actualTitle": "Taille réelle (1:1)",
+      "actual": "Afficher la session en taille réelle",
+      "exitFullscreen": "Quitter le plein écran",
+      "fullscreen": "Plein écran",
+      "enterFullscreen": "Passer en plein écran",
+      "title": "Session de l’agent en direct",
+      "connecting": "Connexion à la session en direct…",
+      "closed": "Session fermée.",
+      "denied": "Accès refusé.",
+      "error": "Erreur de connexion."
+    },
+    "logs": {
+      "log": "Journal",
+      "noRuns": "Aucune exécution pour le moment",
+      "noRunsDescription": "Utilisez Exécuter maintenant ci-dessus. Le journal de la dernière exécution s’affiche ici ; toutes les exécutions sont dans l’onglet Exécutions.",
+      "runs": "Exécutions",
+      "temporary": "La sortie du pod est temporaire et peut disparaître après sa suppression.",
+      "live": "Journaux du pod en direct",
+      "window": "Fenêtre des journaux récents",
+      "loadingEarlier": "Chargement des précédents…",
+      "loadEarlier": "Charger les précédents",
+      "refresh": "Actualiser le journal",
+      "runTitle": "Journal · exécution {id}",
+      "openRun": "Ouvrir l’exécution",
+      "spawnFailed": "L’exécution a échoué avant le démarrage d’un pod",
+      "emptyOutput": "Aucune sortie de pod disponible. L’exécution n’a peut-être pas encore écrit de journaux, ou son pod a été supprimé.",
+      "refreshFailed": "Impossible d’actualiser les journaux.",
+      "earlierFailed": "Impossible de charger les journaux précédents."
+    }
+  },
+  "runLog": {
+    "title": "Journal",
+    "empty": "Aucune sortie pour le moment.",
+    "follow": "Suivre",
+    "download": "Télécharger le journal",
+    "jump": "Aller au plus récent",
+    "newLines": "{count, plural, one {# nouvelle} other {# nouvelles}}"
   }
 }

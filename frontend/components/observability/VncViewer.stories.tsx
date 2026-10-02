@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { VncViewer } from "@/components/observability/VncViewer";
@@ -15,3 +18,18 @@ const meta: Meta<typeof VncViewer> = {
 export default meta;
 
 export const NoRelay: StoryObj<typeof VncViewer> = {};
+
+export const FrenchNoRelay: StoryObj<typeof VncViewer> = {
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <VncViewer {...args} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseNoRelay: StoryObj<typeof VncViewer> = {
+  render: (args) => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <VncViewer {...args} />
+    </NextIntlClientProvider>
+  ),
+};

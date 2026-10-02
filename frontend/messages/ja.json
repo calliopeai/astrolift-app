@@ -7210,5 +7210,59 @@
       "canceled": "キャンセル済み"
     },
     "graphLabel": "エージェントのインタラクションマップ"
+  },
+  "agentObservation": {
+    "session": {
+      "loading": "セッションを読み込み中",
+      "loadFailed": "セッションを読み込めませんでした",
+      "notFound": "エージェントが見つかりません",
+      "notFoundDescription": "このエージェントタスクは存在しないか、アクセス権がありません。",
+      "unavailable": "セッションを利用できません",
+      "notCapable": "このエージェントでは VNC 対応のセッションが実行されていません。",
+      "ended": "このエージェントの実行は終了したため、ライブセッションは閉じられました。",
+      "back": "シアターに戻る",
+      "title": "エージェントのライブセッション",
+      "theatre": "シアター"
+    },
+    "viewer": {
+      "fitTitle": "ウィンドウに合わせる",
+      "fit": "セッションをウィンドウに合わせる",
+      "actualTitle": "実際のサイズ（1:1）",
+      "actual": "セッションを実際のサイズで表示",
+      "exitFullscreen": "全画面表示を終了",
+      "fullscreen": "全画面表示",
+      "enterFullscreen": "全画面表示に切り替える",
+      "title": "エージェントのライブセッション",
+      "connecting": "ライブセッションに接続中…",
+      "closed": "セッションは閉じられました。",
+      "denied": "アクセスが拒否されました。",
+      "error": "接続エラー。"
+    },
+    "logs": {
+      "log": "ログ",
+      "noRuns": "実行はまだありません",
+      "noRunsDescription": "上の「今すぐ実行」を使用してください。最新の実行のログがここに表示されます。すべての実行は「実行」タブで確認できます。",
+      "runs": "実行",
+      "temporary": "Pod の出力は一時的なもので、Pod の削除後に消える場合があります。",
+      "live": "Pod のライブログ",
+      "window": "最近のログ範囲",
+      "loadingEarlier": "以前のログを読み込み中…",
+      "loadEarlier": "以前のログを読み込む",
+      "refresh": "ログを更新",
+      "runTitle": "ログ · 実行 {id}",
+      "openRun": "実行を開く",
+      "spawnFailed": "Pod の起動前に実行が失敗しました",
+      "emptyOutput": "Pod の出力はありません。実行がまだログを書き込んでいないか、Pod が削除された可能性があります。",
+      "refreshFailed": "ログを更新できませんでした。",
+      "earlierFailed": "以前のログを読み込めませんでした。"
+    }
+  },
+  "runLog": {
+    "title": "ログ",
+    "empty": "出力はまだありません。",
+    "follow": "追従",
+    "download": "ログをダウンロード",
+    "jump": "最新に移動",
+    "newLines": "新着 {count, number} 件"
   }
 }
