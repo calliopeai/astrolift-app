@@ -18,6 +18,7 @@ from astrolift_pipelines.run_contracts import (
     PipelineContractError,
     dispatch_pipeline_run,
     observe_pipeline_cancellation,
+    recover_pipeline_start,
     request_pipeline_cancellation,
     reserve_pipeline_run,
 )
@@ -75,6 +76,15 @@ def reserve(world, key="stable-pipeline-request", **kwargs):
             user=world.user,
             **kwargs,
         )
+
+
+@pytest.mark.parametrize("tenant", [None, TenantContext(), TenantContext(organization_id=1)])
+def test_recovery_requires_an_authenticated_organization_actor_before_reading_run(tenant):
+    with (
+        tenant_context(tenant),
+        pytest.raises(PipelineContractError, match="authenticated organization actor"),
+    ):
+        recover_pipeline_start(SimpleNamespace())
 
 
 def dispatch(world, run):

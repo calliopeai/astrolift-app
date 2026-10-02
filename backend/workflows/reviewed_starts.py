@@ -54,7 +54,7 @@ def _definition_graph(definition, *, stages=None, lock=False):
     stage_rows = {definition.pk: root_stages}
     edges = {}
     candidates = [definition]
-    fetched_refs = set()
+    fetched_refs: set[str] = set()
     pending = [definition]
     for depth in range(MAX_WORKFLOW_NESTING_DEPTH + 1):
         refs = {
@@ -267,9 +267,14 @@ def _freeze_plans(run, definition, graph=None) -> dict:
     credential_apps = _credential_app_ids(app_ids, Permission.AGENT_DISPATCH)
     plans = {}
     checked_apps = set()
+    checked_definition_scopes = set()
     for item in graph["definitions"].values():
         if item.pk != definition.pk:
-            check_permission(Permission.WORKFLOW_TRIGGER, scope=definition_scope(item, run.organization_id))
+            scope = definition_scope(item, run.organization_id)
+            identity = (scope.kind, scope.id)
+            if identity not in checked_definition_scopes:
+                check_permission(Permission.WORKFLOW_TRIGGER, scope=scope)
+                checked_definition_scopes.add(identity)
         plan = _get_workflow_stages_sync(
             item.slug,
             None,
@@ -300,6 +305,7 @@ def reserve_start(
 ):
     tenant = get_current_tenant()
     key = actor_key()
+    assert tenant is not None
     if not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 128:
         raise InputContractError("requestId must contain 1 to 128 characters")
     if inputs is not None and not isinstance(inputs, dict):
@@ -396,10 +402,12 @@ def dispatch_start(row):
 
     with transaction.atomic(), current_dispatch_credential(Permission.WORKFLOW_TRIGGER):
         tenant = get_current_tenant()
+        key = actor_key()
+        assert tenant is not None
         current = (
             WorkflowDefinitionStart.objects.select_for_update(of=("self",))
             .select_related("execution", "definition__project")
-            .get(pk=row.pk, organization_id=tenant.organization_id, actor_key=actor_key())
+            .get(pk=row.pk, organization_id=tenant.organization_id, actor_key=key)
         )
         check_permission(
             Permission.WORKFLOW_TRIGGER, scope=definition_scope(current.definition, current.organization_id)
@@ -484,11 +492,13 @@ def recover_start(row):
     from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
 
     tenant = get_current_tenant()
+    key = actor_key()
+    assert tenant is not None
     with transaction.atomic(), current_dispatch_credential(Permission.WORKFLOW_READ):
         current = (
             WorkflowDefinitionStart.objects.select_for_update(of=("self",))
             .select_related("execution", "definition__project")
-            .get(pk=row.pk, organization_id=tenant.organization_id, actor_key=actor_key())
+            .get(pk=row.pk, organization_id=tenant.organization_id, actor_key=key)
         )
         check_permission(
             Permission.WORKFLOW_READ, scope=definition_scope(current.definition, current.organization_id)

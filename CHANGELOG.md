@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Review exact WorkflowDefinition and pipeline starts with caller-owned request
+  IDs, immutable revision/version preconditions, validated inputs and durable
+  execution recovery. Freeze bounded nested Definition graphs under database
+  locks, encrypt retained inputs and expose metadata-only recovery. Legacy
+  Definition/pipeline starts require additive reviewed proof; cancellation
+  distinguishes engine acknowledgement, observed closure and recorded-cluster
+  cleanup. Publish capability discovery and reviewed web controls (#2236, #2204).
+
 - Bind reviewed workload restart and scale requests to an explicit environment,
   cluster and namespace with version preconditions and current credential checks.
   Publish exact-target review metadata and accepted-versus-completed outcomes;

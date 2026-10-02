@@ -283,14 +283,24 @@ def test_nested_definition_change_invalidates_top_review(world):
 
 
 def test_revision_and_freeze_query_count_is_constant_for_repeated_agents_and_sibling_breadth(
-    world, permission_resolver
+    world, permission_resolver, monkeypatch
 ):
     from django.db import connection
     from django.test.utils import CaptureQueriesContext
 
     from astrolift_identity.models import Team
     from astrolift_registry.models import RegisteredApp, Workload
+    from workflows import reviewed_starts
     from workflows.reviewed_starts import _freeze_plans
+
+    permission_checks = []
+    original_check = reviewed_starts.check_permission
+
+    def record_check(permission, scope):
+        permission_checks.append((permission, scope.kind, scope.id))
+        return original_check(permission, scope=scope)
+
+    monkeypatch.setattr(reviewed_starts, "check_permission", record_check)
 
     team = Team.objects.create(organization=world.org, name="Query proof", slug="review-query-proof")
     app = RegisteredApp.objects.create(
@@ -321,11 +331,14 @@ def test_revision_and_freeze_query_count_is_constant_for_repeated_agents_and_sib
         )
 
     def counts():
+        permission_checks.clear()
         with tenant_context(world.tenant):
             with CaptureQueriesContext(connection) as revision_queries:
                 definition_revision(world.definition)
             with CaptureQueriesContext(connection) as plan_queries:
                 plans = _freeze_plans(SimpleNamespace(organization_id=world.org.pk), world.definition)
+        assert sum(check[0] == Permission.WORKFLOW_TRIGGER for check in permission_checks) == 1
+        assert sum(check[0] == Permission.AGENT_DISPATCH for check in permission_checks) == 1
         return len(revision_queries), len(plan_queries), len(plans)
 
     add_child(0)

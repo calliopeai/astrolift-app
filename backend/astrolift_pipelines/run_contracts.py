@@ -158,6 +158,7 @@ def dispatch_pipeline_run(run, *, trusted_webhook=False):
         if not trusted_webhook:
             authorize_pipeline(current.pipeline)
             tenant = get_current_tenant()
+            assert tenant is not None
             if current.actor_key != f"user:{tenant.actor_user_id}":
                 raise PipelineContractError("The start belongs to another actor")
         if current.temporal_run_id:
@@ -329,6 +330,8 @@ def recover_pipeline_start(run):
     from astrolift_workflows.client import recover_workflow_once
 
     tenant = get_current_tenant()
+    if tenant is None or tenant.organization_id is None or tenant.actor_user_id is None:
+        raise PipelineContractError("An authenticated organization actor is required for recovery")
     with transaction.atomic(), current_dispatch_credential(Permission.APP_READ):
         current = (
             PipelineRun.objects.select_for_update(of=("self",))
