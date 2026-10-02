@@ -9,6 +9,7 @@ from datetime import timedelta
 import pytest
 from django.core import signing
 from django.db import connection
+from django.db.models import Count, Max, Q, Sum
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from graphql import GraphQLError
@@ -18,7 +19,12 @@ from astrolift_identity.models import Organization
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import SecretChangeApproval, SecretChangeProposal
 from astrolift_services.schema.queries import ServicesQuery
-from astrolift_services.secret_proposal_pages import CURSOR_MAX_AGE, CURSOR_SALT
+from astrolift_services.secret_proposal_pages import (
+    CURSOR_MAX_AGE,
+    CURSOR_SALT,
+    _revision,
+    metadata_proposals,
+)
 from astrolift_services.tests.test_secret_change_proposals import _ctx, _info, _make_user, _scaffold
 from config.schema import schema
 from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind
@@ -61,7 +67,7 @@ def test_more_than_200_tied_rows_are_bounded_complete_and_exact(permission_resol
         while True:
             with CaptureQueriesContext(connection) as queries:
                 result = page(limit=37, after=cursor, status="pending")
-            assert len(queries) <= 6
+            assert len(queries) <= 7
             assert len(result.items) <= 37
             assert result.total_count == 237
             assert result.complete == (result.next_cursor is None)
@@ -71,6 +77,197 @@ def test_more_than_200_tied_rows_are_bounded_complete_and_exact(permission_resol
             cursor = result.next_cursor
     assert seen == expected
     assert len(set(seen)) == 237
+
+
+def previous_revision_facts(qs):
+    """Prove the review regression keeps every original revision input equal."""
+    return qs.order_by().aggregate(
+        count=Count("pk", distinct=True),
+        updated=Max("updated_at"),
+        votes=Max("approvals__updated_at"),
+        versions=Sum("version"),
+        vote_versions=Sum("approvals__version"),
+        **{
+            status: Count("pk", distinct=True, filter=Q(status=status))
+            for status in SecretChangeProposal.Status.values
+        },
+    )
+
+
+def test_same_token_visibility_cohort_swap_with_identical_aggregates_refuses(permission_resolver):
+    from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token
+    from astrolift_identity.models import ApiToken, Team
+    from astrolift_registry.models import AppTeamAccess
+
+    org, anchor_app, _, _ = _scaffold()
+    team_a = anchor_app.team
+    team_b = Team.objects.create(organization=org, name="Other", slug="other")
+    apps = [
+        RegisteredApp.objects.create(organization=org, team=team, name=slug, slug=slug)
+        for team, slug in [(team_a, "cohort-a"), (team_b, "cohort-b")]
+    ]
+    AppTeamAccess.objects.create(registered_app=anchor_app, team=team_b, access_level="viewer")
+    anchor = proposals(anchor_app)[0]
+    cohorts = [proposals(app, 2) for app in apps]
+    stamp = timezone.now()
+    SecretChangeProposal.objects.update(created_at=stamp, updated_at=stamp, version=1)
+    SecretChangeProposal.objects.filter(pk=anchor.pk).update(created_at=stamp + timedelta(seconds=1))
+    user = _make_user("cohort-reader")
+    token = ApiToken.objects.create(
+        user=user,
+        organization=org,
+        team=team_a,
+        token_hash=uuid.uuid4().hex,
+        name="team",
+        scopes=["read:apps"],
+    )
+    permission_resolver.grant(Permission.APP_READ)
+    marker = set_current_api_token(token)
+    try:
+        with _ctx(org, actor=user):
+            first = page(limit=1, status="pending")
+            before = previous_revision_facts(metadata_proposals(org.pk))
+        assert first.total_count == 3 and str(first.items[0].id) == str(anchor.guid)
+        identity = token.guid
+        token.team = team_b
+        token.save(update_fields=["team", "updated_at", "version"])
+        with _ctx(org, actor=user):
+            assert token.guid == identity
+            assert before == previous_revision_facts(metadata_proposals(org.pk))
+            result = schema.execute_sync(
+                'query($after:String!){astroliftSecretChangeProposalsPage(status:"pending",limit:1,after:$after){'
+                "items{id} totalCount nextCursor complete}}",
+                variable_values={"after": first.next_cursor},
+                context_value=_info(user).context,
+            )
+            assert result.data is None and result.errors[0].extensions["code"] == "STALE_CURSOR"
+            response = json.dumps(
+                {"data": result.data, "errors": [error.formatted for error in result.errors]}
+            )
+            assert not any(str(row.guid) in response for row in cohorts[0])
+            fresh = page(status="pending")
+            assert fresh.total_count == 3
+            assert {str(row.id) for row in fresh.items} == {
+                str(anchor.guid),
+                *[str(r.guid) for r in cohorts[1]],
+            }
+            with pytest.raises(PermissionDenied):
+                ServicesQuery().astrolift_secret_change_proposal_metadata(
+                    _info(user), id=GUID(str(cohorts[0][0].guid))
+                )
+    finally:
+        reset_current_api_token(marker)
+
+
+@pytest.mark.parametrize("change", ["vote_guid", "approver", "proposal_distribution"])
+def test_vote_identity_changes_with_identical_lifecycle_aggregates_refuse(permission_resolver, change):
+    org, app, _, _ = _scaffold()
+    rows = proposals(app, 3)
+    users = [_make_user(f"vote-reader-{i}") for i in range(3)]
+    votes = [
+        SecretChangeApproval.objects.create(proposal=rows[index], approver=users[index], decision="approved")
+        for index in range(2)
+    ]
+    stamp = timezone.now()
+    SecretChangeProposal.objects.update(created_at=stamp, updated_at=stamp, version=1)
+    SecretChangeApproval.objects.update(updated_at=stamp, version=1)
+    permission_resolver.grant(Permission.APP_READ)
+    with _ctx(org):
+        first = page(limit=1, status="pending")
+        before = previous_revision_facts(metadata_proposals(org.pk))
+    if change == "vote_guid":
+        SecretChangeApproval.objects.filter(pk=votes[0].pk).update(guid=uuid.uuid4())
+    elif change == "approver":
+        SecretChangeApproval.objects.filter(pk=votes[0].pk).update(approver=users[2])
+    else:
+        # Swap both votes' targets without changing total joins, versions,
+        # timestamps or statuses. Vote identity must include its proposal.
+        SecretChangeApproval.objects.filter(pk=votes[0].pk).update(proposal=rows[1])
+        SecretChangeApproval.objects.filter(pk=votes[1].pk).update(proposal=rows[0])
+    with _ctx(org):
+        assert before == previous_revision_facts(metadata_proposals(org.pk))
+        with pytest.raises(GraphQLError) as error:
+            page(limit=1, status="pending", after=first.next_cursor)
+        assert error.value.extensions["code"] == "STALE_CURSOR"
+
+
+def test_vote_authorization_cohort_swap_with_constant_aggregates_refuses():
+    from astrolift_identity.abac import RequestAttributes, request_attributes
+    from astrolift_identity.models import Member, Policy
+    from core.tests.utils.scope_world import bind_role
+
+    org, app, env, _ = _scaffold()
+    rows = proposals(app, 3, app_environment=env)
+    reader = _make_user("approval-reader")
+    voter = _make_user("approval-voter")
+    Member.objects.create(user=reader, scope_kind="ORG", scope_id=org.pk, lifecycle="active", is_active=True)
+    bind_role(reader, permissions=[Permission.APP_READ], kind="ORG", scope_id=org.pk, slug="proposal-reader")
+    Policy.objects.create(
+        organization=org,
+        name="Require verified approval",
+        slug="verified-approval",
+        scope_level="ORG",
+        scope_id=org.pk,
+        effect="DENY",
+        action_pattern="app.read",
+        conditions=[{"kind": "approval_required"}],
+    )
+    stamp = timezone.now()
+    SecretChangeProposal.objects.update(created_at=stamp, updated_at=stamp, version=1)
+    SecretChangeProposal.objects.filter(pk=rows[2].pk).update(created_at=stamp + timedelta(seconds=1))
+    votes = [
+        SecretChangeApproval.objects.create(proposal=row, approver=approver, decision="approved")
+        for row, approver in [(rows[0], voter), (rows[1], None), (rows[2], reader)]
+    ]
+    SecretChangeApproval.objects.update(updated_at=stamp, version=1)
+    with _ctx(org, actor=reader), request_attributes(RequestAttributes(actor_user_id=reader.pk)):
+        first = page(limit=1, status="pending")
+        before = previous_revision_facts(metadata_proposals(org.pk))
+        assert first.total_count == 2 and str(first.items[0].id) == str(rows[2].guid)
+    # Existing vote rows and their timestamps/versions stay unchanged; the
+    # durable voter identity is what changes verified operation authority.
+    SecretChangeApproval.objects.filter(pk=votes[0].pk).update(approver=None)
+    SecretChangeApproval.objects.filter(pk=votes[1].pk).update(approver=voter)
+    with _ctx(org, actor=reader), request_attributes(RequestAttributes(actor_user_id=reader.pk)):
+        assert before == previous_revision_facts(metadata_proposals(org.pk))
+        with pytest.raises(GraphQLError) as error:
+            page(limit=1, status="pending", after=first.next_cursor)
+        assert error.value.extensions["code"] == "STALE_CURSOR"
+        fresh = page(status="pending")
+        assert fresh.total_count == 2
+        assert {str(row.id) for row in fresh.items} == {str(rows[1].guid), str(rows[2].guid)}
+        with pytest.raises(PermissionDenied):
+            ServicesQuery().astrolift_secret_change_proposal_metadata(
+                _info(reader), id=GUID(str(rows[0].guid))
+            )
+
+
+def test_fingerprints_deduplicate_source_ids_not_hash_limbs_and_return_no_queue_arrays(permission_resolver):
+    from astrolift_identity.models import Team
+    from astrolift_registry.models import AppTeamAccess
+
+    org, app, _, _ = _scaffold()
+    rows = proposals(app, 3)
+    for index in range(3):
+        team = Team.objects.create(organization=org, name=f"Shared {index}", slug=f"shared-{index}")
+        AppTeamAccess.objects.create(registered_app=app, team=team, access_level="viewer")
+        SecretChangeApproval.objects.create(
+            proposal=rows[0], approver=_make_user(f"shared-voter-{index}"), decision="approved"
+        )
+    permission_resolver.grant(Permission.APP_READ)
+    with _ctx(org), CaptureQueriesContext(connection) as queries:
+        qs = metadata_proposals(org.pk)
+        ordinary = _revision(qs)
+        duplicated = _revision(qs.filter(registered_app__team_accesses__access_level="viewer"))
+    assert ordinary == duplicated
+    assert len(queries) == 4
+    for query in queries:
+        sql = query["sql"].lower()
+        assert "pg_catalog.sha256" in sql and "::numeric" in sql
+        assert "sum(distinct" not in sql and "array_agg" not in sql and "string_agg" not in sql
+        assert not any(
+            '"' + field + '"' in sql for field in ("payload", "payload_diff", "apply_error", "reason")
+        )
 
 
 def test_filters_counts_and_empty_pages_use_only_visible_apps(permission_resolver):

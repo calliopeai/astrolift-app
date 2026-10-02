@@ -28,7 +28,11 @@ include unreadable apps or foreign organizations.
 Cursors are signed, bound to the current tenant, actor, credential and filters,
 and expire after 15 minutes. The server uses scoped database aggregates to detect
 proposal creation, update, deletion and approval changes before and after reading
-a page. Changed queues return `STALE_CURSOR`; malformed or mismatched tokens
+a page. Fixed-size SHA-256 identity fingerprints also detect changed visible
+proposal cohorts and vote identities when counts, versions and timestamps stay
+equal. The database sums hash limbs from deduplicated source rows; it does not
+load all GUIDs into the application or build whole-queue arrays or strings.
+Changed queues return `STALE_CURSOR`; malformed or mismatched tokens
 return `INVALID_CURSOR`, rather than silently restarting or producing an empty
 continuation. Discard the entire cursor chain and request the first page. Counts
 and ordering are observations of an unchanged walk, not a retained historical

@@ -7,7 +7,8 @@ import json
 import uuid
 
 from django.core import signing
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import BinaryField, Count, DecimalField, Func, Max, Q, Sum, TextField, Value
+from django.db.models.functions import Cast, Coalesce, Concat, Substr
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import is_aware
 from graphql import GraphQLError
@@ -17,7 +18,7 @@ from astrolift_identity.api_tokens import get_current_api_token
 from astrolift_identity.operation_visibility import visible_operation_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import live_app_owners
-from astrolift_services.models import SecretChangeProposal
+from astrolift_services.models import SecretChangeApproval, SecretChangeProposal
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import get_current_tenant
 
@@ -81,21 +82,68 @@ def _digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
 
 
-def _revision(qs):
-    # Aggregate both lifecycle and votes, without loading proposal bodies or reasons.
-    return _digest(
-        qs.order_by().aggregate(
-            count=Count("pk", distinct=True),
-            updated=Max("updated_at"),
-            votes=Max("approvals__updated_at"),
-            versions=Sum("version"),
-            vote_versions=Sum("approvals__version"),
-            **{
-                status: Count("pk", distinct=True, filter=Q(status=status))
-                for status in SecretChangeProposal.Status.values
-            },
-        )
+def _identity_sums(identity):
+    # PostgreSQL's built-in SHA-256 needs no extension. Hash each fixed-size
+    # metadata identity in the database, then sum all four independent limbs.
+    # Numeric sums avoid bigint overflow; neither GUID arrays nor whole-queue
+    # concatenations are allocated or returned. Do not DISTINCT hash limbs:
+    # only the scoped source rows are deduplicated, not their hash values.
+    fingerprint = Func(
+        Func(
+            Func(identity, Value("UTF8"), function="pg_catalog.convert_to", output_field=BinaryField()),
+            function="pg_catalog.sha256",
+            output_field=BinaryField(),
+        ),
+        Value("hex"),
+        function="pg_catalog.encode",
+        output_field=TextField(),
     )
+    return {
+        f"identity_{index}": Sum(
+            Func(
+                Substr(fingerprint, index * 16 + 1, 16),
+                template="(('x' || %(expressions)s)::bit(64)::bigint)::numeric",
+                output_field=DecimalField(),
+            )
+        )
+        for index in range(4)
+    }
+
+
+def _revision(qs):
+    # IN subqueries preserve present visibility while making each proposal
+    # and each vote contribute exactly once, independent of authorization
+    # joins. Aggregate queries select metadata only and return fixed-size
+    # lifecycle facts and fingerprint sums to Python.
+    visible_ids = qs.order_by().values("pk")
+    proposals = SecretChangeProposal.objects.filter(pk__in=visible_ids).aggregate(
+        count=Count("pk", distinct=True),
+        updated=Max("updated_at"),
+        versions=Sum("version"),
+        **{
+            status: Count("pk", distinct=True, filter=Q(status=status))
+            for status in SecretChangeProposal.Status.values
+        },
+        **_identity_sums(Cast("guid", TextField())),
+    )
+    vote_identity = Concat(
+        Cast("proposal__guid", TextField()),
+        Value(":"),
+        Cast("guid", TextField()),
+        Value(":"),
+        Cast("approver_id", TextField()),
+        Value(":"),
+        "decision",
+        Value(":"),
+        Coalesce(Cast("deleted_at", TextField()), Value(""), output_field=TextField()),
+        output_field=TextField(),
+    )
+    votes = SecretChangeApproval.objects.filter(proposal_id__in=visible_ids).aggregate(
+        updated=Max("updated_at"),
+        versions=Sum("version"),
+        **_identity_sums(vote_identity),
+    )
+    return _digest({"proposals": proposals, "votes": votes})
 
 
 def _error(code):
