@@ -308,12 +308,6 @@ export function useDeploymentDetail(id: string) {
         await fetchMoreLog({
           variables: { deploymentId: id, cursor },
           updateQuery: (previous, { fetchMoreResult }) => {
-            console.log(
-              "2176debug",
-              previous.astroliftDeploymentRunLogPage.nextCursor,
-              cursor,
-              fetchMoreResult?.astroliftDeploymentRunLogPage.items.length
-            );
             if (!fetchMoreResult || previous.astroliftDeploymentRunLogPage.nextCursor !== cursor)
               return previous;
             return {
