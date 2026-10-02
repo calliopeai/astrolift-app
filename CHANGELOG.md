@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Translate cluster registration controls, help and request feedback in all eight
+  locales. Preserve edited authentication drafts across provider/auth steps and
+  locale changes; malformed credential JSON receives a generic local error
+  without echoing credential text (#2145).
+
 - Review exact WorkflowDefinition and pipeline starts with caller-owned request
   IDs, immutable revision/version preconditions, validated inputs and durable
   execution recovery. Freeze bounded nested Definition graphs under database
