@@ -1,5 +1,10 @@
 # Review the environment before restart or scale
 
+Public `astroliftServerInfo` discovery advertises `workloads.environment_targets`
+when this additive contract is installed. That capability describes available
+API fields; present app permissions and action preconditions still decide each
+request. It does not establish a client's confirmation UI or native consent.
+
 Restart and scale can target an explicit environment GUID. First read
 `astroliftWorkloadActionTarget(workloadId: ..., environmentId: ...)`. It returns
 immutable workload, app, environment and cluster GUIDs, their current versions,

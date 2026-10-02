@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Bind reviewed workload restart and scale requests to an explicit environment,
+  cluster and namespace with version preconditions and current credential checks.
+  Publish exact-target review metadata and accepted-versus-completed outcomes;
+  native Kubernetes clients retain independent cluster configuration (#2217).
+
 - Preserve actual shared-model deletion outcomes while an independent resource
   admission check completes. Target, version and authority changes still invalidate
   deletion reviews; resource drafts and admission observations gate updates (#2148).

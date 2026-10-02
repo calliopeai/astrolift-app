@@ -72,6 +72,16 @@ class AstroliftServerInfoTest(TestCase):
         self.assertIn("featureFlags", info)
         self.assertIn("authMethods", info)
 
+    def test_discovery_reports_explicit_workload_environment_review(self) -> None:
+        self.assertIn("workloads.environment_targets", self._execute()["capabilities"])
+        result = schema.execute_sync(
+            '{ astroliftWorkloadActionTarget(workloadId: "11111111-1111-4111-8111-111111111111", '
+            'environmentId: "22222222-2222-4222-8222-222222222222") { workloadId environmentId } }',
+            context_value=_anonymous_context(),
+        )
+        self.assertIsNotNone(result.errors)
+        self.assertIsNone(result.data["astroliftWorkloadActionTarget"])
+
     # ---- Test 2: version matches settings.VERSION -------------------
 
     def test_version_matches_settings(self) -> None:
