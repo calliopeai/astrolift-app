@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
@@ -25,8 +26,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws._naming import iam_role_name
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import ManagedServiceError, handle_for, live_ownership_refusal, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "workflow_engine"
@@ -79,6 +80,7 @@ class _StepFunctionsDriver(ManagedServiceDriver):
                 )
                 state_machine_arn = str(response["stateMachineArn"])
                 version_arn = str(response.get("stateMachineVersionArn") or "")
+                self._assert_target(state_machine_arn, name, spec.managed_service_id)
             else:
                 state_machine_arn = str(existing["stateMachineArn"])
                 response = self._sfn.update_state_machine(
@@ -99,7 +101,7 @@ class _StepFunctionsDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="step_functions")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, state_machine_arn = parse_handle(spec.handle)
+        state_machine_arn = self._handle_arn(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg)
         if error:
@@ -109,7 +111,7 @@ class _StepFunctionsDriver(ManagedServiceDriver):
         if definition_error:
             return UpdateResult(False, spec.handle, definition_error, ["invalid_state_machine_definition"])
         try:
-            machine = self._sfn.describe_state_machine(stateMachineArn=state_machine_arn)
+            machine = self._sfn.describe_state_machine(stateMachineArn=state_machine_arn, includedData="METADATA_ONLY")
             if str(machine.get("type") or "") != self.WORKFLOW_TYPE:
                 return UpdateResult(
                     False,
@@ -117,12 +119,24 @@ class _StepFunctionsDriver(ManagedServiceDriver):
                     f"state machine is {machine.get('type')}, not immutable type {self.WORKFLOW_TYPE}",
                     ["workflow_type_mismatch"],
                 )
-            if not self._is_owned(state_machine_arn):
+            if (
+                str(machine.get("stateMachineArn") or "") != state_machine_arn
+                or str(machine.get("name") or "") != state_machine_arn.rsplit(":", 1)[1]
+            ):
+                return UpdateResult(
+                    False,
+                    spec.handle,
+                    "live state machine identity does not match the recorded target",
+                    ["target_mismatch"],
+                    retryable=False,
+                )
+            if not self._is_owned(state_machine_arn, spec.managed_service_id):
                 return UpdateResult(
                     False,
                     spec.handle,
                     "refusing to update a state machine not owned by Astrolift",
                     ["resource_not_owned"],
+                    retryable=False,
                 )
             response = self._sfn.update_state_machine(
                 stateMachineArn=state_machine_arn,
@@ -153,14 +167,36 @@ class _StepFunctionsDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del delete_data
-        _, state_machine_arn = parse_handle(spec.handle)
+        state_machine_arn = self._handle_arn(spec.handle)
         try:
-            machine = self._sfn.describe_state_machine(stateMachineArn=state_machine_arn)
+            machine = self._sfn.describe_state_machine(stateMachineArn=state_machine_arn, includedData="METADATA_ONLY")
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, "state machine already gone")
             return DeprovisionResult(False, spec.handle, f"describe state machine: {exc}", [str(exc)])
-        if not self._is_owned(state_machine_arn) and not force_destroy:
+        if (
+            str(machine.get("stateMachineArn") or "") != state_machine_arn
+            or str(machine.get("name") or "") != state_machine_arn.rsplit(":", 1)[1]
+            or str(machine.get("type") or "") != self.WORKFLOW_TYPE
+        ):
+            return DeprovisionResult(
+                False,
+                spec.handle,
+                "live state machine identity or type does not match the recorded target",
+                ["target_mismatch"],
+                retryable=False,
+            )
+        try:
+            owned = self._is_owned(state_machine_arn, spec.managed_service_id)
+        except Exception as exc:
+            return DeprovisionResult(
+                False,
+                spec.handle,
+                f"verify state machine ownership: {exc}",
+                ["ownership_verification_failed"],
+                retryable=not isinstance(exc, ManagedServiceError),
+            )
+        if not owned:
             return DeprovisionResult(
                 False,
                 spec.handle,
@@ -446,16 +482,54 @@ class _StepFunctionsDriver(ManagedServiceDriver):
         return f"invalid state machine definition: {details or 'AWS validation failed'}"
 
     def _name(self, spec: ProvisionSpec) -> str:
-        return iam_role_name(
-            self._config.state_machine_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_len=80,
-        )
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return self._handle_arn(spec.recorded_handle).rsplit(":", 1)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.state_machine_name_prefix, max_length=80)
+
+    def _handle_arn(self, handle: str) -> str:
+        from botocore.session import get_session
+
+        kind, arn = parse_handle(handle)
+        parts = arn.split(":")
+        if (
+            kind != KIND
+            or len(parts) != 7
+            or parts[0] != "arn"
+            or parts[1] != get_session().get_partition_for_region(self._config.region)
+            or parts[2] != "states"
+            or parts[3] != self._config.region
+            or not re.fullmatch(r"[0-9]{12}", parts[4])
+            or parts[5] != "stateMachine"
+            or re.fullmatch(r"[A-Za-z0-9_+=.@-]{1,80}", parts[6]) is None
+        ):
+            raise ManagedServiceError("recorded Step Functions handle does not match the configured driver target")
+        return arn
+
+    def _assert_target(self, arn: str, name: str, identity: str) -> dict[str, Any]:
+        self._handle_arn(handle_for(kind=KIND, resource_id=arn))
+        current = self._sfn.describe_state_machine(stateMachineArn=arn, includedData="METADATA_ONLY")
+        if (
+            str(current.get("stateMachineArn") or "") != arn
+            or str(current.get("name") or "") != name
+            or str(current.get("type") or "") != self.WORKFLOW_TYPE
+        ):
+            raise ManagedServiceError("live Step Functions state machine does not match the exact name, ARN and type")
+        if not self._is_owned(arn, identity):
+            raise ManagedServiceError("Step Functions state machine is not owned by this managed-service identity")
+        return dict(current)
 
     def _find_owned(self, name: str, spec: ProvisionSpec) -> dict[str, Any] | None:
+        if spec.recorded_handle:
+            arn = self._handle_arn(spec.recorded_handle)
+            try:
+                return self._assert_target(arn, name, spec.managed_service_id)
+            except Exception as exc:
+                if _not_found(exc):
+                    raise ManagedServiceError(
+                        "recorded Step Functions state machine is missing; refusing a replacement"
+                    ) from None
+                raise
         token = ""
         while True:
             request: dict[str, Any] = {"maxResults": 100}
@@ -463,27 +537,33 @@ class _StepFunctionsDriver(ManagedServiceDriver):
                 request["nextToken"] = token
             response = self._sfn.list_state_machines(**request)
             for machine in response.get("stateMachines", []) or []:
-                if machine.get("name") != name or machine.get("type") != self.WORKFLOW_TYPE:
-                    continue
-                arn = str(machine["stateMachineArn"])
-                tags = self._tags(arn)
-                if (
-                    tags.get("astrolift.io/managed-by") == "platform"
-                    and tags.get("astrolift.io/organization") == spec.organization_slug
-                    and tags.get("astrolift.io/app") == spec.app_slug
-                    and tags.get("astrolift.io/environment") == spec.environment_name
-                ):
-                    return dict(machine)
+                if machine.get("name") == name:
+                    return self._assert_target(str(machine.get("stateMachineArn") or ""), name, spec.managed_service_id)
             token = str(response.get("nextToken") or "")
             if not token:
                 return None
 
-    def _is_owned(self, state_machine_arn: str) -> bool:
-        return self._tags(state_machine_arn).get("astrolift.io/managed-by") == "platform"
+    def _is_owned(self, state_machine_arn: str, identity: str) -> bool:
+        return (
+            live_ownership_refusal(
+                self._tags(state_machine_arn), managed_service_id=identity, resource="Step Functions state machine"
+            )
+            is None
+        )
 
     def _tags(self, state_machine_arn: str) -> dict[str, str]:
         response = self._sfn.list_tags_for_resource(resourceArn=state_machine_arn)
-        return {str(item.get("key")): str(item.get("value")) for item in response.get("tags", []) or []}
+        tags = {}
+        for item in response.get("tags", []) or []:
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("key"), str)
+                or not isinstance(item.get("value"), str)
+                or item["key"] in tags
+            ):
+                raise ManagedServiceError("live Step Functions ownership tags cannot be verified")
+            tags[item["key"]] = item["value"]
+        return tags
 
     def _state_machine_request(self, cfg: dict[str, Any], definition: str) -> dict[str, Any]:
         request = dict(cfg.get("state_machine") or {})
