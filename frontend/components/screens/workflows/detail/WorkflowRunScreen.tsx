@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations, useFormatter } from "next-intl";
+
 import {
   CheckIcon,
   CopyIcon,
@@ -114,6 +116,8 @@ export function workflowRunCrumbs(slug: string, workflowName: string, runId: str
 }
 
 function BranchList({ item }: { item: RunStepItem }) {
+  const t = useTranslations("workflowBounds");
+  const format = useFormatter();
   const settled = item.branches.filter((b) => b.state === "ok" || b.state === "failed").length;
   return (
     <span className="mt-1 flex min-w-0 flex-col gap-1">
@@ -130,6 +134,17 @@ function BranchList({ item }: { item: RunStepItem }) {
             <StatusDot status={DOT[b.state]} className="mt-1" />
             <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
               {b.label}
+              {b.startedAt && (
+                <span className="text-muted-foreground block">
+                  {t("branchStarted", {
+                    time: format.dateTime(new Date(b.startedAt), {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    }),
+                  })}
+                </span>
+              )}
               {b.error && <span className="text-danger-fg font-mono"> · {b.error}</span>}
             </span>
             {b.durationMs != null && (
@@ -181,6 +196,7 @@ export function WorkflowRunScreen({
   onCancel,
 }: WorkflowRunScreenProps) {
   const [confirmCancel, setConfirmCancel] = React.useState(false);
+  const tBounds = useTranslations("workflowBounds");
   const title = `run ${runId.slice(0, 8)}`;
   const crumbs = workflowRunCrumbs(slug, workflowName, runId);
 
@@ -253,9 +269,16 @@ export function WorkflowRunScreen({
     return [
       {
         id: `round-${r.round}`,
-        name: `Round ${r.round}`,
+        name:
+          r.maxRounds && r.edgeRound === r.round
+            ? tBounds("roundBound", { round: r.round, max: r.maxRounds })
+            : tBounds("roundTitle", { round: r.round }),
         state: STEP[r.state],
-        detail: r.cause ?? (r.round === 1 ? "The first pass" : undefined),
+        detail: r.cause
+          ? `${r.cause}${r.maxRounds && r.edgeRound !== r.round ? ` · ${tBounds("edgeBound", { edgeRound: r.edgeRound!, max: r.maxRounds })}` : ""}`
+          : r.round === 1
+            ? "The first pass"
+            : undefined,
       },
       ...items,
     ];

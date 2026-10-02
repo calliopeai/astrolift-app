@@ -25,10 +25,10 @@ import {
 } from "./workflow-run-model";
 
 describe("placeExecutions", () => {
-  it("opens a round when work goes back to an earlier stage, with the cause", () => {
+  it("reads the persisted round and return cause", () => {
     const placed = placeExecutions(LOOP_PLAN, LOOP_EXECUTIONS);
     expect(placed.map((p) => p.round)).toEqual([1, 1, 2, 2, 2, 2]);
-    expect(placed[2]!.causedBy?.reason).toBe("tester failed: 3 specs failed in checkout");
+    expect(placed[2]!.causedBy?.reason).toBe("stage_failed");
   });
 
   it("numbers a fan-out's executions as branches within the round", () => {
@@ -45,7 +45,7 @@ describe("placeExecutions", () => {
       execution("x2", 0, "agent_dispatch", { attemptNumber: 2, startedAt: "2026-09-28T14:03:00Z" }),
     ]);
     expect(placed.map((p) => p.round)).toEqual([1, 1]);
-    expect(placed[1]!.causedBy?.reason).toBe("Attempt 2 after: OOMKilled");
+    expect(placed[1]!.causedBy).toBeNull();
   });
 });
 
@@ -57,7 +57,7 @@ describe("runRounds", () => {
       [2, ["coder", "tester", "Gate · code review", "deployer"]],
     ]);
     expect(rounds[0]!.state).toBe("failed");
-    expect(rounds[1]!.cause).toMatch(/tester failed/);
+    expect(rounds[1]!.cause).toBe("stage_failed");
     expect(rounds[1]!.items[0]!.cause).toBeNull();
   });
 
@@ -127,7 +127,7 @@ describe("runReplayTimeline", () => {
     const timeline = runReplayTimeline(LOOP_PLAN, LOOP_EXECUTIONS, LOOP_RUN, "run")!;
     expect(timeline.stages[2]).toMatchObject({
       round: 2,
-      causedBy: { reason: expect.stringMatching(/tester failed/) },
+      causedBy: { reason: "stage_failed" },
     });
     expect(timeline.finishedAt).toBe(Date.UTC(2026, 8, 28, 14, 7, 0));
   });
@@ -240,4 +240,39 @@ describe("configuredRunOutcome", () => {
 
 it("builds the run page href", () => {
   expect(workflowRunHref("a b", "r/1")).toBe("/workflows/a%20b/runs/r%2F1");
+});
+
+it("never infers a return or fan-out membership from stage ordering alone", () => {
+  const placed = placeExecutions(LOOP_PLAN, [
+    execution("later", 1, "agent_dispatch"),
+    execution("earlier", 0, "agent_dispatch", { startedAt: "2026-09-28T14:04:00Z" }),
+  ]);
+  expect(placed.map((p) => [p.round, p.branch, p.causedBy])).toEqual([
+    [1, null, null],
+    [1, null, null],
+  ]);
+});
+
+it("keeps global rounds distinct from the bounded edge's own round", () => {
+  const [round] = runRounds(
+    LOOP_PLAN,
+    [
+      execution("overlap", 0, "agent_dispatch", {
+        roundNumber: 7,
+        causedBy: { edge: "review->draft", reason: "gate_rejected", edgeRound: 3, maxRounds: 5 },
+      }),
+    ],
+    RUN,
+    NOW
+  );
+  expect(round).toMatchObject({ round: 7, edgeRound: 3, maxRounds: 5 });
+});
+
+it("keeps branch start times and refuses identity mismatches", () => {
+  const branch = GATE_EXECUTIONS[0]!;
+  const [round] = runRounds(PLAN, [branch], RUN, NOW);
+  expect(round!.items[0]!.branches[0]!.startedAt).toBe(branch.startedAt);
+  expect(
+    placeExecutions(PLAN, [{ ...branch, fanoutStageId: "different-stage" }])[0]!.branch
+  ).toBeNull();
 });

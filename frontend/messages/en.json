@@ -7067,5 +7067,32 @@
       "stopRefreshFailed": "The task stopped, but the view could not refresh. Refresh to see its latest state.",
       "dispatchUnconfirmed": "The server did not return a task ID. Check agent runs before trying again."
     }
+  },
+  "workflowBounds": {
+    "title": "Execution bounds",
+    "attempts": "Maximum attempts (1–20)",
+    "attemptHint": "Includes the initial dispatch. Attempts restart independently in each round.",
+    "enable": "Return to an earlier stage",
+    "target": "Return target (output key)",
+    "trigger": "Return when",
+    "gate_rejected": "Reviewer rejects",
+    "stage_failed": "Final attempt fails",
+    "output_equals": "Output field matches",
+    "rounds": "Maximum rounds (1–20)",
+    "exhausted": "At round limit",
+    "fail": "Fail workflow",
+    "escalate": "Ask operator",
+    "path": "Output field path",
+    "value": "Expected value (JSON scalar)",
+    "invalidValue": "Enter a JSON string, number, boolean or null.",
+    "invalidEdge": "This edge needs code-view editing before it can run.",
+    "noTargets": "Give an earlier stage an output key to enable a return.",
+    "roundHint": "Includes the initial pass. Retry attempts do not add rounds. Feedback goes to the producer.",
+    "invalidCondition": "The return condition must be a valid JSON scalar.",
+    "roundBound": "Round {round} of {max}",
+    "edgeBound": "Return {edgeRound} of {max}",
+    "roundTitle": "Round {round}",
+    "branchStarted": "Started {time}",
+    "max_rounds_exhausted": "Round limit reached"
   }
 }

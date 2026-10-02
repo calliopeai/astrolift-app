@@ -6987,5 +6987,32 @@
       "stopRefreshFailed": "タスクは停止しましたが、表示を更新できませんでした。更新して最新の状態を確認してください。",
       "dispatchUnconfirmed": "サーバーからタスク ID が返されませんでした。再試行する前に、エージェントの実行を確認してください。"
     }
+  },
+  "workflowBounds": {
+    "title": "実行上限",
+    "attempts": "最大試行回数（1〜20）",
+    "attemptHint": "最初の実行を含みます。試行回数は各ラウンドで独立してリセットされます。",
+    "enable": "前のステージに戻る",
+    "target": "戻り先（出力キー）",
+    "trigger": "戻る条件",
+    "gate_rejected": "レビュー担当者が却下",
+    "stage_failed": "最終試行が失敗",
+    "output_equals": "出力フィールドが一致",
+    "rounds": "最大ラウンド数（1〜20）",
+    "exhausted": "ラウンド上限に達した場合",
+    "fail": "ワークフローを失敗にする",
+    "escalate": "オペレーターに確認",
+    "path": "出力フィールドのパス",
+    "value": "期待値（JSONスカラー）",
+    "invalidValue": "JSON文字列、数値、真偽値、またはnullを入力してください。",
+    "invalidEdge": "実行する前にコード表示でこの接続を編集する必要があります。",
+    "noTargets": "前のステージに出力キーを設定すると戻り先に指定できます。",
+    "roundHint": "最初の実行を含みます。再試行ではラウンドは増えません。フィードバックは生成元に送られます。",
+    "invalidCondition": "戻る条件には有効なJSONスカラーが必要です。",
+    "roundBound": "ラウンド {round} / {max}",
+    "edgeBound": "戻り {edgeRound} / {max}",
+    "roundTitle": "ラウンド {round}",
+    "branchStarted": "開始: {time}",
+    "max_rounds_exhausted": "ラウンド上限に到達"
   }
 }

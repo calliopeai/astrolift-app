@@ -241,8 +241,16 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
             path=f"{base}.on_failure",
         )
 
+    raw_edge = d.get("back_edge", {})
+    if "back_edge_json" in d:
+        if "back_edge" in d or not isinstance(d["back_edge_json"], str):
+            raise ManifestError("Supply only one of back_edge or back_edge_json", path=f"{base}.back_edge")
+        try:
+            raw_edge = json.loads(d["back_edge_json"])
+        except ValueError as exc:
+            raise ManifestError("back_edge_json must contain valid JSON", path=f"{base}.back_edge") from exc
     try:
-        back_edge = validate_back_edge(d.get("back_edge", {}), kind=kind)
+        back_edge = validate_back_edge(raw_edge, kind=kind)
     except LoopContractError as exc:
         raise ManifestError(str(exc), path=f"{base}.back_edge") from exc
 
@@ -368,7 +376,13 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
         if stage.on_failure != _DEFAULT_ON_FAILURE:
             row["on_failure"] = stage.on_failure
         if stage.back_edge:
-            row["back_edge"] = validate_back_edge(stage.back_edge, kind=stage.kind)
+            edge = validate_back_edge(stage.back_edge, kind=stage.kind)
+            if "value" in edge and edge["value"] is None:
+                # TOML has no null literal. Preserve typed JSON null rather
+                # than deleting the condition or turning it into a string.
+                row["back_edge_json"] = json.dumps(edge, sort_keys=True, separators=(",", ":"))
+            else:
+                row["back_edge"] = edge
         if stage.max_attempts != DEFAULT_STAGE_ATTEMPTS:
             row["max_attempts"] = validate_stage_attempts(stage.max_attempts)
         if stage.timeout != _DEFAULT_TIMEOUT:
@@ -488,6 +502,10 @@ def create_definition_from_manifest(
     in-use definition does not land disabled under configured Workflows that
     keep firing on a schedule.
     """
+    from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
+
+    if parsed.definition.pattern not in SUPPORTED_EXECUTOR_PATTERNS:
+        raise ManifestError("This workflow pattern has no supported executor", path="workflow.pattern")
     slug = _unique_definition_slug(parsed.definition.slug, organization)
     definition = WorkflowDefinition.objects.create(
         organization=organization,

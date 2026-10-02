@@ -61,12 +61,11 @@ describe("definitionLine", () => {
     expect(merge.kind).toBe("stage");
   });
 
-  it("draws a supervisor_worker definition's fanned stage as a supervisor with its workers", () => {
+  it("does not invent supervisor execution semantics for a legacy label", () => {
     const [sup] = definitionLine({ ...DEF, patternKind: "supervisor_worker" }, [
       stage(0, "agent_dispatch", { role: "route", fanOutCount: 2 }),
     ]).stations;
-    expect(sup.kind).toBe("supervisor");
-    expect(sup.kind === "supervisor" && sup.workers.map((w) => w.busy)).toEqual([false, false]);
+    expect(sup.kind).toBe("fanout");
   });
 
   it("draws a nested workflow stage by its child's slug", () => {
@@ -122,8 +121,22 @@ describe("lineShape", () => {
       stage(2, "human_gate", { onFailure: "retry" }),
       stage(3, "workflow", { workflowRef: "child" }),
     ]);
-    expect(lineShape(line)).toBe("4 stages: fan-out, join, gate, nested workflow, 1 retry");
+    expect(lineShape(line)).toBe("4 stages: fan-out, join, gate, nested workflow");
     expect(lineShape(definitionLine(DEF, []))).toBe("No stages");
     expect(lineShape(definitionLine(DEF, [stage(0, "agent_dispatch")]))).toBe("1 stage");
   });
+});
+
+it("draws the authored earlier-stage return and independent attempt ceiling", () => {
+  const line = definitionLine(DEF, [
+    stage(0, "agent_dispatch", { outputKey: "draft", onFailure: "retry", maxAttempts: 4 }),
+    stage(1, "human_gate", {
+      outputKey: "review",
+      backEdge: { to: "draft", when: "gate_rejected", max_rounds: 5, on_exhausted: "fail" },
+    }),
+  ]);
+  expect(line.loops).toEqual([
+    { id: "s0-retry", from: 0, to: 0, trigger: "failed", maxRounds: 4, kind: "retry" },
+    { id: "review->draft", from: 1, to: 0, trigger: "rejected", maxRounds: 5, kind: "back-edge" },
+  ]);
 });

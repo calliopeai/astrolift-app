@@ -236,3 +236,23 @@ def test_real_pg_repeated_activity_has_one_round_attempt_and_refuses_foreign_sta
         _create_stage_execution_sync(str(run.pk), str(foreign_stage.pk), 1, context)
     with pytest.raises(ValueError):
         _create_stage_execution_sync(str(run.pk), str(stage.pk), 21, context)
+
+
+@pytest.mark.parametrize("value", [None,False,True,0,1.5,"", "null"])
+def test_toml_preserves_typed_scalar_conditions_including_json_null(value):
+    from workflows.manifest import ParsedWorkflowManifest, WorkflowDefSpec, WorkflowStageSpec
+
+    parsed = ParsedWorkflowManifest(
+        definition=WorkflowDefSpec(slug="typed-condition",name="Typed condition",pattern="chained"),
+        stages=[
+            WorkflowStageSpec(order=0,kind="checkpoint",output_key="draft"),
+            WorkflowStageSpec(order=1,kind="checkpoint",output_key="check",back_edge={
+                "to":"draft","when":"output_equals","max_rounds":2,"on_exhausted":"fail",
+                "path":"value","value":value,
+            }),
+        ],
+    )
+    encoded = emit_workflow_manifest(parsed)
+    assert parse_workflow_manifest(encoded) == parsed
+    if value is None:
+        assert "back_edge_json" in encoded

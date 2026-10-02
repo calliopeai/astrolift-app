@@ -42,6 +42,11 @@ export const execution = (
   guid,
   status: "completed",
   attemptNumber: 1,
+  roundNumber: 1,
+  causedBy: null,
+  fanoutIndex: null,
+  fanoutParentExecutionGuid: null,
+  fanoutStageId: null,
   startedAt: at(2),
   endedAt: at(3),
   output: null,
@@ -71,16 +76,25 @@ export const RUN: WorkflowRunSubject = {
 
 export const GATE_EXECUTIONS: WorkflowStageExecution[] = [
   execution("x-research-1", 0, "agent_dispatch", {
+    fanoutIndex: 0,
+    fanoutParentExecutionGuid: "x-research-parent",
+    fanoutStageId: "stage-0",
     executionId: "10",
     startedAt: at(2),
     endedAt: at(4, 10),
   }),
   execution("x-research-2", 0, "agent_dispatch", {
+    fanoutIndex: 1,
+    fanoutParentExecutionGuid: "x-research-parent",
+    fanoutStageId: "stage-0",
     executionId: "11",
     startedAt: at(2, 5),
     endedAt: at(5),
   }),
   execution("x-research-3", 0, "agent_dispatch", {
+    fanoutIndex: 2,
+    fanoutParentExecutionGuid: "x-research-parent",
+    fanoutStageId: "stage-0",
     executionId: "12",
     startedAt: at(2, 10),
     endedAt: at(3, 30),
@@ -177,16 +191,22 @@ export const LOOP_EXECUTIONS: WorkflowStageExecution[] = [
     errorMessage: "3 specs failed in checkout",
   }),
   execution("x-code-2", 0, "agent_dispatch", {
+    roundNumber: 2,
+    causedBy: { edge: "test->code", reason: "stage_failed", maxRounds: 5, edgeRound: 2 },
     executionId: "22",
     startedAt: at(2),
     endedAt: at(3),
   }),
   execution("x-test-2", 1, "agent_dispatch", {
+    roundNumber: 2,
+    causedBy: { edge: "test->code", reason: "stage_failed", maxRounds: 5, edgeRound: 2 },
     executionId: "23",
     startedAt: at(3),
     endedAt: at(4),
   }),
   execution("x-review", 2, "human_gate", {
+    roundNumber: 2,
+    causedBy: { edge: "test->code", reason: "stage_failed", maxRounds: 5, edgeRound: 2 },
     executionId: "24",
     status: "approved",
     startedAt: at(4),
@@ -194,6 +214,8 @@ export const LOOP_EXECUTIONS: WorkflowStageExecution[] = [
     stageRole: "code review",
   }),
   execution("x-deploy", 3, "agent_dispatch", {
+    roundNumber: 2,
+    causedBy: { edge: "test->code", reason: "stage_failed", maxRounds: 5, edgeRound: 2 },
     executionId: "25",
     startedAt: at(5),
     endedAt: at(7),
@@ -214,11 +236,17 @@ export const LOOP_RUN: WorkflowRunSubject = {
 
 export const FAILED_EXECUTIONS: WorkflowStageExecution[] = [
   execution("x-research-1", 0, "agent_dispatch", {
+    fanoutIndex: 0,
+    fanoutParentExecutionGuid: "x-research-parent",
+    fanoutStageId: "stage-0",
     executionId: "30",
     startedAt: at(2),
     endedAt: at(3),
   }),
   execution("x-research-2", 0, "agent_dispatch", {
+    fanoutIndex: 1,
+    fanoutParentExecutionGuid: "x-research-parent",
+    fanoutStageId: "stage-0",
     executionId: "31",
     status: "failed",
     startedAt: at(2),
@@ -226,6 +254,9 @@ export const FAILED_EXECUTIONS: WorkflowStageExecution[] = [
     errorMessage: "Enrichment API returned 429 Too Many Requests",
   }),
   execution("x-research-3", 0, "agent_dispatch", {
+    fanoutIndex: 2,
+    fanoutParentExecutionGuid: "x-research-parent",
+    fanoutStageId: "stage-0",
     executionId: "32",
     startedAt: at(2),
     endedAt: at(4),

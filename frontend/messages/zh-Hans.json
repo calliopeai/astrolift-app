@@ -6987,5 +6987,32 @@
       "stopRefreshFailed": "任务已停止，但无法刷新视图。请刷新以查看最新状态。",
       "dispatchUnconfirmed": "服务器未返回任务 ID。请先检查智能体运行，再决定是否重试。"
     }
+  },
+  "workflowBounds": {
+    "title": "执行上限",
+    "attempts": "最大尝试次数（1–20）",
+    "attemptHint": "包含首次执行。每轮的尝试次数独立重置。",
+    "enable": "返回之前的阶段",
+    "target": "返回目标（输出键）",
+    "trigger": "返回条件",
+    "gate_rejected": "审核者拒绝",
+    "stage_failed": "最后一次尝试失败",
+    "output_equals": "输出字段匹配",
+    "rounds": "最大轮数（1–20）",
+    "exhausted": "达到轮数上限时",
+    "fail": "将工作流标记为失败",
+    "escalate": "请求操作员确认",
+    "path": "输出字段路径",
+    "value": "预期值（JSON 标量）",
+    "invalidValue": "请输入 JSON 字符串、数字、布尔值或 null。",
+    "invalidEdge": "此连接需要在代码视图中编辑后才能运行。",
+    "noTargets": "为之前的阶段设置输出键即可启用返回。",
+    "roundHint": "包含首次执行。重试不会增加轮数。反馈会传回生成阶段。",
+    "invalidCondition": "返回条件必须是有效的 JSON 标量。",
+    "roundBound": "第 {round} 轮，共 {max} 轮",
+    "edgeBound": "第 {edgeRound} 次返回，共 {max} 次",
+    "roundTitle": "第 {round} 轮",
+    "branchStarted": "开始时间：{time}",
+    "max_rounds_exhausted": "已达到轮数上限"
   }
 }

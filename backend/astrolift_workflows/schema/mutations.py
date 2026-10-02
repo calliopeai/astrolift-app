@@ -412,6 +412,13 @@ class WorkflowsMutation:
                 ],
             )
 
+        from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
+
+        if definition.pattern_kind not in SUPPORTED_EXECUTOR_PATTERNS:
+            return CreateWorkflowResult(
+                ok=False, errors=[ValidationError(field="definition_slug", messages=["This workflow pattern has no supported executor"])]
+            )
+
         user = info.context.user
         wf = Workflow(
             organization=org,

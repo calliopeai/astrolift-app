@@ -301,3 +301,22 @@ need an explicit reviewed edge before a new bounded run; the platform `rasd`
 and `moderate` templates now declare three-round review edges.
 `supervisor_worker` and `advisor` are unsupported executor patterns and are
 refused on new runs.
+
+In the Builder's Stages editor, **Execution bounds** separates maximum attempts
+from the return edge's maximum rounds. Give the producer and review stage explicit
+output keys, enable the return, then choose the earlier key and the trigger.
+Output-field conditions accept a JSON string, number, boolean or `null`; invalid
+JSON never submits a stage mutation. The Code view exports the same authored
+limits and return targets. The run timeline uses recorded rounds and causes,
+shows an edge's round ceiling, and exposes branch start times. Reordered stage
+visits or repeated agent names do not establish a loop or branch identity.
+
+New authoring choices exclude `supervisor_worker` and `advisor`; their legacy
+records remain readable. Creating or cloning another definition or configured
+workflow with either unsupported pattern is refused instead of labelling an
+ordinary sequence as a supervisor or advisor implementation.
+
+TOML has no `null` literal. A condition comparing an output field to JSON `null`
+exports as `back_edge_json = '<JSON object>'`; importing that representation
+restores the same typed condition. Supplying both `back_edge` and
+`back_edge_json` is refused. The YAML and GraphQL forms use their native `null`.

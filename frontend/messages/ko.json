@@ -6987,5 +6987,32 @@
       "stopRefreshFailed": "작업은 중지됐지만 화면을 새로 고치지 못했습니다. 새로 고침하여 최신 상태를 확인하세요.",
       "dispatchUnconfirmed": "서버가 작업 ID를 반환하지 않았습니다. 다시 시도하기 전에 에이전트 실행을 확인하세요."
     }
+  },
+  "workflowBounds": {
+    "title": "실행 한도",
+    "attempts": "최대 시도 횟수 (1–20)",
+    "attemptHint": "최초 실행을 포함합니다. 각 라운드에서 시도 횟수가 독립적으로 초기화됩니다.",
+    "enable": "이전 단계로 돌아가기",
+    "target": "반환 대상 (출력 키)",
+    "trigger": "반환 조건",
+    "gate_rejected": "검토자가 거부함",
+    "stage_failed": "최종 시도가 실패함",
+    "output_equals": "출력 필드가 일치함",
+    "rounds": "최대 라운드 수 (1–20)",
+    "exhausted": "라운드 한도 도달 시",
+    "fail": "워크플로 실패 처리",
+    "escalate": "운영자에게 확인",
+    "path": "출력 필드 경로",
+    "value": "예상 값 (JSON 스칼라)",
+    "invalidValue": "JSON 문자열, 숫자, 불리언 또는 null을 입력하세요.",
+    "invalidEdge": "실행하기 전에 코드 보기에서 이 연결을 수정해야 합니다.",
+    "noTargets": "이전 단계에 출력 키를 지정하면 반환 대상을 설정할 수 있습니다.",
+    "roundHint": "첫 실행을 포함합니다. 재시도는 라운드를 추가하지 않습니다. 피드백은 생성 단계로 전달됩니다.",
+    "invalidCondition": "반환 조건은 유효한 JSON 스칼라여야 합니다.",
+    "roundBound": "라운드 {round} / {max}",
+    "edgeBound": "반환 {edgeRound} / {max}",
+    "roundTitle": "라운드 {round}",
+    "branchStarted": "시작: {time}",
+    "max_rounds_exhausted": "라운드 한도에 도달함"
   }
 }

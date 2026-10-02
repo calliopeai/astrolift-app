@@ -89,7 +89,13 @@ class WorkflowStageExecutionType:
     @strawberry_django.field
     def caused_by(self) -> WorkflowLoopCause | None:
         cause = self.caused_by
-        if not cause:
+        if not isinstance(cause, dict) or not {"edge", "reason", "max_rounds", "edge_round"} <= cause.keys():
+            return None
+        if not isinstance(cause["edge"], str) or not isinstance(cause["reason"], str):
+            return None
+        if type(cause["max_rounds"]) is not int or type(cause["edge_round"]) is not int:
+            return None
+        if not 1 <= cause["edge_round"] <= cause["max_rounds"] <= 20:
             return None
         return WorkflowLoopCause(edge=cause["edge"], reason=cause["reason"], max_rounds=cause["max_rounds"], edge_round=cause["edge_round"])
 

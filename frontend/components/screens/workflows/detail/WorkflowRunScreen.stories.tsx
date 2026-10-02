@@ -61,7 +61,7 @@ export const Looped: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByText("Round 2").length).toBeGreaterThan(0);
+    await expect(canvas.getAllByText("Round 2 of 5").length).toBeGreaterThan(0);
     await expect(
       canvas.getAllByText(/tester failed: 3 specs failed in checkout/).length
     ).toBeGreaterThan(0);

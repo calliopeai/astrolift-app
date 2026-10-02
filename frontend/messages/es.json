@@ -6990,5 +6990,32 @@
       "stopRefreshFailed": "La tarea se detuvo, pero no se pudo actualizar la vista. Actualízala para ver su estado actual.",
       "dispatchUnconfirmed": "El servidor no devolvió un ID de tarea. Revisa las ejecuciones del agente antes de intentarlo de nuevo."
     }
+  },
+  "workflowBounds": {
+    "title": "Límites de ejecución",
+    "attempts": "Máximo de intentos (1–20)",
+    "attemptHint": "Incluye el envío inicial. Los intentos se reinician de forma independiente en cada ronda.",
+    "enable": "Volver a una etapa anterior",
+    "target": "Destino de retorno (clave de salida)",
+    "trigger": "Volver cuando",
+    "gate_rejected": "El revisor rechaza",
+    "stage_failed": "Falla el último intento",
+    "output_equals": "Coincide el campo de salida",
+    "rounds": "Máximo de rondas (1–20)",
+    "exhausted": "Al alcanzar el límite de rondas",
+    "fail": "Fallar el flujo",
+    "escalate": "Consultar al operador",
+    "path": "Ruta del campo de salida",
+    "value": "Valor esperado (escalar JSON)",
+    "invalidValue": "Introduce una cadena JSON, número, booleano o null.",
+    "invalidEdge": "Esta conexión necesita editarse en la vista de código antes de ejecutarse.",
+    "noTargets": "Asigna una clave de salida a una etapa anterior para permitir el retorno.",
+    "roundHint": "Incluye la primera pasada. Los reintentos no añaden rondas. Los comentarios vuelven al productor.",
+    "invalidCondition": "La condición de retorno debe ser un escalar JSON válido.",
+    "roundBound": "Ronda {round} de {max}",
+    "edgeBound": "Retorno {edgeRound} de {max}",
+    "roundTitle": "Ronda {round}",
+    "branchStarted": "Inicio: {time}",
+    "max_rounds_exhausted": "Límite de rondas alcanzado"
   }
 }

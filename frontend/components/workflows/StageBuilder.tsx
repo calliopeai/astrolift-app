@@ -56,6 +56,8 @@ import {
   WorkflowIcon,
 } from "lucide-react";
 
+import { BoundedStageOptions } from "./BoundedStageOptions";
+
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -156,6 +158,9 @@ export type StageDraft = {
   fanOutCount: number | null;
   onFailure: string;
   timeoutSeconds: number;
+  maxAttempts?: number;
+  backEdge?: unknown;
+  backEdgeValueJson?: string;
   prompt: string;
   outputKey: string;
   approvers: string[];
@@ -178,6 +183,8 @@ function draftFromStage(stage: WorkflowStage): StageDraft {
     fanOutCount: stage.fanOutCount,
     onFailure: stage.onFailure,
     timeoutSeconds: stage.timeoutSeconds,
+    maxAttempts: stage.maxAttempts ?? 3,
+    backEdge: stage.backEdge ?? {},
     prompt: stage.prompt,
     outputKey: stage.outputKey,
     approvers: parseSkillRefs(stage.approvers),
@@ -196,6 +203,8 @@ function emptyDraft(): StageDraft {
     fanOutCount: null,
     onFailure: "fail",
     timeoutSeconds: 300,
+    maxAttempts: 3,
+    backEdge: {},
     prompt: "",
     outputKey: "",
     approvers: [],
@@ -215,17 +224,24 @@ const PickerOptionsContext = createContext<PickerOptions>({
   skillsLoading: false,
 });
 
+const StageTargetsContext = createContext<WorkflowStage[]>([]);
+
 function StageEditorFields({
   draft,
   onPatch,
   orgScoped,
   disabled,
+  stageOrder = Infinity,
 }: {
+  stageOrder?: number;
   draft: StageDraft;
   onPatch: (patch: Partial<StageDraft>) => void;
   orgScoped: string | null;
   disabled: boolean;
 }) {
+  const previousKeys = useContext(StageTargetsContext)
+    .filter((stage) => stage.order < stageOrder && stage.outputKey)
+    .map((stage) => stage.outputKey);
   const kindMeta = stageKindMeta(draft.kind);
   const options = useContext(PickerOptionsContext);
   return (
@@ -410,25 +426,27 @@ function StageEditorFields({
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">On failure</Label>
-          <Select
-            value={draft.onFailure}
-            onValueChange={(v) => onPatch({ onFailure: v })}
-            disabled={disabled}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ON_FAILURE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {["agent_dispatch", "workflow"].includes(draft.kind) && (
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">On failure</Label>
+            <Select
+              value={draft.onFailure}
+              onValueChange={(v) => onPatch({ onFailure: v })}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ON_FAILURE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs">Timeout (seconds)</Label>
           <Input
@@ -442,6 +460,15 @@ function StageEditorFields({
           />
         </div>
       </div>
+      <BoundedStageOptions
+        kind={draft.kind}
+        maxAttempts={draft.maxAttempts ?? 3}
+        backEdge={draft.backEdge ?? {}}
+        valueJson={draft.backEdgeValueJson}
+        targets={previousKeys}
+        disabled={disabled}
+        onChange={onPatch}
+      />
     </div>
   );
 }
@@ -558,6 +585,7 @@ function StageCard({
             <Separator />
             <StageEditorFields
               draft={draft}
+              stageOrder={stage.order}
               onPatch={(patch) => setDraft((d) => ({ ...d, ...patch }))}
               orgScoped={orgScoped}
               disabled={readOnly || saving}
@@ -927,154 +955,156 @@ export function StageBuilder({
   }
 
   return (
-    <PickerOptionsContext.Provider value={pickerOptions}>
-      <PageShell
-        title={`Builder · ${definition.name}`}
-        description={
-          definition.description || `Ordered stage pipeline (${definition.patternKind}).`
-        }
-        actions={
-          <div className="flex items-center gap-1 rounded-md border p-0.5">
-            {VIEW_OPTIONS.map((opt) => {
-              const OptIcon = opt.icon;
-              return (
-                <Button
-                  key={opt.value}
-                  type="button"
-                  variant={view === opt.value ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 px-2.5"
-                  onClick={() => setView(opt.value)}
-                >
-                  <OptIcon className="mr-1 h-3.5 w-3.5" />
-                  {opt.label}
-                </Button>
-              );
-            })}
-          </div>
-        }
-      >
-        {isGlobal && (
-          <div className="border-info/40 bg-info/10 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3">
-            <div className="flex items-center gap-2 text-sm">
+    <StageTargetsContext.Provider value={sorted}>
+      <PickerOptionsContext.Provider value={pickerOptions}>
+        <PageShell
+          title={`Builder · ${definition.name}`}
+          description={
+            definition.description || `Ordered stage pipeline (${definition.patternKind}).`
+          }
+          actions={
+            <div className="flex items-center gap-1 rounded-md border p-0.5">
+              {VIEW_OPTIONS.map((opt) => {
+                const OptIcon = opt.icon;
+                return (
+                  <Button
+                    key={opt.value}
+                    type="button"
+                    variant={view === opt.value ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 px-2.5"
+                    onClick={() => setView(opt.value)}
+                  >
+                    <OptIcon className="mr-1 h-3.5 w-3.5" />
+                    {opt.label}
+                  </Button>
+                );
+              })}
+            </div>
+          }
+        >
+          {isGlobal && (
+            <div className="border-info/40 bg-info/10 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3">
+              <div className="flex items-center gap-2 text-sm">
+                <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
+                <span>
+                  <span className="font-medium">Platform template</span>, read-only. Clone it to
+                  create an editable copy in your organization.
+                </span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!canCreate || cloning}
+                onClick={handleClone}
+                title={canCreate ? undefined : "You don't have create access"}
+              >
+                {cloning ? (
+                  <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CopyIcon className="mr-1 h-3.5 w-3.5" />
+                )}
+                Clone to edit
+              </Button>
+            </div>
+          )}
+
+          {isSourceManaged && (
+            <div className="border-info/40 bg-info/10 flex items-center gap-2 rounded-md border px-4 py-3 text-sm">
               <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
               <span>
-                <span className="font-medium">Platform template</span>, read-only. Clone it to
-                create an editable copy in your organization.
+                <span className="font-medium">Repository managed</span>: edit{" "}
+                <code>
+                  {definition.sourceRepo}/{definition.sourcePath}
+                </code>{" "}
+                and sync the agent repository.
+                {definition.sourceRef
+                  ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.`
+                  : ""}
               </span>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!canCreate || cloning}
-              onClick={handleClone}
-              title={canCreate ? undefined : "You don't have create access"}
+          )}
+
+          {view === "code" ? (
+            <CodeView slug={slug} canCreate={canCreate} manifest={manifest} />
+          ) : (
+            <Section
+              title="Stages"
+              description="An ordered pipeline: stages run in sequence; fan-out runs parallel copies merged by a later aggregation stage."
+              action={
+                !readOnly && !adding ? (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
+                    <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add stage
+                  </Button>
+                ) : undefined
+              }
             >
-              {cloning ? (
-                <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
+              {stagesLoading && sorted.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2Icon className="text-muted-foreground h-5 w-5 animate-spin" />
+                </div>
+              ) : sorted.length === 0 && !adding ? (
+                <EmptyState
+                  icon={<WorkflowIcon className="size-5" />}
+                  title="No stages yet"
+                  description={
+                    readOnly
+                      ? "This definition has no stages."
+                      : "Add stages to define what this workflow does."
+                  }
+                  secondary={
+                    !readOnly ? (
+                      <Button size="sm" onClick={() => setAdding(true)}>
+                        <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add first stage
+                      </Button>
+                    ) : undefined
+                  }
+                />
               ) : (
-                <CopyIcon className="mr-1 h-3.5 w-3.5" />
+                <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  {line && (
+                    <WorkflowView
+                      snapshot={definitionSnapshot(line)}
+                      title="Shape"
+                      description={`${lineShape(line)}. Pick a station to open its stage.`}
+                      onSelectStation={(_, stationId) => setOpenGuid(stationId)}
+                      className="min-w-0 self-start xl:sticky xl:top-4"
+                    />
+                  )}
+                  <ol className="flex min-w-0 flex-col gap-3" aria-label="Stages">
+                    {sorted.map((stage, index) => (
+                      <li key={stage.guid} className="min-w-0">
+                        <StageCard
+                          stage={stage}
+                          index={index}
+                          total={sorted.length}
+                          orgScoped={orgId}
+                          readOnly={readOnly}
+                          expanded={openGuid === stage.guid}
+                          saving={busyGuid === stage.guid}
+                          onToggle={toggleExpanded}
+                          onSave={handleSaveStage}
+                          onDelete={handleDeleteStage}
+                          onMove={handleMoveStage}
+                        />
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               )}
-              Clone to edit
-            </Button>
-          </div>
-        )}
 
-        {isSourceManaged && (
-          <div className="border-info/40 bg-info/10 flex items-center gap-2 rounded-md border px-4 py-3 text-sm">
-            <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
-            <span>
-              <span className="font-medium">Repository managed</span>: edit{" "}
-              <code>
-                {definition.sourceRepo}/{definition.sourcePath}
-              </code>{" "}
-              and sync the agent repository.
-              {definition.sourceRef
-                ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.`
-                : ""}
-            </span>
-          </div>
-        )}
-
-        {view === "code" ? (
-          <CodeView slug={slug} canCreate={canCreate} manifest={manifest} />
-        ) : (
-          <Section
-            title="Stages"
-            description="An ordered pipeline: stages run in sequence; fan-out runs parallel copies merged by a later aggregation stage."
-            action={
-              !readOnly && !adding ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
-                  <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add stage
-                </Button>
-              ) : undefined
-            }
-          >
-            {stagesLoading && sorted.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2Icon className="text-muted-foreground h-5 w-5 animate-spin" />
-              </div>
-            ) : sorted.length === 0 && !adding ? (
-              <EmptyState
-                icon={<WorkflowIcon className="size-5" />}
-                title="No stages yet"
-                description={
-                  readOnly
-                    ? "This definition has no stages."
-                    : "Add stages to define what this workflow does."
-                }
-                secondary={
-                  !readOnly ? (
-                    <Button size="sm" onClick={() => setAdding(true)}>
-                      <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add first stage
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                {line && (
-                  <WorkflowView
-                    snapshot={definitionSnapshot(line)}
-                    title="Shape"
-                    description={`${lineShape(line)}. Pick a station to open its stage.`}
-                    onSelectStation={(_, stationId) => setOpenGuid(stationId)}
-                    className="min-w-0 self-start xl:sticky xl:top-4"
-                  />
-                )}
-                <ol className="flex min-w-0 flex-col gap-3" aria-label="Stages">
-                  {sorted.map((stage, index) => (
-                    <li key={stage.guid} className="min-w-0">
-                      <StageCard
-                        stage={stage}
-                        index={index}
-                        total={sorted.length}
-                        orgScoped={orgId}
-                        readOnly={readOnly}
-                        expanded={openGuid === stage.guid}
-                        saving={busyGuid === stage.guid}
-                        onToggle={toggleExpanded}
-                        onSave={handleSaveStage}
-                        onDelete={handleDeleteStage}
-                        onMove={handleMoveStage}
-                      />
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
-
-            {adding && (
-              <AddStageCard
-                orgScoped={orgId}
-                creating={creating}
-                onCreate={handleCreateStage}
-                onCancel={() => setAdding(false)}
-              />
-            )}
-          </Section>
-        )}
-      </PageShell>
-    </PickerOptionsContext.Provider>
+              {adding && (
+                <AddStageCard
+                  orgScoped={orgId}
+                  creating={creating}
+                  onCreate={handleCreateStage}
+                  onCancel={() => setAdding(false)}
+                />
+              )}
+            </Section>
+          )}
+        </PageShell>
+      </PickerOptionsContext.Provider>
+    </StageTargetsContext.Provider>
   );
 }

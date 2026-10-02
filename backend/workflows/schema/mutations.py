@@ -975,6 +975,13 @@ class Mutation:
                 ],
             )
 
+        from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
+
+        if source.pattern_kind not in SUPPORTED_EXECUTOR_PATTERNS:
+            return CloneWorkflowDefinitionResult(
+                ok=False, errors=[GQLValidationError(field="pattern_kind", messages=["This workflow pattern has no supported executor"])]
+            )
+
         new_slug = _unique_clone_slug(source.slug, org)
         same_org = source.organization_id == org.pk
         with transaction.atomic():

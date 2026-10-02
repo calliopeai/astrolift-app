@@ -6987,5 +6987,32 @@
       "stopRefreshFailed": "A tarefa foi parada, mas não foi possível atualizar a tela. Atualize-a para ver o estado atual.",
       "dispatchUnconfirmed": "O servidor não retornou um ID de tarefa. Verifique as execuções do agente antes de tentar novamente."
     }
+  },
+  "workflowBounds": {
+    "title": "Limites de execução",
+    "attempts": "Máximo de tentativas (1–20)",
+    "attemptHint": "Inclui o envio inicial. As tentativas reiniciam de forma independente em cada rodada.",
+    "enable": "Voltar a uma etapa anterior",
+    "target": "Destino do retorno (chave de saída)",
+    "trigger": "Voltar quando",
+    "gate_rejected": "O revisor rejeita",
+    "stage_failed": "A última tentativa falha",
+    "output_equals": "O campo de saída corresponde",
+    "rounds": "Máximo de rodadas (1–20)",
+    "exhausted": "No limite de rodadas",
+    "fail": "Falhar o fluxo",
+    "escalate": "Consultar o operador",
+    "path": "Caminho do campo de saída",
+    "value": "Valor esperado (escalar JSON)",
+    "invalidValue": "Informe uma string JSON, número, booleano ou null.",
+    "invalidEdge": "Esta conexão precisa ser editada na visualização de código antes de executar.",
+    "noTargets": "Atribua uma chave de saída a uma etapa anterior para permitir o retorno.",
+    "roundHint": "Inclui a primeira passagem. As novas tentativas não adicionam rodadas. O feedback volta ao produtor.",
+    "invalidCondition": "A condição de retorno deve ser um escalar JSON válido.",
+    "roundBound": "Rodada {round} de {max}",
+    "edgeBound": "Retorno {edgeRound} de {max}",
+    "roundTitle": "Rodada {round}",
+    "branchStarted": "Início: {time}",
+    "max_rounds_exhausted": "Limite de rodadas atingido"
   }
 }

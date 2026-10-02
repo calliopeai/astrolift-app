@@ -3,12 +3,11 @@
  * grouped by round with fan-out branches, the log, the replay scrubber's
  * timeline and the workflow view's snapshot. Pure.
  *
- * The backend reports stage executions, not rounds or branches, so both are
- * derived here: executions are taken in start order, one at an earlier stage
- * than the round already reached opens the next round (a loop sent work
- * back), a second attempt at the same stage is a retry, and the executions
- * of a fan-out stage within a round are its branches.
+ * Round, attempt, return cause and branch identity are server metadata.
+ * Older rows cannot establish those identities by start order or stage names.
  */
+import { definitionLine } from "@/components/workflows/definition-line";
+
 import type { LogLine } from "@/components/run/LogView";
 import {
   outcomeOf,
@@ -115,7 +114,8 @@ export function definitionRunSubject(run: WorkflowDefinitionRun): WorkflowRunSub
 export type PlanStage = Pick<
   WorkflowTopologyStage,
   "order" | "kind" | "role" | "agentName" | "workflowRef" | "fanOutCount" | "fanOutDynamic"
->;
+> &
+  Partial<Pick<WorkflowTopologyStage, "outputKey" | "backEdge" | "maxAttempts" | "onFailure">>;
 
 export type ExecState = "pending" | "running" | "waiting" | "ok" | "failed" | "skipped";
 
@@ -128,7 +128,7 @@ export interface PlacedExecution {
   /** A fan-out's branch: which one, 1-based. */
   branch: number | null;
   /** Why this execution happened again: the loop or retry, in words. */
-  causedBy: { loopId: string; reason: string } | null;
+  causedBy: { loopId: string; reason: string; maxRounds: number; edgeRound: number } | null;
 }
 
 function humanize(kind: string): string {
@@ -204,41 +204,32 @@ export function placeExecutions(
 ): PlacedExecution[] {
   const stages = planByOrder(plan);
   const out: PlacedExecution[] = [];
-  const branches = new Map<string, number>();
-  let round = 1;
-  let reached = -1;
   for (const x of [...executions].sort(byStart)) {
     const def = stages.get(x.stageOrder) ?? null;
-    const fan = isFan(def);
-    const prev = out[out.length - 1] ?? null;
-    let causedBy: PlacedExecution["causedBy"] = null;
-    if (x.stageOrder < reached) {
-      round += 1;
-      reached = -1;
-      const why = prev
-        ? `${prev.name} ${STATE_WORD[prev.state]}${prev.execution.errorMessage ? `: ${prev.execution.errorMessage}` : ""}`
-        : "Sent back";
-      causedBy = {
-        loopId: `back:${prev?.execution.stageOrder ?? "?"}->${x.stageOrder}`,
-        reason: why,
-      };
-    } else if (x.attemptNumber > 1) {
-      const failed = [...out]
-        .reverse()
-        .find((p) => p.round === round && p.execution.stageOrder === x.stageOrder);
-      const err = failed?.execution.errorMessage;
-      causedBy = {
-        loopId: `retry:${x.stageOrder}`,
-        reason: `Attempt ${x.attemptNumber}${err ? ` after: ${err}` : ""}`,
-      };
-    }
-    reached = Math.max(reached, x.stageOrder);
-    let branch: number | null = null;
-    if (fan) {
-      const key = `${round}:${x.stageOrder}`;
-      branch = (branches.get(key) ?? 0) + 1;
-      branches.set(key, branch);
-    }
+    const round = Number.isInteger(x.roundNumber) && (x.roundNumber ?? 0) > 0 ? x.roundNumber! : 1;
+    const cause = x.causedBy;
+    const causedBy: PlacedExecution["causedBy"] =
+      cause &&
+      Number.isInteger(cause.maxRounds) &&
+      cause.maxRounds > 0 &&
+      Number.isInteger(cause.edgeRound) &&
+      cause.edgeRound > 0 &&
+      cause.edgeRound <= cause.maxRounds
+        ? {
+            loopId: cause.edge,
+            reason: cause.reason,
+            maxRounds: cause.maxRounds,
+            edgeRound: cause.edgeRound,
+          }
+        : null;
+    const branch =
+      x.fanoutParentExecutionGuid &&
+      x.fanoutStageId === x.stageGuid &&
+      Number.isInteger(x.fanoutIndex) &&
+      (x.fanoutIndex ?? -1) >= 0 &&
+      (x.fanoutIndex ?? 50) < 50
+        ? x.fanoutIndex! + 1
+        : null;
     out.push({
       execution: x,
       name: stageName(def, x),
@@ -258,6 +249,7 @@ export function placeExecutions(
 
 export interface RunBranchItem {
   id: string;
+  startedAt: string | null;
   label: string;
   state: ExecState;
   durationMs: number | null;
@@ -287,6 +279,8 @@ export interface RunStepItem {
 
 export interface RunRound {
   round: number;
+  maxRounds?: number;
+  edgeRound?: number;
   /** What sent the run into this round. Null for the first. */
   cause: string | null;
   state: ExecState;
@@ -335,13 +329,20 @@ export function runRounds(
   for (const p of placed) {
     let r = rounds[rounds.length - 1];
     if (!r || r.round !== p.round) {
-      r = { round: p.round, cause: p.causedBy?.reason ?? null, state: "ok", items: [] };
+      r = {
+        round: p.round,
+        maxRounds: p.causedBy?.maxRounds,
+        edgeRound: p.causedBy?.edgeRound,
+        cause: p.causedBy?.reason ?? null,
+        state: "ok",
+        items: [],
+      };
       rounds.push(r);
     }
     const x = p.execution;
     const def = stages.get(x.stageOrder) ?? null;
     if (p.branch !== null) {
-      const id = `r${p.round}:o${x.stageOrder}`;
+      const id = x.fanoutParentExecutionGuid!;
       let item = r.items.find((i) => i.id === id);
       if (!item) {
         item = {
@@ -362,7 +363,8 @@ export function runRounds(
       }
       item.branches.push({
         id: x.guid,
-        label: `Branch ${p.branch}`,
+        label: `Branch ${p.branch}${p.attempt > 1 ? ` · attempt ${p.attempt}` : ""}`,
+        startedAt: x.startedAt,
         state: p.state,
         durationMs: spanOf(x, now),
         error: x.errorMessage || null,
@@ -389,7 +391,7 @@ export function runRounds(
   const branchesOf = new Map<string, WorkflowStageExecution[]>();
   for (const p of placed)
     if (p.branch !== null) {
-      const id = `r${p.round}:o${p.execution.stageOrder}`;
+      const id = p.execution.fanoutParentExecutionGuid!;
       branchesOf.set(id, [...(branchesOf.get(id) ?? []), p.execution]);
     }
   for (const r of rounds)
@@ -540,7 +542,7 @@ export function runReplayTimeline(
     const end = ms(x.endedAt);
     const def = stages.get(x.stageOrder) ?? null;
     if (p.branch !== null) {
-      const key = `r${p.round}:o${x.stageOrder}`;
+      const key = x.fanoutParentExecutionGuid!;
       let span = fanSpans.get(key);
       if (!span) {
         span = {
@@ -588,7 +590,7 @@ export function runReplayTimeline(
   // A fan-out span takes its branches' worst status.
   for (const [key, span] of fanSpans) {
     const states = placed
-      .filter((p) => p.branch !== null && `r${p.round}:o${p.execution.stageOrder}` === key)
+      .filter((p) => p.branch !== null && p.execution.fanoutParentExecutionGuid === key)
       .map((p) => p.state);
     span.status = REPLAY_STATUS[worstState(states)];
   }
@@ -671,7 +673,15 @@ export function workflowLine(
       stations.push({ id, name: stageName(s), kind: isGateKind(s.kind) ? "gate" : "stage" });
     }
   });
-  return { id: lineId, name, stations };
+  const authored = definitionLine(
+    { slug: lineId, name, patternKind: "chained" },
+    plan.map((stage) => ({
+      ...stage,
+      guid: `${lineId}:o${stage.order}`,
+      onFailure: stage.onFailure ?? "fail",
+    }))
+  );
+  return { id: lineId, name, stations, ...(authored.loops ? { loops: authored.loops } : {}) };
 }
 
 const trainLabel = (guid: string) => `run ${guid.slice(0, 8)}`;
@@ -697,7 +707,7 @@ export function runSnapshot(
       ? null
       : xs.map((p) => ({
           id: p.execution.guid,
-          label: `Branch ${p.branch}`,
+          label: `Branch ${p.branch}${p.attempt > 1 ? ` · attempt ${p.attempt}` : ""}`,
           state: BRANCH_STATE[p.state],
         }));
   };

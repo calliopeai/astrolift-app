@@ -67,6 +67,8 @@ const DEFINITION_SUMMARY_FIELDS = `
     fanOutCount
     fanOutDynamic
     onFailure
+    maxAttempts
+    backEdge
     timeoutSeconds
   }
   createdAt
@@ -86,6 +88,8 @@ const STAGE_FIELDS = `
   skillRefs
   fanOutCount
   onFailure
+  maxAttempts
+  backEdge
   timeoutSeconds
   createdAt
   agentDefinitionGuid
@@ -221,6 +225,16 @@ export const LIST_WORKFLOW_STAGE_EXECUTIONS = gql`
       guid
       status
       attemptNumber
+      roundNumber
+      causedBy {
+        edge
+        reason
+        maxRounds
+        edgeRound
+      }
+      fanoutStageId
+      fanoutParentExecutionGuid
+      fanoutIndex
       startedAt
       endedAt
       output
@@ -277,6 +291,8 @@ export const PREVIEW_WORKFLOW_MANIFEST = gql`
         environmentSpecSlug
         skills
         onFailure
+        maxAttempts
+        backEdge
         timeout
         fanOut
         prompt
