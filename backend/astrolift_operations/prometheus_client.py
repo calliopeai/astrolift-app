@@ -430,6 +430,12 @@ def query_range(
     payload = _request_json(
         url, timeout=timeout, auth=auth, max_response_bytes=max_response_bytes, **request_options
     )
+    # A successful response can still describe a partial/uncertain query.
+    # Strict evidence must be complete; preserve the legacy non-strict path.
+    if strict and "warnings" in payload:
+        warnings = payload["warnings"]
+        if not isinstance(warnings, list) or warnings:
+            raise PrometheusQueryError("prometheus response completeness is uncertain")
     data = payload.get("data") or {}
     if not isinstance(data, Mapping):
         raise PrometheusQueryError("matrix data is not an object")
