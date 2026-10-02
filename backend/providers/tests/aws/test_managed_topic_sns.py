@@ -226,11 +226,13 @@ def test_invalid_topic_configuration_is_rejected(driver_type, config, message):
 def test_update_reconciles_existing_subscription_and_prunes_only_when_requested():
     existing = [
         {
+            "TopicArn": TOPIC_ARN,
             "Protocol": "sqs",
             "Endpoint": "arn:aws:sqs:us-west-2:123456789012:keep",
             "SubscriptionArn": f"{TOPIC_ARN}:keep-id",
         },
         {
+            "TopicArn": TOPIC_ARN,
             "Protocol": "https",
             "Endpoint": "https://old.example.com/hook",
             "SubscriptionArn": f"{TOPIC_ARN}:old-id",

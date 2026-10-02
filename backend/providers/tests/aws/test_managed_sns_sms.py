@@ -155,8 +155,18 @@ def _spec(config: dict | None = None) -> ProvisionSpec:
         config={} if config is None else config,
         tags={"owner": "support"},
         binding_id="binding-id",
-        managed_service_id="service-id",
+        managed_service_id="11111111-1111-4111-8111-111111111111",
     )
+
+
+def _update_spec(*args, **kwargs):
+    kwargs.setdefault("managed_service_id", "11111111-1111-4111-8111-111111111111")
+    return UpdateSpec(*args, **kwargs)
+
+
+def _deprovision_spec(*args, **kwargs):
+    kwargs.setdefault("managed_service_id", "11111111-1111-4111-8111-111111111111")
+    return DeprovisionSpec(*args, **kwargs)
 
 
 def _arn(result) -> str:
@@ -245,7 +255,7 @@ def test_phone_subscriptions_are_idempotent_and_pruned_declaratively() -> None:
     assert sns.names().count("create_topic") == 1
     assert sns.names().count("subscribe") == 2
     updated = driver.update(
-        UpdateSpec(first.handle, config={"phone_numbers": ["+12065550102", "+12065550103"]}),
+        _update_spec(first.handle, config={"phone_numbers": ["+12065550102", "+12065550103"]}),
     )
     assert updated.ok
     endpoints = {item["Endpoint"] for item in sns.subscriptions[_arn(first)]}
@@ -257,7 +267,7 @@ def test_phone_subscription_pruning_can_be_disabled() -> None:
     driver, sns = _driver()
     result = driver.provision(_spec({"phone_numbers": ["+12065550101"]}))
     updated = driver.update(
-        UpdateSpec(result.handle, config={"phone_numbers": [], "prune_phone_numbers": False}),
+        _update_spec(result.handle, config={"phone_numbers": [], "prune_phone_numbers": False}),
     )
     assert updated.ok and sns.subscriptions[_arn(result)]
     assert "unsubscribe" not in sns.names()
@@ -266,7 +276,7 @@ def test_phone_subscription_pruning_can_be_disabled() -> None:
 def test_topic_name_is_immutable_on_update() -> None:
     driver, _ = _driver()
     result = driver.provision(_spec({"topic_name": "sms-alerts"}))
-    updated = driver.update(UpdateSpec(result.handle, config={"topic_name": "renamed"}))
+    updated = driver.update(_update_spec(result.handle, config={"topic_name": "renamed"}))
     assert not updated.ok and updated.errors == ["immutable_topic_name"]
 
 
@@ -283,11 +293,11 @@ def test_foreign_handle_cannot_be_updated_bound_or_deleted() -> None:
     driver, sns = _driver()
     arn = sns.seed("foreign")
     handle = f"sms/{arn}"
-    updated = driver.update(UpdateSpec(handle, config={}))
+    updated = driver.update(_update_spec(handle, config={}))
     assert not updated.ok and "foreign" in updated.message
     with pytest.raises(Exception, match="foreign"):
         driver.binding(ServiceHandle(handle))
-    deleted = driver.deprovision(DeprovisionSpec(handle, {}), force_destroy=True)
+    deleted = driver.deprovision(_deprovision_spec(handle, {}), force_destroy=True)
     assert not deleted.ok and arn in sns.topics
 
 
@@ -312,11 +322,11 @@ def test_sandbox_read_permission_is_optional_and_reported_unknown() -> None:
 def test_deprovision_is_protected_idempotent_and_forceable() -> None:
     driver, sns = _driver()
     result = driver.provision(_spec())
-    protected = driver.deprovision(DeprovisionSpec(result.handle, {}))
+    protected = driver.deprovision(_deprovision_spec(result.handle, {}))
     assert not protected.ok and protected.retryable is False
-    deleted = driver.deprovision(DeprovisionSpec(result.handle, {}), force_destroy=True)
+    deleted = driver.deprovision(_deprovision_spec(result.handle, {}), force_destroy=True)
     assert deleted.ok and sns.topics == {}
-    again = driver.deprovision(DeprovisionSpec(result.handle, {}), force_destroy=True)
+    again = driver.deprovision(_deprovision_spec(result.handle, {}), force_destroy=True)
     assert again.ok and "already gone" in again.message
 
 
@@ -332,7 +342,7 @@ def test_explicit_null_policies_clear_to_safe_provider_defaults() -> None:
         _spec({"topic_policy": {"Version": "2012-10-17"}, "data_protection_policy": {"Name": "audit"}}),
     )
     updated = driver.update(
-        UpdateSpec(result.handle, config={"topic_policy": None, "data_protection_policy": None}),
+        _update_spec(result.handle, config={"topic_policy": None, "data_protection_policy": None}),
     )
     assert updated.ok
     arn = _arn(result)
@@ -398,8 +408,8 @@ def test_native_requests_match_current_botocore_shapes() -> None:
     result = driver.provision(_spec(config))
     assert result.ok
     assert driver.provision(_spec(config)).ok
-    assert driver.update(UpdateSpec(result.handle, config={**config, "phone_numbers": []})).ok
-    assert driver.deprovision(DeprovisionSpec(result.handle, {}), force_destroy=True).ok
+    assert driver.update(_update_spec(result.handle, config={**config, "phone_numbers": []})).ok
+    assert driver.deprovision(_deprovision_spec(result.handle, {}), force_destroy=True).ok
     model = Session().get_service_model("sns")
     for method, operation in {
         "create_topic": "CreateTopic",
