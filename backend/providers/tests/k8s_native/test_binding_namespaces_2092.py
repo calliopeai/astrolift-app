@@ -24,6 +24,9 @@ class RecordingCluster:
     def get_object(self, *args):
         return None
 
+    def get_manifest(self, *args):
+        return None
+
     def apply_manifests(self, cluster, namespace, manifests, **kwargs):
         self.applies.append((cluster, namespace, manifests))
         return ApplyResult(created=[], updated=[], unchanged=[], errors=[])
@@ -47,6 +50,7 @@ def test_recording_provision_and_binding_use_the_same_namespace(driver_cls, conf
     if hasattr(config, "namespace"):
         config = replace(config, namespace="operator-service-namespace")
     spec = ProvisionSpec(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="organization-a",
         organization_slug="acme",
         app_id="app-a",

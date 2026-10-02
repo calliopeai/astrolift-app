@@ -279,7 +279,9 @@ def _recorded_handle_exclusive(svc: Any, *, resolved: Any, cfg: Any) -> bool:
 
     Scoped the way a GCP handle is. A handle names a resource inside one project,
     so another row counts only when it resolves to the same driver in the same
-    project. Established for GCP drivers only, the ones that read it; ``False``
+    project. Kubernetes locators already carry the immutable cluster and namespace,
+    so their namespace/name must be unique across live rows, including alternate
+    registrations of the same physical cluster. ``False``
     elsewhere means "not established". A row that cannot be placed counts against
     exclusivity, because unknown is not unique.
     """
@@ -288,6 +290,25 @@ def _recorded_handle_exclusive(svc: Any, *, resolved: Any, cfg: Any) -> bool:
     from core.cluster_observability import managed_config_for
 
     handle = str(svc.backend_ref or "")
+    if resolved.plugin_slug == "k8s_native" and handle:
+        from k8s_native.managed._handle import unpack
+
+        try:
+            locator = unpack(handle)
+        except ValueError:
+            return False
+        cluster = _service_cluster(svc)
+        if locator.is_legacy or cluster is None or locator.cluster_id != str(cluster.guid):
+            return False
+        return (
+            not ManagedService.objects.filter(
+                kind=svc.kind,
+                backend_ref__endswith=f"/{locator.namespace}/{locator.name}",
+                deleted_at__isnull=True,
+            )
+            .exclude(pk=svc.pk)
+            .exists()
+        )
     project = str(getattr(cfg, "project_id", "") or "")
     if not handle or not project or resolved.plugin_slug != "gcp":
         return False

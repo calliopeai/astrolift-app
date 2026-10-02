@@ -22,6 +22,7 @@ from k8s_native.managed.redis_operator import (
 
 def _spec(**overrides) -> ProvisionSpec:
     base = dict(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="1",
         organization_slug="acme",
         app_id="1",
@@ -49,6 +50,7 @@ def test_cnpg_provision_renders_cluster_crd() -> None:
 
 def test_cnpg_size_translates_to_instances() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=["Cluster/api-prod-db"],
         updated=[],
@@ -69,6 +71,7 @@ def test_cnpg_size_translates_to_instances() -> None:
 
 def test_cnpg_extensions_in_post_init_sql() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=[],
         updated=[],
@@ -90,6 +93,7 @@ def test_cnpg_extensions_in_post_init_sql() -> None:
 
 def test_cnpg_storage_class_config_threaded() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=[],
         updated=[],
@@ -146,6 +150,7 @@ def test_cnpg_binding_emits_the_canonical_postgres_envelope() -> None:
 
 def test_cnpg_provision_failure_propagates() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=[],
         updated=[],
@@ -166,6 +171,7 @@ def test_cnpg_provision_failure_propagates() -> None:
 
 def test_redis_provision_single_instance_for_small() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=[],
         updated=[],
@@ -186,6 +192,7 @@ def test_redis_provision_single_instance_for_small() -> None:
 
 def test_redis_provision_replicated_for_medium() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=[],
         updated=[],
@@ -206,6 +213,7 @@ def test_redis_provision_replicated_for_medium() -> None:
 
 def test_redis_persistent_storage_block() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=[],
         updated=[],
@@ -226,6 +234,7 @@ def test_redis_persistent_storage_block() -> None:
 
 def test_redis_cache_mode_no_storage() -> None:
     cluster_driver = MagicMock()
+    cluster_driver.get_manifest.return_value = None
     cluster_driver.apply_manifests.return_value = ApplyResult(
         created=[],
         updated=[],
