@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { vncProps } from "./agents-list.fixtures";
@@ -15,4 +19,19 @@ export const On: Story = { render: () => <VncSessionSectionView {...vncProps({ v
 /** A write in flight: the switch is disabled (the loading state). */
 export const Saving: Story = {
   render: () => <VncSessionSectionView {...vncProps({ vncOn: true, vncBusy: true })} />,
+};
+
+export const FrenchOff: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <VncSessionSectionView {...vncProps()} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseSaving: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <VncSessionSectionView {...vncProps({ vncOn: true, vncBusy: true })} />
+    </NextIntlClientProvider>
+  ),
 };

@@ -7292,5 +7292,32 @@
     "python_fn": "Función de Python",
     "http_endpoint": "Endpoint HTTP",
     "mcp_server": "Servidor MCP"
+  },
+  "agentModelAccess": {
+    "title": "Acceso al modelo",
+    "description": "Cómo se autentica este agente ante su proveedor de modelos.",
+    "liveTitle": "Sesión en directo",
+    "liveDescription": "Si este agente se ejecuta en un escritorio VNC visible o sin interfaz gráfica.",
+    "noSpec": "No hay ninguna especificación de entorno registrada para este agente.",
+    "readFailed": "No se pudieron cargar las especificaciones de entorno.",
+    "retry": "Reintentar",
+    "modelLabel": "Usar el modelo nativo del clúster (Bedrock / Vertex)",
+    "modelDescription": "Ejecuta este agente con el proveedor de modelos en la nube del clúster mediante la identidad de la carga de trabajo, en lugar de una clave de API.",
+    "modelEnable": "Activar el modelo nativo del clúster",
+    "modelDisable": "Desactivar el modelo nativo del clúster",
+    "on": "Activado",
+    "off": "Desactivado",
+    "modelSavedOn": "Usando el modelo nativo del clúster",
+    "modelSavedOff": "Usando una clave de API para acceder al modelo",
+    "modelUpdateFailed": "No se pudo actualizar el origen del modelo: {reason}",
+    "vncLabel": "Sesión VNC en directo (visible)",
+    "vncDescription": "Ejecuta este agente con una imagen VNC visible para observar la sesión de escritorio en directo. Consume recursos adicionales; desactívala para las ejecuciones sin interfaz gráfica, que transmiten registros.",
+    "vncEnable": "Activar la sesión VNC en directo",
+    "vncDisable": "Desactivar la sesión VNC en directo",
+    "vncSavedOn": "VNC visible activado",
+    "vncSavedOff": "VNC visible desactivado",
+    "vncUpdateFailed": "No se pudo actualizar la sesión en directo: {reason}",
+    "unknownError": "Error desconocido",
+    "updateUnconfirmed": "No se confirmó la actualización de la especificación de entorno seleccionada. Actualiza su configuración antes de volver a intentarlo."
   }
 }

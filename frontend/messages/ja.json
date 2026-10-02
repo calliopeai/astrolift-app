@@ -7289,5 +7289,32 @@
     "python_fn": "Python 関数",
     "http_endpoint": "HTTP エンドポイント",
     "mcp_server": "MCP サーバー"
+  },
+  "agentModelAccess": {
+    "title": "モデルへのアクセス",
+    "description": "このエージェントがモデルプロバイダーに認証する方法です。",
+    "liveTitle": "ライブセッション",
+    "liveDescription": "表示可能な VNC デスクトップで実行するか、画面なしで実行するかを設定します。",
+    "noSpec": "このエージェントには環境仕様が登録されていません。",
+    "readFailed": "環境仕様を読み込めませんでした。",
+    "retry": "再試行",
+    "modelLabel": "クラスターのネイティブモデルを使用（Bedrock / Vertex）",
+    "modelDescription": "API キーの代わりにワークロード ID を使用し、クラスターのクラウドモデルプロバイダーでこのエージェントを実行します。",
+    "modelEnable": "クラスターのネイティブモデルを有効にする",
+    "modelDisable": "クラスターのネイティブモデルを無効にする",
+    "on": "オン",
+    "off": "オフ",
+    "modelSavedOn": "クラスターのネイティブモデルを使用しています",
+    "modelSavedOff": "モデルへのアクセスに API キーを使用しています",
+    "modelUpdateFailed": "モデルの接続先を更新できませんでした：{reason}",
+    "vncLabel": "ライブ VNC セッション（表示可能）",
+    "vncDescription": "表示可能な VNC イメージで実行すると、デスクトップをライブで確認できます。追加のリソースが必要なため、画面なしでログを配信する実行ではオフにしてください。",
+    "vncEnable": "ライブ VNC セッションを有効にする",
+    "vncDisable": "ライブ VNC セッションを無効にする",
+    "vncSavedOn": "表示可能な VNC をオンにしました",
+    "vncSavedOff": "表示可能な VNC をオフにしました",
+    "vncUpdateFailed": "ライブセッションを更新できませんでした：{reason}",
+    "unknownError": "不明なエラー",
+    "updateUnconfirmed": "選択した環境仕様の更新を確認できませんでした。再試行する前に設定を再読み込みしてください。"
   }
 }

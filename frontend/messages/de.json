@@ -7292,5 +7292,32 @@
     "python_fn": "Python-Funktion",
     "http_endpoint": "HTTP-Endpunkt",
     "mcp_server": "MCP-Server"
+  },
+  "agentModelAccess": {
+    "title": "Modellzugriff",
+    "description": "Wie sich dieser Agent bei seinem Modellanbieter authentifiziert.",
+    "liveTitle": "Live-Sitzung",
+    "liveDescription": "Ob dieser Agent auf einem sichtbaren VNC-Desktop oder ohne grafische Oberfläche läuft.",
+    "noSpec": "Für diesen Agent ist keine Umgebungsspezifikation registriert.",
+    "readFailed": "Die Umgebungsspezifikationen konnten nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "modelLabel": "Cluster-natives Modell verwenden (Bedrock / Vertex)",
+    "modelDescription": "Führen Sie diesen Agent über die Workload-Identität beim Cloud-Modellanbieter des Clusters aus, statt einen API-Schlüssel zu verwenden.",
+    "modelEnable": "Cluster-natives Modell aktivieren",
+    "modelDisable": "Cluster-natives Modell deaktivieren",
+    "on": "An",
+    "off": "Aus",
+    "modelSavedOn": "Cluster-natives Modell wird verwendet",
+    "modelSavedOff": "API-Schlüssel für den Modellzugriff wird verwendet",
+    "modelUpdateFailed": "Modellquelle konnte nicht aktualisiert werden: {reason}",
+    "vncLabel": "Live-VNC-Sitzung (sichtbar)",
+    "vncDescription": "Führen Sie diesen Agent auf einem VNC-Image aus, um den Desktop live zu beobachten. Das benötigt zusätzliche Ressourcen. Lassen Sie die Option für Ausführungen ohne grafische Oberfläche aus; diese übertragen stattdessen Protokolle.",
+    "vncEnable": "Live-VNC-Sitzung aktivieren",
+    "vncDisable": "Live-VNC-Sitzung deaktivieren",
+    "vncSavedOn": "Sichtbares VNC an",
+    "vncSavedOff": "Sichtbares VNC aus",
+    "vncUpdateFailed": "Live-Sitzung konnte nicht aktualisiert werden: {reason}",
+    "unknownError": "Unbekannter Fehler",
+    "updateUnconfirmed": "Die Änderung für die ausgewählte Umgebungsspezifikation wurde nicht bestätigt. Aktualisieren Sie deren Einstellungen, bevor Sie es erneut versuchen."
   }
 }

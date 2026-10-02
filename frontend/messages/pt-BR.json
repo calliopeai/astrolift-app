@@ -7289,5 +7289,32 @@
     "python_fn": "Função Python",
     "http_endpoint": "Endpoint HTTP",
     "mcp_server": "Servidor MCP"
+  },
+  "agentModelAccess": {
+    "title": "Acesso ao modelo",
+    "description": "Como este agente se autentica no provedor de modelos.",
+    "liveTitle": "Sessão ao vivo",
+    "liveDescription": "Se este agente roda em um desktop VNC que pode ser observado ou sem interface gráfica.",
+    "noSpec": "Nenhuma especificação de ambiente registrada para este agente.",
+    "readFailed": "Não foi possível carregar as especificações de ambiente.",
+    "retry": "Tentar novamente",
+    "modelLabel": "Usar modelo nativo do cluster (Bedrock / Vertex)",
+    "modelDescription": "Execute este agente no provedor de modelos em nuvem do cluster usando a identidade do workload, em vez de uma chave de API.",
+    "modelEnable": "Ativar modelo nativo do cluster",
+    "modelDisable": "Desativar modelo nativo do cluster",
+    "on": "Ativado",
+    "off": "Desativado",
+    "modelSavedOn": "Usando modelo nativo do cluster",
+    "modelSavedOff": "Usando chave de API para acessar o modelo",
+    "modelUpdateFailed": "Não foi possível atualizar a origem do modelo: {reason}",
+    "vncLabel": "Sessão VNC ao vivo (observável)",
+    "vncDescription": "Execute este agente em uma imagem VNC para observar o desktop ao vivo. Isso consome recursos adicionais; deixe desativado para execuções sem interface gráfica, que transmitem logs.",
+    "vncEnable": "Ativar sessão VNC ao vivo",
+    "vncDisable": "Desativar sessão VNC ao vivo",
+    "vncSavedOn": "VNC observável ativado",
+    "vncSavedOff": "VNC observável desativado",
+    "vncUpdateFailed": "Não foi possível atualizar a sessão ao vivo: {reason}",
+    "unknownError": "Erro desconhecido",
+    "updateUnconfirmed": "A atualização da especificação de ambiente selecionada não foi confirmada. Atualize suas configurações antes de tentar novamente."
   }
 }

@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { managedModelProps } from "./agents-list.fixtures";
@@ -18,5 +22,20 @@ export const On: Story = {
 export const Saving: Story = {
   render: () => (
     <ManagedModelSectionView {...managedModelProps({ managedOn: true, managedBusy: true })} />
+  ),
+};
+
+export const FrenchOff: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <ManagedModelSectionView {...managedModelProps()} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseSaving: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <ManagedModelSectionView {...managedModelProps({ managedOn: true, managedBusy: true })} />
+    </NextIntlClientProvider>
   ),
 };
