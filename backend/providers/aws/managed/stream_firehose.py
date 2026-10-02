@@ -8,6 +8,7 @@ The driver validates those structures against the installed botocore model.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -35,7 +36,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import ManagedServiceError, handle_for, live_ownership_refusal, parse_handle, tags_for
 
 KIND = "stream"
 _SOURCE_TYPES = {
@@ -104,30 +106,29 @@ class FirehoseDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_firehose_config"])
-        if not self._config.account_id:
+        if not re.fullmatch(r"[0-9]{12}", self._config.account_id) or not self._config.region:
             return ProvisionResult(
                 False,
                 "",
-                "Firehose requires the AWS account_id to construct a stable delivery-stream ARN",
+                "Firehose requires a region and 12-digit AWS account_id for exact delivery-stream identity",
                 ["missing_account_id"],
             )
         name = self._stream_name(spec)
         arn = self._stream_arn(name)
         created = False
-        try:
-            self._firehose.create_delivery_stream(**self._create_request(name, spec))
-            created = True
-        except Exception as exc:
-            if not _already_exists(exc):
-                return ProvisionResult(False, "", f"create Firehose stream: {exc}", [str(exc)])
+        if not spec.recorded_handle:
+            try:
+                response = self._firehose.create_delivery_stream(**self._create_request(name, spec))
+                if response.get("DeliveryStreamARN") != arn:
+                    raise ManagedServiceError("Firehose creation response does not match the exact target")
+                created = True
+            except Exception as exc:
+                if not _already_exists(exc):
+                    return ProvisionResult(False, "", f"create Firehose stream: {exc}", [str(exc)])
         handle = handle_for(kind=KIND, resource_id=arn)
         try:
             description = self._await_delivery_state(name, {"ACTIVE"})
-            arn = str(description.get("DeliveryStreamARN") or arn)
-            if not created and not self._is_own_stream(arn, spec):
-                raise ManagedServiceError(
-                    f"delivery stream {name} already exists outside this resource declaration",
-                )
+            self._assert_owner(arn, spec.managed_service_id)
             if not created:
                 self._verify_create_only_identity(description, cfg)
             self._reconcile(name, arn, description, cfg, spec=spec, newly_created=created)
@@ -143,15 +144,17 @@ class FirehoseDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="stream_firehose")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, arn = parse_handle(spec.handle)
-        name = _stream_name_from_arn(arn)
+        arn, name = self._target(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg, partial=True)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_firehose_config"])
         try:
             description = self._description(name)
+            self._assert_owner(arn, spec.managed_service_id)
             self._reconcile(name, arn, description, cfg)
+        except ManagedServiceError as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, f"Firehose stream {name} not found", ["not_found"])
@@ -171,10 +174,10 @@ class FirehoseDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, arn = parse_handle(spec.handle)
-        name = _stream_name_from_arn(arn)
+        arn, name = self._target(spec.handle)
         try:
             self._description(name)
+            self._assert_owner(arn, spec.managed_service_id)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, f"Firehose stream {name} already gone")
@@ -508,7 +511,10 @@ class FirehoseDriver(ManagedServiceDriver):
 
     def _description(self, name: str) -> dict[str, Any]:
         response = self._firehose.describe_delivery_stream(DeliveryStreamName=name)
-        return dict(response["DeliveryStreamDescription"])
+        value = dict(response["DeliveryStreamDescription"])
+        if value.get("DeliveryStreamARN") != self._stream_arn(name) or value.get("DeliveryStreamName") != name:
+            raise ManagedServiceError("live Firehose delivery stream does not match the exact target")
+        return value
 
     def _await_delivery_state(self, name: str, desired: set[str]) -> dict[str, Any]:
         last: dict[str, Any] = {}
@@ -542,10 +548,7 @@ class FirehoseDriver(ManagedServiceDriver):
             f"Firehose encryption did not reach {desired}",
         )
 
-    def _is_own_stream(self, arn: str, spec: ProvisionSpec) -> bool:
-        """Platform-made is not enough to adopt: it must be this service's (#1961)."""
-        if not self._is_managed(arn):
-            return False
+    def _assert_owner(self, arn: str, identity: str) -> None:
         tags: list[dict[str, Any]] = []
         token = ""
         while True:
@@ -555,24 +558,15 @@ class FirehoseDriver(ManagedServiceDriver):
             response = self._firehose.list_tags_for_delivery_stream(**request)
             page = response.get("Tags") or []
             tags.extend(page)
-            if not response.get("HasMoreTags") or not page:
+            if not response.get("HasMoreTags"):
                 break
-            token = str(page[-1].get("Key") or "")
-        return adoption_refusal(tags, spec, resource="Firehose delivery stream") is None
-
-    def _is_managed(self, arn: str) -> bool:
-        token = ""
-        while True:
-            request: dict[str, Any] = {"DeliveryStreamName": _stream_name_from_arn(arn)}
-            if token:
-                request["ExclusiveStartTagKey"] = token
-            response = self._firehose.list_tags_for_delivery_stream(**request)
-            tags = response.get("Tags") or []
-            if any(tag.get("Key") == "astrolift.io/managed-by" and tag.get("Value") == "platform" for tag in tags):
-                return True
-            if not response.get("HasMoreTags") or not tags:
-                return False
-            token = str(tags[-1].get("Key") or "")
+            next_token = page[-1].get("Key") if page and isinstance(page[-1], dict) else None
+            if not isinstance(next_token, str) or not next_token or next_token == token:
+                raise ManagedServiceError("Firehose ownership pagination cannot be verified")
+            token = next_token
+        refusal = live_ownership_refusal(tags, managed_service_id=identity, resource="Firehose delivery stream")
+        if refusal:
+            raise ManagedServiceError(refusal)
 
     def _validate_config(self, cfg: dict[str, Any], *, partial: bool = False) -> str:
         if self._config.poll_delay_seconds < 0 or self._config.max_poll_attempts < 1:
@@ -657,22 +651,28 @@ class FirehoseDriver(ManagedServiceDriver):
         return ""
 
     def _stream_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            "-".join(
-                part
-                for part in (
-                    self._config.delivery_stream_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "delivery",
-                )
-                if part
-            ),
-        )
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return self._target(spec.recorded_handle)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.delivery_stream_name_prefix, max_length=64)
+
+    def _target(self, handle: str) -> tuple[str, str]:
+        kind, arn = parse_handle(handle)
+        name = _stream_name_from_arn(arn)
+        if (
+            kind != KIND
+            or re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", name) is None
+            or not re.fullmatch(r"[0-9]{12}", self._config.account_id)
+            or arn != self._stream_arn(name)
+        ):
+            raise ManagedServiceError("recorded Firehose handle does not match the configured driver target")
+        return arn, name
 
     def _stream_arn(self, name: str) -> str:
-        return f"arn:aws:firehose:{self._config.region}:{self._config.account_id}:deliverystream/{name}"
+        from botocore.session import get_session
+
+        partition = get_session().get_partition_for_region(self._config.region)
+        return f"arn:{partition}:firehose:{self._config.region}:{self._config.account_id}:deliverystream/{name}"
 
 
 def _validate_request(operation: str, request: dict[str, Any]) -> None:
@@ -699,16 +699,6 @@ def _role_arns(value: Any) -> set[str]:
 
 def _stream_name_from_arn(arn: str) -> str:
     return arn.rsplit("/", 1)[-1]
-
-
-def _name(value: str) -> str:
-    clean = "".join(char if char.isalnum() or char in "-_." else "-" for char in value)
-    while "--" in clean:
-        clean = clean.replace("--", "-")
-    clean = clean.strip("-_.")
-    if not clean:
-        raise ManagedServiceError("Firehose delivery-stream name cannot be empty")
-    return clean[:64].rstrip("-_.")
 
 
 def _already_exists(exc: Exception) -> bool:
