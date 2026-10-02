@@ -93,11 +93,15 @@ existing target resolver. Environments created before separate namespaces inheri
 the app namespace when their recorded namespace field is blank, as deployed;
 the review returns that resolved namespace.
 
-The current `astro exec --app=<slug>` command uses that legacy primary-environment
-path and has no explicit-environment flag. Its optional `--pod`, `--workload` and
-`--container` flags narrow selection within that path; they do not select a
-cluster or environment. The explicit-environment web shell omits the legacy CLI
-shortcut palette so those examples cannot be mistaken for its selected target.
+CLI builds that support `--environment <GUID>` use selected-environment review and
+admission for both `astro exec` and `astro app exec`. Supplying all of `--workload`,
+`--pod` and `--container` requests the exact exec target directly with current
+`app.exec_pod` authority; filling in missing selectors uses the selected
+environment's inventory and its normal read permissions. Older clients and calls
+that omit `--environment` retain the legacy primary-environment path. The explicit
+web shell omits the generic CLI shortcut palette so primary-only examples cannot
+be mistaken for its selected target. See `astro docs show environment-actions`
+for the consumer contract.
 
 The broader native-client execution contract remains incomplete: action-admission
 proofs, mobile-specific audience/token support, durable pre-open audit admission
