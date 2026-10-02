@@ -1,13 +1,15 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@apollo/client/react";
+import { EXACT_WORKFLOW_DEFINITION_FRAME } from "@/graphql/reviewed-starts/reviewed.queries";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useReviewedStart } from "@/components/reviewed-starts/use-reviewed-start";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import {
   useRunWorkflow,
-  useRunWorkflowDefinition,
   useTieredWorkflow,
   useWorkflowDefinition,
   useWorkflowDefinitionRuns,
@@ -64,12 +66,24 @@ export function useWorkflowFrame(slug: string): {
   const orgId = org?.id ?? null;
   const entitlement = useWorkflowsEntitlement();
 
-  const configuredQ = useTieredWorkflow(slug);
-  const workflow = configuredQ.workflow;
+  const exactDefinitionId = useSearchParams().get("definitionId");
+  const exactQ = useQuery<{
+    workflowDefinitionById: { definition: WorkflowDefinitionSummary } | null;
+  }>(EXACT_WORKFLOW_DEFINITION_FRAME, {
+    variables: { id: exactDefinitionId },
+    skip: !exactDefinitionId,
+    fetchPolicy: "cache-and-network",
+  });
+  const configuredQ = useTieredWorkflow(exactDefinitionId ? null : slug);
+  const workflow = exactDefinitionId ? null : configuredQ.workflow;
   const configuredSettled = !(configuredQ.loading && !configuredQ.workflow);
   const definitionSlug = workflow?.definitionSlug ?? (configuredSettled ? slug : null);
-  const definitionQ = useWorkflowDefinition(definitionSlug, orgId);
-  const definition = workflow ? null : definitionQ.definition;
+  const definitionQ = useWorkflowDefinition(exactDefinitionId ? null : definitionSlug, orgId);
+  const definition = workflow
+    ? null
+    : exactDefinitionId
+      ? (exactQ.data?.workflowDefinitionById?.definition ?? null)
+      : definitionQ.definition;
 
   const definitionRunsQ = useWorkflowDefinitionRuns({
     orgId: definition?.organizationGuid,
@@ -95,7 +109,7 @@ export function useWorkflowFrame(slug: string): {
     null;
 
   const [runConfigured, { loading: runningConfigured }] = useRunWorkflow();
-  const [runDefinition, { loading: runningDefinition }] = useRunWorkflowDefinition();
+  const reviewedStart = useReviewedStart("workflow");
 
   async function dispatch(): Promise<boolean> {
     if (workflow) {
@@ -118,18 +132,8 @@ export function useWorkflowFrame(slug: string): {
       return false;
     }
     if (definition) {
-      const { data } = await runDefinition({
-        variables: { workflowSlug: definition.slug, triggerPayload: null },
-      });
-      if (data?.runWorkflowDefinition?.ok) {
-        toast.success("Workflow started", {
-          description: data.runWorkflowDefinition.temporalWorkflowId ?? definition.name,
-        });
-        return true;
-      }
-      toast.error(
-        data?.runWorkflowDefinition?.errors?.[0]?.messages?.[0] ?? "Failed to start workflow"
-      );
+      await reviewedStart.open(definition.guid);
+      return false;
     }
     return false;
   }
@@ -160,30 +164,36 @@ export function useWorkflowFrame(slug: string): {
     [workflow, definition, refetchConfigured]
   );
 
-  const loading =
-    !configuredSettled || (!workflow && definitionQ.loading && !definitionQ.definition);
+  const loading = exactDefinitionId
+    ? exactQ.loading && !definition
+    : !configuredSettled || (!workflow && definitionQ.loading && !definitionQ.definition);
 
   return {
     framed,
     frame: {
       slug,
       pathname,
+      exactDefinitionId,
       workflow: subject,
       loading,
       error:
         !workflow && !definition
-          ? ((configuredQ.error ?? definitionQ.error)?.message ?? null)
+          ? ((exactDefinitionId ? exactQ.error : (configuredQ.error ?? definitionQ.error))
+              ?.message ?? null)
           : null,
       onRetry: () => {
         void configuredQ.refetch();
-        void definitionQ.refetch();
+        if (exactDefinitionId) void exactQ.refetch();
+        else void definitionQ.refetch();
       },
       failedRun: failing && lastRun ? { href: workflowRunHref(slug, lastRun.guid), reason } : null,
       canRun: entitlement.canRun,
       canDelete:
         entitlement.canManage &&
         (workflow ? true : definition ? definitionDeletable(definition) : false),
-      dispatching: runningConfigured || runningDefinition,
+      dispatching: runningConfigured || reviewedStart.busy,
+      reviewedDefinitionStart: Boolean(definition),
+      startDialog: reviewedStart.dialog,
       onRun,
       onCopyId,
     },

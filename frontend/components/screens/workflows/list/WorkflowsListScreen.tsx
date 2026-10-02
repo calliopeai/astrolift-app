@@ -62,14 +62,15 @@ export interface WorkflowsListScreenProps {
   canViewPlatformRuns: boolean;
   /** The row with a mutation in flight. */
   busySlug: string | null;
+  startDialog?: React.ReactNode;
   onRun: (row: WorkflowRow) => Promise<void>;
   onToggle: (row: WorkflowRow) => Promise<void>;
   onDelete: (row: WorkflowRow) => Promise<void>;
   onClone: (row: WorkflowRow) => Promise<void>;
 }
 
-const workflowHref = (w: Pick<WorkflowRow, "slug">, tail = "") =>
-  `/workflows/${encodeURIComponent(w.slug)}${tail}`;
+const workflowHref = (w: Pick<WorkflowRow, "slug" | "configured" | "definition">, tail = "") =>
+  `/workflows/${encodeURIComponent(w.slug)}${tail}${!w.configured && w.definition ? `?definitionId=${encodeURIComponent(w.definition.guid)}` : ""}`;
 
 /** Where the workflow comes from, in one muted line. */
 function Origin({ row }: { row: WorkflowRow }) {
@@ -227,6 +228,7 @@ export function WorkflowsListScreen({
   canViewPlatformRuns,
   busySlug,
   onRun,
+  startDialog,
   onToggle,
   onDelete,
   onClone,
@@ -285,92 +287,95 @@ export function WorkflowsListScreen({
   );
 
   return (
-    <ListPage<WorkflowRow>
-      header={{
-        crumbs: workflowsCrumbs(),
-        title: "Workflows",
-        primaryAction: canCreate ? (
-          <Button size="sm" asChild>
-            <Link href="/workflows/new">
-              <PlusIcon className="size-4" />
-              New workflow
-            </Link>
-          </Button>
-        ) : undefined,
-        menu: <HeaderMenu canViewPlatformRuns={canViewPlatformRuns} />,
-      }}
-      list={list}
-      label="Workflows"
-      columns={columns}
-      rows={rows}
-      getRowId={(w) => w.id}
-      rowHref={(w) => workflowHref(w)}
-      renderCard={(w) => <WorkflowCard row={w} />}
-      rowActions={(w) => {
-        const busy = busySlug === w.slug;
-        return (
-          <>
-            {canRun && w.kind !== "template" && (
-              <DropdownMenuItem disabled={busy || !w.isEnabled} onSelect={() => void onRun(w)}>
-                <PlayIcon className="size-4" />
-                Run now
-              </DropdownMenuItem>
-            )}
-            {canManage && w.kind === "configured" && (
-              <DropdownMenuItem disabled={busy} onSelect={() => void onToggle(w)}>
-                {w.isEnabled ? (
-                  <PowerOffIcon className="size-4" />
-                ) : (
-                  <PowerIcon className="size-4" />
-                )}
-                {w.isEnabled ? "Disable" : "Enable"}
-              </DropdownMenuItem>
-            )}
-            {w.kind === "configured" && (
-              <DropdownMenuItem asChild>
-                <Link href={workflowHref(w, "/triggers")}>
-                  <TimerIcon className="size-4" />
-                  Edit triggers
-                </Link>
-              </DropdownMenuItem>
-            )}
-            {canCreate && w.kind !== "configured" && (
-              <DropdownMenuItem asChild>
-                <Link href={`/workflows/new?definition=${encodeURIComponent(w.slug)}`}>
-                  <LayoutTemplateIcon className="size-4" />
-                  Create workflow from
-                </Link>
-              </DropdownMenuItem>
-            )}
-            {canCreate && w.kind === "template" && (
-              <DropdownMenuItem disabled={busy} onSelect={() => void onClone(w)}>
-                <CopyIcon className="size-4" />
-                Clone to edit
-              </DropdownMenuItem>
-            )}
-            {canManage && w.deletable && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={busy}
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => void onDelete(w)}
-                >
-                  <TrashIcon className="size-4" />
-                  Delete
+    <>
+      {startDialog}
+      <ListPage<WorkflowRow>
+        header={{
+          crumbs: workflowsCrumbs(),
+          title: "Workflows",
+          primaryAction: canCreate ? (
+            <Button size="sm" asChild>
+              <Link href="/workflows/new">
+                <PlusIcon className="size-4" />
+                New workflow
+              </Link>
+            </Button>
+          ) : undefined,
+          menu: <HeaderMenu canViewPlatformRuns={canViewPlatformRuns} />,
+        }}
+        list={list}
+        label="Workflows"
+        columns={columns}
+        rows={rows}
+        getRowId={(w) => w.id}
+        rowHref={(w) => workflowHref(w)}
+        renderCard={(w) => <WorkflowCard row={w} />}
+        rowActions={(w) => {
+          const busy = busySlug === w.slug;
+          return (
+            <>
+              {canRun && w.kind !== "template" && (
+                <DropdownMenuItem disabled={busy || !w.isEnabled} onSelect={() => void onRun(w)}>
+                  <PlayIcon className="size-4" />
+                  Run now
                 </DropdownMenuItem>
-              </>
-            )}
-          </>
-        );
-      }}
-      loading={loading}
-      stale={stale}
-      error={error}
-      onRetry={onRetry}
-      empty={empty}
-      totalCount={totalCount}
-      notice={notices}
-    />
+              )}
+              {canManage && w.kind === "configured" && (
+                <DropdownMenuItem disabled={busy} onSelect={() => void onToggle(w)}>
+                  {w.isEnabled ? (
+                    <PowerOffIcon className="size-4" />
+                  ) : (
+                    <PowerIcon className="size-4" />
+                  )}
+                  {w.isEnabled ? "Disable" : "Enable"}
+                </DropdownMenuItem>
+              )}
+              {w.kind === "configured" && (
+                <DropdownMenuItem asChild>
+                  <Link href={workflowHref(w, "/triggers")}>
+                    <TimerIcon className="size-4" />
+                    Edit triggers
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canCreate && w.kind !== "configured" && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/workflows/new?definition=${encodeURIComponent(w.slug)}`}>
+                    <LayoutTemplateIcon className="size-4" />
+                    Create workflow from
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canCreate && w.kind === "template" && (
+                <DropdownMenuItem disabled={busy} onSelect={() => void onClone(w)}>
+                  <CopyIcon className="size-4" />
+                  Clone to edit
+                </DropdownMenuItem>
+              )}
+              {canManage && w.deletable && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={busy}
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => void onDelete(w)}
+                  >
+                    <TrashIcon className="size-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </>
+          );
+        }}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        empty={empty}
+        totalCount={totalCount}
+        notice={notices}
+      />
+    </>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
 
@@ -28,7 +30,12 @@ const TAB_LABELS: Record<PipelineDetailTab, string> = {
   secrets: "Secrets",
 };
 
-export type PipelineDetailScreenProps = ReturnType<typeof usePipelineDetail> & {
+export type PipelineDetailScreenProps = Omit<
+  ReturnType<typeof usePipelineDetail>,
+  "onCancelRun" | "cancellationDialog"
+> & {
+  onCancelRun?: (id: string) => Promise<void>;
+  cancellationDialog?: React.ReactNode;
   pipelineId?: string;
   /** The latest run's graph (a RunGraphView behind its hook), keyed on the run id. */
   runGraph?: React.ReactNode;
@@ -51,13 +58,17 @@ export function PipelineDetailScreen({
   runGraph,
   secrets,
   pipelineId,
+  onCancelRun,
+  cancellationDialog,
 }: PipelineDetailScreenProps) {
+  const t = useTranslations("ReviewedPipelineStart");
   return (
     <PageShell
       title={pipeline?.name ?? "Pipeline"}
       description="Pipeline run details, logs, and artifacts."
     >
       <div className="space-y-4">
+        {cancellationDialog}
         {pipelineLoading && <Skeleton className="h-5 w-48" aria-label="Loading pipeline name" />}
         <QueryError
           title="Could not load pipeline"
@@ -146,6 +157,11 @@ export function PipelineDetailScreen({
                   <span className="text-muted-foreground font-mono text-xs">
                     {run.triggerRef?.replace(/^refs\/heads\//, "")}
                   </span>
+                  {onCancelRun && ["pending", "running"].includes(run.status) && (
+                    <Button size="sm" variant="outline" onClick={() => void onCancelRun(run.id)}>
+                      {t("cancelRequest")}
+                    </Button>
+                  )}
                   <span className="text-muted-foreground ml-auto text-xs">
                     {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
                   </span>
@@ -199,10 +215,19 @@ export function PipelineDetailScreen({
   );
 }
 
-export type RunGraphViewProps = ReturnType<typeof useRunGraph>;
+export type RunGraphViewProps = Pick<ReturnType<typeof useRunGraph>, "loading" | "stages"> &
+  Partial<Omit<ReturnType<typeof useRunGraph>, "loading" | "stages">>;
 
 /** A single run's jobs as a status-coloured DAG. */
-export function RunGraphView({ loading, stages }: RunGraphViewProps) {
+export function RunGraphView({
+  loading,
+  stages,
+  truncated,
+  onLoadMore,
+  loadingMore,
+  pageError,
+}: RunGraphViewProps) {
+  const t = useTranslations("ReviewedPipelineStart");
   if (loading) return <Skeleton className="h-64 w-full" />;
   if (stages.length === 0) {
     return (
@@ -212,5 +237,18 @@ export function RunGraphView({ loading, stages }: RunGraphViewProps) {
     );
   }
 
-  return <PipelineDag stages={stages} height={320} />;
+  return (
+    <div className="space-y-2">
+      <PipelineDag stages={stages} height={320} />
+      {truncated && (
+        <>
+          <p className="text-muted-foreground text-xs">{t("graphPartial")}</p>
+          <Button variant="outline" size="sm" disabled={loadingMore} onClick={onLoadMore}>
+            {t("loadMore")}
+          </Button>
+        </>
+      )}
+      {pageError && <p role="alert">{t("unavailable")}</p>}
+    </div>
+  );
 }
