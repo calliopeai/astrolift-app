@@ -164,6 +164,13 @@ memory measurement. A valid resource signal does not imply that request
 instrumentation is installed or that the app is healthy. Saturation alone
 does not prove CPU throttling or an imminent OOM.
 
+Strict workload reads also refuse successful Prometheus responses containing
+nonempty or malformed `warnings`: those samples cannot establish complete
+evidence. The refusal is per signal and uses a static error without exposing
+collector warning text. Responses without warnings or with an empty warning
+array remain valid; existing non-strict aggregate reads keep their compatibility
+behavior.
+
 ## Validation boundaries
 
 The integration fixture exercises real PostgreSQL authorization, native Kind

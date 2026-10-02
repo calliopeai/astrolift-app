@@ -65,6 +65,13 @@ owner, placement and desired configuration before provider effects. Legacy
 histories without proof retain their compatibility path. An accepted/enqueued
 operation does not certify completion or provider convergence.
 
+Workflow start and receipt annotation are separate. Once the engine accepts a
+start, saving its run ID uses nonblocking locks on the reviewed service and its
+parents. Contention, a replaced operation or an annotation failure leaves the
+run ID unconfirmed; it does not convert an accepted start into a failed one.
+Worker operations retain their blocking safety fences. Enqueue on transaction
+commit is not a durable dispatch outbox.
+
 For app-owned generic exporter metrics, pass that same revision to
 `astroliftAppManagedServiceMetrics(managedServiceId, expectedContextRevision)`.
 The server checks current placement and authority, reads the captured cluster
