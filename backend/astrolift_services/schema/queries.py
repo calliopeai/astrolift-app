@@ -1909,9 +1909,10 @@ class ServicesQuery(ClusterModelsQuery):
     ) -> SecretChangeProposalMetadataType | None:
         from astrolift_services.secret_proposal_pages import METADATA_FIELDS, metadata_proposals
 
+        org_id = _caller_org_id()
         row = (
-            metadata_proposals(_caller_org_id())
-            .filter(guid=str(id))
+            metadata_proposals(org_id)
+            .filter(guid=str(id), registered_app__organization_id=org_id)
             .select_related("registered_app", "proposer")
             .only(*METADATA_FIELDS)
             .first()
