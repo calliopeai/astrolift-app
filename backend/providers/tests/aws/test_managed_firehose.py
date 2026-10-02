@@ -602,6 +602,43 @@ def test_a_platform_stream_of_another_org_is_not_adopted():
     client.tag_delivery_stream.assert_not_called()
 
 
+@pytest.mark.parametrize("operation", ["provision", "update", "deprovision"])
+def test_ownership_cursor_cycle_refuses_before_any_existing_stream_write(operation):
+    client = _client()
+    client.list_tags_for_delivery_stream.side_effect = [
+        {"Tags": [{"Key": key, "Value": "marker"}], "HasMoreTags": True} for key in ("alpha", "beta", "alpha")
+    ] + [AssertionError("ownership cursor cycle was followed again")]
+    driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
+    handle = f"stream/{STREAM_ARN}"
+    if operation == "provision":
+        result = driver.provision(_spec(recorded_handle=handle))
+    elif operation == "update":
+        result = driver.update(
+            _update_spec(
+                handle,
+                config={
+                    "destination_update": {
+                        "type": "extended_s3",
+                        "configuration": {"Prefix": "changed/"},
+                    }
+                },
+            )
+        )
+    else:
+        result = driver.deprovision(_deprovision_spec(handle), force_destroy=True)
+    assert not result.ok and "ownership pagination cannot be verified" in result.message
+    assert client.list_tags_for_delivery_stream.call_count == 3
+    for method in (
+        "create_delivery_stream",
+        "tag_delivery_stream",
+        "update_destination",
+        "start_delivery_stream_encryption",
+        "stop_delivery_stream_encryption",
+        "delete_delivery_stream",
+    ):
+        getattr(client, method).assert_not_called()
+
+
 @pytest.mark.parametrize(
     ("destination_type", "field", "value"),
     [("redshift", "Password", "hunter2"), ("splunk", "HECToken", "t"), ("snowflake", "PrivateKey", "k" * 256)],

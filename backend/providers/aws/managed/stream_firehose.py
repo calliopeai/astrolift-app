@@ -551,6 +551,7 @@ class FirehoseDriver(ManagedServiceDriver):
     def _assert_owner(self, arn: str, identity: str) -> None:
         tags: list[dict[str, Any]] = []
         token = ""
+        seen: set[str] = set()
         while True:
             request: dict[str, Any] = {"DeliveryStreamName": _stream_name_from_arn(arn)}
             if token:
@@ -561,8 +562,9 @@ class FirehoseDriver(ManagedServiceDriver):
             if not response.get("HasMoreTags"):
                 break
             next_token = page[-1].get("Key") if page and isinstance(page[-1], dict) else None
-            if not isinstance(next_token, str) or not next_token or next_token == token:
+            if not isinstance(next_token, str) or not next_token or next_token in seen:
                 raise ManagedServiceError("Firehose ownership pagination cannot be verified")
+            seen.add(next_token)
             token = next_token
         refusal = live_ownership_refusal(tags, managed_service_id=identity, resource="Firehose delivery stream")
         if refusal:
