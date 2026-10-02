@@ -18,12 +18,14 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { FlowGraph, rankLayout } from "@/components/viz";
 import type { AstroliftAgentInteraction } from "@/graphql/agents/agents.types";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
+import type { AgentActivityTranslator } from "./agent-run-steps";
 import type { AgentInteractionMapState } from "./use-agent-interaction-map";
 
 export type AgentInteractionMapProps = AgentInteractionMapState;
@@ -42,11 +44,11 @@ type IconType = React.ComponentType<{ className?: string }>;
 // is stable and always complete. Each renders as a live hub when the run has
 // interactions of that kind and stays gracefully empty ("No calls yet")
 // otherwise — control_api / tool_call, gate, and signal are all captured now.
-const KINDS: { key: string; label: string; icon: IconType }[] = [
-  { key: "control_api", label: "Control API", icon: RadioTowerIcon },
-  { key: "tool_call", label: "Tools", icon: WrenchIcon },
-  { key: "gate", label: "Gates", icon: ShieldIcon },
-  { key: "signal", label: "Signals", icon: RadioIcon },
+const KINDS: { key: string; icon: IconType }[] = [
+  { key: "control_api", icon: RadioTowerIcon },
+  { key: "tool_call", icon: WrenchIcon },
+  { key: "gate", icon: ShieldIcon },
+  { key: "signal", icon: RadioIcon },
 ];
 
 // ─── node model ─────────────────────────────────────────────────────────────
@@ -127,9 +129,22 @@ const NODE_TYPES: NodeTypes = { interaction: InteractionNode };
 
 const TASK_ID = "task";
 
-function prettyStatus(status: string): string {
-  const s = status.replace(/_/g, " ");
-  return s.charAt(0).toUpperCase() + s.slice(1);
+const KNOWN_TASK_STATUSES = new Set([
+  "running",
+  "provisioning",
+  "queued",
+  "pending",
+  "completed",
+  "succeeded",
+  "failed",
+  "timed_out",
+  "cancelled",
+  "canceled",
+]);
+
+function prettyStatus(status: string, t: AgentActivityTranslator): string {
+  const key = status.toLowerCase();
+  return KNOWN_TASK_STATUSES.has(key) ? t(`statuses.${key}`) : status;
 }
 
 function isError(status: string): boolean {
@@ -178,10 +193,12 @@ function taskTone(status: string): { tone: Tone; pulse: boolean } {
  * an animated incoming edge) while the run is non-terminal and its most-recent
  * interaction is within the recency window.
  */
-function buildInteractionGraph(
+export function buildInteractionGraph(
   interactions: AstroliftAgentInteraction[],
   taskStatus: string,
-  isTerminal: boolean
+  isTerminal: boolean,
+  t: AgentActivityTranslator,
+  relativeTime: (date: string) => string
 ): { nodes: Node<InteractionNodeData>[]; edges: Edge[] } {
   const now = Date.now();
   const recent = (ms: number) => !isTerminal && !Number.isNaN(ms) && now - ms < RECENCY_MS;
@@ -192,8 +209,8 @@ function buildInteractionGraph(
   descriptors.push({
     id: TASK_ID,
     icon: BotIcon,
-    label: "Agent",
-    sublabel: prettyStatus(taskStatus),
+    label: t("agent"),
+    sublabel: prettyStatus(taskStatus, t),
     tone: origin.tone,
     pulse: origin.pulse,
     needs: [],
@@ -214,8 +231,8 @@ function buildInteractionGraph(
       descriptors.push({
         id: hubId,
         icon: kind.icon,
-        label: kind.label,
-        sublabel: "No calls yet",
+        label: t(`hubs.${kind.key}`),
+        sublabel: t("noCalls"),
         tone: "muted",
         needs: [TASK_ID],
       });
@@ -225,14 +242,12 @@ function buildInteractionGraph(
     const hubLast = latestMs(items);
     const hubLive = recent(hubLast);
     const hubError = items.some((it) => isError(it.status));
-    const ageLabel = Number.isNaN(hubLast)
-      ? ""
-      : formatRelativeAge(new Date(hubLast).toISOString());
+    const ageLabel = Number.isNaN(hubLast) ? "" : relativeTime(new Date(hubLast).toISOString());
     descriptors.push({
       id: hubId,
       icon: kind.icon,
-      label: kind.label,
-      sublabel: `${items.length} call${items.length === 1 ? "" : "s"}${ageLabel ? ` · ${ageLabel}` : ""}`,
+      label: t(`hubs.${kind.key}`),
+      sublabel: `${t("calls", { count: items.length })}${ageLabel ? ` · ${ageLabel}` : ""}`,
       tone: hubError ? "danger" : hubLive ? "running" : "success",
       pulse: hubLive,
       needs: [TASK_ID],
@@ -250,12 +265,12 @@ function buildInteractionGraph(
       const last = latestMs(group);
       const live = recent(last);
       const errored = group.some((it) => isError(it.status));
-      const rel = Number.isNaN(last) ? "" : formatRelativeAge(new Date(last).toISOString());
+      const rel = Number.isNaN(last) ? "" : relativeTime(new Date(last).toISOString());
       descriptors.push({
         id: `leaf:${kind.key}:${name}`,
         icon: kind.icon,
-        label: name,
-        sublabel: `${group.length}×${rel ? ` · ${rel}` : ""}`,
+        label: name === "(unnamed)" && group.every((it) => !it.name) ? t("unnamed") : name,
+        sublabel: `${t("repetitions", { count: group.length })}${rel ? ` · ${rel}` : ""}`,
         tone: errored ? "danger" : live ? "running" : "success",
         pulse: live,
         needs: [hubId],
@@ -315,25 +330,35 @@ export function AgentInteractionMapView({
   loading,
   error,
 }: AgentInteractionMapProps) {
-  const { nodes, edges } = React.useMemo(
-    () => buildInteractionGraph(interactions, taskStatus, isTerminal),
-    [interactions, taskStatus, isTerminal]
+  const t = useTranslations("agentActivity");
+  const locale = useLocale();
+  const format = useFormatters();
+  const { nodes, edges } = buildInteractionGraph(
+    interactions,
+    taskStatus,
+    isTerminal,
+    (key, values) => t(key, values),
+    format.formatRelativeTime
   );
 
   // Remount signature: any new interaction (or a task-status change) re-flows the
   // graph, which recomputes recency so the fresh activity lights up.
   const signature = React.useMemo(
     () =>
-      `${taskStatus}|${isTerminal}|${interactions
+      `${locale}|${taskStatus}|${isTerminal}|${interactions
         .map((i) => `${i.id}:${i.status}`)
         .sort()
         .join("|")}`,
-    [interactions, taskStatus, isTerminal]
+    [locale, interactions, taskStatus, isTerminal]
   );
 
   if (loading && interactions.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-md border p-12">
+      <div
+        role="status"
+        aria-label={t("loading")}
+        className="flex items-center justify-center rounded-md border p-12"
+      >
         <Loader2Icon className="text-muted-foreground size-5 animate-spin" />
       </div>
     );
@@ -351,10 +376,8 @@ export function AgentInteractionMapView({
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-12 text-center text-sm">
         <WaypointsIcon className="text-muted-foreground mx-auto mb-2 size-5" />
-        <p className="text-foreground mb-1 font-medium">No interactions recorded yet</p>
-        <p>
-          Control API calls, tool invocations, gates, and signals appear here as the run makes them.
-        </p>
+        <p className="text-foreground mb-1 font-medium">{t("emptyTitle")}</p>
+        <p>{t("emptyDescription")}</p>
       </div>
     );
   }
@@ -362,6 +385,7 @@ export function AgentInteractionMapView({
   return (
     <FlowGraph
       key={signature}
+      ariaLabel={t("graphLabel")}
       nodes={nodes}
       edges={edges}
       nodeTypes={NODE_TYPES}

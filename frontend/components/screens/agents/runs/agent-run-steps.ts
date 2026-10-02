@@ -54,6 +54,8 @@ function interactionState(status: string, terminal: boolean): StepState {
   return "ok";
 }
 
+export type AgentActivityTranslator = (key: string, values?: { count: number }) => string;
+
 /**
  * The run's steps, oldest first: waiting for a pod, the run itself, then
  * each tool call, gate and signal. Control API calls (heartbeats) stay on
@@ -63,7 +65,8 @@ function interactionState(status: string, terminal: boolean): StepState {
 export function agentRunSteps(
   task: AgentRunTimes,
   interactions: AstroliftAgentInteraction[],
-  now: number
+  now: number,
+  t?: AgentActivityTranslator
 ): TimelineStep[] {
   const s = task.status.toLowerCase();
   const terminal = isTerminalAgentTask(s);
@@ -73,7 +76,7 @@ export function agentRunSteps(
   const steps: TimelineStep[] = [
     {
       id: "queued",
-      name: "queued",
+      name: t ? t("statuses.queued") : "queued",
       state: started ? "ok" : terminal ? (failed ? "failed" : "skipped") : "running",
       durationMs: span(
         task.createdAt,
@@ -82,7 +85,11 @@ export function agentRunSteps(
     },
     {
       id: "run",
-      name: terminal ? s.replace(/_/g, " ") : "running",
+      name: t
+        ? t(`statuses.${terminal ? s : "running"}`)
+        : terminal
+          ? s.replace(/_/g, " ")
+          : "running",
       state: !started
         ? terminal
           ? "skipped"
@@ -122,18 +129,25 @@ export function agentRunSteps(
     const n = grouped.slice(0, hidden).reduce((sum, g) => sum + g.count, 0);
     steps.push({
       id: "earlier",
-      name: `${n} earlier ${n === 1 ? "call" : "calls"}`,
+      name: t ? t("earlierCalls", { count: n }) : `${n} earlier ${n === 1 ? "call" : "calls"}`,
       state: "ok",
-      detail: "The interaction map has every one.",
+      detail: t ? t("earlierDetail") : "The interaction map has every one.",
     });
   }
   for (const { first, count } of grouped.slice(hidden)) {
-    const kind = KIND_LABEL[first.kind] ?? first.kind.replace(/_/g, " ");
+    const knownKind = Object.hasOwn(KIND_LABEL, first.kind);
+    const kind = t
+      ? knownKind
+        ? t(`kinds.${first.kind}`)
+        : first.kind
+      : knownKind
+        ? KIND_LABEL[first.kind]
+        : first.kind.replace(/_/g, " ");
     steps.push({
       id: first.id,
       name: first.name,
       state: interactionState(first.status, terminal),
-      detail: count > 1 ? `${kind} · ×${count}` : kind,
+      detail: count > 1 ? `${kind} · ${t ? t("repetitions", { count }) : `×${count}`}` : kind,
     });
   }
   return steps;

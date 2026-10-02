@@ -7254,5 +7254,41 @@
       "webhooks": "Webhooks that tell CI and CD systems when the agent deploys.",
       "model-access": "How the agent reaches its model, and whether its runs can be watched live."
     }
+  },
+  "agentActivity": {
+    "agent": "Agent",
+    "noCalls": "No calls yet",
+    "calls": "{count, plural, one {# call} other {# calls}}",
+    "repetitions": "{count, number}×",
+    "unnamed": "(unnamed)",
+    "loading": "Loading interactions",
+    "emptyTitle": "No interactions recorded yet",
+    "emptyDescription": "Control API calls, tool invocations, gates, and signals appear here as the run makes them.",
+    "earlierCalls": "{count, plural, one {# earlier call} other {# earlier calls}}",
+    "earlierDetail": "Explore calls in the interaction map.",
+    "hubs": {
+      "control_api": "Control API",
+      "tool_call": "Tools",
+      "gate": "Gates",
+      "signal": "Signals"
+    },
+    "kinds": {
+      "tool_call": "tool call",
+      "gate": "gate",
+      "signal": "signal"
+    },
+    "statuses": {
+      "running": "Running",
+      "provisioning": "Provisioning",
+      "queued": "Queued",
+      "pending": "Pending",
+      "completed": "Completed",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "timed_out": "Timed out",
+      "cancelled": "Cancelled",
+      "canceled": "Cancelled"
+    },
+    "graphLabel": "Agent interaction map"
   }
 }

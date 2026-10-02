@@ -7174,5 +7174,41 @@
       "webhooks": "에이전트가 배포될 때 CI 및 CD 시스템에 알리는 웹훅입니다.",
       "model-access": "에이전트가 모델에 접근하는 방식과 실행을 실시간으로 볼 수 있는지 설정합니다."
     }
+  },
+  "agentActivity": {
+    "agent": "에이전트",
+    "noCalls": "아직 호출이 없습니다",
+    "calls": "호출 {count, number}개",
+    "repetitions": "{count, number}×",
+    "unnamed": "(이름 없음)",
+    "loading": "상호작용을 불러오는 중",
+    "emptyTitle": "아직 기록된 상호작용이 없습니다",
+    "emptyDescription": "실행 중 발생하는 제어 API 호출, 도구 호출, 승인 게이트 및 신호가 여기에 표시됩니다.",
+    "earlierCalls": "이전 호출 {count, number}개",
+    "earlierDetail": "상호작용 지도에서 호출을 살펴보세요.",
+    "hubs": {
+      "control_api": "제어 API",
+      "tool_call": "도구",
+      "gate": "승인 게이트",
+      "signal": "신호"
+    },
+    "kinds": {
+      "tool_call": "도구 호출",
+      "gate": "승인 게이트",
+      "signal": "신호"
+    },
+    "statuses": {
+      "running": "실행 중",
+      "provisioning": "프로비저닝 중",
+      "queued": "대기열에 있음",
+      "pending": "대기 중",
+      "completed": "완료",
+      "succeeded": "성공",
+      "failed": "실패",
+      "timed_out": "시간 초과",
+      "cancelled": "취소됨",
+      "canceled": "취소됨"
+    },
+    "graphLabel": "에이전트 상호작용 지도"
   }
 }

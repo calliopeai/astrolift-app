@@ -7177,5 +7177,41 @@
       "webhooks": "Webhooks que avisan a los sistemas de CI y CD cuando se despliega el agente.",
       "model-access": "Cómo accede el agente a su modelo y si sus ejecuciones se pueden ver en directo."
     }
+  },
+  "agentActivity": {
+    "agent": "Agente",
+    "noCalls": "Aún no hay llamadas",
+    "calls": "{count, plural, one {# llamada} other {# llamadas}}",
+    "repetitions": "{count, number}×",
+    "unnamed": "(sin nombre)",
+    "loading": "Cargando interacciones",
+    "emptyTitle": "Aún no se han registrado interacciones",
+    "emptyDescription": "Las llamadas a la API de control, las invocaciones de herramientas, los controles de aprobación y las señales aparecen aquí durante la ejecución.",
+    "earlierCalls": "{count, plural, one {# llamada anterior} other {# llamadas anteriores}}",
+    "earlierDetail": "Explora las llamadas en el mapa de interacciones.",
+    "hubs": {
+      "control_api": "API de control",
+      "tool_call": "Herramientas",
+      "gate": "Aprobaciones",
+      "signal": "Señales"
+    },
+    "kinds": {
+      "tool_call": "llamada a herramienta",
+      "gate": "aprobación",
+      "signal": "señal"
+    },
+    "statuses": {
+      "running": "En ejecución",
+      "provisioning": "Aprovisionando",
+      "queued": "En cola",
+      "pending": "Pendiente",
+      "completed": "Completado",
+      "succeeded": "Correcto",
+      "failed": "Fallido",
+      "timed_out": "Tiempo agotado",
+      "cancelled": "Cancelado",
+      "canceled": "Cancelado"
+    },
+    "graphLabel": "Mapa de interacciones del agente"
   }
 }

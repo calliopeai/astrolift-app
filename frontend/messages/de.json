@@ -7177,5 +7177,41 @@
       "webhooks": "Webhooks, die CI- und CD-Systeme über die Bereitstellung des Agenten informieren.",
       "model-access": "Wie der Agent sein Modell erreicht und ob seine Ausführungen live beobachtet werden können."
     }
+  },
+  "agentActivity": {
+    "agent": "Agent",
+    "noCalls": "Noch keine Aufrufe",
+    "calls": "{count, plural, one {# Aufruf} other {# Aufrufe}}",
+    "repetitions": "{count, number}×",
+    "unnamed": "(unbenannt)",
+    "loading": "Interaktionen werden geladen",
+    "emptyTitle": "Noch keine Interaktionen erfasst",
+    "emptyDescription": "Aufrufe der Steuerungs-API, Werkzeugaufrufe, Freigaben und Signale erscheinen hier während der Ausführung.",
+    "earlierCalls": "{count, plural, one {# früherer Aufruf} other {# frühere Aufrufe}}",
+    "earlierDetail": "Erkunden Sie die Aufrufe in der Interaktionskarte.",
+    "hubs": {
+      "control_api": "Steuerungs-API",
+      "tool_call": "Werkzeuge",
+      "gate": "Freigaben",
+      "signal": "Signale"
+    },
+    "kinds": {
+      "tool_call": "Werkzeugaufruf",
+      "gate": "Freigabe",
+      "signal": "Signal"
+    },
+    "statuses": {
+      "running": "Wird ausgeführt",
+      "provisioning": "Wird bereitgestellt",
+      "queued": "In der Warteschlange",
+      "pending": "Ausstehend",
+      "completed": "Abgeschlossen",
+      "succeeded": "Erfolgreich",
+      "failed": "Fehlgeschlagen",
+      "timed_out": "Zeitüberschreitung",
+      "cancelled": "Abgebrochen",
+      "canceled": "Abgebrochen"
+    },
+    "graphLabel": "Interaktionskarte des Agents"
   }
 }

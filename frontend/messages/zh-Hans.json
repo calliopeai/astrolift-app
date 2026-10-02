@@ -7174,5 +7174,41 @@
       "webhooks": "智能体部署时通知 CI 和 CD 系统的 Webhook。",
       "model-access": "智能体访问模型的方式，以及能否实时查看其运行。"
     }
+  },
+  "agentActivity": {
+    "agent": "智能体",
+    "noCalls": "暂无调用",
+    "calls": "{count, number} 次调用",
+    "repetitions": "{count, number}×",
+    "unnamed": "（未命名）",
+    "loading": "正在加载交互",
+    "emptyTitle": "尚未记录交互",
+    "emptyDescription": "运行过程中产生的控制 API 调用、工具调用、审批关卡和信号会显示在这里。",
+    "earlierCalls": "此前的 {count, number} 次调用",
+    "earlierDetail": "在交互图中查看调用详情。",
+    "hubs": {
+      "control_api": "控制 API",
+      "tool_call": "工具",
+      "gate": "审批关卡",
+      "signal": "信号"
+    },
+    "kinds": {
+      "tool_call": "工具调用",
+      "gate": "审批关卡",
+      "signal": "信号"
+    },
+    "statuses": {
+      "running": "运行中",
+      "provisioning": "配置中",
+      "queued": "已排队",
+      "pending": "等待中",
+      "completed": "已完成",
+      "succeeded": "成功",
+      "failed": "失败",
+      "timed_out": "已超时",
+      "cancelled": "已取消",
+      "canceled": "已取消"
+    },
+    "graphLabel": "智能体交互图"
   }
 }
