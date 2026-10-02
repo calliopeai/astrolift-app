@@ -3346,6 +3346,18 @@
         "proposer": "{name} による",
         "received": "{rel} に受信",
         "review": "確認"
+      },
+      "paging": {
+        "app": "アプリ",
+        "environment": "環境",
+        "operation": "変更",
+        "approvals": "承認",
+        "proposer": "提案者",
+        "created": "作成日時",
+        "refresh": "キューを更新",
+        "recovery": "キューが変更されたか、続きを取得できませんでした。再試行すると最初のページに戻ります。",
+        "description": "保留中の提案のメタデータのみです。提案を開くと、別途認可された詳細を確認できます。",
+        "unknown": "不明"
       }
     },
     "deployments": {

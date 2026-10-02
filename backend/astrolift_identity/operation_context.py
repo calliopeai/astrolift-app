@@ -328,6 +328,7 @@ def secret_proposal_operation(field: str = "input.proposal_id") -> OperationLoad
                 guid=guid, registered_app__organization_id=org_id, deleted_at__isnull=True
             )
             .select_related("app_environment__tenant_cluster", "registered_app")
+            .defer("payload", "payload_diff", "apply_error")
             .first()
         )
         if proposal is None:

@@ -3346,6 +3346,18 @@
         "proposer": "por {name}",
         "received": "recebido {rel}",
         "review": "Revisar"
+      },
+      "paging": {
+        "app": "Aplicativo",
+        "environment": "Ambiente",
+        "operation": "Alteração",
+        "approvals": "Aprovações",
+        "proposer": "Proposto por",
+        "created": "Criado",
+        "refresh": "Atualizar fila",
+        "recovery": "A fila mudou ou não pôde continuar. Tentar novamente começa na primeira página.",
+        "description": "Somente metadados das propostas pendentes. Abra uma proposta para revisar seus detalhes com autorização separada.",
+        "unknown": "Desconhecido"
       }
     },
     "deployments": {

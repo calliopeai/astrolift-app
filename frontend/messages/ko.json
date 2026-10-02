@@ -3346,6 +3346,18 @@
         "proposer": "{name} 제안",
         "received": "{rel}에 수신됨",
         "review": "검토"
+      },
+      "paging": {
+        "app": "앱",
+        "environment": "환경",
+        "operation": "변경",
+        "approvals": "승인",
+        "proposer": "제안자",
+        "created": "생성일",
+        "refresh": "대기열 새로 고침",
+        "recovery": "대기열이 변경되었거나 계속 불러올 수 없습니다. 다시 시도하면 첫 페이지부터 시작합니다.",
+        "description": "대기 중인 제안의 메타데이터만 표시합니다. 제안을 열어 별도 권한이 필요한 상세 내용을 검토하세요.",
+        "unknown": "알 수 없음"
       }
     },
     "deployments": {

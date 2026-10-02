@@ -3346,6 +3346,18 @@
         "proposer": "von {name}",
         "received": "eingegangen {rel}",
         "review": "Prüfen"
+      },
+      "paging": {
+        "app": "App",
+        "environment": "Umgebung",
+        "operation": "Änderung",
+        "approvals": "Genehmigungen",
+        "proposer": "Vorgeschlagen von",
+        "created": "Erstellt",
+        "refresh": "Warteschlange aktualisieren",
+        "recovery": "Die Warteschlange wurde geändert oder kann nicht fortgesetzt werden. Erneut versuchen beginnt auf der ersten Seite.",
+        "description": "Nur Metadaten ausstehender Vorschläge. Öffnen Sie einen Vorschlag, um dessen separat autorisierte Details zu prüfen.",
+        "unknown": "Unbekannt"
       }
     },
     "deployments": {

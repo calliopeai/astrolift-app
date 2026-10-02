@@ -5078,10 +5078,32 @@ type AstroliftSecretChangeProposal {
   approvals: [AstroliftSecretChangeApproval!]!
 }
 
+type AstroliftSecretChangeProposalMetadata {
+  id: GUID!
+  registeredAppSlug: String!
+  environmentName: String!
+  op: String!
+  status: String!
+  proposerDisplayName: String!
+  requiredApproverCount: Int!
+  approvalsCount: Int!
+  expiresAt: DateTime!
+  decidedAt: DateTime
+  appliedAt: DateTime
+  createdAt: DateTime!
+}
+
 type AstroliftSecretChangeProposalMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftSecretChangeProposal
+}
+
+type AstroliftSecretChangeProposalPage {
+  items: [AstroliftSecretChangeProposalMetadata!]!
+  nextCursor: String
+  totalCount: Int!
+  complete: Boolean!
 }
 
 type AstroliftSecretEditor {
@@ -8486,6 +8508,8 @@ type Query {
   astroliftEmailTemplateStats(managedServiceId: GUID!, name: String!, days: Int! = 14): [AstroliftTemplateSendStatPoint!]!
   astroliftEmailMessages(managedServiceId: GUID!, limit: Int! = 50, eventKind: String = null, recipient: String = null): [AstroliftEmailMessage!]!
   astroliftEmailEngagementMetrics(managedServiceId: GUID!, days: Int! = 30): AstroliftEmailEngagementMetrics
+  astroliftSecretChangeProposalsPage(appSlug: String = null, status: String = null, limit: Int! = 25, after: String = null): AstroliftSecretChangeProposalPage!
+  astroliftSecretChangeProposalMetadata(id: GUID!): AstroliftSecretChangeProposalMetadata
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
   astroliftModelDeploymentMetrics(serviceId: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ModelDeploymentMetrics

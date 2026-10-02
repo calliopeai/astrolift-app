@@ -61,9 +61,7 @@ const frames: Array<{ name: string; view: (retry: () => void) => ReactNode; empt
   },
   {
     name: "proposal queue",
-    view: (retry) => (
-      <SecretProposalsQueue {...QUEUE} proposals={[]} error={refusal} onRetry={retry} />
-    ),
+    view: (retry) => <SecretProposalsQueue {...QUEUE} rows={[]} error={refusal} onRetry={retry} />,
     empty: /No pending secret/,
   },
   {

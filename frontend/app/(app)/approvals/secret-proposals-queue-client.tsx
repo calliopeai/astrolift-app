@@ -1,9 +1,6 @@
 "use client";
-
-import { SecretProposalsQueue } from "@/components/screens/approvals/SecretProposalsQueue";
-import { useSecretProposalsQueue } from "@/components/screens/approvals/use-secret-proposals-queue";
-
-/** Secret-change proposals queue (#488) on the global /approvals page. */
+import { SecretProposalsSummary } from "@/components/screens/approvals/SecretProposalsSummary";
+import { useSecretProposalsSummary } from "@/components/screens/approvals/use-secret-proposals-summary";
 export function SecretProposalsQueueClient() {
-  return <SecretProposalsQueue {...useSecretProposalsQueue()} />;
+  return <SecretProposalsSummary {...useSecretProposalsSummary()} />;
 }

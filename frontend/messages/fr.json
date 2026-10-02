@@ -3346,6 +3346,18 @@
         "proposer": "par {name}",
         "received": "reçu {rel}",
         "review": "Examiner"
+      },
+      "paging": {
+        "app": "Application",
+        "environment": "Environnement",
+        "operation": "Modification",
+        "approvals": "Approbations",
+        "proposer": "Proposé par",
+        "created": "Création",
+        "refresh": "Actualiser la file",
+        "recovery": "La file a changé ou ne peut pas être poursuivie. Réessayer revient à la première page.",
+        "description": "Métadonnées des propositions en attente uniquement. Ouvrez une proposition pour consulter ses détails soumis à une autorisation distincte.",
+        "unknown": "Inconnu"
       }
     },
     "deployments": {

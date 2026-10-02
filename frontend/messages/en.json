@@ -3620,6 +3620,18 @@
         "proposer": "by {name}",
         "received": "received {rel}",
         "review": "Review"
+      },
+      "paging": {
+        "app": "App",
+        "environment": "Environment",
+        "operation": "Change",
+        "approvals": "Approvals",
+        "proposer": "Proposed by",
+        "created": "Created",
+        "refresh": "Refresh queue",
+        "recovery": "The queue changed or could not be continued. Retry starts at the first page.",
+        "description": "Pending proposal metadata only. Open a proposal to review its separately authorized details.",
+        "unknown": "Unknown"
       }
     }
   },

@@ -3346,6 +3346,18 @@
         "proposer": "由 {name} 提交",
         "received": "{rel} 收到",
         "review": "审查"
+      },
+      "paging": {
+        "app": "应用",
+        "environment": "环境",
+        "operation": "变更",
+        "approvals": "审批",
+        "proposer": "提议者",
+        "created": "创建时间",
+        "refresh": "刷新队列",
+        "recovery": "队列已更改或无法继续加载。重试将从第一页开始。",
+        "description": "仅显示待处理提案的元数据。打开提案以查看需要单独授权的详情。",
+        "unknown": "未知"
       }
     },
     "deployments": {

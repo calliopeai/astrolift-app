@@ -69,6 +69,8 @@ from astrolift_services.schema.types import (
     ModelEndpointsFilterInput,
     ModelPromptReadinessType,
     SecretBundleType,
+    SecretChangeProposalMetadataType,
+    SecretChangeProposalPageType,
     SecretChangeProposalType,
     SecretHistoryActorType,
     SecretHistoryEntryType,
@@ -78,6 +80,7 @@ from astrolift_services.schema.types import (
     managed_service_catalog_entry_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
+    secret_change_proposal_metadata_to_type,
     secret_change_proposal_to_type,
     secret_editor_from_user,
     workload_identity_grant_to_type,
@@ -1863,6 +1866,57 @@ class ServicesQuery(ClusterModelsQuery):
         )
 
     # ---- Secret-change proposals (#488) ------------------------------
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_secret_change_proposals_page(
+        self,
+        info: Info,
+        app_slug: str | None = None,
+        status: str | None = None,
+        limit: int = 25,
+        after: str | None = None,
+    ) -> SecretChangeProposalPageType:
+        from astrolift_services.secret_proposal_pages import metadata_proposals, proposal_page
+
+        rows, cursor, total, complete = proposal_page(
+            metadata_proposals(_caller_org_id(), app_slug),
+            app_slug=app_slug,
+            status=status,
+            limit=limit,
+            after=after,
+        )
+        return SecretChangeProposalPageType(
+            items=[secret_change_proposal_metadata_to_type(row) for row in rows],
+            next_cursor=cursor,
+            total_count=total,
+            complete=complete,
+        )
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ,
+        scope=secret_change_proposal_app_scope("id", permissions=(Permission.APP_READ,)),
+        operation=secret_proposal_operation("id"),
+    )
+    @tenant_scoped()
+    def astrolift_secret_change_proposal_metadata(
+        self,
+        info: Info,
+        id: GUID,  # type: ignore[valid-type]  # Strawberry's runtime scalar wrapper.
+    ) -> SecretChangeProposalMetadataType | None:
+        from astrolift_services.secret_proposal_pages import METADATA_FIELDS, metadata_proposals
+
+        row = (
+            metadata_proposals(_caller_org_id())
+            .filter(guid=str(id))
+            .select_related("registered_app", "proposer")
+            .only(*METADATA_FIELDS)
+            .first()
+        )
+        return secret_change_proposal_metadata_to_type(row) if row is not None else None
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)

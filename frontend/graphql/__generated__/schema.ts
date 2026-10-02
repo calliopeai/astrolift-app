@@ -4783,10 +4783,32 @@ export type AstroliftSecretChangeProposal = {
   status: Scalars['String']['output'];
 };
 
+export type AstroliftSecretChangeProposalMetadata = {
+  appliedAt?: Maybe<Scalars['DateTime']['output']>;
+  approvalsCount: Scalars['Int']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  decidedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  op: Scalars['String']['output'];
+  proposerDisplayName: Scalars['String']['output'];
+  registeredAppSlug: Scalars['String']['output'];
+  requiredApproverCount: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type AstroliftSecretChangeProposalMutationResult = {
   data?: Maybe<AstroliftSecretChangeProposal>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftSecretChangeProposalPage = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<AstroliftSecretChangeProposalMetadata>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount: Scalars['Int']['output'];
 };
 
 export type AstroliftSecretEditor = {
@@ -9919,7 +9941,9 @@ export type Query = {
   astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
   astroliftSecretChangeProposal?: Maybe<AstroliftSecretChangeProposal>;
+  astroliftSecretChangeProposalMetadata?: Maybe<AstroliftSecretChangeProposalMetadata>;
   astroliftSecretChangeProposals: Array<AstroliftSecretChangeProposal>;
+  astroliftSecretChangeProposalsPage: AstroliftSecretChangeProposalPage;
   /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
   astroliftServerInfo: AstroliftServerInfo;
   astroliftSharedModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
@@ -11397,8 +11421,21 @@ export type QueryAstroliftSecretChangeProposalArgs = {
 };
 
 
+export type QueryAstroliftSecretChangeProposalMetadataArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftSecretChangeProposalsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftSecretChangeProposalsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
 };
 

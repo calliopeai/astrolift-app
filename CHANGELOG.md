@@ -41,6 +41,11 @@
   the request clock and locale; compact durations keep invalid reports unknown
   and retain the existing minute/hour boundaries (#2145).
 
+- Add bounded, permission-scoped metadata-only secret proposal pages and exact
+  GUID metadata reads. Signed cursors reject changed or expired walks explicitly;
+  the web queue follows server pages and resets continuations after refresh or
+  decisions without broadening payload reveal or step-up authority (#2233).
+
 - Localize cluster connection snapshots and shared read recovery in all eight
   locales. Failed, incomplete and wrong-target reads cannot confirm connectivity
   or mount driver cards. Cached reports remain explicitly unconfirmed, unknown

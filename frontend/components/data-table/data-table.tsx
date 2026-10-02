@@ -168,7 +168,7 @@ export function DataTable<TRow>({
         return (
           <TableRow className="hover:bg-transparent">
             <TableCell colSpan={columnCount} className="py-10">
-              <div className="flex flex-col items-center gap-3 text-center">
+              <div role="alert" className="flex flex-col items-center gap-3 text-center">
                 <AlertTriangleIcon className="text-danger size-5" />
                 <div>
                   <p className="font-medium">{t("loadFailed", { label: noun })}</p>

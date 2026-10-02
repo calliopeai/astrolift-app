@@ -3346,6 +3346,18 @@
         "proposer": "por {name}",
         "received": "recibido {rel}",
         "review": "Revisar"
+      },
+      "paging": {
+        "app": "Aplicación",
+        "environment": "Entorno",
+        "operation": "Cambio",
+        "approvals": "Aprobaciones",
+        "proposer": "Propuesto por",
+        "created": "Creado",
+        "refresh": "Actualizar cola",
+        "recovery": "La cola cambió o no se pudo continuar. Reintentar vuelve a la primera página.",
+        "description": "Solo metadatos de propuestas pendientes. Abre una propuesta para revisar sus detalles con autorización independiente.",
+        "unknown": "Desconocido"
       }
     },
     "deployments": {

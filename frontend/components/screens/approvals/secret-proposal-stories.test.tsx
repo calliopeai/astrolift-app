@@ -3,6 +3,8 @@ import { cleanup, render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import * as preview from "../../../.storybook/preview";
 import * as stories from "./SecretProposalDetail.stories";
+import * as queueStories from "./SecretProposalsQueue.stories";
+import * as summaryStories from "./SecretProposalsSummary.stories";
 
 setProjectAnnotations(preview);
 describe("Secret proposal portable stories", () => {
@@ -18,3 +20,22 @@ describe("Secret proposal portable stories", () => {
     }
   });
 });
+
+for (const [screen, fixtures] of Object.entries({
+  Queue: composeStories(queueStories),
+  Summary: composeStories(summaryStories),
+})) {
+  describe(`Secret proposal ${screen} portable stories`, () => {
+    it.each(Object.entries(fixtures))("%s renders", async (_name, Story) => {
+      const canvasElement = document.createElement("div");
+      document.body.append(canvasElement);
+      try {
+        await Story.run({ canvasElement, testingLibraryRender: render });
+        expect(canvasElement.childElementCount).toBeGreaterThan(0);
+      } finally {
+        cleanup();
+        canvasElement.remove();
+      }
+    });
+  });
+}
