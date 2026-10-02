@@ -7243,5 +7243,59 @@
       "canceled": "Cancelled"
     },
     "graphLabel": "Agent interaction map"
+  },
+  "agentObservation": {
+    "session": {
+      "loading": "Loading session",
+      "loadFailed": "Could not load session",
+      "notFound": "Agent not found",
+      "notFoundDescription": "This agent task doesn't exist or you don't have access to it.",
+      "unavailable": "Session not available",
+      "notCapable": "This agent isn't running a VNC-capable session.",
+      "ended": "This agent is no longer running, so its live session has closed.",
+      "back": "Back to theatre",
+      "title": "Live agent session",
+      "theatre": "Theatre"
+    },
+    "viewer": {
+      "fitTitle": "Fit to window",
+      "fit": "Fit session to window",
+      "actualTitle": "Actual size (1:1)",
+      "actual": "Show session at actual size",
+      "exitFullscreen": "Exit fullscreen",
+      "fullscreen": "Fullscreen",
+      "enterFullscreen": "Enter fullscreen",
+      "title": "Live agent session",
+      "connecting": "Connecting to live session…",
+      "closed": "Session closed.",
+      "denied": "Access denied.",
+      "error": "Connection error."
+    },
+    "logs": {
+      "log": "Log",
+      "noRuns": "No runs yet",
+      "noRunsDescription": "Use Run now above. The newest run's log streams here; every run is on the Runs tab.",
+      "runs": "Runs",
+      "temporary": "Pod output is temporary and may disappear after the pod is removed.",
+      "live": "Live pod logs",
+      "window": "Recent log window",
+      "loadingEarlier": "Loading earlier…",
+      "loadEarlier": "Load earlier",
+      "refresh": "Refresh log",
+      "runTitle": "Log · run {id}",
+      "openRun": "Open run",
+      "spawnFailed": "Run failed before a pod started",
+      "emptyOutput": "No pod output is available. The run may not have written logs yet, or its pod may have been removed.",
+      "refreshFailed": "Logs could not be refreshed.",
+      "earlierFailed": "Earlier logs could not be loaded."
+    }
+  },
+  "runLog": {
+    "title": "Log",
+    "empty": "No output yet.",
+    "follow": "Follow",
+    "download": "Download log",
+    "jump": "Jump to latest",
+    "newLines": "{count, plural, one {# new} other {# new}}"
   }
 }

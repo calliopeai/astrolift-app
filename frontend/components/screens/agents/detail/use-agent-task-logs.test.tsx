@@ -2,6 +2,8 @@ import { ApolloClient, ApolloLink, InMemoryCache, Observable } from "@apollo/cli
 import { ApolloProvider } from "@apollo/client/react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { NextIntlClientProvider } from "next-intl";
+import en from "@/messages/en.json";
 import { describe, expect, it } from "vitest";
 
 import type { AstroliftAgentTaskLogPage } from "@/graphql/__generated__/schema";
@@ -54,7 +56,9 @@ function server(
     ),
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <ApolloProvider client={client}>{children}</ApolloProvider>
+    <NextIntlClientProvider locale="en" messages={en}>
+      <ApolloProvider client={client}>{children}</ApolloProvider>
+    </NextIntlClientProvider>
   );
   return { client, requests, wrapper };
 }

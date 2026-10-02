@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { AgentVncPopoutScreen } from "./AgentVncPopout";
@@ -49,5 +52,23 @@ export const LongTaskId: Story = {
       taskId={"a-very-long-task-identifier-that-keeps-going-".repeat(4)}
       task={{ ...VNC_POPOUT.task!, status: "running", vncEnabled: false }}
     />
+  ),
+};
+
+export const FrenchSessionEnded: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AgentVncPopoutScreen
+        {...VNC_POPOUT}
+        task={{ ...VNC_POPOUT.task!, status: "completed", vncUrl: "" }}
+      />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseUnavailable: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <AgentVncPopoutScreen {...VNC_POPOUT} task={{ ...VNC_POPOUT.task!, vncEnabled: false }} />
+    </NextIntlClientProvider>
   ),
 };

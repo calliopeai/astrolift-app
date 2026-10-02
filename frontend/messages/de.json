@@ -7166,5 +7166,59 @@
       "canceled": "Abgebrochen"
     },
     "graphLabel": "Interaktionskarte des Agents"
+  },
+  "agentObservation": {
+    "session": {
+      "loading": "Sitzung wird geladen",
+      "loadFailed": "Sitzung konnte nicht geladen werden",
+      "notFound": "Agent nicht gefunden",
+      "notFoundDescription": "Diese Agent-Aufgabe existiert nicht oder Sie haben keinen Zugriff darauf.",
+      "unavailable": "Sitzung nicht verfügbar",
+      "notCapable": "Dieser Agent führt keine VNC-fähige Sitzung aus.",
+      "ended": "Dieser Agent wird nicht mehr ausgeführt; seine Live-Sitzung wurde geschlossen.",
+      "back": "Zurück zum Theater",
+      "title": "Live-Sitzung des Agents",
+      "theatre": "Theater"
+    },
+    "viewer": {
+      "fitTitle": "An Fenster anpassen",
+      "fit": "Sitzung an Fenster anpassen",
+      "actualTitle": "Originalgröße (1:1)",
+      "actual": "Sitzung in Originalgröße anzeigen",
+      "exitFullscreen": "Vollbild verlassen",
+      "fullscreen": "Vollbild",
+      "enterFullscreen": "Vollbild öffnen",
+      "title": "Live-Sitzung des Agents",
+      "connecting": "Verbindung zur Live-Sitzung wird hergestellt…",
+      "closed": "Sitzung geschlossen.",
+      "denied": "Zugriff verweigert.",
+      "error": "Verbindungsfehler."
+    },
+    "logs": {
+      "log": "Protokoll",
+      "noRuns": "Noch keine Ausführungen",
+      "noRunsDescription": "Verwenden Sie oben Jetzt ausführen. Hier erscheint das Protokoll der neuesten Ausführung; alle Ausführungen stehen auf dem Tab Ausführungen.",
+      "runs": "Ausführungen",
+      "temporary": "Die Pod-Ausgabe ist temporär und kann nach dem Entfernen des Pods verschwinden.",
+      "live": "Live-Pod-Protokolle",
+      "window": "Aktueller Protokollausschnitt",
+      "loadingEarlier": "Frühere Einträge werden geladen…",
+      "loadEarlier": "Frühere Einträge laden",
+      "refresh": "Protokoll aktualisieren",
+      "runTitle": "Protokoll · Ausführung {id}",
+      "openRun": "Ausführung öffnen",
+      "spawnFailed": "Ausführung vor dem Start eines Pods fehlgeschlagen",
+      "emptyOutput": "Keine Pod-Ausgabe verfügbar. Die Ausführung hat möglicherweise noch keine Protokolle geschrieben oder ihr Pod wurde entfernt.",
+      "refreshFailed": "Protokolle konnten nicht aktualisiert werden.",
+      "earlierFailed": "Frühere Protokolle konnten nicht geladen werden."
+    }
+  },
+  "runLog": {
+    "title": "Protokoll",
+    "empty": "Noch keine Ausgabe.",
+    "follow": "Folgen",
+    "download": "Protokoll herunterladen",
+    "jump": "Zum neuesten Eintrag",
+    "newLines": "{count, plural, one {# neuer Eintrag} other {# neue Einträge}}"
   }
 }

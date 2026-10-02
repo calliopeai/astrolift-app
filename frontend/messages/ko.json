@@ -7163,5 +7163,59 @@
       "canceled": "취소됨"
     },
     "graphLabel": "에이전트 상호작용 지도"
+  },
+  "agentObservation": {
+    "session": {
+      "loading": "세션을 불러오는 중",
+      "loadFailed": "세션을 불러올 수 없습니다",
+      "notFound": "에이전트를 찾을 수 없습니다",
+      "notFoundDescription": "이 에이전트 작업이 없거나 접근 권한이 없습니다.",
+      "unavailable": "세션을 사용할 수 없습니다",
+      "notCapable": "이 에이전트는 VNC를 지원하는 세션을 실행하고 있지 않습니다.",
+      "ended": "이 에이전트의 실행이 끝나 라이브 세션이 닫혔습니다.",
+      "back": "시어터로 돌아가기",
+      "title": "에이전트 라이브 세션",
+      "theatre": "시어터"
+    },
+    "viewer": {
+      "fitTitle": "창에 맞추기",
+      "fit": "세션을 창에 맞추기",
+      "actualTitle": "실제 크기 (1:1)",
+      "actual": "세션을 실제 크기로 표시",
+      "exitFullscreen": "전체 화면 종료",
+      "fullscreen": "전체 화면",
+      "enterFullscreen": "전체 화면으로 전환",
+      "title": "에이전트 라이브 세션",
+      "connecting": "라이브 세션에 연결 중…",
+      "closed": "세션이 닫혔습니다.",
+      "denied": "접근이 거부되었습니다.",
+      "error": "연결 오류."
+    },
+    "logs": {
+      "log": "로그",
+      "noRuns": "아직 실행이 없습니다",
+      "noRunsDescription": "위의 지금 실행을 사용하세요. 최신 실행의 로그가 여기에 표시되며, 모든 실행은 실행 탭에서 확인할 수 있습니다.",
+      "runs": "실행",
+      "temporary": "Pod 출력은 임시 데이터이며 Pod가 삭제되면 사라질 수 있습니다.",
+      "live": "Pod 라이브 로그",
+      "window": "최근 로그 범위",
+      "loadingEarlier": "이전 로그를 불러오는 중…",
+      "loadEarlier": "이전 로그 불러오기",
+      "refresh": "로그 새로고침",
+      "runTitle": "로그 · 실행 {id}",
+      "openRun": "실행 열기",
+      "spawnFailed": "Pod가 시작되기 전에 실행이 실패했습니다",
+      "emptyOutput": "Pod 출력이 없습니다. 실행이 아직 로그를 쓰지 않았거나 Pod가 삭제되었을 수 있습니다.",
+      "refreshFailed": "로그를 새로고침할 수 없습니다.",
+      "earlierFailed": "이전 로그를 불러올 수 없습니다."
+    }
+  },
+  "runLog": {
+    "title": "로그",
+    "empty": "아직 출력이 없습니다.",
+    "follow": "따라가기",
+    "download": "로그 다운로드",
+    "jump": "최신 로그로 이동",
+    "newLines": "새 로그 {count, number}개"
   }
 }
