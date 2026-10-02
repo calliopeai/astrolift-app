@@ -2705,6 +2705,97 @@
           "pulled": "已拉取仓库的工作流文件。该文件现在是基准。",
           "refreshed": "已重新检查差异：{state}。"
         }
+      },
+      "ciSetup": {
+        "agentTitle": "代理源码交付",
+        "agentDescription": "代理推送会固定一个不可变的包快照，不会部署常驻应用或开始运行。下次调度将使用最近成功的快照和该包指定的镜像。",
+        "agentSyncTitle": "推送 → 包同步",
+        "agentSyncHint": "已签名的源码 Webhook · 仅部署分支 · 指定的清单或明确启用的联合包。",
+        "agentAutomatic": "推送时自动执行",
+        "agentConfig": "配置和脚本",
+        "agentConfigHint": "从选定的 chroot 源码范围固定。",
+        "agentImage": "容器镜像",
+        "agentImageHint": "由仓库的镜像 CI 单独发布。",
+        "agentRuns": "运行",
+        "agentRunsHint": "源码推送不会自动开始运行。",
+        "appHint": "应用的固定标识符。请将其包含在部署 Webhook 正文中，以便平台正确路由。",
+        "apiHint": "Astrolift API 的公开基本 URL。部署 Webhook 会向此地址发送 POST。",
+        "tokenHint": "作用域限定于应用的 Bearer 令牌。在部署令牌页面创建时仅显示一次。",
+        "manageTokens": "管理部署令牌",
+        "yamlCopied": "已复制参考工作流 YAML。",
+        "copyTextFailed": "复制失败，请选择文本并手动复制。",
+        "title": "CI 配置",
+        "description": "同步到源码仓库前，请检查应用的 CI 密钥和工作流。",
+        "managedWorkflow": "托管 CI 工作流",
+        "referenceWorkflow": "GitHub Actions 参考工作流",
+        "reviewBeforeSync": "同步前检查",
+        "pasteInto": "粘贴到 <path>.github/workflows/astrolift-ci.yml</path>",
+        "workflowUnavailable": "工作流不可用。请检查应用的 CI 配置，并刷新当前工作流预览。",
+        "copyYaml": "复制工作流 YAML",
+        "pushRotate": "推送并轮换",
+        "rotateTitle": "将 CI 密钥推送到仓库？",
+        "rotateDescription": "此操作会轮换部署令牌。旧令牌会立即失效。",
+        "validateTitle": "验证 CI 密钥",
+        "validateDescription": "检查 GitHub Actions 当前实际可见的值。只读取，不做更改。",
+        "validate": "验证",
+        "current": "最新",
+        "stale": "已设置，但已过时",
+        "notSet": "未设置",
+        "unknownDate": "日期不可用",
+        "pushRotateDescription": "一次性加密并上传全部五个值到 GitHub Actions 密钥。此操作同时会轮换部署令牌。",
+        "secretNameHint": "GitHub Actions 密钥名称",
+        "open": "打开",
+        "valueCopied": "已复制 {name}。",
+        "copyValueFailed": "复制失败，请选择该值并手动复制。",
+        "pending": "等待配置…",
+        "copy": "复制",
+        "copied": "已复制",
+        "syncTitle": "同步工作流文件",
+        "syncDescription": "将生成的<path>工作流文件</path>提交到部署分支。操作具有幂等性，对已同步的仓库重复执行不会产生更改。",
+        "webhookTitle": "源码 Webhook",
+        "installed": "已安装 · {relative}",
+        "notInstalled": "未安装",
+        "webhookDescription": "在源码仓库中注册指向平台接收 URL 的推送 Webhook。再次执行会轮换 HMAC 密钥，不会重复创建 Webhook。",
+        "refreshWebhook": "刷新 Webhook",
+        "installWebhook": "安装 Webhook",
+        "providers": {
+          "aws": {
+            "pushHint": "GitHub Actions 运行器通过 OIDC 承担、用于推送镜像的 IAM 角色。由 Astrolift 在集群初始化时配置。",
+            "registryHint": "此应用推送镜像的 Amazon ECR 仓库 URI。每次构建请使用提交 SHA 作为标签。"
+          },
+          "gcp": {
+            "pushHint": "运行器通过 OIDC 认证的 Workload Identity Federation 提供商资源。由 Astrolift 在集群初始化时配置。",
+            "registryHint": "此应用推送镜像的 Google Artifact Registry 路径（例如 us-docker.pkg.dev/PROJECT/REPO/app）。每次构建请使用提交 SHA 作为标签。"
+          },
+          "azure": {
+            "pushHint": "具有 GitHub 联合凭据的 Entra ID 应用程序（客户端）ID。运行器通过 OIDC 登录，不存储客户端密钥。由 Astrolift 在集群初始化时配置。",
+            "registryHint": "此应用推送镜像的 Azure Container Registry 登录服务器（例如 myregistry.azurecr.io）。每次构建请使用提交 SHA 作为标签。"
+          },
+          "k8s_native": {
+            "pushHint": "用于 docker login 的仓库密码或机器人账户令牌。请同时在仓库中设置 ASTROLIFT_REGISTRY_USERNAME 密钥。",
+            "registryHint": "此应用推送镜像的容器仓库 URI。可使用集群能够拉取镜像的任意 OCI 兼容仓库。每次构建请使用提交 SHA 作为标签。"
+          }
+        },
+        "feedback": {
+          "pushFailed": "无法推送 CI 密钥。",
+          "pushed": "已向 {repo} 推送 {count} 个密钥；新令牌的最后四个字符：{last4}",
+          "validateFailed": "无法验证 CI 密钥。",
+          "validated": "{repo} 上的 {count} 个密钥均已设置且为最新。",
+          "partiallyValidated": "{repo} 上的有效密钥：{healthy}/{total}。",
+          "syncFailed": "无法同步工作流文件。",
+          "inSync": "已是最新。",
+          "protectedPr": "分支受保护，已打开 PR。",
+          "viewPr": "查看 PR",
+          "created": "已创建",
+          "updated": "已更新",
+          "syncedCommit": "{verb}：{filename}（提交 {commit}）。",
+          "synced": "{verb}：{filename}。",
+          "webhookFailed": "无法安装源码 Webhook。",
+          "installed": "已安装",
+          "refreshed": "已刷新",
+          "webhookUrl": "{verb}：推送 Webhook → {url}",
+          "webhook": "{verb}：推送 Webhook。"
+        }
       }
     },
     "frame": {
