@@ -2,7 +2,6 @@ import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from astrolift_agents.models import AgentTask
 from astrolift_identity.models import Organization
 
 APP = "astrolift_agents"
@@ -36,8 +35,10 @@ def test_combined_upgrade_preserves_tasks_from_either_branch(starting_migration)
             fields["backlog_snapshot"] = backlog
         task = historical_task.objects.create(organization_id=organization.pk, **fields)
 
-        MigrationExecutor(connection).migrate([(APP, MERGE)])
-        restored = AgentTask.objects.get(pk=task.pk)
+        executor = MigrationExecutor(connection)
+        executor.migrate([(APP, MERGE)])
+        merged_task = executor.loader.project_state([(APP, MERGE)]).apps.get_model(APP, "AgentTask")
+        restored = merged_task.objects.get(pk=task.pk)
         assert restored.guid == task.guid
         assert restored.organization_id == organization.pk
         assert restored.startup_diagnostic == (diagnostic if starting_migration == STARTUP else {})
