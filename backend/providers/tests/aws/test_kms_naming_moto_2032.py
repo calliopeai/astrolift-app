@@ -11,42 +11,14 @@ import pytest
 from _sdk.managed_service import DeprovisionSpec, UpdateSpec
 from aws._naming import iam_role_name
 from aws.managed.encryption_kms import KMSDriver
-from tests.aws._kms_native_2032 import native_kms
+from tests.aws._kms_native_2032 import OTHER_ID, native_kms, spies
 from tests.aws.test_managed_kms import SERVICE_ID, _spec
-
-OTHER_ID = "22222222-2222-4222-8222-222222222222"
-WRITES = (
-    "create_key",
-    "create_alias",
-    "update_key_description",
-    "put_key_policy",
-    "enable_key",
-    "disable_key",
-    "enable_key_rotation",
-    "disable_key_rotation",
-    "cancel_key_deletion",
-    "replicate_key",
-    "create_grant",
-    "revoke_grant",
-    "schedule_key_deletion",
-    "import_key_material",
-)
 
 
 @pytest.fixture
 def cloud(monkeypatch):
     with native_kms(monkeypatch) as state:
         yield state
-
-
-def spies(state):
-    stack = ExitStack()
-    calls = [
-        stack.enter_context(patch.object(api, name, wraps=getattr(api, name)))
-        for api in state.clients.values()
-        for name in WRITES
-    ]
-    return stack, calls
 
 
 def assert_refused_without_writes(cloud, spec):

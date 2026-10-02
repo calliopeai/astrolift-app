@@ -8,8 +8,6 @@ from unittest.mock import patch
 import pytest
 from aws._naming import iam_role_name
 from aws.managed.encryption_kms import KMSDriver
-from tests.aws._kms_native_2032 import native_kms
-from tests.aws.test_kms_naming_moto_2032 import OTHER_ID, spies
 
 from astrolift_drivers.registry import PluginManifest, PluginRegistry
 from astrolift_workflows.activities.managed_service_lifecycle import (
@@ -18,6 +16,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     _update_sync,
 )
 from astrolift_workflows.tests.test_recorded_handle_exclusive_2086 import _service
+from providers.tests.aws._kms_native_2032 import OTHER_ID, native_kms, spies
 
 pytestmark = pytest.mark.django_db
 
