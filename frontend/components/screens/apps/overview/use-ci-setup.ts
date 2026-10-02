@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -70,7 +71,7 @@ interface ReconcileResp {
 }
 
 /** A toast body with a trailing "View PR" link (a .ts file, so no JSX). */
-function prToast(text: string, prUrl: string) {
+function prToast(text: string, prUrl: string, label = "View PR") {
   return React.createElement(
     "span",
     null,
@@ -79,12 +80,13 @@ function prToast(text: string, prUrl: string) {
     React.createElement(
       Link,
       { href: prUrl, target: "_blank", rel: "noreferrer", className: "underline" },
-      "View PR"
+      label
     )
   );
 }
 
 function useWorkflowSync(appId: string) {
+  const t = useTranslations("apps.overview.ciWorkflow");
   const [push, { loading: pushing }] = useMutation<PushResp>(RESYNC_CI_WORKFLOW, {
     refetchQueries: ["GetApp"],
     awaitRefetchQueries: true,
@@ -107,13 +109,15 @@ function useWorkflowSync(appId: string) {
       const { data } = await refresh({ variables: { input: { appId } } });
       const payload = data?.refreshCiWorkflowSyncStatus;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't recompute drift.");
+        toast.error(payload?.errors?.[0]?.message ?? t("feedback.refreshFailed"));
         return;
       }
-      const label = DRIFT_BADGE[payload.data.state]?.label ?? payload.data.state;
-      toast.success(`Drift re-checked — ${label}.`);
+      const label = Object.hasOwn(DRIFT_BADGE, payload.data.state)
+        ? t(`states.${payload.data.state}.label`)
+        : payload.data.state;
+      toast.success(t("feedback.refreshed", { state: label }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't recompute drift.");
+      toast.error(err instanceof Error ? err.message : t("feedback.refreshFailed"));
     }
   }
 
@@ -122,18 +126,16 @@ function useWorkflowSync(appId: string) {
       const { data } = await push({ variables: { input: { appId } } });
       const payload = data?.resyncAstroliftCiWorkflow;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't push the workflow file.");
+        toast.error(payload?.errors?.[0]?.message ?? t("feedback.pushFailed"));
         return;
       }
       if (payload.data.prUrl) {
-        toast.success(
-          prToast("Opened a PR rather than overwriting the repo's file.", payload.data.prUrl)
-        );
+        toast.success(prToast(t("feedback.pushPr"), payload.data.prUrl, t("viewPr")));
         return;
       }
-      toast.success("Pushed the current template to the repo.");
+      toast.success(t("feedback.pushed"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't push the workflow file.");
+      toast.error(err instanceof Error ? err.message : t("feedback.pushFailed"));
     }
   }
 
@@ -142,21 +144,16 @@ function useWorkflowSync(appId: string) {
       const { data } = await openReconcile({ variables: { input: { appId } } });
       const payload = data?.openCiWorkflowReconcilePr;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Couldn't open the reconcile PR.");
+        toast.error(payload?.errors?.[0]?.message ?? t("feedback.reconcileFailed"));
         return;
       }
       if (payload.data.prUrl) {
-        toast.success(
-          prToast(
-            "Opened a reconcile PR to overwrite the drifted file with the template.",
-            payload.data.prUrl
-          )
-        );
+        toast.success(prToast(t("feedback.reconciled"), payload.data.prUrl, t("viewPr")));
         return;
       }
-      toast.success("Opened a reconcile PR to overwrite the drifted file with the template.");
+      toast.success(t("feedback.reconciled"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't open the reconcile PR.");
+      toast.error(err instanceof Error ? err.message : t("feedback.reconcileFailed"));
     }
   }
 
@@ -165,9 +162,9 @@ function useWorkflowSync(appId: string) {
     const { data } = await pull({ variables: { input: { appId } } });
     const payload = data?.pullCiWorkflowFromRepo;
     if (!payload?.ok || !payload.data) {
-      throw new Error(payload?.errors?.[0]?.message ?? "Couldn't pull the repo's file.");
+      throw new Error(payload?.errors?.[0]?.message ?? t("feedback.pullFailed"));
     }
-    toast.success("Pulled the repo's workflow file. It's now the baseline.");
+    toast.success(t("feedback.pulled"));
   }
 
   return {

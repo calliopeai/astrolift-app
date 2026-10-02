@@ -2644,6 +2644,67 @@
           "connect": "Conecte um GitHub App ou uma conexão da organização para configurar a implantação automática",
           "attention": "Algumas etapas da configuração automática ainda precisam de atenção"
         }
+      },
+      "ciWorkflow": {
+        "title": "Sincronização do fluxo gerenciado",
+        "templateVersions": "modelo v{previous} → v{current}",
+        "lastChecked": "última verificação: {relative}",
+        "check": "Verificar",
+        "pull": "Importar do repositório",
+        "push": "Enviar ao repositório",
+        "reconcile": "Abrir PR de reconciliação",
+        "compare": "Comparar o arquivo do repositório com o conteúdo a enviar",
+        "comparePulled": "Comparar o arquivo do repositório com o conteúdo a enviar (importado {relative})",
+        "repoVersion": "No repositório",
+        "pushVersion": "Conteúdo a enviar",
+        "pullTitle": "Importar o arquivo do fluxo do repositório?",
+        "pullDescription": "O Astrolift lê o arquivo da branch de implantação, armazena-o e o adota como referência, para que deixe de ser sinalizado como alterado. Nada é gravado no repositório.",
+        "viewPr": "Ver PR",
+        "states": {
+          "in_sync": {
+            "label": "corresponde",
+            "hint": "O arquivo do fluxo no repositório corresponde ao conteúdo gerado pela plataforma. Nenhuma ação necessária."
+          },
+          "template_stale": {
+            "label": "modelo antigo",
+            "hint": "O arquivo do repositório não foi alterado, mas a plataforma gera um modelo mais recente. Envie-o para atualizar o arquivo."
+          },
+          "repo_drift": {
+            "label": "editado no repositório",
+            "hint": "Alguém editou o arquivo do repositório. Importe-o para manter essa versão ou envie o modelo para substituí-la por meio de um PR."
+          },
+          "conflict": {
+            "label": "ambos alterados",
+            "hint": "O arquivo do repositório e o modelo foram alterados. Importe a versão do repositório ou envie o modelo para substituí-la por meio de um PR."
+          },
+          "absent": {
+            "label": "ausente no repositório",
+            "hint": "Não há arquivo do fluxo na branch de implantação. Envie-o para criar um."
+          },
+          "unknown": {
+            "label": "desconhecido",
+            "hint": "Não foi possível ler o repositório na última verificação. Verifique novamente para tentar de novo."
+          }
+        },
+        "relative": {
+          "justNow": "agora mesmo",
+          "minutes": "há {count} min",
+          "hours": "há {count} h",
+          "days": "há {count, plural, one {# dia} other {# dias}}",
+          "months": "há {count, plural, one {# mês} other {# meses}}",
+          "years": "há {count, plural, one {# ano} other {# anos}}"
+        },
+        "feedback": {
+          "refreshFailed": "Não foi possível recalcular as diferenças.",
+          "pushFailed": "Não foi possível enviar o arquivo do fluxo.",
+          "reconcileFailed": "Não foi possível abrir o PR de reconciliação.",
+          "pullFailed": "Não foi possível importar o arquivo do repositório.",
+          "pushed": "O modelo atual foi enviado ao repositório.",
+          "pushPr": "Um PR foi aberto em vez de sobrescrever o arquivo do repositório.",
+          "reconciled": "Um PR de reconciliação foi aberto para substituir o arquivo alterado pelo modelo.",
+          "pulled": "O arquivo do fluxo foi importado do repositório. Agora ele é a referência.",
+          "refreshed": "Diferenças verificadas novamente: {state}."
+        }
       }
     },
     "frame": {

@@ -884,6 +884,67 @@
           "connect": "Connect a GitHub App or org connection to wire auto-deploy",
           "attention": "Some autowire steps still need attention"
         }
+      },
+      "ciWorkflow": {
+        "title": "Managed workflow sync",
+        "templateVersions": "template v{previous} → v{current}",
+        "lastChecked": "last checked {relative}",
+        "check": "Check",
+        "pull": "Pull from repo",
+        "push": "Push to repo",
+        "reconcile": "Open reconcile PR",
+        "compare": "Compare the repo's file with what a push would send",
+        "comparePulled": "Compare the repo's file with what a push would send (pulled {relative})",
+        "repoVersion": "In the repo",
+        "pushVersion": "What a push would send",
+        "pullTitle": "Pull the repo's workflow file?",
+        "pullDescription": "Astrolift reads the file from the deploy branch, stores it, and treats it as the baseline, so it stops being reported as changed. Nothing is written to the repo.",
+        "viewPr": "View PR",
+        "states": {
+          "in_sync": {
+            "label": "matches",
+            "hint": "The repo's workflow file matches what the platform renders. Nothing to do."
+          },
+          "template_stale": {
+            "label": "template behind",
+            "hint": "The repo file is untouched, but the platform renders a newer template. Push to update it."
+          },
+          "repo_drift": {
+            "label": "edited in repo",
+            "hint": "Someone edited the repo's file. Pull to keep their version, or push to replace it through a PR."
+          },
+          "conflict": {
+            "label": "both changed",
+            "hint": "The repo file and the template both changed. Pull to keep the repo's version, or push to replace it through a PR."
+          },
+          "absent": {
+            "label": "not in repo",
+            "hint": "No workflow file on the deploy branch. Push to create one."
+          },
+          "unknown": {
+            "label": "unknown",
+            "hint": "The repo couldn't be read on the last check. Check again to retry."
+          }
+        },
+        "relative": {
+          "justNow": "just now",
+          "minutes": "{count}m ago",
+          "hours": "{count}h ago",
+          "days": "{count}d ago",
+          "months": "{count}mo ago",
+          "years": "{count}y ago"
+        },
+        "feedback": {
+          "refreshFailed": "Couldn't recompute drift.",
+          "pushFailed": "Couldn't push the workflow file.",
+          "reconcileFailed": "Couldn't open the reconcile PR.",
+          "pullFailed": "Couldn't pull the repo's file.",
+          "pushed": "Pushed the current template to the repo.",
+          "pushPr": "Opened a PR rather than overwriting the repo's file.",
+          "reconciled": "Opened a reconcile PR to overwrite the drifted file with the template.",
+          "pulled": "Pulled the repo's workflow file. It's now the baseline.",
+          "refreshed": "Drift re-checked — {state}."
+        }
       }
     },
     "wizard": {

@@ -2644,6 +2644,67 @@
           "connect": "Verbinde eine GitHub App oder eine Verbindung der Organisation, um die automatische Bereitstellung einzurichten",
           "attention": "Einige Schritte der automatischen Einrichtung erfordern noch Aufmerksamkeit"
         }
+      },
+      "ciWorkflow": {
+        "title": "Synchronisierung des verwalteten Workflows",
+        "templateVersions": "Vorlage v{previous} → v{current}",
+        "lastChecked": "zuletzt geprüft: {relative}",
+        "check": "Prüfen",
+        "pull": "Aus Repository übernehmen",
+        "push": "An Repository senden",
+        "reconcile": "Abgleich-PR öffnen",
+        "compare": "Repository-Datei mit dem Inhalt einer Übertragung vergleichen",
+        "comparePulled": "Repository-Datei mit dem Inhalt einer Übertragung vergleichen (übernommen {relative})",
+        "repoVersion": "Im Repository",
+        "pushVersion": "Inhalt einer Übertragung",
+        "pullTitle": "Workflow-Datei aus dem Repository übernehmen?",
+        "pullDescription": "Astrolift liest die Datei aus dem Bereitstellungsbranch, speichert sie und übernimmt sie als Grundlage. Sie wird dann nicht mehr als geändert gemeldet. Es wird nichts in das Repository geschrieben.",
+        "viewPr": "PR anzeigen",
+        "states": {
+          "in_sync": {
+            "label": "stimmt überein",
+            "hint": "Die Workflow-Datei im Repository entspricht dem Ergebnis der Plattform. Keine Aktion erforderlich."
+          },
+          "template_stale": {
+            "label": "Vorlage veraltet",
+            "hint": "Die Repository-Datei ist unverändert, aber die Plattform erzeugt eine neuere Vorlage. Sende sie, um die Datei zu aktualisieren."
+          },
+          "repo_drift": {
+            "label": "im Repository bearbeitet",
+            "hint": "Jemand hat die Repository-Datei bearbeitet. Übernimm sie, um diese Version zu behalten, oder sende die Vorlage, um sie über einen PR zu ersetzen."
+          },
+          "conflict": {
+            "label": "beide geändert",
+            "hint": "Die Repository-Datei und die Vorlage wurden geändert. Übernimm die Repository-Version oder sende die Vorlage, um sie über einen PR zu ersetzen."
+          },
+          "absent": {
+            "label": "nicht im Repository",
+            "hint": "Im Bereitstellungsbranch gibt es keine Workflow-Datei. Sende sie, um eine anzulegen."
+          },
+          "unknown": {
+            "label": "unbekannt",
+            "hint": "Das Repository konnte bei der letzten Prüfung nicht gelesen werden. Prüfe es erneut."
+          }
+        },
+        "relative": {
+          "justNow": "gerade eben",
+          "minutes": "vor {count} Min.",
+          "hours": "vor {count} Std.",
+          "days": "vor {count, plural, one {# Tag} other {# Tagen}}",
+          "months": "vor {count, plural, one {# Monat} other {# Monaten}}",
+          "years": "vor {count, plural, one {# Jahr} other {# Jahren}}"
+        },
+        "feedback": {
+          "refreshFailed": "Abweichungen konnten nicht neu berechnet werden.",
+          "pushFailed": "Die Workflow-Datei konnte nicht gesendet werden.",
+          "reconcileFailed": "Der Abgleich-PR konnte nicht geöffnet werden.",
+          "pullFailed": "Die Repository-Datei konnte nicht übernommen werden.",
+          "pushed": "Die aktuelle Vorlage wurde an das Repository gesendet.",
+          "pushPr": "Ein PR wurde geöffnet, statt die Repository-Datei zu überschreiben.",
+          "reconciled": "Ein Abgleich-PR wurde geöffnet, um die geänderte Datei durch die Vorlage zu ersetzen.",
+          "pulled": "Die Workflow-Datei wurde aus dem Repository übernommen und dient jetzt als Grundlage.",
+          "refreshed": "Abweichungen erneut geprüft: {state}."
+        }
       }
     },
     "frame": {

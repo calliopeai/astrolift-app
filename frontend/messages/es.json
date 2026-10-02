@@ -2644,6 +2644,67 @@
           "connect": "Conecta una GitHub App o una conexión de la organización para activar el despliegue automático",
           "attention": "Algunos pasos de la configuración automática aún requieren atención"
         }
+      },
+      "ciWorkflow": {
+        "title": "Sincronización del flujo administrado",
+        "templateVersions": "plantilla v{previous} → v{current}",
+        "lastChecked": "última comprobación: {relative}",
+        "check": "Comprobar",
+        "pull": "Traer del repositorio",
+        "push": "Enviar al repositorio",
+        "reconcile": "Abrir PR de reconciliación",
+        "compare": "Comparar el archivo del repositorio con lo que se enviaría",
+        "comparePulled": "Comparar el archivo del repositorio con lo que se enviaría (traído {relative})",
+        "repoVersion": "En el repositorio",
+        "pushVersion": "Lo que se enviaría",
+        "pullTitle": "¿Traer el archivo del flujo del repositorio?",
+        "pullDescription": "Astrolift lee el archivo de la rama de despliegue, lo guarda y lo adopta como base para dejar de señalarlo como modificado. No se escribe nada en el repositorio.",
+        "viewPr": "Ver PR",
+        "states": {
+          "in_sync": {
+            "label": "coincide",
+            "hint": "El archivo del flujo del repositorio coincide con lo que genera la plataforma. No hay nada que hacer."
+          },
+          "template_stale": {
+            "label": "plantilla desactualizada",
+            "hint": "El archivo del repositorio no se ha modificado, pero la plataforma genera una plantilla más reciente. Envíala para actualizarlo."
+          },
+          "repo_drift": {
+            "label": "editado en el repositorio",
+            "hint": "Alguien editó el archivo del repositorio. Tráelo para conservar esa versión o envía la plantilla para sustituirlo mediante un PR."
+          },
+          "conflict": {
+            "label": "ambos modificados",
+            "hint": "Tanto el archivo del repositorio como la plantilla han cambiado. Trae la versión del repositorio para conservarla o envía la plantilla para sustituirla mediante un PR."
+          },
+          "absent": {
+            "label": "no está en el repositorio",
+            "hint": "No hay un archivo del flujo en la rama de despliegue. Envíalo para crearlo."
+          },
+          "unknown": {
+            "label": "desconocido",
+            "hint": "No se pudo leer el repositorio en la última comprobación. Comprueba de nuevo para reintentar."
+          }
+        },
+        "relative": {
+          "justNow": "ahora mismo",
+          "minutes": "hace {count} min",
+          "hours": "hace {count} h",
+          "days": "hace {count, plural, one {# día} other {# días}}",
+          "months": "hace {count, plural, one {# mes} other {# meses}}",
+          "years": "hace {count, plural, one {# año} other {# años}}"
+        },
+        "feedback": {
+          "refreshFailed": "No se pudieron recalcular los cambios.",
+          "pushFailed": "No se pudo enviar el archivo del flujo.",
+          "reconcileFailed": "No se pudo abrir el PR de reconciliación.",
+          "pullFailed": "No se pudo traer el archivo del repositorio.",
+          "pushed": "Se envió la plantilla actual al repositorio.",
+          "pushPr": "Se abrió un PR en lugar de sobrescribir el archivo del repositorio.",
+          "reconciled": "Se abrió un PR de reconciliación para sustituir el archivo modificado por la plantilla.",
+          "pulled": "Se trajo el archivo del flujo del repositorio. Ahora es la base.",
+          "refreshed": "Cambios comprobados de nuevo: {state}."
+        }
       }
     },
     "frame": {
