@@ -18,7 +18,7 @@ How Astrolift works, how to install it, and the operator runbooks for the surfac
 # Changelog
 Release notes and project change history.
 Versioned release notes are not available in this dashboard.
-Project changes are maintained in the repository changelog . Repository access requires an authorized GitHub account.
+Project changes are maintained in the repository changelog .
 
 ## /documentation/cluster-prerequisites
 

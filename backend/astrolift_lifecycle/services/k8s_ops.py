@@ -103,31 +103,29 @@ def resolve_replica_bounds(env: AppEnvironment | None) -> tuple[int, int]:
 
 
 def _primary_environment_for_workload(workload: Workload) -> AppEnvironment | None:
-    """Pick the env to drive the patch against.
+    """First nondeleted environment for callers that omit the environment.
 
-    A workload belongs to a ``RegisteredApp`` which has 1..N
-    environments. V1 targets the app's first active env — the same
-    "primary cluster" the renderer would target for a single-workload
-    app. Multi-env apps will need an explicit environment_id input on
-    the mutation; for V1 the spec only carries ``workload_id``.
+    Explicit callers pass the already verified, locked environment; this
+    function is only the deliberately retained primary-environment path. A
+    invalid first live row is returned so validation refuses it without
+    silently selecting a later live environment.
 
-    Returns None when the app has no active environments (the caller
+    Returns None when the app has no nondeleted environments (the caller
     raises a structured NOT_FOUND / PRECONDITION).
     """
     from astrolift_lifecycle.models import AppEnvironment
 
     return (
-        AppEnvironment.objects.filter(
-            registered_app=workload.registered_app,
-            deleted_at__isnull=True,
-        )
+        AppEnvironment.objects.filter(registered_app=workload.registered_app)
         .select_related("tenant_cluster", "registered_app")
         .order_by("id")
         .first()
     )
 
 
-def _resolve_driver_and_namespace(workload: Workload) -> tuple[Any, str, str]:
+def _resolve_driver_and_namespace(
+    workload: Workload, *, environment: AppEnvironment | None = None
+) -> tuple[Any, str, str]:
     """Return ``(driver, namespace, cluster_slug)`` for ``workload``.
 
     Mirrors the cluster-management resolution path so an injected
@@ -138,7 +136,7 @@ def _resolve_driver_and_namespace(workload: Workload) -> tuple[Any, str, str]:
     from core.app_deploy import namespace_for_environment
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
-    env = _primary_environment_for_workload(workload)
+    env = environment if environment is not None else _primary_environment_for_workload(workload)
     if env is None or env.tenant_cluster_id is None:
         raise K8sOpError(
             "PRECONDITION",
@@ -148,7 +146,13 @@ def _resolve_driver_and_namespace(workload: Workload) -> tuple[Any, str, str]:
 
     if (
         not live_lifecycle_rows(type(env).objects.all(), org_id=workload.registered_app.organization_id)
-        .filter(pk=env.pk)
+        .filter(
+            pk=env.pk,
+            registered_app_id=workload.registered_app_id,
+            version=env.version,
+            tenant_cluster_id=env.tenant_cluster_id,
+            k8s_namespace=env.k8s_namespace,
+        )
         .exists()
     ):
         raise K8sOpError(
@@ -201,7 +205,9 @@ def _patch_workload_or_raise(
 # ---------------------------------------------------------------------------
 
 
-def rollout_restart_workload(workload: Workload) -> RestartResult:
+def rollout_restart_workload(
+    workload: Workload, *, environment: AppEnvironment | None = None
+) -> RestartResult:
     """Trigger a rolling restart on ``workload``'s Deployment.
 
     Same shape as ``kubectl rollout restart``: patch
@@ -216,7 +222,7 @@ def rollout_restart_workload(workload: Workload) -> RestartResult:
     drivers that don't return that information leave it None and the
     UI just falls back to "restart issued".
     """
-    driver, namespace, cluster_slug = _resolve_driver_and_namespace(workload)
+    driver, namespace, cluster_slug = _resolve_driver_and_namespace(workload, environment=environment)
     now_iso = datetime.now(UTC).isoformat()
     patch = {
         "spec": {
@@ -258,6 +264,7 @@ def scale_workload(
     replicas: int,
     *,
     policy: dict[str, Any] | None = None,
+    environment: AppEnvironment | None = None,
 ) -> ScaleResult:
     """Patch ``workload``'s Deployment ``spec.replicas`` to ``replicas``.
 
@@ -271,7 +278,7 @@ def scale_workload(
     ``ready_replicas`` when surfaced; otherwise echoes the desired
     count for ``current_replicas`` and leaves ``ready_replicas`` None.
     """
-    env = _primary_environment_for_workload(workload)
+    env = environment if environment is not None else _primary_environment_for_workload(workload)
     lower, upper = resolve_replica_bounds(env)
     if policy:
         override = policy.get("max_replicas")
@@ -282,7 +289,7 @@ def scale_workload(
             "VALIDATION",
             f"replicas {replicas} outside bounds [{lower}, {upper}]",
         )
-    driver, namespace, cluster_slug = _resolve_driver_and_namespace(workload)
+    driver, namespace, cluster_slug = _resolve_driver_and_namespace(workload, environment=env)
     patch = {"spec": {"replicas": int(replicas)}}
     response = _patch_workload_or_raise(
         driver,

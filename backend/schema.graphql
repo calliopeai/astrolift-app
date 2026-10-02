@@ -5776,6 +5776,11 @@ type AstroliftWorkload {
   Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply.
   """
   viewerCan: AstroliftWorkloadViewerCan!
+
+  """
+  Immutable primary target review facts. Explicit targets require a fresh action-target read.
+  """
+  primaryActionTarget: AstroliftWorkloadActionTarget
   inClusterServiceFqdn: String!
   volumes: JSON!
   ownerUserId: String
@@ -5785,6 +5790,20 @@ type AstroliftWorkload {
   A cron job's most recent run. Null for other kinds, for a job that never ran, and on reads that do not load it (astroliftWorkloads).
   """
   lastRun: AstroliftCronJobLastRun
+}
+
+type AstroliftWorkloadActionTarget {
+  workloadId: GUID!
+  workloadVersion: Int!
+  appId: GUID!
+  appVersion: Int!
+  environmentId: GUID!
+  environmentName: String!
+  environmentVersion: Int!
+  clusterId: GUID!
+  clusterVersion: Int!
+  namespace: String!
+  viewerCan: AstroliftWorkloadViewerCan!
 }
 
 type AstroliftWorkloadIdentityGrant {
@@ -5824,6 +5843,15 @@ type AstroliftWorkloadOpPayload {
   newRevision: Int
   desiredReplicas: Int
   readyReplicas: Int
+  operationId: GUID
+  target: AstroliftWorkloadActionTarget
+  workloadVersion: Int
+  accepted: Boolean!
+
+  """
+  Null: the cluster accepted a patch; rollout completion is not established.
+  """
+  completed: Boolean
 }
 
 type AstroliftWorkloadOpPayloadMutationResult {
@@ -8318,6 +8346,7 @@ type Query {
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage.")
   astroliftWorkloadsPage(appSlug: String = null, search: String = null, kinds: [String!] = null, limit: Int! = 50, after: String = null, filter: AstroliftWorkloadsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftWorkloadPage!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
+  astroliftWorkloadActionTarget(workloadId: GUID!, environmentId: GUID = null): AstroliftWorkloadActionTarget
   astroliftWorkloadScalingStatus(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadScalingStatus
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!
   astroliftRenderedManifest(appSlug: String!, environmentName: String = null, imageTag: String = null): AstroliftRenderedManifest
@@ -8785,6 +8814,12 @@ input ResendInvitationInput {
 
 input RestartWorkloadInput {
   workloadId: GUID!
+  environmentId: GUID = null
+  ifMatchEnvironmentVersion: Int = null
+  expectedClusterId: GUID = null
+  ifMatchClusterVersion: Int = null
+  ifMatchAppVersion: Int = null
+  expectedNamespace: String = null
 }
 
 input RestoreAppInput {
@@ -8970,6 +9005,12 @@ type RunWorkflowResult {
 input ScaleWorkloadInput {
   workloadId: GUID!
   replicas: Int!
+  environmentId: GUID = null
+  ifMatchEnvironmentVersion: Int = null
+  expectedClusterId: GUID = null
+  ifMatchClusterVersion: Int = null
+  ifMatchAppVersion: Int = null
+  expectedNamespace: String = null
 }
 
 input SendManagedServiceTestEmailInput {

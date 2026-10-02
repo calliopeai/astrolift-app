@@ -41,7 +41,7 @@ export function ChangelogScreen({ entries = [] }: ChangelogScreenProps) {
             >
               repository changelog
             </Link>
-            . Repository access requires an authorized GitHub account.
+            .
           </p>
         </div>
       )}

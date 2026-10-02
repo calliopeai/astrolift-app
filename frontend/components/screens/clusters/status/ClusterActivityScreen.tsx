@@ -13,7 +13,7 @@ import { CheckIcon, ClockIcon, GitBranchIcon, XIcon } from "lucide-react";
 import { Feed } from "@/components/feed/Feed";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { useFormatters } from "@/lib/i18n/formatters";
+import { useClusterActivity } from "@/lib/i18n/cluster-activity";
 
 import type { AuditRow, WorkflowRun } from "./types";
 import type { useClusterLifecycleAudit } from "./use-cluster-lifecycle-audit";
@@ -38,19 +38,7 @@ export function ClusterActivityBody({ workflows, lifecycle }: ClusterActivityBod
 }
 
 // ─── Recent workflows card (#394) ────────────────────────────────────────
-// Pulled live from Temporal's visibility API filtered by workflow ids
-// that reference this cluster's guid. Empty when Temporal is disabled
-// or the query fails — identical empty-state copy in both cases.
-
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  RUNNING: "secondary",
-  COMPLETED: "default",
-  FAILED: "destructive",
-  CANCELED: "outline",
-  TERMINATED: "destructive",
-  TIMED_OUT: "destructive",
-  CONTINUED_AS_NEW: "outline",
-};
+// Empty results also cover disabled Temporal; they do not prove a complete census.
 
 function ActivityWorkflowsCard({
   runs,
@@ -59,18 +47,19 @@ function ActivityWorkflowsCard({
   refetch,
   more,
 }: ClusterActivityBodyProps["workflows"]) {
-  const fmt = useFormatters();
+  const activity = useClusterActivity();
+  const { t } = activity;
 
   return (
     <Panel
       span={6}
       icon={<GitBranchIcon className="size-4" />}
-      title="Recent workflows"
-      description="Temporal runs targeting this cluster — BringClusterIntoManagement, Refresh, Decommission, InstallClusterPrereqs, DriftDetection. Polls every 15s while a run is in flight."
+      title={t("workflowTitle")}
+      description={t("workflowDescription")}
       flush
     >
       <Feed<WorkflowRun>
-        label="Recent workflows"
+        label={t("workflowTitle")}
         items={runs}
         keyOf={(r) => r.workflowId + r.runId}
         loading={loading && runs.length === 0}
@@ -81,31 +70,27 @@ function ActivityWorkflowsCard({
         className="px-4"
         empty={{
           icon: <GitBranchIcon className="size-5" />,
-          title: "No workflow runs recorded yet",
-          description:
-            "Operator actions like Bring into management, Refresh, or Install prereqs will appear here.",
+          title: t("noRuns"),
+          description: t("noRunsHelp"),
         }}
         renderItem={(r) => {
-          const duration =
-            r.closedAt && r.startedAt
-              ? Math.max(
-                  0,
-                  Math.round(
-                    (new Date(r.closedAt).getTime() - new Date(r.startedAt).getTime()) / 1000
-                  )
-                )
-              : null;
+          const duration = activity.duration(r.startedAt, r.closedAt);
+          const status = activity.status(r.status);
           return (
             <div className="flex min-w-0 flex-wrap items-baseline gap-2 text-sm">
               <code className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
                 {r.workflowType}
               </code>
-              <Badge variant={STATUS_VARIANT[r.status] ?? "outline"} className="text-2xs font-mono">
-                {r.status}
+              <Badge
+                variant={status.variant}
+                className="text-2xs max-w-full min-w-0 font-mono"
+                title={typeof r.status === "string" ? r.status : undefined}
+              >
+                <span className="min-w-0 [overflow-wrap:anywhere]">{status.label}</span>
               </Badge>
-              <span className="text-muted-foreground ml-auto font-mono text-xs">
-                {r.startedAt ? fmt.formatDateTime(r.startedAt) : "—"}
-                {duration !== null && <span className="opacity-60"> · {duration}s</span>}
+              <span className="text-muted-foreground ml-auto font-mono text-xs" title={r.startedAt}>
+                {activity.date(r.startedAt)}
+                {duration !== null && <span className="opacity-60"> · {duration}</span>}
               </span>
             </div>
           );
@@ -127,18 +112,19 @@ function ActivityLifecycleCard({
   refetch,
   more,
 }: ClusterActivityBodyProps["lifecycle"]) {
-  const fmt = useFormatters();
+  const activity = useClusterActivity();
+  const { t } = activity;
 
   return (
     <Panel
       span={6}
       icon={<ClockIcon className="size-4" />}
-      title="Lifecycle + activity"
-      description="Every mutation that targeted this cluster — registered → managing → managed transitions, refreshes, prereq installs, decommission attempts. Sourced from the platform audit log."
+      title={t("lifecycleTitle")}
+      description={t("lifecycleDescription")}
       flush
     >
       <Feed<AuditRow>
-        label="Lifecycle events"
+        label={t("lifecycleLabel")}
         items={entries}
         keyOf={(e) => `${e.timestamp}-${e.operation}`}
         groupBy={{ day: (e) => e.timestamp }}
@@ -150,8 +136,8 @@ function ActivityLifecycleCard({
         className="px-4"
         empty={{
           icon: <ClockIcon className="size-5" />,
-          title: "No lifecycle events recorded yet",
-          description: "Operator mutations against this cluster will show up here.",
+          title: t("noEvents"),
+          description: t("noEventsHelp"),
         }}
         renderItem={(e) => (
           <div className="flex min-w-0 items-start gap-2">
@@ -170,11 +156,14 @@ function ActivityLifecycleCard({
                 </code>
                 {e.actor && (
                   <span className="text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]">
-                    by <span className="font-mono">{e.actor}</span>
+                    {t.rich("actor", {
+                      name: e.actor,
+                      actor: (chunks) => <span className="font-mono">{chunks}</span>,
+                    })}
                   </span>
                 )}
                 <span className="text-muted-foreground ml-auto font-mono text-xs">
-                  {fmt.formatDateTime(e.timestamp)}
+                  {activity.date(e.timestamp)}
                 </span>
               </div>
               {!e.success && e.errors.length > 0 && (

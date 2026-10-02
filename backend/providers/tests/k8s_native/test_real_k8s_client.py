@@ -27,7 +27,7 @@ def _patched_kubernetes() -> Any:
     fake_config = MagicMock()
     fake_api_client = MagicMock()
     fake_client.ApiClient.return_value = fake_api_client
-    fake_client.Configuration.get_default_copy.return_value = MagicMock()
+    fake_client.Configuration.return_value = MagicMock()
     return fake_client, fake_config, fake_api_client
 
 
@@ -94,6 +94,7 @@ def test_build_with_kubeconfig_path_loads_from_file() -> None:
     fake_config.load_kube_config.assert_called_once_with(
         config_file="/path/to/kubeconfig",
         context="prod",
+        client_configuration=fake_client.Configuration.return_value,
     )
     fake_config.load_incluster_config.assert_not_called()
     assert isinstance(result, KubernetesDynamicClient)
@@ -115,7 +116,9 @@ def test_build_with_no_path_falls_back_to_default_kubeconfig() -> None:
             context="",
             in_cluster=False,
         )
-    fake_config.load_kube_config.assert_called_once_with(context=None)
+    fake_config.load_kube_config.assert_called_once_with(
+        context=None, client_configuration=fake_client.Configuration.return_value
+    )
 
 
 def test_build_explicit_context_passed_through() -> None:
@@ -132,7 +135,9 @@ def test_build_explicit_context_passed_through() -> None:
             context="staging",
             in_cluster=False,
         )
-    fake_config.load_kube_config.assert_called_once_with(context="staging")
+    fake_config.load_kube_config.assert_called_once_with(
+        context="staging", client_configuration=fake_client.Configuration.return_value
+    )
 
 
 def test_built_client_carries_api_client_from_loaded_config() -> None:

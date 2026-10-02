@@ -41,7 +41,7 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
   return (
     <PageShell
       title="Downloads"
-      description={`Install the ${CLI_BINARY} CLI to interact with Astrolift from your shell or CI. Native releases require an authorized GitHub identity; the container image is public.`}
+      description={`Install the ${CLI_BINARY} CLI to interact with Astrolift from your shell or CI. Native releases and container images are public.`}
       actions={
         <Button asChild variant="outline">
           <a href={RELEASES_URL} target="_blank" rel="noreferrer">
@@ -61,8 +61,8 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
             <DownloadIcon className="size-4" /> {detected ? "Other platforms" : "Native binaries"}
           </CardTitle>
           <CardDescription>
-            Single-file static binaries. Run `gh auth login` with an account that can read the CLI
-            repository before using these commands.
+            Download the archive for your platform and verify it against {CHECKSUMS_FILENAME} before
+            extracting the binary into a directory on your PATH.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -81,15 +81,15 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
             <PackageIcon className="size-4" /> Install channels
           </CardTitle>
           <CardDescription>
-            Native archives are private. Homebrew, Scoop, anonymous curl, and direct asset links
-            cannot authenticate them and are not supported yet.
+            Native archives and checksum files are public. Direct downloads and curl are supported.
+            Homebrew and Scoop packages are not published.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <PackageRow
             name="GitHub CLI"
-            command={`gh auth login; gh release view --repo ${CLI_REPO} --web`}
-            note="Authenticate first, then use the matching command above. Each command also fetches the release checksum list."
+            command={`gh release view --repo ${CLI_REPO} --web`}
+            note="GitHub CLI is optional. Direct downloads require no account; each platform command also fetches the release checksum list."
           />
           <PackageRow
             name="Docker"
@@ -112,16 +112,16 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
         </CardHeader>
         <CardContent className="space-y-4">
           <CopyableCommand
-            label="Fetch checksums (authenticated)"
-            command={`gh release download --repo ${CLI_REPO} --pattern '${CHECKSUMS_FILENAME}'`}
+            label="Fetch checksums"
+            command={`curl -fL '${LATEST_URL}/download/${CHECKSUMS_FILENAME}' -o '${CHECKSUMS_FILENAME}'`}
           />
           <CopyableCommand
             label="Verify (macOS/Linux)"
-            command={`shasum -a 256 -c ${CHECKSUMS_FILENAME} --ignore-missing`}
+            command={`shasum -a 256 ${CLI_BINARY}-*.tar.gz`}
           />
           <CopyableCommand
             label="Verify (Windows PowerShell)"
-            command={`Get-FileHash ${CLI_BINARY}-windows-amd64.zip -Algorithm SHA256`}
+            command={`Get-FileHash ${CLI_BINARY}-windows-*.zip -Algorithm SHA256`}
           />
           <p className="text-muted-foreground text-xs">
             Compare the computed digest with the checksum published alongside the archive on{" "}
@@ -230,7 +230,7 @@ function FeaturedPlatformCallout({
             </a>
           </Button>
         </div>
-        <CopyableCommand label="Install" command={platform.installLine} />
+        <CopyableCommand label="Download" command={platform.installLine} />
       </CardContent>
     </Card>
   );
@@ -259,7 +259,7 @@ function PlatformCard({ platform }: { platform: PlatformAsset }) {
             Open release
           </a>
         </Button>
-        <CopyButton value={platform.installLine} label="Copy install line" />
+        <CopyButton value={platform.installLine} label="Copy download commands" />
       </div>
     </div>
   );

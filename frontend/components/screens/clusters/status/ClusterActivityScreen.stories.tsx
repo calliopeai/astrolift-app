@@ -34,6 +34,41 @@ function Screen({
 
 export const Full: Story = { render: () => <Screen workflows={WORKFLOWS} lifecycle={AUDIT} /> };
 
+export const UnknownStatusLongStrings: Story = {
+  render: () => (
+    <Screen
+      workflows={{
+        ...WORKFLOWS,
+        runs: [
+          {
+            ...WORKFLOWS.runs[0],
+            status: "LITERAL_FUTURE_WORKFLOW_STATUS_WITH_LONG_PROVIDER_DETAILS",
+          },
+        ],
+      }}
+      lifecycle={AUDIT}
+    />
+  ),
+};
+
+export const UnknownDuration: Story = {
+  render: () => (
+    <Screen
+      workflows={{ ...WORKFLOWS, runs: [{ ...WORKFLOWS.runs[0], closedAt: "RAW_INVALID_TIME" }] }}
+      lifecycle={AUDIT}
+    />
+  ),
+};
+
+export const CachedReadFailed: Story = {
+  render: () => (
+    <Screen
+      workflows={{ ...WORKFLOWS, error: "RAW_TEMPORAL_READ_DIAGNOSTIC" }}
+      lifecycle={{ ...AUDIT, error: "RAW_AUDIT_READ_DIAGNOSTIC" }}
+    />
+  ),
+};
+
 const MORE = { hasMore: true, loadingMore: false, onLoadMore: () => {} };
 
 /** More behind each window: Load older at the end of each frame. */

@@ -28,6 +28,7 @@ from astrolift_graphql import (
     resolve_list_sort,
     search_q,
 )
+from astrolift_identity.operation_context import workload_operation
 from astrolift_identity.schema.types import ProjectType, project_to_type
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.dependency_context import (
@@ -52,6 +53,7 @@ from astrolift_registry.schema.types import (
     RegisteredAppPageType,
     RegisteredAppType,
     RenderedManifestType,
+    WorkloadActionTargetType,
     WorkloadManifestType,
     WorkloadScalingStatus,
     WorkloadType,
@@ -64,6 +66,7 @@ from astrolift_registry.schema.types import (
     build_config_drift,
     build_settings_last_modified,
     container_to_type,
+    workload_action_target_to_type,
     workload_to_type,
 )
 from astrolift_registry.schema.workload_list import (
@@ -76,6 +79,7 @@ from astrolift_registry.schema.workload_list import (
 from astrolift_registry.scopes import (
     app_scope_by_guid,
     app_scope_by_slug,
+    app_scope_by_workload_guid,
     registry_organization_scope,
 )
 from astrolift_registry.topology import classify_topology
@@ -1778,6 +1782,49 @@ class RegistryQuery:
             .first()
         )
         return workload_to_type(w, last_run=cron_last_runs([w]).get(w.pk)) if w else None
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ,
+        scope=app_scope_by_workload_guid("workload_id", permission=Permission.APP_READ),
+        operation=workload_operation("workload_id", "environment_id"),
+    )
+    @tenant_scoped()
+    def astrolift_workload_action_target(
+        self, info: Info, workload_id: GUID, environment_id: GUID | None = None
+    ) -> WorkloadActionTargetType | None:
+        """Review one exact mapping; omitted environment retains the primary compatibility path."""
+        from astrolift_lifecycle.visibility import live_app_rows
+        from astrolift_registry.viewer_actions import exact_workload_viewer_permission
+        from core.scope_args import read_guid
+
+        guid = read_guid({"id": workload_id}, "id")
+        org_id = _caller_org_id()
+        if guid is None or org_id is None:
+            return None
+        workload = (
+            Workload.objects.filter(
+                guid=guid,
+                registered_app__organization_id=org_id,
+                registered_app__in=live_app_rows(RegisteredApp.objects.all()),
+            )
+            .select_related("registered_app__organization", "registered_app__project")
+            .first()
+        )
+        if workload is None:
+            return None
+        environments = AppEnvironment.objects.filter(
+            registered_app_id=workload.registered_app_id
+        ).select_related("tenant_cluster", "registered_app")
+        if environment_id is not None:
+            env_guid = read_guid({"id": environment_id}, "id")
+            if env_guid is None:
+                return None
+            environment = environments.filter(guid=env_guid).first()
+        else:
+            environment = environments.order_by("id").first()
+        permission = exact_workload_viewer_permission(workload, environment)
+        return workload_action_target_to_type(permission.target, permission)
 
     # ----------------------------------------------------------------
     # Live workload scaling status (#430)

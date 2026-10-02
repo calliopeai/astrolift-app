@@ -148,6 +148,172 @@ export const MalformedReadiness: Story = {
   ),
 };
 
+export const WorkflowUnknownStatusLongStrings: Story = {
+  render: () => (
+    <Screen
+      workflows={
+        <StatusRecentWorkflowsCard
+          slug={CLUSTER.slug}
+          {...WORKFLOWS}
+          runs={[
+            {
+              ...WORKFLOWS.runs[0],
+              workflowType: "RAW_FUTURE_WORKFLOW_IDENTIFIER",
+              status: "RAW_FUTURE_WORKFLOW_STATUS_WITH_LONG_PROVIDER_DETAILS",
+            },
+          ]}
+        />
+      }
+    />
+  ),
+};
+
+export const WorkflowUnknownDuration: Story = {
+  render: () => (
+    <Screen
+      workflows={
+        <StatusRecentWorkflowsCard
+          slug={CLUSTER.slug}
+          {...WORKFLOWS}
+          runs={[{ ...WORKFLOWS.runs[0], closedAt: "RAW_INVALID_TIME" }]}
+        />
+      }
+    />
+  ),
+};
+
+export const AuditUnknownOperationLongStrings: Story = {
+  render: () => (
+    <Screen
+      lifecycle={
+        <StatusLifecycleCard
+          slug={CLUSTER.slug}
+          {...AUDIT_LONG}
+          entries={AUDIT_LONG.entries.map((entry) => ({
+            ...entry,
+            operation: "RAW_FUTURE_MUTATION_IDENTIFIER_WITH_LONG_PROVIDER_DETAILS",
+          }))}
+        />
+      }
+    />
+  ),
+};
+
+export const HealthCachedReadFailed: Story = {
+  render: () => (
+    <Screen
+      workloads={<StatusWorkloadHealthCard slug={CLUSTER.slug} {...WORKLOADS} {...QUERY_FAILED} />}
+      liveHealth={<StatusLiveHealthCard {...HEALTH_LONG} {...QUERY_FAILED} />}
+    />
+  ),
+};
+
+export const HealthCachedReadPending: Story = {
+  render: () => (
+    <Screen
+      workloads={<StatusWorkloadHealthCard slug={CLUSTER.slug} {...WORKLOADS} loading />}
+      liveHealth={<StatusLiveHealthCard {...HEALTH} loading />}
+    />
+  ),
+};
+
+export const HealthUnknownReports: Story = {
+  render: () => (
+    <Screen
+      workloads={
+        <StatusWorkloadHealthCard
+          slug={CLUSTER.slug}
+          {...WORKLOADS}
+          rows={[
+            { ...WORKLOADS.rows[0], readyReplicas: -1, lastImageDeployedAt: "RAW_INVALID_TIME" },
+          ]}
+        />
+      }
+      liveHealth={
+        <StatusLiveHealthCard
+          {...HEALTH}
+          pods={[
+            { namespace: "RAW_NAMESPACE", phase: "__proto__", count: 2 },
+            {
+              namespace: "RAW_NAMESPACE",
+              phase: "RAW_FUTURE_PHASE_WITH_LONG_PROVIDER_DETAILS",
+              count: 1,
+            },
+            { namespace: "RAW_NAMESPACE", phase: "Pending", count: -1 },
+          ]}
+        />
+      }
+    />
+  ),
+};
+
+export const MetricsUnknownReason: Story = {
+  render: () => (
+    <Screen
+      metrics={
+        <StatusMetricsCard
+          slug={CLUSTER.slug}
+          {...METRICS_NO_ENDPOINT}
+          instant={{ ...METRICS_NO_ENDPOINT.instant!, reason: "RAW_FUTURE_PROMETHEUS_REASON" }}
+          range={{ ...METRICS_NO_ENDPOINT.range!, reason: null }}
+        />
+      }
+    />
+  ),
+};
+
+export const MetricsUnknownValues: Story = {
+  render: () => (
+    <Screen
+      metrics={
+        <StatusMetricsCard
+          slug={CLUSTER.slug}
+          {...METRICS}
+          instant={{ ...METRICS.instant!, cpuUtilization: Infinity, nodeCount: -1 }}
+          range={{
+            ...METRICS.range!,
+            series: [
+              {
+                metric: "restart_rate",
+                label: "Restarts / min",
+                unit: "count",
+                current: 0.01,
+                points: [],
+              },
+              {
+                metric: "RAW_FUTURE_METRIC",
+                label: "RAW_PROVIDER_METRIC_LABEL",
+                unit: "ratio",
+                current: 0.99,
+                points: [],
+              },
+            ],
+          }}
+        />
+      }
+    />
+  ),
+};
+
+export const MetricsCachedReadFailed: Story = {
+  render: () => (
+    <Screen metrics={<StatusMetricsCard slug={CLUSTER.slug} {...METRICS} {...QUERY_FAILED} />} />
+  ),
+};
+
+export const MetricsDuplicateInstances: Story = {
+  render: () => (
+    <Screen
+      metrics={
+        <>
+          <StatusMetricsCard slug={CLUSTER.slug} {...METRICS} />
+          <StatusMetricsCard slug={CLUSTER.slug} {...METRICS} />
+        </>
+      }
+    />
+  ),
+};
+
 /** Prometheus is configured but unreachable / cluster-internal. */
 export const PrometheusError: Story = {
   render: () => (

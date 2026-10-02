@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+- Bind reviewed workload restart and scale requests to an explicit environment,
+  cluster and namespace with version preconditions and current credential checks.
+  Publish exact-target review metadata and accepted-versus-completed outcomes;
+  native Kubernetes clients retain independent cluster configuration (#2217).
+
+- Preserve actual shared-model deletion outcomes while an independent resource
+  admission check completes. Target, version and authority changes still invalidate
+  deletion reviews; resource drafts and admission observations gate updates (#2148).
+
+- Offer public CLI archives and checksum downloads without GitHub login, with
+  platform-specific curl commands and public repository changelog links (#2148).
+
+- Localize cluster saturation metrics, windows and recovery copy in all eight
+  locales. Label CPU/memory ratios as requests against allocatable resources;
+  retain custom labels and unknown reasons without diagnosing unreachable
+  Prometheus. Invalid metrics stay unknown, small nonzero restart rates remain
+  visible, and chart gradients are unique across repeated cards (#2145).
+
+- Localize cluster Status workload and driver-health reports in all eight locales.
+  Retained reports show cached/unconfirmed notices after failed or pending reads,
+  with independent retries and literal diagnostics. Unknown pod phases stay
+  neutral; invalid counts and dates remain unknown. Empty reports do not certify
+  apiserver reachability or cluster health (#2145).
+
+- Localize cluster Activity feeds in all eight locales, retaining workflow IDs,
+  audit operations, actors and diagnostics. Unknown statuses stay neutral and
+  literal; malformed or reversed timestamps cannot report a zero-second duration.
+  Feed retry and load-older callbacks remain independent. Empty returned feeds
+  do not certify a complete workflow or audit census (#2145).
+
+- Share localized workflow/audit presentation with cluster Status summaries.
+  Known operations translate without rewriting unknown identifiers. Ages use
+  the request clock and locale; compact durations keep invalid reports unknown
+  and retain the existing minute/hour boundaries (#2145).
+
 - Localize cluster connection snapshots and shared read recovery in all eight
   locales. Failed, incomplete and wrong-target reads cannot confirm connectivity
   or mount driver cards. Cached reports remain explicitly unconfirmed, unknown
