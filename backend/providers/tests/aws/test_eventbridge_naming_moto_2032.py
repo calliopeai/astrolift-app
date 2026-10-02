@@ -10,7 +10,7 @@ from moto import mock_aws
 
 from _sdk.managed_service import DeprovisionSpec, UpdateSpec
 from aws.managed._base import ManagedServiceError
-from aws.managed.event_bus_eventbridge import EventBridgeConfig, EventBridgeDriver, _name
+from aws.managed.event_bus_eventbridge import EventBridgeConfig, EventBridgeDriver, _archive_name, _name
 from tests.aws._eventbridge_native_2032 import exact_native_tags
 from tests.aws.test_managed_eventbridge import _spec
 
@@ -294,3 +294,99 @@ def test_colliding_explicit_child_declarations_refuse_before_bus_creation(cloud,
     )
     assert not result.ok and "duplicate rule name" in result.message
     assert [bus["Name"] for bus in api.list_event_buses()["EventBuses"]] == ["default"]
+
+
+@pytest.mark.parametrize("existing_legacy_archive", [False, True])
+def test_recorded_legacy_parents_create_distinct_guid_defaults_and_preserve_proven_old_archive(
+    cloud, existing_legacy_archive
+):
+    driver, api, config = cloud
+    names = ["Legacy_" + "x" * 50 + suffix for suffix in ("First", "Second")]
+    old_default = _archive_name(names[0], {})
+    assert old_default == _archive_name(names[1], {})
+    specs = [_spec(), _spec(managed_service_id="22222222-2222-4222-8222-222222222222")]
+    arns = []
+    for name, spec in zip(names, specs, strict=True):
+        result = api.create_event_bus(
+            Name=name,
+            Tags=[
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": spec.managed_service_id},
+            ],
+        )
+        arns.append(result["EventBusArn"])
+    if existing_legacy_archive:
+        api.create_archive(ArchiveName=old_default, EventSourceArn=arns[0], RetentionDays=30)
+    for spec, arn in zip(specs, arns, strict=True):
+        result = driver.provision(dataclasses.replace(spec, recorded_handle="event_bus/" + arn, config={"archive": {}}))
+        assert result.ok and result.handle == "event_bus/" + arn
+        archives = api.list_archives(EventSourceArn=arn)["Archives"]
+        assert len(archives) == 1
+        name = archives[0]["ArchiveName"]
+        if existing_legacy_archive and arn == arns[0]:
+            assert name == old_default
+            assert api.describe_archive(ArchiveName=name)["RetentionDays"] == 30
+        else:
+            assert spec.managed_service_id.replace("-", "") in name
+            assert name != old_default
+        changed = EventBridgeDriver(config=dataclasses.replace(config, event_bus_name_prefix="renamed"), client=api)
+        assert changed.provision(
+            dataclasses.replace(
+                spec,
+                recorded_handle="event_bus/" + arn,
+                organization_slug="renamed",
+                app_slug="renamed",
+                config={"archive": {}},
+            )
+        ).ok
+        assert [row["ArchiveName"] for row in api.list_archives(EventSourceArn=arn)["Archives"]] == [name]
+    for spec, arn in zip(specs, arns, strict=True):
+        assert driver.deprovision(
+            DeprovisionSpec(
+                handle="event_bus/" + arn,
+                managed_service_id=spec.managed_service_id,
+                config={"archive": {}, "deletion_protection": False},
+            ),
+            delete_data=True,
+        ).ok
+
+
+def test_similarly_named_managed_rule_is_not_treated_as_this_archive_child(cloud):
+    driver, api, _ = cloud
+    spec = _spec(config={"archive": {}})
+    created = driver.provision(spec)
+    assert created.ok
+    arn = created.handle.partition("/")[2]
+    archive = api.list_archives(EventSourceArn=arn)["Archives"][0]["ArchiveName"]
+    impostor = "Events-Archive-" + archive + "Other"
+    api.put_rule(Name=impostor, EventBusName=arn, EventPattern='{"source":["impostor"]}')
+    writes = []
+
+    class ManagedRuleMetadata:
+        def __getattr__(self, name):
+            return getattr(api, name)
+
+        def list_rules(self, **params):
+            body = api.list_rules(**params)
+            for rule in body["Rules"]:
+                if rule["Name"] == impostor:
+                    rule["ManagedBy"] = "events.amazonaws.com"
+            return body
+
+        def delete_archive(self, **params):
+            writes.append(params)
+            return api.delete_archive(**params)
+
+    driver._events = ManagedRuleMetadata()
+    result = driver.deprovision(
+        DeprovisionSpec(
+            handle=created.handle,
+            managed_service_id=spec.managed_service_id,
+            config={"archive": {}, "deletion_protection": False},
+        ),
+        delete_data=True,
+    )
+    assert not result.ok and result.errors == ["external_rules_present"]
+    assert writes == []
+    assert api.describe_archive(ArchiveName=archive)["EventSourceArn"] == arn
+    assert api.describe_rule(Name=impostor, EventBusName=arn)["EventPattern"] == '{"source":["impostor"]}'
