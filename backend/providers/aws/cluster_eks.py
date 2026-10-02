@@ -878,6 +878,7 @@ class EKSClusterDriver(ClusterDriver):
 
     # ---- runtime observability (#299) -----------------------------
 
+    @driver_op(cloud="aws", driver="cluster")
     def metric_containers(self, *, auth: ClusterAuth, **selectors):
         from k8s_native.workload_metrics import metric_containers
 
