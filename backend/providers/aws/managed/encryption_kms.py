@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -26,8 +27,9 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name
 from aws._naming import iam_role_name
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, handle_for, live_ownership_refusal, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "encryption_key"
@@ -42,6 +44,7 @@ class KMSConfig(CredentialedConfig):
     alias_name_prefix: str = "alias/astrolift"
     deletion_protection_default: bool = True
     pending_window_days_default: int = 30
+    account_id: str = ""
 
 
 class KMSDriver(ManagedServiceDriver):
@@ -70,17 +73,27 @@ class KMSDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_kms_config"])
-        alias_name = self._primary_alias(spec, cfg)
+        if not self._config.region or re.fullmatch(r"[0-9]{12}", self._config.account_id) is None:
+            return ProvisionResult(False, "", "KMS requires a region and 12-digit account_id", ["invalid_kms_identity"])
         key_arn = ""
         try:
+            managed_service_identity(spec.managed_service_id)
+            alias_name = self._primary_alias(spec, cfg)
             metadata = self._find_owned_key(spec, alias_name)
             if metadata is None:
                 response = self._kms.create_key(**self._create_request(spec, cfg))
                 metadata = dict(response["KeyMetadata"])
-            key_arn = str(metadata["Arn"])
+            key_arn = self._target(handle_for(kind=KIND, resource_id=str(metadata["Arn"])))
+            metadata = self._metadata(self._kms, key_arn)
+            self._assert_owner(self._kms, key_arn, spec.managed_service_id)
+            if spec.recorded_handle and not self._alias_from_config(cfg):
+                alias_name = self._first_managed_alias(self._kms, key_arn) or alias_name
+            self._preflight_children(self._kms, metadata, cfg, alias_name=alias_name)
+            self._replica_targets(metadata, spec.managed_service_id)
+            self._preflight_replica_aliases(metadata, cfg, alias_name)
             self._reconcile_key(self._kms, metadata, cfg, alias_name=alias_name)
-            metadata = self._kms.describe_key(KeyId=key_arn)["KeyMetadata"]
-            self._ensure_replicas(metadata, cfg)
+            metadata = self._metadata(self._kms, key_arn)
+            self._ensure_replicas(metadata, cfg, spec.managed_service_id)
         except Exception as exc:
             handle = handle_for(kind=KIND, resource_id=key_arn) if key_arn else ""
             return ProvisionResult(False, handle, f"provision KMS key: {exc}", [str(exc)])
@@ -94,20 +107,18 @@ class KMSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="kms")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, key_arn = parse_handle(spec.handle)
+        key_arn = self._target(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_kms_config"])
         try:
-            metadata = self._kms.describe_key(KeyId=key_arn)["KeyMetadata"]
-            if not self._is_owned(self._kms, key_arn):
-                return UpdateResult(
-                    False,
-                    spec.handle,
-                    "refusing to update a KMS key not owned by Astrolift",
-                    ["resource_not_owned"],
-                )
+            metadata = self._metadata(self._kms, key_arn)
+            self._assert_owner(self._kms, key_arn, spec.managed_service_id)
+            alias_name = self._alias_from_config(cfg) or self._first_managed_alias(self._kms, key_arn)
+            self._preflight_children(self._kms, metadata, cfg, alias_name=alias_name)
+            self._replica_targets(metadata, spec.managed_service_id)
+            self._preflight_replica_aliases(metadata, cfg, alias_name)
             if metadata.get("KeyState") in {"PendingDeletion", "PendingReplicaDeletion"}:
                 if not cfg.get("cancel_pending_deletion"):
                     return UpdateResult(
@@ -117,11 +128,12 @@ class KMSDriver(ManagedServiceDriver):
                         ["pending_deletion"],
                     )
                 self._kms.cancel_key_deletion(KeyId=key_arn)
-                metadata = self._kms.describe_key(KeyId=key_arn)["KeyMetadata"]
-            alias_name = self._alias_from_config(cfg) or self._first_managed_alias(self._kms, key_arn)
+                metadata = self._metadata(self._kms, key_arn)
             self._reconcile_key(self._kms, metadata, cfg, alias_name=alias_name)
-            metadata = self._kms.describe_key(KeyId=key_arn)["KeyMetadata"]
-            self._ensure_replicas(metadata, cfg)
+            metadata = self._metadata(self._kms, key_arn)
+            self._ensure_replicas(metadata, cfg, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["resource_not_owned"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, "KMS key not found", ["not_found"])
@@ -141,23 +153,21 @@ class KMSDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, key_arn = parse_handle(spec.handle)
+        key_arn = self._target(spec.handle)
         try:
-            metadata = self._kms.describe_key(KeyId=key_arn)["KeyMetadata"]
+            metadata = self._metadata(self._kms, key_arn)
+            self._assert_owner(self._kms, key_arn, spec.managed_service_id)
+            self._aliases(self._kms, key_id=key_arn)
+            self._grants(self._kms, key_arn)
+            replicas = self._replica_targets(metadata, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), ["resource_not_owned"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, "KMS key already gone")
             return DeprovisionResult(False, spec.handle, f"describe KMS key: {exc}", [str(exc)])
         if metadata.get("KeyState") in {"PendingDeletion", "PendingReplicaDeletion"}:
             return DeprovisionResult(True, spec.handle, f"KMS key is {metadata.get('KeyState')}")
-        if not self._is_owned(self._kms, key_arn) and not force_destroy:
-            return DeprovisionResult(
-                False,
-                spec.handle,
-                "refusing to schedule deletion of a KMS key not owned by Astrolift",
-                ["resource_not_owned"],
-                retryable=False,
-            )
         protected = bool(
             spec.config.get(
                 "deletion_protection",
@@ -195,10 +205,10 @@ class KMSDriver(ManagedServiceDriver):
                 retryable=False,
             )
         try:
-            self._schedule_replicas(metadata, pending_window, force_destroy=force_destroy)
+            self._schedule_replicas(replicas, pending_window)
             self._revoke_managed_grants(self._kms, str(metadata["KeyId"]), desired_names=set())
             response = self._kms.schedule_key_deletion(
-                KeyId=key_arn,
+                KeyId=str(metadata["KeyId"]),
                 PendingWindowInDays=pending_window,
             )
         except Exception as exc:
@@ -211,9 +221,9 @@ class KMSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="kms")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, key_arn = parse_handle(handle.handle)
         try:
-            metadata = self._kms.describe_key(KeyId=key_arn)["KeyMetadata"]
+            key_arn = self._target(handle.handle)
+            metadata = self._metadata(self._kms, key_arn)
         except Exception as exc:
             if _not_found(exc):
                 return ServiceStatus(handle.handle, "deprovisioned", "KMS key does not exist")
@@ -232,8 +242,8 @@ class KMSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="kms")
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
-        _, key_arn = parse_handle(handle.handle)
-        metadata = self._kms.describe_key(KeyId=key_arn)["KeyMetadata"]
+        key_arn = self._target(handle.handle)
+        metadata = self._metadata(self._kms, key_arn)
         key_id = str(metadata["KeyId"])
         key_spec = str(metadata.get("KeySpec") or metadata.get("CustomerMasterKeySpec") or "SYMMETRIC_DEFAULT")
         key_usage = str(metadata.get("KeyUsage") or "ENCRYPT_DECRYPT")
@@ -386,6 +396,17 @@ class KMSDriver(ManagedServiceDriver):
             return "config.replica_regions must be unique"
         if self._config.region in replicas:
             return "config.replica_regions cannot include the primary region"
+        if replicas:
+            from botocore.session import get_session
+
+            session = get_session()
+            partition = session.get_partition_for_region(self._config.region)
+            if any(
+                re.fullmatch(r"(?:[a-z]+-){2,3}[0-9]+", region) is None
+                or session.get_partition_for_region(region) != partition
+                for region in replicas
+            ):
+                return "replica_regions must be valid region IDs in the primary AWS partition"
         if replicas and cfg.get("multi_region") is False:
             return "replica_regions require multi_region=true or omission of multi_region"
         if cfg.get("rotation_period_days") is not None:
@@ -436,6 +457,7 @@ class KMSDriver(ManagedServiceDriver):
                     _timestamp(material["valid_to"])
                 except ManagedServiceError as exc:
                     return str(exc)
+        grant_names: set[str] = set()
         for index, grant in enumerate(cfg.get("grants") or []):
             if not isinstance(grant, dict) or not str(grant.get("name") or ""):
                 return f"config.grants[{index}] requires a non-empty name"
@@ -447,6 +469,10 @@ class KMSDriver(ManagedServiceDriver):
                     f"config.grants[{index}].request cannot override Astrolift-owned fields: "
                     f"{', '.join(sorted(reserved_grant))}"
                 )
+            name = iam_role_name(_MANAGED_GRANT_PREFIX.rstrip("-"), str(grant["name"]), max_len=256)
+            if name in grant_names:
+                return "KMS grant names must be unique after provider normalization"
+            grant_names.add(name)
         return ""
 
     def _create_request(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, Any]:
@@ -464,31 +490,74 @@ class KMSDriver(ManagedServiceDriver):
         return request
 
     def _find_owned_key(self, spec: ProvisionSpec, alias_name: str) -> dict[str, Any] | None:
+        if spec.recorded_handle:
+            arn = self._target(spec.recorded_handle)
+            metadata = self._metadata(self._kms, arn)
+            self._assert_owner(self._kms, arn, spec.managed_service_id)
+            return metadata
         alias = self._find_alias(self._kms, alias_name)
         if alias is not None:
-            metadata = self._kms.describe_key(KeyId=str(alias["TargetKeyId"]))["KeyMetadata"]
-            if not self._is_owned(self._kms, str(metadata["KeyId"])):
-                raise ManagedServiceError(f"alias {alias_name!r} points to a key not owned by Astrolift")
-            # Platform-made is not enough: it must be this service's (#1961).
-            refusal = adoption_refusal(
-                self._tags(self._kms, str(metadata["KeyId"])), spec, resource=f"alias {alias_name!r}"
-            )
-            if refusal is not None:
-                raise ManagedServiceError(refusal)
-            return dict(metadata)
-        marker = {
-            "astrolift.io/managed-by": "platform",
-            "astrolift.io/organization": spec.organization_slug,
-            "astrolift.io/app": spec.app_slug,
-            "astrolift.io/environment": spec.environment_name,
-            "astrolift.io/resource-hint": spec.service_handle_hint,
-        }
+            metadata = self._metadata(self._kms, str(alias["TargetKeyId"]))
+            self._assert_owner(self._kms, str(metadata["Arn"]), spec.managed_service_id)
+            return metadata
+        found: dict[str, Any] | None = None
         for item in self._keys(self._kms):
             key_id = str(item["KeyId"])
             tags = self._tags(self._kms, key_id)
-            if all(tags.get(key) == value for key, value in marker.items()):
-                return dict(self._kms.describe_key(KeyId=key_id)["KeyMetadata"])
-        return None
+            if tags.get("astrolift.io/managed_service_id") == spec.managed_service_id:
+                self._assert_owner(self._kms, key_id, spec.managed_service_id)
+                metadata = self._metadata(self._kms, key_id)
+                if found and found["Arn"] != metadata["Arn"]:
+                    raise ManagedServiceError("managed-service identity resolves to multiple KMS keys")
+                found = metadata
+        return found
+
+    def _target(self, handle: str, *, region: str = "") -> str:
+        from botocore.session import get_session
+
+        kind, arn = parse_handle(handle)
+        region = region or self._config.region
+        fields = arn.split(":", 5)
+        partition = get_session().get_partition_for_region(region)
+        if (
+            kind != KIND
+            or not region
+            or re.fullmatch(r"[0-9]{12}", self._config.account_id) is None
+            or len(fields) != 6
+            or fields[:5] != ["arn", partition, "kms", region, self._config.account_id]
+            or re.fullmatch(r"key/(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|mrk-[0-9a-f]{32})", fields[5]) is None
+        ):
+            raise ManagedServiceError("recorded KMS ARN does not match the configured key target")
+        return arn
+
+    def _metadata(self, client: Any, key_id: str, *, region: str = "") -> dict[str, Any]:
+        metadata = dict(client.describe_key(KeyId=key_id)["KeyMetadata"])
+        arn = self._target(handle_for(kind=KIND, resource_id=str(metadata.get("Arn") or "")), region=region)
+        if (
+            metadata.get("KeyId") != arn.rsplit("/", 1)[1]
+            or metadata.get("AWSAccountId") != self._config.account_id
+            or metadata.get("KeyManager") != "CUSTOMER"
+            or key_id not in {arn, metadata.get("KeyId")}
+        ):
+            raise ManagedServiceError("live KMS key does not match the exact recorded identity")
+        return metadata
+
+    def _assert_owner(self, client: Any, key_id: str, identity: str) -> None:
+        refusal = live_ownership_refusal(self._tags(client, key_id), managed_service_id=identity, resource="KMS key")
+        if refusal:
+            raise ManagedServiceError(refusal)
+
+    def _preflight_children(
+        self, client: Any, metadata: dict[str, Any], cfg: dict[str, Any], *, alias_name: str
+    ) -> None:
+        key_id = str(metadata["KeyId"])
+        self._aliases(client, key_id=key_id)
+        self._grants(client, str(metadata["Arn"]))
+        aliases = {str(item["AliasName"]): item for item in self._aliases(client)}
+        for name in self._alias_names(cfg, default=alias_name):
+            alias = aliases.get(name)
+            if alias and alias.get("TargetKeyId") != key_id:
+                raise ManagedServiceError(f"alias {name!r} already targets another KMS key")
 
     def _reconcile_key(
         self,
@@ -594,22 +663,76 @@ class KMSDriver(ManagedServiceDriver):
             if name.startswith(_MANAGED_GRANT_PREFIX) and name not in desired_names:
                 client.revoke_grant(KeyId=key_id, GrantId=str(grant["GrantId"]))
 
-    def _ensure_replicas(self, metadata: dict[str, Any], cfg: dict[str, Any]) -> None:
+    def _replica_targets(self, metadata: dict[str, Any], identity: str) -> list[tuple[Any, dict[str, Any]]]:
+        configuration = metadata.get("MultiRegionConfiguration") or {}
+        declared = configuration.get("ReplicaKeys") or []
+        if declared and configuration.get("MultiRegionKeyType") != "PRIMARY":
+            raise ManagedServiceError("replica list does not belong to a primary KMS key")
+        if configuration.get("MultiRegionKeyType") == "PRIMARY" and configuration.get("PrimaryKey") != {
+            "Arn": metadata["Arn"],
+            "Region": self._config.region,
+        }:
+            raise ManagedServiceError("KMS primary metadata points to another key")
+        targets: list[tuple[Any, dict[str, Any]]] = []
+        seen: set[str] = set()
+        for item in declared:
+            region, arn = str(item.get("Region") or ""), str(item.get("Arn") or "")
+            if not region or region == self._config.region or region in seen:
+                raise ManagedServiceError("KMS replica region cannot be verified")
+            seen.add(region)
+            self._target(handle_for(kind=KIND, resource_id=arn), region=region)
+            if arn.rsplit("/", 1)[1] != metadata["KeyId"]:
+                raise ManagedServiceError("KMS replica belongs to another primary key")
+            client = self._client(region)
+            replica = self._metadata(client, arn, region=region)
+            self._verify_replica(metadata, replica, region)
+            self._assert_owner(client, arn, identity)
+            self._aliases(client, key_id=str(replica["KeyId"]))
+            self._grants(client, arn)
+            targets.append((client, replica))
+        return targets
+
+    def _preflight_replica_aliases(self, metadata: dict[str, Any], cfg: dict[str, Any], alias_name: str) -> None:
+        for region in cfg.get("replica_regions") or []:
+            client = self._client(str(region))
+            aliases = {str(item["AliasName"]): item for item in self._aliases(client)}
+            for name in self._alias_names(cfg, default=alias_name):
+                alias = aliases.get(name)
+                if alias and alias.get("TargetKeyId") != metadata["KeyId"]:
+                    raise ManagedServiceError(f"replica alias {name!r} already targets another KMS key")
+
+    def _verify_replica(self, primary: dict[str, Any], replica: dict[str, Any], region: str) -> None:
+        self._target(handle_for(kind=KIND, resource_id=str(replica.get("Arn") or "")), region=region)
+        configuration = replica.get("MultiRegionConfiguration") or {}
+        if (
+            replica.get("KeyId") != primary["KeyId"]
+            or replica.get("Arn") != self._arn_prefix(region) + "key/" + str(primary["KeyId"])
+            or replica.get("AWSAccountId") != self._config.account_id
+            or replica.get("KeyManager") != "CUSTOMER"
+            or not replica.get("MultiRegion")
+            or configuration.get("MultiRegionKeyType") != "REPLICA"
+            or configuration.get("PrimaryKey") != {"Arn": primary["Arn"], "Region": self._config.region}
+        ):
+            raise ManagedServiceError("KMS replica metadata does not match the exact primary")
+
+    def _ensure_replicas(self, metadata: dict[str, Any], cfg: dict[str, Any], identity: str) -> None:
         desired = [str(region) for region in cfg.get("replica_regions") or []]
         if not desired:
             return
         if not metadata.get("MultiRegion"):
             raise ManagedServiceError("replica_regions require a multi-Region primary KMS key")
         configuration = metadata.get("MultiRegionConfiguration") or {}
-        if configuration.get("MultiRegionKeyType") == "REPLICA":
+        if configuration.get("MultiRegionKeyType") != "PRIMARY":
             raise ManagedServiceError("replicas can be added only from the multi-Region primary key")
         current = {
             str(item.get("Region")): str(item.get("Arn") or "") for item in configuration.get("ReplicaKeys", []) or []
         }
         primary_tags = [
-            {"TagKey": key, "TagValue": value} for key, value in self._tags(self._kms, str(metadata["KeyId"])).items()
+            {"TagKey": key, "TagValue": value} for key, value in self._tags(self._kms, str(metadata["Arn"])).items()
         ]
+        alias = self._alias_from_config(cfg) or self._first_managed_alias(self._kms, str(metadata["KeyId"]))
         for region in desired:
+            client = self._client(region)
             if region not in current:
                 request = dict(cfg.get("replica") or {})
                 request.update(
@@ -621,26 +744,23 @@ class KMSDriver(ManagedServiceDriver):
                 if "policy" in cfg:
                     request["Policy"] = _policy(cfg["policy"])
                 response = self._kms.replicate_key(**request)
-                replica_metadata = dict(response["ReplicaKeyMetadata"])
+                returned = dict(response["ReplicaKeyMetadata"])
+                self._verify_replica(metadata, returned, region)
+                arn = str(returned["Arn"])
             else:
-                replica_metadata = dict(self._client(region).describe_key(KeyId=str(metadata["KeyId"]))["KeyMetadata"])
-            client = self._client(region)
-            alias = self._alias_from_config(cfg) or self._first_managed_alias(self._kms, str(metadata["KeyId"]))
-            self._reconcile_key(client, replica_metadata, cfg, alias_name=alias)
+                arn = current[region]
+            replica = self._metadata(client, arn, region=region)
+            self._verify_replica(metadata, replica, region)
+            self._assert_owner(client, arn, identity)
+            self._preflight_children(client, replica, cfg, alias_name=alias)
+            self._reconcile_key(client, replica, cfg, alias_name=alias)
 
-    def _schedule_replicas(self, metadata: dict[str, Any], pending_window: int, *, force_destroy: bool) -> None:
-        configuration = metadata.get("MultiRegionConfiguration") or {}
-        for replica in configuration.get("ReplicaKeys", []) or []:
-            region = str(replica.get("Region") or "")
-            arn = str(replica.get("Arn") or "")
-            client = self._client(region)
-            replica_metadata = client.describe_key(KeyId=arn)["KeyMetadata"]
-            if replica_metadata.get("KeyState") == "PendingDeletion":
+    def _schedule_replicas(self, targets: list[tuple[Any, dict[str, Any]]], pending_window: int) -> None:
+        for client, metadata in targets:
+            if metadata.get("KeyState") == "PendingDeletion":
                 continue
-            if not self._is_owned(client, arn) and not force_destroy:
-                raise ManagedServiceError(f"replica {arn} is not owned by Astrolift")
-            self._revoke_managed_grants(client, str(replica_metadata["KeyId"]), desired_names=set())
-            client.schedule_key_deletion(KeyId=arn, PendingWindowInDays=pending_window)
+            self._revoke_managed_grants(client, str(metadata["KeyId"]), desired_names=set())
+            client.schedule_key_deletion(KeyId=str(metadata["KeyId"]), PendingWindowInDays=pending_window)
 
     def _client(self, region: str) -> Any:
         if region not in self._regional_clients:
@@ -654,14 +774,7 @@ class KMSDriver(ManagedServiceDriver):
         if explicit:
             return explicit
         prefix = self._config.alias_name_prefix.removeprefix("alias/").rstrip("-/")
-        suffix = iam_role_name(
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_len=max(1, 250 - len(prefix)),
-        )
-        return f"alias/{prefix}-{suffix}"
+        return "alias/" + physical_name(spec.managed_service_id, prefix=prefix, max_length=250)
 
     def _alias_names(self, cfg: dict[str, Any], *, default: str = "") -> list[str]:
         names: list[str] = []
@@ -691,7 +804,15 @@ class KMSDriver(ManagedServiceDriver):
             (alias for alias in aliases if str(alias.get("AliasName") or "").startswith(preferred_prefix)),
             None,
         )
-        return str((item or {}).get("AliasName") or "")
+        return str(
+            (
+                item
+                or next(
+                    (alias for alias in aliases if not str(alias.get("AliasName") or "").startswith("alias/aws/")), {}
+                )
+            ).get("AliasName")
+            or ""
+        )
 
     def _find_alias(self, client: Any, alias_name: str) -> dict[str, Any] | None:
         return next(
@@ -701,7 +822,11 @@ class KMSDriver(ManagedServiceDriver):
 
     def _aliases(self, client: Any, *, key_id: str = "") -> list[dict[str, Any]]:
         aliases: list[dict[str, Any]] = []
+        targets: dict[str, str | None] = {}
         marker = ""
+        seen: set[str] = set()
+        region = self._client_region(client)
+        expected = key_id.rsplit("/", 1)[-1] if key_id else ""
         while True:
             request: dict[str, Any] = {"Limit": 100}
             if key_id:
@@ -709,54 +834,101 @@ class KMSDriver(ManagedServiceDriver):
             if marker:
                 request["Marker"] = marker
             response = client.list_aliases(**request)
-            aliases.extend(response.get("Aliases", []) or [])
-            marker = str(response.get("NextMarker") or "") if response.get("Truncated") else ""
+            for item in response.get("Aliases", []) or []:
+                name = str(item.get("AliasName") or "")
+                expected_arn = self._arn_prefix(region) + name
+                if not name.startswith("alias/") or item.get("AliasArn") != expected_arn:
+                    raise ManagedServiceError("KMS alias identity cannot be verified")
+                if expected and item.get("TargetKeyId") != expected:
+                    raise ManagedServiceError("KMS alias belongs to another key")
+                if name in targets and targets[name] != item.get("TargetKeyId"):
+                    raise ManagedServiceError("KMS alias resolves to ambiguous key identities")
+                targets[name] = item.get("TargetKeyId")
+                aliases.append(dict(item))
+            marker = self._next_marker(response, seen)
             if not marker:
                 return aliases
 
     def _keys(self, client: Any) -> list[dict[str, Any]]:
         keys: list[dict[str, Any]] = []
         marker = ""
+        seen: set[str] = set()
         while True:
             request: dict[str, Any] = {"Limit": 1000}
             if marker:
                 request["Marker"] = marker
             response = client.list_keys(**request)
-            keys.extend(response.get("Keys", []) or [])
-            marker = str(response.get("NextMarker") or "") if response.get("Truncated") else ""
+            for item in response.get("Keys", []) or []:
+                arn = self._target(handle_for(kind=KIND, resource_id=str(item.get("KeyArn") or "")))
+                if item.get("KeyId") != arn.rsplit("/", 1)[1]:
+                    raise ManagedServiceError("listed KMS key identity cannot be verified")
+                keys.append(dict(item))
+            marker = self._next_marker(response, seen)
             if not marker:
                 return keys
 
     def _grants(self, client: Any, key_id: str) -> list[dict[str, Any]]:
         grants: list[dict[str, Any]] = []
         marker = ""
+        seen: set[str] = set()
+        region = self._client_region(client)
+        expected_arn = key_id if key_id.startswith("arn:") else self._arn_prefix(region) + "key/" + key_id
+        self._target(handle_for(kind=KIND, resource_id=expected_arn), region=region)
         while True:
             request: dict[str, Any] = {"KeyId": key_id, "Limit": 100}
             if marker:
                 request["Marker"] = marker
             response = client.list_grants(**request)
-            grants.extend(response.get("Grants", []) or [])
-            marker = str(response.get("NextMarker") or "") if response.get("Truncated") else ""
+            for item in response.get("Grants", []) or []:
+                if (
+                    item.get("KeyId") not in {expected_arn, expected_arn.rsplit("/", 1)[1]}
+                    or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", str(item.get("GrantId") or "")) is None
+                ):
+                    raise ManagedServiceError("KMS grant does not belong to the exact key")
+                grants.append(dict(item))
+            marker = self._next_marker(response, seen)
             if not marker:
                 return grants
 
     def _tags(self, client: Any, key_id: str) -> dict[str, str]:
         tags: dict[str, str] = {}
         marker = ""
+        seen: set[str] = set()
         while True:
             request: dict[str, Any] = {"KeyId": key_id, "Limit": 50}
             if marker:
                 request["Marker"] = marker
             response = client.list_resource_tags(**request)
-            tags.update(
-                {str(item.get("TagKey")): str(item.get("TagValue")) for item in response.get("Tags", []) or []},
-            )
-            marker = str(response.get("NextMarker") or "") if response.get("Truncated") else ""
+            for item in response.get("Tags", []) or []:
+                name, value = item.get("TagKey"), item.get("TagValue")
+                if not isinstance(name, str) or not isinstance(value, str) or name in tags:
+                    raise ManagedServiceError("KMS ownership tags cannot be verified")
+                tags[name] = value
+            marker = self._next_marker(response, seen)
             if not marker:
                 return tags
 
-    def _is_owned(self, client: Any, key_id: str) -> bool:
-        return self._tags(client, key_id).get("astrolift.io/managed-by") == "platform"
+    def _client_region(self, client: Any) -> str:
+        return str(
+            getattr(getattr(client, "meta", None), "region_name", "")
+            or getattr(client, "region", "")
+            or self._config.region
+        )
+
+    def _arn_prefix(self, region: str) -> str:
+        from botocore.session import get_session
+
+        return f"arn:{get_session().get_partition_for_region(region)}:kms:{region}:{self._config.account_id}:"
+
+    @staticmethod
+    def _next_marker(response: dict[str, Any], seen: set[str]) -> str:
+        if not response.get("Truncated"):
+            return ""
+        marker = response.get("NextMarker")
+        if not isinstance(marker, str) or not marker or marker in seen:
+            raise ManagedServiceError("KMS pagination cannot be verified")
+        seen.add(marker)
+        return marker
 
 
 def _policy(value: Any) -> str:
