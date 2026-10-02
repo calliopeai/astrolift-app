@@ -117,7 +117,9 @@ def deployment_approval_count(deployment) -> int:
     )
 
 
-def workload_operation(field: str = "input.workload_id") -> OperationLoader:
+def workload_operation(
+    field: str = "input.workload_id", environment_field: str = "input.environment_id"
+) -> OperationLoader:
     def load(args):
         from astrolift_lifecycle.services.k8s_ops import _primary_environment_for_workload
         from astrolift_registry.models import Workload
@@ -132,7 +134,22 @@ def workload_operation(field: str = "input.workload_id") -> OperationLoader:
             .select_related("registered_app")
             .first()
         )
-        return (environment_context(_primary_environment_for_workload(workload)),) if workload else UNKNOWN
+        if workload is None:
+            return UNKNOWN
+        if read_arg(args, environment_field) is not None:
+            from astrolift_lifecycle.models import AppEnvironment
+
+            environment_guid = read_guid(args, environment_field)
+            environment = (
+                AppEnvironment.objects.filter(guid=environment_guid, registered_app=workload.registered_app)
+                .select_related("tenant_cluster")
+                .first()
+                if environment_guid is not None
+                else None
+            )
+        else:
+            environment = _primary_environment_for_workload(workload)
+        return (environment_context(environment),)
 
     return load
 

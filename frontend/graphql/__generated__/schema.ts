@@ -5422,6 +5422,8 @@ export type AstroliftWorkload = {
   name: Scalars['String']['output'];
   ownedByMe: Scalars['Boolean']['output'];
   ownerUserId?: Maybe<Scalars['String']['output']>;
+  /** Immutable primary target review facts. Explicit targets require a fresh action-target read. */
+  primaryActionTarget?: Maybe<AstroliftWorkloadActionTarget>;
   registeredAppSlug: Scalars['String']['output'];
   replicas: Scalars['Int']['output'];
   schedule: Scalars['String']['output'];
@@ -5433,6 +5435,20 @@ export type AstroliftWorkload = {
   /** Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply. */
   viewerCan: AstroliftWorkloadViewerCan;
   volumes: Scalars['JSON']['output'];
+};
+
+export type AstroliftWorkloadActionTarget = {
+  appId: Scalars['GUID']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  namespace: Scalars['String']['output'];
+  viewerCan: AstroliftWorkloadViewerCan;
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
 };
 
 export type AstroliftWorkloadIdentityGrant = {
@@ -5468,10 +5484,16 @@ export type AstroliftWorkloadManifest = {
 };
 
 export type AstroliftWorkloadOpPayload = {
+  accepted: Scalars['Boolean']['output'];
+  /** Null: the cluster accepted a patch; rollout completion is not established. */
+  completed?: Maybe<Scalars['Boolean']['output']>;
   desiredReplicas?: Maybe<Scalars['Int']['output']>;
   newRevision?: Maybe<Scalars['Int']['output']>;
+  operationId?: Maybe<Scalars['GUID']['output']>;
   readyReplicas?: Maybe<Scalars['Int']['output']>;
+  target?: Maybe<AstroliftWorkloadActionTarget>;
   workloadId: Scalars['GUID']['output'];
+  workloadVersion?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftWorkloadOpPayloadMutationResult = {
@@ -9911,6 +9933,7 @@ export type Query = {
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
   astroliftWorkflowRuns: Array<AstroliftWorkflowRun>;
   astroliftWorkload?: Maybe<AstroliftWorkload>;
+  astroliftWorkloadActionTarget?: Maybe<AstroliftWorkloadActionTarget>;
   astroliftWorkloadIdentityGrants: Array<AstroliftWorkloadIdentityGrant>;
   astroliftWorkloadManifest?: Maybe<AstroliftWorkloadManifest>;
   astroliftWorkloadPodStatusBreakdown: Array<AstroliftWorkloadPodStatusBucket>;
@@ -11505,6 +11528,12 @@ export type QueryAstroliftWorkloadArgs = {
 };
 
 
+export type QueryAstroliftWorkloadActionTargetArgs = {
+  environmentId?: InputMaybe<Scalars['GUID']['input']>;
+  workloadId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftWorkloadIdentityGrantsArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -12083,6 +12112,12 @@ export type ResendInvitationInput = {
 };
 
 export type RestartWorkloadInput = {
+  environmentId: InputMaybe<Scalars['GUID']['input']>;
+  expectedClusterId: InputMaybe<Scalars['GUID']['input']>;
+  expectedNamespace: InputMaybe<Scalars['String']['input']>;
+  ifMatchAppVersion: InputMaybe<Scalars['Int']['input']>;
+  ifMatchClusterVersion: InputMaybe<Scalars['Int']['input']>;
+  ifMatchEnvironmentVersion: InputMaybe<Scalars['Int']['input']>;
   workloadId: Scalars['GUID']['input'];
 };
 
@@ -12267,6 +12302,12 @@ export type RunWorkflowResult = {
 };
 
 export type ScaleWorkloadInput = {
+  environmentId: InputMaybe<Scalars['GUID']['input']>;
+  expectedClusterId: InputMaybe<Scalars['GUID']['input']>;
+  expectedNamespace: InputMaybe<Scalars['String']['input']>;
+  ifMatchAppVersion: InputMaybe<Scalars['Int']['input']>;
+  ifMatchClusterVersion: InputMaybe<Scalars['Int']['input']>;
+  ifMatchEnvironmentVersion: InputMaybe<Scalars['Int']['input']>;
   replicas: Scalars['Int']['input'];
   workloadId: Scalars['GUID']['input'];
 };

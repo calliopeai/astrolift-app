@@ -817,6 +817,40 @@ class WorkloadViewerCanType:
     scale: ActionPermissionType
 
 
+@strawberry.type(name="AstroliftWorkloadActionTarget")
+class WorkloadActionTargetType:
+    workload_id: GUID
+    workload_version: int
+    app_id: GUID
+    app_version: int
+    environment_id: GUID
+    environment_name: str
+    environment_version: int
+    cluster_id: GUID
+    cluster_version: int
+    namespace: str
+    viewer_can: WorkloadViewerCanType
+
+
+def workload_action_target_to_type(target, permission) -> WorkloadActionTargetType | None:
+    if target is None:
+        return None
+    action = ActionPermissionType(allowed=permission.allowed, code=permission.code, reason=permission.reason)
+    return WorkloadActionTargetType(
+        workload_id=GUID(target.workload_id),
+        workload_version=target.workload_version,
+        app_id=GUID(target.app_id),
+        app_version=target.app_version,
+        environment_id=GUID(target.environment_id),
+        environment_name=target.environment_name,
+        environment_version=target.environment_version,
+        cluster_id=GUID(target.cluster_id),
+        cluster_version=target.cluster_version,
+        namespace=target.namespace,
+        viewer_can=WorkloadViewerCanType(restart=action, scale=action),
+    )
+
+
 @strawberry.type(name="AstroliftWorkload")
 class WorkloadType:
     version: int = strawberry.field(
@@ -847,6 +881,10 @@ class WorkloadType:
     registered_app_slug: str
     viewer_can: WorkloadViewerCanType = strawberry.field(
         description="Advisory permissions at read time for the current primary environment. Mutations recheck; input, version and driver preconditions still apply."
+    )
+    primary_action_target: WorkloadActionTargetType | None = strawberry.field(
+        default=None,
+        description="Immutable primary target review facts. Explicit targets require a fresh action-target read.",
     )
     # The DNS name in-cluster callers use to reach this workload's
     # ClusterIP Service — ``<workloadSlug>.<namespace>.svc.cluster.local``
@@ -1785,6 +1823,7 @@ def workload_to_type(workload, *, last_run=None, viewer_permission=None) -> Work
         storage_size=workload.storage_size or "",
         registered_app_slug=workload.registered_app.slug,
         viewer_can=WorkloadViewerCanType(restart=action, scale=action),
+        primary_action_target=workload_action_target_to_type(viewer_permission.target, viewer_permission),
         in_cluster_service_fqdn=_in_cluster_service_fqdn(workload),
         volumes=list(workload.volumes or []),
         owner_user_id=str(owner_id) if owner_id else None,
