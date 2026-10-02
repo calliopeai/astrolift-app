@@ -42,9 +42,51 @@ describe("workload client operation contracts", () => {
         },
       });
       expect(result.errors).toBeUndefined();
-      expect(calls).toEqual([{ input, ifMatchVersion: 7 }]);
+      expect(calls).toEqual([
+        {
+          input: {
+            ...input,
+            environmentId: null,
+            expectedClusterId: null,
+            expectedNamespace: null,
+            ifMatchAppVersion: null,
+            ifMatchClusterVersion: null,
+            ifMatchEnvironmentVersion: null,
+          },
+          ifMatchVersion: 7,
+        },
+      ]);
     }
   );
+  it.each([
+    [RESTART_WORKLOAD, "restartAstroliftWorkload"],
+    [SCALE_WORKLOAD, "scaleAstroliftWorkload"],
+  ] as const)("binds every reviewed environment precondition to %s", async (document, field) => {
+    const calls: unknown[] = [];
+    const input = {
+      workloadId: "workload-guid",
+      ...(field === "scaleAstroliftWorkload" ? { replicas: 4 } : {}),
+      environmentId: "environment-guid",
+      expectedClusterId: "cluster-guid",
+      expectedNamespace: "reviewed-namespace",
+      ifMatchAppVersion: 11,
+      ifMatchClusterVersion: 13,
+      ifMatchEnvironmentVersion: 17,
+    };
+    const result = await execute({
+      schema,
+      document,
+      variableValues: { input, ifMatchVersion: 7 },
+      rootValue: {
+        [field]: (args: unknown) => {
+          calls.push(args);
+          return { ok: true, errors: [], data: null };
+        },
+      },
+    });
+    expect(result.errors).toBeUndefined();
+    expect(calls).toEqual([{ input, ifMatchVersion: 7 }]);
+  });
 });
 
 const messages = path.resolve(process.cwd(), "messages");
