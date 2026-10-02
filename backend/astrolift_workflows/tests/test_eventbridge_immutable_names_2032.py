@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import boto3
 import pytest
-from aws.managed.event_bus_eventbridge import EventBridgeConfig, EventBridgeDriver, _name
+from aws.managed.event_bus_eventbridge import EventBridgeConfig, EventBridgeDriver, _archive_name, _name
 from moto import mock_aws
 
 from astrolift_drivers.registry import PluginManifest, PluginRegistry
@@ -98,7 +98,9 @@ def test_actual_two_org_collision_gets_distinct_saved_buses_and_archives(cloud, 
         assert _provision_sync(row.pk)["handle"] == row.backend_ref
         archives = cloud.api.list_archives(EventSourceArn=arn)["Archives"]
         assert len(archives) == 1 and row.guid.hex in archives[0]["ArchiveName"]
-        rules = [rule for rule in cloud.api.list_rules(EventBusName=arn)["Rules"] if not rule.get("ManagedBy")]
+        rules = [
+            rule for rule in cloud.api.list_rules(EventBusName=arn)["Rules"] if not rule.get("ManagedBy")
+        ]
         assert len(rules) == 1 and rules[0]["Name"] == "Exact_Rule"
         assert rules[0]["Arn"].endswith("/" + bus["Name"] + "/Exact_Rule")
 
@@ -176,3 +178,49 @@ def test_actual_missing_recorded_bus_does_not_create_replacement(cloud):
     result = _provision_sync(row.pk)
     assert not result["ok"] and "refusing a replacement" in result["message"]
     assert [bus["Name"] for bus in cloud.api.list_event_buses()["EventBuses"]] == ["default"]
+
+
+@pytest.mark.parametrize("existing_legacy_archive", [False, True])
+def test_saved_legacy_bus_collisions_get_guid_archives_without_replacing_proven_legacy_archive(
+    cloud, existing_legacy_archive
+):
+    rows = [new_service("legacy-first", archive=True), new_service("legacy-second", archive=True)]
+    names = ["Legacy_" + "x" * 50 + suffix for suffix in ("First", "Second")]
+    old_name = _archive_name(names[0], {})
+    assert old_name == _archive_name(names[1], {})
+    arns = []
+    for row, name in zip(rows, names, strict=True):
+        result = cloud.api.create_event_bus(
+            Name=name,
+            Tags=[
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": str(row.guid)},
+            ],
+        )
+        arns.append(result["EventBusArn"])
+        row.backend_ref = "event_bus/" + result["EventBusArn"]
+        row.save(update_fields=["backend_ref"])
+    if existing_legacy_archive:
+        cloud.api.create_archive(ArchiveName=old_name, EventSourceArn=arns[0], RetentionDays=30)
+    for row, arn in zip(rows, arns, strict=True):
+        result = _provision_sync(row.pk)
+        assert result["ok"] and result["handle"] == row.backend_ref
+        archives = cloud.api.list_archives(EventSourceArn=arn)["Archives"]
+        assert len(archives) == 1
+        name = archives[0]["ArchiveName"]
+        if existing_legacy_archive and arn == arns[0]:
+            assert name == old_name
+            assert cloud.api.describe_archive(ArchiveName=name)["RetentionDays"] == 30
+        else:
+            assert row.guid.hex in name and name != old_name
+        cloud.cfg = dataclasses.replace(cloud.cfg, event_bus_name_prefix="changed-prefix")
+        row.registered_app.slug = "changed-app"
+        row.registered_app.save(update_fields=["slug"])
+        assert _provision_sync(row.pk)["ok"]
+        assert [item["ArchiveName"] for item in cloud.api.list_archives(EventSourceArn=arn)["Archives"]] == [
+            name
+        ]
+    for row in rows:
+        row.config = {**row.config, "deletion_protection": False}
+        row.save(update_fields=["config"])
+        assert _deprovision_sync(row.pk, delete_data=True, force_destroy=False)["ok"]

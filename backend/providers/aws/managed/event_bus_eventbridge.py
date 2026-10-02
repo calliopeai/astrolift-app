@@ -181,7 +181,11 @@ class EventBridgeDriver(ManagedServiceDriver):
                     ["retained_archives_require_delete_data"],
                     retryable=False,
                 )
-            configured_archive = _archive_name(bus_name, spec.config["archive"]) if "archive" in spec.config else ""
+            configured_archive = (
+                self._archive_target(bus_name, bus_arn, spec.config["archive"], spec.managed_service_id)[0]
+                if "archive" in spec.config
+                else ""
+            )
             external = [archive for archive in archives if str(archive.get("ArchiveName") or "") != configured_archive]
             if external and not force_destroy:
                 return DeprovisionResult(
@@ -192,8 +196,12 @@ class EventBridgeDriver(ManagedServiceDriver):
                     retryable=False,
                 )
             rules = self._rules(bus_name)
+            archive_rules = {f"Events-Archive-{archive['ArchiveName']}" for archive in archives}
             external_rules = [
-                rule for rule in rules if not self._is_managed(str(rule.get("Arn") or ""), spec.managed_service_id)
+                rule
+                for rule in rules
+                if not self._is_managed(str(rule.get("Arn") or ""), spec.managed_service_id)
+                and not (rule.get("ManagedBy") and rule.get("Name") in archive_rules)
             ]
             if external_rules and not force_destroy:
                 return DeprovisionResult(
@@ -381,7 +389,7 @@ class EventBridgeDriver(ManagedServiceDriver):
         if "rules" in cfg:
             self._reconcile_rules(bus_name, cfg, spec=spec, identity=identity)
         if "archive" in cfg:
-            self._reconcile_archive(bus_name, bus_arn, cfg["archive"])
+            self._reconcile_archive(bus_name, bus_arn, cfg["archive"], identity=identity)
 
     def _reconcile_permissions(self, bus_name: str, cfg: dict[str, Any]) -> None:
         if "resource_policy" in cfg:
@@ -497,10 +505,9 @@ class EventBridgeDriver(ManagedServiceDriver):
                     f"remove targets for rule {rule_name} partially failed: {response.get('FailedEntries') or []}",
                 )
 
-    def _reconcile_archive(self, bus_name: str, bus_arn: str, config: Any) -> None:
+    def _reconcile_archive(self, bus_name: str, bus_arn: str, config: Any, *, identity: str) -> None:
         archive = dict(config or {})
-        archive_name = _archive_name(bus_name, archive)
-        existing = self._archive(archive_name)
+        archive_name, existing = self._archive_target(bus_name, bus_arn, archive, identity)
         if existing is not None:
             self._assert_archive_parent(archive_name, bus_arn, current=existing)
         enabled = bool(archive.get("enabled", True))
@@ -556,7 +563,6 @@ class EventBridgeDriver(ManagedServiceDriver):
         managed_service_identity(spec.managed_service_id)
         if spec.recorded_handle:
             return _bus_name_from_arn(self._handle_arn(spec.recorded_handle))
-        # The default account-wide archive appends eight characters and is limited to 48.
         return physical_name(spec.managed_service_id, prefix=self._config.event_bus_name_prefix, max_length=40)
 
     def _handle_arn(self, handle: str) -> str:
@@ -588,6 +594,24 @@ class EventBridgeDriver(ManagedServiceDriver):
         current = current if current is not None else self._archive(name)
         if current is None or current.get("ArchiveName") != name or current.get("EventSourceArn") != arn:
             raise ManagedServiceError("EventBridge archive does not belong to this exact bus")
+
+    def _archive_target(
+        self, bus_name: str, bus_arn: str, config: Any, identity: str
+    ) -> tuple[str, dict[str, Any] | None]:
+        archive = dict(config or {})
+        legacy_name = _archive_name(bus_name, archive)
+        existing = self._archive(legacy_name)
+        if archive.get("name"):
+            return legacy_name, existing
+        if existing is not None:
+            if existing.get("ArchiveName") != legacy_name or not existing.get("EventSourceArn"):
+                raise ManagedServiceError("legacy EventBridge archive source cannot be verified")
+            if existing["EventSourceArn"] == bus_arn:
+                return legacy_name, existing
+        # Only a proven existing legacy archive is retained. New defaults use a
+        # stable service identity even when the recorded parent has a human name.
+        name = physical_name(identity, prefix="archive", max_length=48)
+        return name, self._archive(name)
 
     def _bus(self, name: str) -> dict[str, Any]:
         return dict(self._events.describe_event_bus(Name=name))
