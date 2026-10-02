@@ -390,7 +390,7 @@ def _managed_redis() -> Live:
     return Live(
         driver=driver,
         handle=result.handle,
-        owner="managed-service-id",
+        owner=managed_redis_suite._spec().managed_service_id,
         read_owner=read,
         write_owner=write,
         exists=lambda: name in clusters,

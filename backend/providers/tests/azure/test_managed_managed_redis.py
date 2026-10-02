@@ -199,18 +199,18 @@ class FakeSecrets:
 def _spec(**config: Any) -> ProvisionSpec:
     return ProvisionSpec(
         organization_id="org-id",
-        organization_slug="SteadyMD",
+        organization_slug="ExampleOrg",
         app_id="app-id",
-        app_slug="EMR-Triage",
+        app_slug="ExampleApp",
         environment_id="env-id",
         environment_name="Production",
         tenant_cluster_id="cluster-id",
         service_handle_hint="Cache",
         size="small",
         config=config,
-        tags={"owner": "triage"},
+        tags={"owner": "example"},
         binding_id="binding-id",
-        managed_service_id="managed-service-id",
+        managed_service_id="11111111-1111-4111-8111-111111111111",
     )
 
 
@@ -282,7 +282,7 @@ def test_provision_creates_cluster_database_and_key_vault_binding() -> None:
     )
 
     assert result.ok and result.ready
-    assert result.handle.startswith("redis/astrolift-amr-steadymd-emr-triage-production-")
+    assert result.handle == "redis/astrolift-amr-11111111111141118111111111111111/default"
     cluster_call = next(call for call in management.calls if call[0] == "cluster.create")
     cluster = cluster_call[-1]
     assert cluster.location == "eastus"
@@ -448,7 +448,7 @@ def test_update_scales_cluster_updates_database_and_refreshes_secrets() -> None:
                 "eviction_policy": "AllKeysLFU",
                 "persistence": {"aof_enabled": True, "aof_frequency": "1s"},
             },
-            managed_service_id="managed-service-id",
+            managed_service_id="11111111-1111-4111-8111-111111111111",
         ),
     )
 
@@ -477,7 +477,7 @@ def test_partial_update_does_not_silently_downsize_or_reset_database_shape() -> 
                     "userAssignedIdentities/redis-cmk"
                 ),
             },
-            managed_service_id="managed-service-id",
+            managed_service_id="11111111-1111-4111-8111-111111111111",
         ),
     )
 
@@ -500,7 +500,11 @@ def test_immutable_database_shape_requires_reprovision() -> None:
     management.calls.clear()
 
     result = driver.update(
-        UpdateSpec(handle=handle, config={"clustering_policy": "NoCluster"}, managed_service_id="managed-service-id")
+        UpdateSpec(
+            handle=handle,
+            config={"clustering_policy": "NoCluster"},
+            managed_service_id="11111111-1111-4111-8111-111111111111",
+        )
     )
 
     assert not result.ok
@@ -523,7 +527,9 @@ def test_provision_reconciliation_rejects_clustering_policy_drift() -> None:
 def test_update_reports_missing_resource() -> None:
     driver, _, _ = _driver()
     result = driver.update(
-        UpdateSpec(handle="redis/missing/default", size="medium", managed_service_id="managed-service-id")
+        UpdateSpec(
+            handle="redis/missing/default", size="medium", managed_service_id="11111111-1111-4111-8111-111111111111"
+        )
     )
     assert not result.ok
     assert result.errors == ["not_found"]
@@ -576,7 +582,7 @@ def test_default_teardown_refuses_unverifiable_data_loss() -> None:
     driver, management, _, handle = _provisioned()
     management.calls.clear()
 
-    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="managed-service-id"))
+    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="11111111-1111-4111-8111-111111111111"))
 
     assert not result.ok and not result.retryable
     assert result.errors == ["data_preserving_teardown_unsupported"]
@@ -587,7 +593,9 @@ def test_destructive_teardown_deletes_database_cluster_and_all_secrets() -> None
     driver, management, secrets, handle = _provisioned()
     management.calls.clear()
 
-    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="managed-service-id"), delete_data=True)
+    result = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="11111111-1111-4111-8111-111111111111"), delete_data=True
+    )
 
     assert result.ok
     assert [call[0] for call in management.calls if call[0].endswith("delete")] == [
@@ -604,7 +612,9 @@ def test_idempotent_teardown_does_not_hide_secret_cleanup_failure() -> None:
     management.clusters.pop(cluster_name)
     secrets.fail_delete = True
 
-    result = driver.deprovision(DeprovisionSpec(handle, managed_service_id="managed-service-id"), delete_data=True)
+    result = driver.deprovision(
+        DeprovisionSpec(handle, managed_service_id="11111111-1111-4111-8111-111111111111"), delete_data=True
+    )
 
     assert not result.ok
     assert "credential cleanup failed" in result.message
@@ -620,7 +630,7 @@ def test_idempotent_teardown_requires_the_configured_secret_backend() -> None:
         ),
     )
     result = driver.deprovision(
-        DeprovisionSpec("redis/already-gone/default", managed_service_id="managed-service-id"),
+        DeprovisionSpec("redis/already-gone/default", managed_service_id="11111111-1111-4111-8111-111111111111"),
         delete_data=True,
     )
     assert not result.ok
@@ -683,7 +693,7 @@ def test_names_are_bounded_stable_and_collision_resistant() -> None:
     first = driver._cluster_name_for(_spec())
     second = driver._cluster_name_for(_spec())
     other = driver._cluster_name_for(
-        ProvisionSpec(**{**_spec().__dict__, "managed_service_id": "other-managed-service"}),
+        ProvisionSpec(**{**_spec().__dict__, "managed_service_id": "22222222-2222-4222-8222-222222222222"}),
     )
     assert first == second
     assert first != other
