@@ -547,6 +547,11 @@ class AKSClusterDriver(ClusterDriver):
 
     # ---- runtime observability (#299) -----------------------------
 
+    def metric_containers(self, *, auth: ClusterAuth, **selectors):
+        from k8s_native.workload_metrics import metric_containers
+
+        return metric_containers(auth=self._resolve_aks_auth(auth), **selectors)
+
     @driver_op(cloud="azure", driver="cluster")
     def list_pods(
         self,

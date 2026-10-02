@@ -9,6 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
     from datetime import datetime
 
+    from _sdk.workload_metrics import MetricContainer
+
 
 @dataclass(frozen=True)
 class ApplyError:
@@ -1107,6 +1109,21 @@ class ClusterDriver(Protocol):
         Kubernetes' own ``job-name`` label — a fallback for resolving a
         Job's real (suffixed) pod name from just the Job's frozen name.
         """
+        ...
+
+    def metric_containers(
+        self,
+        *,
+        auth: ClusterAuth,
+        namespace: str,
+        app_slug: str,
+        app_id: str,
+        environment_id: str,
+        workload_slug: str,
+        workload_id: str,
+        workload_kind: str,
+    ) -> tuple[MetricContainer, ...]:
+        """Verified physical membership; unsupported providers must refuse."""
         ...
 
     def stream_logs(
