@@ -80,6 +80,7 @@ def _stage_types(result: FlowImportResult) -> list[WorkflowManifestStageType]:
             on_failure=s.on_failure,
             max_attempts=s.max_attempts,
             back_edge=s.back_edge,
+            iteration=s.iteration,
             timeout=s.timeout,
             fan_out=str(s.fan_out),
             prompt=s.prompt,

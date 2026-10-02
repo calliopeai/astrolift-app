@@ -31,6 +31,7 @@ class WorkflowStageType:
     fan_out_count: int | None
     on_failure: str
     max_attempts: int
+    iteration: strawberry.scalars.JSON
     back_edge: strawberry.scalars.JSON
     timeout_seconds: int
     created_at: datetime
@@ -78,6 +79,7 @@ class WorkflowStageExecutionType:
     status: str
     attempt_number: int
     round_number: int
+    collection_index: int | None
     fanout_index: int | None
     started_at: datetime | None
     ended_at: datetime | None
@@ -116,6 +118,16 @@ class WorkflowStageExecutionType:
             if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage_id == self.stage_id
             else None
         )
+
+    @strawberry_django.field
+    def collection_stage_id(self) -> str | None:
+        parent = self.collection_parent_execution
+        return str(parent.stage.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage.definition_id == self.stage.definition_id else None
+
+    @strawberry_django.field
+    def collection_parent_execution_guid(self) -> str | None:
+        parent = self.collection_parent_execution
+        return str(parent.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage.definition_id == self.stage.definition_id else None
 
     @strawberry_django.field
     def execution_id(self) -> str:

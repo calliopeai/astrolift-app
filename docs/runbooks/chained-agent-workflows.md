@@ -348,10 +348,112 @@ read-only, and allows the round cap to be changed without discarding the source
 output contract. Changing that source mapping requires editing the native
 manifest; mismatched source node and canonical return target are rejected.
 
-Langflow's [collection Loop](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/flow_controls/loop.py)
-processes Data/Message/DataFrame items in an isolated body and aggregates a `done`
-output. Its [conditional router](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/flow_controls/conditional_router.py)
-has separate message outputs and branch-exclusion state. These source constructs
-currently have no equivalent import mapping and must be reviewed as unsupported;
-unresolved cycles are rejected instead of flattened. Bounded collection/body
-scheduling and conditional-router import remain unfinished acceptance work.
+## Serial collection bodies
+
+A `collection` stage declares a forward body ending at an explicit output key.
+Its `max_items` is required, from 1 to 50. Choose exactly one of `items`, an
+ordered array of JSON records, or `items_path`, a dotted field in the preceding
+output (the dispatch input for an initial stage). An empty array completes with
+zero items. Missing data, non-record items and data exceeding the cap are
+unavailable and dispatch no body stages; data is never truncated.
+
+```toml
+[workflow]
+slug = "serial-review"
+name = "Serial item review"
+pattern = "chained"
+
+[[stage]]
+order = 0
+kind = "collection"
+output_key = "item_each"
+iteration_json = '{"max_items":4,"items_path":"items","body_end":"review"}'
+
+[[stage]]
+order = 1
+kind = "agent_dispatch"
+agent = "worker"
+output_key = "draft"
+on_failure = "retry"
+max_attempts = 2
+
+[[stage]]
+order = 2
+kind = "human_gate"
+output_key = "review"
+timeout = 3600
+```
+
+Configure the agent binding using the definition's existing agent picker or
+reviewed binding controls before starting. The collection engine forwards that
+exact workload binding, environment recipe, skills and prompt to each item;
+matching a slug in another app does not substitute its workload. A `workflow`
+body stage similarly uses the exact bound nested definition. Every body must be
+a contiguous forward range of agent, nested-workflow, checkpoint, human-gate or
+record-format stages. Nested collections, parallel body stages and edges that
+enter or leave a body range are refused. A bounded review return entirely inside
+the body is supported; its local rounds and attempts apply independently to each
+item. Returning to the outer collection repeats the collection under the outer
+edge's lifetime cap. The reviewed plan multiplies item counts, attempts and
+return visits before any dispatch and enforces the global execution budget.
+
+Each item runs in a separate durable child workflow, in order. Its exact parent
+execution, zero-based item index and child workflow identity are persisted.
+Approving a gate with its execution GUID signals that item, after the usual
+organization, actor and approval checks. The next item waits for the current
+body to finish. The timeline displays recorded one-based item labels separately
+from parallel branches and review rounds; it does not infer them from stage names.
+
+The parent output includes `results` in input order, `item_execution_ids`,
+`finished_count`, `complete` and the frozen `collection` binding. Complete means
+every body finished under its authored failure policy: a skipped failed agent or
+a cleared escalation retains that outcome and does not become a successful agent
+result. A failed body stops later items and exposes `complete: false`. Abort or
+cancellation closes the outstanding run and executions. Inputs and collected
+outputs must be finite JSON, with string object keys, at most 32 nesting levels,
+16,384 nodes and 256 KiB encoded size; an oversized aggregate fails explicitly.
+
+The Stage editor exposes the maximum item count and forward body end, preserving
+literal source records during cap edits. Dynamic inputs expose `items_path`.
+TOML uses `iteration_json` to preserve JSON `null`; YAML and GraphQL retain the
+same typed contract. Imported target bindings are read-only in the visual editor.
+
+### Supported Langflow collection import
+
+The supported mapping is based on Langflow commit
+[`f9b283243d2fdd8502cb4ffd606c3058cff5017e`](https://github.com/langflow-ai/langflow/tree/f9b283243d2fdd8502cb4ffd606c3058cff5017e):
+[CreateList](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/processing/create_list.py),
+[Loop](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/flow_controls/loop.py),
+[the isolated Loop body scheduler](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/base/flow_controls/loop_utils.py),
+[Parser](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/processing/parser.py),
+and [TypeConverter](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/processing/converter.py).
+
+Import requires one exact `CreateList` collection edge into `Loop.data`, an
+`item` edge into `Parser.input_data`, and `Parser.parsed_text` feedback into
+`Loop.item`. An optional `Loop.done` edge may feed TypeConverter's explicit JSON
+conversion without automatic parsing. Handle node IDs and input/output names
+must agree, including Langflow's encoded handle representation. A default
+`max_items` of 50 becomes explicit in the native contract; an optional source
+`astrolift_max_items` field can lower it. Source component code, when present,
+must match the pinned built-in implementation.
+
+The importer preserves ordered text records, plain named Parser fields, missing
+fields as empty strings and the ordered final record table. A record includes
+the deterministic execution timestamp matching the pinned Message data shape.
+TOML/YAML export and re-import preserve the literal records, cap, body binding,
+pattern and separator. The native engine then actually executes each Parser body;
+import does not merely flatten the source feedback cycle into a stage list.
+
+Custom component code, state, routers, nested Loop graphs, Stringify mode,
+unresolved variables and other source body component types remain unsupported
+and are rejected explicitly. Broader Langflow agent/workflow source translation
+is not certified by the native agent/workflow body support. The Langflow runtime
+itself is not invoked by these import tests. Conditional-router message outputs
+and branch-exclusion state remain outside this supported mapping.
+
+The collection proof uses real PostgreSQL 15.15 and Temporal: source import and
+authoring round-trip, ordered body completion, exact nested-workflow binding,
+gate delivery through the actual GraphQL mutation, worker restart, malformed
+input refusal before dispatch, and exact agent preparation with bounded
+unavailable-target failures. Successful container-backed agent execution needs a
+reachable cluster and is not established by an unavailable-target proof.

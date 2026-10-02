@@ -109,6 +109,10 @@ def validate_workflow_composition(
                     "kind": stage.kind,
                     "output_key": stage.output_key,
                     "back_edge": stage.back_edge,
+                    "iteration": stage.iteration,
+                    "max_attempts": stage.max_attempts,
+                    "fan_out_count": stage.fan_out_count,
+                    "fan_out_dynamic": stage.fan_out_dynamic,
                 }
                 for stage in current.stages.filter(deleted_at__isnull=True).order_by("order")
             ],

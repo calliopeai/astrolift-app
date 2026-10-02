@@ -63,7 +63,7 @@ from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attemp
 _VALID_PATTERN_KINDS = frozenset(
     {"single", "chained", "fan_out", "review_loop"}
 )
-_VALID_STAGE_KINDS = frozenset({"agent_dispatch", "human_gate", "checkpoint", "aggregation", "workflow"})
+_VALID_STAGE_KINDS = frozenset({"agent_dispatch", "human_gate", "checkpoint", "aggregation", "workflow", "collection", "format_record"})
 _VALID_ON_FAILURE = frozenset({"fail", "retry", "skip", "escalate"})
 
 # Default states/transitions injected when the author omits them. The
@@ -186,6 +186,13 @@ def _parse_stage_entry(entry: Any, workflow_index: int, stage_index: int) -> dic
 
     on_failure = str(entry.get("on_failure", "fail")).lower()
 
+    from workflows.collections import validate_iteration
+
+    try:
+        iteration = validate_iteration(entry.get("iteration", {}), kind=kind)
+    except ValueError as exc:
+        raise DslParseError(f"{path}.iteration: {exc}") from exc
+
     try:
         back_edge = validate_back_edge(entry.get("back_edge", {}), kind=kind)
     except LoopContractError as exc:
@@ -228,6 +235,7 @@ def _parse_stage_entry(entry: Any, workflow_index: int, stage_index: int) -> dic
         "on_failure": on_failure,
         "max_attempts": max_attempts,
         "back_edge": back_edge,
+        "iteration": iteration,
         "timeout_seconds": timeout_seconds,
     }
 

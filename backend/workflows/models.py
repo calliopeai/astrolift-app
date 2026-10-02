@@ -514,6 +514,8 @@ class WorkflowStage(BaseCoreModel):
         AGGREGATION = "aggregation"
         # Execute another WorkflowDefinition as a linked Temporal child run.
         WORKFLOW = "workflow"
+        COLLECTION = "collection"
+        FORMAT_RECORD = "format_record"
 
     class OnFailure(models.TextChoices):
         FAIL = "fail"
@@ -597,6 +599,7 @@ class WorkflowStage(BaseCoreModel):
         default=OnFailure.FAIL,
         help_text="What to do if this stage fails.",
     )
+    iteration = models.JSONField(default=dict, blank=True, help_text="Bounded serial body range or supported record formatter configuration.")
     back_edge = models.JSONField(
         default=dict,
         blank=True,
@@ -898,6 +901,9 @@ class WorkflowStageExecution(BaseCoreModel):
         related_name="fanout_children",
     )
     fanout_index = models.PositiveSmallIntegerField(null=True, blank=True)
+    collection_parent_execution = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="collection_children")
+    collection_index = models.PositiveSmallIntegerField(null=True, blank=True)
+    collection_workflow_id = models.CharField(max_length=512, blank=True, default="")
     attempt_number = models.IntegerField(
         default=1,
         help_text="1-based retry count — incremented each time the stage is retried.",

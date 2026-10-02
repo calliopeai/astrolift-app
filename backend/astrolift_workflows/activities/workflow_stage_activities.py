@@ -259,6 +259,7 @@ def _get_workflow_stages_sync(
                 "on_failure": stage.on_failure,
                 "max_attempts": stage.max_attempts,
                 "back_edge": dict(stage.back_edge),
+                "iteration": dict(stage.iteration),
                 "timeout_seconds": int(stage.timeout_seconds),
                 "fan_out_count": stage.fan_out_count,
                 "fan_out_dynamic": stage.fan_out_dynamic,
@@ -401,6 +402,9 @@ def _execution_metadata(run, stage, context: dict | None) -> dict:
         "caused_by",
         "fanout_parent_execution_id",
         "fanout_index",
+        "collection_parent_execution_id",
+        "collection_index",
+        "collection_workflow_id",
     }:
         raise ValueError("invalid stage execution context")
     if run.workflow_definition_id != stage.definition_id:
@@ -414,7 +418,13 @@ def _execution_metadata(run, stage, context: dict | None) -> dict:
             raise ValueError("invalid round cause")
         if not isinstance(cause["edge"], str) or not 1 <= len(cause["edge"]) <= 203:
             raise ValueError("invalid round edge")
-        if cause["reason"] not in {"gate_rejected", "stage_failed", "output_equals", "always", "max_rounds_exhausted"}:
+        if cause["reason"] not in {
+            "gate_rejected",
+            "stage_failed",
+            "output_equals",
+            "always",
+            "max_rounds_exhausted",
+        }:
             raise ValueError("invalid round reason")
         cap = cause["max_rounds"]
         if isinstance(cap, bool) or not isinstance(cap, int) or not 1 <= cap <= 20:
@@ -432,11 +442,45 @@ def _execution_metadata(run, stage, context: dict | None) -> dict:
             raise ValueError("fan-out parent is not open")
     elif index is not None:
         raise ValueError("fan-out branch has no parent")
+    from workflows.collections import collection_binding
+
+    collection_parent = context.get("collection_parent_execution_id")
+    collection_index = context.get("collection_index")
+    collection_metadata = {}
+    if collection_parent is not None:
+        if parent_id is not None or type(collection_index) is not int or not 0 <= collection_index < 50:
+            raise ValueError("invalid serial collection item")
+        parent = WorkflowStageExecution.objects.select_related("stage").get(
+            pk=collection_parent, workflow_run=run
+        )
+        binding = collection_binding(parent.output)
+        if binding is None:
+            raise ValueError("collection parent binding is unavailable")
+        if (
+            parent.status != "running"
+            or parent.stage.kind != "collection"
+            or parent.stage.definition_id != run.workflow_definition_id
+            or parent.collection_parent_execution_id is not None
+            or parent.fanout_parent_execution_id is not None
+            or str(stage.pk) not in binding.get("body_stage_ids", [])
+            or collection_index >= binding.get("item_count", 0)
+            or context.get("collection_workflow_id")
+            != f"WorkflowDefinitionRunWorkflow-{run.pk}:collection:{binding.get('owner_order')}:{collection_index}-parent-{parent.pk}"
+        ):
+            raise ValueError("collection parent does not bind this live item execution")
+        collection_metadata = {
+            "collection_parent_execution_id": collection_parent,
+            "collection_index": collection_index,
+            "collection_workflow_id": context["collection_workflow_id"],
+        }
+    elif collection_index is not None or context.get("collection_workflow_id"):
+        raise ValueError("collection item has no parent")
     return {
         "round_number": round_number,
         "caused_by": cause,
         "fanout_parent_execution_id": parent_id,
         "fanout_index": index,
+        **collection_metadata,
     }
 
 
@@ -483,6 +527,8 @@ def _create_stage_execution_sync(
             branch = "parent" if branch is None else branch
             exhaustion = int(metadata["caused_by"].get("reason") == "max_rounds_exhausted")
             key = f"wfse-{run.pk}-{stage.pk}-r{metadata['round_number']}-a{attempt}-p{parent}-b{branch}-e{exhaustion}"
+            if metadata.get("collection_parent_execution_id") is not None:
+                key += f"-c{metadata['collection_parent_execution_id']}-i{metadata['collection_index']}"
             execution_fields.pop("slug")
             execution, created = WorkflowStageExecution.objects.get_or_create(
                 slug=key, defaults=execution_fields
@@ -1310,7 +1356,7 @@ def _mark_workflow_run_sync(
     from astrolift_agents.services.workflow_task_cleanup import cleanup_workflow_tasks
 
     _finalize_workflow_run_records(workflow_run_id, status, result, failure)
-    if ":fanout:" not in str(workflow_run_id):
+    if not any(tag in str(workflow_run_id) for tag in (":fanout:", ":collection:")):
         cleanup_workflow_tasks(_parent_run_pk(workflow_run_id))
 
 
@@ -1333,7 +1379,7 @@ def _finalize_workflow_run_records(
         raise ValueError(f"invalid workflow run status {status!r}")
     # Fan-out children share their parent's stage store, not its lifecycle.
     # Only the parent executor can decide that the whole run has finished.
-    if ":fanout:" in str(workflow_run_id):
+    if any(tag in str(workflow_run_id) for tag in (":fanout:", ":collection:")):
         return
 
     with transaction.atomic():

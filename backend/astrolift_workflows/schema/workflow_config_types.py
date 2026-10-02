@@ -36,6 +36,7 @@ class WorkflowTopologyStageType:
     fan_out_dynamic: bool
     on_failure: str
     max_attempts: int
+    iteration: JSON
     back_edge: JSON
     timeout_seconds: int
 
@@ -255,6 +256,7 @@ def definition_summary(
                 on_failure=stage.on_failure,
                 max_attempts=stage.max_attempts,
                 back_edge=stage.back_edge,
+                iteration=stage.iteration,
                 timeout_seconds=stage.timeout_seconds,
             )
             for stage in stages

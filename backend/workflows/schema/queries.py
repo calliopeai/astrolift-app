@@ -138,6 +138,7 @@ class Query:
             .select_related(
                 "stage",
                 "fanout_parent_execution__stage",
+                "collection_parent_execution__stage",
                 "agent_run",
                 "child_workflow_run",
                 "child_workflow_run__workflow_definition",

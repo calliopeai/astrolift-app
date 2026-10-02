@@ -7,6 +7,7 @@ import re
 import unicodedata
 from typing import Any
 
+from workflows.collections import CollectionContractError, collection_ranges
 from workflows.stage_limits import validate_stage_attempts
 
 MAX_LOOP_ROUNDS = 20
@@ -157,9 +158,18 @@ def validate_loop_plan(
     """
     if require_review_loop and pattern_kind not in SUPPORTED_EXECUTOR_PATTERNS:
         raise LoopContractError("workflow pattern is not supported by the executor")
+    try:
+        ranges = collection_ranges(stages)
+    except CollectionContractError as exc:
+        raise LoopContractError(str(exc)) from exc
+    if ranges and pattern_kind == "fan_out":
+        raise LoopContractError("collection ranges require a serial workflow pattern")
+    item_multipliers = [1 for _ in stages]
+    for start, end in ranges.items():
+        for index in range(start + 1, end + 1):
+            item_multipliers[index] = stages[start]["iteration"]["max_items"]
     prior: dict[str, dict] = {}
     visit_counts = [1 for _ in stages]
-    extra_visits = 0
     review_edges = 0
     for index, stage in enumerate(stages):
         key = stage.get("output_key") or f"stage_{stage.get('order', index)}"
@@ -176,7 +186,6 @@ def validate_loop_plan(
                 raise LoopContractError(
                     "return-edge source and target require explicit stable output_key values"
                 )
-            extra_visits += (index - target["index"] + 1) * (edge["max_rounds"] - 1)
             for repeated in range(target["index"], index + 1):
                 visit_counts[repeated] += edge["max_rounds"] - 1
             if edge["when"] == "gate_rejected":
@@ -186,7 +195,13 @@ def validate_loop_plan(
             "kind": stage["kind"],
             "explicit_key": bool(stage.get("output_key")),
         }
-    if len(stages) + extra_visits > MAX_STAGE_VISITS:
+    if (
+        sum(
+            visits * items
+            for visits, items in zip(visit_counts, item_multipliers, strict=True)
+        )
+        > MAX_STAGE_VISITS
+    ):
         raise LoopContractError(
             f"workflow return edges exceed {MAX_STAGE_VISITS} maximum stage visits"
         )
@@ -194,7 +209,9 @@ def validate_loop_plan(
         (stage for stage in stages if stage["kind"] == "agent_dispatch"), None
     )
     execution_units = 0
-    for stage, visits in zip(stages, visit_counts, strict=True):
+    for stage, visits, items in zip(
+        stages, visit_counts, item_multipliers, strict=True
+    ):
         attempts = (
             validate_stage_attempts(stage.get("max_attempts", 3))
             if stage["kind"] in ("agent_dispatch", "workflow")
@@ -219,7 +236,7 @@ def validate_loop_plan(
             fanout = 50 if pattern_kind == "fan_out" and stage is first_agent else 1
         else:
             raise LoopContractError("fan-out must be bounded between 1 and 50 branches")
-        execution_units += visits * attempts * max(1, fanout)
+        execution_units += visits * items * attempts * max(1, fanout)
     if execution_units > MAX_EXECUTION_UNITS:
         raise LoopContractError(
             f"workflow exceeds {MAX_EXECUTION_UNITS} maximum execution units"

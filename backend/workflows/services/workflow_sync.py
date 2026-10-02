@@ -201,6 +201,7 @@ def _upsert_definition(defn: dict) -> bool:
                 on_failure=stage["on_failure"],
                 max_attempts=stage["max_attempts"],
                 back_edge=stage["back_edge"],
+                iteration=stage["iteration"],
                 timeout_seconds=stage["timeout_seconds"],
             )
 

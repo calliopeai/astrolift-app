@@ -101,6 +101,7 @@ def seed_workflow_catalogue(WorkflowDefinition, WorkflowStage) -> SeedResult:
                         for key, value in {
                             "max_attempts": stage.max_attempts,
                             "back_edge": stage.back_edge,
+                            "iteration": stage.iteration,
                         }.items()
                         if key in historical_fields
                     },
