@@ -817,6 +817,25 @@ class WorkloadViewerCanType:
     scale: ActionPermissionType
 
 
+@strawberry.type(name="AstroliftAppExecTarget")
+class AppExecTargetType:
+    workload_id: GUID
+    workload_version: int
+    app_id: GUID
+    app_version: int
+    environment_id: GUID
+    environment_name: str
+    environment_version: int
+    cluster_id: GUID
+    cluster_version: int
+    namespace: str
+    pod_name: str
+    pod_uid: str
+    container: str
+    pod_binding: str
+    resumable: bool
+
+
 @strawberry.type(name="AstroliftWorkloadActionTarget")
 class WorkloadActionTargetType:
     workload_id: GUID

@@ -67,6 +67,8 @@ def _connection(org, kind: str, secret: bytes | None = _SECRET, **overrides):
 
 
 def _post(view, org_slug, body=b"{}", **headers):
+    if view is pipeline_github_webhook:
+        headers.setdefault("HTTP_X_GITHUB_DELIVERY", "disposable-security-proof")
     request = _factory.post(
         f"/webhooks/pipelines/{org_slug}/", data=body, content_type="application/json", **headers
     )

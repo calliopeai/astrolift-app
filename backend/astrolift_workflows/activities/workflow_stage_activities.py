@@ -82,6 +82,10 @@ def _get_workflow_stages_sync(
     stage_bindings: dict | None = None,
     workflow_definition_id: str | None = None,
     workflow_ancestry: list[str] | None = None,
+    *,
+    review_organization_id: int | None = None,
+    review_definition_graph: dict | None = None,
+    review_agent_workloads: dict | None = None,
 ) -> dict:
     """Return the definition's stages as ordered plain dicts.
 
@@ -97,10 +101,19 @@ def _get_workflow_stages_sync(
     from workflows.models import WorkflowDefinition, WorkflowStage
 
     run = None
-    organization_id = None
+    organization_id = review_organization_id
     if workflow_run_id is not None:
         run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
         organization_id = run.organization_id
+        from workflows.reviewed_starts import frozen_plan
+
+        frozen = frozen_plan(run, workflow_definition_id)
+        if frozen is not None:
+            definition_id = str(frozen["definition_id"])
+            ancestry = [str(value) for value in (workflow_ancestry or [])]
+            if definition_id in ancestry or len(ancestry) > MAX_WORKFLOW_NESTING_DEPTH:
+                raise RuntimeError("The reviewed nested workflow ancestry is invalid")
+            return frozen
 
     definitions = WorkflowDefinition.objects.filter(
         is_enabled=True,
@@ -110,7 +123,9 @@ def _get_workflow_stages_sync(
         definitions = definitions.filter(pk=int(workflow_definition_id))
     else:
         definitions = definitions.filter(slug=workflow_definition_slug)
-    if organization_id is not None:
+    if review_definition_graph is not None:
+        definition = review_definition_graph["definitions"].get(int(workflow_definition_id))
+    elif organization_id is not None:
         definitions = definitions.filter(Q(organization_id=organization_id) | Q(organization__isnull=True))
         definition = definitions.filter(organization_id=organization_id).first() or definitions.first()
     else:
@@ -129,7 +144,12 @@ def _get_workflow_stages_sync(
 
     bindings = stage_bindings if isinstance(stage_bindings, dict) else {}
     stages: list[dict] = []
-    for stage in definition.stages.filter(deleted_at__isnull=True).order_by("order"):
+    stage_rows = (
+        sorted(review_definition_graph["stages"][definition.pk], key=lambda stage: stage.order)
+        if review_definition_graph is not None
+        else definition.stages.filter(deleted_at__isnull=True).order_by("order")
+    )
+    for stage in stage_rows:
         binding = bindings.get(str(stage.order), bindings.get(stage.order, {}))
         if not isinstance(binding, dict):
             raise RuntimeError(f"stage {stage.order} binding must be an object")
@@ -139,7 +159,23 @@ def _get_workflow_stages_sync(
 
         workload = None
         workload_guid = binding.get("agent_workload_id")
-        if workload_guid:
+        if review_agent_workloads is not None:
+            if workload_guid:
+                workload = next(
+                    (
+                        item
+                        for item in review_agent_workloads.values()
+                        if str(item.guid) == str(workload_guid)
+                    ),
+                    None,
+                )
+            elif stage.agent_definition_id is not None:
+                workload = review_agent_workloads.get(stage.agent_definition_id)
+            elif stage.agent_ref:
+                workload = next(
+                    (item for item in review_agent_workloads.values() if item.slug == stage.agent_ref), None
+                )
+        elif workload_guid:
             workload = Workload.objects.filter(
                 guid=str(workload_guid),
                 kind=Workload.Kind.AGENT,
@@ -184,7 +220,11 @@ def _get_workflow_stages_sync(
 
         nested_definition = None
         if stage.kind == WorkflowStage.StageKind.WORKFLOW:
-            nested_definition = resolve_child_definition(definition, stage.workflow_ref)
+            nested_definition = (
+                review_definition_graph["edges"].get(stage.pk)
+                if review_definition_graph is not None
+                else resolve_child_definition(definition, stage.workflow_ref)
+            )
             if nested_definition is None:
                 raise RuntimeError(
                     f"stage {stage.order} cannot resolve visible child workflow {stage.workflow_ref!r}"

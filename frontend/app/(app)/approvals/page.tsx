@@ -1,5 +1,5 @@
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
-import { LIST_SECRET_CHANGE_PROPOSALS } from "@/graphql/services/services.queries";
+import { LIST_SECRET_CHANGE_PROPOSALS_PAGE } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
 import { ApprovalsQueueClient } from "./approvals-queue-client";
@@ -14,8 +14,8 @@ export default function ApprovalsPage() {
   return (
     <PreloadQuery query={LIST_DEPLOYMENTS} variables={{ limit: 100 }}>
       <PreloadQuery
-        query={LIST_SECRET_CHANGE_PROPOSALS}
-        variables={{ appSlug: null, status: "pending" }}
+        query={LIST_SECRET_CHANGE_PROPOSALS_PAGE}
+        variables={{ appSlug: null, status: "pending", limit: 5, after: null }}
       >
         <ApprovalsQueueClient>
           <SecretProposalsQueueClient />

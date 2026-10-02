@@ -12,6 +12,7 @@ from django.db.models.functions import Coalesce
 from strawberry.types import Info
 
 from astrolift_graphql import (
+    GUID,
     FilterField,
     KeysetPage,
     PageType,
@@ -60,8 +61,16 @@ from core.permissions import (
     require_permission,
 )
 from core.tenancy import get_current_tenant
+from workflows.schema.reviewed_start_types import (
+    ReviewedWorkflowDefinition,
+    WorkflowDefinitionStartType,
+    review_to_type,
+    start_to_type,
+)
 from workflows.scopes import (
+    definition_scope_by_guid,
     definition_scope_by_slug,
+    definition_start_scope,
     execution_scope_by_id,
     may_decide_human_gate,
     visible_project_owned,
@@ -715,6 +724,43 @@ class WorkflowsQuery:
         if d is None:
             return None
         return definition_summary(d, environment_models=environment_model_map([d]))
+
+    @strawberry.field(
+        description="Review one exact definition GUID and its canonical input/revision contract; no slug substitution."
+    )
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=definition_scope_by_guid("id", permission=Permission.WORKFLOW_READ)
+    )
+    @tenant_scoped()
+    def workflow_definition_by_id(self, info: Info, id: GUID) -> ReviewedWorkflowDefinition | None:
+        caller, ok = _org_pk_matches(None)
+        if not ok:
+            return None
+        definition = (
+            _workflow_definitions_qs(org_pk=caller)
+            .filter(Q(organization_id=caller) | Q(organization__isnull=True), guid=str(id))
+            .first()
+        )
+        return (
+            review_to_type(definition, environment_models=environment_model_map([definition]))
+            if definition is not None
+            else None
+        )
+
+    @strawberry.field(
+        description="Reconcile the authenticated actor's original reviewed start request without dispatching another run."
+    )
+    @require_permission(Permission.WORKFLOW_READ, scope=definition_start_scope("request_id"))
+    @tenant_scoped()
+    def workflow_definition_start_request(
+        self, info: Info, request_id: str
+    ) -> WorkflowDefinitionStartType | None:
+        from workflows.reviewed_starts import find_start, recover_start
+
+        row = find_start(request_id)
+        if row is not None:
+            row = recover_start(row)
+        return start_to_type(row) if row is not None else None
 
     @strawberry.field(description="Runs (tier 3) of one configured Workflow, newest first.")
     @require_permission(Permission.WORKFLOW_READ, scope=workflow_scope_by_guid("workflow_id"))

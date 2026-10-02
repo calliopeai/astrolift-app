@@ -15,6 +15,8 @@ from django.db import models
 from django.utils import timezone
 
 from core.models import BaseCoreModel, Tracking
+from core.models.base import BaseCoreModel as DurableBaseCoreModel
+from core.run_input_contract import no_input_schema
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +77,7 @@ class WorkflowDefinition(BaseCoreModel):
         help_text="List of transition definitions [{from_state, to_state, label, conditions, actions, timeout_hours}]",
     )
     is_enabled = models.BooleanField(default=True)
+    input_schema = models.JSONField(default=no_input_schema)
     source_repo = models.CharField(
         max_length=512,
         blank=True,
@@ -186,6 +189,34 @@ class WorkflowDefinition(BaseCoreModel):
 
     def __str__(self):
         return f"{self.name} ({self.model_label})"
+
+
+class WorkflowDefinitionStart(DurableBaseCoreModel):
+    """Durable reviewed start identity, including uncertain engine submissions."""
+
+    organization = models.ForeignKey("astrolift_identity.Organization", on_delete=models.PROTECT)
+    definition = models.ForeignKey(
+        WorkflowDefinition, on_delete=models.PROTECT, related_name="start_requests"
+    )
+    execution = models.OneToOneField(
+        "astrolift_operations.WorkflowRun", on_delete=models.PROTECT, related_name="definition_start"
+    )
+    actor_key = models.CharField(max_length=96)
+    request_id = models.CharField(max_length=128)
+    request_digest = models.CharField(max_length=64)
+    definition_revision = models.CharField(max_length=64)
+    input_schema_digest = models.CharField(max_length=64)
+    payload_backend_kind = models.CharField(max_length=32)
+    payload_ciphertext = models.BinaryField()
+    dispatch_status = models.CharField(max_length=16, default="reserved")
+    dispatch_last_error = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "actor_key", "request_id"], name="workflow_start_request_unique"
+            )
+        ]
 
 
 class WorkflowInstance(Tracking):

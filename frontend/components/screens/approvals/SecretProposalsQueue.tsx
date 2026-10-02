@@ -1,125 +1,139 @@
 "use client";
 
-import { QueryError } from "@/components/QueryError";
-
-import { KeyIcon, ShieldCheckIcon } from "lucide-react";
-import Link from "next/link";
+import { KeyIcon, RefreshCwIcon, ShieldCheckIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-
-import { EmptyState } from "@/components/EmptyState";
-import { Badge } from "@/components/ui/badge";
+import { type Column } from "@/components/data-table";
+import { ListPage } from "@/components/list/ListPage";
 import { Button } from "@/components/ui/button";
-import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
+
 import { useFormatters } from "@/lib/i18n/formatters";
+import type { SecretProposalMetadata } from "./use-secret-proposals-queue";
 
 import type { useSecretProposalsQueue } from "./use-secret-proposals-queue";
-
 export type SecretProposalsQueueProps = ReturnType<typeof useSecretProposalsQueue>;
 
-/**
- * Secret-change proposals queue (#488). Renders below the deployment
- * approvals queue on the global /approvals page — distinct list so the
- * two axes' per-row affordances (env scope, approver policy) stay
- * separate. Clicking a row routes to the proposal-detail page where
- * the operator approves / rejects / inspects the diff.
- */
 export function SecretProposalsQueue({
-  proposals,
+  list,
+  rows,
+  totalCount,
+  nextCursor,
   loading,
+  stale,
   error,
   onRetry,
+  onRefresh,
 }: SecretProposalsQueueProps) {
   const t = useTranslations("lists.secretProposalsQueue");
+  const presentation = useTranslations("approvals.secretProposalDetail.presentation");
   const fmt = useFormatters();
-
-  if (loading) {
-    return (
-      <Section title={t("title")} className="mt-8">
-        <Skeleton className="h-24 w-full" />
-      </Section>
-    );
-  }
-
-  if (error) {
-    return (
-      <Section title={t("title")} className="mt-8">
-        <QueryError title="Could not load secret proposals" error={error} onRetry={onRetry} />
-      </Section>
-    );
-  }
-  if (proposals.length === 0) {
-    return (
-      <Section title={t("title")} className="mt-8">
-        <EmptyState
-          title={t("empty.title")}
-          description={t("empty.description")}
-          icon={<ShieldCheckIcon className="size-6" aria-hidden />}
-        />
-      </Section>
-    );
-  }
-
+  const operations: Record<string, string> = {
+    set: "operations.set",
+    delete: "operations.delete",
+    attach_bundle: "operations.attachBundle",
+    detach_bundle: "operations.detachBundle",
+    set_metadata: "operations.setMetadata",
+  };
+  const columns: Column<SecretProposalMetadata>[] = [
+    {
+      id: "app",
+      header: t("paging.app"),
+      cell: (row) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <KeyIcon className="size-4 shrink-0" />
+          <code className="truncate" title={row.registeredAppSlug}>
+            {row.registeredAppSlug}
+          </code>
+        </span>
+      ),
+    },
+    {
+      id: "environment",
+      header: t("paging.environment"),
+      cell: (row) => (
+        <code className="block truncate" title={row.environmentName}>
+          {row.environmentName || t("row.appWide")}
+        </code>
+      ),
+    },
+    {
+      id: "operation",
+      header: t("paging.operation"),
+      cell: (row) =>
+        Object.hasOwn(operations, row.op) ? presentation(operations[row.op]) : row.op,
+    },
+    {
+      id: "approvals",
+      header: t("paging.approvals"),
+      cell: (row) =>
+        t("row.approvalsCount", {
+          received: row.approvalsCount,
+          required: row.requiredApproverCount,
+        }),
+    },
+    {
+      id: "proposer",
+      header: t("paging.proposer"),
+      cell: (row) => (
+        <span className="block truncate" title={row.proposerDisplayName}>
+          {row.proposerDisplayName || "—"}
+        </span>
+      ),
+    },
+    {
+      id: "created",
+      header: t("paging.created"),
+      cell: (row) =>
+        Number.isFinite(Date.parse(row.createdAt))
+          ? fmt.formatDateTime(row.createdAt)
+          : t("paging.unknown"),
+    },
+  ];
+  const localizedList = {
+    ...list,
+    isFiltered: false,
+    state: { ...list.state, q: "", filters: {}, sort: [] },
+    definition: {
+      ...list.definition,
+      views: list.definition.views.map((view) => ({
+        ...view,
+        label: presentation("statuses.pending"),
+      })),
+    },
+  };
   return (
-    <Section title={t("title")} className="mt-8">
-      <ul className="flex flex-col gap-2">
-        {proposals.map((proposal) => (
-          <li key={proposal.id}>
-            <ProposalRow proposal={proposal} formatRelative={fmt.formatRelativeTime} />
-          </li>
-        ))}
-      </ul>
-    </Section>
-  );
-}
-
-function ProposalRow({
-  proposal,
-  formatRelative,
-}: {
-  proposal: AstroliftSecretChangeProposal;
-  formatRelative: (d: Date | string, now?: Date) => string;
-}) {
-  const t = useTranslations("lists.secretProposalsQueue.row");
-  const env = proposal.environmentName || t("appWide");
-  const summary =
-    (proposal.payloadDiff as { summary?: string })?.summary ?? `${proposal.op} on ${env}`;
-  return (
-    <div className="bg-background flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <KeyIcon className="text-muted-foreground size-4 shrink-0" aria-hidden />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/approvals/secret/${proposal.id}`} className="font-medium hover:underline">
-              {proposal.registeredAppSlug} → {env}
-            </Link>
-            <Badge variant="outline" className="text-2xs">
-              {t("typeBadge")}
-            </Badge>
-            <Badge variant="outline" className="text-2xs">
-              {t("opLabel", { op: proposal.op })}
-            </Badge>
-            <Badge variant="outline" className="text-2xs">
-              {t("approvalsCount", {
-                received: proposal.approvalsCount,
-                required: proposal.requiredApproverCount,
-              })}
-            </Badge>
-          </div>
-          <div className="text-muted-foreground text-xs">
-            {t("summary", { summary })}
-            {proposal.proposerDisplayName &&
-              ` · ${t("proposer", { name: proposal.proposerDisplayName })}`}
-            {` · ${t("received", { rel: formatRelative(proposal.createdAt) })}`}
-          </div>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <Button asChild size="sm" variant="outline" className="min-h-11 w-full sm:w-auto">
-          <Link href={`/approvals/secret/${proposal.id}`}>{t("review")}</Link>
-        </Button>
-      </div>
-    </div>
+    <ListPage
+      header={{
+        title: t("title"),
+        crumbs: [{ label: t("title"), href: "/approvals/secret" }],
+        primaryAction: (
+          <Button variant="outline" onClick={onRefresh}>
+            <RefreshCwIcon className="size-4" />
+            {t("paging.refresh")}
+          </Button>
+        ),
+      }}
+      list={localizedList}
+      label={t("title")}
+      rows={rows}
+      totalCount={totalCount}
+      nextCursor={nextCursor}
+      loading={loading}
+      stale={stale}
+      error={error}
+      onRetry={onRetry}
+      columns={columns}
+      getRowId={(row) => row.id}
+      rowHref={(row) => `/approvals/secret/${row.id}`}
+      notice={
+        <p role={error ? "status" : undefined} className="text-sm">
+          {t(error ? "paging.recovery" : "paging.description")}
+        </p>
+      }
+      empty={{
+        title: t("empty.title"),
+        description: t("empty.description"),
+        icon: <ShieldCheckIcon className="size-6" />,
+      }}
+    />
   );
 }

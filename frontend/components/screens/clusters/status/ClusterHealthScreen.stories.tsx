@@ -3,7 +3,10 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { selectRows } from "@/components/list/select-rows";
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
-import { CLUSTER_WORKLOADS_LIST, CLUSTER_WORKLOADS_SELECT } from "./cluster-workloads-list";
+import {
+  useClusterWorkloadsListDefinition,
+  CLUSTER_WORKLOADS_SELECT,
+} from "./cluster-workloads-list";
 import { ClusterHealthBody, type ClusterHealthBodyProps } from "./ClusterHealthScreen";
 import { ClusterTabFrame } from "./ClusterTabFrame";
 import {
@@ -44,7 +47,8 @@ function Screen({
   workloads: WorkloadsFixture;
   initial?: Partial<ListState>;
 }) {
-  const list = useLocalListState(CLUSTER_WORKLOADS_LIST, initial);
+  const definition = useClusterWorkloadsListDefinition();
+  const list = useLocalListState(definition, initial);
   const { rows, totalCount } = selectRows(
     workloads.rows,
     {
@@ -102,7 +106,7 @@ export const Loading: Story = {
   ),
 };
 
-/** Reachable, nothing to report: no pods yet and no warnings. */
+/** Empty observations do not establish reachability or a healthy cluster. */
 export const Empty: Story = {
   render: () => (
     <Screen
@@ -118,6 +122,47 @@ export const LoadError: Story = {
     <Screen
       health={{ pods: [], events: [], loading: false, ...QUERY_FAILED }}
       workloads={{ rows: [], loading: false, error: QUERY_FAILED.error }}
+    />
+  ),
+};
+
+/** Keep reports visible while qualifying a failed independent refresh. */
+export const CachedError: Story = {
+  render: () => (
+    <Screen
+      health={{ ...HEALTH, error: QUERY_FAILED.error }}
+      workloads={{ ...WORKLOADS, error: QUERY_FAILED.error }}
+    />
+  ),
+};
+
+export const Refreshing: Story = {
+  render: () => (
+    <Screen health={{ ...HEALTH, loading: true }} workloads={{ ...WORKLOADS, loading: true }} />
+  ),
+};
+
+/** Unknown provider tokens, malformed observations and zero-sized deployments. */
+export const UnknownObservations: Story = {
+  render: () => (
+    <Screen
+      health={{
+        ...HEALTH,
+        pods: [{ namespace: "raw-namespace", phase: "FuturePhase", count: -1 }],
+        events: [{ ...HEALTH.events[0], lastSeen: "invalid-time", count: -1 }],
+      }}
+      workloads={{
+        ...WORKLOADS,
+        rows: [
+          {
+            ...WORKLOADS.rows[0],
+            readyReplicas: -1,
+            restartCount24h: -1,
+            lastImageDeployedAt: "invalid-time",
+          },
+          { ...WORKLOADS.rows[1], readyReplicas: 0, desiredReplicas: 0 },
+        ],
+      }}
     />
   ),
 };

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useReviewedPipelineCancel } from "@/components/reviewed-starts/use-reviewed-pipeline-cancel";
 import { gql } from "@apollo/client";
-import { useQuery } from "@apollo/client/react";
+import { useQuery, useApolloClient } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { GET_PIPELINE } from "@/graphql/pipelines/pipelines.queries";
@@ -30,6 +32,7 @@ const GET_PIPELINE_RUN_GRAPH = gql`
       id
       runNumber
       status
+      jobsTruncated
       jobRuns {
         id
         status
@@ -59,6 +62,7 @@ interface RunGraphResp {
     runNumber: number;
     status: string;
     jobRuns: JobRunNode[];
+    jobsTruncated: boolean;
   } | null;
 }
 
@@ -127,8 +131,11 @@ export function usePipelineDetail(pipelineId: string) {
   });
 
   const runs = runsData?.astroliftPipelineRuns ?? [];
+  const cancellation = useReviewedPipelineCancel();
 
   return {
+    onCancelRun: cancellation.open,
+    cancellationDialog: cancellation.dialog,
     pipeline: definition.data?.astroliftPipeline ?? null,
     pipelineLoading: definition.loading && !definition.data,
     pipelineError: definition.error ?? null,
@@ -152,6 +159,18 @@ export function usePipelineDetail(pipelineId: string) {
  * the graph tracks live status.
  */
 export function useRunGraph(runId: string) {
+  const client = useApolloClient();
+  const [additional, setAdditional] = useState<JobRunNode[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [pagesLoaded, setPagesLoaded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageError, setPageError] = useState(false);
+  useEffect(() => {
+    setAdditional([]);
+    setNextCursor(null);
+    setPagesLoaded(false);
+    setPageError(false);
+  }, [runId]);
   const { data, loading } = useQuery<RunGraphResp>(GET_PIPELINE_RUN_GRAPH, {
     variables: { id: runId },
     fetchPolicy: "cache-and-network",
@@ -160,7 +179,9 @@ export function useRunGraph(runId: string) {
 
   const run = data?.astroliftPipelineRun ?? null;
 
-  const stages: PipelineDagStage[] = (run?.jobRuns ?? []).map((jr) => ({
+  const merged = new Map((run?.jobRuns ?? []).map((job) => [job.id, job]));
+  for (const job of additional) if (!merged.has(job.id)) merged.set(job.id, job);
+  const stages: PipelineDagStage[] = [...merged.values()].map((jr) => ({
     id: jr.job.jobId,
     name: jr.job.name,
     status: jr.status,
@@ -173,5 +194,54 @@ export function useRunGraph(runId: string) {
   /** True only for the first fetch: a poll keeps the graph on screen. */
   const initialLoading = loading && !run;
 
-  return { loading: initialLoading, stages };
+  async function onLoadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    setPageError(false);
+    try {
+      const response = await client.query<{
+        pipelineJobRunsPage: { items: JobRunNode[]; nextCursor: string | null };
+      }>({
+        query: GET_PIPELINE_JOB_PAGE,
+        variables: { runId, after: pagesLoaded ? nextCursor : null },
+        fetchPolicy: "no-cache",
+      });
+      const page = response.data?.pipelineJobRunsPage;
+      if (!page) throw new Error("missing");
+      setAdditional((jobs) => [...jobs, ...page.items]);
+      setNextCursor(page.nextCursor);
+      setPagesLoaded(true);
+    } catch {
+      setPageError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+  return {
+    loading: initialLoading,
+    stages,
+    truncated: Boolean(run?.jobsTruncated && (!pagesLoaded || nextCursor)),
+    loadingMore,
+    pageError,
+    onLoadMore,
+  };
 }
+
+const GET_PIPELINE_JOB_PAGE = gql`
+  query GetPipelineGraphJobsPage($runId: GUID!, $after: String) {
+    pipelineJobRunsPage(runId: $runId, limit: 20, after: $after) {
+      items {
+        id
+        status
+        startedAt
+        finishedAt
+        job {
+          jobId
+          name
+          needs
+        }
+      }
+      nextCursor
+    }
+  }
+`;

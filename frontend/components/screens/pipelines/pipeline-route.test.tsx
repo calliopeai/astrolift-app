@@ -1,12 +1,14 @@
 import { ApolloClient, ApolloLink, InMemoryCache, type Operation } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { Observable, type Subscriber } from "rxjs";
 import { afterEach, expect, it, vi } from "vitest";
 import { PipelineDetailScreen } from "./PipelineDetail";
 import { DETAIL } from "./pipelines-previews.fixtures";
 import { usePipelineDetail } from "./use-pipeline-detail";
+import messages from "@/messages/en.json";
 
 const navigation = vi.hoisted(() => ({
   pathname: "/pipelines/pipeline/secrets",
@@ -37,7 +39,9 @@ function network(reply: (operation: Operation, observer: Observer) => void) {
     link: new ApolloLink((operation) => new Observable((observer) => reply(operation, observer))),
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <ApolloProvider client={client}>{children}</ApolloProvider>
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <ApolloProvider client={client}>{children}</ApolloProvider>
+    </NextIntlClientProvider>
   );
   return { client, wrapper };
 }
@@ -62,7 +66,8 @@ it("reads the actual pipeline name on the secrets route without requesting runs"
       {...hook.result.current}
       pipelineId="pipeline-guid"
       secrets={<div>Secret bindings</div>}
-    />
+    />,
+    { wrapper: transport.wrapper }
   );
   expect(screen.getByRole("heading", { name: "Build and release" })).toBeVisible();
   expect(screen.getByText("Secret bindings")).toBeVisible();
@@ -82,7 +87,8 @@ it("distinguishes pipeline metadata refusal from a missing definition and retrie
   const hook = renderHook(() => usePipelineDetail("pipeline-guid"), { wrapper: transport.wrapper });
   await waitFor(() => expect(hook.result.current.pipelineError?.message).toBe("Permission denied"));
   const view = render(
-    <PipelineDetailScreen {...hook.result.current} secrets={<div>Secret bindings</div>} />
+    <PipelineDetailScreen {...hook.result.current} secrets={<div>Secret bindings</div>} />,
+    { wrapper: transport.wrapper }
   );
   expect(screen.getByRole("alert")).toHaveTextContent("Could not load pipeline");
   expect(screen.queryByText("Pipeline definition unavailable.")).not.toBeInTheDocument();

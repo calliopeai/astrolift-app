@@ -10,6 +10,7 @@ import * as React from "react";
 import "@xterm/xterm/css/xterm.css";
 
 import { cn } from "@/lib/utils";
+import { admitsReviewedSession, type ReviewedExecTarget } from "@/lib/exec-session";
 
 /** Server-frame protocol — matches backend/core/schema/exec_ws.py.  */
 type ServerFrame =
@@ -17,7 +18,14 @@ type ServerFrame =
   | { type: "stderr"; data: string }
   | { type: "exit"; code: number }
   | { type: "error"; message: string }
-  | { type: "ready" }
+  | {
+      type: "ready";
+      sessionId?: string;
+      resumable?: boolean;
+      disconnect?: "END";
+      inputReplay?: boolean;
+      target?: unknown;
+    }
   | {
       type: "replay";
       lines: (
@@ -27,17 +35,7 @@ type ServerFrame =
       )[];
     };
 
-type ConnectionState =
-  | "idle"
-  | "connecting"
-  | "ready"
-  | "reconnecting"
-  | "closed"
-  | "denied"
-  | "error";
-
-const MAX_BACKOFF_MS = 30_000;
-const INITIAL_BACKOFF_MS = 500;
+type ConnectionState = "idle" | "connecting" | "ready" | "closed" | "denied" | "error";
 
 /** Drag bounds. Below the minimum a PTY is unusable; the maximum is the
  *  viewport less enough room to still reach the handle. */
@@ -55,6 +53,8 @@ export interface TerminalEmulatorProps {
   container: string;
   /** Command (defaults to ``["sh"]`` server-side if empty). */
   command?: string[];
+  /** Exact reviewed app/environment/pod; omitted only by legacy callers. */
+  target?: ReviewedExecTarget;
   /**
    * The terminal is the whole page (the popped-out window). Drops the
    * resize handle, the expand toggle and the pop-out button: the OS window
@@ -71,11 +71,9 @@ export interface TerminalEmulatorProps {
  * (see ``backend/core/schema/exec_ws.py``), opens an exec session,
  * and renders the bidirectional stream through an xterm.js terminal.
  *
- * Reconnect: the WS drops trigger an exponential-backoff reconnect
- * (up to 30 s). On the new connection we send a ``replay`` frame so
- * the server-side ring buffer catches the terminal up before
- * resuming live IO. Typed input that landed *during* the dead window
- * is queued locally and flushed once the new session is ``ready``.
+ * Disconnect ends the server session. Reopening requires an explicit click;
+ * unsent input is discarded and output from a previous connection is never
+ * advertised as replayable. A pop-out opens a separate new session.
  *
  * Sizing (#1246): the operator can drag the bottom edge, expand to fill the
  * viewport, or pop the session out into its own OS window. Expanding is a
@@ -83,10 +81,10 @@ export interface TerminalEmulatorProps {
  * is never reparented and the component never unmounts, so the exec socket
  * and the scrollback survive it. Popping out cannot preserve the socket (a
  * separate window is a separate React tree), so it opens a fresh session and
- * leans on the server-side ring buffer's ``replay`` to open warm.
+ * requires a separate, newly authorized session.
  */
 export function TerminalEmulator(props: TerminalEmulatorProps) {
-  const { appSlug, podName, container, command, standalone, className } = props;
+  const { appSlug, podName, container, command, standalone, className, target } = props;
   const t = useTranslations("apps.shell.terminal");
 
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -94,9 +92,8 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
   const termRef = React.useRef<Terminal | null>(null);
   const fitRef = React.useRef<FitAddon | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
-  const stdinBufferRef = React.useRef<string[]>([]);
-  const reconnectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const backoffRef = React.useRef<number>(INITIAL_BACKOFF_MS);
+  const sessionRef = React.useRef<string | null>(null);
+  const readyRef = React.useRef(false);
   const disposedRef = React.useRef<boolean>(false);
 
   const [state, setState] = React.useState<ConnectionState>("idle");
@@ -185,14 +182,15 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
   const onPopOut = React.useCallback(() => {
     const params = new URLSearchParams({ pod: podName, container });
     if (command && command.length > 0) params.set("command", command.join(" "));
+    if (target) params.set("target", JSON.stringify(target));
     window.open(
       `/terminal/${encodeURIComponent(appSlug)}?${params.toString()}`,
       `astrolift-shell-${appSlug}-${podName}-${container}`,
       "popup=yes,width=960,height=620"
     );
-  }, [appSlug, podName, container, command]);
+  }, [appSlug, podName, container, command, target]);
 
-  // Lifetime: one xterm per mount, reused across reconnects.
+  // Lifetime: one xterm per mount; local scrollback survives explicit new attaches.
   React.useEffect(() => {
     if (!containerRef.current) return;
     const term = new Terminal({
@@ -267,45 +265,27 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
 
   const buildWsUrl = React.useCallback((): string => {
     const wsOrigin = process.env.NEXT_PUBLIC_WS_ORIGIN;
-    const path = `/app/exec/${encodeURIComponent(appSlug)}/${encodeURIComponent(podName)}`;
+    const query = target ? `?environmentId=${encodeURIComponent(target.environmentId)}` : "";
+    const path = `/app/exec/${encodeURIComponent(appSlug)}/${encodeURIComponent(podName)}${query}`;
     if (wsOrigin) {
       return `${wsOrigin.replace(/\/$/, "")}${path}`;
     }
     if (typeof window === "undefined") return path;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${window.location.host}${path}`;
-  }, [appSlug, podName]);
-
-  const flushStdinBuffer = React.useCallback(() => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    const buffered = stdinBufferRef.current;
-    if (buffered.length === 0) return;
-    for (const chunk of buffered) {
-      ws.send(JSON.stringify({ type: "stdin", data: chunk }));
-    }
-    stdinBufferRef.current = [];
-  }, []);
-
-  const connectRef = React.useRef<(() => void) | null>(null);
-
-  const scheduleReconnect = React.useCallback(() => {
-    if (disposedRef.current) return;
-    setState("reconnecting");
-    const delay = backoffRef.current;
-    backoffRef.current = Math.min(delay * 2, MAX_BACKOFF_MS);
-    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-    // The actual reconnect runs through the ref so we don't have a
-    // useCallback → useCallback cycle on `connect`.
-    reconnectTimerRef.current = setTimeout(() => connectRef.current?.(), delay);
-  }, []);
+  }, [appSlug, podName, target]);
 
   const connect = React.useCallback(() => {
     if (disposedRef.current) return;
     const term = termRef.current;
     if (!term) return;
 
-    setState((prev) => (prev === "reconnecting" ? "reconnecting" : "connecting"));
+    const previous = wsRef.current;
+    wsRef.current = null;
+    previous?.close(1000);
+    sessionRef.current = null;
+    readyRef.current = false;
+    setState("connecting");
     setErrorMessage(null);
 
     let ws: WebSocket;
@@ -313,27 +293,23 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
       ws = new WebSocket(buildWsUrl());
     } catch (err) {
       setErrorMessage((err as Error).message);
-      scheduleReconnect();
+      setState("error");
       return;
     }
     wsRef.current = ws;
 
-    // Forward terminal keystrokes to the WS — when the WS is mid-reconnect
-    // we queue them locally so the operator's input isn't lost.
+    // Only the currently admitted connection accepts input. Disconnected or
+    // not-yet-admitted keystrokes are discarded; never replayed into a new shell.
     const dataDisposable = term.onData((data: string) => {
       const live = wsRef.current;
-      if (live && live.readyState === WebSocket.OPEN) {
-        live.send(JSON.stringify({ type: "stdin", data }));
-      } else {
-        stdinBufferRef.current.push(data);
+      if (live === ws && live.readyState === WebSocket.OPEN && readyRef.current) {
+        live.send(JSON.stringify({ type: "stdin", data, sessionId: sessionRef.current }));
       }
     });
     ws.addEventListener("close", () => dataDisposable.dispose());
 
-    const isReconnect = backoffRef.current > INITIAL_BACKOFF_MS;
-
     ws.onopen = () => {
-      if (disposedRef.current) {
+      if (disposedRef.current || wsRef.current !== ws) {
         ws.close();
         return;
       }
@@ -342,6 +318,7 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
           type: "open",
           container,
           command: command ?? [],
+          ...(target ? { target } : {}),
         })
       );
       ws.send(
@@ -351,15 +328,10 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
           cols: term.cols,
         })
       );
-      if (isReconnect) {
-        // Drain the server-side ring buffer before the new live IO
-        // starts arriving so the operator sees the missed output.
-        ws.send(JSON.stringify({ type: "replay" }));
-      }
     };
 
     ws.onmessage = (event) => {
-      if (typeof event.data !== "string") return;
+      if (wsRef.current !== ws || typeof event.data !== "string") return;
       let frame: ServerFrame;
       try {
         frame = JSON.parse(event.data);
@@ -368,9 +340,22 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
       }
       switch (frame.type) {
         case "ready":
+          if (
+            target &&
+            (!frame.sessionId ||
+              frame.resumable !== false ||
+              frame.disconnect !== "END" ||
+              frame.inputReplay !== false ||
+              !admitsReviewedSession(target, frame.target))
+          ) {
+            setErrorMessage(targetGoneLabel);
+            setState("error");
+            ws.close(4403);
+            return;
+          }
+          sessionRef.current = frame.sessionId ?? null;
+          readyRef.current = true;
           setState("ready");
-          backoffRef.current = INITIAL_BACKOFF_MS;
-          flushStdinBuffer();
           return;
         case "stdout":
           term.write(frame.data);
@@ -383,11 +368,15 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
           return;
         case "exit":
           term.writeln(`\r\n\x1b[2m[process exited with code ${frame.code}]\x1b[0m`);
+          readyRef.current = false;
           setState("closed");
           return;
         case "error":
           term.writeln(`\r\n\x1b[31m[error] ${frame.message}\x1b[0m`);
+          readyRef.current = false;
           setErrorMessage(frame.message);
+          setState("error");
+          ws.close(1000);
           return;
         case "replay":
           for (const line of frame.lines) {
@@ -400,14 +389,17 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
     };
 
     ws.onerror = () => {
+      if (disposedRef.current || wsRef.current !== ws) return;
       // The WS spec strips error detail; the close handler runs
       // straight after with the real reason, so we just flag state
-      // here and let `onclose` decide whether to reconnect.
-      setState((prev) => (prev === "ready" ? "reconnecting" : prev));
+      // here; a disconnected session requires an explicit new attach.
+      setState("error");
     };
 
     ws.onclose = (event) => {
-      if (disposedRef.current) return;
+      if (disposedRef.current || wsRef.current !== ws) return;
+      readyRef.current = false;
+      sessionRef.current = null;
       // 4403 = permission denied. Don't reconnect — the operator
       // can't acquire the capability by retrying.
       if (event.code === 4403) {
@@ -420,40 +412,24 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
         return;
       }
       // 4404 = the relay has no such target (bad URL, or an app/box that
-      // is gone or belongs to another tenant). Reconnecting cannot make
-      // one appear, so stop rather than spin the backoff loop forever.
+      // is gone or belongs to another tenant).
       if (event.code === 4404) {
         setState("error");
         setErrorMessage(targetGoneLabel);
         return;
       }
-      // Clean exit (1000) on session end → leave the terminal in
-      // a closed state and let the operator re-open manually.
-      if (event.code === 1000 && backoffRef.current === INITIAL_BACKOFF_MS) {
-        setState("closed");
-        return;
-      }
-      scheduleReconnect();
+      // The server destroyed this connection's session. A new connection is
+      // an explicit new attach, never a reconnect or input replay.
+      setState((previous) => (previous === "error" ? "error" : "closed"));
     };
-  }, [
-    buildWsUrl,
-    container,
-    command,
-    flushStdinBuffer,
-    scheduleReconnect,
-    authExpiredLabel,
-    targetGoneLabel,
-  ]);
+  }, [buildWsUrl, container, command, target, authExpiredLabel, targetGoneLabel]);
 
-  React.useEffect(() => {
-    connectRef.current = connect;
-  }, [connect]);
-
-  // Connect / reconnect — owns the WS lifecycle. Re-runs when the
+  // A target change closes the old connection. Re-runs when the
   // target pod / container / command tuple changes.
   React.useEffect(() => {
     disposedRef.current = false;
-    backoffRef.current = INITIAL_BACKOFF_MS;
+    readyRef.current = false;
+    sessionRef.current = null;
     if (!podName || !container) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState("idle");
@@ -462,10 +438,6 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
     connect();
     return () => {
       disposedRef.current = true;
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
         try {
@@ -502,6 +474,15 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
       )}
     >
       <ConnectionBanner state={state} message={errorMessage} />
+      {(state === "closed" || state === "error") && (
+        <button
+          type="button"
+          className="self-start rounded border px-2 py-1 text-xs"
+          onClick={connect}
+        >
+          {t("open")}
+        </button>
+      )}
       <div className="relative min-h-0 flex-1">
         <div
           ref={containerRef}
@@ -578,15 +559,11 @@ function ConnectionBanner({ state, message }: { state: ConnectionState; message:
   const t = useTranslations("apps.shell.terminal");
   if (state === "ready" || state === "idle") return null;
 
-  let tone: "info" | "warn" | "error" = "info";
+  let tone: "info" | "error" = "info";
   let label: string;
   switch (state) {
     case "connecting":
       label = t("statusConnecting");
-      break;
-    case "reconnecting":
-      label = t("statusReconnecting");
-      tone = "warn";
       break;
     case "closed":
       label = t("statusClosed");
@@ -606,9 +583,7 @@ function ConnectionBanner({ state, message }: { state: ConnectionState; message:
   const cls =
     tone === "error"
       ? "border-danger-border bg-danger/10 text-danger-fg"
-      : tone === "warn"
-        ? "border-warning-border bg-warning/10 text-warning-fg"
-        : "border-info-border bg-info/10 text-info-fg";
+      : "border-info-border bg-info/10 text-info-fg";
 
   return (
     <div className={cn("rounded-md border px-2.5 py-1.5 text-xs", cls)} role="status">

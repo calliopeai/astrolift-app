@@ -6,7 +6,10 @@ import { selectRows } from "@/components/list/select-rows";
 import { useListState } from "@/components/list/use-list-state";
 import { CLUSTER_WORKLOAD_HEALTH } from "@/graphql/clusters/clusters.queries";
 
-import { CLUSTER_WORKLOADS_LIST, CLUSTER_WORKLOADS_SELECT } from "./cluster-workloads-list";
+import {
+  useClusterWorkloadsListDefinition,
+  CLUSTER_WORKLOADS_SELECT,
+} from "./cluster-workloads-list";
 import type { WorkloadRow } from "./types";
 
 interface WorkloadHealthResp {
@@ -18,13 +21,15 @@ export function useClusterWorkloadHealth(clusterId: string) {
   const { data, loading, error, refetch } = useQuery<WorkloadHealthResp>(CLUSTER_WORKLOAD_HEALTH, {
     variables: { clusterId },
     pollInterval: 30000,
+    fetchPolicy: "cache-and-network",
+    notifyOnNetworkStatusChange: true,
   });
   return {
     rows: data?.astroliftClusterWorkloadHealth ?? [],
     loading,
     error: error?.message ?? null,
     refetch: () => {
-      void refetch();
+      void refetch().catch(() => {});
     },
   };
 }
@@ -35,7 +40,8 @@ export function useClusterWorkloadHealth(clusterId: string) {
  * arguments yet; see cluster-workloads-list.ts).
  */
 export function useClusterWorkloadList(clusterId: string) {
-  const list = useListState(CLUSTER_WORKLOADS_LIST);
+  const definition = useClusterWorkloadsListDefinition();
+  const list = useListState(definition);
   const workloads = useClusterWorkloadHealth(clusterId);
   const { state } = list;
   const { rows, totalCount } = selectRows(
@@ -56,5 +62,10 @@ export function useClusterWorkloadList(clusterId: string) {
     loading: workloads.loading && workloads.rows.length === 0,
     error: workloads.error && workloads.rows.length === 0 ? { message: workloads.error } : null,
     onRetry: workloads.refetch,
+    observation: {
+      hasRows: workloads.rows.length > 0,
+      loading: workloads.loading,
+      error: workloads.error,
+    },
   };
 }

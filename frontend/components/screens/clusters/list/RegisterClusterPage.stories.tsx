@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import german from "@/messages/de.json";
+import spanish from "@/messages/es.json";
 import * as React from "react";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -108,4 +111,43 @@ export const LongStrings: Story = {
 
 export const Width768: Story = {
   render: () => <div style={{ width: 768 }}>{page({ initialStep: 2 })}</div>,
+};
+
+/** Long translated controls wrap while provider identifiers remain literal. */
+export const GermanWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={german}>
+      <div style={{ width: 768 }}>{page({ initialStep: 2 })}</div>
+    </NextIntlClientProvider>
+  ),
+};
+
+/** Client validation is localized; malformed credentials are never echoed. */
+export const SpanishValidation: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="es" messages={spanish}>
+      {page()}
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Continuar" }));
+    await expect(await canvas.findByText("Asigna un nombre al clúster.")).toBeInTheDocument();
+    await userEvent.type(canvas.getByLabelText("Nombre visible"), "literal-cluster");
+    await userEvent.click(canvas.getByRole("button", { name: "Continuar" }));
+    await userEvent.clear(canvas.getByLabelText("Configuración de autenticación (JSON)"));
+    await userEvent.type(
+      canvas.getByLabelText("Configuración de autenticación (JSON)"),
+      "INVALID_CREDENTIAL_MARKER"
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Registrar clúster" }));
+    await expect(
+      await canvas.findByText("El JSON de autenticación no es válido.")
+    ).toBeInTheDocument();
+    await expect(
+      canvas
+        .getAllByRole("alert")
+        .every((alert) => !alert.textContent?.includes("INVALID_CREDENTIAL_MARKER"))
+    ).toBe(true);
+  },
 };

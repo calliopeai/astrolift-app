@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import strawberry
 from django.apps import apps
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from graphql import GraphQLError
 from strawberry.types import Info
 
+from astrolift_graphql import GUID, MutationResultType
+from astrolift_graphql import failure as gql_failure
+from astrolift_graphql import success as gql_success
 from astrolift_identity.operation_context import agent_region_operation, instance_operation
+from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
+from core.mutations import ErrorCode, mutation_audit
 from core.permissions import (
     Permission,
     PermissionDenied,
@@ -25,10 +29,17 @@ from core.schema.common import MutationResult
 from core.schema.common import ValidationError as GQLValidationError
 from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
+from workflows.schema.reviewed_start_types import (
+    StartWorkflowDefinitionInput,
+    WorkflowDefinitionStartType,
+    start_to_type,
+)
 from workflows.schema.types import WorkflowDefinitionType, WorkflowStageType
 from workflows.scopes import (
+    definition_scope_by_guid,
     definition_scope_by_slug,
     instance_scope_by_id,
+    legacy_reviewed_definition_scope,
 )
 
 
@@ -43,6 +54,9 @@ class RunWorkflowDefinitionResult(MutationResult):
     workflow_run_id: strawberry.ID | None = None
     # Temporal workflow id, for the viewer / signalling.
     temporal_workflow_id: str | None = None
+    temporal_run_id: str | None = None
+    request_id: str | None = None
+    dispatch_status: str | None = None
 
 
 @strawberry.type
@@ -188,6 +202,61 @@ def _unique_clone_slug(base_slug, org):
 
 @strawberry.type
 class Mutation:
+    @strawberry.mutation(
+        description="Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response."
+    )
+    @mutation_audit(action="workflow.definition.start")
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=definition_scope_by_guid("input.definition_id"),
+        operation=agent_region_operation,
+    )
+    @requires_elevation(action_label="Start a reviewed workflow definition")
+    @tenant_scoped()
+    def start_workflow_definition(
+        self, info: Info, input: StartWorkflowDefinitionInput
+    ) -> MutationResultType[WorkflowDefinitionStartType]:
+        from django.db import IntegrityError
+
+        from core.run_input_contract import InputContractError
+        from workflows.reviewed_starts import ReviewedStartError, dispatch_start, reserve_start
+
+        if not input.confirmed:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "Explicit confirmation of this reviewed workflow start is required",
+            )
+        try:
+            row = reserve_start(
+                definition_id=input.definition_id,
+                expected_revision=input.expected_revision,
+                expected_input_schema_digest=input.expected_input_schema_digest,
+                request_id=input.request_id,
+                inputs=input.inputs,
+                user=info.context.user,
+            )
+            row = dispatch_start(row)
+        except InputContractError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        except PermissionDenied:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value, "Current authority does not permit this workflow start"
+            )
+        except ReviewedStartError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        except IntegrityError:
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                "Concurrent requestId reservation; reconcile the same request before retrying",
+            )
+        except Exception:
+            return gql_failure(ErrorCode.INTERNAL.value, "Unable to reserve this workflow start")
+        if row.dispatch_status != "submitted":
+            result = gql_failure(ErrorCode.PRECONDITION.value, row.dispatch_last_error)
+            result.data = start_to_type(row)
+            return result
+        return gql_success(start_to_type(row))
+
     @strawberry.mutation(description="Start a workflow for an object.")
     @require_permission(Permission.WORKFLOW_TRIGGER, scope=definition_scope_by_slug("workflow_slug"))
     @tenant_scoped()
@@ -255,17 +324,15 @@ class Mutation:
 
     @strawberry.mutation(
         description=(
-            "Run an agent WorkflowDefinition's stages durably via Temporal "
-            "(WorkflowDefinitionRunWorkflow). Creates the WorkflowInstance + "
-            "WorkflowRun mirror rows and enqueues the stage executor."
+            "Compatibility entry for reviewed Definition starts. Requires exact definitionId, "
+            "revision, input schema digest, caller requestId and confirmation; prefer startWorkflowDefinition."
         )
     )
-    # The slug names a definition, not a configured Workflow. The handler
-    # skips a disabled definition of the org's for an enabled template, so
-    # the scope resolves the same row it runs (#1965).
+    # Complete compatibility requests authorize their immutable GUID;
+    # missing-proof requests retain the old scoped refusal behavior.
     @require_permission(
         Permission.WORKFLOW_TRIGGER,
-        scope=definition_scope_by_slug("workflow_slug", enabled_only=True),
+        scope=legacy_reviewed_definition_scope,
         operation=agent_region_operation,
     )
     @tenant_scoped()
@@ -274,91 +341,72 @@ class Mutation:
         info: Info,
         workflow_slug: str,
         trigger_payload: strawberry.scalars.JSON | None = None,
+        definition_id: GUID | None = None,
+        expected_revision: str | None = None,
+        expected_input_schema_digest: str | None = None,
+        request_id: str | None = None,
+        confirmed: bool | None = False,
     ) -> RunWorkflowDefinitionResult:
-        user = info.context.user
-        organization_id = _caller_org_pk()
-        visible = WorkflowDefinition.visible_to_org(organization_id).filter(
-            slug=workflow_slug,
-            is_enabled=True,
-            deleted_at__isnull=True,
-        )
-        workflow = (
-            visible.filter(organization_id=organization_id).first()
-            or visible.filter(organization__isnull=True).first()
-        )
-        if not workflow:
+        if (
+            not all((definition_id, expected_revision, expected_input_schema_digest, request_id))
+            or not confirmed
+        ):
             return RunWorkflowDefinitionResult(
                 ok=False,
                 errors=[
                     GQLValidationError(
-                        field="workflow_slug",
-                        messages=[f'Workflow "{workflow_slug}" not found or disabled'],
+                        field="input",
+                        messages=[
+                            "PRECONDITION: Upgrade to startWorkflowDefinition, or supply exact definitionId, reviewed revision/input schema digest, stable requestId and confirmed: true"
+                        ],
                     )
                 ],
             )
-
-        if not workflow.stages.filter(deleted_at__isnull=True).exists():
+        # The legacy slug is an assertion about the exact GUID, never a resolver
+        # that can substitute a newer organization copy for a reviewed template.
+        definition = (
+            WorkflowDefinition.visible_to_org(_caller_org_pk())
+            .filter(guid=str(definition_id), deleted_at__isnull=True)
+            .first()
+        )
+        if definition is None or definition.slug != workflow_slug:
             return RunWorkflowDefinitionResult(
                 ok=False,
                 errors=[
                     GQLValidationError(
-                        field="workflow_slug",
-                        messages=[f'Workflow "{workflow_slug}" has no stages to execute'],
+                        field="definition_id",
+                        messages=[
+                            "PRECONDITION: Exact definition not found or its slug changed; review it again"
+                        ],
                     )
                 ],
             )
-
-        # Imports kept local so this engine app's schema module doesn't pull
-        # the Temporal client + operations models at import time (the app is
-        # feature-gated).
-        from astrolift_workflows.inputs import Actor
-        from core.run_trigger import request_trigger
-        from workflows.run_service import start_workflow_definition_run
-
-        # Start the stage executor via the shared helper (the same path the
-        # inbound webhook uses, so both actually run the stages — #1020).
-        run, workflow_id = start_workflow_definition_run(
-            workflow,
-            trigger_payload=trigger_payload,
-            organization_id=organization_id,
-            actor=Actor(
-                kind="user",
-                user_id=user.pk if getattr(user, "pk", None) else None,
-                display=getattr(user, "username", "") or "",
+        result = Mutation.start_workflow_definition(
+            self,
+            info,
+            input=StartWorkflowDefinitionInput(
+                definition_id=definition_id,
+                expected_revision=expected_revision,
+                expected_input_schema_digest=expected_input_schema_digest,
+                request_id=request_id,
+                inputs=trigger_payload,
+                confirmed=True,
             ),
-            trigger_kind=request_trigger(),
         )
+        from workflows.reviewed_starts import find_start
 
-        # Keep the existing instance surface populated (UI mirror). Agent stage
-        # workflows don't use the state-machine ``states`` array, so point the
-        # instance at the definition with a plain ``running`` state rather than
-        # ``WorkflowInstance.start`` (which requires an initial state the stage
-        # model doesn't declare).
-        instance = WorkflowInstance.objects.create(
-            workflow=workflow,
-            organization_id=organization_id,
-            content_type=ContentType.objects.get_for_model(WorkflowDefinition),
-            object_id=workflow.pk,
-            current_state="running",
-            created_by=user,
-            updated_by=user,
-        )
-        instance.temporal_workflow_id = workflow_id
-        # The completion sync matches the instance by run id (#1774).
-        instance.temporal_run_id = run.run_id or None
-        instance.save(update_fields=["temporal_workflow_id", "temporal_run_id"])
-        # A short run may already have settled before this mirror existed.
-        from astrolift_operations.models import WorkflowRun
-        from workflows.run_status import synchronize_workflow_instances
-
-        settled = WorkflowRun.objects.filter(pk=run.pk).first()
-        if settled is not None:
-            synchronize_workflow_instances(settled)
-
+        row = find_start(request_id) if result.data is not None else None
         return RunWorkflowDefinitionResult(
-            ok=True,
-            workflow_run_id=str(run.pk),
-            temporal_workflow_id=workflow_id,
+            ok=result.ok,
+            errors=[
+                GQLValidationError(field="input", messages=[f"{error.code}: {error.message}"])
+                for error in result.errors
+            ],
+            workflow_run_id=str(row.execution_id) if row else None,
+            temporal_workflow_id=result.data.temporal_workflow_id if result.data else None,
+            temporal_run_id=result.data.temporal_run_id if result.data else None,
+            request_id=request_id if row else None,
+            dispatch_status=result.data.dispatch_status if result.data else None,
         )
 
     @strawberry.mutation(description="Transition a workflow instance to a new state.")
@@ -437,9 +485,18 @@ class Mutation:
         description: str | None = None,
         is_enabled: bool = False,
         pattern_kind: str | None = None,
+        input_schema: strawberry.scalars.JSON | None = None,
     ) -> MutationResult:
         user = info.context.user
         _require_platform_operator(user)
+        from core.run_input_contract import InputContractError, no_input_schema, validate_schema
+
+        try:
+            declared_schema = validate_schema(input_schema) if input_schema is not None else no_input_schema()
+        except InputContractError as exc:
+            return MutationResult(
+                ok=False, errors=[GQLValidationError(field="input_schema", messages=[str(exc)])]
+            )
 
         # pattern_kind drives the executor's composition (single / chained /
         # fan_out / ...). It existed on the model but had no creation arg, so
@@ -465,6 +522,7 @@ class Mutation:
             description=description or "",
             is_enabled=is_enabled,
             pattern_kind=pattern_kind or WorkflowDefinition.PatternKind.SINGLE,
+            input_schema=declared_schema,
             created_by=user,
             updated_by=user,
         )
@@ -500,6 +558,7 @@ class Mutation:
         transitions: strawberry.scalars.JSON | None = None,
         is_enabled: bool | None = None,
         pattern_kind: str | None = None,
+        input_schema: strawberry.scalars.JSON | None = None,
     ) -> MutationResult:
         user = info.context.user
 
@@ -513,6 +572,16 @@ class Mutation:
                 ok=False,
                 errors=[GQLValidationError(field=write_err[0], messages=[write_err[1]])],
             )
+
+        if input_schema is not None:
+            from core.run_input_contract import InputContractError, validate_schema
+
+            try:
+                workflow.input_schema = validate_schema(input_schema)
+            except InputContractError as exc:
+                return MutationResult(
+                    ok=False, errors=[GQLValidationError(field="input_schema", messages=[str(exc)])]
+                )
 
         if pattern_kind is not None:
             valid_patterns = {c[0] for c in WorkflowDefinition.PatternKind.choices}
@@ -906,6 +975,7 @@ class Mutation:
                 pattern_kind=source.pattern_kind,
                 states=source.states,
                 transitions=source.transitions,
+                input_schema=source.input_schema,
                 is_enabled=source.is_enabled,
                 created_by=user,
                 updated_by=user,

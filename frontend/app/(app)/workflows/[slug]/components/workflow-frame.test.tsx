@@ -17,6 +17,7 @@ import { WorkflowFrameContainer } from "./workflow-frame";
 vi.mock("next/navigation", () => ({
   usePathname: () => "/workflows/nightly-sync/runs/run-1",
   useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/graphql/identity/identity.hooks", () => ({
   useActiveOrg: () => ({ org: { id: "org-1" } }),

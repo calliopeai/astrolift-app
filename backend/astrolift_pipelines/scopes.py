@@ -99,49 +99,52 @@ def pipeline_secret_scope(field: str = "pipeline_id", *, permissions=(Permission
     return _scope
 
 
-def pipeline_app_scope(field: str = "id"):
-    """Scope on the app a pipeline is associated with, if any."""
-
-    def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_guid(args, field)
-        org_id = _org_id()
-        if not guid or org_id is None:
-            return PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
-        from astrolift_pipelines.models import Pipeline
-
-        app_id = (
-            Pipeline.objects.filter(guid=guid, organization_id=org_id)
-            .values_list("registered_app__id", flat=True)
-            .first()
-        )
-        return (
-            PermissionScope(kind=ScopeKind.APP, id=app_id)
-            if app_id
-            else PermissionScope(kind=ScopeKind.ORG, id=org_id)
-        )
-
-    return _scope
+def pipeline_app_scope(field: str = "id", *, permission=Permission.APP_READ):
+    """Resolve the coherent live app and the current bearer ceiling."""
+    return pipeline_secret_scope(field, permissions=(permission,))
 
 
-def pipeline_run_app_scope(field: str = "run_id"):
-    """Scope on the app the pipeline behind a run is associated with."""
+def live_pipeline_runs(qs, *, organization_id):
+    """Run identity stays pinned to its original live owner after association edits."""
+    from django.db.models import F, Q
 
-    def _scope(args: dict[str, Any]) -> PermissionScope | None:
-        guid = read_guid(args, field)
-        org_id = _org_id()
-        if not guid or org_id is None:
-            return PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
+    from astrolift_pipelines.models import Pipeline
+
+    pipelines = live_secret_pipelines(Pipeline.objects.all(), organization_id=organization_id)
+    return qs.filter(
+        Q(registered_app_id=F("pipeline__registered_app_id"))
+        | Q(registered_app_id__isnull=True, pipeline__registered_app_id__isnull=True),
+        organization_id=organization_id,
+        organization_id__exact=F("pipeline__organization_id"),
+        pipeline_id__in=pipelines.values("pk"),
+        deleted_at__isnull=True,
+    )
+
+
+def pipeline_run_app_scope(field: str = "run_id", *, permission=Permission.APP_READ):
+    """Gate the immutable run owner and current credential ceiling."""
+
+    def _scope(args):
+        from astrolift_identity.api_tokens import get_current_api_token
         from astrolift_pipelines.models import PipelineRun
+        from astrolift_registry.scopes import app_scope_by_guid
 
-        app_id = (
-            PipelineRun.objects.filter(guid=guid, pipeline__organization_id=org_id)
-            .values_list("pipeline__registered_app__id", flat=True)
+        org_id = _org_id()
+        guid = read_guid(args, field)
+        run = (
+            live_pipeline_runs(PipelineRun.objects.all(), organization_id=org_id)
+            .select_related("registered_app")
+            .filter(guid=guid)
             .first()
+            if guid
+            else None
         )
-        return (
-            PermissionScope(kind=ScopeKind.APP, id=app_id)
-            if app_id
-            else PermissionScope(kind=ScopeKind.ORG, id=org_id)
-        )
+        if run is not None and run.registered_app_id is not None:
+            return app_scope_by_guid(permission=permission)({"app_id": run.registered_app.guid})
+        scope = PermissionScope(kind=ScopeKind.ORG, id=org_id or 0)
+        token = get_current_api_token()
+        if token is not None and (token.organization_id != org_id or token.team_id is not None):
+            raise PermissionDenied(permission, scope, "credential does not cover organization runs")
+        return scope
 
     return _scope

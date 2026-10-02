@@ -17,14 +17,17 @@ import {
  * sits in a container here so its hook runs only while that tab is shown.
  */
 export function PipelinesClient() {
-  const { tab, onTabChange, onTrigger, triggering } = usePipelines();
+  const { tab, onTabChange, onTrigger, triggering, startDialog } = usePipelines();
   return (
-    <PipelinesScreen
-      tab={tab}
-      onTabChange={onTabChange}
-      pipelinesTab={<PipelineListTab onTrigger={onTrigger} triggering={triggering} />}
-      runsTab={<RunHistoryTab />}
-    />
+    <>
+      {startDialog}
+      <PipelinesScreen
+        tab={tab}
+        onTabChange={onTabChange}
+        pipelinesTab={<PipelineListTab onTrigger={onTrigger} triggering={triggering} />}
+        runsTab={<RunHistoryTab />}
+      />
+    </>
   );
 }
 

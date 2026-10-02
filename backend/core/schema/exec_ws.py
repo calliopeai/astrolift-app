@@ -18,7 +18,7 @@ Frame protocol (JSON-line for control, raw bytes for stream):
       {"type": "exit", "code": 0}
       {"type": "error", "message": "..."}
       {"type": "ready"}                 ← session opened, ready for stdin
-      {"type": "replay", "lines": [...]}← stdout/stderr ring buffer for reconnect
+      {"type": "replay", "lines": [...]}← output buffer for this connection only
 
 Two kinds of thing answer to the first path segment. Usually it is a
 ``RegisteredApp`` slug. It may also be an ``AgentBox`` slug (#129): a box
@@ -56,8 +56,8 @@ WS code, so the pre-accept ordering is load-bearing: moving any of these
 closes after accept would silently change what ``astro exec`` prints.
 
 Production wiring: the connection-time backend resolution looks up the
-app's ``default_tenant_cluster`` (or per-environment cluster), or for a
-box the org's agent cluster plus the namespace frozen on the row, and
+app's reviewed environment mapping (or first nondeleted environment for
+legacy callers), or for a box the org's agent cluster plus the namespace frozen on the row, and
 calls ``driver.exec_in_pod(...)`` via the ``astrolift-providers`` SDK.
 The backend factory is swappable so tests can stand up a recording fake
 without touching the kubernetes client.
@@ -74,6 +74,8 @@ import collections
 import json
 import logging
 from typing import Any
+from urllib.parse import parse_qs
+from uuid import uuid4
 
 from asgiref.sync import sync_to_async
 
@@ -86,9 +88,8 @@ from core.permissions import Permission, route_auth
 logger = logging.getLogger(__name__)
 
 
-# Server-side ring-buffer size per session — replayed verbatim on a
-# {"type": "replay"} request from the client after a transient
-# disconnect. The cap is small enough that an idle session doesn't
+# Server-side ring-buffer size per connection. A replay request reads only
+# this active connection; disconnect destroys it and the session. The cap is small enough that an idle session doesn't
 # pin many KB per WS connection but large enough to cover a typical
 # burst (e.g. ``kubectl exec ls -laR /``).
 _REPLAY_BUFFER_LINES = 1000
@@ -139,6 +140,8 @@ class ExecSession:
 
 
 class _StubExecSession(ExecSession):
+    opened = False
+
     def __init__(self) -> None:
         self._closed = False
 
@@ -268,8 +271,7 @@ def _holds(permission, *, scope_for, tenant_org_id, actor_user_id, api_token=Non
             actor_user_id=actor_user_id,
         ),
     )
-    if api_token is not None:
-        set_current_api_token(api_token)
+    set_current_api_token(api_token)
     try:
         check_permission(permission, scope=scope_for())
     except PermissionDenied:
@@ -278,19 +280,40 @@ def _holds(permission, *, scope_for, tenant_org_id, actor_user_id, api_token=Non
 
 
 @sync_to_async
-def _check_exec_permission(*, app_slug: str, tenant_org_id, actor_user_id, api_token=None) -> bool:
+def _check_exec_permission(
+    *, app_slug: str, tenant_org_id, actor_user_id, api_token=None, environment_guid=None
+) -> bool:
     """Resolver-entry permission check — deny-by-default. Returns True
     iff the resolved tenant + user holds ``app.exec_pod`` on this app."""
+    from astrolift_identity.abac import operation_attributes
+    from astrolift_identity.operation_context import environment_context
+    from astrolift_lifecycle.models import AppEnvironment
     from astrolift_lifecycle.scopes import live_app_scope
     from core.permissions import Permission
 
-    return _holds(
-        Permission.APP_EXEC_POD,
-        scope_for=lambda: live_app_scope("app_slug")({"app_slug": app_slug}),
-        tenant_org_id=tenant_org_id,
-        actor_user_id=actor_user_id,
-        api_token=api_token,
-    )
+    environments = AppEnvironment.objects.filter(
+        registered_app__slug=app_slug,
+        registered_app__organization_id=tenant_org_id,
+    ).select_related("tenant_cluster")
+    if environment_guid is not None:
+        from core.scope_args import read_guid
+
+        guid = read_guid({"id": environment_guid}, "id")
+        if guid is None:
+            return False
+        environment = environments.filter(guid=guid).first()
+        if environment is None:
+            return False
+    else:
+        environment = environments.order_by("id").first()
+    with operation_attributes(**environment_context(environment, approvals=None).attributes()):
+        return _holds(
+            Permission.APP_EXEC_POD,
+            scope_for=lambda: live_app_scope("app_slug")({"app_slug": app_slug}),
+            tenant_org_id=tenant_org_id,
+            actor_user_id=actor_user_id,
+            api_token=api_token,
+        )
 
 
 @sync_to_async
@@ -329,6 +352,8 @@ def _audit_exec_open(
     command: list[str],
     tenant_org_id,
     actor_user_id,
+    session_id=None,
+    admitted_target=None,
 ) -> None:
     """Append-only audit row for a successful exec open. Failures are
     swallowed — audit emission is best-effort and we don't want a
@@ -356,6 +381,9 @@ def _audit_exec_open(
                 # paste large heredocs and we don't want the audit row
                 # to balloon.
                 "command": [str(c)[:512] for c in (command or [])][:32],
+                "session_id": session_id,
+                "resumable": False,
+                **(admitted_target or {}),
             },
             resource_kind="app",
             resource_id=app_slug,
@@ -455,6 +483,8 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
         await send({"type": "websocket.close", "code": 4404})
         return
     app_slug, workload_slug = parsed
+    query = parse_qs(scope.get("query_string", b"").decode("ascii", errors="ignore"))
+    environment_guid = (query.get("environmentId") or [None])[0]
 
     from core.schema.ws_auth import (
         _bearer_from_scope,
@@ -521,6 +551,7 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
             tenant_org_id=org_id,
             actor_user_id=actor_user_id,
             api_token=api_token,
+            **({"environment_guid": environment_guid} if environment_guid is not None else {}),
         )
     )
     if not granted:
@@ -528,11 +559,12 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
         return
 
     await send({"type": "websocket.accept"})
+    session_id = str(uuid4())
+    admitted_target = None
 
     # Server-side replay buffer — every stdout/stderr line the backend
-    # produces gets a copy in this deque. On reconnect (or any client
-    # that wants to catch up after a brief disconnect), a {"type":
-    # "replay"} frame from the client returns the deque's contents.
+    # produces gets a copy in this deque. A replay frame returns only this
+    # connection's output. A new connection has an empty buffer.
     replay: collections.deque[dict[str, Any]] = collections.deque(
         maxlen=_REPLAY_BUFFER_LINES,
     )
@@ -578,8 +610,83 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
             except json.JSONDecodeError:
                 await _send_error("frame is not valid JSON")
                 continue
+            if not isinstance(frame, dict):
+                await _send_error("frame must be a JSON object")
+                continue
             kind = frame.get("type")
+            if kind in {"open", "stdin", "resize", "stdin_eof", "replay"}:
+                if bearer:
+                    fresh_user, fresh_tenant, api_token = await sync_to_async(_resolve_bearer_identity)(
+                        bearer, _header_from_scope(scope, "x-astrolift-organization")
+                    )
+                else:
+                    fresh_user, fresh_data = await _resolve_user_from_sessionid(session_key)
+                    fresh_tenant = (
+                        await _resolve_tenant_for_user(fresh_user, fresh_data)
+                        if getattr(fresh_user, "is_authenticated", False)
+                        else None
+                    )
+                if (
+                    not getattr(fresh_user, "is_authenticated", False)
+                    or fresh_tenant is None
+                    or getattr(fresh_tenant, "organization_id", None) != org_id
+                    or getattr(fresh_tenant, "actor_user_id", None) != actor_user_id
+                ):
+                    await send({"type": "websocket.close", "code": 4401})
+                    break
+                granted = (
+                    await _check_box_attach_permission(
+                        box_slug=app_slug,
+                        tenant_org_id=org_id,
+                        actor_user_id=actor_user_id,
+                        api_token=api_token,
+                    )
+                    if target == TARGET_BOX
+                    else await _check_exec_permission(
+                        app_slug=app_slug,
+                        tenant_org_id=org_id,
+                        actor_user_id=actor_user_id,
+                        api_token=api_token,
+                        **({"environment_guid": environment_guid} if environment_guid is not None else {}),
+                    )
+                )
+                if not granted:
+                    await send({"type": "websocket.close", "code": 4403})
+                    break
+                if admitted_target is not None and kind != "open":
+                    from core.exec_targets import ExecTargetError, admit_exec_target
+
+                    review = {
+                        key.split("_")[0] + "".join(piece.title() for piece in key.split("_")[1:]): value
+                        for key, value in admitted_target.items()
+                    }
+                    try:
+                        await sync_to_async(admit_exec_target)(
+                            app_slug=app_slug,
+                            pod_name=workload_slug,
+                            container=admitted_target["container"],
+                            review=review,
+                            check_pod=False,
+                        )
+                    except ExecTargetError:
+                        await _send_error("admitted target changed; explicitly review and open a new session")
+                        await send({"type": "websocket.close", "code": 4403})
+                        break
+                if frame.get("sessionId") is not None and frame["sessionId"] != session_id:
+                    await _send_error("session ended; explicitly open a new session without replaying input")
+                    continue
             if kind == "open":
+                if (
+                    frame.get("resumeSessionId")
+                    or frame.get("resumable")
+                    or frame.get("requireActionAdmission")
+                    or frame.get("actionAdmissionProof")
+                    or frame.get("requireAtomicPodBinding")
+                ):
+                    await _send_error(
+                        "resume, action-admission proofs and atomic pod binding are unavailable"
+                    )
+                    continue
                 if session is not None:
                     await _send_error("session already open")
                     continue
@@ -590,6 +697,30 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                 # callers ask for a plain pipe so stdout isn't echo-doubled
                 # or CRLF-mangled. Default True for older clients.
                 tty = bool(frame.get("tty", True))
+                reviewed_target = None
+                if frame.get("target") is not None:
+                    from core.exec_targets import ExecTargetError, admit_exec_target
+
+                    if (
+                        target != TARGET_APP
+                        or not isinstance(frame["target"], dict)
+                        or frame["target"].get("environmentId") != environment_guid
+                    ):
+                        await _send_error("reviewed environment must match the app handshake target")
+                        continue
+                    try:
+                        reviewed_target = await sync_to_async(admit_exec_target)(
+                            app_slug=app_slug,
+                            pod_name=workload_slug,
+                            container=container,
+                            review=frame["target"],
+                        )
+                    except ExecTargetError as exc:
+                        await _send_error(str(exc))
+                        continue
+                elif environment_guid is not None:
+                    await _send_error("explicit environments require a complete reviewed target")
+                    continue
                 session = await backend.open(
                     app_slug=app_slug,
                     workload_slug=workload_slug,
@@ -600,7 +731,13 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                     send_exit=_send_exit,
                     send_error=_send_error,
                     tty=tty,
+                    **({"reviewed_target": reviewed_target} if reviewed_target is not None else {}),
                 )
+                if getattr(session, "opened", True) is False:
+                    await session.close()
+                    session = None
+                    continue
+                admitted_target = reviewed_target.facts if reviewed_target is not None else None
                 if target == TARGET_BOX:
                     await _record_box_attach(
                         box_slug=app_slug,
@@ -618,12 +755,27 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                         command=command,
                         tenant_org_id=org_id,
                         actor_user_id=actor_user_id,
+                        session_id=session_id,
+                        admitted_target=admitted_target,
                     )
                 # Signal the frontend that the backend handshake
                 # succeeded and stdin will now be accepted. Lets the
                 # client clear any "connecting…" banner before the
                 # first stdout byte lands.
-                await _send_json({"type": "ready"})
+                await _send_json(
+                    {
+                        "type": "ready",
+                        "sessionId": session_id,
+                        "resumable": False,
+                        "disconnect": "END",
+                        "inputReplay": False,
+                        "target": {
+                            key.split("_")[0] + "".join(piece.title() for piece in key.split("_")[1:]): value
+                            for key, value in (admitted_target or {}).items()
+                        }
+                        or None,
+                    }
+                )
             elif kind == "stdin":
                 if session is None:
                     await _send_error(
@@ -652,6 +804,8 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
                 await _send_json(
                     {
                         "type": "replay",
+                        "sessionId": session_id,
+                        "resumable": False,
                         "lines": list(replay),
                     }
                 )

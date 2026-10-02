@@ -17,6 +17,7 @@ Supported events (``X-Gitlab-Event`` header):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 
@@ -24,7 +25,7 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from astrolift_identity.models import Organization
-from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
+from astrolift_pipelines.models import Pipeline, Trigger
 from astrolift_pipelines.webhook_security import (
     WebhookSecurityError,
     check_payload_size,
@@ -32,7 +33,6 @@ from astrolift_pipelines.webhook_security import (
 )
 from astrolift_pipelines.webhook_views import (
     _dispatch_pipeline_run,
-    _next_run_number,
     _record_webhook,
     _repo_url_matches,
     _trigger_matches,
@@ -156,7 +156,7 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         _record_webhook(org_slug, "rate_limited", provider="gitlab")
         return JsonResponse({"error": "rate limited"}, status=429)
 
-    # No replay check: GitLab does not send a stable per-delivery id, so
+    # Durable body-bound requests reconcile repeated deliveries;
     # there is nothing to deduplicate on. Stated rather than omitted, so the
     # asymmetry with the GitHub receiver reads as a decision.
 
@@ -184,6 +184,7 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     pipelines = Pipeline.objects.filter(organization=org, deleted_at__isnull=True)
 
     dispatched = []
+    uncertain = False
     for pipeline in pipelines:
         if not _repo_url_matches(pipeline.repo_url, clone_url, http_url):
             continue
@@ -195,23 +196,29 @@ def pipeline_gitlab_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
             if decision is None or not decision.should_trigger:
                 continue
             try:
-                run = PipelineRun.objects.create(
-                    pipeline=pipeline,
-                    run_number=_next_run_number(pipeline),
+                from astrolift_pipelines.run_contracts import reserve_pipeline_run
+
+                run = reserve_pipeline_run(
+                    pipeline_id=pipeline.pk,
+                    expected_version=pipeline.version,
+                    request_id=hashlib.sha256(body + str(pipeline.guid).encode()).hexdigest(),
+                    actor_key="webhook:gitlab",
+                    trusted_webhook=True,
                     trigger_kind=canonical_kind,
-                    trigger_ref=ref,
+                    ref=ref,
                     commit_sha=commit_sha,
                     trigger_actor=actor,
-                    status="pending",
-                    temporal_workflow_id="",
                 )
                 _dispatch_pipeline_run(run)
                 dispatched.append({"pipeline": pipeline.name, "run_number": run.run_number})
             except Exception:  # noqa: BLE001
+                uncertain = True
                 logger.exception("pipelines.gitlab_webhook: failed to dispatch pipeline %s", pipeline.name)
             break
 
     # Same convention as the GitHub receiver: `filtered` covers a delivery
     # that matched no pipeline, since nothing was dispatched either way.
     _record_webhook(org_slug, "dispatched" if dispatched else "filtered", provider="gitlab")
-    return JsonResponse({"status": "ok", "dispatched": dispatched})
+    return JsonResponse(
+        {"status": "retry" if uncertain else "ok", "dispatched": dispatched}, status=503 if uncertain else 200
+    )

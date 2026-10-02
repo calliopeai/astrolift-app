@@ -190,7 +190,7 @@ class PipelineRunWorkflow:
                 elif not isinstance(result, Exception):
                     self._job_statuses[job["job_id"]] = "success"
 
-            if failed_jobs:
+            if failed_jobs and not self._cancel_requested:
                 # Cancel any still-pending job runs in subsequent tiers.
                 pending_job_ids = [
                     j["job_run_id"] for t in tiers[tiers.index(tier) + 1 :] for j in t if j.get("job_run_id")

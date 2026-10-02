@@ -1,10 +1,10 @@
 "use client";
 
 import { gql } from "@apollo/client";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useQuery } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
+import { useReviewedStart } from "@/components/reviewed-starts/use-reviewed-start";
 
 import type { CursorPage } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
@@ -37,6 +37,8 @@ const LIST_PIPELINES_PAGE = gql`
       items {
         id
         name
+        version
+        organizationId
         repoUrl
         defaultBranch
         tomlPath
@@ -71,31 +73,6 @@ const LIST_PIPELINE_RUNS_PAGE = gql`
     }
   }
 `;
-
-const TRIGGER_PIPELINE_RUN = gql`
-  mutation TriggerPipelineRun($input: TriggerPipelineRunInput!) {
-    triggerPipelineRun(input: $input) {
-      ok
-      errors {
-        code
-        message
-      }
-      data {
-        id
-        runNumber
-        status
-      }
-    }
-  }
-`;
-
-interface TriggerPipelineRunResp {
-  triggerPipelineRun: {
-    ok: boolean;
-    errors: { code: string; message: string }[];
-    data: { id: string; runNumber: number; status: string } | null;
-  };
-}
 
 export type PipelineTab = "pipelines" | "runs";
 export const PIPELINE_TABS: readonly PipelineTab[] = ["pipelines", "runs"];
@@ -148,26 +125,17 @@ export function usePipelines() {
     router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
   }
 
-  const [triggerPipelineRun, { loading: triggering }] =
-    useMutation<TriggerPipelineRunResp>(TRIGGER_PIPELINE_RUN);
-
-  async function onTrigger(pipeline: Pipeline) {
-    const { data } = await triggerPipelineRun({
-      variables: { input: { pipelineId: pipeline.id } },
-    });
-    if (data?.triggerPipelineRun?.ok) {
-      const run = data.triggerPipelineRun.data;
-      toast.success(`Run #${run?.runNumber} started`, {
-        description: `Pipeline: ${pipeline.name}`,
-      });
-    } else {
-      for (const e of data?.triggerPipelineRun?.errors ?? []) {
-        toast.error(`${e.code}: ${e.message}`);
-      }
-    }
-  }
-
-  return { tab, onTabChange, onTrigger, triggering };
+  const reviewedStart = useReviewedStart("pipeline");
+  const onTrigger = async (pipeline: Pipeline) => {
+    await reviewedStart.open(pipeline.id);
+  };
+  return {
+    tab,
+    onTabChange,
+    onTrigger,
+    triggering: reviewedStart.busy,
+    startDialog: reviewedStart.dialog,
+  };
 }
 
 /** The pipeline list tab (#106): list state in memory, one cursor page. */
