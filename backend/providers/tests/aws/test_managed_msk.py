@@ -17,7 +17,8 @@ from aws.managed.event_stream_msk import (
     MSKServerlessDriver,
 )
 
-CLUSTER_NAME = "platform-steadymd-triage-prod-kafka"
+SERVICE_ID = "11111111-1111-4111-8111-111111111111"
+CLUSTER_NAME = "platform-11111111111141118111111111111111"
 CLUSTER_ARN = f"arn:aws:kafka:us-west-2:123456789012:cluster/{CLUSTER_NAME}/cluster-uuid"
 KEY_ARN = "arn:aws:kms:us-west-2:123456789012:key/key-1"
 SCRAM_ARN = "arn:aws:secretsmanager:us-west-2:123456789012:secret:AmazonMSK_user"
@@ -26,7 +27,7 @@ SCRAM_ARN = "arn:aws:secretsmanager:us-west-2:123456789012:secret:AmazonMSK_user
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
-        "organization_slug": "steadymd",
+        "organization_slug": "example",
         "app_id": "app-1",
         "app_slug": "triage",
         "environment_id": "env-1",
@@ -38,10 +39,18 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": SERVICE_ID,
     }
     values.update(overrides)
     return ProvisionSpec(**values)
+
+
+def _update_spec(handle, **kwargs) -> UpdateSpec:
+    return UpdateSpec(handle, managed_service_id=SERVICE_ID, **kwargs)
+
+
+def _deprovision_spec(handle, **kwargs) -> DeprovisionSpec:
+    return DeprovisionSpec(handle, managed_service_id=SERVICE_ID, **kwargs)
 
 
 def _config(**overrides) -> MSKConfig:
@@ -90,6 +99,7 @@ def _cluster(cluster_type="PROVISIONED", **overrides) -> dict:
 
 def _client(cluster_type="PROVISIONED", **cluster_overrides) -> MagicMock:
     client = MagicMock()
+    client.list_clusters_v2.return_value = {"ClusterInfoList": []}
     client.create_cluster_v2.return_value = {
         "ClusterArn": CLUSTER_ARN,
         "ClusterName": CLUSTER_NAME,
@@ -100,7 +110,7 @@ def _client(cluster_type="PROVISIONED", **cluster_overrides) -> MagicMock:
         "ClusterInfo": _cluster(cluster_type, **cluster_overrides),
     }
     client.list_tags_for_resource.return_value = {
-        "Tags": {"astrolift.io/managed-by": "platform"},
+        "Tags": {"astrolift.io/managed-by": "platform", "astrolift.io/managed_service_id": SERVICE_ID},
     }
     client.list_scram_secrets.return_value = {"SecretArnList": []}
     client.get_bootstrap_brokers.return_value = {
@@ -254,7 +264,7 @@ def test_existing_external_cluster_is_never_silently_adopted():
 
     result = driver.provision(_spec())
 
-    assert not result.ok and "outside this resource declaration" in result.message
+    assert not result.ok and "ownership" in result.message
     client.tag_resource.assert_not_called()
 
 
@@ -287,7 +297,7 @@ def test_update_operations_use_current_version_and_exact_aws_shapes(operation, p
     driver = MSKProvisionedDriver(config=_config(), client=client, sleep=lambda _seconds: None)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"event_stream/{CLUSTER_ARN}",
             config={"update_operations": [{"operation": operation, "parameters": parameters}]},
         ),
@@ -319,7 +329,7 @@ def test_update_operations_use_current_version_and_exact_aws_shapes(operation, p
 def test_identical_update_plan_is_applied_once_across_retries():
     client = _client()
     driver = MSKProvisionedDriver(config=_config(), client=client, sleep=lambda _seconds: None)
-    update = UpdateSpec(
+    update = _update_spec(
         f"event_stream/{CLUSTER_ARN}",
         config={
             "update_operations": [
@@ -333,6 +343,7 @@ def test_identical_update_plan_is_applied_once_across_retries():
     client.list_tags_for_resource.return_value = {
         "Tags": {
             "astrolift.io/managed-by": "platform",
+            "astrolift.io/managed_service_id": SERVICE_ID,
             "astrolift.io/update-plan-sha256": digest,
         },
     }
@@ -351,7 +362,7 @@ def test_scram_associations_and_cluster_policy_reconcile_exact_delta():
     policy = {"Version": "2012-10-17", "Statement": []}
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"event_stream/{CLUSTER_ARN}",
             config={
                 "scram_secret_arns": [SCRAM_ARN],
@@ -394,7 +405,7 @@ def test_scram_association_chunks_requests_and_surfaces_partial_failures():
     driver = MSKProvisionedDriver(config=_config(), client=client, sleep=lambda _seconds: None)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"event_stream/{CLUSTER_ARN}",
             config={"scram_secret_arns": secrets},
         ),
@@ -410,7 +421,7 @@ def test_policy_can_be_removed_idempotently():
     driver = MSKProvisionedDriver(config=_config(), client=client, sleep=lambda _seconds: None)
 
     result = driver.update(
-        UpdateSpec(f"event_stream/{CLUSTER_ARN}", config={"resource_policy": None}),
+        _update_spec(f"event_stream/{CLUSTER_ARN}", config={"resource_policy": None}),
     )
 
     assert result.ok
@@ -488,12 +499,12 @@ def test_deprovision_requires_guard_override_and_explicit_data_loss_ack():
     driver = MSKProvisionedDriver(config=_config(), client=client)
     handle = f"event_stream/{CLUSTER_ARN}"
 
-    protected = driver.deprovision(DeprovisionSpec(handle))
+    protected = driver.deprovision(_deprovision_spec(handle))
     retained = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        _deprovision_spec(handle, config={"deletion_protection": False}),
     )
     deleted = driver.deprovision(
-        DeprovisionSpec(handle),
+        _deprovision_spec(handle),
         delete_data=True,
         force_destroy=True,
     )
@@ -531,8 +542,8 @@ def test_missing_paths_and_snapshot_contract_are_honest():
     handle = f"event_stream/{CLUSTER_ARN}"
 
     assert driver.status(ServiceHandle(handle)).state == "deprovisioned"
-    assert driver.deprovision(DeprovisionSpec(handle)).ok
-    assert not driver.update(UpdateSpec(handle, config={})).ok
+    assert driver.deprovision(_deprovision_spec(handle)).ok
+    assert not driver.update(_update_spec(handle, config={})).ok
     with pytest.raises(ManagedServiceError, match="no cluster snapshot API"):
         driver.snapshot(ServiceHandle(handle))
 
@@ -680,5 +691,5 @@ def test_a_platform_cluster_of_another_org_is_not_adopted():
 
     result = driver.provision(_spec())
 
-    assert not result.ok and "outside this resource declaration" in result.message
+    assert not result.ok and "ownership" in result.message
     client.tag_resource.assert_not_called()

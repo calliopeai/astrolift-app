@@ -19,6 +19,7 @@ from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowDefinitionStart, WorkflowInstance, WorkflowStage
 from workflows.scopes import reviewed_definition_scope as definition_scope
+from workflows.target_references import references_filter
 
 
 class ReviewedStartError(ValueError):
@@ -67,7 +68,7 @@ def _definition_graph(definition, *, stages=None, lock=False):
         if missing_refs:
             query = (
                 WorkflowDefinition.visible_to_org(definition.organization_id)
-                .filter(slug__in=missing_refs, is_enabled=True, deleted_at__isnull=True)
+                .filter(references_filter(missing_refs), is_enabled=True, deleted_at__isnull=True)
                 .select_related("project__team")
                 .order_by("pk")
             )
@@ -258,7 +259,7 @@ def _freeze_plans(run, definition, graph=None) -> dict:
         )
         .filter(
             Q(pk__in={stage.agent_definition_id for stage in all_stages if stage.agent_definition_id})
-            | Q(slug__in={stage.agent_ref for stage in all_stages if stage.agent_ref})
+            | references_filter({stage.agent_ref for stage in all_stages if stage.agent_ref})
         )
         .order_by("pk")
     )

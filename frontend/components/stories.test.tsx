@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { runStory } from "@/test/run-story";
 import { composeStories, setProjectAnnotations } from "@storybook/react";
 
 type ComposedStory = { run: (context?: { canvasElement?: HTMLElement }) => Promise<void> };
@@ -56,7 +57,7 @@ describe.each(Object.entries(modules))("%s", (_file, module) => {
     // function, if it has one.
     const canvasElement = document.createElement("div");
     document.body.appendChild(canvasElement);
-    await Story.run({ canvasElement });
+    await runStory(Story, canvasElement);
     expect(canvasElement.childElementCount).toBeGreaterThan(0);
     canvasElement.remove();
   });

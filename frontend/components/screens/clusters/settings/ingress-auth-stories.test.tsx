@@ -1,3 +1,4 @@
+import { runStory } from "@/test/run-story";
 import { composeStories, setProjectAnnotations } from "@storybook/react";
 import { describe, expect, it } from "vitest";
 import * as preview from "../../../../.storybook/preview";
@@ -8,7 +9,7 @@ describe("Ingress auth portable stories", () => {
     const canvasElement = document.createElement("div");
     document.body.append(canvasElement);
     try {
-      await Story.run({ canvasElement });
+      await runStory(Story, canvasElement);
       expect(canvasElement.childElementCount).toBeGreaterThan(0);
     } finally {
       canvasElement.remove();

@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, within } from "storybook/test";
 
@@ -67,3 +70,20 @@ export const SpawnFailed: Story = {
 };
 
 export const LongStrings: Story = { args: { logs: logsOf(RUNNING_TASK, LONG_LOG_LINES) } };
+
+export const FrenchEmpty: Story = {
+  args: { latest: null, logs: null },
+  render: (args) => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AgentObserveScreen {...args} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseReadError: Story = {
+  args: { latest: null, logs: null, error: "RAW_OBSERVE_DIAGNOSTIC" },
+  render: (args) => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <AgentObserveScreen {...args} />
+    </NextIntlClientProvider>
+  ),
+};

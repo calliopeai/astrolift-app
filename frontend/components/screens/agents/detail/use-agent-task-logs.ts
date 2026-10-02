@@ -2,6 +2,7 @@
 
 import { useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import {
   downloadTextFile,
@@ -23,6 +24,7 @@ const LOG_TAIL = 200;
  * The data half of AgentTaskLogsView.
  */
 export function useAgentTaskLogs(taskId: string) {
+  const t = useTranslations("agentObservation.logs");
   const [loadingEarlier, setLoadingEarlier] = React.useState(false);
   const [pageError, setPageError] = React.useState<string | null>(null);
   const [frozenPage, setFrozenPage] = React.useState<AstroliftAgentTaskLogPage | null>(null);
@@ -50,7 +52,7 @@ export function useAgentTaskLogs(taskId: string) {
     setPageError(null);
     startPolling(5000);
     void refetch({ id: taskId, cursor: null, limit: LOG_TAIL }).catch((cause: unknown) => {
-      setPageError(cause instanceof Error ? cause.message : "Logs could not be refreshed.");
+      setPageError(cause instanceof Error ? cause.message : t("refreshFailed"));
     });
   };
   const loadEarlier = async () => {
@@ -66,12 +68,12 @@ export function useAgentTaskLogs(taskId: string) {
       });
       if (current === generation.current) {
         const earlier = result.data?.agentTaskLogsPage;
-        if (!earlier) throw new Error("Earlier logs could not be loaded.");
+        if (!earlier) throw new Error(t("earlierFailed"));
         setFrozenPage({ ...earlier, items: [...earlier.items, ...page.items] });
       }
     } catch (cause) {
       if (current === generation.current) {
-        setPageError(cause instanceof Error ? cause.message : "Earlier logs could not be loaded.");
+        setPageError(cause instanceof Error ? cause.message : t("earlierFailed"));
       }
     } finally {
       if (current === generation.current) setLoadingEarlier(false);

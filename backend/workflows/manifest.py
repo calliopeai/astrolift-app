@@ -28,10 +28,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import tomllib
 from typing import Any
 
 import tomli_w
-import tomllib
 
 from astrolift_manifest.parser import (
     ManifestError,
@@ -48,6 +48,7 @@ from workflows.back_edges import (
 from workflows.collections import CollectionContractError, validate_iteration
 from workflows.models import WorkflowDefinition, WorkflowStage
 from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attempts
+from workflows.target_references import reference_guid, references_filter
 
 # Valid value sets are sourced from the models so the serializer stays in
 # lockstep with #966 — a new pattern/kind/on_failure choice needs no edit here.
@@ -204,19 +205,19 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
     agent = d.get("agent")
     if agent is not None and (not isinstance(agent, str) or not agent.strip()):
         raise ManifestError(
-            "agent must be a non-empty local agent slug (omit it for role-only globals)",
+            "agent must be a non-empty local slug or guid:UUID reference (omit it for role-only globals)",
             path=f"{base}.agent",
         )
 
     workflow_ref = d.get("workflow")
     if workflow_ref is not None and (not isinstance(workflow_ref, str) or not workflow_ref.strip()):
         raise ManifestError(
-            "workflow must be a non-empty child workflow slug",
+            "workflow must be a non-empty child slug or guid:UUID reference",
             path=f"{base}.workflow",
         )
     if kind == WorkflowStage.StageKind.WORKFLOW and workflow_ref is None:
         raise ManifestError(
-            'kind="workflow" requires a workflow child slug',
+            'kind="workflow" requires a child workflow reference',
             path=f"{base}.workflow",
         )
     if kind != WorkflowStage.StageKind.WORKFLOW and workflow_ref is not None:
@@ -224,6 +225,13 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
             'workflow is only valid when kind="workflow"',
             path=f"{base}.workflow",
         )
+
+    for field, value in (("agent", agent), ("workflow", workflow_ref)):
+        if value is not None:
+            try:
+                reference_guid(value)
+            except ValueError as exc:
+                raise ManifestError(str(exc), path=f"{base}.{field}") from exc
 
     environment_spec_slug = d.get("environment_spec_slug")
     if environment_spec_slug is not None and (
@@ -396,7 +404,12 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
         if stage.on_failure != _DEFAULT_ON_FAILURE:
             row["on_failure"] = stage.on_failure
         if stage.iteration:
-            row["iteration_json"] = json.dumps(validate_iteration(stage.iteration, kind=stage.kind), sort_keys=True, separators=(",", ":"), allow_nan=False)
+            row["iteration_json"] = json.dumps(
+                validate_iteration(stage.iteration, kind=stage.kind),
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
         if stage.back_edge:
             edge = validate_back_edge(stage.back_edge, kind=stage.kind)
             if any(value is None for value in edge.values()):
@@ -446,7 +459,13 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
     stages: list[WorkflowStageSpec] = []
     rows = definition.stages.order_by("order").select_related("agent_definition")
     for stage in rows:
-        agent_slug = stage.agent_definition.slug if stage.agent_definition else (stage.agent_ref or None)
+        agent_slug = (
+            stage.agent_ref
+            if stage.agent_ref.startswith("guid:")
+            else stage.agent_definition.slug
+            if stage.agent_definition
+            else (stage.agent_ref or None)
+        )
         if stage.fan_out_dynamic:
             fan_out: int | str = "dynamic"
         elif stage.fan_out_count:
@@ -514,9 +533,10 @@ def create_definition_from_manifest(
     globals) live in exactly one place.
 
     Imported definitions land disabled for operator review by default. Local
-    ``agent`` slugs are retained in ``agent_ref`` and eagerly bound when the
+    ``agent`` slugs or explicit ``guid:UUID`` references remain in ``agent_ref`` and eagerly bind when the
     matching org workload already exists; otherwise they remain late-bound
-    and can resolve after that agent is registered. The slug is made unique
+    and can resolve after that agent is registered. An explicit GUID never selects
+    a sibling or a same-slug replacement. The definition slug is made unique
     within the org on collision.
 
     ``is_enabled`` defaults to ``False`` for a brand-new import; the
@@ -547,12 +567,15 @@ def create_definition_from_manifest(
         if stage.agent:
             from astrolift_registry.models import Workload
 
-            agent_definition = Workload.objects.filter(
-                registered_app__organization=organization,
-                slug=stage.agent,
-                kind=Workload.Kind.AGENT,
-                deleted_at__isnull=True,
-            ).first()
+            agent_definition = (
+                Workload.objects.filter(
+                    registered_app__organization=organization,
+                    kind=Workload.Kind.AGENT,
+                    deleted_at__isnull=True,
+                )
+                .filter(references_filter([stage.agent]))
+                .first()
+            )
         fan_out_count, fan_out_dynamic = _fan_out_columns(stage.fan_out)
         WorkflowStage.objects.create(
             definition=definition,
@@ -650,12 +673,15 @@ def replace_definition_content(
         if stage_spec.agent:
             from astrolift_registry.models import Workload
 
-            agent_definition = Workload.objects.filter(
-                registered_app__organization=organization,
-                slug=stage_spec.agent,
-                kind=Workload.Kind.AGENT,
-                deleted_at__isnull=True,
-            ).first()
+            agent_definition = (
+                Workload.objects.filter(
+                    registered_app__organization=organization,
+                    kind=Workload.Kind.AGENT,
+                    deleted_at__isnull=True,
+                )
+                .filter(references_filter([stage_spec.agent]))
+                .first()
+            )
         fan_out_count, fan_out_dynamic = _fan_out_columns(stage_spec.fan_out)
         stage_row.role = stage_spec.role or ""
         stage_row.agent_definition = agent_definition

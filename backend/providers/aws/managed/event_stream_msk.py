@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -33,7 +34,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import ManagedServiceError, handle_for, live_ownership_refusal, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "event_stream"
@@ -117,45 +119,47 @@ class MSKDriver(ManagedServiceDriver):
         error = self._validate_config(cfg, size=spec.size)
         if error:
             return ProvisionResult(False, "", error, ["invalid_msk_config"])
+        if not re.fullmatch(r"[0-9]{12}", self._config.account_id) or not self._config.region:
+            return ProvisionResult(
+                False, "", "MSK requires a region and 12-digit AWS account_id", ["invalid_msk_identity"]
+            )
         name = self._cluster_name(spec)
-        request = self._create_request(name, spec)
-        created = False
         arn = ""
         try:
-            response = self._msk.create_cluster_v2(**request)
-            arn = str(response.get("ClusterArn") or "")
-            created = True
+            if spec.recorded_handle:
+                arn = self._target(spec.recorded_handle)[0]
+            else:
+                existing = self._find_cluster(name)
+                if existing:
+                    arn = str(existing.get("ClusterArn") or "")
+                else:
+                    try:
+                        response = self._msk.create_cluster_v2(**self._create_request(name, spec))
+                        arn = str(response.get("ClusterArn") or "")
+                    except Exception as exc:
+                        if not _already_exists(exc):
+                            raise
+                        existing = self._find_cluster(name)
+                        arn = str(existing.get("ClusterArn") or "")
+            if not arn or self._target(handle_for(kind=KIND, resource_id=arn))[1] != name:
+                raise ManagedServiceError("MSK cluster response does not match the exact target")
         except Exception as exc:
-            if not _already_exists(exc):
-                return ProvisionResult(False, "", f"create MSK cluster: {exc}", [str(exc)])
-            existing = self._find_cluster(name)
-            arn = str(existing.get("ClusterArn") or "")
-            if not arn:
-                return ProvisionResult(
-                    False,
-                    "",
-                    f"MSK reported cluster {name} already exists but it could not be discovered",
-                    ["cluster_collision_not_discoverable"],
-                )
+            return ProvisionResult(False, "", f"resolve MSK cluster: {exc}", [str(exc)])
         handle = handle_for(kind=KIND, resource_id=arn) if arn else ""
         try:
             cluster = self._await_state(arn, {"ACTIVE"})
-            if not created and not self._is_managed(arn, spec):
-                raise ManagedServiceError(
-                    f"MSK cluster {name} already exists outside this resource declaration",
-                )
+            self._assert_owner(arn, spec.managed_service_id)
             self._verify_cluster_type(cluster)
             self._tag(arn, spec)
             self._apply_update_operations(arn, cfg)
             self._reconcile_associations(arn, cfg)
         except Exception as exc:
-            action = "configure new" if created else "reconcile existing"
-            return ProvisionResult(False, handle, f"{action} MSK cluster: {exc}", [str(exc)])
+            return ProvisionResult(False, handle, f"configure MSK cluster: {exc}", [str(exc)])
         return ProvisionResult(True, handle, f"MSK {self.cluster_type.lower()} cluster {name} available", ready=True)
 
     @driver_op(cloud="aws", driver="event_stream_msk")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, arn = parse_handle(spec.handle)
+        arn, _ = self._target(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg, size=spec.size or "custom", partial=True)
         if error:
@@ -163,8 +167,11 @@ class MSKDriver(ManagedServiceDriver):
         try:
             cluster = self._cluster(arn)
             self._verify_cluster_type(cluster)
+            self._assert_owner(arn, spec.managed_service_id)
             self._apply_update_operations(arn, cfg)
             self._reconcile_associations(arn, cfg)
+        except ManagedServiceError as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, "MSK cluster not found", ["not_found"])
@@ -184,9 +191,10 @@ class MSKDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, arn = parse_handle(spec.handle)
+        arn, _ = self._target(spec.handle)
         try:
             cluster = self._cluster(arn)
+            self._assert_owner(arn, spec.managed_service_id)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, "MSK cluster already gone")
@@ -693,10 +701,17 @@ class MSKDriver(ManagedServiceDriver):
 
     def _cluster(self, arn: str) -> dict[str, Any]:
         response = self._msk.describe_cluster_v2(ClusterArn=arn)
-        return dict(response.get("ClusterInfo") or {})
+        value = dict(response.get("ClusterInfo") or {})
+        _, name = self._target(handle_for(kind=KIND, resource_id=arn))
+        if value.get("ClusterArn") != arn or value.get("ClusterName") != name:
+            raise ManagedServiceError("live MSK cluster does not match the exact recorded incarnation")
+        self._verify_cluster_type(value)
+        return value
 
     def _find_cluster(self, name: str) -> dict[str, Any]:
         token = ""
+        seen: set[str] = set()
+        found: dict[str, Any] = {}
         while True:
             request: dict[str, Any] = {"ClusterNameFilter": name, "MaxResults": 100}
             if token:
@@ -704,10 +719,15 @@ class MSKDriver(ManagedServiceDriver):
             response = self._msk.list_clusters_v2(**request)
             for cluster in response.get("ClusterInfoList") or []:
                 if cluster.get("ClusterName") == name:
-                    return dict(cluster)
+                    if found and found.get("ClusterArn") != cluster.get("ClusterArn"):
+                        raise ManagedServiceError("MSK cluster name resolves to ambiguous incarnations")
+                    found = dict(cluster)
             token = str(response.get("NextToken") or "")
             if not token:
-                return {}
+                return found
+            if token in seen:
+                raise ManagedServiceError("MSK cluster pagination cannot be verified")
+            seen.add(token)
 
     def _await_state(self, arn: str, desired: set[str]) -> dict[str, Any]:
         last: dict[str, Any] = {}
@@ -741,17 +761,16 @@ class MSKDriver(ManagedServiceDriver):
     def _tag(self, arn: str, spec: ProvisionSpec) -> None:
         self._msk.tag_resource(ResourceArn=arn, Tags=_tag_map(spec))
 
-    def _is_managed(self, arn: str, spec: ProvisionSpec) -> bool:
-        """Platform-made is not enough: it must be this service's (#1961)."""
+    def _assert_owner(self, arn: str, identity: str) -> None:
         response = self._msk.list_tags_for_resource(ResourceArn=arn)
         tags = response.get("Tags") or {}
-        return tags.get("astrolift.io/managed-by") == "platform" and (
-            adoption_refusal(tags, spec, resource="MSK cluster") is None
-        )
+        refusal = live_ownership_refusal(tags, managed_service_id=identity, resource="MSK cluster")
+        if refusal:
+            raise ManagedServiceError(refusal)
 
     def _verify_cluster_type(self, cluster: dict[str, Any]) -> None:
         live = str(cluster.get("ClusterType") or "")
-        if live and live != self.cluster_type:
+        if live != self.cluster_type:
             raise ManagedServiceError(
                 f"live MSK cluster type {live} does not match requested {self.cluster_type}; reprovision is required",
             )
@@ -769,19 +788,30 @@ class MSKDriver(ManagedServiceDriver):
         return "plaintext"
 
     def _cluster_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            "-".join(
-                part
-                for part in (
-                    self._config.cluster_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "kafka",
-                )
-                if part
-            ),
-        )
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return self._target(spec.recorded_handle)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.cluster_name_prefix, max_length=64)
+
+    def _target(self, handle: str) -> tuple[str, str]:
+        from botocore.session import get_session
+
+        kind, arn = parse_handle(handle)
+        parts = arn.split(":", 5)
+        resource = parts[-1].split("/")
+        partition = get_session().get_partition_for_region(self._config.region)
+        if (
+            kind != KIND
+            or len(parts) != 6
+            or parts[:5] != ["arn", partition, "kafka", self._config.region, self._config.account_id]
+            or not re.fullmatch(r"[0-9]{12}", self._config.account_id)
+            or len(resource) != 3
+            or resource[0] != "cluster"
+            or re.fullmatch(r"[\w-]{1,64}", resource[1]) is None
+            or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", resource[2]) is None
+        ):
+            raise ManagedServiceError("recorded MSK ARN does not match the configured cluster target")
+        return arn, resource[1]
 
 
 class MSKProvisionedDriver(MSKDriver):
@@ -857,16 +887,6 @@ def _default_broker_count(size: str, subnet_count: int) -> int:
     return max(subnet_count, ((base + subnet_count - 1) // subnet_count) * subnet_count)
 
 
-def _name(value: str) -> str:
-    clean = "".join(char if char.isalnum() or char in "-_" else "-" for char in value)
-    while "--" in clean:
-        clean = clean.replace("--", "-")
-    clean = clean.strip("-_")
-    if not clean:
-        raise ManagedServiceError("MSK cluster name cannot be empty")
-    return clean[:64].rstrip("-_")
-
-
 def _already_exists(exc: Exception) -> bool:
     code = str(((getattr(exc, "response", {}) or {}).get("Error") or {}).get("Code") or "")
     message = str(exc).lower()
@@ -888,5 +908,9 @@ def _not_found(exc: Exception) -> bool:
 
 def _deprovision_error(handle: str, operation: str, exc: Exception) -> DeprovisionResult:
     code = str(((getattr(exc, "response", {}) or {}).get("Error") or {}).get("Code") or "")
-    retryable = code not in {"BadRequestException", "ForbiddenException", "UnauthorizedException"}
+    retryable = not isinstance(exc, ManagedServiceError) and code not in {
+        "BadRequestException",
+        "ForbiddenException",
+        "UnauthorizedException",
+    }
     return DeprovisionResult(False, handle, f"{operation}: {exc}", [code or str(exc)], retryable=retryable)
