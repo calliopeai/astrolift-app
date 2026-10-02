@@ -219,3 +219,77 @@ def test_duplicate_live_ownership_tags_refuse_force_delete_without_effect(cloud)
     assert not result.ok and result.retryable is False
     assert result.errors == ["ownership_verification_failed"]
     assert client.describe_state_machine(stateMachineArn=arn)["stateMachineArn"] == arn
+
+
+@pytest.mark.parametrize("foreign", ["published", "configured", "listed", "described"])
+def test_alias_children_cannot_escape_the_exact_recorded_machine(cloud, foreign):
+    driver, client, _ = cloud
+    first, second = _spec(), _spec(identity="22222222-2222-4222-8222-222222222222")
+    owned, other = driver.provision(first), driver.provision(second)
+    assert owned.ok and other.ok
+    own_arn, other_arn = owned.handle.partition("/")[2], other.handle.partition("/")[2]
+    writes = []
+
+    class ContaminatedAliasMetadata(NativeLifecycle):
+        def list_state_machine_aliases(self, **params):
+            return {
+                "stateMachineAliases": [
+                    {"stateMachineAliasArn": (other_arn if foreign == "listed" else own_arn) + ":LIVE"}
+                ]
+            }
+
+        def describe_state_machine_alias(self, **params):
+            return {
+                "stateMachineAliasArn": (other_arn if foreign == "described" else own_arn) + ":LIVE",
+                "description": "Astrolift managed alias: LIVE",
+                "routingConfiguration": [{"stateMachineVersionArn": own_arn + ":1", "weight": 100}],
+            }
+
+        def create_state_machine_alias(self, **params):
+            writes.append(params)
+            return self.client.create_state_machine_alias(**params)
+
+        def update_state_machine_alias(self, **params):
+            writes.append(params)
+            return self.client.update_state_machine_alias(**params)
+
+    driver._sfn = ContaminatedAliasMetadata(client)
+    cfg = {"alias": {"name": "LIVE"}}
+    if foreign == "configured":
+        cfg["alias"]["routing_configuration"] = [{"stateMachineVersionArn": other_arn + ":1", "weight": 100}]
+    with pytest.raises(ManagedServiceError, match=r"exact|belong"):
+        driver._ensure_alias(own_arn, (other_arn if foreign == "published" else own_arn) + ":1", cfg)
+    assert writes == []
+    assert client.describe_state_machine(stateMachineArn=other_arn)["name"] == driver._name(second)
+
+
+def test_force_destroy_preflights_all_execution_parents_before_any_stop(cloud):
+    driver, client, _ = cloud
+    if driver.WORKFLOW_TYPE != "STANDARD":
+        pytest.skip("Express executions cannot be listed or stopped")
+    spec = _spec()
+    created = driver.provision(spec)
+    assert created.ok
+    arn = created.handle.partition("/")[2]
+    writes = []
+
+    class ContaminatedExecutions(NativeLifecycle):
+        def list_executions(self, **params):
+            stem = arn.replace(":stateMachine:", ":execution:")
+            return {"executions": [{"executionArn": stem + ":Own"}, {"executionArn": stem + "Other:Foreign"}]}
+
+        def stop_execution(self, **params):
+            writes.append(params)
+            return self.client.stop_execution(**params)
+
+        def delete_state_machine(self, **params):
+            writes.append(params)
+            return self.client.delete_state_machine(**params)
+
+    driver._sfn = ContaminatedExecutions(client)
+    result = driver.deprovision(
+        DeprovisionSpec(handle=created.handle, managed_service_id=spec.managed_service_id), force_destroy=True
+    )
+    assert not result.ok and "exact state machine" in result.message
+    assert writes == []
+    assert client.describe_state_machine(stateMachineArn=arn)["stateMachineArn"] == arn

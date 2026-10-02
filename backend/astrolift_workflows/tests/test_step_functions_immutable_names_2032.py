@@ -188,3 +188,76 @@ def test_missing_recorded_machine_is_not_replaced_by_a_new_name(cloud):
     result = _provision_sync(row.pk)
     assert not result["ok"] and "refusing a replacement" in result["message"]
     assert cloud.api.list_state_machines()["stateMachines"] == []
+
+
+def test_saved_machine_publishes_and_reconciles_only_its_exact_alias(cloud):
+    row = new_service(cloud, "alias-owner")
+    row.config = {**row.config, "publish": True, "alias": {"name": "LIVE"}}
+    row.save(update_fields=["config"])
+    created = _provision_sync(row.pk)
+    assert created["ok"], created
+    row.backend_ref = created["handle"]
+    row.save(update_fields=["backend_ref"])
+    arn = row.backend_ref.partition("/")[2]
+    first = cloud.api.describe_state_machine_alias(stateMachineAliasArn=arn + ":LIVE")
+    assert first["routingConfiguration"][0]["stateMachineVersionArn"].startswith(arn + ":")
+    assert _update_sync(row.pk)["ok"]
+    after = cloud.api.describe_state_machine_alias(stateMachineAliasArn=arn + ":LIVE")
+    assert after["stateMachineAliasArn"] == arn + ":LIVE"
+    assert after["description"] == "Astrolift managed alias: LIVE"
+    assert (
+        after["routingConfiguration"][0]["stateMachineVersionArn"]
+        != first["routingConfiguration"][0]["stateMachineVersionArn"]
+    )
+
+
+def test_saved_config_cannot_create_an_alias_under_another_machine(cloud):
+    owner, contender = new_service(cloud, "version-owner"), new_service(cloud, "alias-contender")
+    owner.config = {**owner.config, "publish": True, "alias": {"name": "LIVE"}}
+    owner.save(update_fields=["config"])
+    existing = _provision_sync(owner.pk)
+    assert existing["ok"]
+    arn = existing["handle"].partition("/")[2]
+    original_alias = cloud.api.describe_state_machine_alias(stateMachineAliasArn=arn + ":LIVE")
+    version = original_alias["routingConfiguration"][0]["stateMachineVersionArn"]
+    contender.config = {
+        **contender.config,
+        "publish": True,
+        "alias": {
+            "name": "Foreign",
+            "routing_configuration": [{"stateMachineVersionArn": version, "weight": 100}],
+        },
+    }
+    contender.save(update_fields=["config"])
+    result = _provision_sync(contender.pk)
+    assert not result["ok"] and "version does not belong to the exact state machine" in result["message"]
+    assert len(cloud.api.list_state_machine_aliases(stateMachineArn=arn)["stateMachineAliases"]) == 1
+    assert (
+        cloud.api.describe_state_machine_alias(stateMachineAliasArn=arn + ":LIVE")["routingConfiguration"]
+        == original_alias["routingConfiguration"]
+    )
+
+
+def test_saved_force_destroy_refuses_contaminated_execution_parent_before_effects(cloud, monkeypatch):
+    if cloud.variant.endswith("express"):
+        pytest.skip("Express executions cannot be listed or stopped")
+    row = new_service(cloud, "execution-owner")
+    created = _provision_sync(row.pk)
+    assert created["ok"]
+    row.backend_ref = created["handle"]
+    row.save(update_fields=["backend_ref"])
+    arn = row.backend_ref.partition("/")[2]
+    stem = arn.replace(":stateMachine:", ":execution:")
+    monkeypatch.setattr(
+        cloud.api,
+        "list_executions",
+        lambda **_: {
+            "executions": [{"executionArn": stem + ":Own"}, {"executionArn": stem + "Other:Foreign"}]
+        },
+    )
+    calls = []
+    monkeypatch.setattr(cloud.api, "stop_execution", lambda **params: calls.append(params))
+    result = _deprovision_sync(row.pk, delete_data=True, force_destroy=True)
+    assert not result["ok"] and "execution does not belong to the exact state machine" in result["message"]
+    assert calls == []
+    assert snapshot(cloud, arn)["stateMachineArn"] == arn

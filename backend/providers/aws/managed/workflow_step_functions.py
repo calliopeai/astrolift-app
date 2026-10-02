@@ -222,7 +222,13 @@ class _StepFunctionsDriver(ManagedServiceDriver):
             try:
                 running = self._running_executions(state_machine_arn)
             except Exception as exc:
-                return DeprovisionResult(False, spec.handle, f"list running executions: {exc}", [str(exc)])
+                return DeprovisionResult(
+                    False,
+                    spec.handle,
+                    f"list running executions: {exc}",
+                    [str(exc)],
+                    retryable=not isinstance(exc, ManagedServiceError),
+                )
             if running and not force_destroy:
                 return DeprovisionResult(
                     False,
@@ -588,6 +594,7 @@ class _StepFunctionsDriver(ManagedServiceDriver):
             return
         if not published_version_arn:
             raise ManagedServiceError("alias reconciliation requires a newly published state machine version")
+        self._assert_version_parent(published_version_arn, state_machine_arn)
         name = str(alias["name"])
         routing = alias.get("routing_configuration") or [
             {"stateMachineVersionArn": published_version_arn, "weight": 100},
@@ -603,6 +610,8 @@ class _StepFunctionsDriver(ManagedServiceDriver):
             }
             for route in routing
         ]
+        for route in routing:
+            self._assert_version_parent(route.get("stateMachineVersionArn"), state_machine_arn)
         aliases = self._aliases(state_machine_arn)
         current = next(
             (item for item in aliases if _alias_name(str(item.get("stateMachineAliasArn") or "")) == name),
@@ -621,7 +630,11 @@ class _StepFunctionsDriver(ManagedServiceDriver):
             details = self._sfn.describe_state_machine_alias(
                 stateMachineAliasArn=str(current["stateMachineAliasArn"]),
             )
-            if not str(details.get("description") or "").startswith(_ALIAS_MARKER):
+            if str(details.get("stateMachineAliasArn") or "") != current["stateMachineAliasArn"]:
+                raise ManagedServiceError("live Step Functions alias does not match the exact listed parent and ARN")
+            for route in details.get("routingConfiguration") or []:
+                self._assert_version_parent(route.get("stateMachineVersionArn"), state_machine_arn)
+            if str(details.get("description") or "") != f"{_ALIAS_MARKER}: {name}":
                 raise ManagedServiceError(f"alias {name!r} exists but is not owned by Astrolift")
             self._sfn.update_state_machine_alias(
                 stateMachineAliasArn=str(current["stateMachineAliasArn"]),
@@ -636,7 +649,13 @@ class _StepFunctionsDriver(ManagedServiceDriver):
             if token:
                 request["nextToken"] = token
             response = self._sfn.list_state_machine_aliases(**request)
-            aliases.extend(response.get("stateMachineAliases", []) or [])
+            for item in response.get("stateMachineAliases", []) or []:
+                arn = str(item.get("stateMachineAliasArn") or "")
+                prefix = state_machine_arn + ":"
+                suffix = arn[len(prefix) :] if arn.startswith(prefix) else ""
+                if not 1 <= len(suffix) <= 80 or ":" in suffix or "/" in suffix or suffix.isdecimal():
+                    raise ManagedServiceError("listed Step Functions alias does not belong to the exact state machine")
+                aliases.append(item)
             token = str(response.get("nextToken") or "")
             if not token:
                 return aliases
@@ -653,10 +672,29 @@ class _StepFunctionsDriver(ManagedServiceDriver):
             if token:
                 request["nextToken"] = token
             response = self._sfn.list_executions(**request)
-            executions.extend(str(item["executionArn"]) for item in response.get("executions", []) or [])
+            prefix = _execution_resource(state_machine_arn)[:-1]
+            for item in response.get("executions", []) or []:
+                arn = str(item.get("executionArn") or "")
+                suffix = arn[len(prefix) :] if arn.startswith(prefix) else ""
+                if not 1 <= len(suffix) <= 80 or ":" in suffix or "/" in suffix:
+                    raise ManagedServiceError(
+                        "listed Step Functions execution does not belong to the exact state machine"
+                    )
+                if item.get("stateMachineArn") not in (None, state_machine_arn):
+                    raise ManagedServiceError(
+                        "listed Step Functions execution parent does not match the exact state machine"
+                    )
+                executions.append(arn)
             token = str(response.get("nextToken") or "")
             if not token:
                 return executions
+
+    @staticmethod
+    def _assert_version_parent(arn: Any, parent: str) -> None:
+        prefix = parent + ":"
+        suffix = arn[len(prefix) :] if isinstance(arn, str) and arn.startswith(prefix) else ""
+        if re.fullmatch(r"[1-9][0-9]*", suffix) is None:
+            raise ManagedServiceError("Step Functions version does not belong to the exact state machine")
 
 
 class StepFunctionsStandardDriver(_StepFunctionsDriver):
