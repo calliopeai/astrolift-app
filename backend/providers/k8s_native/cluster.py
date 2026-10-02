@@ -368,6 +368,12 @@ class K8sNativeClusterDriver(ClusterDriver):
     # ---- workload status ------------------------------------------
 
     @driver_op(cloud="k8s_native", driver="cluster")
+    def patch_workload(self, cluster: str, namespace: str, kind: str, name: str, patch: dict) -> dict:
+        if kind != "Deployment":
+            raise NotImplementedError(f"patch_workload only supports Deployment, got {kind!r}")
+        return self._k8s(cluster).merge_patch_deployment(namespace=namespace, name=name, patch=patch)
+
+    @driver_op(cloud="k8s_native", driver="cluster")
     def get_workload_status(
         self,
         cluster: str,
@@ -1177,9 +1183,9 @@ def _build_k8s_client(
         scoped to ``context``.
       * Neither — fall back to the default kubeconfig (``~/.kube/config``).
 
-    All three paths populate ``client.Configuration().default()`` /
-    pass the same auth shape; we then build an ``ApiClient`` from the
-    resolved configuration and hand it to the shared helper via
+    Each path loads a separate ``Configuration`` so concurrent cluster
+    connections cannot overwrite another target's default configuration.
+    We build an ``ApiClient`` from that resolved configuration and hand it to the shared helper via
     ``from_api_client``. The kubeconfig already carries the bearer or
     cert-based auth, so ``token_provider`` is a no-op and the shared
     helper's ``_refresh_token`` becomes inert (kubeconfig-based auth
@@ -1188,20 +1194,20 @@ def _build_k8s_client(
     """
     from kubernetes import client, config
 
+    configuration = client.Configuration()
     if in_cluster:
-        config.load_incluster_config()
+        config.load_incluster_config(client_configuration=configuration)
     elif kubeconfig_path:
         config.load_kube_config(
             config_file=kubeconfig_path,
             context=context or None,
+            client_configuration=configuration,
         )
     else:
-        config.load_kube_config(context=context or None)
-    # ``load_*_config`` writes onto the singleton default configuration
-    # (the python kubernetes client's convention). Snapshot it so
-    # callers that rebuild a fresh ApiClient with overrides don't
-    # mutate ours mid-flight.
+        config.load_kube_config(context=context or None, client_configuration=configuration)
+    # Concurrent operations on different environments must not overwrite a
+    # process-wide default between kubeconfig loading and client creation.
     api_client = client.ApiClient(
-        configuration=client.Configuration.get_default_copy(),
+        configuration=configuration,
     )
     return KubernetesDynamicClient.from_api_client(api_client=api_client)
