@@ -77,6 +77,7 @@ def spec():
         service_handle_hint="orders",
         size="small",
         config={},
+        managed_service_id="00000000-0000-4000-8000-000000000001",
     )
 
 
@@ -103,7 +104,7 @@ def test_provision_is_private_encrypted_license_included_and_idempotent():
     again = subject.provision(spec())
 
     assert result.ok and again.ok
-    assert result.handle == "mssql/astrolift-acme-api-prod-orders"
+    assert result.handle == "mssql/astrolift-00000000000040008000000000000001"
     assert len(rds.creates) == 1
     create = rds.creates[0]
     assert create["Engine"] == "sqlserver-ex"

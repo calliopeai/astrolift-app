@@ -58,6 +58,7 @@ from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
     handle_for,
+    managed_name_for,
     parse_handle,
     tags_for,
 )
@@ -564,16 +565,7 @@ class RDSMySQLDriver(ManagedServiceDriver):
         return instances[0] if instances else None
 
     def _instance_id_for(self, *, spec: ProvisionSpec) -> str:
-        return (
-            (
-                f"{self._config.instance_name_prefix}-"
-                f"{spec.organization_slug}-{spec.app_slug}-"
-                f"{spec.environment_name}-"
-                f"{spec.service_handle_hint or 'mysql'}"
-            )
-            .lower()
-            .replace("_", "-")[:60]
-        )
+        return managed_name_for(spec, kind=KIND, prefix=self._config.instance_name_prefix, max_len=60)
 
     def _secret_name_for(self, *, instance_id: str) -> str:
         return f"{self._config.secrets_manager_prefix}/{instance_id}/master"

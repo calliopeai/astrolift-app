@@ -107,6 +107,7 @@ def _spec(**overrides) -> ProvisionSpec:
         tenant_cluster_id="aws-prod",
         service_handle_hint="mysql",
         size="small",
+        managed_service_id="00000000-0000-4000-8000-000000000001",
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -495,7 +496,7 @@ def test_restore_from_snapshot_creates_new_instance(
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
 
-    restore_spec = _spec(service_handle_hint="restored")
+    restore_spec = _spec(service_handle_hint="restored", managed_service_id="00000000-0000-4000-8000-000000000002")
     result = driver.restore(snap, restore_spec)
     assert result.ok
     _, target_id = parse_handle(result.handle)
