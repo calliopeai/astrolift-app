@@ -23,7 +23,7 @@ from astrolift_workflows.tests.test_recorded_handle_exclusive_2086 import _servi
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture(params=["sns", "sns_fifo"])
+@pytest.fixture(params=["sns_standard", "sns_fifo"])
 def cloud(request, monkeypatch):
     with mock_aws():
         client = boto3.client("sns", region_name="us-west-2")
