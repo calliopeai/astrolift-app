@@ -17,7 +17,7 @@ interface MutResp {
 
 /** The short image tag (or id) a pending deploy is named by in the queue. */
 export function shortDeploymentTag(deployment: AstroliftDeployment): string {
-  return (deployment.imageTag ?? deployment.id).slice(0, 10);
+  return (deployment.imageTag || deployment.id).slice(0, 10);
 }
 
 /**
