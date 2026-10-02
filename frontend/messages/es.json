@@ -7267,5 +7267,39 @@
     "download": "Descargar registro",
     "jump": "Ir al más reciente",
     "newLines": "{count, plural, one {# nueva} other {# nuevas}}"
+  },
+  "agentRunTab": {
+    "run": "Ejecución",
+    "status": "Estado",
+    "started": "Inicio",
+    "finished": "Fin",
+    "took": "Duración",
+    "notYet": "Aún no",
+    "unknownDate": "Fecha desconocida",
+    "runningNow": "En ejecución ahora",
+    "runs": "Ejecuciones",
+    "noRuns": "Aún no hay ejecuciones",
+    "noRunsDescription": "Usa Ejecutar ahora arriba para iniciar una. Aparecerá aquí con su estado en directo.",
+    "openRun": "Abrir ejecución",
+    "watchLive": "Ver en directo",
+    "openLive": "Abrir la sesión en directo en una pestaña nueva",
+    "watchLogs": "Ver registros",
+    "sessionTitle": "Sesión del agente en directo",
+    "logsTitle": "Registros del agente en directo",
+    "search": "Buscar IDs de ejecución…",
+    "mineNote": "Por ahora, la vista «Mías» muestra todas las ejecuciones de este agente: aún no se registra quién las inició.",
+    "views": {
+      "all": "Todas",
+      "mine": "Mías",
+      "running": "En ejecución",
+      "failed": "Fallidas",
+      "queued": "En cola"
+    },
+    "terminal": {
+      "readFailed": "No se pudieron cargar los registros:",
+      "label": "Registros de ejecución del agente",
+      "waiting": "Esperando salida…",
+      "empty": "No hay salida disponible para esta ejecución."
+    }
   }
 }

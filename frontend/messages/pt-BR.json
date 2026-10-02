@@ -7264,5 +7264,39 @@
     "download": "Baixar log",
     "jump": "Ir ao mais recente",
     "newLines": "{count, plural, one {# nova} other {# novas}}"
+  },
+  "agentRunTab": {
+    "run": "Execução",
+    "status": "Status",
+    "started": "Início",
+    "finished": "Fim",
+    "took": "Duração",
+    "notYet": "Ainda não",
+    "unknownDate": "Data desconhecida",
+    "runningNow": "Em execução agora",
+    "runs": "Execuções",
+    "noRuns": "Ainda não há execuções",
+    "noRunsDescription": "Use Executar agora acima para iniciar uma. Ela aparece aqui com seu status ao vivo.",
+    "openRun": "Abrir execução",
+    "watchLive": "Ver ao vivo",
+    "openLive": "Abrir sessão ao vivo em uma nova aba",
+    "watchLogs": "Ver logs",
+    "sessionTitle": "Sessão ao vivo do agente",
+    "logsTitle": "Logs ao vivo do agente",
+    "search": "Buscar IDs de execução…",
+    "mineNote": "Por enquanto, a visualização Minhas mostra todas as execuções deste agente: ainda não é registrado quem as iniciou.",
+    "views": {
+      "all": "Todas",
+      "mine": "Minhas",
+      "running": "Em execução",
+      "failed": "Falhas",
+      "queued": "Na fila"
+    },
+    "terminal": {
+      "readFailed": "Não foi possível carregar os logs:",
+      "label": "Logs de execução do agente",
+      "waiting": "Aguardando saída…",
+      "empty": "Nenhuma saída está disponível para esta execução."
+    }
   }
 }

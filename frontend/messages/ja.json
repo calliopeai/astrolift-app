@@ -7264,5 +7264,39 @@
     "download": "ログをダウンロード",
     "jump": "最新に移動",
     "newLines": "新着 {count, number} 件"
+  },
+  "agentRunTab": {
+    "run": "実行",
+    "status": "状態",
+    "started": "開始",
+    "finished": "終了",
+    "took": "所要時間",
+    "notYet": "まだありません",
+    "unknownDate": "日付不明",
+    "runningNow": "現在実行中",
+    "runs": "実行",
+    "noRuns": "実行はまだありません",
+    "noRunsDescription": "上の「今すぐ実行」から開始してください。実行状況がここに表示されます。",
+    "openRun": "実行を開く",
+    "watchLive": "ライブ表示",
+    "openLive": "ライブセッションを新しいタブで開く",
+    "watchLogs": "ログを表示",
+    "sessionTitle": "エージェントのライブセッション",
+    "logsTitle": "エージェントのライブログ",
+    "search": "実行 ID を検索…",
+    "mineNote": "開始したユーザーはまだ記録されていないため、現在「自分の実行」にはこのエージェントのすべての実行が表示されます。",
+    "views": {
+      "all": "すべて",
+      "mine": "自分の実行",
+      "running": "実行中",
+      "failed": "失敗",
+      "queued": "キュー待機中"
+    },
+    "terminal": {
+      "readFailed": "ログを読み込めませんでした：",
+      "label": "エージェントの実行ログ",
+      "waiting": "出力を待機中…",
+      "empty": "この実行の出力は利用できません。"
+    }
   }
 }

@@ -7344,5 +7344,39 @@
     "download": "Download log",
     "jump": "Jump to latest",
     "newLines": "{count, plural, one {# new} other {# new}}"
+  },
+  "agentRunTab": {
+    "run": "Run",
+    "status": "Status",
+    "started": "Started",
+    "finished": "Finished",
+    "took": "Took",
+    "notYet": "Not yet",
+    "unknownDate": "Unknown date",
+    "runningNow": "Running now",
+    "runs": "Runs",
+    "noRuns": "No runs yet",
+    "noRunsDescription": "Use Run now above to start one. It shows here with a live status.",
+    "openRun": "Open run",
+    "watchLive": "Watch live",
+    "openLive": "Open live session in a new tab",
+    "watchLogs": "Watch logs",
+    "sessionTitle": "Live agent session",
+    "logsTitle": "Live agent logs",
+    "search": "Search run ids…",
+    "mineNote": "Mine shows every run of this agent for now: a run does not record who started it yet.",
+    "views": {
+      "all": "All",
+      "mine": "Mine",
+      "running": "Running",
+      "failed": "Failed",
+      "queued": "Queued"
+    },
+    "terminal": {
+      "readFailed": "Couldn’t load logs:",
+      "label": "Agent run logs",
+      "waiting": "Waiting for output…",
+      "empty": "No output is available for this run."
+    }
   }
 }
