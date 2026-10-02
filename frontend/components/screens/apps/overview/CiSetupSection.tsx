@@ -4,13 +4,10 @@ import {
   CheckIcon,
   ChevronDownIcon,
   CopyIcon,
-  DownloadIcon,
   ExternalLinkIcon,
   FileCheck2Icon,
-  GitPullRequestIcon,
   KeyIcon,
   Loader2Icon,
-  RefreshCwIcon,
   ShieldCheckIcon,
   TerminalIcon,
   UploadCloudIcon,
@@ -30,12 +27,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { AstroliftCiWorkflowSyncStatus } from "@/graphql/__generated__/schema";
 
 import {
-  DRIFT_BADGE,
-  DRIFT_HINT,
   formatRelativeWebhookInstall,
   renderWorkflowYaml,
   resolveProviderCiMeta,
 } from "./ci-setup-meta";
+import { WorkflowSyncStatusControl } from "./WorkflowSyncStatusControl";
 import type { CiSetupData, usePushAndRotate } from "./use-ci-setup";
 
 /**
@@ -313,168 +309,6 @@ export function CiSetupSectionView({
         />
       </Can>
     </Section>
-  );
-}
-
-function WorkflowSyncStatusControl({
-  status,
-  pushing,
-  pulling,
-  refreshing,
-  reconciling,
-  onRefresh,
-  onPush,
-  onReconcile,
-  onPull,
-}: { status: AstroliftCiWorkflowSyncStatus } & CiSetupData["workflowSync"]) {
-  const [confirmPullOpen, setConfirmPullOpen] = React.useState(false);
-  const [comparing, setComparing] = React.useState(false);
-
-  const badge = DRIFT_BADGE[status.state] ?? DRIFT_BADGE.unknown;
-  const hint = DRIFT_HINT[status.state] ?? DRIFT_HINT.unknown;
-  const busy = pushing || pulling || refreshing || reconciling;
-  // A reconcile PR only makes sense for a drifted (hand-edited) file.
-  const canReconcile = status.state === "repo_drift" || status.state === "conflict";
-
-  async function handlePull() {
-    await onPull();
-    setComparing(true);
-  }
-
-  return (
-    <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium">Managed workflow sync</p>
-            <span
-              className={
-                "text-2xs inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium " +
-                badge.className
-              }
-            >
-              {badge.label}
-            </span>
-            {status.syncedTemplateVersion != null &&
-            status.syncedTemplateVersion !== status.currentTemplateVersion ? (
-              <span className="text-muted-foreground text-2xs">
-                template v{status.syncedTemplateVersion} → v{status.currentTemplateVersion}
-              </span>
-            ) : null}
-          </div>
-          <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>
-          {status.checkedAt ? (
-            <p className="text-muted-foreground text-2xs mt-0.5">
-              last checked {formatRelativeWebhookInstall(status.checkedAt)}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      <Can permission="app.update">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onRefresh}
-            disabled={busy}
-            className="gap-1.5"
-          >
-            {refreshing ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCwIcon className="size-3.5" />
-            )}
-            Check
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setConfirmPullOpen(true)}
-            disabled={busy}
-            className="gap-1.5"
-          >
-            {pulling ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <DownloadIcon className="size-3.5" />
-            )}
-            Pull from repo
-          </Button>
-          <Button size="sm" variant="outline" onClick={onPush} disabled={busy} className="gap-1.5">
-            {pushing ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <UploadCloudIcon className="size-3.5" />
-            )}
-            Push to repo
-          </Button>
-          {canReconcile ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onReconcile}
-              disabled={busy}
-              className="gap-1.5"
-            >
-              {reconciling ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <GitPullRequestIcon className="size-3.5" />
-              )}
-              Open reconcile PR
-            </Button>
-          ) : null}
-        </div>
-      </Can>
-
-      {status.repoText && status.renderedText && status.repoText !== status.renderedText ? (
-        <div className="border-border rounded-md border">
-          <button
-            type="button"
-            onClick={() => setComparing((v) => !v)}
-            className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs"
-          >
-            <span>
-              Compare the repo&apos;s file with what a push would send
-              {status.repoTextPulledAt
-                ? ` (pulled ${formatRelativeWebhookInstall(status.repoTextPulledAt)})`
-                : ""}
-            </span>
-            <span aria-hidden>{comparing ? "−" : "+"}</span>
-          </button>
-          {comparing ? (
-            <div className="grid gap-3 border-t p-3 md:grid-cols-2">
-              <div className="min-w-0">
-                <p className="text-muted-foreground text-2xs mb-1 font-medium uppercase">
-                  In the repo
-                </p>
-                <pre className="bg-muted/40 max-h-72 overflow-auto rounded-sm p-2 text-xs leading-relaxed">
-                  {status.repoText}
-                </pre>
-              </div>
-              <div className="min-w-0">
-                <p className="text-muted-foreground text-2xs mb-1 font-medium uppercase">
-                  What a push would send
-                </p>
-                <pre className="bg-muted/40 max-h-72 overflow-auto rounded-sm p-2 text-xs leading-relaxed">
-                  {status.renderedText}
-                </pre>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      <ConfirmDialog
-        open={confirmPullOpen}
-        onOpenChange={setConfirmPullOpen}
-        title="Pull the repo's workflow file?"
-        description="Astrolift reads the file from the deploy branch, stores it, and treats it as the baseline, so it stops being reported as changed. Nothing is written to the repo."
-        confirmLabel="Pull from repo"
-        onConfirm={handlePull}
-      />
-    </div>
   );
 }
 

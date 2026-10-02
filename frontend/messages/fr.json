@@ -2644,6 +2644,67 @@
           "connect": "Connectez une GitHub App ou une connexion de l’organisation pour activer le déploiement automatique",
           "attention": "Certaines étapes de la configuration automatique nécessitent encore votre attention"
         }
+      },
+      "ciWorkflow": {
+        "title": "Synchronisation du workflow géré",
+        "templateVersions": "modèle v{previous} → v{current}",
+        "lastChecked": "dernière vérification : {relative}",
+        "check": "Vérifier",
+        "pull": "Importer depuis le dépôt",
+        "push": "Envoyer au dépôt",
+        "reconcile": "Ouvrir une PR de réconciliation",
+        "compare": "Comparer le fichier du dépôt à ce qui serait envoyé",
+        "comparePulled": "Comparer le fichier du dépôt à ce qui serait envoyé (importé {relative})",
+        "repoVersion": "Dans le dépôt",
+        "pushVersion": "Ce qui serait envoyé",
+        "pullTitle": "Importer le fichier du workflow depuis le dépôt ?",
+        "pullDescription": "Astrolift lit le fichier de la branche de déploiement, le conserve et l’adopte comme référence afin de ne plus le signaler comme modifié. Rien n’est écrit dans le dépôt.",
+        "viewPr": "Voir la PR",
+        "states": {
+          "in_sync": {
+            "label": "identique",
+            "hint": "Le fichier du workflow dans le dépôt correspond au rendu de la plateforme. Aucune action nécessaire."
+          },
+          "template_stale": {
+            "label": "modèle ancien",
+            "hint": "Le fichier du dépôt n’a pas été modifié, mais la plateforme produit un modèle plus récent. Envoyez-le pour mettre le fichier à jour."
+          },
+          "repo_drift": {
+            "label": "modifié dans le dépôt",
+            "hint": "Quelqu’un a modifié le fichier du dépôt. Importez-le pour conserver cette version ou envoyez le modèle pour la remplacer via une PR."
+          },
+          "conflict": {
+            "label": "les deux ont changé",
+            "hint": "Le fichier du dépôt et le modèle ont changé. Importez la version du dépôt pour la conserver ou envoyez le modèle pour la remplacer via une PR."
+          },
+          "absent": {
+            "label": "absent du dépôt",
+            "hint": "Aucun fichier du workflow sur la branche de déploiement. Envoyez-le pour le créer."
+          },
+          "unknown": {
+            "label": "inconnu",
+            "hint": "Le dépôt n’a pas pu être lu lors de la dernière vérification. Vérifiez à nouveau pour réessayer."
+          }
+        },
+        "relative": {
+          "justNow": "à l’instant",
+          "minutes": "il y a {count} min",
+          "hours": "il y a {count} h",
+          "days": "il y a {count} j",
+          "months": "il y a {count} mois",
+          "years": "il y a {count, plural, one {# an} other {# ans}}"
+        },
+        "feedback": {
+          "refreshFailed": "Impossible de recalculer les écarts.",
+          "pushFailed": "Impossible d’envoyer le fichier du workflow.",
+          "reconcileFailed": "Impossible d’ouvrir la PR de réconciliation.",
+          "pullFailed": "Impossible d’importer le fichier du dépôt.",
+          "pushed": "Le modèle actuel a été envoyé au dépôt.",
+          "pushPr": "Une PR a été ouverte au lieu d’écraser le fichier du dépôt.",
+          "reconciled": "Une PR de réconciliation a été ouverte pour remplacer le fichier modifié par le modèle.",
+          "pulled": "Le fichier du workflow a été importé depuis le dépôt. Il sert désormais de référence.",
+          "refreshed": "Écarts vérifiés à nouveau : {state}."
+        }
       }
     },
     "frame": {

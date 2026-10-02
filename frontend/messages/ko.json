@@ -2644,6 +2644,67 @@
           "connect": "GitHub App 또는 조직 연결을 연결하여 자동 배포를 설정하세요",
           "attention": "일부 자동 설정 단계를 아직 확인해야 합니다"
         }
+      },
+      "ciWorkflow": {
+        "title": "관리형 워크플로 동기화",
+        "templateVersions": "템플릿 v{previous} → v{current}",
+        "lastChecked": "마지막 확인: {relative}",
+        "check": "확인",
+        "pull": "저장소에서 가져오기",
+        "push": "저장소로 보내기",
+        "reconcile": "조정 PR 열기",
+        "compare": "저장소 파일과 보낼 내용을 비교",
+        "comparePulled": "저장소 파일과 보낼 내용을 비교(가져온 시점: {relative})",
+        "repoVersion": "저장소의 내용",
+        "pushVersion": "보낼 내용",
+        "pullTitle": "저장소의 워크플로 파일을 가져올까요?",
+        "pullDescription": "Astrolift가 배포 브랜치의 파일을 읽고 저장하여 기준으로 사용합니다. 그러면 변경된 파일로 표시되지 않습니다. 저장소에는 아무것도 쓰지 않습니다.",
+        "viewPr": "PR 보기",
+        "states": {
+          "in_sync": {
+            "label": "일치",
+            "hint": "저장소의 워크플로 파일이 플랫폼에서 생성하는 내용과 일치합니다. 필요한 작업이 없습니다."
+          },
+          "template_stale": {
+            "label": "템플릿이 오래됨",
+            "hint": "저장소 파일은 변경되지 않았지만 플랫폼에서 더 새로운 템플릿을 생성합니다. 보내서 업데이트하세요."
+          },
+          "repo_drift": {
+            "label": "저장소에서 편집됨",
+            "hint": "저장소 파일이 편집되었습니다. 그 버전을 유지하려면 가져오고, 템플릿으로 바꾸려면 PR을 통해 보내세요."
+          },
+          "conflict": {
+            "label": "둘 다 변경됨",
+            "hint": "저장소 파일과 템플릿이 모두 변경되었습니다. 저장소 버전을 가져와 유지하거나 PR을 통해 템플릿으로 바꾸세요."
+          },
+          "absent": {
+            "label": "저장소에 없음",
+            "hint": "배포 브랜치에 워크플로 파일이 없습니다. 보내서 생성하세요."
+          },
+          "unknown": {
+            "label": "알 수 없음",
+            "hint": "마지막 확인에서 저장소를 읽을 수 없었습니다. 다시 확인하세요."
+          }
+        },
+        "relative": {
+          "justNow": "방금 전",
+          "minutes": "{count}분 전",
+          "hours": "{count}시간 전",
+          "days": "{count}일 전",
+          "months": "{count}개월 전",
+          "years": "{count}년 전"
+        },
+        "feedback": {
+          "refreshFailed": "차이를 다시 계산할 수 없습니다.",
+          "pushFailed": "워크플로 파일을 보낼 수 없습니다.",
+          "reconcileFailed": "조정 PR을 열 수 없습니다.",
+          "pullFailed": "저장소 파일을 가져올 수 없습니다.",
+          "pushed": "현재 템플릿을 저장소로 보냈습니다.",
+          "pushPr": "저장소 파일을 덮어쓰는 대신 PR을 열었습니다.",
+          "reconciled": "변경된 파일을 템플릿으로 바꾸는 조정 PR을 열었습니다.",
+          "pulled": "저장소의 워크플로 파일을 가져왔습니다. 이제 이 파일이 기준입니다.",
+          "refreshed": "차이를 다시 확인했습니다: {state}."
+        }
       }
     },
     "frame": {

@@ -2644,6 +2644,67 @@
           "connect": "请连接 GitHub App 或组织连接，以配置自动部署",
           "attention": "部分自动配置步骤仍需处理"
         }
+      },
+      "ciWorkflow": {
+        "title": "托管工作流同步",
+        "templateVersions": "模板 v{previous} → v{current}",
+        "lastChecked": "上次检查：{relative}",
+        "check": "检查",
+        "pull": "从仓库拉取",
+        "push": "推送到仓库",
+        "reconcile": "打开协调 PR",
+        "compare": "比较仓库文件与将要推送的内容",
+        "comparePulled": "比较仓库文件与将要推送的内容（拉取时间：{relative}）",
+        "repoVersion": "仓库中的内容",
+        "pushVersion": "将要推送的内容",
+        "pullTitle": "拉取仓库的工作流文件？",
+        "pullDescription": "Astrolift 会读取部署分支上的文件，将其保存并作为基准，从而不再将其标记为已修改。不会向仓库写入任何内容。",
+        "viewPr": "查看 PR",
+        "states": {
+          "in_sync": {
+            "label": "一致",
+            "hint": "仓库的工作流文件与平台生成的内容一致。无需操作。"
+          },
+          "template_stale": {
+            "label": "模板过时",
+            "hint": "仓库文件未被修改，但平台生成了更新的模板。请推送以更新文件。"
+          },
+          "repo_drift": {
+            "label": "已在仓库中编辑",
+            "hint": "仓库文件已被编辑。拉取以保留该版本，或通过 PR 推送模板以替换它。"
+          },
+          "conflict": {
+            "label": "两者都已修改",
+            "hint": "仓库文件和模板都已修改。拉取以保留仓库版本，或通过 PR 推送模板以替换它。"
+          },
+          "absent": {
+            "label": "仓库中不存在",
+            "hint": "部署分支上没有工作流文件。请推送以创建。"
+          },
+          "unknown": {
+            "label": "未知",
+            "hint": "上次检查时无法读取仓库。请再次检查以重试。"
+          }
+        },
+        "relative": {
+          "justNow": "刚刚",
+          "minutes": "{count} 分钟前",
+          "hours": "{count} 小时前",
+          "days": "{count} 天前",
+          "months": "{count} 个月前",
+          "years": "{count} 年前"
+        },
+        "feedback": {
+          "refreshFailed": "无法重新计算差异。",
+          "pushFailed": "无法推送工作流文件。",
+          "reconcileFailed": "无法打开协调 PR。",
+          "pullFailed": "无法拉取仓库文件。",
+          "pushed": "已将当前模板推送到仓库。",
+          "pushPr": "已打开 PR，而没有覆盖仓库文件。",
+          "reconciled": "已打开协调 PR，用模板替换修改过的文件。",
+          "pulled": "已拉取仓库的工作流文件。该文件现在是基准。",
+          "refreshed": "已重新检查差异：{state}。"
+        }
       }
     },
     "frame": {
