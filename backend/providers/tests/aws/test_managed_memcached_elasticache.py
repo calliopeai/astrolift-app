@@ -41,6 +41,12 @@ class FakeElastiCache:
             "ARN": f"arn:aws:elasticache:us-west-2:123456789012:cluster:{name}",
         }
 
+    def list_tags_for_resource(self, **kwargs):
+        for cluster in self.clusters.values():
+            if cluster["ARN"] == kwargs["ResourceName"]:
+                return {"TagList": cluster.get("Tags", [])}
+        return {"TagList": []}
+
     def modify_cache_cluster(self, **kwargs):
         self.calls.append(("ModifyCacheCluster", kwargs))
         self.clusters[kwargs["CacheClusterId"]].update(kwargs)
@@ -52,6 +58,7 @@ class FakeElastiCache:
 
 def spec(**config: Any) -> ProvisionSpec:
     return ProvisionSpec(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="org",
         organization_slug="acme",
         app_id="app",
@@ -131,3 +138,26 @@ def test_current_botocore_accepts_memcached_request_shapes():
     service = Session().get_service_model("elasticache")
     for operation, request in ec.calls:
         validate_parameters(request, service.operation_model(operation).input_shape)
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        [],
+        [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/managed_service_id", "Value": "8b7e2c6b-0b93-4126-a121-abc123456780"},
+        ],
+    ],
+)
+def test_recorded_memcached_locator_never_authorizes_an_unowned_cluster(tags):
+    import dataclasses
+
+    subject, ec = driver()
+    original = subject.provision(spec())
+    name = original.handle.partition("/")[2]
+    ec.clusters[name]["Tags"] = tags
+    calls = list(ec.calls)
+    result = subject.provision(dataclasses.replace(spec(num_cache_nodes=4), recorded_handle=original.handle))
+    assert not result.ok and result.handle == original.handle
+    assert ec.calls == calls and ec.clusters[name]["Tags"] == tags

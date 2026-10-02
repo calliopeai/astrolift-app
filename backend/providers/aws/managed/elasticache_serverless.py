@@ -26,7 +26,15 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    live_ownership_refusal,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 _ENGINES = {"valkey", "redis", "memcached"}
@@ -445,7 +453,8 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
             return ""
         user_id = self._user_id(name)
         user_name = str(cfg.get("user_name") or ("default" if self._config.engine == "redis" else "astrolift"))
-        if self._describe_user(user_id) is None:
+        existing_user = self._describe_user(user_id)
+        if existing_user is None:
             authentication: dict[str, Any] = {"Type": mode}
             if mode == "password":
                 authentication["Passwords"] = [self._ensure_password_secret(name, spec)]
@@ -457,15 +466,31 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
                 AuthenticationMode=authentication,
                 Tags=tags_for(spec),
             )
+        else:
+            self._verify_access_owner(existing_user, spec)
         group_id = self._group_id(name)
-        if self._describe_group(group_id) is None:
+        existing_group = self._describe_group(group_id)
+        if existing_group is None:
             self._ec.create_user_group(
                 UserGroupId=group_id,
                 Engine=self._config.engine,
                 UserIds=[user_id],
                 Tags=tags_for(spec),
             )
+        else:
+            self._verify_access_owner(existing_group, spec)
+            if list(existing_group.get("UserIds") or []) != [user_id]:
+                raise ManagedServiceError("existing ElastiCache group has a different user membership")
         return group_id
+
+    def _verify_access_owner(self, resource: dict[str, Any], spec: ProvisionSpec) -> None:
+        refusal = live_ownership_refusal(
+            self._existing_tags(resource),
+            managed_service_id=spec.managed_service_id,
+            resource="ElastiCache access resource",
+        )
+        if refusal:
+            raise ManagedServiceError(refusal)
 
     def _cleanup_access(self, name: str, cfg: dict[str, Any]) -> bool:
         if self._config.engine == "memcached" or self._auth_mode(cfg) in ("none", "external"):
@@ -538,13 +563,8 @@ class ElastiCacheServerlessDriver(ManagedServiceDriver):
                 raise
 
     def _cache_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            self._config.cache_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "cache",
-        )
+        # Generated user/group prefixes must preserve the entire service identity.
+        return managed_name_for(spec, kind=self.kind, prefix=self._config.cache_name_prefix, max_len=38)
 
     @staticmethod
     def _user_id(name: str) -> str:
