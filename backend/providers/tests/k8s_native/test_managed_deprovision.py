@@ -82,6 +82,9 @@ class FakeClusterDriver:
         self._delete_errors = delete_errors or []
         self._apply_errors = apply_errors or []
 
+    def get_manifest(self, cluster, namespace, kind, name):
+        return None
+
     def apply_manifests(
         self,
         cluster: str,
@@ -89,8 +92,9 @@ class FakeClusterDriver:
         manifests: list[dict[str, Any]],
         *,
         dry_run: bool = False,
+        create_only: bool = False,
     ) -> ApplyResult:
-        del dry_run
+        del dry_run, create_only
         self.apply_calls.append(
             _DeleteCall(
                 cluster=cluster,
@@ -127,6 +131,7 @@ class FakeClusterDriver:
 
 def _spec(**overrides: Any) -> ProvisionSpec:
     base = dict(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="org-1",
         organization_slug="acme",
         app_id="app-1",
@@ -159,7 +164,7 @@ def test_cnpg_deprovision_deletes_cluster_cr_at_correct_ns() -> None:
     cr = call.manifests[0]
     assert cr["apiVersion"] == "postgresql.cnpg.io/v1"
     assert cr["kind"] == "Cluster"
-    assert cr["metadata"]["name"] == "api-prod"
+    assert cr["metadata"]["name"] == "pg-" + _spec().managed_service_id.replace("-", "")
     assert cr["metadata"]["namespace"] == "acme-api"
 
 
