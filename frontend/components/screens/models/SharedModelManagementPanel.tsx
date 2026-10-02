@@ -73,14 +73,28 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
     model.clusterId,
     model.providerId,
     model.status,
+    manageable,
+  ]);
+  const updateScopeKey = JSON.stringify([
+    scopeKey,
     requestKey,
     admission,
     props.admissionLoading,
     props.admissionError,
-    manageable,
   ]);
-  const [scope, setScope] = useState({ key: scopeKey, revision: 0 });
-  if (scope.key !== scopeKey) setScope({ key: scopeKey, revision: scope.revision + 1 });
+  const [scope, setScope] = useState({
+    key: scopeKey,
+    revision: 0,
+    updateKey: updateScopeKey,
+    updateRevision: 0,
+  });
+  if (scope.key !== scopeKey || scope.updateKey !== updateScopeKey)
+    setScope({
+      key: scopeKey,
+      revision: scope.revision + Number(scope.key !== scopeKey),
+      updateKey: updateScopeKey,
+      updateRevision: scope.updateRevision + Number(scope.updateKey !== updateScopeKey),
+    });
   const [review, setReview] = useState<Review | null>(null),
     [failure, setFailure] = useState<string | null>(null),
     [accepted, setAccepted] = useState<{ kind: "update" | "delete"; operationId: string } | null>(
@@ -94,9 +108,9 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
   const awaitingOperation = !!accepted && !observedOperation;
   const mounted = useRef(true),
     lifecycle = useRef(0),
-    latest = useRef({ revision: scope.revision, props });
+    latest = useRef({ revision: scope.revision, updateRevision: scope.updateRevision, props });
   useLayoutEffect(() => {
-    latest.current = { revision: scope.revision, props };
+    latest.current = { revision: scope.revision, updateRevision: scope.updateRevision, props };
   });
   useLayoutEffect(() => {
     mounted.current = true;
@@ -107,7 +121,7 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
   }, []);
   const reviewCurrent =
     !!review &&
-    review.revision === scope.revision &&
+    review.revision === (review.kind === "update" ? scope.updateRevision : scope.revision) &&
     manageable &&
     (review.kind === "delete" || updatable);
   async function confirm() {
@@ -126,7 +140,8 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
       if (
         !mounted.current ||
         lifecycle.current !== epoch ||
-        latest.current.revision !== candidate.revision
+        (candidate.kind === "update" ? latest.current.updateRevision : latest.current.revision) !==
+          candidate.revision
       )
         return false;
       if (!result.accepted) {
@@ -148,7 +163,8 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
       if (
         mounted.current &&
         lifecycle.current === epoch &&
-        latest.current.revision === candidate.revision
+        (candidate.kind === "update" ? latest.current.updateRevision : latest.current.revision) ===
+          candidate.revision
       )
         setFailure(t("failed"));
       return false;
@@ -184,7 +200,7 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
           setAccepted(null);
           setReview({
             kind: "update",
-            revision: scope.revision,
+            revision: scope.updateRevision,
             input: {
               organizationId: model.organizationId,
               id: model.id,

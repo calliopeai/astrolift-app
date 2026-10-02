@@ -352,6 +352,69 @@ describe("real shared model management boundary", () => {
       },
     });
   });
+  it.each(["accepted", "refused"])(
+    "preserves an actual %s deletion reply when resource admission finishes during delivery",
+    async (outcome) => {
+      let finishAdmission: (() => void) | undefined;
+      let finishDeletion: (() => void) | undefined;
+      transport = async (request) => {
+        if (request.operationName === "GetClusterModelRuntimeAdmission")
+          return new Promise<Response>((resolve) => {
+            finishAdmission = () => resolve(fixture(request));
+          });
+        if (request.operationName === "DeprovisionClusterModel")
+          return new Promise<Response>((resolve) => {
+            finishDeletion = () =>
+              resolve(
+                outcome === "accepted"
+                  ? fixture(request)
+                  : response({
+                      deprovisionClusterModel: {
+                        ok: false,
+                        data: null,
+                        errors: [{ code: "CONFLICT", message: "Subscriptions remain active." }],
+                      },
+                    })
+              );
+          });
+        return fixture(request);
+      };
+      const refresh = vi.fn();
+      render(client(model, refresh), { wrapper: wrapper() });
+      await waitFor(() => {
+        expect(finishAdmission).toBeDefined();
+        expect(
+          screen.getByRole("button", { name: en.models.shared.management.reviewDelete })
+        ).toBeEnabled();
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: en.models.shared.management.reviewDelete })
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: en.models.shared.management.confirmDelete })
+      );
+      await waitFor(() => expect(finishDeletion).toBeDefined());
+      await act(async () => finishAdmission!());
+      await waitFor(() =>
+        expect(screen.queryByText(en.models.shared.placement.verifying)).not.toBeInTheDocument()
+      );
+      await act(async () => finishDeletion!());
+      if (outcome === "accepted") {
+        expect(
+          await screen.findByText(en.models.shared.management.acceptedDelete)
+        ).toBeInTheDocument();
+        expect(refresh).toHaveBeenCalledTimes(1);
+      } else {
+        expect(
+          await screen.findByText("CONFLICT: Subscriptions remain active.")
+        ).toBeInTheDocument();
+        expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+        expect(refresh).not.toHaveBeenCalled();
+      }
+      expect(screen.queryByText(en.models.shared.management.changed)).not.toBeInTheDocument();
+      expect(writes()).toHaveLength(1);
+    }
+  );
   it("shows exact pending-subscription deletion refusal without claiming removal", async () => {
     transport = async (request) =>
       request.operationName === "DeprovisionClusterModel"
@@ -505,6 +568,36 @@ describe("real shared model management boundary", () => {
     expect(writes()).toHaveLength(1);
     expect(
       screen.getByRole("button", { name: en.models.shared.management.confirmUpdate })
+    ).toBeDisabled();
+  });
+  it("does not revive a late deletion after the target version changes away and back", async () => {
+    let release!: (value: Response) => void;
+    transport = async (request) =>
+      request.operationName === "DeprovisionClusterModel"
+        ? new Promise<Response>((resolve) => {
+            release = resolve;
+          })
+        : fixture(request);
+    const refresh = vi.fn(),
+      { rerender } = render(client(model, refresh), { wrapper: wrapper() });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: en.models.shared.management.reviewDelete })
+      ).toBeEnabled()
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.models.shared.management.reviewDelete }));
+    fireEvent.click(
+      screen.getByRole("button", { name: en.models.shared.management.confirmDelete })
+    );
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    rerender(client({ ...model, version: 6 }, refresh));
+    rerender(client(model, refresh));
+    await act(async () => release(fixture(writes()[0])));
+    expect(screen.queryByText(en.models.shared.management.acceptedDelete)).not.toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(writes()).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: en.models.shared.management.confirmDelete })
     ).toBeDisabled();
   });
   it("keeps pending operations unavailable for further management", async () => {

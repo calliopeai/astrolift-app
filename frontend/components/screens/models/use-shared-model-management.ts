@@ -124,19 +124,33 @@ export function useSharedModelManagement(
     canManage,
     capabilities.loading,
     capabilities.error?.message,
+  ]);
+  const updateScopeKey = JSON.stringify([
+    scopeKey,
     requestKey,
     admission.loading,
     admission.error?.message,
     admission.data,
   ]);
-  const [scope, setScope] = useState({ key: scopeKey, revision: 0 });
-  if (scope.key !== scopeKey) setScope({ key: scopeKey, revision: scope.revision + 1 });
-  const latest = useRef({ key: scopeKey, revision: scope.revision }),
+  const [scope, setScope] = useState({
+    key: scopeKey,
+    revision: 0,
+    updateKey: updateScopeKey,
+    updateRevision: 0,
+  });
+  if (scope.key !== scopeKey || scope.updateKey !== updateScopeKey)
+    setScope({
+      key: scopeKey,
+      revision: scope.revision + Number(scope.key !== scopeKey),
+      updateKey: updateScopeKey,
+      updateRevision: scope.updateRevision + Number(scope.updateKey !== updateScopeKey),
+    });
+  const latest = useRef({ ...scope }),
     mounted = useRef(true),
     lifecycle = useRef(0),
     busy = useRef(false);
   useLayoutEffect(() => {
-    latest.current = { key: scopeKey, revision: scope.revision };
+    latest.current = { ...scope };
   });
   useLayoutEffect(() => {
     mounted.current = true;
@@ -157,13 +171,14 @@ export function useSharedModelManagement(
     input: UpdateClusterModelInput | DeprovisionClusterModelInput
   ): Promise<ManagementResult> {
     const epoch = lifecycle.current,
-      revision = scope.revision,
-      isUpdate = "cpuRequest" in input;
+      isUpdate = "cpuRequest" in input,
+      revision = isUpdate ? scope.updateRevision : scope.revision;
     const current = () =>
       mounted.current &&
       lifecycle.current === epoch &&
-      latest.current.key === scopeKey &&
-      latest.current.revision === revision;
+      (isUpdate ? latest.current.updateKey : latest.current.key) ===
+        (isUpdate ? updateScopeKey : scopeKey) &&
+      (isUpdate ? latest.current.updateRevision : latest.current.revision) === revision;
     if (
       !current() ||
       busy.current ||
