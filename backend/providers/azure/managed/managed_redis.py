@@ -46,6 +46,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from azure._managed_identities import unlisted_identity
 from azure.managed.tags import arm_tags_for as tags_for
 
@@ -972,21 +973,23 @@ class AzureManagedRedisDriver(ManagedServiceDriver):
                     raise AzureManagedRedisError(f"delete Key Vault secret {name!r}: {exc}") from exc
 
     def _cluster_name_for(self, spec: ProvisionSpec) -> str:
-        base = "-".join(
-            part
-            for part in (
-                self._config.cluster_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "redis",
-            )
-            if part
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            cluster_name, database_name = self._parse_handle(spec.recorded_handle)
+            recorded_resource_name(f"{KIND}/{database_name}", kind=KIND)
+            recorded = recorded_resource_name(f"{KIND}/{cluster_name}", kind=KIND)
+            if recorded is None:
+                raise AzureManagedRedisError("recorded Azure Managed Redis cluster is missing")
+            return recorded
+        return physical_name(
+            spec.managed_service_id,
+            prefix=self._config.cluster_name_prefix,
+            max_length=60,
         )
-        entropy = spec.managed_service_id or spec.app_id or spec.environment_id or base
-        return _unique_name(base, 60, entropy=entropy)
 
     def _database_name_for(self, spec: ProvisionSpec) -> str:
+        if spec.recorded_handle:
+            return self._parse_handle(spec.recorded_handle)[1]
         raw = str((spec.config or {}).get("database_name") or self._config.database_name)
         return _safe_name(raw, 60)
 
@@ -1046,13 +1049,6 @@ def _safe_name(value: str, max_length: int) -> str:
     if not clean:
         raise AzureManagedRedisError("Azure Managed Redis name cannot be empty")
     return clean[:max_length].rstrip("-")
-
-
-def _unique_name(value: str, max_length: int, *, entropy: str) -> str:
-    clean = _safe_name(value.lower(), max_length)
-    digest = hashlib.sha256(entropy.encode()).hexdigest()[:10]
-    prefix = clean[: max_length - len(digest) - 1].rstrip("-")
-    return f"{prefix}-{digest}"
 
 
 def _keyvault_secret_name(value: str, *, suffix: str) -> str:
