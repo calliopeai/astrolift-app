@@ -61,6 +61,8 @@ _factory = RequestFactory()
 
 
 def _post(view, org_slug, body=b"{}", **headers):
+    if view is pipeline_github_webhook:
+        headers.setdefault("HTTP_X_GITHUB_DELIVERY", "disposable-security-proof")
     request = _factory.post(
         f"/webhooks/pipelines/{org_slug}/",
         data=body,
@@ -133,7 +135,7 @@ def _sample(name: str, **labels) -> float:
 # ---------------------------------------------------------------------------
 
 
-def test_a_repeated_delivery_id_is_rejected(org):
+def test_a_repeated_filtered_delivery_remains_safe_without_ephemeral_acknowledgement(org):
     """The control that did not exist: without it, one captured delivery
     re-triggers a pipeline as often as it is replayed."""
     body = _push_body()
@@ -149,7 +151,7 @@ def test_a_repeated_delivery_id_is_rejected(org):
     # 200, not 4xx: the delivery really was processed, and a non-2xx would
     # make GitHub retry it forever.
     assert second.status_code == 200
-    assert json.loads(second.content)["status"] == "duplicate"
+    assert json.loads(second.content)["status"] == "ok"
 
 
 def test_a_delivery_without_an_id_is_not_deduplicated(org):

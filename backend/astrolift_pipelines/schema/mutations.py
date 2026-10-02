@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import strawberry
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
-from astrolift_pipelines.cancellation import cancel_pipeline_run as cascade_cancel
+from astrolift_identity.step_up import requires_elevation
 from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
+from astrolift_pipelines.run_contracts import (
+    PipelineContractError,
+    dispatch_pipeline_run,
+    request_pipeline_cancellation,
+    reserve_pipeline_run,
+)
 from astrolift_pipelines.schema.types import (
     PipelineRunType,
     PipelineSecretChangeType,
@@ -28,7 +34,6 @@ from astrolift_pipelines.scopes import (
     pipeline_run_app_scope,
     pipeline_secret_scope,
 )
-from astrolift_workflows.client import start_workflow
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, PermissionDenied, require_permission
@@ -73,6 +78,15 @@ class SetPipelineSecretInput:
 class DeletePipelineSecretInput:
     pipeline_id: GUID
     name: str
+
+
+@strawberry.input
+class StartPipelineRunInput:
+    pipeline_id: GUID
+    expected_version: int
+    request_id: str
+    ref: str | None = None
+    confirmed: bool = False
 
 
 _SECRET_WRITE_PERMISSIONS = (Permission.PIPELINE_SECRET_MANAGE, Permission.SECRET_WRITE)
@@ -124,6 +138,37 @@ def _change_secret(info, input, *, delete=False):
 # ---------------------------------------------------------------------------
 
 _VALID_TRIGGER_KINDS = {k.value for k in Trigger.Kind}
+
+
+def _start_pipeline(info, input):
+    user = info.context.get("user") if isinstance(info.context, dict) else getattr(info.context, "user", None)
+    try:
+        run = reserve_pipeline_run(
+            pipeline_id=input.pipeline_id,
+            expected_version=input.expected_version,
+            request_id=input.request_id,
+            ref=input.ref,
+            user=user,
+        )
+        run = dispatch_pipeline_run(run)
+    except Pipeline.DoesNotExist:
+        return gql_failure(ErrorCode.NOT_FOUND.value, "Pipeline not found")
+    except PermissionDenied:
+        return gql_failure(ErrorCode.PERMISSION_DENIED.value, "Pipeline permission denied")
+    except PipelineContractError as exc:
+        return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+    except IntegrityError:
+        return gql_failure(
+            ErrorCode.CONFLICT.value,
+            "A concurrent start reserved this request; reconcile with the same requestId",
+        )
+    except Exception:
+        return gql_failure(ErrorCode.INTERNAL.value, "Pipeline start could not be prepared")
+    if run.dispatch_status == "uncertain":
+        result = gql_failure(ErrorCode.PRECONDITION.value, run.dispatch_last_error)
+        result.data = pipeline_run_to_type(run)
+        return result
+    return gql_success(pipeline_run_to_type(run))
 
 
 @strawberry.type
@@ -188,7 +233,9 @@ class PipelinesMutation:
         return gql_success(pipeline_to_type(pipeline))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=pipeline_app_scope("id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def update_pipeline(
         self, info: Info, id: GUID, input: UpdatePipelineInput
@@ -256,7 +303,9 @@ class PipelinesMutation:
         return gql_success(pipeline_to_type(pipeline))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=pipeline_app_scope("id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def delete_pipeline(self, info: Info, id: GUID) -> MutationResultType[PipelineType]:
         tenant = get_current_tenant()
@@ -284,7 +333,9 @@ class PipelinesMutation:
         return gql_success(snapshot)
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("input.pipeline_id"))
+    @require_permission(
+        Permission.APP_UPDATE, scope=pipeline_app_scope("input.pipeline_id", permission=Permission.APP_UPDATE)
+    )
     @tenant_scoped()
     def create_trigger(self, info: Info, input: CreateTriggerInput) -> MutationResultType[TriggerType]:
         kind = (input.kind or "").strip().lower()
@@ -331,139 +382,96 @@ class PipelinesMutation:
         return gql_success(trigger_to_type(trigger))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE, scope=pipeline_app_scope("pipeline_id"))
+    @mutation_audit(action="pipeline.run.start")
+    @require_permission(
+        Permission.APP_UPDATE, scope=pipeline_app_scope("input.pipeline_id", permission=Permission.APP_UPDATE)
+    )
+    @requires_elevation(action_label="Start this pipeline")
+    @tenant_scoped()
+    def start_pipeline_run(
+        self, info: Info, input: StartPipelineRunInput
+    ) -> MutationResultType[PipelineRunType]:
+        if not input.confirmed:
+            return gql_failure(ErrorCode.PRECONDITION.value, "Explicit confirmation is required")
+        return _start_pipeline(info, input)
+
+    @strawberry.field
+    @mutation_audit(action="pipeline.run.start")
+    @require_permission(
+        Permission.APP_UPDATE, scope=pipeline_app_scope("pipeline_id", permission=Permission.APP_UPDATE)
+    )
+    @requires_elevation(action_label="Start this pipeline")
     @tenant_scoped()
     def trigger_pipeline_run(
         self,
         info: Info,
         pipeline_id: GUID,
         ref: str | None = None,
+        request_id: str | None = None,
+        expected_version: int | None = None,
+        confirmed: bool = False,
     ) -> MutationResultType[PipelineRunType]:
-        """Dispatch a manual PipelineRunWorkflow via Temporal (#75).
-
-        Creates a PipelineRun with trigger_kind=manual, writes the
-        Temporal workflow id onto the row, then starts the workflow.
-        The actor is set from the authenticated request user.
-        """
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
+        """Compatibility entry; old clients receive an explicit review prerequisite."""
+        if not request_id or expected_version is None or not confirmed:
             return gql_failure(
-                ErrorCode.PERMISSION_DENIED.value,
-                "tenant context required",
+                ErrorCode.PRECONDITION.value,
+                "Review the pipeline and supply requestId, expectedVersion and confirmed; use startPipelineRun",
             )
-
-        pipeline = Pipeline.objects.filter(
-            guid=str(pipeline_id),
-            organization_id=tenant.organization_id,
-            deleted_at__isnull=True,
-        ).first()
-        if pipeline is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "pipeline not found")
-
-        trigger_ref = (ref or pipeline.default_branch or "").strip()
-
-        # Resolve the caller identity for the trigger_actor field.
-        request = (
-            info.context.get("request")
-            if isinstance(info.context, dict)
-            else getattr(info.context, "request", None)
+        return _start_pipeline(
+            info,
+            StartPipelineRunInput(
+                pipeline_id=pipeline_id,
+                ref=ref,
+                request_id=request_id,
+                expected_version=expected_version,
+                confirmed=confirmed,
+            ),
         )
-        trigger_actor = ""
-        if request is not None and hasattr(request, "user") and request.user.is_authenticated:
-            trigger_actor = getattr(request.user, "email", "") or str(request.user)
-
-        last_run_number = (
-            PipelineRun.objects.filter(
-                pipeline=pipeline,
-                deleted_at__isnull=True,
-            )
-            .order_by("-run_number")
-            .values_list("run_number", flat=True)
-            .first()
-            or 0
-        )
-        run_number = last_run_number + 1
-
-        # Workflow id is deterministic so a duplicate UI click collides
-        # on the same workflow id rather than spawning a parallel run.
-        workflow_id = f"pipeline-run-{pipeline.pk}-{run_number}"
-
-        with transaction.atomic():
-            run = PipelineRun.objects.create(
-                pipeline=pipeline,
-                run_number=run_number,
-                trigger_kind=PipelineRun.TriggerKind.MANUAL,
-                trigger_ref=trigger_ref,
-                trigger_actor=trigger_actor,
-                temporal_workflow_id=workflow_id,
-                status=PipelineRun.Status.PENDING,
-            )
-
-        start_workflow(
-            "PipelineRunWorkflow",
-            args=[run.pk],
-            workflow_id=workflow_id,
-        )
-
-        return gql_success(pipeline_run_to_type(run))
 
     @strawberry.field
-    @require_permission(Permission.APP_UPDATE, scope=pipeline_run_app_scope("run_id"))
+    @mutation_audit(action="pipeline.run.cancel.request")
+    @require_permission(
+        Permission.APP_UPDATE, scope=pipeline_run_app_scope("run_id", permission=Permission.APP_UPDATE)
+    )
+    @requires_elevation(action_label="Cancel this pipeline run")
     @tenant_scoped()
-    def cancel_pipeline_run(self, info: Info, run_id: GUID) -> MutationResultType[PipelineRunType]:
-        """Send a cancel signal to the running PipelineRunWorkflow (#68, #75).
-
-        Sends the ``cancel`` signal to the Temporal workflow. The workflow
-        handles cleanup (cancelling in-flight K8s Jobs, marking job runs
-        cancelled) before transitioning the run to CANCELLED. If Temporal
-        is disabled the status is flipped locally.
-        """
-        tenant = get_current_tenant()
-        if tenant is None or tenant.organization_id is None:
+    def cancel_pipeline_run(
+        self,
+        info: Info,
+        run_id: GUID,
+        expected_version: int | None = None,
+        temporal_workflow_id: str | None = None,
+        temporal_run_id: str | None = None,
+        confirmed: bool = False,
+    ) -> MutationResultType[PipelineRunType]:
+        if expected_version is None or not temporal_workflow_id or not temporal_run_id or not confirmed:
             return gql_failure(
-                ErrorCode.PERMISSION_DENIED.value,
-                "tenant context required",
+                ErrorCode.PRECONDITION.value,
+                "Review the exact execution and supply expectedVersion, temporalWorkflowId, temporalRunId and confirmed",
             )
-
+        tenant = get_current_tenant()
         run = (
             PipelineRun.objects.filter(
-                guid=str(run_id),
-                pipeline__organization_id=tenant.organization_id,
-                pipeline__deleted_at__isnull=True,
-                deleted_at__isnull=True,
+                guid=str(run_id), organization_id=tenant.organization_id, pipeline__deleted_at__isnull=True
             )
             .select_related("pipeline")
-            .prefetch_related("job_runs__job", "job_runs__step_runs__step")
             .first()
         )
         if run is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "pipeline run not found")
-
-        cancellable = {PipelineRun.Status.PENDING, PipelineRun.Status.RUNNING}
-        if run.status not in cancellable:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                f"run is in status {run.status!r} — only pending/running runs can be cancelled",
+            return gql_failure(ErrorCode.NOT_FOUND.value, "Pipeline run not found")
+        try:
+            run = request_pipeline_cancellation(
+                run,
+                expected_version=expected_version,
+                workflow_id=temporal_workflow_id,
+                temporal_run_id=temporal_run_id,
             )
-
-        # Delegate to the cancellation service rather than flipping the
-        # status here. Three things the local flip did not do:
-        #
-        #  * cascade to StepRun -- nothing in the codebase did, so a
-        #    cancelled run's steps read `running` forever;
-        #  * cascade to JobRun when the Temporal signal does not land
-        #    (Temporal disabled, workflow already gone, or a PENDING run
-        #    that was never dispatched and so has no workflow id);
-        #  * emit the `pipeline_run.cancelled` audit event, which only
-        #    `state_machine.transition_pipeline_run` emits.
-        #
-        # The workflow's own cancel handler still cascades job runs when it
-        # is alive to receive the signal; this makes the outcome the same
-        # when it is not.
-        actor = getattr(getattr(info.context, "request", None), "user", None)
-        # The service owns the cascade, the state transition, the metric and
-        # the commit status, so a second cancel entry point cannot forget
-        # half of them.
-        cascade_cancel(run, actor_display=str(actor) if actor else "operator")
-
+        except PermissionDenied:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "Pipeline permission denied")
+        except PipelineContractError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        if run.cancellation_status == "uncertain":
+            result = gql_failure(ErrorCode.PRECONDITION.value, run.cancellation_last_error)
+            result.data = pipeline_run_to_type(run)
+            return result
         return gql_success(pipeline_run_to_type(run))

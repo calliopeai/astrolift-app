@@ -813,7 +813,10 @@ class InteractiveExecSession:
                 if self._resp.peek_stderr():
                     self._stderr_q.put(self._resp.read_stderr())
         except Exception:
-            logger.exception("interactive_exec: drain loop failed")
+            # Closing the connection can interrupt the drain thread's recv.
+            # Intentional session teardown is normal EOF, not a runtime error.
+            if not self._closed.is_set():
+                logger.exception("interactive_exec: drain loop failed")
         finally:
             self._exit_q.put(self._exit_code())
             # Sentinels unblock any reader parked on an empty queue.

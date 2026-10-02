@@ -549,7 +549,7 @@ def test_legacy_triggers_check_the_definition_they_run(world, monkeypatch):
     legacy = LegacyMutation()
 
     with _as(world, developer, team=world.medops):
-        assert legacy.run_workflow_definition(info, "intake-flow").ok
+        assert not legacy.run_workflow_definition(info, "intake-flow").ok
         for slug in ("core-flow", "org-flow", "template-flow"):
             with pytest.raises(PermissionDenied):
                 legacy.run_workflow_definition(info, slug)
@@ -558,7 +558,7 @@ def test_legacy_triggers_check_the_definition_they_run(world, monkeypatch):
                 info, "core-flow", "astrolift_registry.RegisteredApp", world.platform_app.pk
             )
 
-    assert started == ["intake-flow"]
+    assert started == []
 
 
 def _forms_definition(org, slug):

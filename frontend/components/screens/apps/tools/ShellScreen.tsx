@@ -35,6 +35,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
+import type { ReviewedExecTarget } from "@/lib/exec-session";
+
 import type { UploadedScript } from "./use-app-shell";
 
 export interface ShellScreenProps {
@@ -57,6 +59,10 @@ export interface ShellScreenProps {
   fetchCommand: string | null;
   onPickScript: (file: File) => Promise<void>;
   onClearUpload: () => void;
+  environments?: { id: string; name: string; clusterSlug: string }[];
+  environmentId?: string | null;
+  setEnvironmentId?: (id: string) => void;
+  execTarget?: ReviewedExecTarget | null;
   /** Chrome-aware links: the deployments empty-state action and the tokens page. */
   deploymentsHref: string;
   tokensHref: string;
@@ -91,6 +97,10 @@ export function ShellScreen({
   deploymentsHref,
   tokensHref,
   tabs,
+  environments,
+  environmentId,
+  setEnvironmentId,
+  execTarget,
 }: ShellScreenProps) {
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.shell");
@@ -102,7 +112,7 @@ export function ShellScreen({
   const [shellOpen, setShellOpen] = React.useState(false);
   // Reset the open shell when the pod/container picker changes so the next
   // click starts a clean session against the new target.
-  const shellKey = `${selectedPod ?? ""}::${selectedContainer ?? ""}`;
+  const shellKey = `${environmentId ?? ""}::${selectedPod ?? ""}::${selectedContainer ?? ""}::${JSON.stringify(execTarget ?? null)}`;
   const [prevShellKey, setPrevShellKey] = React.useState(shellKey);
   if (prevShellKey !== shellKey) {
     setPrevShellKey(shellKey);
@@ -226,6 +236,8 @@ export function ShellScreen({
           description={
             selectedPod && selectedContainer ? (
               <span className="font-mono">
+                {execTarget &&
+                  `${execTarget.environmentName} · ${environments?.find((row) => row.id === environmentId)?.clusterSlug ?? execTarget.clusterId} · ${execTarget.namespace} · `}
                 {t("terminal.targetDescription", {
                   pod: selectedPod,
                   container: selectedContainer,
@@ -244,7 +256,11 @@ export function ShellScreen({
               <Button
                 size="sm"
                 onClick={() => setShellOpen(true)}
-                disabled={!selectedPod || !selectedContainer}
+                disabled={
+                  !selectedPod ||
+                  !selectedContainer ||
+                  (setEnvironmentId !== undefined && !execTarget)
+                }
               >
                 <TerminalIcon className="size-3.5" />
                 {t("terminal.open")}
@@ -267,6 +283,20 @@ export function ShellScreen({
           <div className="flex min-w-0 flex-col gap-4">
             {/* Each surface owns its target: the pod and container the shell opens on. */}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
+              {setEnvironmentId && (
+                <Select value={environmentId ?? ""} onValueChange={setEnvironmentId}>
+                  <SelectTrigger size="sm" aria-label={tObs("scope.environment")}>
+                    <SelectValue placeholder={tObs("scope.environmentPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(environments ?? []).map((row) => (
+                      <SelectItem key={row.id} value={row.id}>
+                        {row.name} · {row.clusterSlug}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <div className="flex min-w-0 items-center gap-1.5">
                 <BoxIcon aria-hidden="true" className="text-muted-foreground size-3.5 shrink-0" />
                 <Select value={selectedPod ?? ""} onValueChange={(v) => setPickedPod(v)}>
@@ -319,6 +349,7 @@ export function ShellScreen({
                 appSlug={a.slug}
                 podName={selectedPod}
                 container={selectedContainer}
+                target={execTarget ?? undefined}
               />
             ) : (
               <div className="bg-muted/40 flex h-64 items-center justify-center rounded-md border border-dashed">
@@ -425,19 +456,21 @@ export function ShellScreen({
           )}
         </Panel>
 
-        <Panel
-          span={6}
-          title={t("shortcuts.title")}
-          description={t.rich("shortcuts.description", {
-            login: () => <code className="font-mono">astro login</code>,
-          })}
-        >
-          <div className="flex min-w-0 flex-col gap-3">
-            {sampleCommands.map((s) => (
-              <CopyableCommand key={s.key} label={s.label} command={s.template(a.slug)} />
-            ))}
-          </div>
-        </Panel>
+        {environments === undefined && (
+          <Panel
+            span={6}
+            title={t("shortcuts.title")}
+            description={t.rich("shortcuts.description", {
+              login: () => <code className="font-mono">astro login</code>,
+            })}
+          >
+            <div className="flex min-w-0 flex-col gap-3">
+              {sampleCommands.map((s) => (
+                <CopyableCommand key={s.key} label={s.label} command={s.template(a.slug)} />
+              ))}
+            </div>
+          </Panel>
+        )}
       </PanelGrid>
     </PageShell>
   );

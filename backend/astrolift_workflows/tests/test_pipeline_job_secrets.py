@@ -103,6 +103,20 @@ def _capture(monkeypatch, job_run, *, lines, resolved=None, raises=False):
         "core.cluster_observability.fetch_pod_log_tail",
         _async_returning(lines),
     )
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+
+    plugin, _ = ProviderPlugin.objects.get_or_create(
+        slug="k8s_native", defaults={"name": "Native", "plugin_version": "test"}
+    )
+    job_run.cluster = TenantCluster.objects.create(
+        organization=job_run.pipeline_run.organization,
+        provider_plugin=plugin,
+        name="Recorded log fixture",
+        slug=f"log-fixture-{job_run.pk}",
+        lifecycle="managed",
+    )
+    job_run.k8s_namespace = "disposable-logs"
+    job_run.save()
     mod._capture_job_logs(
         job_run=job_run,
         run=job_run.pipeline_run,

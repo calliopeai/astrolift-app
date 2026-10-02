@@ -1254,6 +1254,24 @@ export type AstroliftAppEnvironmentPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftAppExecTarget = {
+  appId: Scalars['GUID']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  container: Scalars['String']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  namespace: Scalars['String']['output'];
+  podBinding: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  podUid: Scalars['String']['output'];
+  resumable: Scalars['Boolean']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
+};
+
 export type AstroliftAppGoldenSignal = {
   name: GoldenSignalKind;
   promql: Scalars['String']['output'];
@@ -3067,14 +3085,32 @@ export type AstroliftJob = {
 };
 
 export type AstroliftJobRun = {
+  cleanupLastError?: Maybe<Scalars['String']['output']>;
+  cleanupStatus: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   job: AstroliftJob;
   logExcerpt: Scalars['String']['output'];
+  logKind: Scalars['String']['output'];
+  logTruncated: Scalars['Boolean']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   stepRuns: Array<AstroliftStepRun>;
+  stepsTruncated: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftJobRunPage = {
+  items: Array<AstroliftJobRun>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftLaunchTaskResult = {
@@ -3653,10 +3689,12 @@ export type AstroliftPipeline = {
   defaultBranch: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   name: Scalars['String']['output'];
+  organizationId?: Maybe<Scalars['GUID']['output']>;
   repoUrl: Scalars['String']['output'];
   tomlPath: Scalars['String']['output'];
   triggers: Array<AstroliftTrigger>;
   updatedAt: Scalars['DateTime']['output'];
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftPipelineMutationResult = {
@@ -3679,16 +3717,31 @@ export type AstroliftPipelinePage = {
 };
 
 export type AstroliftPipelineRun = {
+  appId?: Maybe<Scalars['GUID']['output']>;
+  cancellationLastError?: Maybe<Scalars['String']['output']>;
+  cancellationObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  cancellationStatus: Scalars['String']['output'];
+  cleanupStatus: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  dispatchLastError?: Maybe<Scalars['String']['output']>;
+  dispatchStatus: Scalars['String']['output'];
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
   jobRuns: Array<AstroliftJobRun>;
+  jobsTruncated: Scalars['Boolean']['output'];
+  organizationId?: Maybe<Scalars['GUID']['output']>;
+  pipelineId?: Maybe<Scalars['GUID']['output']>;
+  pipelineVersion: Scalars['Int']['output'];
+  requestId?: Maybe<Scalars['String']['output']>;
   runNumber: Scalars['Int']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  temporalRunId?: Maybe<Scalars['String']['output']>;
+  temporalWorkflowId: Scalars['String']['output'];
   triggerActor: Scalars['String']['output'];
   triggerKind: Scalars['String']['output'];
   triggerRef: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftPipelineRunMutationResult = {
@@ -4765,10 +4818,32 @@ export type AstroliftSecretChangeProposal = {
   status: Scalars['String']['output'];
 };
 
+export type AstroliftSecretChangeProposalMetadata = {
+  appliedAt?: Maybe<Scalars['DateTime']['output']>;
+  approvalsCount: Scalars['Int']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  decidedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  op: Scalars['String']['output'];
+  proposerDisplayName: Scalars['String']['output'];
+  registeredAppSlug: Scalars['String']['output'];
+  requiredApproverCount: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type AstroliftSecretChangeProposalMutationResult = {
   data?: Maybe<AstroliftSecretChangeProposal>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftSecretChangeProposalPage = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<AstroliftSecretChangeProposalMetadata>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount: Scalars['Int']['output'];
 };
 
 export type AstroliftSecretEditor = {
@@ -4985,6 +5060,19 @@ export type AstroliftStepRun = {
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   step: AstroliftStep;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftStepRunPage = {
+  items: Array<AstroliftStepRun>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftTaskRun = {
@@ -7238,7 +7326,7 @@ export type Mutation = {
   runTask: AstroliftTaskRunPayloadMutationResult;
   /** Run a configured Workflow now via Temporal (spec 40 §3). */
   runWorkflow: RunWorkflowResult;
-  /** Run an agent WorkflowDefinition's stages durably via Temporal (WorkflowDefinitionRunWorkflow). Creates the WorkflowInstance + WorkflowRun mirror rows and enqueues the stage executor. */
+  /** Compatibility entry for reviewed Definition starts. Requires exact definitionId, revision, input schema digest, caller requestId and confirmation; prefer startWorkflowDefinition. */
   runWorkflowDefinition: RunWorkflowDefinitionResult;
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   scaleServiceAgent: AstroliftAgentScaleResult;
@@ -7286,8 +7374,11 @@ export type Mutation = {
   softDeleteRole: SoftdeletepayloadMutationResult;
   softDeleteTeam: SoftdeletepayloadMutationResult;
   startDeployment: AstroliftDeploymentMutationResult;
+  startPipelineRun: AstroliftPipelineRunMutationResult;
   /** Start a workflow for an object. */
   startWorkflow: StartWorkflowResult;
+  /** Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response. */
+  startWorkflowDefinition: WorkflowDefinitionStartMutationResult;
   submitForm: AstroliftFormSubmissionMutationResult;
   subscribeClusterModel: ModelSubscriptionOperationMutationResult;
   /** Switch the active user (impersonation). */
@@ -7552,7 +7643,11 @@ export type MutationCancelAstroliftDeregisterArgs = {
 
 
 export type MutationCancelPipelineRunArgs = {
+  confirmed?: Scalars['Boolean']['input'];
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   runId: Scalars['GUID']['input'];
+  temporalRunId?: InputMaybe<Scalars['String']['input']>;
+  temporalWorkflowId?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -7784,6 +7879,7 @@ export type MutationCreateWorkflowArgs = {
 
 export type MutationCreateWorkflowDefinitionArgs = {
   description?: InputMaybe<Scalars['String']['input']>;
+  inputSchema?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: Scalars['Boolean']['input'];
   modelLabel: Scalars['String']['input'];
   name: Scalars['String']['input'];
@@ -8734,6 +8830,11 @@ export type MutationRunWorkflowArgs = {
 
 
 export type MutationRunWorkflowDefinitionArgs = {
+  confirmed?: InputMaybe<Scalars['Boolean']['input']>;
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
+  expectedInputSchemaDigest?: InputMaybe<Scalars['String']['input']>;
+  expectedRevision?: InputMaybe<Scalars['String']['input']>;
+  requestId?: InputMaybe<Scalars['String']['input']>;
   triggerPayload?: InputMaybe<Scalars['JSON']['input']>;
   workflowSlug: Scalars['String']['input'];
 };
@@ -8959,10 +9060,20 @@ export type MutationStartDeploymentArgs = {
 };
 
 
+export type MutationStartPipelineRunArgs = {
+  input: StartPipelineRunInput;
+};
+
+
 export type MutationStartWorkflowArgs = {
   modelLabel: Scalars['String']['input'];
   objectId: Scalars['Int']['input'];
   workflowSlug: Scalars['String']['input'];
+};
+
+
+export type MutationStartWorkflowDefinitionArgs = {
+  input: StartWorkflowDefinitionInput;
 };
 
 
@@ -9041,8 +9152,11 @@ export type MutationTriggerAstroliftDeployWorkflowArgs = {
 
 
 export type MutationTriggerPipelineRunArgs = {
+  confirmed?: Scalars['Boolean']['input'];
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   pipelineId: Scalars['GUID']['input'];
   ref?: InputMaybe<Scalars['String']['input']>;
+  requestId?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -9246,6 +9360,7 @@ export type MutationUpdateWorkflowArgs = {
 
 export type MutationUpdateWorkflowDefinitionArgs = {
   description?: InputMaybe<Scalars['String']['input']>;
+  inputSchema?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   modelLabel?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -9718,6 +9833,7 @@ export type Query = {
   astroliftAppDoctor: AstroliftAppDoctorReport;
   astroliftAppDomains: Array<AstroliftAppDomain>;
   astroliftAppEndpointMetrics: Array<AstroliftAppEndpointMetric>;
+  astroliftAppExecTarget?: Maybe<AstroliftAppExecTarget>;
   astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
@@ -9900,7 +10016,9 @@ export type Query = {
   astroliftSearchableUsers: Array<AstroliftSearchableUser>;
   astroliftSecretBundles: Array<AstroliftSecretBundle>;
   astroliftSecretChangeProposal?: Maybe<AstroliftSecretChangeProposal>;
+  astroliftSecretChangeProposalMetadata?: Maybe<AstroliftSecretChangeProposalMetadata>;
   astroliftSecretChangeProposals: Array<AstroliftSecretChangeProposal>;
+  astroliftSecretChangeProposalsPage: AstroliftSecretChangeProposalPage;
   /** Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in. */
   astroliftServerInfo: AstroliftServerInfo;
   astroliftSharedModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
@@ -9984,6 +10102,9 @@ export type Query = {
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission, optionally on a target scope (scopeType ORG, TEAM, PROJECT, APP or AGENT; scopeId its guid). Self, superuser or org.manage_members; the user must be a member of the active organization. */
   permissionDiagnose?: Maybe<PermissionDiagnosis>;
+  pipelineJobRunsPage: AstroliftJobRunPage;
+  pipelineStartRequest?: Maybe<AstroliftPipelineRun>;
+  pipelineStepRunsPage: AstroliftStepRunPage;
   previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
   previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
   previewWorkflowManifest: WorkflowManifestPreviewType;
@@ -9999,12 +10120,16 @@ export type Query = {
   workflow?: Maybe<ConfiguredWorkflow>;
   /** One visible workflow definition by slug (prefers the org's over a global). */
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
+  /** Review one exact definition GUID and its canonical input/revision contract; no slug substitution. */
+  workflowDefinitionById?: Maybe<ReviewedWorkflowDefinition>;
   /** One run of a workflow definition by guid, or null (#2155). */
   workflowDefinitionRun?: Maybe<WorkflowDefinitionRun>;
   /** Recent runs of workflow definitions visible in the caller's organization. */
   workflowDefinitionRuns: Array<WorkflowDefinitionRun>;
   /** Runs of workflow definitions visible in the caller's organization, cursor-paged, with search and filters (#2155). */
   workflowDefinitionRunsPage: WorkflowDefinitionRunPage;
+  /** Reconcile the authenticated actor's original reviewed start request without dispatching another run. */
+  workflowDefinitionStartRequest?: Maybe<WorkflowDefinitionStart>;
   /**
    * Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
    * @deprecated Unbounded — returns every visible definition in one response. Use workflowDefinitionsPage.
@@ -10411,6 +10536,15 @@ export type QueryAstroliftAppEndpointMetricsArgs = {
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppExecTargetArgs = {
+  appSlug: Scalars['String']['input'];
+  container: Scalars['String']['input'];
+  environmentId: Scalars['GUID']['input'];
+  podName: Scalars['String']['input'];
+  workloadSlug: Scalars['String']['input'];
 };
 
 
@@ -11369,8 +11503,21 @@ export type QueryAstroliftSecretChangeProposalArgs = {
 };
 
 
+export type QueryAstroliftSecretChangeProposalMetadataArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftSecretChangeProposalsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftSecretChangeProposalsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
   status?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -11748,6 +11895,27 @@ export type QueryPermissionDiagnoseArgs = {
 };
 
 
+export type QueryPipelineJobRunsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  runId: Scalars['GUID']['input'];
+};
+
+
+export type QueryPipelineStartRequestArgs = {
+  pipelineId: Scalars['GUID']['input'];
+  requestId: Scalars['String']['input'];
+};
+
+
+export type QueryPipelineStepRunsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  jobRunId: Scalars['GUID']['input'];
+  limit?: Scalars['Int']['input'];
+  runId: Scalars['GUID']['input'];
+};
+
+
 export type QueryPreviewAstroliftDeregisterArgs = {
   appSlug: Scalars['String']['input'];
 };
@@ -11822,6 +11990,11 @@ export type QueryWorkflowDefinitionArgs = {
 };
 
 
+export type QueryWorkflowDefinitionByIdArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryWorkflowDefinitionRunArgs = {
   guid: Scalars['String']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
@@ -11843,6 +12016,11 @@ export type QueryWorkflowDefinitionRunsPageArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryWorkflowDefinitionStartRequestArgs = {
+  requestId: Scalars['String']['input'];
 };
 
 
@@ -12176,6 +12354,13 @@ export type RevealManagedServiceConnectionInput = {
   managedServiceId: Scalars['GUID']['input'];
 };
 
+export type ReviewedWorkflowDefinition = {
+  definition: WorkflowDefinitionSummary;
+  guid: Scalars['GUID']['output'];
+  inputContract: RunInputContract;
+  revision: Scalars['String']['output'];
+};
+
 export type RevokeApiTokenInput = {
   id: Scalars['GUID']['input'];
 };
@@ -12273,6 +12458,28 @@ export type RunAstroliftAgentInput = {
   triggerPayload: InputMaybe<Scalars['JSON']['input']>;
 };
 
+export type RunInputContract = {
+  acceptsInputs: Scalars['Boolean']['output'];
+  digest: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  fields: Array<RunInputField>;
+  schema?: Maybe<Scalars['JSON']['output']>;
+  supported: Scalars['Boolean']['output'];
+  supportsSimpleForm: Scalars['Boolean']['output'];
+};
+
+export type RunInputField = {
+  constraints: Scalars['JSON']['output'];
+  default?: Maybe<Scalars['JSON']['output']>;
+  enumValues?: Maybe<Scalars['JSON']['output']>;
+  hasDefault: Scalars['Boolean']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  required: Scalars['Boolean']['output'];
+  sensitive: Scalars['Boolean']['output'];
+  simple: Scalars['Boolean']['output'];
+};
+
 export type RunJobOnceInput = {
   appSlug: Scalars['String']['input'];
   environmentName: Scalars['String']['input'];
@@ -12287,8 +12494,11 @@ export type RunTaskInput = {
 };
 
 export type RunWorkflowDefinitionResult = {
+  dispatchStatus?: Maybe<Scalars['String']['output']>;
   errors: Array<ValidationError>;
   ok: Scalars['Boolean']['output'];
+  requestId?: Maybe<Scalars['String']['output']>;
+  temporalRunId?: Maybe<Scalars['String']['output']>;
   temporalWorkflowId?: Maybe<Scalars['String']['output']>;
   workflowRunId?: Maybe<Scalars['ID']['output']>;
 };
@@ -12505,6 +12715,23 @@ export type StartDeploymentInput = {
   strategy: InputMaybe<Scalars['String']['input']>;
   triggerKind: Scalars['String']['input'];
   workloadSlug: InputMaybe<Scalars['String']['input']>;
+};
+
+export type StartPipelineRunInput = {
+  confirmed: Scalars['Boolean']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  pipelineId: Scalars['GUID']['input'];
+  ref: InputMaybe<Scalars['String']['input']>;
+  requestId: Scalars['String']['input'];
+};
+
+export type StartWorkflowDefinitionInput = {
+  confirmed: Scalars['Boolean']['input'];
+  definitionId: Scalars['GUID']['input'];
+  expectedInputSchemaDigest: Scalars['String']['input'];
+  expectedRevision: Scalars['String']['input'];
+  inputs: InputMaybe<Scalars['JSON']['input']>;
+  requestId: Scalars['String']['input'];
 };
 
 export type StartWorkflowResult = {
@@ -13075,6 +13302,26 @@ export type WorkflowDefinitionRunsFilter = {
   status: InputMaybe<Array<Scalars['String']['input']>>;
   /** manual, api, schedule, webhook, parent or unknown. */
   trigger: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+export type WorkflowDefinitionStart = {
+  definitionId: Scalars['GUID']['output'];
+  definitionRevision: Scalars['String']['output'];
+  dispatchLastError?: Maybe<Scalars['String']['output']>;
+  dispatchStatus: Scalars['String']['output'];
+  executionId: Scalars['GUID']['output'];
+  id: Scalars['GUID']['output'];
+  inputSchemaDigest: Scalars['String']['output'];
+  organizationId: Scalars['GUID']['output'];
+  requestId: Scalars['String']['output'];
+  temporalRunId?: Maybe<Scalars['String']['output']>;
+  temporalWorkflowId: Scalars['String']['output'];
+};
+
+export type WorkflowDefinitionStartMutationResult = {
+  data?: Maybe<WorkflowDefinitionStart>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type WorkflowDefinitionSummary = {
@@ -14756,6 +15003,17 @@ export type GetAppDeployTokenRotationMetadataQueryVariables = Exact<{
 
 export type GetAppDeployTokenRotationMetadataQuery = { astroliftAppDeployTokenRotationMetadata?: { rotationGraceSeconds: number } | null };
 
+export type GetAppExecTargetQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+  workloadSlug: Scalars['String']['input'];
+  environmentId: Scalars['GUID']['input'];
+  podName: Scalars['String']['input'];
+  container: Scalars['String']['input'];
+}>;
+
+
+export type GetAppExecTargetQuery = { astroliftAppExecTarget?: { workloadId: string, workloadVersion: number, appId: string, appVersion: number, environmentId: string, environmentName: string, environmentVersion: number, clusterId: string, clusterVersion: number, namespace: string, podName: string, podUid: string, container: string, podBinding: string, resumable: boolean } | null };
+
 export type DeploymentLifecycleStreamSubscriptionVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
 }>;
@@ -15456,6 +15714,73 @@ export type GetAppDependencyContextQueryVariables = Exact<{
 
 export type GetAppDependencyContextQuery = { astroliftAppDependencyContext?: { appId: string, environmentId: string, environmentName: string, readAt: string, managedDomainState: DependencyObservationState, domainsScope: string, domainsState: DependencyObservationState, domainsTruncated: boolean, domainLimit: number, liveProviderObservationState: DependencyObservationState, liveProviderObservationReason: string, permissions: { requiredPermission: string, appReadAllowed: boolean, appDeployGateAllowed: boolean, clusterRegisterGateAllowed: boolean }, cluster: { id: string, slug: string, providerId: string, providerSlug: string, region?: string | null, lifecycle: string, isActive: boolean, heartbeatSource: string, heartbeatState: DependencyObservationState, heartbeatStatus: string, heartbeatObservedAt?: string | null }, managedDomain?: { id: string, zone: string } | null, domains: Array<{ id: string, hostname: string, isActive: boolean, validationStatus: string, validationObservedAt?: string | null, configuredCertificateReferencePresent: boolean, certificateSource: string, storedCertificateState: string, certificateMetadataState: DependencyObservationState, certificateObservedAt?: string | null, storedCertificateExpiresAt?: string | null, storedCertificateRenewalStatus?: string | null }> } | null };
 
+export type StartReviewedWorkflowMutationVariables = Exact<{
+  input: StartWorkflowDefinitionInput;
+}>;
+
+
+export type StartReviewedWorkflowMutation = { startWorkflowDefinition: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, requestId: string, definitionId: string, organizationId: string, definitionRevision: string, inputSchemaDigest: string, executionId: string, temporalWorkflowId: string, temporalRunId?: string | null, dispatchStatus: string, dispatchLastError?: string | null } | null } };
+
+export type StartReviewedPipelineMutationVariables = Exact<{
+  input: StartPipelineRunInput;
+}>;
+
+
+export type StartReviewedPipelineMutation = { startPipelineRun: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, requestId?: string | null, pipelineId?: string | null, organizationId?: string | null, pipelineVersion: number, version: number, temporalWorkflowId: string, temporalRunId?: string | null, dispatchStatus: string, dispatchLastError?: string | null, cancellationStatus: string, cleanupStatus: string } | null } };
+
+export type CancelReviewedPipelineMutationVariables = Exact<{
+  runId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  temporalWorkflowId: Scalars['String']['input'];
+  temporalRunId: Scalars['String']['input'];
+}>;
+
+
+export type CancelReviewedPipelineMutation = { cancelPipelineRun: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, status: string, temporalWorkflowId: string, temporalRunId?: string | null, cancellationStatus: string, cleanupStatus: string, cancellationLastError?: string | null } | null } };
+
+export type ReviewWorkflowStartQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+}>;
+
+
+export type ReviewWorkflowStartQuery = { workflowDefinitionById?: { guid: string, revision: string, definition: { name: string, slug: string, isEnabled: boolean, stageCount: number }, inputContract: { schema?: Record<string, unknown> | null, digest: string, supported: boolean, error: string, acceptsInputs: boolean, supportsSimpleForm: boolean, fields: Array<{ name: string, kind: string, required: boolean, hasDefault: boolean, default?: Record<string, unknown> | null, sensitive: boolean, simple: boolean, enumValues?: Record<string, unknown> | null, constraints: Record<string, unknown> }> } } | null };
+
+export type ReconcileWorkflowStartQueryVariables = Exact<{
+  requestId: Scalars['String']['input'];
+}>;
+
+
+export type ReconcileWorkflowStartQuery = { workflowDefinitionStartRequest?: { id: string, requestId: string, definitionId: string, organizationId: string, definitionRevision: string, inputSchemaDigest: string, executionId: string, temporalWorkflowId: string, temporalRunId?: string | null, dispatchStatus: string, dispatchLastError?: string | null } | null };
+
+export type ReviewPipelineStartQueryVariables = Exact<{
+  id: Scalars['String']['input'];
+}>;
+
+
+export type ReviewPipelineStartQuery = { astroliftPipeline?: { id: string, name: string, organizationId?: string | null, version: number, defaultBranch: string } | null };
+
+export type ReconcilePipelineStartQueryVariables = Exact<{
+  pipelineId: Scalars['GUID']['input'];
+  requestId: Scalars['String']['input'];
+}>;
+
+
+export type ReconcilePipelineStartQuery = { pipelineStartRequest?: { id: string, requestId?: string | null, pipelineId?: string | null, organizationId?: string | null, pipelineVersion: number, version: number, temporalWorkflowId: string, temporalRunId?: string | null, dispatchStatus: string, dispatchLastError?: string | null, cancellationStatus: string, cleanupStatus: string } | null };
+
+export type ReviewPipelineCancellationQueryVariables = Exact<{
+  id: Scalars['String']['input'];
+}>;
+
+
+export type ReviewPipelineCancellationQuery = { astroliftPipelineRun?: { id: string, version: number, status: string, temporalWorkflowId: string, temporalRunId?: string | null, cancellationStatus: string, cleanupStatus: string } | null };
+
+export type ExactWorkflowDefinitionFrameQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+}>;
+
+
+export type ExactWorkflowDefinitionFrameQuery = { workflowDefinitionById?: { definition: { guid: string, name: string, slug: string, description: string, patternKind: string, isEnabled: boolean, isGlobal: boolean, organizationGuid?: string | null, projectGuid?: string | null, projectSlug: string, projectTeamSlug: string, sourceRepo: string, sourcePath: string, sourceRef: string, stageCount: number, createdAt: string, stages: Array<{ guid: string, order: number, kind: string, role: string, agentRef: string, workflowRef: string, agentGuid?: string | null, agentName: string, agentSlug: string, environmentSpecSlug: string, resolvedModel: string, hasPrompt: boolean, outputKey: string, skillRefs: Array<string>, fanOutCount?: number | null, fanOutDynamic: boolean, onFailure: string, timeoutSeconds: number }> } } | null };
+
 export type ConnectSourceMutationVariables = Exact<{
   input: ConnectSourceInput;
 }>;
@@ -15701,6 +16026,23 @@ export type ListSecretChangeProposalsQueryVariables = Exact<{
 
 
 export type ListSecretChangeProposalsQuery = { astroliftSecretChangeProposals: Array<{ id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerUserId: string, proposerDisplayName: string, payload: Record<string, unknown>, payloadDiff: Record<string, unknown>, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, applyError: string, createdAt: string, approvals: Array<{ id: string, approverUserId: string, approverDisplayName: string, decision: string, decidedAt: string, reason: string }> }> };
+
+export type ListSecretChangeProposalsPageQueryVariables = Exact<{
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+  limit: Scalars['Int']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ListSecretChangeProposalsPageQuery = { astroliftSecretChangeProposalsPage: { nextCursor?: string | null, totalCount: number, complete: boolean, items: Array<{ id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerDisplayName: string, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, createdAt: string }> } };
+
+export type GetSecretChangeProposalMetadataQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+}>;
+
+
+export type GetSecretChangeProposalMetadataQuery = { astroliftSecretChangeProposalMetadata?: { id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerDisplayName: string, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, createdAt: string } | null };
 
 export type GetSecretChangeProposalQueryVariables = Exact<{
   id: Scalars['GUID']['input'];

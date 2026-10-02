@@ -1,5 +1,7 @@
 "use client";
 
+import { isReviewedExecTarget } from "@/lib/exec-session";
+
 import { TerminalEmulator } from "@/components/observability";
 import { PopoutTerminalScreen } from "@/components/screens/shell/PopoutTerminalScreen";
 
@@ -13,11 +15,13 @@ export function PopoutTerminalClient({
   podName,
   container,
   command,
+  target,
 }: {
   appSlug: string;
   podName: string;
   container: string;
   command?: string[];
+  target?: unknown;
 }) {
   return (
     <PopoutTerminalScreen
@@ -27,9 +31,10 @@ export function PopoutTerminalClient({
       terminal={
         <TerminalEmulator
           appSlug={appSlug}
-          podName={podName}
+          podName={target !== undefined && !isReviewedExecTarget(target) ? "" : podName}
           container={container}
           command={command}
+          target={isReviewedExecTarget(target) ? target : undefined}
           standalone
           className="min-h-0 flex-1"
         />

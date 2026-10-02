@@ -10,24 +10,32 @@ export const metadata = {
  *
  * A separate window is a separate React tree, so this necessarily opens a
  * *new* exec session rather than adopting the one on the originating tab.
- * The backend's ring buffer makes that survivable: the terminal replays
- * recent output on connect, so the window opens warm.
+ * Output and stdin from the originating window are never replayed.
  */
 export default async function PopoutTerminalPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ pod?: string; container?: string; command?: string }>;
+  searchParams: Promise<{ pod?: string; container?: string; command?: string; target?: string }>;
 }) {
   const { slug } = await params;
-  const { pod, container, command } = await searchParams;
+  const { pod, container, command, target } = await searchParams;
+  let reviewedTarget: unknown = undefined;
+  if (target !== undefined) {
+    try {
+      reviewedTarget = JSON.parse(target);
+    } catch {
+      reviewedTarget = null;
+    }
+  }
   return (
     <PopoutTerminalClient
       appSlug={slug}
       podName={pod ?? ""}
       container={container ?? ""}
       command={command ? command.split(" ").filter(Boolean) : undefined}
+      target={reviewedTarget}
     />
   );
 }

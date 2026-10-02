@@ -775,6 +775,52 @@ class SecretChangeProposalType:
     approvals: list[SecretChangeApprovalType]
 
 
+@strawberry.type(name="AstroliftSecretChangeProposalMetadata")
+class SecretChangeProposalMetadataType:
+    """Queue and exact-detail metadata, without values, diffs or free-text errors."""
+
+    id: GUID  # type: ignore[valid-type]  # Strawberry's runtime scalar wrapper.
+    registered_app_slug: str
+    environment_name: str
+    op: str
+    status: str
+    proposer_display_name: str
+    required_approver_count: int
+    approvals_count: int
+    expires_at: dt.datetime
+    decided_at: dt.datetime | None
+    applied_at: dt.datetime | None
+    created_at: dt.datetime
+
+
+@strawberry.type(name="AstroliftSecretChangeProposalPage")
+class SecretChangeProposalPageType:
+    items: list[SecretChangeProposalMetadataType]
+    next_cursor: str | None
+    total_count: int
+    complete: bool
+    """True when this unchanged scoped queue has no following page."""
+
+
+def secret_change_proposal_metadata_to_type(proposal) -> SecretChangeProposalMetadataType:
+    proposer = proposal.proposer
+    display = (proposer.get_full_name() or proposer.username or proposer.email) if proposer else ""
+    return SecretChangeProposalMetadataType(
+        id=GUID(str(proposal.guid)),
+        registered_app_slug=proposal.registered_app.slug,
+        environment_name=proposal.environment_name or "",
+        op=proposal.op,
+        status=proposal.status,
+        proposer_display_name=display,
+        required_approver_count=proposal.required_approver_count,
+        approvals_count=proposal._policy_approvals,
+        expires_at=proposal.expires_at,
+        decided_at=proposal.decided_at,
+        applied_at=proposal.applied_at,
+        created_at=proposal.created_at,
+    )
+
+
 def secret_change_approval_to_type(approval) -> SecretChangeApprovalType:
     approver = approval.approver
     if approver is None:

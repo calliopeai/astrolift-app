@@ -86,6 +86,11 @@ class JobRunType:
     started_at: dt.datetime | None
     finished_at: dt.datetime | None
     created_at: dt.datetime
+    log_kind: str = "recorded"
+    log_truncated: bool = False
+    steps_truncated: bool = False
+    cleanup_status: str = "unknown"
+    cleanup_last_error: str | None = None
 
 
 @strawberry.type(name="AstroliftArtifact")
@@ -110,6 +115,21 @@ class PipelineRunType:
     started_at: dt.datetime | None
     finished_at: dt.datetime | None
     created_at: dt.datetime
+    version: int = 0
+    pipeline_id: GUID | None = None
+    organization_id: GUID | None = None
+    app_id: GUID | None = None
+    pipeline_version: int = 0
+    request_id: str | None = None
+    temporal_workflow_id: str = ""
+    temporal_run_id: str | None = None
+    dispatch_status: str = "unknown"
+    dispatch_last_error: str | None = None
+    cancellation_status: str = "not_requested"
+    cancellation_observed_at: dt.datetime | None = None
+    cancellation_last_error: str | None = None
+    cleanup_status: str = "unknown"
+    jobs_truncated: bool = False
 
 
 @strawberry.type(name="AstroliftRegisteredAppStub")
@@ -140,6 +160,8 @@ class PipelineType:
     triggers: list[TriggerType]
     created_at: dt.datetime
     updated_at: dt.datetime
+    version: int = 0
+    organization_id: GUID | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -197,16 +219,24 @@ def step_run_to_type(sr) -> StepRunType:
 
 
 def job_run_to_type(jr) -> JobRunType:
-    step_runs = list(jr.step_runs.select_related("step", "step__job").order_by("step__position"))
+    step_runs = getattr(jr, "bounded_steps", None)
+    if step_runs is None:
+        step_runs = list(
+            jr.step_runs.select_related("step", "step__job").order_by("step__position", "pk")[:51]
+        )
     return JobRunType(
         id=GUID(str(jr.guid)),
         job=job_to_type(jr.job),
         status=jr.status,
-        step_runs=[step_run_to_type(sr) for sr in step_runs],
-        log_excerpt=jr.log_excerpt or "",
+        step_runs=[step_run_to_type(sr) for sr in step_runs[:50]],
+        log_excerpt=(jr.log_excerpt or "")[-64000:],
         started_at=jr.started_at,
         finished_at=jr.finished_at,
         created_at=jr.created_at,
+        log_truncated=len(jr.log_excerpt or "") > 64000,
+        steps_truncated=len(step_runs) > 50,
+        cleanup_status=jr.cleanup_status,
+        cleanup_last_error=jr.cleanup_last_error or None,
     )
 
 
@@ -222,10 +252,22 @@ def artifact_to_type(a) -> ArtifactType:
 
 
 def pipeline_run_to_type(pr) -> PipelineRunType:
+    from django.db.models import Prefetch
+
+    from astrolift_pipelines.models import StepRun
+
     job_runs = list(
         pr.job_runs.select_related("job", "job__pipeline")
-        .prefetch_related("step_runs__step")
-        .order_by("job__job_id")
+        .prefetch_related(
+            Prefetch(
+                "step_runs",
+                queryset=StepRun.objects.select_related("step", "step__job").order_by("step__position", "pk")[
+                    :51
+                ],
+                to_attr="bounded_steps",
+            )
+        )
+        .order_by("job__job_id", "pk")[:21]
     )
     return PipelineRunType(
         id=GUID(str(pr.guid)),
@@ -234,10 +276,25 @@ def pipeline_run_to_type(pr) -> PipelineRunType:
         trigger_ref=pr.trigger_ref or "",
         trigger_actor=pr.trigger_actor or "",
         status=pr.status,
-        job_runs=[job_run_to_type(jr) for jr in job_runs],
+        job_runs=[job_run_to_type(jr) for jr in job_runs[:20]],
         started_at=pr.started_at,
         finished_at=pr.finished_at,
         created_at=pr.created_at,
+        version=pr.version,
+        pipeline_id=GUID(str(pr.pipeline.guid)),
+        organization_id=GUID(str(pr.organization.guid)) if pr.organization_id else None,
+        app_id=GUID(str(pr.registered_app.guid)) if pr.registered_app_id else None,
+        pipeline_version=pr.pipeline_version,
+        request_id=pr.request_id,
+        temporal_workflow_id=pr.temporal_workflow_id,
+        temporal_run_id=pr.temporal_run_id or None,
+        dispatch_status=pr.dispatch_status,
+        dispatch_last_error=pr.dispatch_last_error or None,
+        cancellation_status=pr.cancellation_status,
+        cancellation_observed_at=pr.cancellation_observed_at,
+        cancellation_last_error=pr.cancellation_last_error or None,
+        cleanup_status=pr.cleanup_status,
+        jobs_truncated=len(job_runs) > 20,
     )
 
 
@@ -262,4 +319,6 @@ def pipeline_to_type(p) -> PipelineType:
         triggers=[trigger_to_type(t) for t in triggers],
         created_at=p.created_at,
         updated_at=p.updated_at,
+        version=p.version,
+        organization_id=GUID(str(p.organization.guid)),
     )

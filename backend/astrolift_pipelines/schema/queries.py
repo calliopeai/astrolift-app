@@ -7,15 +7,20 @@ from strawberry.types import Info
 
 from astrolift_graphql import GUID, PageType, keyset_page, search_q
 from astrolift_identity.scope_visibility import visible_apps
-from astrolift_pipelines.models import Pipeline, PipelineRun
+from astrolift_pipelines.models import JobRun, Pipeline, PipelineRun, StepRun
 from astrolift_pipelines.schema.types import (
+    JobRunType,
     PipelineRunType,
     PipelineSecretType,
     PipelineType,
+    StepRunType,
+    job_run_to_type,
     pipeline_run_to_type,
     pipeline_to_type,
+    step_run_to_type,
 )
 from astrolift_pipelines.scopes import (
+    live_pipeline_runs,
     live_secret_pipelines,
     pipeline_app_scope,
     pipeline_run_app_scope,
@@ -81,17 +86,14 @@ def _pipeline_runs_qs(*, pipeline_id: str, search: str | None = None):
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
     qs = (
-        PipelineRun.objects.filter(
+        live_pipeline_runs(PipelineRun.objects.all(), organization_id=org_id)
+        .filter(
             pipeline__guid=pipeline_id,
             pipeline__organization_id=org_id,
             pipeline__deleted_at__isnull=True,
             deleted_at__isnull=True,
         )
-        .select_related("pipeline")
-        .prefetch_related(
-            "job_runs__job",
-            "job_runs__step_runs__step",
-        )
+        .select_related("pipeline", "organization", "registered_app")
     )
     if search:
         qs = qs.filter(search_q(search, "trigger_ref", "trigger_actor", "trigger_kind"))
@@ -100,6 +102,60 @@ def _pipeline_runs_qs(*, pipeline_id: str, search: str | None = None):
 
 @strawberry.type
 class PipelinesQuery:
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=pipeline_run_app_scope("run_id"))
+    @tenant_scoped()
+    def pipeline_job_runs_page(
+        self, info: Info, run_id: GUID, limit: int = 20, after: str | None = None
+    ) -> PageType[JobRunType]:
+        tenant = get_current_tenant()
+        runs = live_pipeline_runs(PipelineRun.objects.all(), organization_id=tenant.organization_id)
+        queryset = JobRun.objects.filter(
+            pipeline_run__guid=str(run_id), pipeline_run_id__in=runs.values("pk")
+        ).select_related("job", "job__pipeline")
+        return keyset_page(queryset, cursor=after, limit=min(limit, 20)).map(job_run_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=pipeline_run_app_scope("run_id"))
+    @tenant_scoped()
+    def pipeline_step_runs_page(
+        self, info: Info, run_id: GUID, job_run_id: GUID, limit: int = 50, after: str | None = None
+    ) -> PageType[StepRunType]:
+        tenant = get_current_tenant()
+        runs = live_pipeline_runs(PipelineRun.objects.all(), organization_id=tenant.organization_id)
+        queryset = StepRun.objects.filter(
+            job_run__guid=str(job_run_id),
+            job_run__deleted_at__isnull=True,
+            job_run__pipeline_run__guid=str(run_id),
+            job_run__pipeline_run_id__in=runs.values("pk"),
+        ).select_related("step", "step__job")
+        return keyset_page(queryset, cursor=after, limit=min(limit, 50)).map(step_run_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, scope=pipeline_app_scope("pipeline_id"))
+    @tenant_scoped()
+    def pipeline_start_request(
+        self, info: Info, pipeline_id: GUID, request_id: str
+    ) -> PipelineRunType | None:
+        tenant = get_current_tenant()
+        run = (
+            live_pipeline_runs(PipelineRun.objects.all(), organization_id=tenant.organization_id)
+            .select_related("pipeline", "organization", "registered_app")
+            .filter(
+                pipeline__guid=str(pipeline_id),
+                organization_id=tenant.organization_id,
+                actor_key=f"user:{tenant.actor_user_id}",
+                request_id=request_id,
+                pipeline__deleted_at__isnull=True,
+            )
+            .first()
+        )
+        if run is not None:
+            from astrolift_pipelines.run_contracts import recover_pipeline_start
+
+            run = recover_pipeline_start(run)
+        return pipeline_run_to_type(run) if run else None
+
     @strawberry.field
     @require_permission(Permission.SECRET_LIST, scope=pipeline_secret_scope())
     @tenant_scoped()
@@ -251,17 +307,18 @@ class PipelinesQuery:
         if tenant is None or tenant.organization_id is None:
             return None
         pr = (
-            PipelineRun.objects.filter(
+            live_pipeline_runs(PipelineRun.objects.all(), organization_id=tenant.organization_id)
+            .filter(
                 guid=id,
                 pipeline__organization_id=tenant.organization_id,
                 pipeline__deleted_at__isnull=True,
                 deleted_at__isnull=True,
             )
-            .select_related("pipeline")
-            .prefetch_related(
-                "job_runs__job",
-                "job_runs__step_runs__step",
-            )
+            .select_related("pipeline", "organization", "registered_app")
             .first()
         )
+        if pr and pr.cancellation_status in {"acknowledged", "uncertain", "observed"}:
+            from astrolift_pipelines.run_contracts import observe_pipeline_cancellation
+
+            pr = observe_pipeline_cancellation(pr)
         return pipeline_run_to_type(pr) if pr else None

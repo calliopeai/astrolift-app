@@ -76,8 +76,9 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
     'no runtime' state.
     """
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_lifecycle.visibility import cluster_owned_and_live, live_app_rows
     from astrolift_registry.models import RegisteredApp
-    from core.cluster_observability import namespace_for_app
+    from core.app_deploy import namespace_for_environment
     from core.tenancy import get_current_tenant
 
     tenant = get_current_tenant()
@@ -86,7 +87,8 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
         return None
 
     app = (
-        RegisteredApp.objects.select_related("organization", "default_tenant_cluster")
+        live_app_rows(RegisteredApp.objects.all())
+        .select_related("organization")
         .filter(
             slug=app_slug,
             organization_id=org_id,
@@ -97,28 +99,16 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
     if app is None:
         return _resolve_box_target(box_slug=app_slug, org_id=org_id)
 
-    cluster = None
-    if workload_slug:
-        # workload_slug is informational — the pod name encodes the
-        # workload — but we use it as a hint to pick the right
-        # environment cluster when an app spans more than one.
-        env = (
-            AppEnvironment.objects.select_related("tenant_cluster")
-            .filter(registered_app=app, deleted_at__isnull=True)
-            .order_by("created_at")
-            .first()
-        )
-        if env and env.tenant_cluster_id:
-            cluster = env.tenant_cluster
-    if cluster is None:
-        cluster = app.default_tenant_cluster
-    if cluster is None or not getattr(cluster, "is_active", True):
+    environment = (
+        AppEnvironment.objects.filter(registered_app=app)
+        .select_related("tenant_cluster")
+        .order_by("id")
+        .first()
+    )
+    if environment is None or not cluster_owned_and_live(environment.tenant_cluster, org_id):
         return None
-
-    return {
-        "cluster": cluster,
-        "namespace": namespace_for_app(app),
-    }
+    environment.registered_app = app
+    return {"cluster": environment.tenant_cluster, "namespace": namespace_for_environment(environment)}
 
 
 def _resolve_box_target(*, box_slug: str, org_id: int) -> dict | None:
@@ -203,10 +193,15 @@ class K8sExecBackend(ExecBackend):
         send_exit,
         send_error,
         tty: bool = True,
+        reviewed_target=None,
     ) -> ExecSession:
-        resolved = await _resolve_target(
-            app_slug=app_slug,
-            workload_slug=workload_slug,
+        resolved = (
+            {"cluster": reviewed_target.cluster, "namespace": reviewed_target.facts["namespace"]}
+            if reviewed_target is not None
+            else await _resolve_target(
+                app_slug=app_slug,
+                workload_slug=workload_slug,
+            )
         )
         if resolved is None:
             await send_stderr(
@@ -225,7 +220,11 @@ class K8sExecBackend(ExecBackend):
             # reads cluster rows (sync ORM), so it must not run on the event
             # loop directly — wrap in sync_to_async or Django's async guard
             # raises "cannot call this from an async context" (#1040).
-            driver = await sync_to_async(_driver_for)(cluster)
+            driver = (
+                reviewed_target.driver
+                if reviewed_target is not None
+                else await sync_to_async(_driver_for)(cluster)
+            )
             auth = await sync_to_async(_auth_for)(cluster)
         except Exception as exc:  # noqa: BLE001
             logger.exception("cluster_exec: driver resolution failed")
@@ -275,6 +274,8 @@ class K8sExecBackend(ExecBackend):
 
 
 class _ClosedSession(ExecSession):
+    opened = False
+
     """Used when the open path bailed before a real session existed —
     keeps the WS dispatcher's stdin/close calls from raising."""
 

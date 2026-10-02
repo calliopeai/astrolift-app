@@ -1,9 +1,13 @@
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
+import { defaultListState, type ListStateController } from "@/components/list/list-state";
+import { SECRET_PROPOSALS_LIST } from "./secret-proposals-list";
+import type { SecretProposalMetadata } from "./use-secret-proposals-queue";
 import type { PendingHumanGate } from "@/graphql/workflows/tiered.types";
 
 import type { PendingGatesScreenProps } from "./PendingGates";
 import type { SecretProposalDetailScreenProps } from "./SecretProposalDetail";
 import type { SecretProposalsQueueProps } from "./SecretProposalsQueue";
+import type { SecretProposalsSummaryProps } from "./SecretProposalsSummary";
 
 /** Hand-typed fixtures for the secret-proposal queue, its detail page, and pending gates. */
 
@@ -88,11 +92,62 @@ export const LONG_PROPOSAL: AstroliftSecretChangeProposal = {
   ],
 };
 
+export function proposalMetadata(proposal: AstroliftSecretChangeProposal): SecretProposalMetadata {
+  return {
+    id: proposal.id,
+    registeredAppSlug: proposal.registeredAppSlug,
+    environmentName: proposal.environmentName,
+    op: proposal.op,
+    status: proposal.status,
+    proposerDisplayName: proposal.proposerDisplayName,
+    requiredApproverCount: proposal.requiredApproverCount,
+    approvalsCount: proposal.approvalsCount,
+    expiresAt: proposal.expiresAt,
+    decidedAt: proposal.decidedAt,
+    appliedAt: proposal.appliedAt,
+    createdAt: proposal.createdAt,
+  };
+}
+
+const list: ListStateController = {
+  definition: SECRET_PROPOSALS_LIST,
+  state: defaultListState(SECRET_PROPOSALS_LIST),
+  filters: {},
+  isFiltered: false,
+  setSearch: noop,
+  setFilter: noop,
+  applySearch: noop,
+  clearFilters: noop,
+  toggleSort: noop,
+  setSort: noop,
+  setPage: noop,
+  older: noop,
+  newer: noop,
+  hasNewer: false,
+  setPageSize: noop,
+  viewHref: () => "/approvals/secret",
+  hiddenColumns: [],
+  toggleColumn: noop,
+  mode: "list",
+  setMode: noop,
+};
 export const QUEUE: SecretProposalsQueueProps = {
-  error: null,
-  onRetry: () => {},
-  proposals: PROPOSALS,
+  list,
+  rows: PROPOSALS.map(proposalMetadata),
+  totalCount: 2,
+  nextCursor: null,
   loading: false,
+  stale: false,
+  error: null,
+  onRetry: noop,
+  onRefresh: noop,
+};
+export const SECRET_SUMMARY: SecretProposalsSummaryProps = {
+  rows: PROPOSALS.map(proposalMetadata),
+  count: 2,
+  loading: false,
+  error: null,
+  onRetry: noop,
 };
 
 export const DETAIL: SecretProposalDetailScreenProps = {

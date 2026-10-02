@@ -27,6 +27,7 @@ retry queue stays empty for events we intentionally don't handle.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 
@@ -38,7 +39,6 @@ from astrolift_pipelines.models import Pipeline, PipelineRun, Trigger
 from astrolift_pipelines.webhook_security import (
     WebhookSecurityError,
     check_payload_size,
-    check_replay,
     check_webhook_rate_limit,
 )
 
@@ -201,14 +201,10 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
         _record_webhook(org_slug, "rate_limited")
         return JsonResponse({"error": "rate limited"}, status=429)
 
-    # Replay protection. A duplicate returns 200: the delivery was already
-    # processed, and a non-2xx would make GitHub retry it forever.
-    try:
-        check_replay(delivery_id, org_slug)
-    except WebhookSecurityError as exc:
-        logger.info("pipelines.webhook: duplicate delivery for org %s: %s", org_slug, exc)
-        _record_webhook(org_slug, "replay")
-        return JsonResponse({"status": "duplicate", "delivery": delivery_id})
+    # Signed retries reconcile the durable actor/body-bound run. An ephemeral
+    # replay cache must not acknowledge a delivery whose engine start is uncertain.
+    if not delivery_id or len(delivery_id) > 128:
+        return JsonResponse({"error": "a valid delivery ID is required"}, status=400)
 
     # Parse payload
     try:
@@ -230,6 +226,7 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
     )
 
     dispatched = []
+    uncertain = False
     for pipeline in pipelines:
         if not _repo_url_matches(pipeline.repo_url, clone_url, html_url):
             continue
@@ -243,11 +240,16 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
 
             # Create PipelineRun and dispatch workflow
             try:
-                run = PipelineRun.objects.create(
-                    pipeline=pipeline,
-                    run_number=_next_run_number(pipeline),
+                from astrolift_pipelines.run_contracts import reserve_pipeline_run
+
+                run = reserve_pipeline_run(
+                    pipeline_id=pipeline.pk,
+                    expected_version=pipeline.version,
+                    request_id=hashlib.sha256(f"{delivery_id}:{pipeline.guid}".encode()).hexdigest(),
+                    actor_key="webhook:github",
+                    trusted_webhook=True,
                     trigger_kind=event,
-                    trigger_ref=ref,
+                    ref=ref,
                     commit_sha=commit_sha,
                     trigger_actor=actor,
                     # A fork's pull request runs code the org has not
@@ -255,17 +257,18 @@ def pipeline_github_webhook(request: HttpRequest, org_slug: str) -> JsonResponse
                     # at spawn time, because the payload is gone by then
                     # and the answer must not be able to differ.
                     skip_secrets=decision.skip_secrets,
-                    status="pending",
-                    temporal_workflow_id="",  # set by dispatcher on workflow start
                 )
                 _dispatch_pipeline_run(run)
                 dispatched.append({"pipeline": pipeline.name, "run_number": run.run_number})
             except Exception:  # noqa: BLE001
+                uncertain = True
                 logger.exception("pipelines.webhook: failed to dispatch pipeline %s", pipeline.name)
             break  # One trigger match per pipeline is enough
 
     _record_webhook(org_slug, "dispatched" if dispatched else "filtered")
-    return JsonResponse({"status": "ok", "dispatched": dispatched})
+    return JsonResponse(
+        {"status": "retry" if uncertain else "ok", "dispatched": dispatched}, status=503 if uncertain else 200
+    )
 
 
 def _record_webhook(
@@ -309,47 +312,10 @@ def _next_run_number(pipeline: Pipeline) -> int:
 
 
 def _dispatch_pipeline_run(run: PipelineRun) -> None:
-    """Start PipelineRunWorkflow via the Temporal client.
+    from astrolift_pipelines.run_contracts import dispatch_pipeline_run
 
-    Five things were wrong here and each on its own was fatal, so no webhook
-    has ever started a pipeline (#1614):
+    current = dispatch_pipeline_run(run, trusted_webhook=True)
+    if current.dispatch_status != "submitted":
+        from astrolift_pipelines.run_contracts import PipelineContractError
 
-    * ``astrolift_workflows.inputs`` has no ``PipelineRunInput``. That raised
-      ImportError on the first line of the ``try``, which is why the other
-      four were never reached and never surfaced.
-    * ``start_workflow`` takes ``args`` as a *list*, not a single value.
-    * Its keyword is ``workflow_id``, not ``id``.
-    * ``PipelineRunWorkflow.run`` takes the integer PK, not a GUID string.
-    * ``task_queue="pipelines"`` names no queue anybody registers; the
-      workflow is in the single ``WORKFLOWS`` tuple served on
-      ``TEMPORAL_TASK_QUEUE``, so the default is the correct one.
-
-    The write of ``temporal_workflow_id`` was inside the same ``try``, which
-    made this worse than a dead dispatch: the field stayed empty, and
-    ``astrolift_pipelines.cancellation._signal_temporal_cancel`` returns
-    early on an empty one. So cancelling a pipeline run could not work
-    either, for a second and independent reason, even after that function's
-    own signature bug was fixed.
-
-    Still best-effort -- Temporal is genuinely optional on dev/test installs
-    -- but the failure is logged with its exception now. A bare
-    "dispatch skipped" is indistinguishable from "Temporal is off", and that
-    is precisely how the five above survived.
-    """
-    from astrolift_workflows.client import start_workflow
-
-    workflow_id = f"pipeline-run-{run.pipeline_id}-{run.run_number}"
-    try:
-        start_workflow(
-            "PipelineRunWorkflow",
-            [run.pk],
-            workflow_id=workflow_id,
-        )
-    except Exception:
-        logger.exception("pipelines.webhook: Temporal dispatch failed for run %s", run.guid)
-        return
-
-    # Outside the try: a dispatch that succeeded must be recorded even if
-    # this save were to fail, and a save failure is not a dispatch failure.
-    run.temporal_workflow_id = workflow_id
-    run.save(update_fields=["temporal_workflow_id", "updated_at", "version"])
+        raise PipelineContractError("Pipeline submission is uncertain")

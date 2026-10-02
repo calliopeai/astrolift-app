@@ -477,7 +477,9 @@ async def test_dispatcher_emits_ready_frame_after_open(monkeypatch) -> None:
     await mod.exec_ws_application(scope, receive, send)
 
     text_frames = [json.loads(m["text"]) for m in sent if m["type"] == "websocket.send"]
-    assert {"type": "ready"} in text_frames
+    ready = next(frame for frame in text_frames if frame["type"] == "ready")
+    assert ready["sessionId"] and ready["resumable"] is False
+    assert ready["disconnect"] == "END" and ready["inputReplay"] is False
 
 
 @pytest.mark.asyncio

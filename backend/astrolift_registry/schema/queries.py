@@ -28,7 +28,7 @@ from astrolift_graphql import (
     resolve_list_sort,
     search_q,
 )
-from astrolift_identity.operation_context import workload_operation
+from astrolift_identity.operation_context import environment_operation, workload_operation
 from astrolift_identity.schema.types import ProjectType, project_to_type
 from astrolift_lifecycle.models import AppEnvironment, Deployment
 from astrolift_registry.dependency_context import (
@@ -40,6 +40,7 @@ from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, W
 from astrolift_registry.schema.types import (
     STALE_DEPLOY_WINDOW_DAYS,
     AppDoctorReportType,
+    AppExecTargetType,
     AppFreshness,
     AppHealthPulseType,
     AppListState,
@@ -1782,6 +1783,37 @@ class RegistryQuery:
             .first()
         )
         return workload_to_type(w, last_run=cron_last_runs([w]).get(w.pk)) if w else None
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_EXEC_POD,
+        scope=app_scope_by_slug("app_slug", permission=Permission.APP_EXEC_POD),
+        operation=environment_operation("environment_id"),
+    )
+    @tenant_scoped()
+    def astrolift_app_exec_target(
+        self,
+        info: Info,
+        app_slug: str,
+        workload_slug: str,
+        environment_id: GUID,
+        pod_name: str,
+        container: str,
+    ) -> AppExecTargetType | None:
+        """Current exact app/environment/pod review; UID binding remains a preflight check."""
+        from core.exec_targets import ExecTargetError, review_exec_target
+
+        try:
+            target = review_exec_target(
+                app_slug=app_slug,
+                workload_slug=workload_slug,
+                environment_guid=environment_id,
+                pod_name=pod_name,
+                container=container,
+            )
+        except ExecTargetError:
+            return None
+        return AppExecTargetType(**target.facts)
 
     @strawberry.field
     @require_permission(

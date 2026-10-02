@@ -2,10 +2,27 @@
 
 ## Unreleased
 
+- Translate cluster registration controls, help and request feedback in all eight
+  locales. Preserve edited authentication drafts across provider/auth steps and
+  locale changes; malformed credential JSON receives a generic local error
+  without echoing credential text (#2145).
+
+- Review exact WorkflowDefinition and pipeline starts with caller-owned request
+  IDs, immutable revision/version preconditions, validated inputs and durable
+  execution recovery. Freeze bounded nested Definition graphs under database
+  locks, encrypt retained inputs and expose metadata-only recovery. Legacy
+  Definition/pipeline starts require additive reviewed proof; cancellation
+  distinguishes engine acknowledgement, observed closure and recorded-cluster
+  cleanup. Publish capability discovery and reviewed web controls (#2236, #2204).
+
 - Bind reviewed workload restart and scale requests to an explicit environment,
   cluster and namespace with version preconditions and current credential checks.
   Publish exact-target review metadata and accepted-versus-completed outcomes;
   native Kubernetes clients retain independent cluster configuration (#2217).
+
+- Translate the full cluster Health tab, workload filters and warning panels in
+  all eight locales. Keep malformed observations unknown, zero-sized deployments
+  neutral and failed cached refreshes visible with independent retries (#2145).
 
 - Preserve actual shared-model deletion outcomes while an independent resource
   admission check completes. Target, version and authority changes still invalidate
@@ -36,6 +53,11 @@
   Known operations translate without rewriting unknown identifiers. Ages use
   the request clock and locale; compact durations keep invalid reports unknown
   and retain the existing minute/hour boundaries (#2145).
+
+- Add bounded, permission-scoped metadata-only secret proposal pages and exact
+  GUID metadata reads. Signed cursors reject changed or expired walks explicitly;
+  the web queue follows server pages and resets continuations after refresh or
+  decisions without broadening payload reveal or step-up authority (#2233).
 
 - Localize cluster connection snapshots and shared read recovery in all eight
   locales. Failed, incomplete and wrong-target reads cannot confirm connectivity

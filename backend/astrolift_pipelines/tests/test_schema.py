@@ -302,8 +302,12 @@ def test_trigger_pipeline_run_creates_pending_run(user, org, pipeline, permissio
             info,
             pipeline_id=str(pipeline.guid),
             ref="refs/heads/main",
+            request_id="reviewed-schema-test",
+            expected_version=pipeline.version,
+            confirmed=True,
         )
-    assert result.ok, result.errors
+    assert not result.ok
+    assert result.data.dispatch_status == "uncertain"
     assert result.data.status == "pending"
     assert result.data.run_number == 1
     assert PipelineRun.objects.filter(pipeline=pipeline, status="pending").exists()
@@ -314,7 +318,7 @@ def test_trigger_pipeline_run_creates_pending_run(user, org, pipeline, permissio
 # ---------------------------------------------------------------------------
 
 
-def test_cancel_pipeline_run_transitions_to_cancelled(user, org, pipeline, permission_resolver):
+def test_legacy_unreviewed_cancel_cannot_claim_terminal_success(user, org, pipeline, permission_resolver):
     run = PipelineRun.objects.create(
         pipeline=pipeline,
         run_number=1,
@@ -327,14 +331,14 @@ def test_cancel_pipeline_run_transitions_to_cancelled(user, org, pipeline, permi
     permission_resolver.grant(Permission.APP_UPDATE)
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         result = mutation.cancel_pipeline_run(info, run_id=str(run.guid))
-    assert result.ok, result.errors
-    assert result.data.status == "cancelled"
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
     run.refresh_from_db()
-    assert run.status == "cancelled"
-    assert run.finished_at is not None
+    assert run.status == "pending"
+    assert run.finished_at is None
 
 
-def test_cancel_pipeline_run_cascades_to_jobs_and_steps(user, org, pipeline, permission_resolver):
+def test_legacy_unreviewed_cancel_preserves_active_jobs_and_steps(user, org, pipeline, permission_resolver):
     """The mutation must settle the whole run, not only its own row.
 
     Asserted through the mutation rather than the service, because the
@@ -367,13 +371,14 @@ def test_cancel_pipeline_run_cascades_to_jobs_and_steps(user, org, pipeline, per
     with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
         result = mutation.cancel_pipeline_run(info, run_id=str(run.guid))
 
-    assert result.ok, result.errors
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
     run.refresh_from_db()
     job_run.refresh_from_db()
     step_run.refresh_from_db()
-    assert run.status == "cancelled"
-    assert job_run.status == "cancelled", "job run left running after its pipeline was cancelled"
-    assert step_run.status == "cancelled", "step run left running after its pipeline was cancelled"
+    assert run.status == "running"
+    assert job_run.status == "running"
+    assert step_run.status == "running"
 
 
 def test_cancel_pipeline_run_already_finished(user, org, pipeline, permission_resolver):

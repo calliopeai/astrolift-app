@@ -6,6 +6,7 @@ import { useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { useReviewedStart } from "@/components/reviewed-starts/use-reviewed-start";
 import { useListState } from "@/components/list/use-list-state";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
@@ -14,7 +15,6 @@ import {
   useDeleteConfiguredWorkflow,
   useDeleteDefinition,
   useRunWorkflow,
-  useRunWorkflowDefinition,
   useUpdateConfiguredWorkflow,
   useWorkflowDefinitionRuns,
   useWorkflowDefinitions,
@@ -137,7 +137,7 @@ export function useWorkflowsList() {
   });
 
   const [runConfigured] = useRunWorkflow();
-  const [runDefinition] = useRunWorkflowDefinition();
+  const reviewedStart = useReviewedStart("workflow");
   const [updateConfigured] = useUpdateConfiguredWorkflow();
   const [deleteConfigured] = useDeleteConfiguredWorkflow();
   const [deleteDefinition] = useDeleteDefinition();
@@ -162,11 +162,8 @@ export function useWorkflowsList() {
         if (!data?.runWorkflow?.ok)
           return toastErrors(data?.runWorkflow?.errors ?? [], "Failed to start run");
       } else {
-        const { data } = await runDefinition({
-          variables: { workflowSlug: row.slug, triggerPayload: null },
-        });
-        if (!data?.runWorkflowDefinition?.ok)
-          return toastErrors(data?.runWorkflowDefinition?.errors ?? [], "Failed to start run");
+        if (row.definition) await reviewedStart.open(row.definition.guid);
+        return;
       }
       toast.success("Run started", { description: row.name });
       router.push(`/workflows/${encodeURIComponent(row.slug)}/runs`);
@@ -230,6 +227,7 @@ export function useWorkflowsList() {
   const totalConfigured = configuredQ.data?.workflowsPage.totalCount ?? null;
 
   return {
+    startDialog: reviewedStart.dialog,
     list,
     rows,
     totalCount,

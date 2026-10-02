@@ -1,13 +1,12 @@
-"""run_workflow_definition GraphQL mutation (#976).
+"""Legacy reviewed Definition start compatibility (#2236).
 
 This mutation is permission- and tenant-gated, validates the visible
 WorkflowDefinition (exists / enabled / has stages), then starts the shared
 stage executor (WorkflowDefinitionRunWorkflow) via
-``workflows.run_service.start_workflow_definition_run`` — creating the
+the reviewed durable start service — creating the
 WorkflowRun mirror + WorkflowInstance. These tests pin that contract without
-a real Temporal worker: ``start_workflow`` is patched at its canonical module
-(``astrolift_workflows.client.start_workflow``) because run_service imports it
-locally inside the function, so a stale re-export would let a real call leak.
+a real Temporal worker: ``start_workflow_once`` is patched at its canonical
+module. Separate real Temporal tests cover the durable executor.
 """
 
 from __future__ import annotations
@@ -19,8 +18,10 @@ from django.contrib.auth import get_user_model
 
 from astrolift_operations.models import WorkflowRun
 from core.permissions import Permission, PermissionDenied
+from core.run_input_contract import digest
 from core.tenancy import TenantContext, tenant_context
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
+from workflows.reviewed_starts import definition_revision
 from workflows.schema.mutations import Mutation
 
 pytestmark = pytest.mark.django_db
@@ -59,7 +60,7 @@ def _definition(*, organization, slug="wf-run-test", enabled=True, with_stage=Tr
         WorkflowStage.objects.create(
             definition=wd,
             order=0,
-            kind=WorkflowStage.StageKind.AGENT_DISPATCH,
+            kind=WorkflowStage.StageKind.CHECKPOINT,
         )
     return wd
 
@@ -69,11 +70,11 @@ def patched_start(monkeypatch):
     """Patch the canonical Temporal entry point run_service imports locally."""
     calls = []
 
-    def _fake(name, *, args=None, workflow_id=None, **kw):
+    def _fake(name, args=None, *, workflow_id=None, **kw):
         calls.append({"name": name, "args": args, "workflow_id": workflow_id})
-        return SimpleNamespace(enqueued=True, run_id="test-run-id")
+        return SimpleNamespace(enqueued=True, run_id="test-run-id", workflow_id=workflow_id)
 
-    monkeypatch.setattr("astrolift_workflows.client.start_workflow", _fake)
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow_once", _fake)
     return calls
 
 
@@ -84,7 +85,15 @@ def test_happy_path_starts_executor_and_creates_rows(patched_start, permission_r
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
 
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_user.pk)):
-        result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
+        result = Mutation().run_workflow_definition(
+            info,
+            workflow_slug=wd.slug,
+            definition_id=str(wd.guid),
+            expected_revision=definition_revision(wd),
+            expected_input_schema_digest=digest(wd.input_schema),
+            request_id="legacy-reviewed-start",
+            confirmed=True,
+        )
 
     assert result.ok is True
     # WorkflowRun mirror created, kind + derived workflow id correct.
@@ -126,7 +135,7 @@ def test_unknown_slug_returns_error_no_start(patched_start, permission_resolver)
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
         result = Mutation().run_workflow_definition(info, workflow_slug="does-not-exist")
     assert result.ok is False
-    assert result.errors[0].field == "workflow_slug"
+    assert result.errors[0].messages[0].startswith("PRECONDITION:")
     assert patched_start == []
 
 
@@ -138,7 +147,7 @@ def test_disabled_definition_returns_error(patched_start, permission_resolver):
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
         result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
     assert result.ok is False
-    assert result.errors[0].field == "workflow_slug"
+    assert result.errors[0].messages[0].startswith("PRECONDITION:")
     assert patched_start == []
 
 
@@ -150,7 +159,7 @@ def test_definition_with_no_stages_returns_error(patched_start, permission_resol
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
         result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
     assert result.ok is False
-    assert "no stages" in result.errors[0].messages[0].lower()
+    assert "PRECONDITION" in result.errors[0].messages[0]
     assert patched_start == []
     assert not WorkflowRun.objects.exists()
 
@@ -166,6 +175,6 @@ def test_foreign_org_definition_is_not_runnable(patched_start, permission_resolv
         result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
 
     assert result.ok is False
-    assert "not found" in result.errors[0].messages[0].lower()
+    assert "PRECONDITION" in result.errors[0].messages[0]
     assert patched_start == []
     assert not WorkflowRun.objects.exists()

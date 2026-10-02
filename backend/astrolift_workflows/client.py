@@ -186,6 +186,82 @@ def start_workflow(
     return WorkflowHandle(workflow_id=wf_id, run_id=run_id, enqueued=True)
 
 
+async def _verify_existing_start(client, workflow_name, args, workflow_id, run_id):
+    handle = client.get_workflow_handle(workflow_id, run_id=run_id)
+    description = await handle.describe(rpc_timeout=timedelta(seconds=3))
+    if description.workflow_type != workflow_name:
+        raise RuntimeError("The existing execution belongs to a different workflow")
+    started = None
+    async for event in handle.fetch_history_events(page_size=1, rpc_timeout=timedelta(seconds=3)):
+        if event.HasField("workflow_execution_started_event_attributes"):
+            started = event.workflow_execution_started_event_attributes
+        break
+    if started is None:
+        raise RuntimeError("Existing execution inputs are unavailable")
+    values = await client.data_converter.decode(
+        started.input.payloads, type_hints=[type(value) for value in args]
+    )
+    if values != args:
+        raise RuntimeError("Existing execution inputs differ from the reviewed request")
+    return run_id
+
+
+@async_to_sync
+async def _recover_start_once(workflow_name, args, workflow_id):
+    from temporalio.service import RPCError, RPCStatusCode
+
+    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+    try:
+        description = await client.get_workflow_handle(workflow_id).describe(rpc_timeout=timedelta(seconds=3))
+    except RPCError as exc:
+        if exc.status == RPCStatusCode.NOT_FOUND:
+            return None
+        raise
+    return await _verify_existing_start(client, workflow_name, args, workflow_id, description.run_id)
+
+
+def recover_workflow_once(workflow_name, args, *, workflow_id):
+    """Read-only reconciliation of a platform-reserved, never-reused ID."""
+    if not _temporal_enabled():
+        raise RuntimeError("The workflow engine is disabled")
+    run_id = _recover_start_once(workflow_name, args, workflow_id)
+    return WorkflowHandle(workflow_id, run_id, True) if run_id else None
+
+
+@async_to_sync
+async def _start_once(workflow_name: str, args: list[Any], workflow_id: str, task_queue: str):
+    from temporalio.common import WorkflowIDReusePolicy
+    from temporalio.exceptions import WorkflowAlreadyStartedError
+
+    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+    try:
+        handle = await client.start_workflow(
+            workflow_name,
+            args=args,
+            id=workflow_id,
+            task_queue=task_queue,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+            rpc_timeout=timedelta(seconds=5),
+        )
+        return handle.result_run_id or handle.first_execution_run_id or ""
+    except WorkflowAlreadyStartedError as exc:
+        if not exc.run_id:
+            raise RuntimeError("Existing execution identity is unavailable") from exc
+        return await _verify_existing_start(client, workflow_name, args, workflow_id, exc.run_id)
+
+
+def start_workflow_once(
+    workflow_name: str, args: list[Any], *, workflow_id: str, task_queue: str | None = None
+) -> WorkflowHandle:
+    """Join an existing exact start; never replace or repeat a closed execution."""
+    if not _temporal_enabled():
+        raise RuntimeError("The workflow engine is disabled")
+    run_id = _start_once(workflow_name, args, workflow_id, task_queue or _task_queue())
+    if not run_id:
+        raise RuntimeError("The workflow engine did not return an execution identity")
+    return WorkflowHandle(workflow_id=workflow_id, run_id=run_id, enqueued=True)
+
+
 def signal_workflow(workflow_id: str, signal_name: str, *args: Any) -> bool:
     """Best-effort signal. Returns False when disabled or not found."""
     if not _temporal_enabled():
@@ -197,6 +273,27 @@ def signal_workflow(workflow_id: str, signal_name: str, *args: Any) -> bool:
     except Exception:
         logger.exception("temporal signal failed: id=%s signal=%s", workflow_id, signal_name)
         return False
+
+
+@async_to_sync
+async def _signal_exact(workflow_id, run_id, signal_name):
+    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+    handle = client.get_workflow_handle(workflow_id, run_id=run_id)
+    description = await handle.describe(rpc_timeout=timedelta(seconds=3))
+    if (
+        description.run_id != run_id
+        or description.workflow_type != "PipelineRunWorkflow"
+        or description.status.name != "RUNNING"
+    ):
+        raise RuntimeError("The reviewed pipeline execution is no longer running")
+    await handle.signal(signal_name, rpc_timeout=timedelta(seconds=3))
+
+
+def signal_pipeline_execution(workflow_id, run_id):
+    """Acknowledge a signal to precisely the reviewed pipeline incarnation."""
+    if not workflow_id or not run_id or not _temporal_enabled():
+        raise RuntimeError("The exact workflow execution is unavailable")
+    _signal_exact(workflow_id, run_id, "cancel")
 
 
 def terminate_workflow(workflow_id: str, reason: str, *, run_id: str | None = None) -> bool:

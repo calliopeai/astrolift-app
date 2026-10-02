@@ -335,7 +335,7 @@ def test_every_terminal_transition_anywhere_records():
     )
 
 
-def test_the_cancel_service_records():
+def test_observed_cancellation_records_at_the_worker():
     """Pinned by name, because the cancel path has no assignment shape.
 
     It settles the run through `state_machine.transition_pipeline_run`,
@@ -343,15 +343,16 @@ def test_the_cancel_service_records():
     end matches the sweep above. Same situation as the runner endpoint, and
     the same remedy.
 
-    This is where the cancel metric lives now. It used to live in the
-    GraphQL mutation; moving it to the service means a second cancel entry
-    point cannot forget it.
+    This is where the observed cancel metric lives now. Requesting a cancel
+    cannot record terminal success before the worker observes closure.
     """
-    target = run_status_sites.find_named("astrolift_pipelines/cancellation.py", "cancel_pipeline_run")
+    target = run_status_sites.find_named(
+        "astrolift_workflows/activities/pipeline_job_spawn.py", "_mark_pipeline_run_failed_sync"
+    )
 
     assert target is not None, (
-        "cancellation.cancel_pipeline_run is gone or renamed; this ratchet is "
-        "now blind. Point it at whatever cancels a run instead."
+        "The worker terminal-state writer is gone or renamed; point this "
+        "ratchet at the activity that records observed cancellation."
     )
     assert run_status_sites.calls_any(target, _RECORDER_NAMES), (
         "the cancel service settles a run without recording a metric, so "

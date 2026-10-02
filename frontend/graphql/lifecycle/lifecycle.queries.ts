@@ -1228,3 +1228,37 @@ export const GET_APP_DEPLOY_TOKEN_ROTATION_METADATA = gql`
     }
   }
 `;
+
+export const GET_APP_EXEC_TARGET = gql`
+  query GetAppExecTarget(
+    $appSlug: String!
+    $workloadSlug: String!
+    $environmentId: GUID!
+    $podName: String!
+    $container: String!
+  ) {
+    astroliftAppExecTarget(
+      appSlug: $appSlug
+      workloadSlug: $workloadSlug
+      environmentId: $environmentId
+      podName: $podName
+      container: $container
+    ) {
+      workloadId
+      workloadVersion
+      appId
+      appVersion
+      environmentId
+      environmentName
+      environmentVersion
+      clusterId
+      clusterVersion
+      namespace
+      podName
+      podUid
+      container
+      podBinding
+      resumable
+    }
+  }
+`;

@@ -14,6 +14,8 @@ import { GET_SECRET_CHANGE_PROPOSAL } from "@/graphql/services/services.queries"
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { invalidateSecretProposalQueue } from "./secret-proposal-queue-events";
+
 interface GetResp {
   astroliftSecretChangeProposal: AstroliftSecretChangeProposal | null;
 }
@@ -69,6 +71,7 @@ export function useSecretProposalDetail(proposalId: string) {
     if (!result?.ok) {
       throw new Error(result?.errors[0]?.message ?? t("toasts.approveFailed"));
     }
+    invalidateSecretProposalQueue();
     toast.success(t("toasts.approveOk"));
     refetch().catch(() => {});
   }
@@ -81,6 +84,7 @@ export function useSecretProposalDetail(proposalId: string) {
     if (!result?.ok) {
       throw new Error(result?.errors[0]?.message ?? t("toasts.rejectFailed"));
     }
+    invalidateSecretProposalQueue();
     toast.success(t("toasts.rejectOk"));
     refetch().catch(() => {});
   }
@@ -91,6 +95,7 @@ export function useSecretProposalDetail(proposalId: string) {
     if (!result?.ok) {
       throw new Error(result?.errors[0]?.message ?? t("toasts.withdrawFailed"));
     }
+    invalidateSecretProposalQueue();
     toast.success(t("toasts.withdrawOk"));
     router.push("/approvals");
   }

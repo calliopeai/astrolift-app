@@ -483,6 +483,59 @@ export const LIST_SECRET_CHANGE_PROPOSALS = gql`
   }
 `;
 
+export const LIST_SECRET_CHANGE_PROPOSALS_PAGE = gql`
+  query ListSecretChangeProposalsPage(
+    $appSlug: String
+    $status: String
+    $limit: Int!
+    $after: String
+  ) {
+    astroliftSecretChangeProposalsPage(
+      appSlug: $appSlug
+      status: $status
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        id
+        registeredAppSlug
+        environmentName
+        op
+        status
+        proposerDisplayName
+        requiredApproverCount
+        approvalsCount
+        expiresAt
+        decidedAt
+        appliedAt
+        createdAt
+      }
+      nextCursor
+      totalCount
+      complete
+    }
+  }
+`;
+
+export const GET_SECRET_CHANGE_PROPOSAL_METADATA = gql`
+  query GetSecretChangeProposalMetadata($id: GUID!) {
+    astroliftSecretChangeProposalMetadata(id: $id) {
+      id
+      registeredAppSlug
+      environmentName
+      op
+      status
+      proposerDisplayName
+      requiredApproverCount
+      approvalsCount
+      expiresAt
+      decidedAt
+      appliedAt
+      createdAt
+    }
+  }
+`;
+
 export const GET_SECRET_CHANGE_PROPOSAL = gql`
   ${SECRET_CHANGE_PROPOSAL_FIELDS}
   query GetSecretChangeProposal($id: GUID!) {

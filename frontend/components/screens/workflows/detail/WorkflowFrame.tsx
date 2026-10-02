@@ -42,6 +42,7 @@ export interface WorkflowFrameProps {
   slug: string;
   /** The current pathname: picks the active tab. */
   pathname: string;
+  exactDefinitionId?: string | null;
   /** Null while loading, when the load failed, or when nothing has this slug. */
   workflow: WorkflowFrameSubject | null;
   loading?: boolean;
@@ -55,6 +56,8 @@ export interface WorkflowFrameProps {
   /** The workflow may be deleted by this viewer: the `⋯` menu links its Danger zone. */
   canDelete?: boolean;
   dispatching?: boolean;
+  reviewedDefinitionStart?: boolean;
+  startDialog?: React.ReactNode;
   /** Starts one run; resolves true once it started, and the sheet closes. */
   onRun: () => Promise<boolean>;
   onCopyId: () => void;
@@ -74,6 +77,7 @@ export interface WorkflowFrameProps {
 export function WorkflowFrame({
   slug,
   pathname,
+  exactDefinitionId,
   workflow,
   loading = false,
   error,
@@ -82,12 +86,21 @@ export function WorkflowFrame({
   canRun,
   canDelete = false,
   dispatching = false,
+  reviewedDefinitionStart = false,
+  startDialog,
   onRun,
   onCopyId,
   children,
 }: WorkflowFrameProps) {
   const [runOpen, setRunOpen] = React.useState(false);
-  const tabs = workflowTabs(slug, pathname);
+  const preserveDefinition = (href: string) =>
+    exactDefinitionId
+      ? `${href}${href.includes("?") ? "&" : "?"}definitionId=${encodeURIComponent(exactDefinitionId)}`
+      : href;
+  const tabs = workflowTabs(slug, pathname).map((tab) => ({
+    ...tab,
+    href: preserveDefinition(tab.href),
+  }));
   const areaCrumb: Crumb = areaSwitcher(NAV, "agents", "workflows");
   const listCrumb: Crumb = { label: "Workflows", href: "/workflows" };
   const pending = loading && !workflow;
@@ -184,7 +197,7 @@ export function WorkflowFrame({
   const primaryAction = canRun ? (
     <Button
       size="sm"
-      onClick={() => setRunOpen(true)}
+      onClick={() => (reviewedDefinitionStart ? void onRun() : setRunOpen(true))}
       disabled={dispatching || !workflow.isEnabled}
       title={workflow.isEnabled ? undefined : "Enable this workflow to run it"}
     >
@@ -202,7 +215,7 @@ export function WorkflowFrame({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <DropdownMenuItem asChild>
-          <Link href={workflowTabHref(workflow.slug, "triggers")}>
+          <Link href={preserveDefinition(workflowTabHref(workflow.slug, "triggers"))}>
             <ZapIcon className="size-4" />
             Edit triggers
           </Link>
@@ -215,7 +228,11 @@ export function WorkflowFrame({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild variant="destructive">
-              <Link href={workflowSectionHref(workflow.slug, "settings", "danger-zone")}>
+              <Link
+                href={preserveDefinition(
+                  workflowSectionHref(workflow.slug, "settings", "danger-zone")
+                )}
+              >
                 <Trash2Icon className="size-4" />
                 Delete workflow
               </Link>
@@ -273,8 +290,9 @@ export function WorkflowFrame({
 
       {children}
 
+      {startDialog}
       {canRun && (
-        <Sheet open={runOpen} onOpenChange={setRunOpen}>
+        <Sheet open={runOpen && !reviewedDefinitionStart} onOpenChange={setRunOpen}>
           <SheetContent className="flex flex-col">
             <SheetHeader>
               <SheetTitle className="[overflow-wrap:anywhere]">Run {workflow.name}</SheetTitle>
