@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-from contextlib import ExitStack
 from unittest.mock import patch
 
 import pytest
@@ -12,30 +11,10 @@ from _sdk.managed_service import DeprovisionSpec, ServiceHandle, UpdateSpec
 from aws._naming import iam_role_name
 from aws.managed._base import ManagedServiceError, tags_for
 from aws.managed.faas_lambda import LambdaDriver
-from tests.aws._lambda_native_2032 import native_lambda
+from tests.aws._lambda_native_2032 import native_lambda, no_effects
 from tests.aws.test_managed_faas_lambda import _ID, _spec
 
 OTHER = "b1234567-1234-4234-8234-123456789012"
-LAMBDA_EFFECTS = (
-    "create_function",
-    "update_function_code",
-    "update_function_configuration",
-    "delete_function",
-    "create_function_url_config",
-    "update_function_url_config",
-    "delete_function_url_config",
-    "add_permission",
-    "remove_permission",
-    "tag_resource",
-)
-IAM_EFFECTS = (
-    "create_role",
-    "update_assume_role_policy",
-    "put_role_policy",
-    "delete_role_policy",
-    "delete_role",
-    "tag_role",
-)
 
 
 @pytest.fixture
@@ -54,16 +33,6 @@ def provision(cloud, **kwargs):
 
 def name(handle):
     return handle.partition("/")[2]
-
-
-def no_effects(cloud):
-    stack = ExitStack()
-    spies = [
-        stack.enter_context(patch.object(client, key, wraps=getattr(client, key)))
-        for client, keys in ((cloud.api, LAMBDA_EFFECTS), (cloud.iam, IAM_EFFECTS))
-        for key in keys
-    ]
-    return stack, spies
 
 
 def legacy(cloud, function_name="astrolift-legacy-2032", service_id=_ID):

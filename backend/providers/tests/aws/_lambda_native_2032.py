@@ -4,13 +4,45 @@ from __future__ import annotations
 
 import io
 import zipfile
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import boto3
 from moto import mock_aws
 
 from aws.managed.faas_lambda import LambdaConfig, LambdaDriver
+
+LAMBDA_EFFECTS = (
+    "create_function",
+    "update_function_code",
+    "update_function_configuration",
+    "delete_function",
+    "create_function_url_config",
+    "update_function_url_config",
+    "delete_function_url_config",
+    "add_permission",
+    "remove_permission",
+    "tag_resource",
+)
+IAM_EFFECTS = (
+    "create_role",
+    "update_assume_role_policy",
+    "put_role_policy",
+    "delete_role_policy",
+    "delete_role",
+    "tag_role",
+)
+
+
+def no_effects(cloud):
+    stack = ExitStack()
+    spies = [
+        stack.enter_context(patch.object(client, key, wraps=getattr(client, key)))
+        for client, keys in ((cloud.api, LAMBDA_EFFECTS), (cloud.iam, IAM_EFFECTS))
+        for key in keys
+    ]
+    return stack, spies
 
 
 @contextmanager

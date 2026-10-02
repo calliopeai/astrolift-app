@@ -7,8 +7,6 @@ from unittest.mock import patch
 import pytest
 from aws._naming import iam_role_name
 from aws.managed.faas_lambda import LambdaDriver
-from tests.aws._lambda_native_2032 import native_lambda
-from tests.aws.test_lambda_naming_moto_2032 import no_effects
 
 from astrolift_drivers.registry import PluginManifest, PluginRegistry
 from astrolift_workflows.activities.managed_service_lifecycle import (
@@ -18,6 +16,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     build_provision_spec,
 )
 from astrolift_workflows.tests.test_recorded_handle_exclusive_2086 import _service
+from providers.tests.aws._lambda_native_2032 import native_lambda, no_effects
 
 pytestmark = pytest.mark.django_db
 
