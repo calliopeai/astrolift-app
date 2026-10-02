@@ -6987,5 +6987,74 @@
       "stopRefreshFailed": "작업은 중지됐지만 화면을 새로 고치지 못했습니다. 새로 고침하여 최신 상태를 확인하세요.",
       "dispatchUnconfirmed": "서버가 작업 ID를 반환하지 않았습니다. 다시 시도하기 전에 에이전트 실행을 확인하세요."
     }
+  },
+  "agentFrame": {
+    "agents": "에이전트",
+    "notFound": "찾을 수 없습니다",
+    "agentNotFound": "에이전트를 찾을 수 없습니다",
+    "sections": "에이전트 섹션",
+    "moreActions": "추가 작업",
+    "loadFailed": "이 에이전트를 불러오지 못했습니다",
+    "retry": "다시 시도",
+    "noSlug": "slug가 {slug}인 에이전트가 없습니다",
+    "missingDescription": "등록이 해제됐거나 다른 조직에 속해 있거나 조회 권한이 없을 수 있습니다.",
+    "back": "에이전트 목록으로 돌아가기",
+    "openCluster": "관리에서 클러스터 {slug} 열기",
+    "runNow": "지금 실행",
+    "openRepo": "저장소 열기",
+    "editConfig": "설정 편집",
+    "copyId": "에이전트 ID 복사",
+    "archive": "보관 또는 삭제",
+    "lastFailed": "마지막 실행 실패",
+    "openRun": "실행 열기",
+    "noReason": "실행에서 이유를 보고하지 않았습니다.",
+    "runTitle": "{name} 지금 실행",
+    "runDescription": "에이전트의 저장된 설정으로 한 번 실행합니다. 실행 목록에 현재 상태가 표시됩니다.",
+    "runMode": "실행 모드",
+    "cluster": "클러스터",
+    "cancel": "취소",
+    "starting": "시작 중…",
+    "unknownDate": "날짜 불명",
+    "idCopied": "에이전트 ID를 복사했습니다",
+    "copyFailed": "에이전트 ID를 복사하지 못했습니다.",
+    "managedModel": "관리형 모델",
+    "apiKey": "API 키",
+    "tabs": {
+      "overview": "개요",
+      "runs": "실행",
+      "configuration": "구성",
+      "skills": "스킬 및 도구",
+      "logs": "로그 및 메트릭",
+      "secrets": "시크릿",
+      "access": "접근",
+      "settings": "설정"
+    },
+    "status": {
+      "running": "{count}개 실행 중",
+      "paused": "일시 중지",
+      "failed": "마지막 실행 실패",
+      "never": "실행 이력 없음",
+      "ready": "준비됨"
+    },
+    "modes": {
+      "task": "작업",
+      "service": "서비스",
+      "once": "한 번",
+      "loop": "반복",
+      "schedule": "예약",
+      "trigger": "트리거",
+      "persistent": "상시"
+    },
+    "input": {
+      "title": "실행 중인 에이전트에 메시지 보내기",
+      "placeholder": "실행 중인 에이전트에 후속 메시지를 보내세요…",
+      "ariaLabel": "감독자 메시지",
+      "send": "보내기",
+      "hint": "대기열에 추가되어 에이전트의 다음 턴이 시작될 때 전달됩니다.",
+      "notQueued": "메시지를 대기열에 추가하지 못했습니다",
+      "queued": "에이전트의 다음 턴을 위해 메시지를 대기열에 추가했습니다",
+      "failed": "감독자에 연결하지 못했습니다",
+      "unconfirmed": "서버가 대기 중인 메시지 ID를 반환하지 않았습니다. 다시 보내기 전에 실행 중인 작업을 확인하세요."
+    }
   }
 }

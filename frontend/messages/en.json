@@ -7067,5 +7067,74 @@
       "stopRefreshFailed": "The task stopped, but the view could not refresh. Refresh to see its latest state.",
       "dispatchUnconfirmed": "The server did not return a task ID. Check agent runs before trying again."
     }
+  },
+  "agentFrame": {
+    "agents": "Agents",
+    "notFound": "Not found",
+    "agentNotFound": "Agent not found",
+    "sections": "Agent sections",
+    "moreActions": "More actions",
+    "loadFailed": "Could not load this agent",
+    "retry": "Retry",
+    "noSlug": "No agent with slug {slug}",
+    "missingDescription": "It may have been deregistered, belong to a different organization, or you may not have permission to view it.",
+    "back": "Back to agents",
+    "openCluster": "Open cluster {slug} in Admin",
+    "runNow": "Run now",
+    "openRepo": "Open repository",
+    "editConfig": "Edit configuration",
+    "copyId": "Copy agent ID",
+    "archive": "Archive or delete",
+    "lastFailed": "Last run failed",
+    "openRun": "Open run",
+    "noReason": "The run reported no reason.",
+    "runTitle": "Run {name} now",
+    "runDescription": "Starts one run with the agent’s saved configuration. It shows under Runs with a live status.",
+    "runMode": "Run mode",
+    "cluster": "Cluster",
+    "cancel": "Cancel",
+    "starting": "Starting…",
+    "unknownDate": "Unknown date",
+    "idCopied": "Agent ID copied",
+    "copyFailed": "Could not copy the agent ID.",
+    "managedModel": "managed model",
+    "apiKey": "API key",
+    "tabs": {
+      "overview": "Overview",
+      "runs": "Runs",
+      "configuration": "Configuration",
+      "skills": "Skills & tools",
+      "logs": "Logs & metrics",
+      "secrets": "Secrets",
+      "access": "Access",
+      "settings": "Settings"
+    },
+    "status": {
+      "running": "{count} running",
+      "paused": "Paused",
+      "failed": "Last run failed",
+      "never": "Never run",
+      "ready": "Ready"
+    },
+    "modes": {
+      "task": "Task",
+      "service": "Service",
+      "once": "Once",
+      "loop": "Loop",
+      "schedule": "Schedule",
+      "trigger": "Trigger",
+      "persistent": "Persistent"
+    },
+    "input": {
+      "title": "Message the running agent",
+      "placeholder": "Send a follow-up to the running agent…",
+      "ariaLabel": "Overseer message",
+      "send": "Send",
+      "hint": "Queued and delivered at the agent’s next turn boundary.",
+      "notQueued": "Message was not queued",
+      "queued": "Message queued for the next agent turn",
+      "failed": "Could not reach the overseer",
+      "unconfirmed": "The server did not return a queued-message ID. Check the running task before sending again."
+    }
   }
 }

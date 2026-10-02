@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -35,7 +36,11 @@ interface FleetResp {
   agentFleet: AstroliftAgentListItem[];
 }
 interface SendInputResp {
-  sendAgentTaskInput?: { ok: boolean; errors?: { message: string }[] };
+  sendAgentTaskInput?: {
+    ok: boolean;
+    errors?: { message: string }[];
+    data?: { id: string } | null;
+  };
 }
 
 const POLL_MS = 5000;
@@ -59,6 +64,7 @@ export function useAgentOverview({
   agent: AstroliftAgentListItem;
   orgId: string;
 }) {
+  const t = useTranslations("agentFrame.input");
   const router = useRouter();
   const detailQ = useQuery<AgentDetailResp>(GET_AGENT_DETAIL, {
     variables: { orgId, slug: agent.slug },
@@ -100,11 +106,12 @@ export function useAgentOverview({
     try {
       const response = await sendInput({ variables: { taskId, message } });
       const result = response.data?.sendAgentTaskInput;
-      if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? "Message was not queued");
-      toast.success("Message queued for the next agent turn");
+      if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? t("notQueued"));
+      if (!result.data?.id?.trim()) throw new Error(t("unconfirmed"));
+      toast.success(t("queued"));
       return true;
     } catch (error) {
-      toast.error("Could not reach the overseer", {
+      toast.error(t("failed"), {
         description: error instanceof Error ? error.message : String(error),
       });
       return false;

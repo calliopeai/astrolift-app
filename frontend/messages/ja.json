@@ -6987,5 +6987,74 @@
       "stopRefreshFailed": "タスクは停止しましたが、表示を更新できませんでした。更新して最新の状態を確認してください。",
       "dispatchUnconfirmed": "サーバーからタスク ID が返されませんでした。再試行する前に、エージェントの実行を確認してください。"
     }
+  },
+  "agentFrame": {
+    "agents": "エージェント",
+    "notFound": "見つかりません",
+    "agentNotFound": "エージェントが見つかりません",
+    "sections": "エージェントのセクション",
+    "moreActions": "その他の操作",
+    "loadFailed": "このエージェントを読み込めませんでした",
+    "retry": "再試行",
+    "noSlug": "slug が {slug} のエージェントはありません",
+    "missingDescription": "登録が解除された、別の組織に属している、または閲覧権限がない可能性があります。",
+    "back": "エージェント一覧に戻る",
+    "openCluster": "管理画面でクラスター {slug} を開く",
+    "runNow": "今すぐ実行",
+    "openRepo": "リポジトリを開く",
+    "editConfig": "設定を編集",
+    "copyId": "エージェント ID をコピー",
+    "archive": "アーカイブまたは削除",
+    "lastFailed": "前回の実行に失敗しました",
+    "openRun": "実行を開く",
+    "noReason": "実行から理由が報告されませんでした。",
+    "runTitle": "{name} を今すぐ実行",
+    "runDescription": "保存済みのエージェント設定で 1 回の実行を開始します。「実行」に現在の状態が表示されます。",
+    "runMode": "実行モード",
+    "cluster": "クラスター",
+    "cancel": "キャンセル",
+    "starting": "開始しています…",
+    "unknownDate": "日付不明",
+    "idCopied": "エージェント ID をコピーしました",
+    "copyFailed": "エージェント ID をコピーできませんでした。",
+    "managedModel": "管理対象モデル",
+    "apiKey": "API キー",
+    "tabs": {
+      "overview": "概要",
+      "runs": "実行",
+      "configuration": "設定",
+      "skills": "スキルとツール",
+      "logs": "ログとメトリクス",
+      "secrets": "シークレット",
+      "access": "アクセス",
+      "settings": "各種設定"
+    },
+    "status": {
+      "running": "{count} 件実行中",
+      "paused": "一時停止",
+      "failed": "前回の実行に失敗",
+      "never": "未実行",
+      "ready": "準備完了"
+    },
+    "modes": {
+      "task": "タスク",
+      "service": "サービス",
+      "once": "1 回",
+      "loop": "繰り返し",
+      "schedule": "スケジュール",
+      "trigger": "トリガー",
+      "persistent": "常駐"
+    },
+    "input": {
+      "title": "実行中のエージェントにメッセージを送る",
+      "placeholder": "実行中のエージェントに追加のメッセージを送信…",
+      "ariaLabel": "監督者へのメッセージ",
+      "send": "送信",
+      "hint": "キューに追加され、エージェントの次のターン開始時に配信されます。",
+      "notQueued": "メッセージをキューに追加できませんでした",
+      "queued": "次のエージェントターン用にメッセージをキューに追加しました",
+      "failed": "監督者に接続できませんでした",
+      "unconfirmed": "キューに追加されたメッセージの ID が返されませんでした。再送信する前に、実行中のタスクを確認してください。"
+    }
   }
 }

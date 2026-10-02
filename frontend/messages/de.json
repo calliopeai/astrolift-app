@@ -6990,5 +6990,74 @@
       "stopRefreshFailed": "Die Aufgabe wurde gestoppt, aber die Ansicht konnte nicht aktualisiert werden. Aktualisieren Sie sie, um den aktuellen Status zu sehen.",
       "dispatchUnconfirmed": "Der Server hat keine Aufgaben-ID zurückgegeben. Prüfen Sie die Agentenausführungen, bevor Sie es erneut versuchen."
     }
+  },
+  "agentFrame": {
+    "agents": "Agenten",
+    "notFound": "Nicht gefunden",
+    "agentNotFound": "Agent nicht gefunden",
+    "sections": "Agentenbereiche",
+    "moreActions": "Weitere Aktionen",
+    "loadFailed": "Dieser Agent konnte nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "noSlug": "Kein Agent mit dem Slug {slug}",
+    "missingDescription": "Er wurde möglicherweise abgemeldet, gehört zu einer anderen Organisation oder Sie haben keine Berechtigung, ihn anzuzeigen.",
+    "back": "Zurück zu Agenten",
+    "openCluster": "Cluster {slug} in der Verwaltung öffnen",
+    "runNow": "Jetzt ausführen",
+    "openRepo": "Repository öffnen",
+    "editConfig": "Konfiguration bearbeiten",
+    "copyId": "Agenten-ID kopieren",
+    "archive": "Archivieren oder löschen",
+    "lastFailed": "Letzte Ausführung fehlgeschlagen",
+    "openRun": "Ausführung öffnen",
+    "noReason": "Die Ausführung hat keine Ursache gemeldet.",
+    "runTitle": "{name} jetzt ausführen",
+    "runDescription": "Startet eine Ausführung mit der gespeicherten Agentenkonfiguration. Sie erscheint unter Ausführungen mit ihrem aktuellen Status.",
+    "runMode": "Ausführungsmodus",
+    "cluster": "Cluster",
+    "cancel": "Abbrechen",
+    "starting": "Wird gestartet…",
+    "unknownDate": "Unbekanntes Datum",
+    "idCopied": "Agenten-ID kopiert",
+    "copyFailed": "Die Agenten-ID konnte nicht kopiert werden.",
+    "managedModel": "verwaltetes Modell",
+    "apiKey": "API-Schlüssel",
+    "tabs": {
+      "overview": "Übersicht",
+      "runs": "Ausführungen",
+      "configuration": "Konfiguration",
+      "skills": "Fähigkeiten und Werkzeuge",
+      "logs": "Protokolle und Metriken",
+      "secrets": "Secrets",
+      "access": "Zugriff",
+      "settings": "Einstellungen"
+    },
+    "status": {
+      "running": "{count, plural, one {# läuft} other {# laufen}}",
+      "paused": "Pausiert",
+      "failed": "Letzte Ausführung fehlgeschlagen",
+      "never": "Noch nie ausgeführt",
+      "ready": "Bereit"
+    },
+    "modes": {
+      "task": "Aufgabe",
+      "service": "Dienst",
+      "once": "Einmal",
+      "loop": "Schleife",
+      "schedule": "Zeitplan",
+      "trigger": "Auslöser",
+      "persistent": "Dauerhaft"
+    },
+    "input": {
+      "title": "Dem laufenden Agenten eine Nachricht senden",
+      "placeholder": "Eine Folgemeldung an den laufenden Agenten senden…",
+      "ariaLabel": "Nachricht an die Aufsicht",
+      "send": "Senden",
+      "hint": "Die Nachricht wird eingereiht und zu Beginn des nächsten Agentendurchlaufs zugestellt.",
+      "notQueued": "Die Nachricht wurde nicht eingereiht",
+      "queued": "Nachricht für den nächsten Agentendurchlauf eingereiht",
+      "failed": "Die Aufsicht konnte nicht erreicht werden",
+      "unconfirmed": "Der Server hat keine ID für die eingereihte Nachricht zurückgegeben. Prüfen Sie die laufende Aufgabe, bevor Sie erneut senden."
+    }
   }
 }
