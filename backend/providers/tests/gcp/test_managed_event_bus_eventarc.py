@@ -982,3 +982,82 @@ def test_children_do_not_inherit_an_adopted_buss_marker(driver: EventarcDriver, 
 
     pipeline = client.resources["projects/project-1/locations/us-central1/pipelines/to-run"]
     assert "astrolift-io-adopted" not in pipeline["labels"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "astrolift-io-managed-service-id",
+        "astrolift-io-resource-parent",
+        "astrolift-io-managed-by",
+        "Astrolift.IO/Managed_Service_ID",
+        "astrolift_managed_service_id",
+        "x-astrolift-managed-service-id",
+    ],
+)
+@pytest.mark.parametrize("child", [False, True])
+def test_reserved_tenant_labels_refuse_before_provider_calls(driver, client, key, child) -> None:
+    cfg = {"message_bus_id": "owned-bus"}
+    if child:
+        cfg["pipelines"] = [{**_full_config()["pipelines"][0], "labels": {key: "foreign-id"}}]
+    else:
+        cfg["labels"] = {key: "foreign-id"}
+    refused = driver.provision(replace(SPEC, config=cfg))
+    assert not refused.ok and "Astrolift-reserved" in refused.message
+    assert client.calls == [] and client.resources == {}
+    cfg.pop("message_bus_id")
+    refused = driver.update(UpdateSpec("event_bus/us-central1/owned-bus", managed_service_id=MSID, config=cfg))
+    assert not refused.ok and "Astrolift-reserved" in refused.message
+    assert client.calls == [] and client.resources == {}
+
+
+@pytest.mark.parametrize("operation", ["prune", "delete"])
+@pytest.mark.parametrize("corrupt_root", [False, True])
+def test_prune_and_teardown_cannot_follow_foreign_bus_labels(driver, client, operation, corrupt_root) -> None:
+    handles = []
+    for bus_id, identity, organization in [
+        ("owned-bus", MSID, SPEC.organization_id),
+        ("foreign-bus", "foreign-id", "other-org"),
+    ]:
+        cfg = {
+            "message_bus_id": bus_id,
+            "deletion_protection": False,
+            "pipelines": [{**_full_config()["pipelines"][0], "id": f"{bus_id}-route"}],
+        }
+        result = driver.provision(replace(SPEC, managed_service_id=identity, organization_id=organization, config=cfg))
+        assert result.ok
+        handles.append(result.handle)
+    parent = "projects/project-1/locations/us-central1"
+    own_bus = f"{parent}/messageBuses/owned-bus"
+    own_route = f"{parent}/pipelines/owned-bus-route"
+    foreign_names = [f"{parent}/messageBuses/foreign-bus", f"{parent}/pipelines/foreign-bus-route"]
+    foreign_before = {name: deepcopy(client.resources[name]) for name in foreign_names}
+    if corrupt_root:
+        client.resources[own_bus]["labels"]["astrolift-io-managed-service-id"] = "foreign-id"
+        client.resources[own_bus]["labels"]["astrolift-io-resource-parent"] = "foreign-bus"
+    before = deepcopy(client.resources)
+    client.calls.clear()
+    if operation == "prune":
+        result = driver.update(
+            UpdateSpec(
+                handles[0],
+                managed_service_id=MSID,
+                config={"pipelines": [], "prune_pipelines": True},
+                recorded_handle_exclusive=True,
+            )
+        )
+    else:
+        result = driver.deprovision(
+            DeprovisionSpec(
+                handles[0], {"deletion_protection": False}, managed_service_id=MSID, recorded_handle_exclusive=True
+            ),
+            force_destroy=True,
+        )
+    if corrupt_root:
+        assert not result.ok
+        assert client.resources == before
+        assert not any(call[0] in {"create", "patch", "delete"} for call in client.calls)
+    else:
+        assert result.ok
+        assert own_route not in client.resources
+    assert {name: client.resources[name] for name in foreign_names} == foreign_before

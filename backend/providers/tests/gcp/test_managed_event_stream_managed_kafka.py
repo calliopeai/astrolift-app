@@ -1016,3 +1016,91 @@ def test_connect_clusters_do_not_inherit_an_adopted_clusters_marker(
 
     assert updated.ok
     assert "astrolift-io-adopted" not in client.resources[f"{parent}/connectClusters/events-connect"]["labels"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "astrolift-io-managed-service-id",
+        "astrolift-io-resource-parent",
+        "astrolift-io-managed-by",
+        "Astrolift.IO/Managed_Service_ID",
+        "astrolift_managed_service_id",
+        "x-astrolift-managed-service-id",
+    ],
+)
+@pytest.mark.parametrize("child", [False, True])
+def test_reserved_tenant_labels_refuse_before_provider_calls(driver, client, key, child) -> None:
+    cfg = {"cluster_id": "owned-events"}
+    if child:
+        cfg["connect_clusters"] = [{**_full_config()["connect_clusters"][0], "labels": {key: "foreign-id"}}]
+    else:
+        cfg["labels"] = {key: "foreign-id"}
+    refused = driver.provision(replace(SPEC, config=cfg))
+    assert not refused.ok and "Astrolift-reserved" in refused.message
+    assert client.calls == [] and client.resources == {}
+    cfg.pop("cluster_id")
+    refused = driver.update(UpdateSpec("event_stream/us-central1/owned-events", managed_service_id=MSID, config=cfg))
+    assert not refused.ok and "Astrolift-reserved" in refused.message
+    assert client.calls == [] and client.resources == {}
+
+
+@pytest.mark.parametrize("operation", ["prune", "delete"])
+@pytest.mark.parametrize("corrupt_root", [False, True])
+def test_prune_and_teardown_cannot_follow_foreign_cluster_labels(driver, client, operation, corrupt_root) -> None:
+    handles = []
+    for cluster_id, identity, organization in [
+        ("owned-events", MSID, SPEC.organization_id),
+        ("foreign-events", "foreign-id", "other-org"),
+    ]:
+        cfg = {
+            "cluster_id": cluster_id,
+            "deletion_protection": False,
+            "connect_clusters": [{**_full_config()["connect_clusters"][0], "id": f"{cluster_id}-connect"}],
+            "schema_registries": [{"id": f"{cluster_id}_registry"}],
+        }
+        result = driver.provision(replace(SPEC, managed_service_id=identity, organization_id=organization, config=cfg))
+        assert result.ok
+        handles.append(result.handle)
+    parent = "projects/project-1/locations/us-central1"
+    own_cluster = f"{parent}/clusters/owned-events"
+    own_connect = f"{parent}/connectClusters/owned-events-connect"
+    foreign_names = [
+        f"{parent}/clusters/foreign-events",
+        f"{parent}/connectClusters/foreign-events-connect",
+        f"{parent}/schemaRegistries/foreign-events_registry",
+    ]
+    foreign_before = {name: deepcopy(client.resources[name]) for name in foreign_names}
+    schema_before = deepcopy(client.schema_versions)
+    if corrupt_root:
+        client.resources[own_cluster]["labels"]["astrolift-io-managed-service-id"] = "foreign-id"
+    before = deepcopy(client.resources)
+    client.calls.clear()
+    if operation == "prune":
+        result = driver.update(
+            UpdateSpec(
+                handles[0],
+                managed_service_id=MSID,
+                config={"connect_clusters": [], "prune_connect_clusters": True},
+                recorded_handle_exclusive=True,
+            )
+        )
+    else:
+        result = driver.deprovision(
+            DeprovisionSpec(
+                handles[0], {"deletion_protection": False}, managed_service_id=MSID, recorded_handle_exclusive=True
+            ),
+            delete_data=True,
+            force_destroy=True,
+        )
+    if corrupt_root:
+        assert not result.ok
+        assert client.resources == before and client.schema_versions == schema_before
+        assert not any(call[0] in {"create", "patch", "delete", "delete_schema_subject"} for call in client.calls)
+    else:
+        assert result.ok
+        assert own_connect not in client.resources
+    assert {name: client.resources[name] for name in foreign_names} == foreign_before
+    assert {key: value for key, value in client.schema_versions.items() if key[0] == foreign_names[-1]} == {
+        key: value for key, value in schema_before.items() if key[0] == foreign_names[-1]
+    }
