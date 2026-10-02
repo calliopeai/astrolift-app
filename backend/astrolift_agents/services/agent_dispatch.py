@@ -20,7 +20,9 @@ class AgentDispatchError(RuntimeError):
         return self.message
 
 
-def _replay_or_conflict(existing, *, workload, environment_spec, trigger_payload, effective_timeout: int):
+def _replay_or_conflict(
+    existing, *, workload, environment_spec, trigger_payload, effective_timeout: int, callback=None
+):
     """``existing`` if it is the same request the caller is retrying under a
     ``client_request_id``, else raise ``precondition`` (#2072).
 
@@ -35,6 +37,13 @@ def _replay_or_conflict(existing, *, workload, environment_spec, trigger_payload
         and existing.environment_spec_id == (environment_spec.pk if environment_spec else None)
         and existing.dispatch_input == (trigger_payload or None)
         and existing.timeout_seconds == effective_timeout
+    )
+    from astrolift_agents.models import AgentTaskCompletionCallback
+
+    registered = AgentTaskCompletionCallback.all_objects.filter(task_id=existing.pk).first()
+    stored = {key: getattr(registered, key) for key in callback} if registered and callback else None
+    same = same and (
+        registered is None if callback is None else registered is not None and stored == callback
     )
     if not same:
         raise AgentDispatchError("precondition", "clientRequestId has already been used", "client_request_id")
@@ -57,6 +66,10 @@ def dispatch_registered_agent(
     brief=None,
     owner_project_id: int | None = None,
     owner_team_id: int | None = None,
+    callback_url: str | None = None,
+    callback_secret_ref: str | None = None,
+    correlation_id: str | None = None,
+    callback_mode: str = "FULL",
 ):
     """Create, prepare, queue, and durably dispatch one registered agent.
 
@@ -173,6 +186,45 @@ def dispatch_registered_agent(
     if organization is None:
         raise AgentDispatchError("not_found", "organization not found")
 
+    from astrolift_agents.completion_webhook import CallbackConfigurationError
+    from astrolift_agents.services.task_completion_callbacks import callback_configuration
+
+    if callback_url is not None:
+        from astrolift_identity.api_tokens import get_current_api_token
+        from core.permissions import (
+            Permission,
+            PermissionDenied,
+            PermissionScope,
+            ScopeKind,
+            check_permission,
+        )
+
+        token = get_current_api_token()
+        if token is not None and token.team_id is not None:
+            raise PermissionDenied(
+                Permission.SECRET_READ, None, "org-scoped secret access is required for completion callbacks"
+            )
+        check_permission(
+            Permission.SECRET_READ, scope=PermissionScope(kind=ScopeKind.ORG, id=organization_id)
+        )
+        if callback_mode == "FULL":
+            check_permission(
+                Permission.APP_READ, scope=PermissionScope(kind=ScopeKind.APP, id=workload.registered_app_id)
+            )
+    callback = (
+        {
+            "callback_url": callback_url,
+            "secret_ref": callback_secret_ref,
+            "correlation_id": correlation_id or "",
+            "mode": callback_mode,
+        }
+        if callback_url is not None
+        or callback_secret_ref is not None
+        or correlation_id is not None
+        or callback_mode != "FULL"
+        else None
+    )
+
     if environment_spec_guid:
         environment_specs = AgentEnvironmentSpec.objects.filter(
             guid=environment_spec_guid,
@@ -223,7 +275,19 @@ def dispatch_registered_agent(
                 environment_spec=environment_spec,
                 trigger_payload=trigger_payload,
                 effective_timeout=effective_timeout,
+                callback=callback,
             )
+
+    try:
+        callback = callback_configuration(
+            organization_id,
+            callback_url=callback_url,
+            callback_secret_ref=callback_secret_ref,
+            correlation_id=correlation_id,
+            callback_mode=callback_mode,
+        )
+    except CallbackConfigurationError as exc:
+        raise AgentDispatchError("validation", str(exc), "callback_url") from None
 
     try:
         with transaction.atomic():
@@ -243,6 +307,10 @@ def dispatch_registered_agent(
                 project_id=owner_project_id,
                 team_id=owner_team_id,
             )
+            if callback:
+                from astrolift_agents.models import AgentTaskCompletionCallback
+
+                AgentTaskCompletionCallback.objects.create(task=task, organization=organization, **callback)
     except IntegrityError:
         # A concurrent caller won the race for this exact key -- the
         # unique constraint, not this check, is the actual guard.
@@ -259,6 +327,7 @@ def dispatch_registered_agent(
             environment_spec=environment_spec,
             trigger_payload=trigger_payload,
             effective_timeout=effective_timeout,
+            callback=callback,
         )
 
     if brief is None:

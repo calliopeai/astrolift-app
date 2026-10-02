@@ -72,6 +72,8 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "CreateIdentityProviderInput.config",
         "UpdateIdentityProviderInput.config",
         "RegisterTenantClusterInput.authConfig",
+        "RunAstroliftAgentInput.callbackUrl",
+        "RunAstroliftAgentInput.triggerPayload",
     }
 )
 

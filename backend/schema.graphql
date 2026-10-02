@@ -69,6 +69,31 @@ input AgentRunSpecInput {
   clearScheduledScaling: Boolean! = false
 }
 
+enum AgentTaskCallbackMode {
+  FULL
+  NOTIFY
+}
+
+type AgentTaskCallbackPolicy {
+  allowedHosts: [String!]!
+}
+
+type AgentTaskCallbackPolicyMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AgentTaskCallbackPolicy
+}
+
+type AgentTaskCallbackSecret {
+  name: String!
+}
+
+type AgentTaskCallbackSecretMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AgentTaskCallbackSecret
+}
+
 type Alertruledeletedpayload {
   id: GUID!
   deleted: Boolean!
@@ -703,6 +728,9 @@ type AstroliftAgentTask {
   triggerKind: String!
   triggeredByUserId: String
   triggeredByMe: Boolean!
+  callbackStatus: String
+  callbackAttempts: Int!
+  callbackLastError: String
 }
 
 type AstroliftAgentTaskBacklog {
@@ -7691,6 +7719,9 @@ type Mutation {
   createTrigger(input: CreateTriggerInput!): AstroliftTriggerMutationResult!
   triggerPipelineRun(pipelineId: GUID!, ref: String = null): AstroliftPipelineRunMutationResult!
   cancelPipelineRun(runId: GUID!): AstroliftPipelineRunMutationResult!
+  configureAgentTaskCallbacks(allowedHosts: [String!]!): AgentTaskCallbackPolicyMutationResult!
+  setAgentTaskCallbackSecret(name: String!, value: String!): AgentTaskCallbackSecretMutationResult!
+  redeliverAgentTaskCallback(taskId: GUID!): AstroliftAgentTaskMutationResult!
   clearAgentQuarantine(id: ID!): NoneTypeMutationResult!
   createSkill(input: SkillInput!, orgId: ID!): AstroliftSkillMutationResult!
   updateSkill(id: ID!, input: SkillInput!): AstroliftSkillMutationResult!
@@ -8441,6 +8472,7 @@ type Query {
   astroliftPipelineRuns(pipelineId: String!, limit: Int! = 50): [AstroliftPipelineRun!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage.")
   astroliftPipelineRunsPage(pipelineId: String!, search: String = null, limit: Int! = 50, after: String = null): AstroliftPipelineRunPage!
   astroliftPipelineRun(id: String!): AstroliftPipelineRun
+  agentTaskCallbackPolicy: AgentTaskCallbackPolicy!
   agentQuarantines: [AstroliftAgentQuarantine!]!
   skills(orgId: ID!, isGlobal: Boolean! = false): [AstroliftSkill!]!
   skill(id: ID!): AstroliftSkill
@@ -8901,6 +8933,10 @@ input RunAstroliftAgentInput {
   triggerPayload: JSON = null
   timeoutSeconds: Int = null
   clientRequestId: String = null
+  callbackUrl: String = null
+  callbackSecretRef: String = null
+  correlationId: String = null
+  callbackMode: AgentTaskCallbackMode! = FULL
 }
 
 input RunJobOnceInput {

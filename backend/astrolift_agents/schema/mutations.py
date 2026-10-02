@@ -49,6 +49,9 @@ from astrolift_agents.schema.types import (
     AgentSecretBundleType,
     AgentSecretRevealType,
     AgentSecretStatusType,
+    AgentTaskCallbackMode,
+    AgentTaskCallbackPolicyType,
+    AgentTaskCallbackSecretType,
     AgentTaskInputMessageType,
     AgentTaskInputReplyType,
     AgentTaskType,
@@ -242,7 +245,15 @@ class RunAstroliftAgentInput:
     independent task rather than either colliding with or recovering the
     first caller's. ``agentTaskByClientRequestId`` recovers the task for a
     key without dispatching anything, and likewise resolves only the
-    calling user's own keys.
+    calling user's own keys. Callback destination, signing-secret reference,
+    correlation ID and mode are also part of the idempotency comparison.
+
+    ``callback_url`` registers a signed final-state notification to an HTTPS
+    destination on the organization's callback host allow-list.
+    ``callback_secret_ref`` names an organization signing secret; it never
+    contains the key itself. ``correlation_id`` is returned unchanged and
+    is limited to 128 characters. ``callback_mode`` defaults to FULL;
+    NOTIFY omits the result so callers can fetch it through ``agentTask``.
     """
 
     agent_slug: str
@@ -253,6 +264,10 @@ class RunAstroliftAgentInput:
     trigger_payload: JSON | None = None
     timeout_seconds: int | None = None
     client_request_id: str | None = None
+    callback_url: str | None = None
+    callback_secret_ref: str | None = None
+    correlation_id: str | None = None
+    callback_mode: AgentTaskCallbackMode = AgentTaskCallbackMode.FULL
 
 
 @strawberry.input
@@ -820,6 +835,109 @@ def _agent_secrets_backend(spec):
 
 @strawberry.type
 class AgentsMutation:
+    @strawberry.field
+    @mutation_audit(action="agents.callback.configure")
+    @require_permission(Permission.ORG_UPDATE, scope=agent_org_scope)
+    @tenant_scoped()
+    def configure_agent_task_callbacks(
+        self, info: Info, allowed_hosts: list[str]
+    ) -> MutationResultType[AgentTaskCallbackPolicyType]:
+        from astrolift_agents.completion_webhook import CallbackConfigurationError
+        from astrolift_identity.api_tokens import get_current_api_token
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.organization_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        token = get_current_api_token()
+        if token is not None and (
+            token.organization_id != tenant.organization_id or token.team_id is not None
+        ):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "callback policy changes require an organization-scoped credential",
+            )
+        from astrolift_agents.services.task_completion_callbacks import configure_policy
+
+        try:
+            policy = configure_policy(tenant.organization_id, allowed_hosts)
+        except CallbackConfigurationError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="allowedHosts")
+        return gql_success(AgentTaskCallbackPolicyType(allowed_hosts=policy.allowed_hosts))
+
+    @strawberry.field
+    @mutation_audit(action="agents.callback.secret.write")
+    @require_permission(Permission.SECRET_WRITE, scope=agent_org_scope)
+    @tenant_scoped()
+    def set_agent_task_callback_secret(
+        self, info: Info, name: str, value: str
+    ) -> MutationResultType[AgentTaskCallbackSecretType]:
+        from astrolift_agents.completion_webhook import CallbackConfigurationError
+        from astrolift_identity.api_tokens import get_current_api_token
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.organization_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        token = get_current_api_token()
+        if token is not None and (
+            token.organization_id != tenant.organization_id or token.team_id is not None
+        ):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "callback signing keys require an organization-scoped credential",
+            )
+        from astrolift_agents.services.task_completion_callbacks import set_callback_secret
+
+        try:
+            set_callback_secret(tenant.organization_id, name, value)
+        except CallbackConfigurationError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        return gql_success(AgentTaskCallbackSecretType(name=name))
+
+    @strawberry.field
+    @mutation_audit(
+        action="agents.callback.redeliver",
+        target=lambda self, info, task_id: ("AgentTask", str(task_id)),
+    )
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_task_scope("task_id", Permission.AGENT_DISPATCH),
+        operation=agent_task_operation("task_id"),
+    )
+    @require_permission(
+        Permission.APP_READ,
+        scope=agent_task_scope("task_id", Permission.APP_READ),
+        operation=agent_task_operation("task_id"),
+    )
+    @tenant_scoped()
+    def redeliver_agent_task_callback(self, info: Info, task_id: GUID) -> MutationResultType[AgentTaskType]:
+        from astrolift_agents.completion_webhook import CallbackConfigurationError
+        from astrolift_agents.services.task_completion_callbacks import redeliver_callback
+
+        tenant = get_current_tenant()
+        if tenant is None or tenant.organization_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        guid = read_guid({"task_id": task_id}, "task_id")
+        task = (
+            visible_agent_tasks(tenant.organization_id, Permission.AGENT_DISPATCH)
+            .filter(
+                guid=guid,
+                organization_id=tenant.organization_id,
+                pk__in=visible_agent_tasks(tenant.organization_id, Permission.APP_READ).values("pk"),
+            )
+            .select_related("organization", "dispatcher__tenant_cluster", "completion_callback")
+            .first()
+            if guid
+            else None
+        )
+        if task is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "task not found", field="taskId")
+        try:
+            redeliver_callback(task)
+        except CallbackConfigurationError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        task.refresh_from_db()
+        return gql_success(agent_task_to_type(task))
+
     @strawberry.field
     @mutation_audit(action="agents.quarantine.clear")
     @require_permission(Permission.AGENT_DISPATCH, scope=quarantine_scope)
@@ -2256,6 +2374,10 @@ class AgentsMutation:
                 trigger="manual",
                 trigger_kind=request_trigger(),
                 client_request_id=input.client_request_id,
+                callback_url=input.callback_url,
+                callback_secret_ref=input.callback_secret_ref,
+                correlation_id=input.correlation_id,
+                callback_mode=input.callback_mode.value,
             )
         except AgentDispatchError as exc:
             code = {
@@ -2271,6 +2393,10 @@ class AgentsMutation:
                     "environment_spec_id": "environmentSpecId",
                     "timeout_seconds": "timeoutSeconds",
                     "client_request_id": "clientRequestId",
+                    "callback_url": "callbackUrl",
+                    "callback_secret_ref": "callbackSecretRef",
+                    "correlation_id": "correlationId",
+                    "callback_mode": "callbackMode",
                 }.get(exc.field),
             )
 

@@ -70,6 +70,9 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         ScheduleKind.LOOP_TICK,
         ScheduleKind.RECONCILE_CLUSTER_CAPABILITIES,
         ScheduleKind.REHEAL_WEBHOOK_SUBSCRIPTIONS,
+        # Dispatch explicitly opted into a completion callback. Recovering its
+        # persisted outbox is part of delivery, including after Temporal outages.
+        ScheduleKind.AGENT_TASK_CALLBACK_RECONCILE,
         ScheduleKind.DRIFT_DETECTION,
         ScheduleKind.SECRET_BUNDLE_REFRESH,
         # Synthetic uptime probing ships active — it's the outage detector,

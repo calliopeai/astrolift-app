@@ -755,7 +755,10 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
                     "message": body.get("error", ""),
                     "output": body.get("result", ""),
                 }
-            task.save(update_fields=["result", "failure", "updated_at", "version"])
+            from astrolift_agents.services.task_completion_callbacks import normalized_usage
+
+            task.completion_usage = normalized_usage(body.get("usage"))
+            task.save(update_fields=["result", "failure", "completion_usage", "updated_at", "version"])
             target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
             task.transition_to(target)
 

@@ -17,6 +17,22 @@ from astrolift_graphql import GUID
 JSON = strawberry.scalars.JSON
 
 
+@strawberry.enum
+class AgentTaskCallbackMode(enum.Enum):
+    FULL = "FULL"
+    NOTIFY = "NOTIFY"
+
+
+@strawberry.type(name="AgentTaskCallbackPolicy")
+class AgentTaskCallbackPolicyType:
+    allowed_hosts: list[str]
+
+
+@strawberry.type(name="AgentTaskCallbackSecret")
+class AgentTaskCallbackSecretType:
+    name: str
+
+
 @strawberry.type(name="AstroliftAgentTaskBacklogItem")
 class AgentTaskBacklogItemType:
     id: str
@@ -273,6 +289,9 @@ class AgentTaskType:
     trigger_kind: str = "unknown"
     triggered_by_user_id: str | None = None
     triggered_by_me: bool = False
+    callback_status: str | None = None
+    callback_attempts: int = 0
+    callback_last_error: str | None = None
 
 
 @strawberry.type(name="AstroliftAgentInteraction")
@@ -733,6 +752,9 @@ def agent_tasks_to_types(tasks) -> list[AgentTaskType]:
     from astrolift_agents.visibility import watchable_task_ids
 
     rows = list(tasks)
+    from django.db.models import prefetch_related_objects
+
+    prefetch_related_objects(rows, "completion_callback")
     watchable = watchable_task_ids(rows)
     return [agent_task_to_type(task, can_watch=task.pk in watchable) for task in rows]
 
@@ -751,6 +773,11 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
     dispatcher = t.dispatcher
     if dispatcher is not None and dispatcher.organization_id != t.organization_id:
         dispatcher = None
+    callback = getattr(t, "completion_callback", None)
+    if callback is not None and (
+        callback.deleted_at is not None or callback.organization_id != t.organization_id
+    ):
+        callback = None
     return AgentTaskType(
         id=GUID(str(t.guid)),
         agent_slug=definition.slug if definition is not None else "",
@@ -777,6 +804,9 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
         trigger_kind=t.trigger_kind,
         triggered_by_user_id=str(t.triggered_by_user_id) if t.triggered_by_user_id else None,
         triggered_by_me=_is_viewer(t.triggered_by_user_id),
+        callback_status=callback.status if callback is not None else None,
+        callback_attempts=callback.attempts if callback is not None else 0,
+        callback_last_error=(callback.last_error or None) if callback is not None else None,
     )
 
 
