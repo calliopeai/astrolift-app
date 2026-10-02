@@ -140,3 +140,14 @@ export const FrenchNotFound: Story = {
     </NextIntlClientProvider>
   ),
 };
+
+export const FrenchTimeline: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <AgentRunDetail
+        {...RUN_DETAIL}
+        interactions={{ ...INTERACTION_MAP, interactions: MANY_INTERACTIONS }}
+      />
+    </NextIntlClientProvider>
+  ),
+};

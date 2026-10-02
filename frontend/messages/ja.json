@@ -7127,5 +7127,41 @@
       "webhooks": "エージェントのデプロイ時に CI と CD システムへ通知する Webhook です。",
       "model-access": "エージェントがモデルへアクセスする方法と、実行をライブ表示できるかどうかです。"
     }
+  },
+  "agentActivity": {
+    "agent": "エージェント",
+    "noCalls": "呼び出しはまだありません",
+    "calls": "{count, number} 件の呼び出し",
+    "repetitions": "{count, number}×",
+    "unnamed": "（名前なし）",
+    "loading": "インタラクションを読み込み中",
+    "emptyTitle": "インタラクションはまだ記録されていません",
+    "emptyDescription": "実行中の制御 API の呼び出し、ツールの呼び出し、承認ゲート、シグナルがここに表示されます。",
+    "earlierCalls": "以前の呼び出し {count, number} 件",
+    "earlierDetail": "インタラクションマップで呼び出しの詳細を確認できます。",
+    "hubs": {
+      "control_api": "制御 API",
+      "tool_call": "ツール",
+      "gate": "承認ゲート",
+      "signal": "シグナル"
+    },
+    "kinds": {
+      "tool_call": "ツール呼び出し",
+      "gate": "承認ゲート",
+      "signal": "シグナル"
+    },
+    "statuses": {
+      "running": "実行中",
+      "provisioning": "プロビジョニング中",
+      "queued": "キュー待機中",
+      "pending": "保留中",
+      "completed": "完了",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "timed_out": "タイムアウト",
+      "cancelled": "キャンセル済み",
+      "canceled": "キャンセル済み"
+    },
+    "graphLabel": "エージェントのインタラクションマップ"
   }
 }

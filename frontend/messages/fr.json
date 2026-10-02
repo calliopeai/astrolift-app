@@ -7130,5 +7130,41 @@
       "webhooks": "Les webhooks qui avertissent les systèmes CI et CD lors du déploiement de l’agent.",
       "model-access": "Comment l’agent accède à son modèle et si ses exécutions peuvent être suivies en direct."
     }
+  },
+  "agentActivity": {
+    "agent": "Agent",
+    "noCalls": "Aucun appel pour le moment",
+    "calls": "{count, plural, one {# appel} other {# appels}}",
+    "repetitions": "{count, number}×",
+    "unnamed": "(sans nom)",
+    "loading": "Chargement des interactions",
+    "emptyTitle": "Aucune interaction enregistrée pour le moment",
+    "emptyDescription": "Les appels à l’API de contrôle, les outils, les validations et les signaux apparaissent ici au fil de l’exécution.",
+    "earlierCalls": "{count, plural, one {# appel précédent} other {# appels précédents}}",
+    "earlierDetail": "Explorez les appels dans la carte des interactions.",
+    "hubs": {
+      "control_api": "API de contrôle",
+      "tool_call": "Outils",
+      "gate": "Validations",
+      "signal": "Signaux"
+    },
+    "kinds": {
+      "tool_call": "appel d’outil",
+      "gate": "validation",
+      "signal": "signal"
+    },
+    "statuses": {
+      "running": "En cours",
+      "provisioning": "Provisionnement",
+      "queued": "En file d’attente",
+      "pending": "En attente",
+      "completed": "Terminé",
+      "succeeded": "Réussi",
+      "failed": "Échec",
+      "timed_out": "Délai dépassé",
+      "cancelled": "Annulé",
+      "canceled": "Annulé"
+    },
+    "graphLabel": "Carte des interactions de l’agent"
   }
 }
