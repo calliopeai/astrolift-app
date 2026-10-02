@@ -17,6 +17,7 @@
  * border of its own.
  */
 
+import { useTranslations } from "next-intl";
 import type { LucideIcon } from "lucide-react";
 import * as React from "react";
 
@@ -91,10 +92,11 @@ export function OverviewNotices({
   children: React.ReactNode;
   className?: string;
 }) {
+  const t = useTranslations("apps.overview");
   return (
     <GroupedContext.Provider value={true}>
       <section
-        aria-label="Notices"
+        aria-label={t("noticesLabel")}
         className={cn("bg-card min-w-0 divide-y rounded-md border empty:hidden", className)}
       >
         {children}

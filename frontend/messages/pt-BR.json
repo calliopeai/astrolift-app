@@ -2618,6 +2618,32 @@
         "emptyTitle": "Nenhum repositório de código",
         "emptyDescription": "Conecte um repositório para compilar e implantar este aplicativo ao enviar código.",
         "emptyAction": "Abrir configurações"
+      },
+      "noticesLabel": "Avisos",
+      "autowire": {
+        "connectTitle": "Conectar a implantação automática",
+        "connectDescription": "Este aplicativo está registrado, mas ainda não está conectado ao repositório. Conecte o GitHub App (ou uma conexão do GitHub da organização) para que o Astrolift adicione o fluxo de CI, instale o webhook e implante a cada push.",
+        "connect": "Conectar",
+        "incompleteTitle": "Configuração automática incompleta",
+        "incompleteDescription": "Um git push só acionará a implantação automática quando todas as etapas estiverem conectadas. Tente novamente para concluir a configuração.",
+        "retry": "Tentar a configuração novamente",
+        "steps": {
+          "ciWorkflow": "Fluxo de CI",
+          "webhook": "Webhook do repositório",
+          "secrets": "Segredo de implantação"
+        },
+        "statuses": {
+          "wired": "conectado",
+          "missing": "não configurado",
+          "error": "falhou",
+          "phantom": "sem entregas"
+        },
+        "feedback": {
+          "failed": "A nova tentativa falhou",
+          "wired": "Implantação automática conectada",
+          "connect": "Conecte um GitHub App ou uma conexão da organização para configurar a implantação automática",
+          "attention": "Algumas etapas da configuração automática ainda precisam de atenção"
+        }
       }
     },
     "frame": {

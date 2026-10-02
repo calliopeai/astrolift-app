@@ -2618,6 +2618,32 @@
         "emptyTitle": "Kein Quellcode-Repository",
         "emptyDescription": "Verbinde ein Repository, damit ein Code-Push diese Anwendung erstellen und bereitstellen kann.",
         "emptyAction": "Einstellungen öffnen"
+      },
+      "noticesLabel": "Hinweise",
+      "autowire": {
+        "connectTitle": "Automatische Bereitstellung verbinden",
+        "connectDescription": "Diese App ist registriert, aber noch nicht mit ihrem Repository verbunden. Verbinde die GitHub App (oder eine GitHub-Verbindung der Organisation), damit Astrolift den CI-Workflow bereitstellen, den Webhook installieren und bei jedem Push eine Bereitstellung starten kann.",
+        "connect": "Verbinden",
+        "incompleteTitle": "Automatische Einrichtung unvollständig",
+        "incompleteDescription": "Ein git push löst erst dann eine automatische Bereitstellung aus, wenn alle Schritte verbunden sind. Versuche es erneut, um die Einrichtung abzuschließen.",
+        "retry": "Einrichtung erneut versuchen",
+        "steps": {
+          "ciWorkflow": "CI-Workflow",
+          "webhook": "Repository-Webhook",
+          "secrets": "Bereitstellungsgeheimnis"
+        },
+        "statuses": {
+          "wired": "verbunden",
+          "missing": "nicht eingerichtet",
+          "error": "fehlgeschlagen",
+          "phantom": "keine Zustellung"
+        },
+        "feedback": {
+          "failed": "Erneuter Versuch fehlgeschlagen",
+          "wired": "Automatische Bereitstellung verbunden",
+          "connect": "Verbinde eine GitHub App oder eine Verbindung der Organisation, um die automatische Bereitstellung einzurichten",
+          "attention": "Einige Schritte der automatischen Einrichtung erfordern noch Aufmerksamkeit"
+        }
       }
     },
     "frame": {

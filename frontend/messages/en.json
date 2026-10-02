@@ -858,6 +858,32 @@
           "token": "Tokens",
           "alert": "Alerts"
         }
+      },
+      "noticesLabel": "Notices",
+      "autowire": {
+        "connectTitle": "Connect for auto-deploy",
+        "connectDescription": "This app is registered but not wired to its repo. Connect the GitHub App (or an org GitHub connection) so Astrolift can push the CI workflow, install the webhook, and deploy on every push.",
+        "connect": "Connect",
+        "incompleteTitle": "Autowire incomplete",
+        "incompleteDescription": "A git push won’t auto-deploy until every step is wired. Retry to complete the setup.",
+        "retry": "Retry autowire",
+        "steps": {
+          "ciWorkflow": "CI workflow",
+          "webhook": "Source webhook",
+          "secrets": "Deploy secret"
+        },
+        "statuses": {
+          "wired": "wired",
+          "missing": "not set up",
+          "error": "failed",
+          "phantom": "not delivering"
+        },
+        "feedback": {
+          "failed": "Retry failed",
+          "wired": "Auto-deploy wired up",
+          "connect": "Connect a GitHub App or org connection to wire auto-deploy",
+          "attention": "Some autowire steps still need attention"
+        }
       }
     },
     "wizard": {
