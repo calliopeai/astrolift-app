@@ -49,28 +49,23 @@ export type ClusterDetailProps = ReturnType<typeof useClusterDetail> & {
 const LIFECYCLE_CONFIG: Record<
   Lifecycle,
   {
-    label: string;
     variant: "default" | "secondary" | "outline" | "destructive";
     icon: React.ReactNode;
   }
 > = {
   registered: {
-    label: "Registered",
     variant: "outline",
     icon: <LayersIcon className="size-3" />,
   },
   managing: {
-    label: "Managing…",
     variant: "secondary",
     icon: <Loader2Icon className="size-3 animate-spin" />,
   },
   managed: {
-    label: "Managed",
     variant: "default",
     icon: <CheckCircleIcon className="size-3" />,
   },
   error: {
-    label: "Error",
     variant: "destructive",
     icon: <AlertTriangleIcon className="size-3" />,
   },
@@ -128,6 +123,10 @@ export function ClusterDetail(props: ClusterDetailProps) {
   const { slug, cluster, loading, renderLiveStats, deleting, onUnregister } = props;
   const fmt = useFormatters();
   const t = useTranslations("clusters.unregister");
+  const copy = useTranslations("clusters.detail");
+  const columns = useTranslations("clusters.list.columns");
+  const chrome = useTranslations("clusters.chrome");
+  const actions = useTranslations("clusters.actions");
   const unregister = useUnregisterReview(cluster ? [cluster] : [], slug);
   const lifecycle = (cluster?.lifecycle as Lifecycle | undefined) ?? "registered";
 
@@ -143,10 +142,10 @@ export function ClusterDetail(props: ClusterDetailProps) {
         ) : (
           <EmptyState
             icon={<AlertTriangleIcon className="size-5" />}
-            title={`No cluster with slug ${slug}`}
-            description="The cluster doesn't exist or you don't have permission to view it."
+            title={copy("notFoundTitle", { slug })}
+            description={copy("notFoundDescription")}
             actionHref="/clusters"
-            actionLabel="Back to clusters"
+            actionLabel={copy("back")}
           />
         )}
       </div>
@@ -154,7 +153,7 @@ export function ClusterDetail(props: ClusterDetailProps) {
   }
 
   const provider = providerLabel(cluster.providerPluginSlug);
-  const lc = LIFECYCLE_CONFIG[lifecycle];
+  const lc = LIFECYCLE_CONFIG[lifecycle] ?? LIFECYCLE_CONFIG.registered;
   const caps = (cluster.capabilities ?? {}) as Record<string, unknown>;
   const hasCaps = Object.keys(caps).length > 0;
   const action = lifecycleAction(cluster, props);
@@ -163,7 +162,7 @@ export function ClusterDetail(props: ClusterDetailProps) {
     lifecycle === "managing" ? (
       <Button size="sm" variant="ghost" disabled>
         <Loader2Icon className="size-4 animate-spin" />
-        Setup in progress…
+        {actions("inProgress")}
       </Button>
     ) : action ? (
       <Can permission="cluster.manage">
@@ -174,7 +173,7 @@ export function ClusterDetail(props: ClusterDetailProps) {
           disabled={action.disabled}
         >
           {action.icon}
-          {action.label}
+          {actions(action.labelKey)}
         </Button>
       </Can>
     ) : null;
@@ -182,7 +181,7 @@ export function ClusterDetail(props: ClusterDetailProps) {
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" className="size-8" aria-label="Cluster actions">
+        <Button size="icon" variant="ghost" className="size-8" aria-label={copy("menuLabel")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -190,7 +189,7 @@ export function ClusterDetail(props: ClusterDetailProps) {
         <DropdownMenuItem asChild>
           <Link href={`/clusters/${cluster.slug}/settings`}>
             <SettingsIcon className="size-4" />
-            Settings
+            {chrome("tabs.settings")}
           </Link>
         </DropdownMenuItem>
         <Can permission="cluster.unregister">
@@ -223,11 +222,9 @@ export function ClusterDetail(props: ClusterDetailProps) {
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2 text-base">
               <AlertTriangleIcon className="size-4" />
-              Last management failure
+              {copy("failureTitle")}
             </CardTitle>
-            <CardDescription>
-              Fix the underlying issue and click Retry from Settings to re-run.
-            </CardDescription>
+            <CardDescription>{copy("failureHelp")}</CardDescription>
           </CardHeader>
           <CardContent>
             <pre className="text-destructive font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
@@ -242,33 +239,39 @@ export function ClusterDetail(props: ClusterDetailProps) {
         <CardHeader className="pb-3">
           <div className="flex min-w-0 items-start justify-between gap-4">
             <div className="min-w-0">
-              <CardTitle className="text-base">Management</CardTitle>
+              <CardTitle className="text-base">{copy("management")}</CardTitle>
               <CardDescription className="mt-0.5">
                 {lifecycle === "managed" && cluster.managedAt
-                  ? `Active since ${fmt.formatDateTime(cluster.managedAt)}`
+                  ? copy("activeSince", { time: fmt.formatDateTime(cluster.managedAt) })
                   : cluster.capabilitiesProbedAt
-                    ? `Capabilities probed ${fmt.formatDateTime(cluster.capabilitiesProbedAt)}`
-                    : "Not yet brought into management"}
+                    ? copy("probedAt", { time: fmt.formatDateTime(cluster.capabilitiesProbedAt) })
+                    : copy("notManaged")}
               </CardDescription>
             </div>
             <Badge variant={lc.variant} className="shrink-0 gap-1">
               {lc.icon}
-              {lc.label}
+              {chrome.has(`lifecycle.${lifecycle}`) ? chrome(`lifecycle.${lifecycle}`) : lifecycle}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
             <div className="min-w-0">
-              <dt className="text-muted-foreground text-xs tracking-wide uppercase">Provider</dt>
+              <dt className="text-muted-foreground text-xs tracking-wide uppercase">
+                {columns("provider")}
+              </dt>
               <dd className="mt-0.5 font-medium">{provider}</dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-muted-foreground text-xs tracking-wide uppercase">Region</dt>
+              <dt className="text-muted-foreground text-xs tracking-wide uppercase">
+                {columns("region")}
+              </dt>
               <dd className="mt-0.5 font-mono [overflow-wrap:anywhere]">{cluster.region || "—"}</dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-muted-foreground text-xs tracking-wide uppercase">Auth</dt>
+              <dt className="text-muted-foreground text-xs tracking-wide uppercase">
+                {copy("auth")}
+              </dt>
               <dd className="mt-0.5 font-mono [overflow-wrap:anywhere]">
                 {cluster.authMethod || "—"}
               </dd>
@@ -284,10 +287,8 @@ export function ClusterDetail(props: ClusterDetailProps) {
       {hasCaps && (
         <Card className="!rounded-none shadow-md">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Capabilities</CardTitle>
-            <CardDescription>
-              Detected during the last capability probe. Refresh cluster management to update.
-            </CardDescription>
+            <CardTitle className="text-base">{copy("capabilitiesTitle")}</CardTitle>
+            <CardDescription>{copy("capabilitiesDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -309,9 +310,17 @@ export function ClusterDetail(props: ClusterDetailProps) {
                       {meta.icon}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-sm leading-snug font-medium">{meta.label}</p>
+                      <p className="truncate text-sm leading-snug font-medium">
+                        {key === "storage_classes"
+                          ? copy("storageClasses")
+                          : key === "metrics_server"
+                            ? copy("metricsServer")
+                            : key === "ingress"
+                              ? columns("ingress")
+                              : meta.label}
+                      </p>
                       <p className="text-muted-foreground mt-0.5 text-xs">
-                        {installed ? "Installed" : "Not detected"}
+                        {installed ? copy("installed") : copy("notDetected")}
                       </p>
                     </div>
                   </div>
@@ -325,16 +334,18 @@ export function ClusterDetail(props: ClusterDetailProps) {
       {/* ── Action required ─────────────────────────────────────────── */}
       {lifecycle !== "managed" && lifecycle !== "managing" && (
         <div className="border-border bg-muted/40 border p-4 text-sm">
-          <p className="font-medium">Action required</p>
+          <p className="font-medium">{copy("actionRequired")}</p>
           <p className="text-muted-foreground mt-1">
-            This cluster isn&apos;t managed yet.{" "}
-            <Link
-              href={`/clusters/${slug}/settings`}
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              Go to Settings
-            </Link>{" "}
-            to bring it into management.
+            {copy.rich("actionHelp", {
+              settings: (children) => (
+                <Link
+                  href={`/clusters/${slug}/settings`}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  {children}
+                </Link>
+              ),
+            })}
           </p>
         </div>
       )}

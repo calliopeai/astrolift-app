@@ -35,6 +35,7 @@ export interface ClusterActions {
 /** The cluster lifecycle mutations, shared by the list rows and the detail header. */
 export function useClusterActions(): ClusterActions {
   const t = useTranslations("clusters.unregister");
+  const actions = useTranslations("clusters.actions");
   const [unregister, { loading: deleting }] = useMutation<{
     unregisterTenantCluster: MutationResult<{ id: string; deleted: boolean }>;
   }>(UNREGISTER_TENANT_CLUSTER, {
@@ -67,9 +68,9 @@ export function useClusterActions(): ClusterActions {
   async function onBring(c: AstroliftTenantCluster) {
     const { data } = await bring({ variables: { input: { clusterId: c.id } } });
     if (data?.bringClusterIntoManagement.ok) {
-      toast.success(`Bringing ${c.slug} into management — this can take up to a minute.`);
+      toast.success(actions("bringAccepted", { slug: c.slug }));
     } else {
-      toast.error(data?.bringClusterIntoManagement.errors?.[0]?.message ?? "Failed");
+      toast.error(data?.bringClusterIntoManagement.errors?.[0]?.message ?? actions("bringFailed"));
     }
   }
 
@@ -79,10 +80,10 @@ export function useClusterActions(): ClusterActions {
     });
     if (data?.refreshClusterManagement.ok) {
       toast.success(
-        forcePreflight ? `Refreshing ${c.slug} (full preflight)` : `Refreshing ${c.slug}`
+        actions(forcePreflight ? "fullPreflightAccepted" : "refreshAccepted", { slug: c.slug })
       );
     } else {
-      toast.error(data?.refreshClusterManagement.errors?.[0]?.message ?? "Failed");
+      toast.error(data?.refreshClusterManagement.errors?.[0]?.message ?? actions("refreshFailed"));
     }
   }
 

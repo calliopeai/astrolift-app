@@ -27,7 +27,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
         />
       )}
       renderServiceDetail={(svc, onOpenChange) => (
-        <ServiceDetailSheet service={svc} onOpenChange={onOpenChange} />
+        <ServiceDetailSheet appSlug={slug} service={svc} onOpenChange={onOpenChange} />
       )}
     />
   );

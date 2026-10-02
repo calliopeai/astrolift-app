@@ -179,4 +179,8 @@ def managed_name_for(spec: ProvisionSpec, *, kind: str, prefix: str, max_len: in
         if recorded_kind != kind:
             raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
         return name
+    if max_len < 34:
+        from _sdk.physical_naming import physical_name
+
+        return physical_name(spec.managed_service_id, prefix=prefix, max_length=max_len)
     return managed_service_name(spec.managed_service_id, prefix=prefix, max_len=max_len)

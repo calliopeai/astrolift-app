@@ -42,7 +42,15 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    live_ownership_refusal,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 _ENGINE_PORT = {"aurora-postgresql": 5432, "aurora-mysql": 3306}
@@ -565,23 +573,8 @@ class AuroraDriver(ManagedServiceDriver):
         return ""
 
     def _cluster_id(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.cluster_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "aurora",
-            )
-            if part
-        )
-        clean = "".join(char if char.isalnum() or char == "-" else "-" for char in raw.lower())
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        if not clean or not clean[0].isalpha():
-            clean = f"a-{clean}"
-        return clean.strip("-")[:63]
+        # Leave room for the writer suffix so the complete identity survives both names.
+        return managed_name_for(spec, kind=self._kind, prefix=self._config.cluster_name_prefix, max_len=56)
 
     @staticmethod
     def _writer_id(cluster_id: str) -> str:
@@ -589,7 +582,20 @@ class AuroraDriver(ManagedServiceDriver):
 
     def _ensure_writer(self, cluster_id: str, spec: ProvisionSpec) -> ProvisionResult | None:
         writer_id = self._writer_id(cluster_id)
-        if self._describe_instance(writer_id) is not None:
+        existing = self._describe_instance(writer_id)
+        if existing is not None:
+            refusal = live_ownership_refusal(
+                existing.get("TagList"),
+                managed_service_id=spec.managed_service_id,
+                resource="Aurora writer",
+            )
+            if existing.get("DBClusterIdentifier") != cluster_id or refusal:
+                return ProvisionResult(
+                    False,
+                    handle_for(kind=self._kind, resource_id=cluster_id),
+                    "Aurora writer does not belong to the recorded cluster and service; refusing adoption",
+                    ["ownership_refused"],
+                )
             return None
         cfg = spec.config or {}
         instance_class = (

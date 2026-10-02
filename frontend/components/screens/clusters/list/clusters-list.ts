@@ -65,6 +65,29 @@ export const CLUSTERS_LIST: ListDefinition = {
   pageSizes: [25, 50, 100],
 };
 
+/** Labels only: URL keys, provider identifiers and API filter values stay literal. */
+export function localizedClustersList(
+  t: (key: string) => string,
+  lifecycle: (key: string) => string
+): ListDefinition {
+  return {
+    ...CLUSTERS_LIST,
+    searchPlaceholder: t("searchPlaceholder"),
+    fields: CLUSTERS_LIST.fields.map((field) => ({
+      ...field,
+      label: t(`columns.${field.key}`),
+      options:
+        field.key === "status"
+          ? field.options?.map((option) => ({
+              ...option,
+              label: lifecycle(`lifecycle.${option.value}`),
+            }))
+          : field.options,
+    })),
+    views: CLUSTERS_LIST.views.map((view) => ({ ...view, label: t(`views.${view.key}`) })),
+  };
+}
+
 /** Admin ▾ › Clusters [› name]: the first crumb switches between the Admin functions. */
 export function clusterCrumbs(name?: string): Crumb[] {
   const admin = NAV.find((a) => a.key === "admin");

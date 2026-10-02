@@ -19,7 +19,8 @@ export interface ObservabilitySectionViewProps extends ObservabilitySummary {
  * Compact observability summary: deploys-per-day and failure-rate
  * sparklines computed from the recent deploy stream, plus a count of
  * unresolved alert events with a link to the alerts page. Deep-links to
- * `/metrics/<app>` and `/alerts?app=<slug>` for the full surface.
+ * `/administration/metrics?app=<slug>` and
+ * `/alerts/events?view=firing&app=<slug>` for the full surface.
  */
 export function ObservabilitySectionView({
   appSlug,

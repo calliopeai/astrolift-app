@@ -35,6 +35,15 @@ export const PAGE_SIZES = [10, 25, 50, 100];
 export const DEFAULT_PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 250;
 
+export interface ScopedCursorRead {
+  scopeKey: string;
+  variables: Record<string, unknown>;
+  data?: unknown;
+  error?: ErrorLike;
+  loading: boolean;
+  refresh: () => void;
+}
+
 export type CursorTableOptions<TRow, TVars extends OperationVariables> = {
   query: DocumentNode;
   /** Static filter variables. Changing them resets the walk to page one. */
@@ -69,6 +78,11 @@ export type CursorTableOptions<TRow, TVars extends OperationVariables> = {
   fetchPolicy?: WatchQueryFetchPolicy;
   pollInterval?: number;
   skip?: boolean;
+  /** Discard a cursor chain after an explicit refresh/decision without adding API variables. */
+  resetKey?: string | number;
+  /** Optional actor-bound network loader; the cursor walk remains shared. */
+  requestScopeKey?: string;
+  externalRead?: ScopedCursorRead;
 };
 
 export type CursorTableController<TRow> = {
@@ -82,6 +96,10 @@ export type CursorTableController<TRow> = {
   pageIndex: number;
   hasNext: boolean;
   hasPrev: boolean;
+  /** Opaque server positions, exposed for the shared ListPage adapter. */
+  requestVariables?: Record<string, unknown>;
+  after?: string | null;
+  nextCursor?: string | null;
   next: () => void;
   prev: () => void;
   pageSize: number;
@@ -132,6 +150,9 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
   fetchPolicy = "cache-and-network",
   pollInterval,
   skip,
+  resetKey,
+  requestScopeKey,
+  externalRead,
 }: CursorTableOptions<TRow, TVars>): CursorTableController<TRow> {
   // Lazy initialisers: the URL is read once, on mount. Later URL changes
   // are ignored on purpose — this hook owns the query string it writes, and
@@ -150,7 +171,7 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
   // against the old question: a cursor is a position in a result set, so
   // replaying one after the filter moved seeks into rows that may no longer
   // be there and the page silently skips or repeats.
-  const filterKey = JSON.stringify([debouncedSearch, pageSize, sort, variables]);
+  const filterKey = JSON.stringify([debouncedSearch, pageSize, sort, variables, resetKey]);
 
   /**
    * The walk. `stack[i]` is the cursor that produced page `i`, so page one
@@ -202,13 +223,25 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
     pageSize,
   ]);
 
-  const { data, previousData, loading, error, refetch } = useQuery(query, {
+  const network = useQuery(query, {
     variables: queryVariables,
     fetchPolicy,
     pollInterval,
-    skip,
+    skip: skip || requestScopeKey !== undefined,
     notifyOnNetworkStatusChange: true,
   });
+  const scoped = requestScopeKey !== undefined;
+  const sameScope = Boolean(
+    externalRead && externalRead.scopeKey === requestScopeKey && requestScopeKey
+  );
+  const sameRequest =
+    sameScope && JSON.stringify(externalRead?.variables) === JSON.stringify(queryVariables);
+  const data = scoped ? (sameRequest ? externalRead?.data : undefined) : network.data;
+  const previousData = scoped ? (sameScope ? externalRead?.data : undefined) : network.previousData;
+  const loading = scoped
+    ? !skip && (!sameRequest || Boolean(externalRead?.loading))
+    : network.loading;
+  const error = scoped ? (sameRequest ? externalRead?.error : undefined) : network.error;
 
   // Hold the last good page while the next one is in flight, so paging
   // does not blank the table and shift the layout under the cursor.
@@ -233,12 +266,12 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
 
   const next = React.useCallback(() => {
     const nextCursor = page?.nextCursor;
-    if (!nextCursor) return;
+    if (!nextCursor || loading || error || skip) return;
     setWalk((w) => ({
       key: filterKey,
       stack: [...(w.key === filterKey ? w.stack : [null]), nextCursor],
     }));
-  }, [page?.nextCursor, filterKey]);
+  }, [page?.nextCursor, filterKey, loading, error, skip]);
 
   const prev = React.useCallback(() => {
     setWalk((w) => {
@@ -258,11 +291,15 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
   const clearFilters = React.useCallback(() => setSearchRaw(""), []);
 
   const retry = React.useCallback(() => {
-    void refetch().catch(() => {
+    if (scoped) {
+      externalRead?.refresh();
+      return;
+    }
+    void network.refetch().catch(() => {
       // The rejection is already surfaced through `error`; swallowing it
       // here only stops an unhandled rejection in the console.
     });
-  }, [refetch]);
+  }, [scoped, externalRead, network]);
 
   return {
     rows,
@@ -274,6 +311,9 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
     pageIndex: stack.length - 1,
     hasNext: Boolean(page?.nextCursor),
     hasPrev: stack.length > 1,
+    requestVariables: queryVariables,
+    after: cursor,
+    nextCursor: page?.nextCursor ?? null,
     next,
     prev,
     pageSize,

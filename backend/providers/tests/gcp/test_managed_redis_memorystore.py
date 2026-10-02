@@ -132,6 +132,7 @@ def driver():
 
 def _spec(**overrides) -> ProvisionSpec:
     base = dict(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="1",
         organization_slug="acme",
         app_id="1",
@@ -385,7 +386,7 @@ def test_snapshot_exports_to_gcs(driver):
 def test_restore_imports_from_gcs(driver):
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    restore_spec = _spec(service_handle_hint="restored")
+    restore_spec = _spec(service_handle_hint="restored", managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456780")
     result = driver.restore(snap, restore_spec)
     assert result.ok
 
@@ -443,8 +444,12 @@ def test_provision_does_not_adopt_another_services_resource(driver) -> None:
     """Names are slug-joined, so another service can map to this one's name (#1961)."""
     import dataclasses
 
-    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
-    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+    first = driver.provision(_spec())
+    second = driver.provision(
+        dataclasses.replace(
+            _spec(), managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456780", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and "refusing to adopt" in second.message

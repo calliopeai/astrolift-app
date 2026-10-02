@@ -10,12 +10,10 @@
  * ``astroliftAppGoldenSignals`` + ``astroliftAppStatusCodeBreakdown``
  * resolvers.
  *
- * Empty-state policy: when the backend returns an empty list or null
- * (no ``prometheus_endpoint`` on the cluster, transport failure, or
- * PromQL error), the card renders the "metrics not yet flowing"
- * callout linking to the platform doc. The card-title still renders
- * the PromQL disclosure so operators can verify what the platform
- * *would* have asked Prometheus.
+ * Each signal displays the server's effective scope and provenance.
+ * Missing or failed measurements stay unavailable, while a healthy
+ * sibling remains visible. Legacy envelopes without provenance keep
+ * their structural empty state and never imply a workload measurement.
  */
 
 import { AlertTriangleIcon, ChartSplineIcon } from "lucide-react";
@@ -50,6 +48,7 @@ import type {
 } from "@/graphql/__generated__/schema";
 
 import type { StatusBreakdownWithReason, useGoldenSignals } from "./use-golden-signals";
+import { SignalMeasurement } from "./SignalMeasurement";
 import {
   PROMETHEUS_DOC_LINK,
   STATUS_CLASS_COLORS,
@@ -90,6 +89,7 @@ export function GoldenSignalsPanel({
   // granularity there.
   const showPanelEmpty =
     !isLoading &&
+    !signals?.some((signal) => signal.measurement) &&
     (signalsReason === "NOT_CONFIGURED" ||
       signalsReason === "NOT_SUPPORTED_BY_PROVIDER" ||
       signalsReason === "ERROR");
@@ -147,7 +147,7 @@ export function GoldenSignalsPanel({
             />
             <SignalCard
               title="Saturation (CPU)"
-              description="Container CPU usage ÷ requested limit. >100% means throttling."
+              description="Container CPU usage divided by CPU limits."
               signal={signalsByKind.SATURATION_CPU}
               loading={isLoading}
               lineColor="var(--chart-4)"
@@ -157,7 +157,7 @@ export function GoldenSignalsPanel({
                 kill is imminent. */}
             <SignalCard
               title="Saturation (memory)"
-              description="Working-set memory ÷ requested limit. >100% means OOM is imminent."
+              description="Working-set memory divided by memory limits."
               signal={signalsByKind.SATURATION_MEMORY}
               loading={isLoading}
               lineColor="var(--chart-5)"
@@ -248,6 +248,7 @@ function SignalCard({ title, description, signal, loading, lineColor }: SignalCa
         <CardDescription className="text-xs">{description}</CardDescription>
       </CardHeader>
       <CardContent>
+        {!loading && <SignalMeasurement signal={signal} />}
         {loading ? (
           <Skeleton className="h-40 w-full" />
         ) : !signal || !hasData ? (
@@ -328,6 +329,15 @@ function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!loading &&
+          [p50, p95, p99, p90].filter(Boolean).map((signal) => (
+            <div key={signal!.name}>
+              <p className="text-xs font-medium">
+                {signal!.name.replace("LATENCY_", "").toLowerCase()}
+              </p>
+              <SignalMeasurement signal={signal} />
+            </div>
+          ))}
         {loading ? (
           <Skeleton className="h-40 w-full" />
         ) : !hasData ? (
@@ -399,8 +409,10 @@ interface StatusCodeCardProps {
   onRetry?: () => void;
 }
 
+const EMPTY_STATUS_SERIES: AstroliftStatusCodeSeries[] = [];
+
 function StatusCodeCard({ breakdown, loading, onRetry }: StatusCodeCardProps) {
-  const series = breakdown?.series ?? [];
+  const series = breakdown?.series ?? EMPTY_STATUS_SERIES;
   const promql = breakdown?.promql ?? "";
   // `null` is reserved for "no such app"; a populated breakdown carries
   // a reason (#1111). Fall back to NOT_CONFIGURED when the whole object

@@ -1,10 +1,12 @@
+import { fakeController } from "@/components/data-table/fixtures";
+import { RESOURCE, RESOURCE_DETAIL } from "./resource-reads.fixtures";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
 
 import { ProjectResourcesScreen } from "./ProjectResourcesScreen";
-import { BUNDLES, LONG, RESOURCES, RESOURCES_EMPTY, SERVICES } from "./projects-detail.fixtures";
+import { BUNDLES, LONG, RESOURCES, RESOURCES_EMPTY } from "./projects-detail.fixtures";
 
 const meta: Meta<typeof ProjectResourcesScreen> = {
   title: "Screens/Projects/ProjectResourcesScreen",
@@ -72,7 +74,7 @@ export const NewBundleOpen: Story = {
 };
 
 export const ServiceConsumers: Story = {
-  args: { ...RESOURCES, consumerService: SERVICES[0] },
+  args: { ...RESOURCES, resourceDetail: RESOURCE_DETAIL },
 };
 
 export const BundleConsumers: Story = {
@@ -83,17 +85,9 @@ export const LongStrings: Story = {
   args: {
     ...RESOURCES,
     project: { ...RESOURCES.project!, name: `Project ${LONG}` },
-    services: SERVICES.map((row) => ({
-      ...row,
-      name: `${row.name}-${LONG}`,
-      clusterSlug: `cluster-${LONG}`,
-      statusError: row.statusError ? `${row.statusError} ${LONG}` : "",
-      operationWorkflowId: row.operationWorkflowId ? `${row.operationWorkflowId}-${LONG}` : "",
-      attachments: row.attachments.map((a) => ({
-        ...a,
-        consumerSlug: `${a.consumerSlug}-${LONG}`,
-      })),
-    })),
+    resourceTable: fakeController({
+      rows: [{ ...RESOURCE, name: `${RESOURCE.name}-${LONG}`, clusterSlug: `cluster-${LONG}` }],
+    }),
     bundles: BUNDLES.map((row) => ({
       ...row,
       name: `${row.name} ${LONG}`,

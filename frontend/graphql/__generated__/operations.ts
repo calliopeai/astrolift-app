@@ -1273,6 +1273,7 @@ export type AstroliftAppExecTarget = {
 };
 
 export type AstroliftAppGoldenSignal = {
+  measurement?: Maybe<AstroliftGoldenSignalMeasurement>;
   name: GoldenSignalKind;
   promql: Scalars['String']['output'];
   rangeSeconds: Scalars['Int']['output'];
@@ -2845,6 +2846,33 @@ export type AstroliftFormSubmissionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftGoldenSignalMeasurement = {
+  available: Scalars['Boolean']['output'];
+  containers: Array<AstroliftMetricContainerIdentity>;
+  effectiveScope: GoldenSignalScope;
+  identityBasis: GoldenSignalIdentityBasis;
+  limitSamples: Array<AstroliftTimeSeriesPoint>;
+  measurementStart?: Maybe<Scalars['DateTime']['output']>;
+  membershipObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  source: GoldenSignalSource;
+  target: AstroliftGoldenSignalTarget;
+  unavailableReason?: Maybe<GoldenSignalUnavailableReason>;
+  usageSamples: Array<AstroliftTimeSeriesPoint>;
+  usageUnit?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftGoldenSignalTarget = {
+  appId: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterId?: Maybe<Scalars['String']['output']>;
+  environmentId?: Maybe<Scalars['String']['output']>;
+  environmentName?: Maybe<Scalars['String']['output']>;
+  namespace?: Maybe<Scalars['String']['output']>;
+  organizationId: Scalars['String']['output'];
+  workloadId?: Maybe<Scalars['String']['output']>;
+  workloadSlug?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftGrantPreview = {
   action: Scalars['String']['output'];
   /** Whether the caller's grant ceiling allows it. */
@@ -3208,6 +3236,33 @@ export type AstroliftManagedServiceAttachment = {
   id: Scalars['GUID']['output'];
 };
 
+export type AstroliftManagedServiceAttachmentContext = {
+  clusterId: Scalars['GUID']['output'];
+  consumerId: Scalars['GUID']['output'];
+  consumerKind: Scalars['String']['output'];
+  consumerSlug: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  environmentId?: Maybe<Scalars['GUID']['output']>;
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  registeredAppId?: Maybe<Scalars['GUID']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftManagedServiceAttachmentContextPage = {
+  items: Array<AstroliftManagedServiceAttachmentContext>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftManagedServiceAttachmentMutationResult = {
   data?: Maybe<AstroliftManagedServiceAttachment>;
   errors: Array<MutationError>;
@@ -3252,6 +3307,48 @@ export type AstroliftManagedServiceConnectionMutationResult = {
   data?: Maybe<AstroliftManagedServiceConnection>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedServiceContext = {
+  clusterId: Scalars['GUID']['output'];
+  clusterSlug: Scalars['String']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  contextRevision: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  environmentId?: Maybe<Scalars['GUID']['output']>;
+  environmentName: Scalars['String']['output'];
+  environmentVersion?: Maybe<Scalars['Int']['output']>;
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationKind: Scalars['String']['output'];
+  operationRunId: Scalars['String']['output'];
+  operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationWorkflowId: Scalars['String']['output'];
+  organizationId: Scalars['GUID']['output'];
+  ownerScope: Scalars['String']['output'];
+  projectId?: Maybe<Scalars['GUID']['output']>;
+  projectSlug: Scalars['String']['output'];
+  registeredAppId?: Maybe<Scalars['GUID']['output']>;
+  registeredAppSlug: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  variant: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftManagedServiceContextPage = {
+  items: Array<AstroliftManagedServiceContext>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftManagedServiceCostPreview = {
@@ -3437,6 +3534,13 @@ export type AstroliftMembersListFilter = {
   scopeKind: InputMaybe<Array<Scalars['String']['input']>>;
   /** Team slugs or ids the person is on. */
   team: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+export type AstroliftMetricContainerIdentity = {
+  containerId: Scalars['String']['output'];
+  containerName: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  podUid: Scalars['String']['output'];
 };
 
 export type AstroliftModelEndpointTest = {
@@ -3946,10 +4050,40 @@ export type AstroliftPreviewAggregateResources = {
   podCount: Scalars['Int']['output'];
 };
 
+export type AstroliftPreviewDeployment = {
+  appId: Scalars['GUID']['output'];
+  commitSha: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentId: Scalars['GUID']['output'];
+  id: Scalars['GUID']['output'];
+  imageTag: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  triggerKind: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftPreviewDeploymentPage = {
+  items: Array<AstroliftPreviewDeployment>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftPreviewEnvironment = {
   aggregateResources: AstroliftPreviewAggregateResources;
   branch: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
+  environment?: Maybe<AstroliftPreviewEnvironmentTarget>;
+  /** available, retired or unavailable; retired targets cannot route logs. */
+  environmentStatus: Scalars['String']['output'];
   estimatedCostApproximate: Scalars['Boolean']['output'];
   estimatedCostNotes: Array<Scalars['String']['output']>;
   estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
@@ -3970,10 +4104,14 @@ export type AstroliftPreviewEnvironment = {
   prNumber: Scalars['Int']['output'];
   prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
+  /** not_requested, available or unavailable; basic reads do not query pods or pricing. */
+  runtimeStatus: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
   status: Scalars['String']['output'];
   tornDownAt?: Maybe<Scalars['DateTime']['output']>;
   ttlUntil: Scalars['DateTime']['output'];
+  /** Version of this exact preview binding. */
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftPreviewEnvironmentCounts = {
@@ -4001,6 +4139,20 @@ export type AstroliftPreviewEnvironmentPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftPreviewEnvironmentTarget = {
+  appId: Scalars['GUID']['output'];
+  appSlug: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  namespace: Scalars['String']['output'];
+  previewId: Scalars['GUID']['output'];
+  previewVersion: Scalars['Int']['output'];
 };
 
 /** The previews list's declared filters. Unset fields do not filter; list values match any. */
@@ -5714,6 +5866,7 @@ export type AstroliftZentinelleDisconnectMutationResult = {
 export type AttachProjectManagedServiceInput = {
   agentEnvironmentSpecSlug: InputMaybe<Scalars['String']['input']>;
   appEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['GUID']['input'];
 };
 
@@ -6403,6 +6556,7 @@ export type DeprovisionClusterModelInput = {
 
 export type DeprovisionManagedServiceInput = {
   deleteData: Scalars['Boolean']['input'];
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   forceDestroy: Scalars['Boolean']['input'];
   id: Scalars['GUID']['input'];
 };
@@ -6416,6 +6570,8 @@ export type DeregisterAppInput = {
 
 export type DetachProjectManagedServiceInput = {
   attachmentId: Scalars['GUID']['input'];
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
+  managedServiceId: InputMaybe<Scalars['GUID']['input']>;
 };
 
 export type DetachSecretBundleInput = {
@@ -6612,6 +6768,12 @@ export type GenerateSshDeployKeyInput = {
   name: Scalars['String']['input'];
 };
 
+export type GoldenSignalIdentityBasis =
+  | 'NAMESPACE'
+  | 'SOURCE_LABELS'
+  | 'UNRESOLVED'
+  | 'VERIFIED_RUNTIME';
+
 export type GoldenSignalKind =
   | 'ERRORS'
   | 'LATENCY_P50'
@@ -6621,6 +6783,39 @@ export type GoldenSignalKind =
   | 'SATURATION_CPU'
   | 'SATURATION_MEMORY'
   | 'TRAFFIC';
+
+export type GoldenSignalScope =
+  | 'APP_ENVIRONMENT'
+  | 'UNRESOLVED'
+  | 'WORKLOAD';
+
+export type GoldenSignalSource =
+  | 'APP_INSTRUMENTATION'
+  | 'CADVISOR_KUBE_STATE_METRICS'
+  | 'CLOUDWATCH_ALB'
+  | 'EDGE_PROMETHEUS'
+  | 'NONE';
+
+export type GoldenSignalUnavailableReason =
+  | 'AMBIGUOUS_SERIES'
+  | 'ENVIRONMENT_NOT_FOUND'
+  | 'INVALID_DATA'
+  | 'MEMBERSHIP_LIMIT_EXCEEDED'
+  | 'MISSING_LIMITS'
+  | 'MISSING_USAGE'
+  | 'NOT_CONFIGURED'
+  | 'NOT_INSTRUMENTED'
+  | 'NOT_SUPPORTED_BY_PROVIDER'
+  | 'NO_DATA_YET'
+  | 'NO_PODS'
+  | 'OWNERSHIP_UNVERIFIED'
+  | 'PARTIAL_DATA'
+  | 'PARTIAL_MEMBERSHIP'
+  | 'PERMISSION_DENIED'
+  | 'PROVIDER_ERROR'
+  | 'QUERY_ERROR'
+  | 'TARGET_NOT_OWNED'
+  | 'WORKLOAD_NOT_FOUND';
 
 export type GrantRoleInput = {
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
@@ -9927,6 +10122,8 @@ export type Query = {
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
   astroliftInvitationsPage: AstroliftInvitationPage;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
+  astroliftManagedService?: Maybe<AstroliftManagedServiceContext>;
+  astroliftManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
   astroliftManagedServiceCostPreview?: Maybe<AstroliftManagedServiceCostPreview>;
   astroliftManagedServiceObjects?: Maybe<AstroliftManagedServiceObjects>;
   astroliftManagedServiceQueueDepth?: Maybe<AstroliftManagedServiceQueueDepth>;
@@ -9976,13 +10173,19 @@ export type Query = {
   astroliftPolicy?: Maybe<AstroliftPolicy>;
   astroliftPolicyConditionCatalog: AstroliftPolicyConditionCatalog;
   astroliftPolicySimulation: AstroliftPolicySimulation;
+  astroliftPreviewDeploymentsPage: AstroliftPreviewDeploymentPage;
+  astroliftPreviewEnvironment?: Maybe<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentCounts: AstroliftPreviewEnvironmentCounts;
-  /** @deprecated Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage. */
+  /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPreviewEnvironmentsPage for browsing and astroliftPreviewEnvironment for exact detail. */
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentsPage: AstroliftPreviewEnvironmentPage;
   astroliftPrincipalSearch: AstroliftPrincipalPage;
+  astroliftProjectManagedService?: Maybe<AstroliftManagedServiceContext>;
+  astroliftProjectManagedServiceAttachmentOwner?: Maybe<AstroliftManagedServiceContext>;
+  astroliftProjectManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
   astroliftProjectManagedServiceCatalog: Array<AstroliftManagedServiceCatalogEntry>;
   astroliftProjectManagedServices: Array<AstroliftManagedService>;
+  astroliftProjectManagedServicesPage: AstroliftManagedServiceContextPage;
   astroliftProjectResourceClusters: Array<AstroliftTenantCluster>;
   astroliftProjectSecretBundles: Array<AstroliftSecretBundle>;
   astroliftProjectSlugAvailable: Scalars['Boolean']['output'];
@@ -10566,8 +10769,12 @@ export type QueryAstroliftAppLogsArgs = {
   appSlug: Scalars['String']['input'];
   cursor?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
+  expectedEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
+  ifMatchEnvironmentVersion?: InputMaybe<Scalars['Int']['input']>;
+  ifMatchPreviewVersion?: InputMaybe<Scalars['Int']['input']>;
   level?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  previewId?: InputMaybe<Scalars['GUID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   since: Scalars['DateTime']['input'];
   until: Scalars['DateTime']['input'];
@@ -10576,6 +10783,7 @@ export type QueryAstroliftAppLogsArgs = {
 
 
 export type QueryAstroliftAppManagedServiceMetricsArgs = {
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['ID']['input'];
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -11111,7 +11319,22 @@ export type QueryAstroliftInvitationsPageArgs = {
 };
 
 
+export type QueryAstroliftManagedServiceArgs = {
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftManagedServiceAttachmentsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftManagedServiceCostPreviewArgs = {
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['GUID']['input'];
 };
 
@@ -11320,6 +11543,22 @@ export type QueryAstroliftPolicySimulationArgs = {
 };
 
 
+export type QueryAstroliftPreviewDeploymentsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  expectedEnvironmentId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  ifMatchPreviewVersion: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftPreviewEnvironmentArgs = {
+  id: Scalars['GUID']['input'];
+  includeRuntimeCost?: Scalars['Boolean']['input'];
+};
+
+
 export type QueryAstroliftPreviewEnvironmentCountsArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -11350,6 +11589,28 @@ export type QueryAstroliftPrincipalSearchArgs = {
 };
 
 
+export type QueryAstroliftProjectManagedServiceArgs = {
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['GUID']['input'];
+  projectId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftProjectManagedServiceAttachmentOwnerArgs = {
+  attachmentId: Scalars['GUID']['input'];
+  projectId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftProjectManagedServiceAttachmentsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+  projectId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftProjectManagedServiceCatalogArgs = {
   clusterId: Scalars['GUID']['input'];
   projectId: Scalars['GUID']['input'];
@@ -11358,6 +11619,19 @@ export type QueryAstroliftProjectManagedServiceCatalogArgs = {
 
 export type QueryAstroliftProjectManagedServicesArgs = {
   projectId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftProjectManagedServicesPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  clusterId?: InputMaybe<Scalars['GUID']['input']>;
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  kinds?: InputMaybe<Array<Scalars['String']['input']>>;
+  limit?: Scalars['Int']['input'];
+  name?: InputMaybe<Scalars['String']['input']>;
+  projectId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  statuses?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 
@@ -12268,6 +12542,7 @@ export type RemoveOrganizationAllowlistDomainInput = {
 };
 
 export type ReprovisionManagedServiceInput = {
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['GUID']['input'];
 };
 
@@ -13013,6 +13288,7 @@ export type UpdateManagedDomainInput = {
 
 export type UpdateManagedServiceInput = {
   config: InputMaybe<Scalars['JSON']['input']>;
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
 };
@@ -14858,7 +15134,41 @@ export type ListPreviewEnvironmentsQueryVariables = Exact<{
 
 export type ListPreviewEnvironmentsQuery = { astroliftPreviewEnvironments: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> };
 
-export type PreviewEnvironmentFieldsFragment = { id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } };
+export type PreviewEnvironmentFieldsFragment = { id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } };
+
+export type GetPreviewEnvironmentQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+  includeRuntimeCost?: Scalars['Boolean']['input'];
+}>;
+
+
+export type GetPreviewEnvironmentQuery = { astroliftPreviewEnvironment?: { id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } } | null };
+
+export type GetPreviewLogsQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+  previewId: Scalars['GUID']['input'];
+  expectedEnvironmentId: Scalars['GUID']['input'];
+  ifMatchPreviewVersion: Scalars['Int']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  since: Scalars['DateTime']['input'];
+  until: Scalars['DateTime']['input'];
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type GetPreviewLogsQuery = { astroliftAppLogs: { reason: AstroliftObservabilityPanelReason, historicalAvailable: boolean, items: Array<{ timestamp: string, message: string, level: string, podName: string, container: string }> } };
+
+export type GetPreviewDeploymentsPageQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+  expectedEnvironmentId: Scalars['GUID']['input'];
+  ifMatchPreviewVersion: Scalars['Int']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetPreviewDeploymentsPageQuery = { astroliftPreviewDeploymentsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, appId: string, environmentId: string, status: string, triggerKind: string, commitSha: string, imageTag: string, createdAt: string, startedAt?: string | null, endedAt?: string | null }> } };
 
 export type ListPreviewEnvironmentsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -14870,7 +15180,7 @@ export type ListPreviewEnvironmentsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListPreviewEnvironmentsPageQuery = { astroliftPreviewEnvironmentsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> } };
+export type ListPreviewEnvironmentsPageQuery = { astroliftPreviewEnvironmentsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> } };
 
 export type ListAppPodsQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -15890,6 +16200,51 @@ export type AdminFeatureInventoryQueryVariables = Exact<{ [key: string]: never; 
 
 export type AdminFeatureInventoryQuery = { astroliftServerInfo: { featureFlags: Array<{ key: string, enabled: boolean, description?: string | null }>, buildTimeFeatures: Array<{ key: string, enabled: boolean, envVar: string, description?: string | null }> } };
 
+export type ManagedResourceContextFragment = { id: string, contextRevision: string, version: number, name: string, kind: string, variant: string, status: string, ownerScope: string, organizationId: string, projectId?: string | null, projectSlug: string, registeredAppId?: string | null, registeredAppSlug: string, clusterId: string, clusterSlug: string, clusterVersion: number, environmentId?: string | null, environmentName: string, environmentVersion?: number | null, createdAt: string, updatedAt: string, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null };
+
+export type ListProjectResourcePageQueryVariables = Exact<{
+  projectId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  kinds?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
+  statuses?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  clusterId?: InputMaybe<Scalars['GUID']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ListProjectResourcePageQuery = { astroliftProjectManagedServicesPage: { totalCount?: number | null, nextCursor?: string | null, items: Array<{ id: string, contextRevision: string, version: number, name: string, kind: string, variant: string, status: string, ownerScope: string, organizationId: string, projectId?: string | null, projectSlug: string, registeredAppId?: string | null, registeredAppSlug: string, clusterId: string, clusterSlug: string, clusterVersion: number, environmentId?: string | null, environmentName: string, environmentVersion?: number | null, createdAt: string, updatedAt: string, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null }> } };
+
+export type GetProjectResourceQueryVariables = Exact<{
+  projectId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetProjectResourceQuery = { astroliftProjectManagedService?: { id: string, contextRevision: string, version: number, name: string, kind: string, variant: string, status: string, ownerScope: string, organizationId: string, projectId?: string | null, projectSlug: string, registeredAppId?: string | null, registeredAppSlug: string, clusterId: string, clusterSlug: string, clusterVersion: number, environmentId?: string | null, environmentName: string, environmentVersion?: number | null, createdAt: string, updatedAt: string, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null } | null };
+
+export type GetManagedResourceQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetManagedResourceQuery = { astroliftManagedService?: { id: string, contextRevision: string, version: number, name: string, kind: string, variant: string, status: string, ownerScope: string, organizationId: string, projectId?: string | null, projectSlug: string, registeredAppId?: string | null, registeredAppSlug: string, clusterId: string, clusterSlug: string, clusterVersion: number, environmentId?: string | null, environmentName: string, environmentVersion?: number | null, createdAt: string, updatedAt: string, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null } | null };
+
+export type ListProjectResourceAttachmentsPageQueryVariables = Exact<{
+  projectId: Scalars['GUID']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ListProjectResourceAttachmentsPageQuery = { astroliftProjectManagedServiceAttachmentsPage?: { totalCount?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, managedServiceId: string, consumerKind: string, consumerId: string, consumerSlug: string, registeredAppId?: string | null, environmentId?: string | null, environmentName: string, clusterId: string, createdAt: string }> } | null };
+
 export type ListAppSecretsQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
@@ -15900,6 +16255,7 @@ export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key
 
 export type PreviewManagedServiceCostQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
@@ -15930,7 +16286,7 @@ export type ListProjectResourcesQueryVariables = Exact<{
 }>;
 
 
-export type ListProjectResourcesQuery = { astroliftProjectResourceClusters: Array<{ id: string, slug: string, name: string, providerPluginSlug: string, region: string, isActive: boolean, lifecycle: string }>, astroliftProjectManagedServices: Array<{ id: string, name: string, kind: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, providerPortalUrl: string, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, attachments: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }>, astroliftProjectSecretBundles: Array<{ id: string, slug: string, name: string, backendRef: string, projectSlug?: string | null, clusterSlug?: string | null, keyCount: number, keyNames: Array<string>, lastKnownKeysAt?: string | null, createdAt: string, consumers: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }> };
+export type ListProjectResourcesQuery = { astroliftProjectResourceClusters: Array<{ id: string, slug: string, name: string, providerPluginSlug: string, region: string, isActive: boolean, lifecycle: string }>, astroliftProjectManagedServicesPage: { totalCount?: number | null }, astroliftProjectSecretBundles: Array<{ id: string, slug: string, name: string, backendRef: string, projectSlug?: string | null, clusterSlug?: string | null, keyCount: number, keyNames: Array<string>, lastKnownKeysAt?: string | null, createdAt: string, consumers: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }> };
 
 export type ListProjectManagedServiceCatalogQueryVariables = Exact<{
   projectId: Scalars['GUID']['input'];

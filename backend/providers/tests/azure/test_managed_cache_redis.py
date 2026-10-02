@@ -47,7 +47,7 @@ class FakePoller:
         return self.value
 
 
-OWNER = "managed-service-guid"
+OWNER = "8b7e2c6b-0b93-4126-a121-abc123456789"
 BINDING = "binding-guid"
 
 
@@ -731,7 +731,7 @@ def test_restore_from_snapshot_creates_new_cache(
     provisioned = backup_driver.provision(_spec())
     snap = backup_driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=OWNER))
 
-    restore_spec = _spec(service_handle_hint="restored")
+    restore_spec = _spec(service_handle_hint="restored", managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456780")
     result = backup_driver.restore(snap, restore_spec)
     assert result.ok
     target_name = result.handle.split("/", 1)[1]
@@ -751,7 +751,9 @@ def test_restore_surfaces_error_on_failure(
         snapshot_id="snap-1",
         created_at="2026-05-15T00:00:00+00:00",
     )
-    result = backup_driver.restore(snap, _spec(service_handle_hint="failed"))
+    result = backup_driver.restore(
+        snap, _spec(service_handle_hint="failed", managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456781")
+    )
     assert not result.ok
     assert "begin_import_data" in result.message
 

@@ -257,6 +257,7 @@ class ProvisionProjectManagedServiceInput:
 @strawberry.input
 class AttachProjectManagedServiceInput:
     managed_service_id: GUID
+    expected_context_revision: str | None = None
     agent_environment_spec_slug: str | None = None
     app_environment_id: GUID | None = None
 
@@ -264,6 +265,8 @@ class AttachProjectManagedServiceInput:
 @strawberry.input
 class DetachProjectManagedServiceInput:
     attachment_id: GUID
+    managed_service_id: GUID | None = None
+    expected_context_revision: str | None = None
 
 
 @strawberry.input
@@ -292,6 +295,7 @@ class ProjectSecretBundleKeyInput:
 @strawberry.input
 class UpdateManagedServiceInput:
     id: GUID
+    expected_context_revision: str | None = None
     config: strawberry.scalars.JSON | None = None
     name: str | None = None
 
@@ -307,6 +311,7 @@ class ReprovisionManagedServiceInput:
     """
 
     managed_service_id: GUID
+    expected_context_revision: str | None = None
 
 
 @strawberry.input
@@ -332,6 +337,7 @@ class DeprovisionManagedServiceInput:
     id: GUID
     delete_data: bool = False
     force_destroy: bool = False
+    expected_context_revision: str | None = None
 
 
 @strawberry.input

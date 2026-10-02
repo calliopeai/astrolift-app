@@ -37,6 +37,25 @@ const signal = (
   rangeSeconds: 3600,
   reason: points.length ? "OK" : "NO_DATA_YET",
   samples: points,
+  measurement: {
+    effectiveScope: "APP_ENVIRONMENT",
+    source: name.startsWith("SATURATION") ? "CADVISOR_KUBE_STATE_METRICS" : "APP_INSTRUMENTATION",
+    identityBasis: name.startsWith("SATURATION") ? "NAMESPACE" : "SOURCE_LABELS",
+    available: points.length > 0,
+    unavailableReason: points.length ? null : "NO_DATA_YET",
+    target: {
+      organizationId: "019eb737-0100-7000-8000-000000000001",
+      appId: "019eb737-0100-7000-8000-000000000002",
+      appSlug: "checkout",
+      environmentId: "019eb737-0100-7000-8000-000000000003",
+      environmentName: "production",
+      clusterId: "019eb737-0100-7000-8000-000000000004",
+      namespace: "checkout-production",
+    },
+    containers: [],
+    usageSamples: [],
+    limitSamples: [],
+  },
 });
 
 const SIGNALS: AstroliftAppGoldenSignal[] = [
@@ -81,6 +100,29 @@ function Controlled(props: Partial<GoldenSignalsPanelProps>) {
 
 export const Full: Story = { render: () => <Controlled /> };
 
+export const MixedAvailability: Story = {
+  render: () => (
+    <Controlled
+      signals={SIGNALS.map((row) => ({
+        ...row,
+        samples: row.name === "SATURATION_MEMORY" ? [] : row.samples,
+        reason: row.name === "SATURATION_MEMORY" ? "NO_DATA_YET" : row.reason,
+        measurement: {
+          ...row.measurement!,
+          effectiveScope: "WORKLOAD",
+          target: {
+            ...row.measurement!.target,
+            workloadId: "019eb737-0100-7000-8000-000000000005",
+            workloadSlug: "api",
+          },
+          available: row.name !== "SATURATION_MEMORY",
+          unavailableReason: row.name === "SATURATION_MEMORY" ? "MISSING_LIMITS" : null,
+        },
+      }))}
+    />
+  ),
+};
+
 export const Loading: Story = {
   render: () => (
     <Controlled signals={null} reason={null} loading statusBreakdown={null} statusLoading />
@@ -91,7 +133,16 @@ export const NoDataYet: Story = {
   render: () => (
     <Controlled
       reason="NO_DATA_YET"
-      signals={SIGNALS.map((s) => ({ ...s, reason: "NO_DATA_YET", samples: [] }))}
+      signals={SIGNALS.map((s) => ({
+        ...s,
+        reason: "NO_DATA_YET",
+        samples: [],
+        measurement: {
+          ...s.measurement!,
+          available: false,
+          unavailableReason: "NO_DATA_YET",
+        },
+      }))}
       statusBreakdown={{ ...BREAKDOWN, reason: "NO_DATA_YET", series: [] }}
     />
   ),

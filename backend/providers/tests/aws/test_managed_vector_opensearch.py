@@ -71,6 +71,7 @@ def driver(aws_mock) -> OpenSearchVectorDriver:
 
 def _spec(**overrides) -> ProvisionSpec:
     base = dict(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="1",
         organization_slug="acme",
         app_id="1",
@@ -608,8 +609,10 @@ def test_binding_schema_lists_all_env_vars(
 
 def test_provision_does_not_adopt_another_services_resource(driver) -> None:
     """Names are slug-joined, so another service can map to this one's name (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    first = driver.provision(_spec())
+    second = driver.provision(
+        _spec(managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456780", recorded_handle=first.handle)
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == ""

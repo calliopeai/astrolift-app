@@ -38,6 +38,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from gcp.managed._ownership import label_adoption_refusal
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
@@ -503,17 +504,10 @@ class MemorystoreRedisDriver(ManagedServiceDriver):
             raise
 
     def _instance_id_for(self, *, spec: ProvisionSpec) -> str:
-        # Memorystore instance ids: lowercase letters/digits/hyphens,
-        # must start with letter, ≤40 chars.
-        raw = (
-            f"{self._config.instance_name_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'rd'}"
-        ).lower()
-        sanitized = "".join(c for c in raw if c.isalnum() or c == "-")
-        if not sanitized or not sanitized[0].isalpha():
-            sanitized = f"a{sanitized}"
-        return sanitized[:40]
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.instance_name_prefix, max_length=40
+        )
 
     def _full_name(self, instance_id: str) -> str:
         return f"projects/{self._config.project_id}/locations/{self._config.region}/instances/{instance_id}"

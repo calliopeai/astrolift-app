@@ -52,7 +52,7 @@ interface ProjectWorkflowRunsResp {
   workflowDefinitionRuns: WorkflowDefinitionRun[];
 }
 interface ProjectResourcesResp {
-  astroliftProjectManagedServices: { id: string; status: string }[];
+  astroliftProjectManagedServicesPage: { totalCount: number };
   astroliftProjectSecretBundles: { id: string; keyCount: number }[];
 }
 
@@ -192,7 +192,7 @@ export function useProjectDetail(slug: string) {
     directMembers,
     membersLoading: members.loading,
     resourceCount:
-      (projectResources.data?.astroliftProjectManagedServices.length ?? 0) +
+      (projectResources.data?.astroliftProjectManagedServicesPage?.totalCount ?? 0) +
       (projectResources.data?.astroliftProjectSecretBundles.length ?? 0),
     resourcesLoading: projectResources.loading && !projectResources.data,
     deleting,

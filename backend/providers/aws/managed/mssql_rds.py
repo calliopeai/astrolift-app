@@ -33,7 +33,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "mssql"
@@ -546,23 +553,7 @@ class RDSSqlServerDriver(ManagedServiceDriver):
         return f"option_group {group!r} is not allowed by the cluster install policy mssql_allowed_option_groups"
 
     def _instance_id(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.instance_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "mssql",
-            )
-            if part
-        )
-        clean = "".join(char if char.isalnum() or char == "-" else "-" for char in raw.lower())
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        if not clean or not clean[0].isalpha():
-            clean = f"m-{clean}"
-        return clean.strip("-")[:63]
+        return managed_name_for(spec, kind=KIND, prefix=self._config.instance_name_prefix, max_len=63)
 
     def _password_secret(self, instance_id: str) -> str:
         return f"{self._config.secrets_manager_prefix}/{instance_id}/master"

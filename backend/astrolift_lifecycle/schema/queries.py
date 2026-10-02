@@ -6,7 +6,7 @@ import logging
 from datetime import timedelta
 
 import strawberry
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -23,6 +23,7 @@ from astrolift_graphql import (
 from astrolift_graphql.sorting import NAMED_MODEL_SORTS, ListSortKey, resolve_sort
 from astrolift_identity.operation_context import deployment_operation, named_environment, row_operation
 from astrolift_identity.operation_visibility import require_app_collection_scope
+from astrolift_identity.operation_visibility import visible_operation_rows as operation_rows
 from astrolift_lifecycle.deploy_tokens import rotation_grace_seconds_from_constance
 from astrolift_lifecycle.models import (
     AgentRun,
@@ -82,6 +83,7 @@ from astrolift_lifecycle.schema.types import (
     DeregisterPreviewType,
     ForceRedeployPreviewType,
     ManifestDiffEntryType,
+    PreviewDeploymentType,
     PreviewEnvironmentCountsType,
     PreviewEnvironmentType,
     ReleaseNotesType,
@@ -101,6 +103,7 @@ from astrolift_lifecycle.schema.types import (
     dns_record_to_type,
     identity_binding_to_type,
     pod_info_to_type,
+    preview_deployment_to_type,
     preview_to_type,
     release_notes_to_type,
     scheduled_job_run_to_type,
@@ -122,6 +125,7 @@ from astrolift_lifecycle.visibility import (
 )
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_registry.visibility import visible_registry_apps
 from core.cluster_observability import (
     ClusterObservabilityError,
     list_app_pods,
@@ -653,9 +657,8 @@ def _preview_environments_qs(
     """Filtered, unordered preview stream for the caller's org.
 
     Shared by the list field and its paginated sibling; ordering is
-    left to ``keyset_page``. Cost enrichment (``_preview_with_cost``)
-    deliberately happens on the *sliced* rows, never here — it makes
-    a live cluster call per row.
+    left to ``keyset_page``. Catalog projection performs no runtime pod
+    or pricing calls; exact detail opts into enrichment separately.
     """
     # Org-scope to the caller's tenant (PreviewEnvironment reaches the
     # org via registered_app). Fails closed when org_id is None (#1183).
@@ -696,6 +699,30 @@ def _preview_environments_qs(
             )
         )
     return visible_operation_rows(qs, Permission.APP_READ, app_path="registered_app")
+
+
+def _exact_preview_qs(*, permission=Permission.APP_READ):
+    """Owned previews remain readable after their bound environment retires.
+
+    A foreign environment is an incoherent owner and cannot expose even its
+    existence. Deleted owned environments remain historical FK identities.
+    The operation filter still evaluates the actual environment's facts.
+    """
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    apps = visible_registry_apps(live_app_rows(RegisteredApp.objects.all()), permission)
+    qs = (
+        PreviewEnvironment.objects.select_related(
+            "registered_app__organization",
+            "app_environment__tenant_cluster",
+            "pinned_by",
+        )
+        .filter(registered_app__organization_id=org_id, registered_app__in=apps, deleted_at__isnull=True)
+        .filter(
+            Q(app_environment_id__isnull=True) | Q(app_environment__registered_app_id=F("registered_app_id"))
+        )
+    )
+    return operation_rows(qs, permission, app_path="registered_app")
 
 
 def _app_deploy_tokens_qs(*, app_slug: str, search: str | None = None):
@@ -1550,8 +1577,8 @@ class LifecycleQuery:
 
     @strawberry.field(
         deprecation_reason=(
-            "Caps at 200 rows with no way to reach the 201st, and prices "
-            "every one of them on read. Use astroliftPreviewEnvironmentsPage."
+            "Caps at 200 rows with no way to reach the 201st. Use "
+            "astroliftPreviewEnvironmentsPage for browsing and astroliftPreviewEnvironment for exact detail."
         )
     )
     @require_permission(Permission.APP_READ, any_scope=True)
@@ -1562,7 +1589,82 @@ class LifecycleQuery:
     ) -> list[PreviewEnvironmentType]:
         qs = _preview_environments_qs(app_slug=app_slug).order_by("-created_at")
         rows = list(qs[:200])
-        return [_preview_with_cost(p) for p in rows]
+        reasons = _preview_deploy_failure_reasons(rows)
+        return [preview_to_type(p, failure_reason=reasons.get(p.pk)) for p in rows]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_preview_environment(
+        self, info: Info, id: GUID, include_runtime_cost: bool = False
+    ) -> PreviewEnvironmentType | None:
+        """One exact preview GUID, with optional runtime enrichment of one row.
+
+        Missing, deleted, foreign or unauthorized previews return null. Basic
+        detail never lists pods or calls a price API. Retired owned bindings
+        remain readable but cannot authorize log/deployment routing.
+        """
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        preview = _exact_preview_qs().filter(guid=id, registered_app__organization_id=org_id).first()
+        if preview is None:
+            return None
+        reasons = _preview_deploy_failure_reasons([preview])
+        project = _preview_with_cost if include_runtime_cost else preview_to_type
+        return project(preview, failure_reason=reasons.get(preview.pk))
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_preview_deployments_page(
+        self,
+        info: Info,
+        id: GUID,
+        expected_environment_id: GUID,
+        if_match_preview_version: int,
+        if_match_environment_version: int,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[PreviewDeploymentType]:
+        """Stored deployment history for the exact reviewed preview/environment FK.
+
+        Stale, retired or unavailable bindings refuse before reading history;
+        an environment with a reused name never substitutes for the FK.
+        """
+        from graphql import GraphQLError
+
+        from astrolift_lifecycle.preview_targets import check_preview_target
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        preview = _exact_preview_qs().filter(guid=id, registered_app__organization_id=org_id).first()
+        error = "The reviewed preview environment is unavailable or has changed"
+        if preview is None:
+            raise GraphQLError(error, extensions={"code": "PRECONDITION"})
+        try:
+            check_preview_target(
+                preview,
+                environment_id=expected_environment_id,
+                preview_version=if_match_preview_version,
+                environment_version=if_match_environment_version,
+            )
+        except ValueError:
+            raise GraphQLError(error, extensions={"code": "PRECONDITION"}) from None
+        qs = _deployments_qs(app_slug=None, environment_name=None).filter(
+            registered_app__organization_id=org_id,
+            registered_app_id=preview.registered_app_id,
+            app_environment_id=preview.app_environment_id,
+        )
+        return keyset_page(
+            qs,
+            cursor=after,
+            limit=limit,
+            sort_field="created_at",
+            descending=True,
+            cursor_scope=f"preview-deployments:{preview.guid}:{preview.app_environment.guid}",
+        ).map(preview_deployment_to_type)
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)
@@ -1582,10 +1684,9 @@ class LifecycleQuery:
         """Cursor-paginated preview environments (#1235).
 
         Replaces ``astroliftPreviewEnvironments``, whose 200-row cap hid
-        older previews outright. The cap was also load-bearing for a
-        second reason: every returned row costs one live pod listing plus
-        a pricing lookup (``_preview_with_cost``), so the page limit —
-        applied *before* that enrichment — is what bounds the fan-out.
+        older previews outright. Browsing projects stored metadata only;
+        runtime resources and pricing are explicitly requested on one exact
+        preview through ``astroliftPreviewEnvironment(includeRuntimeCost: true)``.
 
         Seek key is ``(-created_at, -guid)``; ``search`` matches the app,
         branch, hostname, commit, and status.
@@ -1612,7 +1713,7 @@ class LifecycleQuery:
             cursor_scope=cursor_scope,
         )
         reasons = _preview_deploy_failure_reasons(page.rows)
-        return page.map(lambda p: _preview_with_cost(p, failure_reason=reasons.get(p.pk)))
+        return page.map(lambda p: preview_to_type(p, failure_reason=reasons.get(p.pk)))
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)
@@ -2824,47 +2925,38 @@ def _preview_deploy_failure_reasons(previews) -> dict[int, str]:
 
 
 def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnvironmentType:
-    """Project a ``PreviewEnvironment`` row, attaching live pod-resource
-    aggregates + a daily cost estimate from the cluster's provider
-    plugin (#431).
+    """Opt-in runtime resources and pricing for one exact available FK target.
 
-    Cluster resolution mirrors ``_list_pods_for_app`` — prefer the
-    preview's bound ``app_environment.tenant_cluster``, fall back to
-    the app's ``default_tenant_cluster``. When the cluster is unwired
-    / unreachable the resolver still returns the row with zeroed
-    resources + null cost so the page stays renderable.
-
-    Cost is fetched on a per-call basis (no cache) — pricing changes
-    frequently and the read volume is bounded by the 200-row cap on
-    the list resolver. If this becomes a hotspot, the right answer is
-    a short-TTL cache inside the provider plugin's cost driver, not a
-    cache here (we don't want to cache stale numbers across orgs)."""
+    No fallback cluster or namespace is allowed. Unavailable transport is
+    reported explicitly, and a missing price remains null rather than zero.
+    """
     from astrolift_lifecycle.preview_cost import (
         aggregate_pod_resources,
         estimate_daily_cost,
     )
+    from astrolift_lifecycle.preview_targets import preview_binding
     from astrolift_lifecycle.schema.types import PreviewAggregateResourcesType
 
-    cluster = None
-    if p.app_environment_id and p.app_environment.tenant_cluster_id:
-        cluster = p.app_environment.tenant_cluster
-    elif p.registered_app.default_tenant_cluster_id:
-        cluster = p.registered_app.default_tenant_cluster
+    binding_state, target = preview_binding(p)
+    if binding_state != "available" or target is None:
+        return preview_to_type(
+            p,
+            runtime_status="unavailable",
+            estimated_cost_notes=["The preview environment is unavailable or retired."],
+            failure_reason=failure_reason,
+        )
+    cluster = p.app_environment.tenant_cluster
 
     pods: list = []
-    if cluster_owned_and_live(cluster, p.registered_app.organization_id):
-        try:
-            pods = list(
-                list_app_pods(
-                    cluster=cluster,
-                    namespace=p.namespace,
-                    app_slug=p.registered_app.slug,
-                )
-            )
-        except ClusterObservabilityError:
-            pods = []
-        except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
-            pods = []
+    try:
+        pods = list(list_app_pods(cluster=cluster, namespace=target.namespace, app_slug=target.app_slug))
+    except Exception:  # noqa: BLE001 — k8s lib raises many subtypes
+        return preview_to_type(
+            p,
+            runtime_status="unavailable",
+            estimated_cost_notes=["Runtime resource data is unavailable."],
+            failure_reason=failure_reason,
+        )
 
     aggregate = aggregate_pod_resources(pods)
     estimate = None
@@ -2885,6 +2977,7 @@ def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnviro
         estimated_daily_cost_usd=estimate.daily_usd if estimate else None,
         estimated_cost_notes=list(estimate.notes) if estimate else [],
         estimated_cost_approximate=bool(estimate and estimate.approximate),
+        runtime_status="available",
         failure_reason=failure_reason,
     )
 

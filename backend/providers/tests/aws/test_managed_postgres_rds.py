@@ -109,6 +109,7 @@ def _spec(**overrides) -> ProvisionSpec:
         tenant_cluster_id="aws-prod",
         service_handle_hint="pg",
         size="small",
+        managed_service_id="00000000-0000-4000-8000-000000000001",
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -486,12 +487,11 @@ def test_restore_from_snapshot_creates_new_instance(
     rds_client,
 ) -> None:
     # Take a snapshot from one instance, restore into a new one with
-    # a different service_handle_hint so the target instance id
-    # differs from the source.
+    # a distinct persisted managed-service identity. Display hints are not identity.
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
 
-    restore_spec = _spec(service_handle_hint="restored")
+    restore_spec = _spec(service_handle_hint="restored", managed_service_id="00000000-0000-4000-8000-000000000002")
     result = driver.restore(snap, restore_spec)
     assert result.ok
     _, target_id = parse_handle(result.handle)
@@ -693,26 +693,37 @@ def test_provision_refuses_to_adopt_another_orgs_colliding_instance(driver: RDSP
     """org acme app x-api and org acme-x app api compute the same instance id;
     the second must not adopt the first org's database."""
     first = driver.provision(_spec(organization_slug="acme", app_slug="x-api"))
-    second = driver.provision(_spec(organization_slug="acme-x", app_slug="api"))
+    second = driver.provision(
+        _spec(
+            organization_slug="acme-x",
+            app_slug="api",
+            managed_service_id="00000000-0000-4000-8000-000000000002",
+            recorded_handle=first.handle,
+        )
+    )
 
     assert first.ok
     assert parse_handle(first.handle)[1] == driver._instance_id_for(
-        spec=_spec(organization_slug="acme-x", app_slug="api")
+        spec=_spec(organization_slug="acme-x", app_slug="api", recorded_handle=first.handle)
     )
     assert second.ok is False
     assert "refusing to adopt" in second.message
 
 
 def test_provision_refuses_an_instance_tagged_for_another_service(driver: RDSPostgresDriver) -> None:
-    driver.provision(_spec(managed_service_id="svc-1"))
-    other = driver.provision(_spec(managed_service_id="svc-2"))
+    driver.provision(_spec(managed_service_id="00000000-0000-4000-8000-000000000001"))
+    other = driver.provision(
+        _spec(
+            managed_service_id="00000000-0000-4000-8000-000000000002", recorded_handle=driver.provision(_spec()).handle
+        )
+    )
     assert other.ok is False
     assert "another managed service" in other.message
 
 
 def test_provision_still_adopts_its_own_instance(driver: RDSPostgresDriver) -> None:
-    a = driver.provision(_spec(managed_service_id="svc-1"))
-    b = driver.provision(_spec(managed_service_id="svc-1"))
+    a = driver.provision(_spec(managed_service_id="00000000-0000-4000-8000-000000000001"))
+    b = driver.provision(_spec(managed_service_id="00000000-0000-4000-8000-000000000001"))
     legacy = driver.provision(_spec(service_handle_hint="legacy"))
     legacy_again = driver.provision(_spec(service_handle_hint="legacy"))
     assert a.ok and b.ok and a.handle == b.handle

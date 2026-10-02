@@ -1,10 +1,13 @@
 import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
+import { useTranslations, NextIntlClientProvider } from "next-intl";
+import german from "@/messages/de.json";
+import japanese from "@/messages/ja.json";
 import { expect, fn, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
 import { ClustersList, type ClustersListProps } from "./ClustersList";
-import { CLUSTERS_LIST } from "./clusters-list";
+import { CLUSTERS_LIST, localizedClustersList } from "./clusters-list";
 import { CLUSTERS, FLEET, LONG_CLUSTER, listProps, serveClusters } from "./fixtures";
 import type { ClusterRow } from "./use-clusters-list";
 
@@ -38,7 +41,9 @@ type Props = Partial<Omit<ClustersListProps, "list">> & {
 
 /** The screen over a fixture fleet, filtered and paged the way the server does it. */
 function Clusters({ fleet = CLUSTERS, initial, ...patch }: Props) {
-  const list = useLocalListState(CLUSTERS_LIST, initial);
+  const t = useTranslations("clusters.list");
+  const lifecycle = useTranslations("clusters.chrome");
+  const list = useLocalListState(localizedClustersList(t, lifecycle), initial);
   const { rows, totalCount } = serveClusters(fleet, {
     filters: list.filters,
     sort: list.state.sort,
@@ -182,4 +187,22 @@ export const UnregisterRefused: Story = {
     await expect(refusedUnregister).toHaveBeenCalledTimes(1);
     await expect(body.getByRole("alertdialog")).toBeVisible();
   },
+};
+
+export const GermanWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={german}>
+      <div style={{ width: 768 }}>
+        <Clusters fleet={[LONG_CLUSTER, ...CLUSTERS]} />
+      </div>
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseCards: Story = {
+  parameters: { mode: "card" },
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={japanese}>
+      <Clusters />
+    </NextIntlClientProvider>
+  ),
 };

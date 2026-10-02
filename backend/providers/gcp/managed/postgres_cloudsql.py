@@ -56,6 +56,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from gcp.managed._ownership import label_adoption_refusal
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
@@ -603,18 +604,11 @@ class CloudSQLPostgresDriver(ManagedServiceDriver):
         return dict(resp) if isinstance(resp, dict) else getattr(resp, "__dict__", {})
 
     def _instance_id_for(self, *, spec: ProvisionSpec) -> str:
-        # CloudSQL instance names: lowercase, letters/digits/hyphens,
-        # ≤98 chars, must start with letter.
-        raw = (
-            (
-                f"{self._config.instance_name_prefix}-"
-                f"{spec.organization_slug}-{spec.app_slug}-"
-                f"{spec.environment_name}-{spec.service_handle_hint or 'pg'}"
-            )
-            .lower()
-            .replace("_", "-")
+        managed_service_identity(spec.managed_service_id)
+        recorded = recorded_resource_name(spec.recorded_handle, kind=KIND)
+        return recorded or physical_name(
+            spec.managed_service_id, prefix=self._config.instance_name_prefix, max_length=98
         )
-        return "".join(c for c in raw if c.isalnum() or c == "-")[:98]
 
     def _master_secret_for(self, *, instance_id: str) -> str:
         return f"{self._config.secret_manager_prefix}/{instance_id}/master"

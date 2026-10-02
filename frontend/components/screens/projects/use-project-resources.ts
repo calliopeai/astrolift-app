@@ -1,6 +1,6 @@
 "use client";
 
-import { useLazyQuery, useMutation, useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -18,29 +18,25 @@ import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.type
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import {
-  ATTACH_PROJECT_MANAGED_SERVICE,
   ATTACH_SECRET_BUNDLE,
   CREATE_PROJECT_SECRET_BUNDLE,
   DELETE_PROJECT_BUNDLE_SECRET,
   DELETE_PROJECT_SECRET_BUNDLE,
-  DEPROVISION_PROJECT_MANAGED_SERVICE,
-  DETACH_PROJECT_MANAGED_SERVICE,
   DETACH_SECRET_BUNDLE,
   PROVISION_PROJECT_MANAGED_SERVICE,
-  REPROVISION_PROJECT_MANAGED_SERVICE,
   REVEAL_PROJECT_BUNDLE_SECRET,
   SET_PROJECT_BUNDLE_SECRET,
 } from "@/graphql/services/services.mutations";
 import {
   LIST_PROJECT_MANAGED_SERVICE_CATALOG,
   LIST_PROJECT_RESOURCES,
-  PREVIEW_MANAGED_SERVICE_COST,
 } from "@/graphql/services/services.queries";
 import type {
   AstroliftManagedService,
   AstroliftManagedServiceCatalogEntry,
   AstroliftProjectSecretBundle,
 } from "@/graphql/services/services.types";
+import { useManagedResourceReads } from "./use-managed-resource-reads";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
@@ -58,7 +54,7 @@ interface EnvironmentsData {
 }
 interface ResourcesData {
   astroliftProjectResourceClusters: AstroliftTenantCluster[];
-  astroliftProjectManagedServices: AstroliftManagedService[];
+  astroliftProjectManagedServicesPage: { totalCount: number };
   astroliftProjectSecretBundles: AstroliftProjectSecretBundle[];
 }
 interface CatalogData {
@@ -75,9 +71,6 @@ export interface ManagedServiceCostPreview {
   pricingFetchedAt: string;
   notes: string[];
   approximate: boolean;
-}
-interface CostPreviewData {
-  astroliftManagedServiceCostPreview: ManagedServiceCostPreview | null;
 }
 
 /** The project fields the resources screen reads. */
@@ -121,6 +114,9 @@ function firstError(result?: MutationResult<unknown> | null): string {
 export function useProjectResources(slug: string) {
   const permissions = useMyPermissions();
   const confirm = useConfirm();
+  const canUpdate = permissions.can("project.update");
+  const canWriteSecrets = permissions.can("secret.write");
+  const canReadSecrets = permissions.can("secret.read");
   const projects = useQuery<ProjectsData>(LIST_PROJECTS);
   const project = projects.data?.astroliftProjects.find((row) => row.slug === slug);
   const projectId = project?.id ?? "";
@@ -133,61 +129,35 @@ export function useProjectResources(slug: string) {
   });
   const agents = useQuery<AgentsData>(LIST_AGENT_WORKLOADS, {
     variables: { orgId, projectSlug: slug },
-    skip: !orgId,
+    skip: !orgId || !(canUpdate || canWriteSecrets),
   });
-  const apps = useQuery<AppsData>(LIST_APPS, { skip: !projectId });
+  const apps = useQuery<AppsData>(LIST_APPS, {
+    skip: !projectId || !(canUpdate || canWriteSecrets),
+  });
   const environments = useQuery<EnvironmentsData>(LIST_ENVIRONMENTS, {
     variables: { appSlug: null },
-    skip: !projectId,
+    skip: !projectId || !(canUpdate || canWriteSecrets),
   });
-  const refetchResources = () => resources.refetch({ projectId });
+  const managedReads = useManagedResourceReads(projectId, canUpdate, permissions.can("app.read"));
+  const refetchResources = () => {
+    managedReads.refreshResources();
+    return resources.refetch({ projectId });
+  };
   const [clusterId, setClusterId] = React.useState("");
   const [bundleClusterId, setBundleClusterId] = React.useState("");
-  const [consumerService, setConsumerService] = React.useState<AstroliftManagedService | null>(
-    null
-  );
   const [consumerBundle, setConsumerBundle] = React.useState<AstroliftProjectSecretBundle | null>(
     null
   );
   const [revealed, setRevealed] = React.useState<Record<string, string>>({});
-  const [costPreviews, setCostPreviews] = React.useState<Record<string, ManagedServiceCostPreview>>(
-    {}
-  );
-  const [loadCostPreview, costPreviewRequest] = useLazyQuery<CostPreviewData>(
-    PREVIEW_MANAGED_SERVICE_COST,
-    { fetchPolicy: "network-only" }
-  );
   const refreshConsumerBundle = async (bundleId: string) => {
     const refreshed = await refetchResources();
     setConsumerBundle(
       refreshed.data?.astroliftProjectSecretBundles.find((row) => row.id === bundleId) ?? null
     );
   };
-  const refreshConsumerService = async (serviceId: string) => {
-    const refreshed = await refetchResources();
-    setConsumerService(
-      refreshed.data?.astroliftProjectManagedServices.find((row) => row.id === serviceId) ?? null
-    );
-  };
-  const canUpdate = permissions.can("project.update");
-  const canWriteSecrets = permissions.can("secret.write");
-  const canReadSecrets = permissions.can("secret.read");
-
   const [provision, provisionState] = useMutation<{
     provisionProjectManagedService: MutationResult<AstroliftManagedService>;
   }>(PROVISION_PROJECT_MANAGED_SERVICE);
-  const [reprovision] = useMutation<{
-    reprovisionProjectManagedService: MutationResult<AstroliftManagedService>;
-  }>(REPROVISION_PROJECT_MANAGED_SERVICE);
-  const [attachConsumer, attachConsumerState] = useMutation<{
-    attachProjectManagedService: MutationResult<AstroliftManagedService["attachments"][number]>;
-  }>(ATTACH_PROJECT_MANAGED_SERVICE);
-  const [detachConsumer, detachConsumerState] = useMutation<{
-    detachProjectManagedService: MutationResult<AstroliftManagedService["attachments"][number]>;
-  }>(DETACH_PROJECT_MANAGED_SERVICE);
-  const [deprovision] = useMutation<{
-    deprovisionProjectManagedService: MutationResult<{ id: string; deleted: boolean }>;
-  }>(DEPROVISION_PROJECT_MANAGED_SERVICE);
   const [createBundle, createBundleState] = useMutation<{
     createProjectSecretBundle: MutationResult<AstroliftProjectSecretBundle>;
   }>(CREATE_PROJECT_SECRET_BUNDLE);
@@ -227,10 +197,9 @@ export function useProjectResources(slug: string) {
   const effectiveClusterSlug = clusters.find((row) => row.id === effectiveClusterId)?.slug;
   const catalog = useQuery<CatalogData>(LIST_PROJECT_MANAGED_SERVICE_CATALOG, {
     variables: { projectId, clusterId: effectiveClusterId },
-    skip: !projectId || !effectiveClusterId,
+    skip: !projectId || !effectiveClusterId || !canUpdate,
   });
 
-  const services = resources.data?.astroliftProjectManagedServices ?? [];
   const bundles = resources.data?.astroliftProjectSecretBundles ?? [];
   const projectAppSlugs = new Set(
     (apps.data?.astroliftApps ?? [])
@@ -319,43 +288,6 @@ export function useProjectResources(slug: string) {
     return true;
   }
 
-  async function onCostPreview(serviceId: string) {
-    const result = await loadCostPreview({
-      variables: { managedServiceId: serviceId },
-    });
-    const preview = result.data?.astroliftManagedServiceCostPreview;
-    if (preview) setCostPreviews((current) => ({ ...current, [serviceId]: preview }));
-  }
-
-  async function onReprovision(serviceId: string) {
-    const { data } = await reprovision({
-      variables: { input: { managedServiceId: serviceId } },
-    });
-    const result = data?.reprovisionProjectManagedService as MutationResult<unknown> | undefined;
-    if (result?.ok) toast.success("Reprovision started");
-    else toast.error(firstError(result));
-    await refetchResources();
-  }
-
-  async function onDeprovision(service: AstroliftManagedService) {
-    const approved = await confirm({
-      title: `Deprovision ${service.name}?`,
-      description:
-        "The cloud resource will be removed using the provider's safe-delete behavior; persistent data is retained by default.",
-      confirmLabel: "Deprovision",
-    });
-    if (!approved) return;
-    const { data } = await deprovision({
-      variables: {
-        input: { id: service.id, deleteData: false, forceDestroy: false },
-      },
-    });
-    const result = data?.deprovisionProjectManagedService as MutationResult<unknown> | undefined;
-    if (result?.ok) toast.success("Deprovision started");
-    else toast.error(firstError(result));
-    await refetchResources();
-  }
-
   async function onDeleteBundle(bundle: AstroliftProjectSecretBundle) {
     const approved = await confirm({
       title: `Delete ${bundle.name}?`,
@@ -407,34 +339,6 @@ export function useProjectResources(slug: string) {
     if (result?.ok) toast.success(`${key} deleted`);
     else toast.error(firstError(result));
     await refetchResources();
-  }
-
-  async function onDetachServiceConsumer(serviceId: string, attachmentId: string) {
-    const { data } = await detachConsumer({
-      variables: { input: { attachmentId } },
-    });
-    const result = data?.detachProjectManagedService as MutationResult<unknown> | undefined;
-    if (!result?.ok) {
-      toast.error(firstError(result));
-      return;
-    }
-    toast.success("Consumer detached");
-    await refreshConsumerService(serviceId);
-  }
-
-  async function onAttachServiceConsumer(
-    serviceId: string,
-    target: { agentEnvironmentSpecSlug: string | null; appEnvironmentId: string | null }
-  ) {
-    const { data } = await attachConsumer({
-      variables: { input: { managedServiceId: serviceId, ...target } },
-    });
-    const result = data?.attachProjectManagedService as MutationResult<unknown> | undefined;
-    if (!result?.ok) {
-      toast.error(firstError(result));
-      return;
-    }
-    await refreshConsumerService(serviceId);
   }
 
   async function onDetachBundleConsumer(bundleId: string, consumer: BundleConsumer) {
@@ -510,7 +414,7 @@ export function useProjectResources(slug: string) {
     canWriteSecrets,
     canReadSecrets,
     clusters,
-    services,
+    ...managedReads,
     bundles,
     resourcesLoading: resources.loading && !resources.data,
     agents: projectAgents,
@@ -523,23 +427,12 @@ export function useProjectResources(slug: string) {
     catalogEntries: catalog.data?.astroliftProjectManagedServiceCatalog ?? [],
     catalogLoading: catalog.loading,
     catalogError: Boolean(catalog.error),
-    costPreviews,
-    costPreviewLoading: costPreviewRequest.loading,
-    onCostPreview,
     revealed,
     onToggleReveal,
-    consumerService,
-    setConsumerService,
     consumerBundle,
     setConsumerBundle,
     provisioning: provisionState.loading,
     onProvision,
-    onReprovision,
-    onDeprovision,
-    attachingConsumer: attachConsumerState.loading,
-    detachingConsumer: detachConsumerState.loading,
-    onAttachServiceConsumer,
-    onDetachServiceConsumer,
     creatingBundle: createBundleState.loading,
     onCreateBundle,
     onSetBundleKey,

@@ -7,12 +7,14 @@ import {
   GitPullRequestIcon,
   InfoIcon,
   MoreHorizontalIcon,
+  ScrollTextIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
 import { Identifier } from "@/components/Identifier";
+import { LogViewer } from "@/components/observability/LogViewer";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { appsDetailCrumbs } from "@/components/screens/deployments/apps-area";
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -28,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
+import { previewHasAvailableBinding } from "./preview-binding";
 import { PREVIEW_DOT } from "./previews-list";
 import type { usePreviewDetail } from "./use-preview-detail";
 
@@ -49,7 +52,7 @@ function crumbs(p: AstroliftPreviewEnvironment | null, fallback: string) {
   return appsDetailCrumbs(
     "previews",
     { label: p.registeredAppSlug, href: `/apps/${p.registeredAppSlug}/deployments?view=previews` },
-    { label: `PR #${p.prNumber}` }
+    { label: p.isManual ? p.branch : `PR #${p.prNumber}` }
   );
 }
 
@@ -65,6 +68,18 @@ export function PreviewDetailScreen({
   loading,
   error,
   onRetry,
+  runtimeLoading,
+  onLoadRuntime,
+  logs,
+  logsError,
+  logsLoading,
+  logsRequested,
+  onLoadLogs,
+  deployments,
+  deploymentsError,
+  deploymentsLoading,
+  deploymentsRequested,
+  onLoadDeployments,
 }: PreviewDetailScreenProps) {
   const t = useTranslations("lists.previews");
   const fmt = useFormatter();
@@ -105,13 +120,14 @@ export function PreviewDetailScreen({
     );
   }
 
-  const running = p.status === "running";
+  const bound = previewHasAvailableBinding(p);
+  const running = p.status === "running" && !p.tornDownAt && bound && Boolean(p.hostname);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
       <ShellHeader
         crumbs={crumbs(p, fallback)}
-        title={`PR #${p.prNumber}`}
+        title={p.isManual ? p.branch : `PR #${p.prNumber}`}
         status={
           <span className="inline-flex shrink-0 items-center gap-1.5 text-sm capitalize">
             <StatusDot status={PREVIEW_DOT[p.status]} />
@@ -179,17 +195,16 @@ export function PreviewDetailScreen({
           title={t("detail.overview")}
           icon={<InfoIcon className="size-4" />}
           span={6}
-          // No reason field on a preview yet: say where to look.
           failure={
             p.status === "failed"
               ? {
                   title: t("detail.failed"),
-                  reason: t("detail.failureReason"),
-                  action: (
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href={`/apps/${p.registeredAppSlug}/logs`}>{t("detail.openLogs")}</Link>
+                  reason: p.failureReason || t("detail.failureReason"),
+                  action: bound ? (
+                    <Button size="sm" variant="outline" onClick={onLoadLogs} disabled={logsLoading}>
+                      {t("detail.openLogs")}
                     </Button>
-                  ),
+                  ) : undefined,
                 }
               : null
           }
@@ -208,6 +223,19 @@ export function PreviewDetailScreen({
                 term: t("columns.hostname"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">{p.hostname}</span>
+                ),
+              },
+              {
+                term: t("detail.environment"),
+                description: p.environment ? (
+                  <span className="[overflow-wrap:anywhere]">
+                    {p.environment.environmentName} ·{" "}
+                    {t(
+                      `detail.binding.${p.environmentStatus === "available" ? "available" : p.environmentStatus === "retired" ? "retired" : "unavailable"}`
+                    )}
+                  </span>
+                ) : (
+                  t("detail.binding.unavailable")
                 ),
               },
               {
@@ -249,67 +277,176 @@ export function PreviewDetailScreen({
           />
         </Panel>
 
-        <Panel title={t("detail.resources")} icon={<CpuIcon className="size-4" />} span={6}>
-          <DefinitionList
-            items={[
-              {
-                term: t("detail.cpu"),
-                description: (
-                  <span className="font-mono">
-                    {formatNumber(p.aggregateResources.cpuCores, 2)}
-                  </span>
-                ),
-              },
-              {
-                term: t("detail.memory"),
-                description: (
-                  <span className="font-mono">
-                    {formatMemory(p.aggregateResources.memoryBytes, formatNumber)}
-                  </span>
-                ),
-              },
-              {
-                term: t("detail.pods"),
-                description: <span className="font-mono">{p.aggregateResources.podCount}</span>,
-              },
-              {
-                term: t("detail.dailyCost"),
-                // The figure and what the driver said about it (#1509): a
-                // GCP variant's total is an over-count by construction, and
-                // an operator must not read it as exact.
-                description:
-                  p.estimatedDailyCostUsd == null ? (
-                    "—"
-                  ) : (
-                    <span className="flex min-w-0 flex-col gap-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="font-mono">
-                          {fmt.number(p.estimatedDailyCostUsd, {
-                            style: "currency",
-                            currency: "USD",
-                          })}
-                        </span>
-                        {p.estimatedCostApproximate && (
-                          <Badge variant="outline" className="text-2xs gap-1 uppercase">
-                            <AlertTriangleIcon className="size-3" />
-                            {t("detail.approximate")}
-                          </Badge>
-                        )}
-                      </span>
-                      {p.estimatedCostNotes.length > 0 && (
-                        <span className="text-muted-foreground flex flex-col gap-0.5 text-xs">
-                          {p.estimatedCostNotes.map((note) => (
-                            <span key={note} className="[overflow-wrap:anywhere]">
-                              {note}
-                            </span>
-                          ))}
-                        </span>
-                      )}
+        <Panel
+          title={t("detail.resources")}
+          icon={<CpuIcon className="size-4" />}
+          span={6}
+          loading={runtimeLoading}
+          actions={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onLoadRuntime}
+              disabled={!bound || runtimeLoading}
+            >
+              {t("detail.loadResources")}
+            </Button>
+          }
+        >
+          {p.runtimeStatus !== "available" ? (
+            <p className="text-muted-foreground text-sm">
+              {t(
+                p.runtimeStatus === "unavailable"
+                  ? "detail.resourcesUnavailable"
+                  : "detail.resourcesNotRequested"
+              )}
+            </p>
+          ) : (
+            <DefinitionList
+              items={[
+                {
+                  term: t("detail.cpu"),
+                  description: (
+                    <span className="font-mono">
+                      {formatNumber(p.aggregateResources.cpuCores, 2)}
                     </span>
                   ),
-              },
-            ]}
-          />
+                },
+                {
+                  term: t("detail.memory"),
+                  description: (
+                    <span className="font-mono">
+                      {formatMemory(p.aggregateResources.memoryBytes, formatNumber)}
+                    </span>
+                  ),
+                },
+                {
+                  term: t("detail.pods"),
+                  description: <span className="font-mono">{p.aggregateResources.podCount}</span>,
+                },
+                {
+                  term: t("detail.dailyCost"),
+                  // The figure and what the driver said about it (#1509): a
+                  // GCP variant's total is an over-count by construction, and
+                  // an operator must not read it as exact.
+                  description:
+                    p.estimatedDailyCostUsd == null ? (
+                      "—"
+                    ) : (
+                      <span className="flex min-w-0 flex-col gap-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-mono">
+                            {fmt.number(p.estimatedDailyCostUsd, {
+                              style: "currency",
+                              currency: "USD",
+                            })}
+                          </span>
+                          {p.estimatedCostApproximate && (
+                            <Badge variant="outline" className="text-2xs gap-1 uppercase">
+                              <AlertTriangleIcon className="size-3" />
+                              {t("detail.approximate")}
+                            </Badge>
+                          )}
+                        </span>
+                        {p.estimatedCostNotes.length > 0 && (
+                          <span className="text-muted-foreground flex flex-col gap-0.5 text-xs">
+                            {p.estimatedCostNotes.map((note) => (
+                              <span key={note} className="[overflow-wrap:anywhere]">
+                                {note}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                    ),
+                },
+              ]}
+            />
+          )}
+        </Panel>
+        <Panel
+          title={t("detail.previewLogs")}
+          icon={<ScrollTextIcon className="size-4" />}
+          span={12}
+          error={logsError}
+          onRetry={onLoadLogs}
+          actions={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onLoadLogs}
+              disabled={!bound || logsLoading}
+            >
+              {t("detail.loadLogs")}
+            </Button>
+          }
+        >
+          {logsRequested || logsLoading ? (
+            <LogViewer
+              appSlug={p.registeredAppSlug}
+              environmentName={p.environment?.environmentName}
+              lines={(logs?.items ?? []).map((line) => ({ ...line, stream: "stdout" }))}
+              loading={logsLoading}
+              emptyHint={t(
+                logs?.historicalAvailable && logs.reason !== "ERROR"
+                  ? "detail.logsEmpty"
+                  : "detail.logsUnavailable"
+              )}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              {t(bound ? "detail.logsNotRequested" : "detail.binding.unavailable")}
+            </p>
+          )}
+        </Panel>
+        <Panel
+          title={t("detail.previewDeployments")}
+          span={12}
+          error={deploymentsError}
+          onRetry={onLoadDeployments}
+          loading={deploymentsLoading}
+          actions={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onLoadDeployments}
+              disabled={!bound || deploymentsLoading}
+            >
+              {t("detail.loadDeployments")}
+            </Button>
+          }
+        >
+          {deploymentsRequested && deployments?.items.length ? (
+            <ul className="space-y-2 text-sm">
+              {deployments.items.map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <Link
+                    className="font-mono text-xs hover:underline"
+                    href={`/deployments/${row.id}`}
+                  >
+                    {row.id}
+                  </Link>
+                  <span>{row.status}</span>
+                  <DetailTimestamp iso={row.createdAt} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              {t(
+                !bound
+                  ? "detail.binding.unavailable"
+                  : deploymentsRequested
+                    ? "detail.deploymentsEmpty"
+                    : "detail.deploymentsNotRequested"
+              )}
+            </p>
+          )}
+          {deployments?.nextCursor && (
+            <p className="text-muted-foreground mt-2 text-xs">
+              {t("detail.deploymentsBounded", { count: deployments.items.length })}
+            </p>
+          )}
         </Panel>
       </PanelGrid>
     </div>

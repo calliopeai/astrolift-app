@@ -84,6 +84,11 @@ def _truncate(message: str, *, limit: int = 4000) -> str:
     return message[: limit - 3] + "..."
 
 
+def _reviewed_args(input, arguments):
+    # Omitted proof preserves the serialized arguments of legacy histories.
+    return arguments if input.reviewed_binding is None else [*arguments, input.reviewed_binding]
+
+
 @workflow.defn(name="DeprovisionManagedServiceWorkflow")
 class DeprovisionManagedServiceWorkflow:
     @workflow.run
@@ -94,7 +99,7 @@ class DeprovisionManagedServiceWorkflow:
 
         await workflow.execute_activity(
             mark_managed_service_deprovisioning,
-            svc_id,
+            args=_reviewed_args(input, [svc_id]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
@@ -102,7 +107,7 @@ class DeprovisionManagedServiceWorkflow:
         try:
             result = await workflow.execute_activity(
                 deprovision_managed_service,
-                args=[svc_id, delete_data, force_destroy],
+                args=_reviewed_args(input, [svc_id, delete_data, force_destroy]),
                 start_to_close_timeout=_DEPROVISION_TIMEOUT,
                 retry_policy=_DEPROVISION_RETRY,
             )
@@ -114,7 +119,7 @@ class DeprovisionManagedServiceWorkflow:
 
         await workflow.execute_activity(
             finalize_managed_service_deletion,
-            svc_id,
+            args=_reviewed_args(input, [svc_id]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )

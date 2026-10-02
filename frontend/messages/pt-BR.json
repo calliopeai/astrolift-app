@@ -810,6 +810,49 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "signalMeasurement": {
+        "unreported": "Âmbito de medição não informado.",
+        "scope": "Âmbito: {scope}",
+        "source": "Fonte: {source}",
+        "since": "Contêineres atuais medidos desde {timestamp}",
+        "identities": "Identidades canônicas",
+        "app": "App",
+        "environment": "Ambiente",
+        "cluster": "Cluster",
+        "workload": "Carga de trabalho",
+        "scopes": {
+          "APP_ENVIRONMENT": "Ambiente da app",
+          "WORKLOAD": "Carga de trabalho",
+          "UNRESOLVED": "Não resolvido"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "Instrumentação da app",
+          "EDGE_PROMETHEUS": "Métricas de ingresso",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "Nenhuma"
+        },
+        "reasons": {
+          "target": "Destino selecionado indisponível.",
+          "partial": "Medição incompleta ou ambígua; nenhuma proporção é exibida.",
+          "noData": "Não há dados de uso verificados neste intervalo.",
+          "readError": "Não foi possível ler a fonte de medição.",
+          "MISSING_LIMITS": "Faltam limites de recursos; a saturação está indisponível.",
+          "OWNERSHIP_UNVERIFIED": "Propriedade de execução não verificada. Reimplante para registrar as identidades atuais.",
+          "PERMISSION_DENIED": "Permissão de leitura desta medição negada.",
+          "NOT_SUPPORTED_BY_PROVIDER": "O provedor não oferece esta medição.",
+          "NOT_CONFIGURED": "Fonte de medição não configurada.",
+          "NOT_INSTRUMENTED": "As métricas de solicitações não estão instrumentadas para este destino."
+        },
+        "organization": "Organização",
+        "bases": {
+          "SOURCE_LABELS": "Rótulos lógicos de instrumentação",
+          "NAMESPACE": "Total do namespace; pertencimento físico não verificado",
+          "VERIFIED_RUNTIME": "Contêineres físicos atuais verificados",
+          "UNRESOLVED": "Identidade de execução não resolvida"
+        },
+        "observed": "Pertencimento de execução observado em {timestamp}"
       }
     },
     "tokens": {
@@ -3673,7 +3716,26 @@
         "memory": "Memória (total)",
         "pods": "Pods",
         "dailyCost": "Custo diário estimado",
-        "approximate": "aproximado"
+        "approximate": "aproximado",
+        "environment": "Ambiente",
+        "loadResources": "Carregar recursos e custo",
+        "resourcesUnavailable": "O uso atual de recursos e o custo estimado estão indisponíveis.",
+        "resourcesNotRequested": "Carregue o uso atual de recursos e o custo estimado quando precisar.",
+        "previewLogs": "Logs da prévia",
+        "loadLogs": "Carregar logs",
+        "logsEmpty": "Nenhuma linha de log neste intervalo.",
+        "logsUnavailable": "Os logs históricos estão indisponíveis para este ambiente.",
+        "logsNotRequested": "Carregue até 200 linhas dos últimos 30 minutos deste ambiente.",
+        "previewDeployments": "Implantações da prévia",
+        "loadDeployments": "Carregar implantações",
+        "deploymentsEmpty": "Nenhuma implantação para este ambiente.",
+        "deploymentsNotRequested": "Carregue as implantações mais recentes deste ambiente de prévia.",
+        "deploymentsBounded": "Exibindo as {count} implantações mais recentes.",
+        "binding": {
+          "available": "Disponível",
+          "retired": "Desativado",
+          "unavailable": "Ambiente indisponível"
+        }
       }
     }
   },
@@ -4045,6 +4107,61 @@
       "label": "Última operação:",
       "completed": "Concluída em {at}",
       "running": "Em andamento"
+    },
+    "reads": {
+      "title": "Recursos do projeto",
+      "name": "Nome",
+      "kind": "Tipo",
+      "cluster": "Cluster",
+      "status": "Status",
+      "search": "Buscar recursos",
+      "empty": "Nenhum recurso do projeto",
+      "emptyDescription": "A infraestrutura do projeto aparece aqui após o provisionamento.",
+      "emptyFiltered": "Nenhum recurso correspondente",
+      "emptyFilteredDescription": "Altere a busca para ver outros recursos do projeto.",
+      "detail": "Detalhes do recurso",
+      "detailDescription": "Revise este recurso exato e seus consumidores atualmente visíveis.",
+      "refused": "O recurso selecionado está indisponível ou seu contexto mudou. Revise seu GUID exato novamente.",
+      "reviewAgain": "Revisar novamente",
+      "refresh": "Atualizar",
+      "organization": "Organização",
+      "project": "Projeto",
+      "app": "Aplicativo",
+      "environment": "Ambiente",
+      "consumer": "Consumidor",
+      "consumers": "Consumidores visíveis",
+      "actions": "Ações",
+      "detach": "Desvincular",
+      "agentRecipe": "Receita de agente",
+      "noConsumers": "Nenhum consumidor visível",
+      "consumerVisibility": "Apenas consumidores que você pode consultar atualmente são incluídos.",
+      "appEnvironment": "Ambiente do aplicativo",
+      "environmentGuid": "GUID do ambiente",
+      "recipeSlug": "Slug da receita de agente",
+      "consumerContext": "Os consumidores devem pertencer ao mesmo projeto e cluster deste recurso.",
+      "attach": "Vincular",
+      "costUnavailable": "O preço está indisponível.",
+      "costMonthly": "{amount} por mês",
+      "costApproximate": "Aproximadamente {amount} por mês",
+      "costFetched": "Preço consultado em {at}",
+      "costSource": "Fonte do preço",
+      "costPreview": "Estimar custo",
+      "reprovision": "Reprovisionar",
+      "deprovision": "Desprovisionar",
+      "actionRefused": "A ação foi recusada. Revise o recurso e suas permissões atuais.",
+      "operationAccepted": "Operação aceita; a conclusão é acompanhada separadamente.",
+      "deprovisionTitle": "Desprovisionar {name}?",
+      "deprovisionDescription": "Remova o recurso da nuvem com a exclusão segura do provedor. Os dados persistentes são mantidos por padrão.",
+      "activeOnPage": "{count} ativos nesta página",
+      "failedOnPage": "Operações com falha nesta página",
+      "statuses": {
+        "pending": "Pendente",
+        "provisioning": "Provisionando",
+        "active": "Ativo",
+        "updating": "Atualizando",
+        "deprovisioning": "Desprovisionando",
+        "failed": "Falhou"
+      }
     }
   },
   "administration": {
@@ -6291,6 +6408,71 @@
       "exampleCa": "CA do cluster em PEM ou base64; opcional se já configurada",
       "exampleRegion": "Região da nuvem",
       "exampleCluster": "Nome do cluster na nuvem"
+    },
+    "list": {
+      "columns": {
+        "cluster": "Cluster",
+        "status": "Status",
+        "provider": "Provedor",
+        "region": "Região",
+        "ingress": "Entrada",
+        "live": "Conexão",
+        "lastProbe": "Última verificação",
+        "registeredBy": "Registrado por"
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "offline": "Offline"
+      },
+      "searchPlaceholder": "Buscar clusters...",
+      "register": "Registrar cluster",
+      "emptyTitle": "Nenhum cluster registrado",
+      "emptyDescription": "Registre um cluster Kubernetes da organização para salvar seus metadados e ative o gerenciamento após instalar os pré-requisitos.",
+      "emptyLink": "Pré-requisitos do cluster",
+      "never": "nunca",
+      "heartbeatLast": "Último sinal {age}",
+      "heartbeatNone": "Nenhum sinal recente"
+    },
+    "actions": {
+      "bring": "Ativar gerenciamento",
+      "refresh": "Atualizar configuração",
+      "retry": "Tentar novamente",
+      "fullPreflight": "Atualizar configuração com verificação prévia completa",
+      "inProgress": "Configuração em andamento…",
+      "bringAccepted": "Ativando o gerenciamento de {slug}. Isso pode levar até um minuto.",
+      "refreshAccepted": "Atualizando {slug}",
+      "fullPreflightAccepted": "Atualizando {slug} (verificação prévia completa)",
+      "bringFailed": "Não foi possível ativar o gerenciamento do cluster",
+      "refreshFailed": "Não foi possível atualizar o gerenciamento do cluster"
+    },
+    "detail": {
+      "notFoundTitle": "Nenhum cluster com o identificador {slug}",
+      "notFoundDescription": "O cluster não existe ou você não tem permissão para visualizá-lo.",
+      "back": "Voltar aos clusters",
+      "menuLabel": "Ações do cluster",
+      "failureTitle": "Última falha de gerenciamento",
+      "failureHelp": "Corrija o problema e clique em Tentar novamente nas configurações para executar de novo.",
+      "management": "Gerenciamento",
+      "activeSince": "Ativo desde {time}",
+      "probedAt": "Recursos verificados: {time}",
+      "notManaged": "Gerenciamento ainda não ativado",
+      "auth": "Autenticação",
+      "capabilitiesTitle": "Recursos",
+      "capabilitiesDescription": "Detectados na última verificação de recursos. Atualize o gerenciamento do cluster para atualizá-los.",
+      "storageClasses": "Classes de armazenamento",
+      "metricsServer": "Servidor de métricas",
+      "installed": "Instalado",
+      "notDetected": "Não detectado",
+      "actionRequired": "Ação necessária",
+      "actionHelp": "Este cluster ainda não é gerenciado. <settings>Acesse as configurações</settings> para ativar o gerenciamento.",
+      "stats": {
+        "appsBound": "Apps vinculados",
+        "nodes": "Nós",
+        "podsRunning": "Pods em execução",
+        "cpu": "CPU",
+        "memory": "Memória"
+      }
     }
   },
   "clusterConnection": {

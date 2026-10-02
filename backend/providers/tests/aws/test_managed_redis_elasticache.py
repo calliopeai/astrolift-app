@@ -92,6 +92,7 @@ def driver(aws_mock) -> ElastiCacheRedisDriver:
 
 def _spec(**overrides) -> ProvisionSpec:
     base = dict(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="1",
         organization_slug="acme",
         app_id="1",
@@ -435,13 +436,14 @@ def test_restore_creates_new_replication_group(
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    restore_spec = _spec(service_handle_hint="restored")
+    restore_spec = _spec(service_handle_hint="restored", managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456780")
     result = driver.restore(snap, restore_spec)
     # moto may or may not support restore-from-snapshot via
     # create_replication_group; we accept either ok or a clean error.
     if result.ok:
         _, target_id = parse_handle(result.handle)
-        assert target_id.startswith("astrolift-")
+        assert target_id.endswith(restore_spec.managed_service_id.replace("-", ""))
+        assert len(target_id) <= 40
 
 
 def test_restore_surfaces_error_on_missing_snapshot(
@@ -452,7 +454,9 @@ def test_restore_surfaces_error_on_missing_snapshot(
         snapshot_id="does-not-exist",
         created_at="",
     )
-    result = driver.restore(bad, _spec(service_handle_hint="failed"))
+    result = driver.restore(
+        bad, _spec(service_handle_hint="failed", managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456781")
+    )
     # Result either fails (good — surfaces the error) or moto allows
     # it through (acceptable — we'd catch it in real AWS via the
     # workflow retry policy).
@@ -661,9 +665,11 @@ def test_deprovision_force_destroy_retries_on_invalid_state() -> None:
 
 
 def test_provision_does_not_adopt_another_services_resource(driver) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    """A recorded locator never grants ownership of another service's resource."""
+    first = driver.provision(_spec())
+    second = driver.provision(
+        _spec(managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456780", recorded_handle=first.handle)
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == ""

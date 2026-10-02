@@ -25,8 +25,11 @@ export const LIST_APP_SECRETS = gql`
 `;
 
 export const PREVIEW_MANAGED_SERVICE_COST = gql`
-  query PreviewManagedServiceCost($managedServiceId: GUID!) {
-    astroliftManagedServiceCostPreview(managedServiceId: $managedServiceId) {
+  query PreviewManagedServiceCost($managedServiceId: GUID!, $expectedContextRevision: String) {
+    astroliftManagedServiceCostPreview(
+      managedServiceId: $managedServiceId
+      expectedContextRevision: $expectedContextRevision
+    ) {
       managedServiceId
       available
       reason
@@ -105,54 +108,8 @@ export const LIST_PROJECT_RESOURCES = gql`
       isActive
       lifecycle
     }
-    astroliftProjectManagedServices(projectId: $projectId) {
-      id
-      name
-      kind
-      variant
-      status
-      statusError
-      config
-      appliedConfig
-      operationKind
-      operationWorkflowId
-      operationRunId
-      operationStartedAt
-      operationCompletedAt
-      projectSlug
-      ownerScope
-      clusterSlug
-      environmentName
-      providerPortalUrl
-      createdAt
-      updatedAt
-      lastActionAt
-      lastActionKind
-      editableFields
-      attachments {
-        id
-        consumerKind
-        consumerSlug
-        environmentName
-      }
-      volumeBindings {
-        id
-        name
-        mountPath
-        subPath
-        sourceKind
-        protocol
-        claimName
-        claimNamespace
-        storageClassName
-        csiDriver
-        readOnly
-        capacity
-        accessModes
-        workloadNames
-        containerNames
-        credentialReferenceCount
-      }
+    astroliftProjectManagedServicesPage(projectId: $projectId, limit: 1) {
+      totalCount
     }
     astroliftProjectSecretBundles(projectId: $projectId) {
       id

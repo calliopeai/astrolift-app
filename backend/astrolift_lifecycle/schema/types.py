@@ -393,6 +393,56 @@ class PreviewAggregateResourcesType:
     pod_count: int
 
 
+@strawberry.type(name="AstroliftPreviewEnvironmentTarget")
+class PreviewEnvironmentTargetType:
+    """Actual persisted FK identity; never inferred from a hostname or name."""
+
+    preview_id: GUID
+    preview_version: int
+    app_id: GUID
+    app_version: int
+    app_slug: str
+    environment_id: GUID
+    environment_version: int
+    environment_name: str
+    cluster_id: GUID
+    cluster_version: int
+    namespace: str
+
+
+@strawberry.type(name="AstroliftPreviewDeployment")
+class PreviewDeploymentType:
+    """Stored rollout snapshot for an exact preview environment."""
+
+    id: GUID
+    version: int
+    app_id: GUID
+    environment_id: GUID
+    status: str
+    trigger_kind: str
+    commit_sha: str
+    image_tag: str
+    created_at: dt.datetime
+    started_at: dt.datetime | None
+    ended_at: dt.datetime | None
+
+
+def preview_deployment_to_type(deployment) -> PreviewDeploymentType:
+    return PreviewDeploymentType(
+        id=GUID(str(deployment.guid)),
+        version=int(deployment.version),
+        app_id=GUID(str(deployment.registered_app.guid)),
+        environment_id=GUID(str(deployment.app_environment.guid)),
+        status=deployment.status,
+        trigger_kind=deployment.trigger_kind,
+        commit_sha=deployment.commit_sha or "",
+        image_tag=deployment.image_tag or "",
+        created_at=deployment.created_at,
+        started_at=deployment.started_at,
+        ended_at=deployment.ended_at,
+    )
+
+
 @strawberry.type(name="AstroliftPreviewEnvironment")
 class PreviewEnvironmentType:
     id: GUID
@@ -476,6 +526,17 @@ class PreviewEnvironmentType:
     ``None`` (not zero) when the driver doesn't implement the cost
     capability, doesn't recognise compute pricing, or the pricing API
     is unreachable — workspace rule forbids hard-coded fallbacks."""
+
+    version: int = strawberry.field(default=0, description="Version of this exact preview binding.")
+    environment_status: str = strawberry.field(
+        default="unavailable",
+        description="available, retired or unavailable; retired targets cannot route logs.",
+    )
+    environment: PreviewEnvironmentTargetType | None = None
+    runtime_status: str = strawberry.field(
+        default="not_requested",
+        description="not_requested, available or unavailable; basic reads do not query pods or pricing.",
+    )
 
     # Who opened it and why it failed (#2155). ``opened_by_login`` is the
     # pull request author's SCM login on a PR preview and the platform
@@ -1209,6 +1270,7 @@ def preview_to_type(
     estimated_cost_notes: list[str] | None = None,
     estimated_cost_approximate: bool = False,
     failure_reason: str | None = None,
+    runtime_status: str = "not_requested",
 ) -> PreviewEnvironmentType:
     """Serialize a ``PreviewEnvironment`` row into the GraphQL type.
 
@@ -1225,6 +1287,26 @@ def preview_to_type(
     Defaults: zero resources + null cost. Mirrors the "cluster unwired"
     UX — the FE renders empty/dash rather than fabricating numbers.
     """
+    from astrolift_lifecycle.preview_targets import preview_binding
+
+    environment_status, target = preview_binding(p)
+    environment = (
+        PreviewEnvironmentTargetType(
+            preview_id=GUID(target.preview_id),
+            preview_version=target.preview_version,
+            app_id=GUID(target.app_id),
+            app_version=target.app_version,
+            app_slug=target.app_slug,
+            environment_id=GUID(target.environment_id),
+            environment_version=target.environment_version,
+            environment_name=target.environment_name,
+            cluster_id=GUID(target.cluster_id),
+            cluster_version=target.cluster_version,
+            namespace=target.namespace,
+        )
+        if target is not None
+        else None
+    )
     source_url = (
         getattr(p.registered_app, "source_url", "") or getattr(p.registered_app, "source_repo", "") or ""
     )
@@ -1244,6 +1326,10 @@ def preview_to_type(
     # manual deploys without PR provenance).
     return PreviewEnvironmentType(
         id=GUID(str(p.guid)),
+        version=int(p.version),
+        environment_status=environment_status,
+        environment=environment,
+        runtime_status=runtime_status,
         registered_app_slug=p.registered_app.slug,
         pr_number=p.pr_number or 0,
         is_manual=bool(getattr(p, "is_manual", False)),

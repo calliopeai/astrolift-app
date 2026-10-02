@@ -508,6 +508,12 @@ class GKEClusterDriver(ClusterDriver):
     # ---- runtime observability (#299) -----------------------------
 
     @driver_op(cloud="gcp", driver="cluster")
+    def metric_containers(self, *, auth: ClusterAuth, **selectors):
+        from k8s_native.workload_metrics import metric_containers
+
+        return metric_containers(auth=self._materialize_gke_auth_auth(auth), **selectors)
+
+    @driver_op(cloud="gcp", driver="cluster")
     def list_pods(
         self,
         *,

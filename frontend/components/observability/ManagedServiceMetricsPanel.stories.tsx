@@ -110,3 +110,7 @@ export const List: Story = {
     />
   ),
 };
+
+export const RefusedContext: Story = {
+  render: () => <Controlled data={null} loading={false} error />,
+};

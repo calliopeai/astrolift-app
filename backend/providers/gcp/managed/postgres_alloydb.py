@@ -33,6 +33,8 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
+from gcp.managed._ownership import label_identity_refusal
 from gcp.managed._secret_store import ManagedSecretStore, ManagedSecretStoreError
 
 KIND = "postgres"
@@ -337,7 +339,7 @@ class AlloyDBPostgresDriver(ManagedServiceDriver):
                 )
                 self._wait_operation(operation, deadline)
             else:
-                if not _has_platform_ownership(primary):
+                if not _is_owned(primary, spec):
                     return ProvisionResult(
                         False,
                         handle,
@@ -633,7 +635,8 @@ class AlloyDBPostgresDriver(ManagedServiceDriver):
                     )
                 self._wait_resource_ready(target_name, self._alloydb.get_cluster, deadline)
             primary_name = self._primary_name(target_name, target.config or {})
-            if self._get_instance(primary_name) is None:
+            primary = self._get_instance(primary_name)
+            if primary is None:
                 operation = self._alloydb.create_instance(
                     target_name,
                     self._primary_id(target.config or {}),
@@ -641,6 +644,13 @@ class AlloyDBPostgresDriver(ManagedServiceDriver):
                 )
                 self._wait_operation(operation, deadline)
             else:
+                if not _is_owned(primary, target):
+                    return ProvisionResult(
+                        False,
+                        _handle_for(target_id),
+                        "refusing to resume restore into an AlloyDB primary not owned by this service",
+                        ["resource_not_owned"],
+                    )
                 self._wait_resource_ready(primary_name, self._alloydb.get_instance, deadline)
             self._ensure_read_pools(target_name, target, deadline)
             return ProvisionResult(
@@ -895,7 +905,7 @@ class AlloyDBPostgresDriver(ManagedServiceDriver):
                     self._read_pool_body(spec, item),
                 )
                 self._wait_operation(operation, deadline)
-            elif not _has_platform_ownership(existing):
+            elif not _is_owned(existing, spec):
                 raise AlloyDBError(f"read pool {name} is not owned by Astrolift")
             else:
                 self._wait_resource_ready(name, self._alloydb.get_instance, deadline)
@@ -1070,12 +1080,17 @@ class AlloyDBPostgresDriver(ManagedServiceDriver):
         return machine
 
     def _cluster_id_for(self, spec: ProvisionSpec) -> str:
+        managed_service_identity(spec.managed_service_id)
+        recorded = recorded_resource_name(spec.recorded_handle, kind=KIND)
+        if recorded is not None:
+            return recorded
         configured = str((spec.config or {}).get("cluster_id") or "")
         if configured:
             return _resource_id(configured)
-        return _resource_id(
-            f"{self._config.cluster_name_prefix}-{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'pg'}",
+        return physical_name(
+            spec.managed_service_id,
+            prefix=self._config.cluster_name_prefix,
+            max_length=63,
         )
 
     def _location_parent(self) -> str:
@@ -1186,16 +1201,11 @@ def _has_platform_ownership(resource: dict[str, Any]) -> bool:
 
 
 def _is_owned(resource: dict[str, Any], spec: ProvisionSpec) -> bool:
-    labels = resource.get("labels") or {}
-    expected = _labels_for(spec)
-    return _has_platform_ownership(resource) and all(
-        labels.get(key) == expected[key]
-        for key in (
-            "astrolift-organization",
-            "astrolift-app",
-            "astrolift-environment",
-            "astrolift-cluster",
-        )
+    return _has_platform_ownership(resource) and not label_identity_refusal(
+        resource.get("labels"),
+        spec.managed_service_id,
+        record_proves=bool(spec.recorded_handle and spec.recorded_handle_exclusive),
+        resource="AlloyDB resource",
     )
 
 

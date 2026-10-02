@@ -22,7 +22,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    handle_for,
+    live_ownership_refusal,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "cache"
@@ -78,7 +85,17 @@ class ElastiCacheMemcachedDriver(ManagedServiceDriver):
             return ProvisionResult(False, "", error, ["invalid_memcached_config"])
         cluster_id = self._cluster_id(spec)
         handle = handle_for(kind=KIND, resource_id=cluster_id)
-        if self._describe(cluster_id) is not None:
+        existing = self._describe(cluster_id)
+        if existing is not None:
+            try:
+                tags = self._ec.list_tags_for_resource(ResourceName=existing["ARN"]).get("TagList", [])
+            except Exception:
+                tags = []
+            refusal = live_ownership_refusal(
+                tags, managed_service_id=spec.managed_service_id, resource="Memcached cluster"
+            )
+            if refusal:
+                return ProvisionResult(False, handle, refusal, ["ownership_refused"])
             updated = self.update(UpdateSpec(handle=handle, size=spec.size, config=cfg))
             return ProvisionResult(updated.ok, handle, updated.message, updated.errors)
         nodes = int(cfg.get("num_cache_nodes", 2 if spec.isolation == "dedicated" else 1))
@@ -309,23 +326,7 @@ class ElastiCacheMemcachedDriver(ManagedServiceDriver):
         return rows[0] if rows else None
 
     def _cluster_id(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.cluster_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "cache",
-            )
-            if part
-        ).lower()
-        clean = "".join(char if char.isalnum() or char == "-" else "-" for char in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        if not clean or not clean[0].isalpha():
-            clean = f"a-{clean}"
-        return clean.strip("-")[:50].rstrip("-")
+        return managed_name_for(spec, kind=KIND, prefix=self._config.cluster_name_prefix, max_len=50)
 
     @staticmethod
     def _validate_config(cfg: dict[str, Any], *, partial: bool = False) -> str:

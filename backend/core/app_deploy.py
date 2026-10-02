@@ -1215,6 +1215,10 @@ def render_resources_for_deployment(
         workload_env_from_secret_refs=workload_env_from,
     )
 
+    from core.runtime_metric_identity import stamp_metric_identities
+
+    stamp_metric_identities(resources, app=app, environment=env)
+
     # Fold in the managed-subdomain Ingress if the environment has a
     # platform domain assigned. This mirrors the logic in the
     # render_manifests Temporal activity so apply_manifests always has

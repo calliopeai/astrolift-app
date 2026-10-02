@@ -4,19 +4,16 @@
  * Email-service detail sheet (#629, #631, #632, #633, #634).
  *
  * Renders the SES (or future GCP/Azure) observability surface for one
- * bound email managed-service. Five panels:
- *
- *   1. Sender reputation / sandbox vs production (#633)
- *   2. Send-rate vs quota tile (#629)
- *   3. Identity verification badge with DKIM token list (#634)
- *   4. DKIM / SPF / DMARC DNS auth status (#632)
- *   5. Suppression list view + manage (#631)
+ * bound email managed-service: reputation, quota, cost, identity and DNS
+ * authentication, suppressions, sender configuration, SNS publishing,
+ * alert rules, engagement metrics, message logs and templates.
  *
  * The sheet is sectioned so one list shows at a time: Health and
  * Identity & sending hold the panels, and each list (suppressions, alert
  * rules, messages, templates) has a section of its own. Each list is an
- * embedded ListPage over rows nested in one payload, with its list state
- * kept in the panel.
+ * embedded ListPage with its list state kept in the panel. Suppressions
+ * are nested in the detail payload; alert rules, messages and templates
+ * have separate queries wired by the route's containers.
  *
  * Backends that don't expose any of these (GCP, Azure) populate
  * `unsupportedNotes`; the UI shades the corresponding panel and shows

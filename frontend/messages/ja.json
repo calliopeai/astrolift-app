@@ -810,6 +810,49 @@
         "toastReadyTruncated": "ログエクスポート完了 · {rows} 行 · {format}（切り詰め済み）",
         "toastDownload": "ダウンロード",
         "toastFailure": "ログエクスポートに失敗しました"
+      },
+      "signalMeasurement": {
+        "unreported": "測定範囲が報告されていません。",
+        "scope": "範囲: {scope}",
+        "source": "ソース: {source}",
+        "since": "現在のコンテナの測定開始: {timestamp}",
+        "identities": "正規の識別情報",
+        "app": "アプリ",
+        "environment": "環境",
+        "cluster": "クラスター",
+        "workload": "ワークロード",
+        "scopes": {
+          "APP_ENVIRONMENT": "アプリ環境",
+          "WORKLOAD": "ワークロード",
+          "UNRESOLVED": "未解決"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "アプリ計装",
+          "EDGE_PROMETHEUS": "Ingress メトリクス",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "なし"
+        },
+        "reasons": {
+          "target": "選択した対象は利用できません。",
+          "partial": "測定が不完全または曖昧なため、比率は表示されません。",
+          "noData": "この期間には検証済みの使用量データがありません。",
+          "readError": "測定ソースを読み取れませんでした。",
+          "MISSING_LIMITS": "リソース上限がないため、飽和度は利用できません。",
+          "OWNERSHIP_UNVERIFIED": "実行時の所有関係が未検証です。再デプロイして現在の識別情報を付与してください。",
+          "PERMISSION_DENIED": "この測定の読み取り権限が拒否されました。",
+          "NOT_SUPPORTED_BY_PROVIDER": "プロバイダーはこの測定に対応していません。",
+          "NOT_CONFIGURED": "測定ソースが設定されていません。",
+          "NOT_INSTRUMENTED": "この対象にはリクエストの計装がありません。"
+        },
+        "organization": "組織",
+        "bases": {
+          "SOURCE_LABELS": "計装の論理ラベル",
+          "NAMESPACE": "名前空間の集計。物理的な所属は未検証",
+          "VERIFIED_RUNTIME": "現在の物理コンテナを検証済み",
+          "UNRESOLVED": "実行時の識別情報は未解決"
+        },
+        "observed": "実行時の所属の確認時刻: {timestamp}"
       }
     },
     "tokens": {
@@ -3673,7 +3716,26 @@
         "memory": "メモリ（合計）",
         "pods": "Pod 数",
         "dailyCost": "推定日額コスト",
-        "approximate": "概算"
+        "approximate": "概算",
+        "environment": "環境",
+        "loadResources": "リソースと費用を読み込む",
+        "resourcesUnavailable": "現在のリソース使用量と推定費用を取得できません。",
+        "resourcesNotRequested": "必要に応じて現在のリソース使用量と推定費用を読み込めます。",
+        "previewLogs": "プレビューのログ",
+        "loadLogs": "ログを読み込む",
+        "logsEmpty": "この期間のログはありません。",
+        "logsUnavailable": "この環境の過去のログを取得できません。",
+        "logsNotRequested": "この環境の直近30分のログを最大200行読み込みます。",
+        "previewDeployments": "プレビューのデプロイ",
+        "loadDeployments": "デプロイを読み込む",
+        "deploymentsEmpty": "この環境のデプロイはありません。",
+        "deploymentsNotRequested": "このプレビュー環境の最新のデプロイを読み込みます。",
+        "deploymentsBounded": "最新の{count}件のデプロイを表示しています。",
+        "binding": {
+          "available": "利用可能",
+          "retired": "終了済み",
+          "unavailable": "環境を利用できません"
+        }
       }
     }
   },
@@ -4045,6 +4107,61 @@
       "label": "直近の操作：",
       "completed": "{at} に完了",
       "running": "実行中"
+    },
+    "reads": {
+      "title": "プロジェクトのリソース",
+      "name": "名前",
+      "kind": "種類",
+      "cluster": "クラスター",
+      "status": "状態",
+      "search": "リソースを検索",
+      "empty": "プロジェクトのリソースがありません",
+      "emptyDescription": "プロジェクト所有のインフラはプロビジョニング後にここに表示されます。",
+      "emptyFiltered": "一致するリソースがありません",
+      "emptyFilteredDescription": "検索条件を変更して他のプロジェクトリソースを表示してください。",
+      "detail": "リソースの詳細",
+      "detailDescription": "このリソースと現在閲覧できる利用先を確認します。",
+      "refused": "選択したリソースを利用できないか、コンテキストが変更されています。正確な GUID を再確認してください。",
+      "reviewAgain": "再確認",
+      "refresh": "更新",
+      "organization": "組織",
+      "project": "プロジェクト",
+      "app": "アプリ",
+      "environment": "環境",
+      "consumer": "利用先",
+      "consumers": "閲覧できる利用先",
+      "actions": "操作",
+      "detach": "接続解除",
+      "agentRecipe": "エージェントレシピ",
+      "noConsumers": "閲覧できる利用先がありません",
+      "consumerVisibility": "現在閲覧する権限がある利用先のみ表示されます。",
+      "appEnvironment": "アプリ環境",
+      "environmentGuid": "環境の GUID",
+      "recipeSlug": "エージェントレシピのスラッグ",
+      "consumerContext": "利用先はこのリソースと同じプロジェクトとクラスターに属している必要があります。",
+      "attach": "接続",
+      "costUnavailable": "料金情報を利用できません。",
+      "costMonthly": "月額 {amount}",
+      "costApproximate": "月額約 {amount}",
+      "costFetched": "料金取得日時：{at}",
+      "costSource": "料金情報の出典",
+      "costPreview": "費用を見積もる",
+      "reprovision": "再プロビジョニング",
+      "deprovision": "プロビジョニング解除",
+      "actionRefused": "操作が拒否されました。リソースと現在の権限を確認してください。",
+      "operationAccepted": "操作を受け付けました。完了状態は別途追跡されます。",
+      "deprovisionTitle": "{name} のプロビジョニングを解除しますか？",
+      "deprovisionDescription": "プロバイダーの安全な削除方法でクラウドリソースを削除します。永続データは既定で保持されます。",
+      "activeOnPage": "このページで {count} 件が稼働中",
+      "failedOnPage": "このページの失敗した操作",
+      "statuses": {
+        "pending": "保留中",
+        "provisioning": "プロビジョニング中",
+        "active": "稼働中",
+        "updating": "更新中",
+        "deprovisioning": "プロビジョニング解除中",
+        "failed": "失敗"
+      }
     }
   },
   "administration": {
@@ -6291,6 +6408,71 @@
       "exampleCa": "クラスター CA (PEM または base64)。設定済みの場合は省略可",
       "exampleRegion": "クラウドのリージョン",
       "exampleCluster": "クラウドのクラスター名"
+    },
+    "list": {
+      "columns": {
+        "cluster": "クラスター",
+        "status": "状態",
+        "provider": "プロバイダー",
+        "region": "リージョン",
+        "ingress": "イングレス",
+        "live": "接続",
+        "lastProbe": "最終確認",
+        "registeredBy": "登録者"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "offline": "オフライン"
+      },
+      "searchPlaceholder": "クラスターを検索...",
+      "register": "クラスターを登録",
+      "emptyTitle": "登録済みクラスターはありません",
+      "emptyDescription": "組織の Kubernetes クラスターを登録してメタデータを保存し、前提条件をインストールした後に管理を有効にします。",
+      "emptyLink": "クラスターの前提条件",
+      "never": "未実施",
+      "heartbeatLast": "最終ハートビート：{age}",
+      "heartbeatNone": "最近のハートビートはありません"
+    },
+    "actions": {
+      "bring": "管理を有効にする",
+      "refresh": "設定を更新",
+      "retry": "再試行",
+      "fullPreflight": "事前確認をすべて行って設定を更新",
+      "inProgress": "設定中…",
+      "bringAccepted": "{slug} の管理を有効にしています。最大 1 分ほどかかる場合があります。",
+      "refreshAccepted": "{slug} を更新中",
+      "fullPreflightAccepted": "{slug} を更新中（完全な事前確認）",
+      "bringFailed": "クラスターの管理を有効にできませんでした",
+      "refreshFailed": "クラスターの管理を更新できませんでした"
+    },
+    "detail": {
+      "notFoundTitle": "識別子 {slug} のクラスターはありません",
+      "notFoundDescription": "クラスターが存在しないか、表示する権限がありません。",
+      "back": "クラスター一覧に戻る",
+      "menuLabel": "クラスターの操作",
+      "failureTitle": "直近の管理エラー",
+      "failureHelp": "問題を修正し、設定で「再試行」をクリックして再実行してください。",
+      "management": "管理",
+      "activeSince": "{time} から稼働中",
+      "probedAt": "機能の確認日時：{time}",
+      "notManaged": "管理はまだ有効になっていません",
+      "auth": "認証",
+      "capabilitiesTitle": "機能",
+      "capabilitiesDescription": "前回の機能確認で検出された内容です。クラスター管理を更新すると最新の状態を確認できます。",
+      "storageClasses": "ストレージクラス",
+      "metricsServer": "メトリクスサーバー",
+      "installed": "インストール済み",
+      "notDetected": "未検出",
+      "actionRequired": "操作が必要です",
+      "actionHelp": "このクラスターはまだ管理されていません。<settings>設定を開いて</settings>管理を有効にしてください。",
+      "stats": {
+        "appsBound": "関連付けられたアプリ",
+        "nodes": "ノード",
+        "podsRunning": "実行中のPod",
+        "cpu": "CPU",
+        "memory": "メモリ"
+      }
     }
   },
   "clusterConnection": {

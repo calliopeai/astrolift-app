@@ -19,8 +19,10 @@ import logging
 import re
 
 import strawberry
+from graphql import GraphQLError
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_observability.schema.types import AppLogLine, AppLogPage
 from astrolift_operations import observability_retention
@@ -198,6 +200,10 @@ class LogHistoryQuery:
         search: str | None = None,
         limit: int = _DEFAULT_LIMIT,
         cursor: str | None = None,
+        preview_id: GUID | None = None,
+        expected_environment_id: GUID | None = None,
+        if_match_preview_version: int | None = None,
+        if_match_environment_version: int | None = None,
     ) -> AppLogPage:
         """Paginated historical log lines for an app/env within
         ``[since, until]``.
@@ -237,7 +243,45 @@ class LogHistoryQuery:
                 reason=ObservabilityPanelReason.NOT_CONFIGURED,
             )
 
-        cluster = _resolve_cluster(app=app, environment_name=environment_name)
+        preview_proof = (
+            preview_id,
+            expected_environment_id,
+            if_match_preview_version,
+            if_match_environment_version,
+        )
+        if any(value is not None for value in preview_proof):
+            from astrolift_lifecycle.preview_targets import check_preview_target
+            from astrolift_lifecycle.schema.queries import _exact_preview_qs
+
+            error = "The reviewed preview environment is unavailable or has changed"
+            if any(value is None for value in preview_proof):
+                raise GraphQLError(error, extensions={"code": "PRECONDITION"})
+            preview = (
+                _exact_preview_qs(permission=Permission.APP_READ_LOGS)
+                .filter(
+                    guid=preview_id,
+                    registered_app__organization_id=tenant.organization_id,
+                    registered_app_id=app.pk,
+                )
+                .first()
+            )
+            if preview is None:
+                raise GraphQLError(error, extensions={"code": "PRECONDITION"})
+            try:
+                target = check_preview_target(
+                    preview,
+                    environment_id=expected_environment_id,
+                    preview_version=if_match_preview_version,
+                    environment_version=if_match_environment_version,
+                )
+            except ValueError:
+                raise GraphQLError(error, extensions={"code": "PRECONDITION"}) from None
+            if environment_name is not None and environment_name != target.environment_name:
+                raise GraphQLError(error, extensions={"code": "PRECONDITION"})
+            cluster, namespace = preview.app_environment.tenant_cluster, target.namespace
+        else:
+            cluster = _resolve_cluster(app=app, environment_name=environment_name)
+            namespace = namespace_for_app_environment(app, environment_name)
         if cluster is None or not getattr(cluster, "is_active", True):
             return _empty_page(
                 historical_available=False,
@@ -260,7 +304,6 @@ class LogHistoryQuery:
             now=dt.datetime.now(dt.UTC),
         )
 
-        namespace = namespace_for_app_environment(app, environment_name)
         try:
             page = cluster_log_query.query_app_logs(
                 cluster=cluster,

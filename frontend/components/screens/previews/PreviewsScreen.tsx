@@ -1,5 +1,7 @@
 "use client";
 
+import { previewHasAvailableBinding } from "./preview-binding";
+
 import { ExternalLinkIcon, GitPullRequestIcon, TrashIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
@@ -91,7 +93,7 @@ export function PreviewsScreen({
       header: t("columns.hostname"),
       cellClassName: "max-w-72",
       cell: (p) =>
-        p.status === "running" ? (
+        p.status === "running" && previewHasAvailableBinding(p) ? (
           <a
             href={`https://${p.hostname}`}
             target="_blank"
@@ -134,7 +136,7 @@ export function PreviewsScreen({
   function rowActions(p: AstroliftPreviewEnvironment) {
     return (
       <>
-        {p.status === "running" && (
+        {p.status === "running" && previewHasAvailableBinding(p) && (
           <DropdownMenuItem asChild>
             <a href={`https://${p.hostname}`} target="_blank" rel="noreferrer">
               <ExternalLinkIcon className="size-4" />

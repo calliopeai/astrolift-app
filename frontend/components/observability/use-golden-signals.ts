@@ -62,11 +62,13 @@ export function useGoldenSignals(
   return {
     range,
     onRangeChange: setRange,
-    signals: signals.data?.astroliftAppGoldenSignals?.signals ?? null,
-    reason: signals.data?.astroliftAppGoldenSignals?.reason ?? null,
+    signals: signals.error ? null : (signals.data?.astroliftAppGoldenSignals?.signals ?? null),
+    reason: signals.error ? "ERROR" : (signals.data?.astroliftAppGoldenSignals?.reason ?? null),
     loading: signals.loading && !signals.data,
     onRetry: () => void signals.refetch(),
-    statusBreakdown: statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null,
+    statusBreakdown: statusBreakdown.error
+      ? null
+      : (statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null),
     statusLoading: statusBreakdown.loading && !statusBreakdown.data,
     onStatusRetry: () => void statusBreakdown.refetch(),
   };

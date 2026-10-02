@@ -16,6 +16,7 @@ CNPG as it does against RDS on AWS.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -39,6 +40,7 @@ from _sdk.managed_service import (
     ValueRef,
     unsupported_update,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._service_dns import service_host
@@ -117,17 +119,57 @@ class CNPGPostgresDriver(ManagedServiceDriver):
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
         cluster_name = self._cluster_name(spec=spec)
-        namespace = app_namespace(
-            organization_slug=spec.organization_slug,
-            app_slug=spec.app_slug,
+        parsed = _unpack_handle(spec.recorded_handle) if spec.recorded_handle else None
+        namespace = (
+            parsed.namespace
+            if parsed
+            else app_namespace(
+                organization_slug=spec.organization_slug,
+                app_slug=spec.app_slug,
+            )
         )
         manifest = self._render_cluster(spec=spec, cluster_name=cluster_name)
 
         if self._config.cluster_driver is not None:
+            current = self._config.cluster_driver.get_manifest(
+                spec.tenant_cluster_id, namespace, "postgresql.cnpg.io/v1/Cluster", cluster_name
+            )
+            if current is not None:
+                metadata = current.get("metadata", {})
+                labels = metadata.get("labels", {})
+                owner = labels.get("ai.astrolift/managed-service-id")
+                legacy_owned = (
+                    not owner
+                    and bool(spec.recorded_handle)
+                    and spec.recorded_handle_exclusive
+                    and labels.get("astrolift.io/organization") == spec.organization_slug
+                    and labels.get("astrolift.io/app") == spec.app_slug
+                )
+                owned = owner == spec.managed_service_id or legacy_owned
+                if (
+                    not owned
+                    or labels.get("astrolift.io/managed-by") != "platform"
+                    or metadata.get("name") != cluster_name
+                    or metadata.get("namespace") != namespace
+                    or not metadata.get("uid")
+                    or not metadata.get("resourceVersion")
+                    or labels.get("ai.astrolift/organization-id", spec.organization_id) != spec.organization_id
+                    or labels.get("ai.astrolift/app-id", spec.app_id) != spec.app_id
+                ):
+                    return ProvisionResult(
+                        False, spec.recorded_handle, "CNPG resource ownership cannot be verified", ["ownership_refused"]
+                    )
+                retained = deepcopy(current)
+                retained.pop("status", None)
+                retained["metadata"].pop("managedFields", None)
+                retained["metadata"].setdefault("labels", {}).update(manifest["metadata"]["labels"])
+                retained.setdefault("spec", {}).update(manifest["spec"])
+                manifest = retained
             result = self._config.cluster_driver.apply_manifests(
                 spec.tenant_cluster_id,
                 namespace,
                 [manifest],
+                create_only=current is None,
             )
             if not result.ok:
                 return ProvisionResult(
@@ -192,7 +234,7 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                 handle=spec.handle,
                 message=(
                     "legacy 2-segment handle cannot be deprovisioned: "
-                    "re-provision to refresh the handle, or pass a "
+                    "record the operator-confirmed original cluster and namespace in a "
                     "4-segment handle (<kind>/<cluster>/<ns>/<name>)"
                 ),
                 errors=["legacy_handle_missing_locator"],
@@ -451,11 +493,19 @@ class CNPGPostgresDriver(ManagedServiceDriver):
     # ---- internals ------------------------------------------------
 
     def _cluster_name(self, *, spec: ProvisionSpec) -> str:
-        return dns_label(
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-        )
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            parsed = _unpack_handle(spec.recorded_handle)
+            if (
+                parsed.kind != KIND
+                or parsed.is_legacy
+                or not parsed.name
+                or not parsed.namespace
+                or parsed.cluster_id != (spec.tenant_cluster_id or "render-only")
+            ):
+                raise ValueError("recorded CNPG handle requires the original kind, cluster and namespace")
+            return parsed.name
+        return physical_name(spec.managed_service_id, prefix="pg", max_length=60)
 
     def _render_cluster(
         self,
@@ -481,6 +531,9 @@ class CNPGPostgresDriver(ManagedServiceDriver):
                     "astrolift.io/app": spec.app_slug,
                     "astrolift.io/organization": spec.organization_slug,
                     "astrolift.io/environment": spec.environment_name,
+                    "ai.astrolift/managed-service-id": spec.managed_service_id,
+                    "ai.astrolift/organization-id": spec.organization_id,
+                    "ai.astrolift/app-id": spec.app_id,
                 },
             },
             "spec": {

@@ -810,6 +810,49 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "signalMeasurement": {
+        "unreported": "측정 범위가 보고되지 않았습니다.",
+        "scope": "범위: {scope}",
+        "source": "출처: {source}",
+        "since": "현재 컨테이너 측정 시작: {timestamp}",
+        "identities": "정규 식별 정보",
+        "app": "앱",
+        "environment": "환경",
+        "cluster": "클러스터",
+        "workload": "워크로드",
+        "scopes": {
+          "APP_ENVIRONMENT": "앱 환경",
+          "WORKLOAD": "워크로드",
+          "UNRESOLVED": "미확정"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "앱 계측",
+          "EDGE_PROMETHEUS": "인그레스 지표",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "없음"
+        },
+        "reasons": {
+          "target": "선택한 대상이 사용 불가능합니다.",
+          "partial": "측정이 불완전하거나 모호하여 비율을 표시하지 않습니다.",
+          "noData": "이 기간에 검증된 사용량 데이터가 없습니다.",
+          "readError": "측정 출처를 읽을 수 없습니다.",
+          "MISSING_LIMITS": "리소스 제한이 없어 포화도를 사용할 수 없습니다.",
+          "OWNERSHIP_UNVERIFIED": "런타임 소유권이 검증되지 않았습니다. 다시 배포하여 현재 식별 정보를 기록하세요.",
+          "PERMISSION_DENIED": "이 측정의 읽기 권한이 거부되었습니다.",
+          "NOT_SUPPORTED_BY_PROVIDER": "공급자가 이 측정을 지원하지 않습니다.",
+          "NOT_CONFIGURED": "측정 출처가 구성되지 않았습니다.",
+          "NOT_INSTRUMENTED": "이 대상의 요청 지표가 계측되지 않았습니다."
+        },
+        "organization": "조직",
+        "bases": {
+          "SOURCE_LABELS": "계측의 논리 레이블",
+          "NAMESPACE": "네임스페이스 집계, 물리적 소속은 미검증",
+          "VERIFIED_RUNTIME": "현재 물리적 컨테이너 검증됨",
+          "UNRESOLVED": "런타임 식별 정보 미확정"
+        },
+        "observed": "런타임 소속 확인 시각: {timestamp}"
       }
     },
     "tokens": {
@@ -3673,7 +3716,26 @@
         "memory": "메모리(합계)",
         "pods": "파드",
         "dailyCost": "예상 일일 비용",
-        "approximate": "근사치"
+        "approximate": "근사치",
+        "environment": "환경",
+        "loadResources": "리소스 및 비용 불러오기",
+        "resourcesUnavailable": "현재 리소스 사용량과 예상 비용을 확인할 수 없습니다.",
+        "resourcesNotRequested": "필요할 때 현재 리소스 사용량과 예상 비용을 불러오세요.",
+        "previewLogs": "미리보기 로그",
+        "loadLogs": "로그 불러오기",
+        "logsEmpty": "이 시간 범위에 로그가 없습니다.",
+        "logsUnavailable": "이 환경의 과거 로그를 확인할 수 없습니다.",
+        "logsNotRequested": "이 환경의 최근 30분 로그를 최대 200줄 불러옵니다.",
+        "previewDeployments": "미리보기 배포",
+        "loadDeployments": "배포 불러오기",
+        "deploymentsEmpty": "이 환경에 배포가 없습니다.",
+        "deploymentsNotRequested": "이 미리보기 환경의 최신 배포를 불러오세요.",
+        "deploymentsBounded": "최신 배포 {count}개를 표시합니다.",
+        "binding": {
+          "available": "사용 가능",
+          "retired": "종료됨",
+          "unavailable": "환경을 사용할 수 없음"
+        }
       }
     }
   },
@@ -4045,6 +4107,61 @@
       "label": "최근 작업:",
       "completed": "{at}에 완료",
       "running": "실행 중"
+    },
+    "reads": {
+      "title": "프로젝트 리소스",
+      "name": "이름",
+      "kind": "유형",
+      "cluster": "클러스터",
+      "status": "상태",
+      "search": "리소스 검색",
+      "empty": "프로젝트 리소스가 없습니다",
+      "emptyDescription": "프로젝트 소유 인프라는 프로비저닝 후 여기에 표시됩니다.",
+      "emptyFiltered": "일치하는 리소스가 없습니다",
+      "emptyFilteredDescription": "다른 프로젝트 리소스를 보려면 검색 조건을 변경하세요.",
+      "detail": "리소스 세부 정보",
+      "detailDescription": "이 리소스와 현재 볼 수 있는 사용 대상을 확인하세요.",
+      "refused": "선택한 리소스를 사용할 수 없거나 컨텍스트가 변경되었습니다. 정확한 GUID를 다시 확인하세요.",
+      "reviewAgain": "다시 확인",
+      "refresh": "새로 고침",
+      "organization": "조직",
+      "project": "프로젝트",
+      "app": "앱",
+      "environment": "환경",
+      "consumer": "사용 대상",
+      "consumers": "조회 가능한 사용 대상",
+      "actions": "작업",
+      "detach": "연결 해제",
+      "agentRecipe": "에이전트 레시피",
+      "noConsumers": "조회 가능한 사용 대상이 없습니다",
+      "consumerVisibility": "현재 조회 권한이 있는 사용 대상만 포함됩니다.",
+      "appEnvironment": "앱 환경",
+      "environmentGuid": "환경 GUID",
+      "recipeSlug": "에이전트 레시피 슬러그",
+      "consumerContext": "사용 대상은 이 리소스와 같은 프로젝트 및 클러스터에 속해야 합니다.",
+      "attach": "연결",
+      "costUnavailable": "요금 정보를 사용할 수 없습니다.",
+      "costMonthly": "월 {amount}",
+      "costApproximate": "월 약 {amount}",
+      "costFetched": "요금 조회 시각: {at}",
+      "costSource": "요금 정보 출처",
+      "costPreview": "비용 미리 보기",
+      "reprovision": "다시 프로비저닝",
+      "deprovision": "프로비저닝 해제",
+      "actionRefused": "작업이 거부되었습니다. 리소스와 현재 권한을 확인하세요.",
+      "operationAccepted": "작업이 접수되었습니다. 완료 상태는 별도로 추적됩니다.",
+      "deprovisionTitle": "{name}의 프로비저닝을 해제할까요?",
+      "deprovisionDescription": "공급자의 안전한 삭제 방식으로 클라우드 리소스를 제거합니다. 영구 데이터는 기본적으로 유지됩니다.",
+      "activeOnPage": "이 페이지에서 {count}개 활성",
+      "failedOnPage": "이 페이지의 실패한 작업",
+      "statuses": {
+        "pending": "대기 중",
+        "provisioning": "프로비저닝 중",
+        "active": "활성",
+        "updating": "업데이트 중",
+        "deprovisioning": "프로비저닝 해제 중",
+        "failed": "실패"
+      }
     }
   },
   "administration": {
@@ -6291,6 +6408,71 @@
       "exampleCa": "클러스터 CA (PEM 또는 base64). 이미 설정된 경우 생략 가능",
       "exampleRegion": "클라우드 리전",
       "exampleCluster": "클라우드 클러스터 이름"
+    },
+    "list": {
+      "columns": {
+        "cluster": "클러스터",
+        "status": "상태",
+        "provider": "공급자",
+        "region": "리전",
+        "ingress": "인그레스",
+        "live": "연결",
+        "lastProbe": "마지막 확인",
+        "registeredBy": "등록자"
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목",
+        "offline": "오프라인"
+      },
+      "searchPlaceholder": "클러스터 검색...",
+      "register": "클러스터 등록",
+      "emptyTitle": "등록된 클러스터가 없습니다",
+      "emptyDescription": "조직의 Kubernetes 클러스터를 등록하여 메타데이터를 저장하고 사전 요구 사항을 설치한 후 관리를 활성화하세요.",
+      "emptyLink": "클러스터 사전 요구 사항",
+      "never": "미실행",
+      "heartbeatLast": "마지막 하트비트: {age}",
+      "heartbeatNone": "최근 하트비트가 없습니다"
+    },
+    "actions": {
+      "bring": "관리 활성화",
+      "refresh": "설정 새로 고침",
+      "retry": "다시 시도",
+      "fullPreflight": "전체 사전 점검으로 설정 새로 고침",
+      "inProgress": "설정 진행 중…",
+      "bringAccepted": "{slug}의 관리를 활성화하는 중입니다. 최대 1분 정도 걸릴 수 있습니다.",
+      "refreshAccepted": "{slug} 새로 고침 중",
+      "fullPreflightAccepted": "{slug} 새로 고침 중(전체 사전 점검)",
+      "bringFailed": "클러스터 관리를 활성화하지 못했습니다",
+      "refreshFailed": "클러스터 관리를 새로 고치지 못했습니다"
+    },
+    "detail": {
+      "notFoundTitle": "식별자가 {slug}인 클러스터가 없습니다",
+      "notFoundDescription": "클러스터가 없거나 볼 권한이 없습니다.",
+      "back": "클러스터 목록으로 돌아가기",
+      "menuLabel": "클러스터 작업",
+      "failureTitle": "최근 관리 실패",
+      "failureHelp": "문제를 해결하고 설정에서 다시 시도를 클릭하여 재실행하세요.",
+      "management": "관리",
+      "activeSince": "{time}부터 활성 상태",
+      "probedAt": "기능 확인 시간: {time}",
+      "notManaged": "관리가 아직 활성화되지 않았습니다",
+      "auth": "인증",
+      "capabilitiesTitle": "기능",
+      "capabilitiesDescription": "마지막 기능 확인에서 감지한 내용입니다. 클러스터 관리를 새로 고쳐 업데이트하세요.",
+      "storageClasses": "스토리지 클래스",
+      "metricsServer": "메트릭 서버",
+      "installed": "설치됨",
+      "notDetected": "감지되지 않음",
+      "actionRequired": "작업 필요",
+      "actionHelp": "이 클러스터는 아직 관리되지 않습니다. <settings>설정으로 이동</settings>하여 관리를 활성화하세요.",
+      "stats": {
+        "appsBound": "연결된 앱",
+        "nodes": "노드",
+        "podsRunning": "실행 중인 Pod",
+        "cpu": "CPU",
+        "memory": "메모리"
+      }
     }
   },
   "clusterConnection": {

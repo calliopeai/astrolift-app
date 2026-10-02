@@ -810,6 +810,49 @@
           "age": "Age",
           "node": "Node"
         }
+      },
+      "signalMeasurement": {
+        "unreported": "Périmètre de mesure non indiqué.",
+        "scope": "Périmètre : {scope}",
+        "source": "Source : {source}",
+        "since": "Conteneurs actuels mesurés depuis {timestamp}",
+        "identities": "Identités canoniques",
+        "app": "App",
+        "environment": "Environnement",
+        "cluster": "Cluster",
+        "workload": "Charge de travail",
+        "scopes": {
+          "APP_ENVIRONMENT": "Environnement de l’app",
+          "WORKLOAD": "Charge de travail",
+          "UNRESOLVED": "Non résolu"
+        },
+        "sources": {
+          "APP_INSTRUMENTATION": "Instrumentation de l’app",
+          "EDGE_PROMETHEUS": "Métriques ingress",
+          "CLOUDWATCH_ALB": "CloudWatch ALB",
+          "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "NONE": "Aucune"
+        },
+        "reasons": {
+          "target": "Cible sélectionnée indisponible.",
+          "partial": "Mesure incomplète ou ambiguë ; aucun ratio affiché.",
+          "noData": "Aucune donnée d’utilisation vérifiée dans cette période.",
+          "readError": "Impossible de lire la source de mesure.",
+          "MISSING_LIMITS": "Limites de ressources manquantes ; saturation indisponible.",
+          "OWNERSHIP_UNVERIFIED": "Propriété à l’exécution non vérifiée. Redéployez pour inscrire les identités actuelles.",
+          "PERMISSION_DENIED": "Autorisation de lecture de cette mesure refusée.",
+          "NOT_SUPPORTED_BY_PROVIDER": "Le fournisseur ne prend pas en charge cette mesure.",
+          "NOT_CONFIGURED": "Source de mesure non configurée.",
+          "NOT_INSTRUMENTED": "Les métriques de requêtes ne sont pas instrumentées pour cette cible."
+        },
+        "organization": "Organisation",
+        "bases": {
+          "SOURCE_LABELS": "Étiquettes logiques d’instrumentation",
+          "NAMESPACE": "Agrégat du namespace ; appartenance physique non vérifiée",
+          "VERIFIED_RUNTIME": "Conteneurs physiques actuels vérifiés",
+          "UNRESOLVED": "Identité d’exécution non résolue"
+        },
+        "observed": "Appartenance à l’exécution observée à {timestamp}"
       }
     },
     "tokens": {
@@ -3673,7 +3716,26 @@
         "memory": "Mémoire (totale)",
         "pods": "Pods",
         "dailyCost": "Coût journalier estimé",
-        "approximate": "approximatif"
+        "approximate": "approximatif",
+        "environment": "Environnement",
+        "loadResources": "Charger les ressources et le coût",
+        "resourcesUnavailable": "L’utilisation actuelle des ressources et le coût estimé sont indisponibles.",
+        "resourcesNotRequested": "Chargez l’utilisation actuelle des ressources et le coût estimé si nécessaire.",
+        "previewLogs": "Journaux de prévisualisation",
+        "loadLogs": "Charger les journaux",
+        "logsEmpty": "Aucune ligne de journal dans cette période.",
+        "logsUnavailable": "Les journaux historiques sont indisponibles pour cet environnement.",
+        "logsNotRequested": "Chargez jusqu’à 200 lignes des 30 dernières minutes pour cet environnement.",
+        "previewDeployments": "Déploiements de prévisualisation",
+        "loadDeployments": "Charger les déploiements",
+        "deploymentsEmpty": "Aucun déploiement pour cet environnement.",
+        "deploymentsNotRequested": "Chargez les derniers déploiements de cet environnement de prévisualisation.",
+        "deploymentsBounded": "Affichage des {count} derniers déploiements.",
+        "binding": {
+          "available": "Disponible",
+          "retired": "Retiré",
+          "unavailable": "Environnement indisponible"
+        }
       }
     }
   },
@@ -4048,6 +4110,61 @@
       "label": "Dernière opération :",
       "completed": "Terminée le {at}",
       "running": "En cours"
+    },
+    "reads": {
+      "title": "Ressources du projet",
+      "name": "Nom",
+      "kind": "Type",
+      "cluster": "Cluster",
+      "status": "État",
+      "search": "Rechercher des ressources",
+      "empty": "Aucune ressource du projet",
+      "emptyDescription": "L’infrastructure du projet apparaît ici après son provisionnement.",
+      "emptyFiltered": "Aucune ressource correspondante",
+      "emptyFilteredDescription": "Modifiez la recherche pour voir d’autres ressources du projet.",
+      "detail": "Détails de la ressource",
+      "detailDescription": "Examinez cette ressource précise et ses consommateurs actuellement visibles.",
+      "refused": "La ressource sélectionnée est indisponible ou son contexte a changé. Vérifiez de nouveau son GUID exact.",
+      "reviewAgain": "Vérifier de nouveau",
+      "refresh": "Actualiser",
+      "organization": "Organisation",
+      "project": "Projet",
+      "app": "Application",
+      "environment": "Environnement",
+      "consumer": "Consommateur",
+      "consumers": "Consommateurs visibles",
+      "actions": "Actions",
+      "detach": "Détacher",
+      "agentRecipe": "Recette d’agent",
+      "noConsumers": "Aucun consommateur visible",
+      "consumerVisibility": "Seuls les consommateurs que vous pouvez actuellement consulter sont inclus.",
+      "appEnvironment": "Environnement d’application",
+      "environmentGuid": "GUID de l’environnement",
+      "recipeSlug": "Slug de la recette d’agent",
+      "consumerContext": "Les consommateurs doivent appartenir au même projet et cluster que cette ressource.",
+      "attach": "Attacher",
+      "costUnavailable": "Le prix est indisponible.",
+      "costMonthly": "{amount} par mois",
+      "costApproximate": "Environ {amount} par mois",
+      "costFetched": "Prix consulté le {at}",
+      "costSource": "Source du prix",
+      "costPreview": "Estimer le coût",
+      "reprovision": "Reprovisionner",
+      "deprovision": "Déprovisionner",
+      "actionRefused": "L’action a été refusée. Vérifiez la ressource et vos autorisations actuelles.",
+      "operationAccepted": "Opération acceptée ; son achèvement est suivi séparément.",
+      "deprovisionTitle": "Déprovisionner {name} ?",
+      "deprovisionDescription": "Supprimez la ressource cloud avec la suppression sûre du fournisseur. Les données persistantes sont conservées par défaut.",
+      "activeOnPage": "{count} actives sur cette page",
+      "failedOnPage": "Opérations échouées sur cette page",
+      "statuses": {
+        "pending": "En attente",
+        "provisioning": "Provisionnement",
+        "active": "Active",
+        "updating": "Mise à jour",
+        "deprovisioning": "Déprovisionnement",
+        "failed": "Échec"
+      }
     }
   },
   "administration": {
@@ -6294,6 +6411,71 @@
       "exampleCa": "CA du cluster en PEM ou base64 ; facultative si déjà configurée",
       "exampleRegion": "Région cloud",
       "exampleCluster": "Nom du cluster cloud"
+    },
+    "list": {
+      "columns": {
+        "cluster": "Cluster",
+        "status": "État",
+        "provider": "Fournisseur",
+        "region": "Région",
+        "ingress": "Entrée",
+        "live": "Connexion",
+        "lastProbe": "Dernière vérification",
+        "registeredBy": "Enregistré par"
+      },
+      "views": {
+        "all": "Tous",
+        "mine": "Les miens",
+        "offline": "Hors ligne"
+      },
+      "searchPlaceholder": "Rechercher des clusters...",
+      "register": "Enregistrer un cluster",
+      "emptyTitle": "Aucun cluster enregistré",
+      "emptyDescription": "Enregistrez un cluster Kubernetes de l’organisation pour conserver ses métadonnées, puis activez sa gestion une fois les prérequis installés.",
+      "emptyLink": "Prérequis du cluster",
+      "never": "jamais",
+      "heartbeatLast": "Dernier signal {age}",
+      "heartbeatNone": "Aucun signal récent"
+    },
+    "actions": {
+      "bring": "Activer la gestion",
+      "refresh": "Actualiser la configuration",
+      "retry": "Réessayer",
+      "fullPreflight": "Actualiser avec vérification préalable complète",
+      "inProgress": "Configuration en cours…",
+      "bringAccepted": "Activation de la gestion de {slug}. Cela peut prendre jusqu’à une minute.",
+      "refreshAccepted": "Actualisation de {slug}",
+      "fullPreflightAccepted": "Actualisation de {slug} (vérification préalable complète)",
+      "bringFailed": "Impossible d’activer la gestion du cluster",
+      "refreshFailed": "Impossible d’actualiser la gestion du cluster"
+    },
+    "detail": {
+      "notFoundTitle": "Aucun cluster avec l’identifiant {slug}",
+      "notFoundDescription": "Le cluster n’existe pas ou vous n’avez pas l’autorisation de le consulter.",
+      "back": "Retour aux clusters",
+      "menuLabel": "Actions du cluster",
+      "failureTitle": "Dernier échec de gestion",
+      "failureHelp": "Corrigez le problème et cliquez sur Réessayer dans les paramètres pour relancer.",
+      "management": "Gestion",
+      "activeSince": "Actif depuis {time}",
+      "probedAt": "Fonctionnalités vérifiées : {time}",
+      "notManaged": "Gestion pas encore activée",
+      "auth": "Authentification",
+      "capabilitiesTitle": "Fonctionnalités",
+      "capabilitiesDescription": "Détectées lors de la dernière vérification des fonctionnalités. Actualisez la gestion du cluster pour les mettre à jour.",
+      "storageClasses": "Classes de stockage",
+      "metricsServer": "Serveur de métriques",
+      "installed": "Installé",
+      "notDetected": "Non détecté",
+      "actionRequired": "Action requise",
+      "actionHelp": "Ce cluster n’est pas encore géré. <settings>Ouvrez les paramètres</settings> pour activer sa gestion.",
+      "stats": {
+        "appsBound": "Apps liées",
+        "nodes": "Nœuds",
+        "podsRunning": "Pods en cours",
+        "cpu": "CPU",
+        "memory": "Mémoire"
+      }
     }
   },
   "clusterConnection": {

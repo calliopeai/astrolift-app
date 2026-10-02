@@ -57,6 +57,7 @@ from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
     handle_for,
+    managed_name_for,
     parse_handle,
     tags_for,
 )
@@ -556,15 +557,7 @@ class ElastiCacheRedisDriver(ManagedServiceDriver):
         return groups[0] if groups else None
 
     def _replication_group_id_for(self, *, spec: ProvisionSpec) -> str:
-        raw = (
-            f"{self._config.replication_group_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'rd'}"
-        ).lower()
-        sanitized = "".join(c for c in raw if c.isalnum() or c == "-")
-        if not sanitized or not sanitized[0].isalpha():
-            sanitized = f"a{sanitized}"
-        return sanitized[:40]
+        return managed_name_for(spec, kind=KIND, prefix=self._config.replication_group_prefix, max_len=40)
 
     def _auth_secret_name_for(self, *, rg_id: str) -> str:
         return f"{self._config.secrets_manager_prefix}/{rg_id}/auth"

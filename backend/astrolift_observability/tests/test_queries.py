@@ -32,7 +32,7 @@ from astrolift_observability import prom_client
 from astrolift_observability.schema.queries import GoldenSignalsQuery
 from astrolift_observability.schema.types import GoldenSignalKind
 from astrolift_operations.prometheus_client import PrometheusUnavailable
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import RegisteredApp, Workload
 from core.permissions import Permission, PermissionDenied
 from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import TenantContext, tenant_context
@@ -142,7 +142,8 @@ def test_app_without_prometheus_endpoint_reports_not_configured(permission_resol
     with _tenant(org):
         result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
     assert result.reason == ObservabilityPanelReason.NOT_CONFIGURED
-    assert result.signals == []
+    assert len(result.signals) == 8
+    assert all(row.measurement.unavailable_reason.name == "NOT_CONFIGURED" for row in result.signals)
 
 
 def test_happy_path_returns_eight_signals(permission_resolver):
@@ -165,6 +166,7 @@ def test_happy_path_returns_eight_signals(permission_resolver):
         end_unix,
         step_seconds,
         label_key=None,
+        strict=False,
     ):
         # One series with two samples.
         return [("", [(float(start_unix), 1.5), (float(end_unix), 2.5)])]
@@ -276,7 +278,8 @@ def test_prometheus_error_reports_error(permission_resolver):
         with _tenant(org):
             result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
     assert result.reason == ObservabilityPanelReason.ERROR
-    assert result.signals == []
+    assert len(result.signals) == 8
+    assert all(row.measurement.unavailable_reason.name == "QUERY_ERROR" for row in result.signals)
 
 
 def test_permission_denied_raises(permission_resolver):
@@ -401,13 +404,9 @@ def test_status_code_breakdown_reports_error_on_prometheus_error(permission_reso
 
 
 def test_golden_signals_workload_slug_threads_into_promql(permission_resolver):
-    """The ``workload_slug`` resolver arg lands as a ``workload="<slug>"``
-    matcher in every app-instrumentation signal so Prometheus narrows the
-    metric stream to one workload. The saturation pair reads cAdvisor /
-    kube-state-metrics series that carry no ``workload`` label, so those
-    stay namespace-scoped (the workload matcher is intentionally dropped
-    rather than producing a query that matches nothing)."""
+    """RED uses logical workload labels; resources never fall back to the namespace."""
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    Workload.objects.create(registered_app=app, slug="api", name="API", kind="deployment")
     permission_resolver.grant(Permission.APP_READ)
 
     with patch.object(prom_client, "query_range_series", return_value=[]):
@@ -421,13 +420,9 @@ def test_golden_signals_workload_slug_threads_into_promql(permission_resolver):
             )
 
     assert result.signals, "expected one row per signal kind even when samples are empty"
-    namespace_scoped = {GoldenSignalKind.SATURATION_CPU, GoldenSignalKind.SATURATION_MEMORY}
     for row in result.signals:
-        if row.name in namespace_scoped:
-            assert 'workload="api"' not in row.promql, row.promql
-            assert f'namespace="{app.k8s_namespace}"' in row.promql, row.promql
-        else:
-            assert 'workload="api"' in row.promql, row.promql
+        assert row.promql == ""
+        assert row.measurement.unavailable_reason.name == "NOT_SUPPORTED_BY_PROVIDER"
 
 
 def test_golden_signals_without_workload_slug_omits_label(permission_resolver):

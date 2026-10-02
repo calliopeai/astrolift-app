@@ -238,8 +238,20 @@ export const REPROVISION_PROJECT_MANAGED_SERVICE = gql`
   mutation ReprovisionProjectManagedService($input: ReprovisionManagedServiceInput!) {
     reprovisionProjectManagedService(input: $input) {
       ok
-      errors { code message field }
-      data { ${MANAGED_SERVICE_FIELDS} }
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        status
+        operationKind
+        operationWorkflowId
+        operationRunId
+        operationStartedAt
+        operationCompletedAt
+      }
     }
   }
 `;

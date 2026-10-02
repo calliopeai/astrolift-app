@@ -18,6 +18,9 @@
  */
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
+import type { ManagedResourceContextFragment } from "@/graphql/__generated__/operations";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,9 +45,24 @@ export interface ServiceDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   /** The service's metrics panel, wired to its query by the route. */
   metrics?: React.ReactNode;
+  current?: ManagedResourceContextFragment | null;
+  loading?: boolean;
+  refused?: boolean;
+  onRetry?: () => void;
 }
 
-export function ServiceDetailSheet({ service, onOpenChange, metrics }: ServiceDetailSheetProps) {
+export function ServiceDetailSheet({
+  service,
+  onOpenChange,
+  metrics,
+  current,
+  loading,
+  refused,
+  onRetry,
+}: ServiceDetailSheetProps) {
+  const copy = useTranslations("projectResources.reads");
+  const common = useTranslations("common");
+  const displayed = current === undefined ? service : current;
   const open = service !== null;
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -53,31 +71,63 @@ export function ServiceDetailSheet({ service, onOpenChange, metrics }: ServiceDe
           <>
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2 font-mono">
-                {service.name}
+                {displayed?.name || copy("detail")}
                 <Badge variant="secondary" className="font-sans">
-                  {service.kind}
+                  {displayed?.kind}
                 </Badge>
-                {service.variant ? (
+                {displayed?.variant ? (
                   <Badge variant="outline" className="text-2xs font-mono">
-                    {service.variant}
+                    {displayed.variant}
                   </Badge>
                 ) : null}
               </SheetTitle>
               <SheetDescription>
                 <span className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-2 text-xs">
-                  <span>Environment:</span>
+                  <span>{copy("environment")}:</span>
                   <Badge variant="outline" className="text-2xs max-w-full shrink font-mono">
-                    <span className="min-w-0 truncate" title={service.environmentName}>
-                      {service.environmentName}
+                    <span className="min-w-0 truncate" title={displayed?.environmentName}>
+                      {displayed?.environmentName || "—"}
                     </span>
                   </Badge>
                   <span>·</span>
-                  <span className="capitalize">{service.status}</span>
+                  <span className="capitalize">
+                    {displayed?.status &&
+                      ([
+                        "pending",
+                        "provisioning",
+                        "active",
+                        "updating",
+                        "deprovisioning",
+                        "failed",
+                      ].includes(displayed.status)
+                        ? copy(`statuses.${displayed.status}`)
+                        : displayed.status)}
+                  </span>
                 </span>
               </SheetDescription>
             </SheetHeader>
 
-            <div className="mt-6 space-y-6">{metrics}</div>
+            <div className="mt-6 space-y-6">
+              {loading ? (
+                <p role="status">{common("loading")}</p>
+              ) : refused ? (
+                <div role="alert">
+                  <p>{copy("refused")}</p>
+                  <Button variant="outline" onClick={onRetry}>
+                    {copy("reviewAgain")}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {current && (
+                    <p className="text-muted-foreground font-mono text-xs break-all">
+                      {current.id} · {current.clusterId} · {current.environmentId || "—"}
+                    </p>
+                  )}
+                  {metrics}
+                </>
+              )}
+            </div>
           </>
         )}
       </SheetContent>

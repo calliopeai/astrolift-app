@@ -72,9 +72,24 @@ class PromoteInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class ReviewedManagedServiceBinding:
+    """Metadata-only accepted placement; never carries config or credentials."""
+
+    service_guid: str
+    organization_id: int
+    project_id: int
+    team_id: int
+    cluster_id: int
+    provider_plugin_id: int
+    accepted_service_version: int
+    digest: str
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class ProvisionManagedServiceInput:
     managed_service_id: int
     actor: Actor
+    reviewed_binding: ReviewedManagedServiceBinding | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -90,6 +105,7 @@ class SharedModelReconcileInput:
 class UpdateManagedServiceInput:
     managed_service_id: int
     actor: Actor
+    reviewed_binding: ReviewedManagedServiceBinding | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -119,6 +135,7 @@ class DeprovisionManagedServiceInput:
     actor: Actor
     delete_data: bool = False
     force_destroy: bool = False
+    reviewed_binding: ReviewedManagedServiceBinding | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
