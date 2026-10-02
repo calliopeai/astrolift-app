@@ -84,7 +84,10 @@ def cloud(request, monkeypatch):
 def new_service(cloud, org, app="api"):
     row = _service(org_slug=org, plugin_slug="aws", variant=cloud.variant, backend_ref="")
     row.kind, row.name = "workflow_engine", "workflow"
-    row.config = {"definition": DEFINITION, "role_arn": ROLE}
+    row.config = {
+        "definition": DEFINITION,
+        "role_arn": f"arn:aws:iam::123456789012:role/astrolift/{row.registered_app.organization.guid}/fixture-workflow",
+    }
     row.registered_app.slug = app
     row.registered_app.save(update_fields=["slug"])
     row.save(update_fields=["kind", "name", "config"])
