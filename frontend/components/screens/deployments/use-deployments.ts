@@ -20,6 +20,7 @@ import { DEPLOYMENT_LIFECYCLE_STREAM } from "@/graphql/lifecycle/lifecycle.subsc
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { useDeploymentFeedback } from "./use-deployment-feedback";
 import type { ActionKind } from "./deployments-format";
 import { DEPLOYMENTS_LIST, deploymentsVariables } from "./deployments-list";
 
@@ -42,18 +43,6 @@ interface DeploymentsPageResp {
 // object names the page the operator is looking at.
 const REFETCH_LIST = ["ListDeploymentsPage"];
 
-function reportResult(
-  label: string,
-  result: MutationResultLite<AstroliftDeployment> | null | undefined
-) {
-  if (!result) return;
-  if (result.ok) {
-    toast.success(`${label}: ${result.data?.status ?? "ok"}`);
-  } else {
-    throw new Error(result.errors[0]?.message ?? `${label} failed`);
-  }
-}
-
 /**
  * Apps › Deployments: URL list state, one cursor page of
  * `astroliftDeploymentsPage`, live push held behind the "new" pill, and the
@@ -61,6 +50,7 @@ function reportResult(
  * `runBulk` throw on failure so ConfirmDialog holds open with the reason.
  */
 export function useDeployments() {
+  const feedback = useDeploymentFeedback();
   const t = useTranslations("lists.deployments");
   const list = useListState(DEPLOYMENTS_LIST);
   const { state } = list;
@@ -133,17 +123,17 @@ export function useDeployments() {
   async function runAction(kind: ActionKind, d: AstroliftDeployment, reason?: string) {
     if (kind === "approve") {
       const { data } = await approve({ variables: { input: { id: d.id } } });
-      reportResult("approveDeployment", data?.approveDeployment);
+      feedback.report("approve", data?.approveDeployment, true);
     } else if (kind === "abort") {
       // abort requires a non-empty reason at the backend boundary (#419).
       const { data } = await abort({ variables: { input: { id: d.id, reason: reason ?? "" } } });
-      reportResult("abortDeployment", data?.abortDeployment);
+      feedback.report("abort", data?.abortDeployment, true);
     } else if (kind === "rollback") {
       const { data } = await rollback({ variables: { input: { id: d.id } } });
-      reportResult("rollbackDeployment", data?.rollbackDeployment);
+      feedback.report("rollbackConfirm", data?.rollbackDeployment, true);
     } else if (kind === "redeploy") {
       const { data } = await redeploy({ variables: { input: { id: d.id } } });
-      reportResult("redeployApp", data?.redeployApp);
+      feedback.report("redeploy", data?.redeployApp, true);
     }
   }
 
@@ -162,13 +152,13 @@ export function useDeployments() {
             ? abort({ variables: { input: { id: d.id, reason: reason ?? "" } } }).then(
                 ({ data }) => {
                   const r = data?.abortDeployment;
-                  if (!r?.ok) throw new Error(r?.errors[0]?.message ?? "abort failed");
+                  if (!r?.ok) throw new Error(r?.errors[0]?.message ?? feedback.failed("abort"));
                   return r;
                 }
               )
             : redeploy({ variables: { input: { id: d.id } } }).then(({ data }) => {
                 const r = data?.redeployApp;
-                if (!r?.ok) throw new Error(r?.errors[0]?.message ?? "redeploy failed");
+                if (!r?.ok) throw new Error(r?.errors[0]?.message ?? feedback.failed("redeploy"));
                 return r;
               })
         )

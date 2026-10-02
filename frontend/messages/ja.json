@@ -3457,17 +3457,17 @@
         "history": "History"
       },
       "actions": {
-        "label": "Actions",
-        "more": "More actions",
-        "approve": "Approve",
-        "abort": "Cancel",
-        "rollback": "Rollback",
-        "redeploy": "Redeploy",
-        "viewLogs": "View detail / logs",
-        "viewCommit": "View commit",
-        "copyGuid": "Copy deployment ID",
-        "copyOk": "Deployment ID copied.",
-        "copyFail": "Couldn't copy to clipboard."
+        "label": "操作",
+        "more": "その他の操作",
+        "approve": "承認",
+        "abort": "キャンセル",
+        "rollback": "ロールバック",
+        "redeploy": "再デプロイ",
+        "viewLogs": "詳細・ログを表示",
+        "viewCommit": "コミットを表示",
+        "copyGuid": "デプロイ ID をコピー",
+        "copyOk": "デプロイ ID をコピーしました。",
+        "copyFail": "クリップボードにコピーできませんでした。"
       },
       "bulk": {
         "selectAllLabel": "Select all visible deployments",
@@ -3529,23 +3529,41 @@
         "redeployConfirm": "Redeploy"
       },
       "startSheet": {
-        "title": "Start deployment",
-        "description": "Submits a new rollout to Temporal. If the environment requires approvals, the deployment lands as pending_approval and the workflow doesn't start until enough approvers sign off.",
-        "appLabel": "App",
-        "appPlaceholder": "Choose an app",
-        "envLabel": "Environment",
-        "envPlaceholder": "Choose an environment",
-        "tagLabel": "Image tag",
-        "tagPlaceholder": "v1.4.2 or sha-abc123",
-        "digestLabel": "Image digest (optional)",
+        "title": "デプロイを開始",
+        "description": "新しいデプロイを Temporal に送信します。環境に承認が必要な場合、デプロイは pending_approval 状態になり、必要な承認数が揃うまでワークフローは開始されません。",
+        "appLabel": "アプリ",
+        "appPlaceholder": "アプリを選択",
+        "envLabel": "環境",
+        "envPlaceholder": "環境を選択",
+        "tagLabel": "イメージタグ",
+        "tagPlaceholder": "v1.4.2 または sha-abc123",
+        "digestLabel": "イメージのダイジェスト（任意）",
         "digestPlaceholder": "sha256:...",
-        "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
-        "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} approval(s)",
-        "paused": "paused",
-        "cancel": "Cancel",
-        "submit": "Start deployment",
-        "submitting": "Starting…"
+        "digestHint": "指定した場合、ワークフローはこのダイジェストをマニフェストに含め、変更されない対象を保証します。",
+        "triggerLabel": "トリガー",
+        "approvalsSuffix": "承認 {count} 件",
+        "paused": "一時停止中",
+        "cancel": "キャンセル",
+        "submit": "デプロイを開始",
+        "submitting": "開始中…",
+        "steps": {
+          "target": "対象",
+          "image": "イメージ",
+          "review": "確認"
+        },
+        "stepsLabel": "デプロイの手順",
+        "validationApp": "デプロイするアプリを選択してください。",
+        "validationEnv": "環境を選択してください。",
+        "validationTag": "デプロイするイメージのタグを入力してください。",
+        "loadingApps": "アプリを読み込み中…",
+        "noEnvironments": "このアプリにはまだ環境がありません。まずクラスターに紐付けてください。",
+        "reviewDescription": "デプロイを開始します。デプロイする内容を確認してください。",
+        "back": "戻る",
+        "continue": "次へ",
+        "approvalWarning": "{env} ではデプロイの開始前に {count} 件の承認が必要です。",
+        "pausedWarning": "{env} へのデプロイは一時停止中です。ここで開始したデプロイは実行されますが、CI とプッシュによるトリガーは引き続きブロックされます。",
+        "started": "デプロイを開始しました: {status}",
+        "startFailed": "デプロイを開始できませんでした。"
       }
     },
     "deploymentDetail": {
@@ -3613,7 +3631,8 @@
         "retireConfirm": "デプロイを停止",
         "success": "デプロイを破棄しました",
         "failed": "削除に失敗しました"
-      }
+      },
+      "openCiRun": "CI の実行を開く"
     },
     "environments": {
       "title": "環境",

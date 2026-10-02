@@ -41,9 +41,9 @@ interface Values {
 }
 
 const STEPS: { n: Step; label: string }[] = [
-  { n: 1, label: "Target" },
-  { n: 2, label: "Image" },
-  { n: 3, label: "Review" },
+  { n: 1, label: "target" },
+  { n: 2, label: "image" },
+  { n: 3, label: "review" },
 ];
 
 /** Which step holds a field, so a refused start opens where its error is. */
@@ -114,6 +114,7 @@ export function StartDeploymentPage({
   initialErrors = {},
 }: StartDeploymentPageProps) {
   const t = useTranslations("lists.deployments.startSheet");
+  const triggerLabel = useTranslations("apps.deployments.triggers");
   const [step, setStep] = React.useState<Step>(initialStep);
   const [values, setValues] = React.useState<Values>({
     environmentName: "",
@@ -136,10 +137,10 @@ export function StartDeploymentPage({
   function check(at: Step): boolean {
     const found: Partial<Record<StartField, string>> = {};
     if (at === 1) {
-      if (!appSlug) found.appSlug = "Pick the app to deploy.";
-      if (!values.environmentName) found.environmentName = "Pick an environment.";
+      if (!appSlug) found.appSlug = t("validationApp");
+      if (!values.environmentName) found.environmentName = t("validationEnv");
     }
-    if (at === 2 && !values.imageTag.trim()) found.imageTag = "Enter the image tag to deploy.";
+    if (at === 2 && !values.imageTag.trim()) found.imageTag = t("validationTag");
     setErrors((e) => ({ ...e, ...found }));
     return Object.keys(found).length === 0;
   }
@@ -165,7 +166,7 @@ export function StartDeploymentPage({
         crumbs={appsListCrumbs("deployments", { label: t("title") })}
         title={t("title")}
         context={
-          <ol aria-label="Steps" className="inline-flex flex-wrap items-center gap-2">
+          <ol aria-label={t("stepsLabel")} className="inline-flex flex-wrap items-center gap-2">
             {STEPS.map((s, i) => (
               <li
                 key={s.n}
@@ -180,7 +181,7 @@ export function StartDeploymentPage({
                     ·
                   </span>
                 )}
-                <span className="font-mono">{s.n}</span> {s.label}
+                <span className="font-mono">{s.n}</span> {t(`steps.${s.label}`)}
               </li>
             ))}
           </ol>
@@ -221,7 +222,7 @@ export function StartDeploymentPage({
                   className="w-full min-w-0"
                   {...invalid("app", errors.appSlug)}
                 >
-                  <SelectValue placeholder={appsLoading ? "Loading apps…" : t("appPlaceholder")} />
+                  <SelectValue placeholder={appsLoading ? t("loadingApps") : t("appPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {apps.map((a) => (
@@ -240,7 +241,7 @@ export function StartDeploymentPage({
               error={errors.environmentName}
               help={
                 appSlug && !environmentsLoading && environments.length === 0
-                  ? "This app has no environments yet. Bind it to a cluster first."
+                  ? t("noEnvironments")
                   : undefined
               }
             >
@@ -318,7 +319,7 @@ export function StartDeploymentPage({
                   <SelectContent>
                     {TRIGGER_KINDS.map((k) => (
                       <SelectItem key={k} value={k} className="font-mono">
-                        {k}
+                        {triggerLabel(k)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -330,7 +331,7 @@ export function StartDeploymentPage({
 
         {step === 3 && (
           <div className="flex min-w-0 flex-col gap-3">
-            <p className="text-sm">This starts a rollout. Check what is about to deploy.</p>
+            <p className="text-sm">{t("reviewDescription")}</p>
             <DefinitionList
               items={[
                 {
@@ -367,21 +368,27 @@ export function StartDeploymentPage({
                 },
                 {
                   term: t("triggerLabel"),
-                  description: <span className="font-mono text-xs">{values.triggerKind}</span>,
+                  description: (
+                    <span className="font-mono text-xs">
+                      {TRIGGER_KINDS.includes(values.triggerKind)
+                        ? triggerLabel(values.triggerKind)
+                        : values.triggerKind}
+                    </span>
+                  ),
                 },
               ]}
             />
             {env && env.requiredApprovals > 0 && (
               <p className="text-muted-foreground text-xs">
-                {values.environmentName} needs{" "}
-                <span className="font-mono">{env.requiredApprovals}</span> approval
-                {env.requiredApprovals === 1 ? "" : "s"} before the rollout starts.
+                {t("approvalWarning", {
+                  env: values.environmentName,
+                  count: env.requiredApprovals,
+                })}
               </p>
             )}
             {env?.deploysPaused && (
               <p className="text-warning-fg text-xs">
-                Deploys to {values.environmentName} are paused. A deployment started here still
-                runs; CI and push triggers stay blocked.
+                {t("pausedWarning", { env: values.environmentName })}
               </p>
             )}
           </div>
@@ -394,12 +401,12 @@ export function StartDeploymentPage({
           {step > 1 && (
             <Button type="button" variant="outline" onClick={() => setStep((step - 1) as Step)}>
               <ArrowLeftIcon className="size-4" />
-              Back
+              {t("back")}
             </Button>
           )}
           {step < 3 ? (
             <Button type="submit">
-              Continue
+              {t("continue")}
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (

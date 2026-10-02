@@ -3457,17 +3457,17 @@
         "history": "History"
       },
       "actions": {
-        "label": "Actions",
-        "more": "More actions",
-        "approve": "Approve",
-        "abort": "Cancel",
-        "rollback": "Rollback",
-        "redeploy": "Redeploy",
-        "viewLogs": "View detail / logs",
-        "viewCommit": "View commit",
-        "copyGuid": "Copy deployment ID",
-        "copyOk": "Deployment ID copied.",
-        "copyFail": "Couldn't copy to clipboard."
+        "label": "操作",
+        "more": "更多操作",
+        "approve": "批准",
+        "abort": "取消",
+        "rollback": "回滚",
+        "redeploy": "重新部署",
+        "viewLogs": "查看详情 / 日志",
+        "viewCommit": "查看提交",
+        "copyGuid": "复制部署 ID",
+        "copyOk": "已复制部署 ID。",
+        "copyFail": "无法复制到剪贴板。"
       },
       "bulk": {
         "selectAllLabel": "Select all visible deployments",
@@ -3529,23 +3529,41 @@
         "redeployConfirm": "Redeploy"
       },
       "startSheet": {
-        "title": "Start deployment",
-        "description": "Submits a new rollout to Temporal. If the environment requires approvals, the deployment lands as pending_approval and the workflow doesn't start until enough approvers sign off.",
-        "appLabel": "App",
-        "appPlaceholder": "Choose an app",
-        "envLabel": "Environment",
-        "envPlaceholder": "Choose an environment",
-        "tagLabel": "Image tag",
-        "tagPlaceholder": "v1.4.2 or sha-abc123",
-        "digestLabel": "Image digest (optional)",
+        "title": "开始部署",
+        "description": "向 Temporal 提交新的部署。如果环境需要批准，部署将处于 pending_approval 状态，只有获得足够的批准后工作流才会开始。",
+        "appLabel": "应用",
+        "appPlaceholder": "选择应用",
+        "envLabel": "环境",
+        "envPlaceholder": "选择环境",
+        "tagLabel": "镜像标签",
+        "tagPlaceholder": "v1.4.2 或 sha-abc123",
+        "digestLabel": "镜像摘要（可选）",
         "digestPlaceholder": "sha256:...",
-        "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
-        "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} approval(s)",
-        "paused": "paused",
-        "cancel": "Cancel",
-        "submit": "Start deployment",
-        "submitting": "Starting…"
+        "digestHint": "指定后，工作流会将此摘要写入清单，以确保目标不可变。",
+        "triggerLabel": "触发器",
+        "approvalsSuffix": "{count} 次批准",
+        "paused": "已暂停",
+        "cancel": "取消",
+        "submit": "开始部署",
+        "submitting": "正在开始…",
+        "steps": {
+          "target": "目标",
+          "image": "镜像",
+          "review": "检查"
+        },
+        "stepsLabel": "部署步骤",
+        "validationApp": "请选择要部署的应用。",
+        "validationEnv": "请选择环境。",
+        "validationTag": "请输入要部署的镜像标签。",
+        "loadingApps": "正在加载应用…",
+        "noEnvironments": "此应用尚无环境。请先将其绑定到集群。",
+        "reviewDescription": "此操作将开始部署。请检查要部署的内容。",
+        "back": "返回",
+        "continue": "继续",
+        "approvalWarning": "{env} 在部署开始前需要 {count} 次批准。",
+        "pausedWarning": "向 {env} 的部署已暂停。从此处发起的部署仍会运行；CI 和推送触发器仍会被阻止。",
+        "started": "部署已开始：{status}",
+        "startFailed": "无法开始部署。"
       }
     },
     "deploymentDetail": {
@@ -3613,7 +3631,8 @@
         "retireConfirm": "停用部署",
         "success": "已忽略部署",
         "failed": "删除失败"
-      }
+      },
+      "openCiRun": "打开 CI 运行"
     },
     "environments": {
       "title": "环境",

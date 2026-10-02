@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import { START, START_LONG } from "./deployments.fixtures";
 import { StartDeploymentPage } from "./StartDeploymentPage";
 
@@ -95,5 +99,25 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <StartDeploymentPage {...START} />
     </div>
+  ),
+};
+
+export const FrenchReview: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <StartDeploymentPage
+        {...START}
+        initialStep={3}
+        initialValues={{ environmentName: START.environments[0].name, imageTag: "sha-literal" }}
+        environments={[{ ...START.environments[0], requiredApprovals: 2, deploysPaused: true }]}
+      />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseValidation: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <StartDeploymentPage {...START} appSlug="" />
+    </NextIntlClientProvider>
   ),
 };

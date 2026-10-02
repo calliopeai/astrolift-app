@@ -33,6 +33,7 @@ import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_RENDERED_MANIFEST } from "@/graphql/registry/registry.queries";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { useDeploymentFeedback } from "./use-deployment-feedback";
 import { IN_FLIGHT } from "./deployments-format";
 import { downloadText, useNow } from "./run-support";
 
@@ -93,18 +94,6 @@ export interface ApprovalHistoryEntry {
   reason: string;
 }
 
-function reportResult(
-  label: string,
-  result: MutationResultLite<AstroliftDeployment> | null | undefined
-) {
-  if (!result) throw new Error(`${label} failed`);
-  if (result.ok) {
-    toast.success(`${label}: ${result.data?.status ?? "ok"}`);
-  } else {
-    throw new Error(result.errors[0]?.message ?? `${label} failed`);
-  }
-}
-
 /**
  * One deployment's detail page data: the row, its lifecycle log, the
  * rendered manifest, recent events, the approval trail, release notes,
@@ -113,6 +102,7 @@ function reportResult(
  * open with the reason; direct redeploy actions surface failures in a toast.
  */
 export function useDeploymentDetail(id: string) {
+  const feedback = useDeploymentFeedback();
   const t = useTranslations("lists.deploymentDetail");
   const client = useApolloClient();
   const { can } = useMyPermissions();
@@ -245,9 +235,9 @@ export function useDeploymentDetail(id: string) {
       const { data } = await approve({
         variables: { input: { id: deployment.id } },
       });
-      reportResult("approveDeployment", data?.approveDeployment);
+      feedback.report("approve", data?.approveDeployment);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "approveDeployment failed");
+      toast.error(err instanceof Error ? err.message : feedback.failed("approve"));
     }
   }
 
@@ -256,13 +246,13 @@ export function useDeploymentDetail(id: string) {
     const { data } = await abort({
       variables: { input: { id: deployment.id, reason } },
     });
-    reportResult("abortDeployment", data?.abortDeployment);
+    feedback.report("abort", data?.abortDeployment);
   }
 
   async function onRollback() {
     if (!deployment) return;
     const { data } = await rollback({ variables: { input: { id: deployment.id } } });
-    reportResult("rollbackDeployment", data?.rollbackDeployment);
+    feedback.report("rollbackConfirm", data?.rollbackDeployment);
   }
 
   async function onRedeploy() {
@@ -274,7 +264,7 @@ export function useDeploymentDetail(id: string) {
       if (!data?.redeployApp?.ok) {
         throw new Error(data?.redeployApp?.errors[0]?.message || t("redeployFailed"));
       }
-      reportResult(t("redeploy"), data.redeployApp);
+      feedback.report("redeploy", data.redeployApp);
     } catch (error) {
       toast.error(error instanceof Error && error.message ? error.message : t("redeployFailed"));
     }

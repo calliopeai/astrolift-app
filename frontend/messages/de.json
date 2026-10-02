@@ -3457,17 +3457,17 @@
         "history": "History"
       },
       "actions": {
-        "label": "Actions",
-        "more": "More actions",
-        "approve": "Approve",
-        "abort": "Cancel",
-        "rollback": "Rollback",
-        "redeploy": "Redeploy",
-        "viewLogs": "View detail / logs",
-        "viewCommit": "View commit",
-        "copyGuid": "Copy deployment ID",
-        "copyOk": "Deployment ID copied.",
-        "copyFail": "Couldn't copy to clipboard."
+        "label": "Aktionen",
+        "more": "Weitere Aktionen",
+        "approve": "Genehmigen",
+        "abort": "Abbrechen",
+        "rollback": "Zurückrollen",
+        "redeploy": "Erneut bereitstellen",
+        "viewLogs": "Details / Protokolle anzeigen",
+        "viewCommit": "Commit anzeigen",
+        "copyGuid": "Bereitstellungs-ID kopieren",
+        "copyOk": "Bereitstellungs-ID kopiert.",
+        "copyFail": "Kopieren in die Zwischenablage fehlgeschlagen."
       },
       "bulk": {
         "selectAllLabel": "Select all visible deployments",
@@ -3529,23 +3529,41 @@
         "redeployConfirm": "Redeploy"
       },
       "startSheet": {
-        "title": "Start deployment",
-        "description": "Submits a new rollout to Temporal. If the environment requires approvals, the deployment lands as pending_approval and the workflow doesn't start until enough approvers sign off.",
+        "title": "Bereitstellung starten",
+        "description": "Sendet eine neue Bereitstellung an Temporal. Wenn die Umgebung Genehmigungen erfordert, bleibt die Bereitstellung im Status pending_approval. Der Workflow startet erst, wenn genügend Genehmigungen vorliegen.",
         "appLabel": "App",
-        "appPlaceholder": "Choose an app",
-        "envLabel": "Environment",
-        "envPlaceholder": "Choose an environment",
-        "tagLabel": "Image tag",
-        "tagPlaceholder": "v1.4.2 or sha-abc123",
-        "digestLabel": "Image digest (optional)",
+        "appPlaceholder": "App auswählen",
+        "envLabel": "Umgebung",
+        "envPlaceholder": "Umgebung auswählen",
+        "tagLabel": "Image-Tag",
+        "tagPlaceholder": "v1.4.2 oder sha-abc123",
+        "digestLabel": "Image-Digest (optional)",
         "digestPlaceholder": "sha256:...",
-        "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
-        "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} approval(s)",
-        "paused": "paused",
-        "cancel": "Cancel",
-        "submit": "Start deployment",
-        "submitting": "Starting…"
+        "digestHint": "Falls angegeben, verwendet der Workflow diesen Digest im Manifest und garantiert damit ein unveränderliches Ziel.",
+        "triggerLabel": "Auslöser",
+        "approvalsSuffix": "{count, plural, one {# Genehmigung} other {# Genehmigungen}}",
+        "paused": "pausiert",
+        "cancel": "Abbrechen",
+        "submit": "Bereitstellung starten",
+        "submitting": "Wird gestartet…",
+        "steps": {
+          "target": "Ziel",
+          "image": "Image",
+          "review": "Prüfen"
+        },
+        "stepsLabel": "Bereitstellungsschritte",
+        "validationApp": "Wähle die bereitzustellende App.",
+        "validationEnv": "Wähle eine Umgebung.",
+        "validationTag": "Gib den Tag des bereitzustellenden Images ein.",
+        "loadingApps": "Apps werden geladen…",
+        "noEnvironments": "Diese App hat noch keine Umgebungen. Verknüpfe sie zuerst mit einem Cluster.",
+        "reviewDescription": "Dies startet eine Bereitstellung. Prüfe, was bereitgestellt wird.",
+        "back": "Zurück",
+        "continue": "Weiter",
+        "approvalWarning": "{env} benötigt {count, plural, one {# Genehmigung} other {# Genehmigungen}}, bevor die Bereitstellung startet.",
+        "pausedWarning": "Bereitstellungen für {env} sind pausiert. Eine hier gestartete Bereitstellung wird trotzdem ausgeführt; CI- und Push-Auslöser bleiben blockiert.",
+        "started": "Bereitstellung gestartet: {status}",
+        "startFailed": "Die Bereitstellung konnte nicht gestartet werden."
       }
     },
     "deploymentDetail": {
@@ -3613,7 +3631,8 @@
         "retireConfirm": "Deployment stilllegen",
         "success": "Deployment verworfen",
         "failed": "Löschen fehlgeschlagen"
-      }
+      },
+      "openCiRun": "CI-Ausführung öffnen"
     },
     "environments": {
       "title": "Umgebungen",

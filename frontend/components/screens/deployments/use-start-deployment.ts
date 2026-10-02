@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import type {
 } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 
+import { useDeploymentFeedback } from "./use-deployment-feedback";
 import type { TriggerKind } from "./deployments-format";
 
 export interface AppListItem {
@@ -73,6 +75,8 @@ function fieldOf(name: string | null | undefined): StartField | null {
  * comes back as field errors to show in place (spec 44 §5.4).
  */
 export function useStartDeployment() {
+  const t = useTranslations("lists.deployments.startSheet");
+  const feedback = useDeploymentFeedback();
   const router = useRouter();
   const apps = useQuery<AppsResp>(LIST_APPS);
   const [appSlug, setAppSlug] = React.useState("");
@@ -101,7 +105,7 @@ export function useStartDeployment() {
     });
     const res = data?.startDeployment;
     if (res?.ok) {
-      toast.success(`Deployment started: ${res.data?.status}`);
+      toast.success(t("started", { status: feedback.status(res.data?.status) }));
       router.push(res.data ? `/deployments/${res.data.id}` : "/deployments");
       return { ok: true };
     }
@@ -112,7 +116,7 @@ export function useStartDeployment() {
       if (field) fieldErrors[field] = e.message;
       else formError = formError ?? e.message;
     }
-    if (!res) formError = "The deployment could not be started.";
+    if (!res) formError = t("startFailed");
     return { ok: false, fieldErrors, formError };
   }
 
