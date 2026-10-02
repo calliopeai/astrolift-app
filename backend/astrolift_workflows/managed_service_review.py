@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from temporalio.exceptions import ApplicationError
 
 from astrolift_workflows.inputs import ReviewedManagedServiceBinding
@@ -77,7 +77,9 @@ def capture_reviewed_binding(service_id: int) -> ReviewedManagedServiceBinding:
     )
 
 
-def reviewed_service_call(function, service_id: int, binding: ReviewedManagedServiceBinding | None, *args):
+def reviewed_service_call(
+    function, service_id: int, binding: ReviewedManagedServiceBinding | None, *args, nowait: bool = False
+):
     if binding is None:
         return function(service_id, *args)
     from astrolift_clusters.models import ProviderPlugin, TenantCluster
@@ -95,20 +97,24 @@ def reviewed_service_call(function, service_id: int, binding: ReviewedManagedSer
         # Parent-first ordering matches admission. Locks stay held while the
         # existing synchronous lifecycle body calls a provider or writes rows.
         parents = [
-            Organization.objects.select_for_update(no_key=True).filter(pk=binding.organization_id).first(),
-            Team.objects.select_for_update(no_key=True)
+            Organization.objects.select_for_update(no_key=True, nowait=nowait)
+            .filter(pk=binding.organization_id)
+            .first(),
+            Team.objects.select_for_update(no_key=True, nowait=nowait)
             .filter(pk=binding.team_id, organization_id=binding.organization_id)
             .first(),
-            Project.objects.select_for_update(no_key=True)
+            Project.objects.select_for_update(no_key=True, nowait=nowait)
             .filter(pk=binding.project_id, organization_id=binding.organization_id, team_id=binding.team_id)
             .first(),
-            TenantCluster.objects.select_for_update(no_key=True).filter(pk=binding.cluster_id).first(),
-            ProviderPlugin.objects.select_for_update(no_key=True)
+            TenantCluster.objects.select_for_update(no_key=True, nowait=nowait)
+            .filter(pk=binding.cluster_id)
+            .first(),
+            ProviderPlugin.objects.select_for_update(no_key=True, nowait=nowait)
             .filter(pk=binding.provider_plugin_id)
             .first(),
         ]
         row = (
-            ManagedService.all_objects.select_for_update(of=("self",))
+            ManagedService.all_objects.select_for_update(of=("self",), nowait=nowait)
             .filter(
                 pk=service_id,
                 guid=binding.service_guid,
@@ -131,3 +137,19 @@ def reviewed_service_call(function, service_id: int, binding: ReviewedManagedSer
         ):
             refuse()
         return function(service_id, *args)
+
+
+def try_reviewed_service_receipt(function, service_id: int, binding: ReviewedManagedServiceBinding, *args):
+    """Annotate an accepted start without waiting behind a provider effect."""
+    try:
+        reviewed_service_call(function, service_id, binding, *args, nowait=True)
+    except ApplicationError as exc:
+        if exc.type != "STALE_TARGET":
+            raise
+        return False
+    except DatabaseError as exc:
+        cause = exc.__cause__
+        if getattr(cause, "sqlstate", None) != "55P03" and getattr(cause, "pgcode", None) != "55P03":
+            raise
+        return False
+    return True

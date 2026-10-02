@@ -7,7 +7,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from temporalio.client import WorkflowFailureError
 from temporalio.exceptions import ApplicationError
 
@@ -25,7 +25,11 @@ from astrolift_workflows.inputs import (
     ProvisionManagedServiceInput,
     UpdateManagedServiceInput,
 )
-from astrolift_workflows.managed_service_review import capture_reviewed_binding, reviewed_service_call
+from astrolift_workflows.managed_service_review import (
+    capture_reviewed_binding,
+    reviewed_service_call,
+    try_reviewed_service_receipt,
+)
 from astrolift_workflows.workflows.deprovision_managed_service import DeprovisionManagedServiceWorkflow
 from astrolift_workflows.workflows.provision_managed_service import ProvisionManagedServiceWorkflow
 from astrolift_workflows.workflows.update_managed_service import UpdateManagedServiceWorkflow
@@ -285,3 +289,188 @@ async def test_real_temporal_reviewed_provision_survives_its_own_status_and_bind
     assert _FakeAuroraLikeDriver.calls == ["provision", "binding"]
     await sync_to_async(service.refresh_from_db)()
     assert service.status == ManagedService.Status.ACTIVE
+
+
+@pytest.mark.parametrize(
+    "lock_target", ["worker", "organization", "team", "project", "cluster", "plugin", "service"]
+)
+def test_accepted_enqueue_returns_before_worker_or_parent_lock_is_released(world, monkeypatch, lock_target):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from django.db import close_old_connections
+
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+    from astrolift_identity.models import Organization, Project, Team
+
+    locked = threading.Event()
+    release = threading.Event()
+    lock_rows = {
+        "organization": (Organization, world.medops_project.organization_id),
+        "team": (Team, world.medops_project.team_id),
+        "project": (Project, world.medops_project.pk),
+        "cluster": (TenantCluster, world.cluster.pk),
+        "plugin": (ProviderPlugin, world.cluster.provider_plugin_id),
+        "service": (ManagedService, world.service.pk),
+    }
+
+    def hold_lock(binding):
+        close_old_connections()
+        try:
+
+            def provider_body(service_id):
+                locked.set()
+                assert release.wait(10)
+
+            if lock_target == "worker":
+                reviewed_service_call(provider_body, world.service.pk, binding)
+            else:
+                model, pk = lock_rows[lock_target]
+                with transaction.atomic():
+                    model.objects.select_for_update().get(pk=pk)
+                    provider_body(world.service.pk)
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        worker_futures = []
+
+        def start(*args, **kwargs):
+            worker_futures.append(executor.submit(hold_lock, kwargs["args"][0].reviewed_binding))
+            assert locked.wait(10)
+            return SimpleNamespace(enqueued=True, run_id="accepted-but-unconfirmed")
+
+        monkeypatch.setattr("astrolift_workflows.client.start_workflow", start)
+
+        def enqueue():
+            close_old_connections()
+            marker = reviewed_resource_dispatch.set(True)
+            try:
+                with transaction.atomic():
+                    _start_project_service_provision(make_info(world.user), world.service)
+            finally:
+                reviewed_resource_dispatch.reset(marker)
+                close_old_connections()
+
+        accepted = executor.submit(enqueue)
+        try:
+            accepted.result(timeout=5)
+            assert locked.is_set() and not release.is_set()
+            world.service.refresh_from_db()
+            assert world.service.operation_run_id == ""
+            assert world.service.status != ManagedService.Status.FAILED
+            assert world.service.operation_completed_at is None
+        finally:
+            release.set()
+        for future in worker_futures:
+            future.result(timeout=10)
+
+
+@pytest.mark.parametrize("changed", ["workflow", "started_at", "owner"])
+def test_accepted_enqueue_never_annotates_a_replaced_operation(world, monkeypatch, changed):
+    from django.utils import timezone
+
+    def start(*args, **kwargs):
+        replacement = {"operation_run_id": "newer-operation-run"}
+        if changed == "workflow":
+            replacement["operation_workflow_id"] = "newer-operation"
+        elif changed == "started_at":
+            replacement["operation_started_at"] = timezone.now()
+        else:
+            replacement["project_id"] = world.platform_project.pk
+        ManagedService.objects.filter(pk=world.service.pk).update(**replacement)
+        return SimpleNamespace(enqueued=True, run_id="old-operation-run")
+
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow", start)
+    marker = reviewed_resource_dispatch.set(True)
+    try:
+        with transaction.atomic():
+            _start_project_service_provision(make_info(world.user), world.service)
+    finally:
+        reviewed_resource_dispatch.reset(marker)
+    world.service.refresh_from_db()
+    assert world.service.operation_run_id == "newer-operation-run"
+    assert world.service.status != ManagedService.Status.FAILED
+    assert world.service.operation_completed_at is None
+
+
+def test_unexpected_receipt_failure_does_not_fabricate_dispatch_failure(world, monkeypatch):
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda *args, **kwargs: SimpleNamespace(enqueued=True, run_id="accepted-run"),
+    )
+
+    def broken_receipt(function, service_id, binding, *args):
+        def interrupted_annotation(current_id, *current_args):
+            function(current_id, *current_args)
+            raise RuntimeError("receipt annotation unavailable")
+
+        return try_reviewed_service_receipt(interrupted_annotation, service_id, binding, *args)
+
+    monkeypatch.setattr(
+        "astrolift_workflows.managed_service_review.try_reviewed_service_receipt", broken_receipt
+    )
+    marker = reviewed_resource_dispatch.set(True)
+    try:
+        with transaction.atomic():
+            _start_project_service_provision(make_info(world.user), world.service)
+    finally:
+        reviewed_resource_dispatch.reset(marker)
+    assert world.service.operation_run_id == ""
+    world.service.refresh_from_db()
+    assert world.service.operation_run_id == ""
+    assert world.service.status != ManagedService.Status.FAILED
+    assert world.service.operation_completed_at is None
+
+
+def test_unrelated_postgres_error_is_not_classified_as_receipt_contention(world):
+    from django.db import connection
+
+    def invalid_annotation(service_id):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT resource_receipt_missing_column_2207")
+
+    with pytest.raises(DatabaseError):
+        try_reviewed_service_receipt(
+            invalid_annotation, world.service.pk, capture_reviewed_binding(world.service.pk)
+        )
+    world.service.refresh_from_db()
+    assert world.service.operation_run_id == ""
+
+
+def test_engine_start_exception_still_records_a_genuine_enqueue_failure(world, monkeypatch):
+    def failed_start(*args, **kwargs):
+        raise RuntimeError("engine unavailable")
+
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow", failed_start)
+    marker = reviewed_resource_dispatch.set(True)
+    try:
+        with pytest.raises(RuntimeError, match="could not be enqueued"), transaction.atomic():
+            _start_project_service_provision(make_info(world.user), world.service)
+    finally:
+        reviewed_resource_dispatch.reset(marker)
+    world.service.refresh_from_db()
+    assert world.service.operation_run_id == ""
+    assert world.service.status == ManagedService.Status.FAILED
+    assert world.service.operation_completed_at is not None
+
+
+def test_failed_engine_start_never_marks_a_newer_operation_failed(world, monkeypatch):
+    def replaced_then_failed(*args, **kwargs):
+        ManagedService.objects.filter(pk=world.service.pk).update(
+            operation_workflow_id="replacement-workflow", operation_run_id="replacement-run"
+        )
+        raise RuntimeError("old engine start failed")
+
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow", replaced_then_failed)
+    marker = reviewed_resource_dispatch.set(True)
+    try:
+        with pytest.raises(ApplicationError, match="context changed"), transaction.atomic():
+            _start_project_service_provision(make_info(world.user), world.service)
+    finally:
+        reviewed_resource_dispatch.reset(marker)
+    world.service.refresh_from_db()
+    assert world.service.operation_workflow_id == "replacement-workflow"
+    assert world.service.operation_run_id == "replacement-run"
+    assert world.service.status != ManagedService.Status.FAILED
+    assert world.service.operation_completed_at is None

@@ -253,7 +253,11 @@ def _reviewed_enqueue(svc, workflow_name, payload, *, update=False):
     after commit remains visible as FAILED; no success/completion is inferred.
     """
     from astrolift_workflows.client import start_workflow
-    from astrolift_workflows.managed_service_review import capture_reviewed_binding, reviewed_service_call
+    from astrolift_workflows.managed_service_review import (
+        capture_reviewed_binding,
+        reviewed_service_call,
+        try_reviewed_service_receipt,
+    )
 
     if not update:
         svc.operation_kind = "deprovision" if workflow_name.startswith("Deprovision") else "provision"
@@ -283,7 +287,6 @@ def _reviewed_enqueue(svc, workflow_name, payload, *, update=False):
         current = ManagedService.objects.get(pk=service_id)
         current.operation_run_id = run_id
         current.save(update_fields=["operation_run_id", "updated_at", "version"])
-        svc.operation_run_id = run_id
 
     def record_failure(service_id):
         current = ManagedService.objects.get(pk=service_id)
@@ -311,11 +314,13 @@ def _reviewed_enqueue(svc, workflow_name, payload, *, update=False):
             raise RuntimeError("Managed-resource workflow could not be enqueued") from None
         # A fast completion/deletion or later owner change must not turn an
         # accepted engine start into a fabricated enqueue failure.
-        from temporalio.exceptions import ApplicationError
-
         try:
-            reviewed_service_call(record_receipt, service_pk, binding, str(handle.run_id or ""))
-        except ApplicationError:
+            run_id = str(handle.run_id or "")
+            if try_reviewed_service_receipt(record_receipt, service_pk, binding, run_id):
+                svc.operation_run_id = run_id
+        except Exception:
+            # Receipt metadata is optional; even an unexpected annotation error
+            # must not report a successfully accepted engine start as failed.
             pass
 
     transaction.on_commit(enqueue)
