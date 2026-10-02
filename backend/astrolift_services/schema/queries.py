@@ -46,6 +46,11 @@ from astrolift_services.models import (
     WorkloadIdentityGrant,
 )
 from astrolift_services.schema.cluster_models import ClusterModelsQuery
+from astrolift_services.schema.resource_reads import (
+    ManagedResourceReadsQuery,
+    check_context_revision,
+    context_row,
+)
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
     AppSecretType,
@@ -673,7 +678,7 @@ def _managed_services_qs(
 
 
 @strawberry.type
-class ServicesQuery(ClusterModelsQuery):
+class ServicesQuery(ClusterModelsQuery, ManagedResourceReadsQuery):
     @strawberry.field
     @require_permission(
         Permission.PROJECT_READ,
@@ -1225,11 +1230,13 @@ class ServicesQuery(ClusterModelsQuery):
         self,
         info: Info,
         managed_service_id: GUID,
+        expected_context_revision: str | None = None,
     ) -> ManagedServiceCostPreviewType | None:
         """Live-pricing preview for the resource's current desired state."""
-        service = _managed_service_for_caller(managed_service_id)
+        service = context_row(managed_service_id)
         if service is None:
             return None
+        check_context_revision(service, expected_context_revision)
         from astrolift_services.cost_preview import preview_managed_service_cost
 
         preview = preview_managed_service_cost(service)

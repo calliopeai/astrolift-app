@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 
@@ -64,15 +66,42 @@ def preview_managed_service_cost(service) -> ManagedServiceCostPreview:
     )
     try:
         result = estimator.estimate(request)
-    except Exception as exc:  # noqa: BLE001 - absence is a first-class response
-        return ManagedServiceCostPreview(False, reason="api_error", message=str(exc))
+    except Exception:  # noqa: BLE001 - provider diagnostics may contain request credentials
+        return ManagedServiceCostPreview(False, reason="api_error", message="the pricing API request failed")
     if isinstance(result, CostEstimateUnavailable):
-        return ManagedServiceCostPreview(False, reason=result.reason, message=result.message)
+        # Driver diagnostics can echo provider requests, including private config.
+        known_reasons = {"unsupported", "api_error", "sku_not_found", "no_pricing_api"}
+        reason = result.reason if result.reason in known_reasons else "pricing_unavailable"
+        return ManagedServiceCostPreview(
+            False, reason=reason, message="live pricing is unavailable for this resource"
+        )
     if not isinstance(result, CostEstimate):
         return ManagedServiceCostPreview(False, reason="unsupported", message="estimator returned no price")
+    try:
+        amount = float(result.monthly_total)
+        fetched_at = datetime.fromisoformat(result.pricing_fetched_at.replace("Z", "+00:00"))
+        valid = (
+            math.isfinite(amount)
+            and amount >= 0
+            and bool(result.currency.strip())
+            and bool(result.pricing_source_url.strip())
+            and fetched_at.tzinfo is not None
+            and all(
+                math.isfinite(float(item.monthly_amount))
+                and float(item.monthly_amount) >= 0
+                and bool(item.currency.strip())
+                for item in result.line_items
+            )
+        )
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        valid = False
+    if not valid:
+        return ManagedServiceCostPreview(
+            False, reason="incomplete_price", message="the pricing API returned incomplete price evidence"
+        )
     return ManagedServiceCostPreview(
         True,
-        monthly_total=float(result.monthly_total),
+        monthly_total=amount,
         currency=result.currency,
         line_items=tuple(
             {

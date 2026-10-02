@@ -3338,6 +3338,37 @@ type AstroliftManagedServiceAttachment {
   environmentName: String!
 }
 
+type AstroliftManagedServiceAttachmentContext {
+  id: GUID!
+  version: Int!
+  managedServiceId: GUID!
+  consumerKind: String!
+  consumerId: GUID!
+  consumerSlug: String!
+  registeredAppId: GUID
+  environmentId: GUID
+  environmentName: String!
+  clusterId: GUID!
+  createdAt: DateTime!
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftManagedServiceAttachmentContextPage {
+  items: [AstroliftManagedServiceAttachmentContext!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type AstroliftManagedServiceAttachmentMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
@@ -3382,6 +3413,52 @@ type AstroliftManagedServiceConnectionMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftManagedServiceConnection
+}
+
+type AstroliftManagedServiceContext {
+  id: GUID!
+  contextRevision: String!
+  version: Int!
+  name: String!
+  kind: String!
+  variant: String!
+  status: String!
+  ownerScope: String!
+  organizationId: GUID!
+  projectId: GUID
+  projectSlug: String!
+  registeredAppId: GUID
+  registeredAppSlug: String!
+  clusterId: GUID!
+  clusterSlug: String!
+  clusterVersion: Int!
+  environmentId: GUID
+  environmentName: String!
+  environmentVersion: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  operationKind: String!
+  operationWorkflowId: String!
+  operationRunId: String!
+  operationStartedAt: DateTime
+  operationCompletedAt: DateTime
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftManagedServiceContextPage {
+  items: [AstroliftManagedServiceContext!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 type AstroliftManagedServiceCostPreview {
@@ -8605,6 +8682,11 @@ type Query {
   clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
   clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
   clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
+  astroliftProjectManagedServicesPage(projectId: GUID!, search: String = null, name: String = null, kinds: [String!] = null, statuses: [String!] = null, environmentName: String = null, clusterId: GUID = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceContextPage!
+  astroliftProjectManagedService(projectId: GUID!, id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext
+  astroliftManagedService(id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext
+  astroliftProjectManagedServiceAttachmentsPage(projectId: GUID!, managedServiceId: GUID!, expectedContextRevision: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceAttachmentContextPage
+  astroliftManagedServiceAttachmentsPage(managedServiceId: GUID!, expectedContextRevision: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceAttachmentContextPage
   astroliftProjectResourceClusters(projectId: GUID!): [AstroliftTenantCluster!]!
   astroliftProjectManagedServiceCatalog(projectId: GUID!, clusterId: GUID!): [AstroliftManagedServiceCatalogEntry!]!
   astroliftModelEndpoints: [AstroliftManagedService!]!
@@ -8619,7 +8701,7 @@ type Query {
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]! @deprecated(reason: "Unbounded, and applies no ordering at all — row order is whatever Postgres returns. Use astroliftManagedServicesPage.")
   astroliftManagedServicesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServicePage!
-  astroliftManagedServiceCostPreview(managedServiceId: GUID!): AstroliftManagedServiceCostPreview
+  astroliftManagedServiceCostPreview(managedServiceId: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceCostPreview
   astroliftWorkloadIdentityGrants(appSlug: String!, environmentName: String = null, unappliedOnly: Boolean! = false): [AstroliftWorkloadIdentityGrant!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth
