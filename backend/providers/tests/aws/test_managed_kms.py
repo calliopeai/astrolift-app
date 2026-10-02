@@ -6,6 +6,7 @@ import base64
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import ClassVar
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import pytest
 from botocore.session import Session
@@ -13,6 +14,8 @@ from botocore.validate import validate_parameters
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from aws.managed.encryption_kms import KMSConfig, KMSDriver
+
+SERVICE_ID = "11111111-1111-4111-8111-111111111111"
 
 
 class NotFound(Exception):
@@ -59,6 +62,11 @@ class FakeKMS:
         }
 
     def seed_key(self, *, key_id: str = "key-1", tags: list[dict] | None = None, **metadata) -> dict:
+        try:
+            UUID(key_id)
+        except ValueError:
+            if not key_id.startswith("mrk-"):
+                key_id = str(uuid5(NAMESPACE_URL, key_id))
         row = self._metadata(key_id, **metadata)
         self.keys[key_id] = row
         self.tags[key_id] = list(tags or [])
@@ -76,7 +84,8 @@ class FakeKMS:
     def create_key(self, **kwargs):
         self._call("create_key", kwargs)
         self.seq += 1
-        key_id = f"key-{self.seq}"
+        identity = uuid5(NAMESPACE_URL, f"kms-fixture-{self.seq}")
+        key_id = "mrk-" + identity.hex if kwargs.get("MultiRegion") else str(identity)
         origin = kwargs.get("Origin", "AWS_KMS")
         metadata = self.seed_key(
             key_id=key_id,
@@ -171,7 +180,7 @@ class FakeKMS:
         key_id = self._key_id(kwargs["KeyId"])
         self.seq += 1
         item = {"GrantId": f"grant-{self.seq}", "GrantToken": f"token-{self.seq}", **kwargs}
-        item.pop("KeyId")
+        item["KeyId"] = self.keys[key_id]["Arn"]
         self.grants[key_id].append(item)
         return {"GrantId": item["GrantId"], "GrantToken": item["GrantToken"]}
 
@@ -223,7 +232,7 @@ class FakeKMS:
 
 
 def _config() -> KMSConfig:
-    return KMSConfig(region="us-east-1")
+    return KMSConfig(region="us-east-1", account_id="123456789012")
 
 
 def _spec(config: dict | None = None, *, hint: str = "data-key") -> ProvisionSpec:
@@ -239,8 +248,16 @@ def _spec(config: dict | None = None, *, hint: str = "data-key") -> ProvisionSpe
         size="small",
         config=config or {},
         binding_id="binding-1",
-        managed_service_id="service-1",
+        managed_service_id=SERVICE_ID,
     )
+
+
+def _update_spec(*args, **kwargs):
+    return UpdateSpec(*args, managed_service_id=SERVICE_ID, **kwargs)
+
+
+def _deprovision_spec(*args, **kwargs):
+    return DeprovisionSpec(*args, managed_service_id=SERVICE_ID, **kwargs)
 
 
 def _driver(*, client: FakeKMS | None = None, regional_clients: dict[str, FakeKMS] | None = None):
@@ -312,7 +329,7 @@ def test_immutable_key_changes_require_reprovision() -> None:
     driver, _ = _driver()
     created = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(created.handle, config={"key": {"KeySpec": "RSA_4096"}}),
+        _update_spec(created.handle, config={"key": {"KeySpec": "RSA_4096"}}),
     )
     assert not result.ok and "immutable" in result.message
 
@@ -333,7 +350,7 @@ def test_asymmetric_and_hmac_keys_reject_rotation_and_emit_appropriate_grants() 
     assert signing.iam_grants[0].actions == ["kms:DescribeKey", "kms:GetPublicKey", "kms:Sign", "kms:Verify"]
     assert "enable_key_rotation" not in client.names()
     rejected = driver.update(
-        UpdateSpec(
+        _update_spec(
             signed.handle,
             config={
                 "key": {"KeySpec": "RSA_3072", "KeyUsage": "SIGN_VERIFY"},
@@ -466,10 +483,10 @@ def test_grants_are_idempotent_updated_and_pruned_by_managed_name() -> None:
             },
         ],
     }
-    assert driver.update(UpdateSpec(first.handle, config=changed)).ok
+    assert driver.update(_update_spec(first.handle, config=changed)).ok
     assert client.names().count("revoke_grant") == 1
     assert client.names().count("create_grant") == 2
-    assert driver.update(UpdateSpec(first.handle, config={})).ok
+    assert driver.update(_update_spec(first.handle, config={})).ok
     assert client.grants[first.handle.split("/", 1)[1].rsplit("/", 1)[1]] == []
 
 
@@ -538,12 +555,12 @@ def test_foreign_alias_and_key_are_never_adopted() -> None:
     foreign = client.seed_key(key_id="foreign", tags=[])
     client.create_alias(AliasName="alias/shared", TargetKeyId=foreign["KeyId"])
     result = driver.provision(_spec({"alias": "shared"}))
-    assert not result.ok and "not owned" in result.message
+    assert not result.ok and "ownership" in result.message
 
     handle = f"encryption_key/{foreign['Arn']}"
-    update = driver.update(UpdateSpec(handle, config={}))
+    update = driver.update(_update_spec(handle, config={}))
     delete = driver.deprovision(
-        DeprovisionSpec(handle, {"deletion_protection": False}),
+        _deprovision_spec(handle, {"deletion_protection": False}),
         delete_data=True,
     )
     assert not update.ok and update.errors == ["resource_not_owned"]
@@ -553,14 +570,14 @@ def test_foreign_alias_and_key_are_never_adopted() -> None:
 def test_deletion_requires_both_guard_bypass_and_explicit_data_loss() -> None:
     driver, client = _driver()
     created = driver.provision(_spec())
-    protected = driver.deprovision(DeprovisionSpec(created.handle, {}), delete_data=True)
+    protected = driver.deprovision(_deprovision_spec(created.handle, {}), delete_data=True)
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     retained = driver.deprovision(
-        DeprovisionSpec(created.handle, {"deletion_protection": False}),
+        _deprovision_spec(created.handle, {"deletion_protection": False}),
     )
     assert not retained.ok and retained.errors == ["delete_data_required"]
     deleted = driver.deprovision(
-        DeprovisionSpec(created.handle, {"deletion_protection": False, "pending_window_days": 14}),
+        _deprovision_spec(created.handle, {"deletion_protection": False, "pending_window_days": 14}),
         delete_data=True,
     )
     assert deleted.ok
@@ -574,9 +591,9 @@ def test_pending_deletion_can_be_cancelled_only_explicitly() -> None:
     arn = created.handle.split("/", 1)[1]
     key_id = arn.rsplit("/", 1)[1]
     client.keys[key_id].update(KeyState="PendingDeletion", Enabled=False)
-    refused = driver.update(UpdateSpec(created.handle, config={}))
+    refused = driver.update(_update_spec(created.handle, config={}))
     assert not refused.ok and refused.errors == ["pending_deletion"]
-    recovered = driver.update(UpdateSpec(created.handle, config={"cancel_pending_deletion": True}))
+    recovered = driver.update(_update_spec(created.handle, config={"cancel_pending_deletion": True}))
     assert recovered.ok
     assert "cancel_key_deletion" in client.names()
     assert "enable_key" in client.names()
@@ -591,7 +608,7 @@ def test_multi_region_delete_schedules_replicas_before_primary() -> None:
         _spec({"multi_region": True, "replica_regions": ["us-west-2"]}),
     )
     deleted = driver.deprovision(
-        DeprovisionSpec(created.handle, {"deletion_protection": False}),
+        _deprovision_spec(created.handle, {"deletion_protection": False}),
         delete_data=True,
     )
     assert deleted.ok
@@ -668,6 +685,7 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
         region="us-west-2",
         provider_config={
             "kms_alias_name_prefix": "alias/platform",
+            "account_id": "123456789012",
             "kms_deletion_protection_default": False,
             "kms_pending_window_days_default": 21,
         },
@@ -675,6 +693,7 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
     )
     config = managed_config_for("aws", cluster, kind="encryption_key", variant="kms")
     assert config.region == "us-west-2"
+    assert config.account_id == "123456789012"
     assert config.alias_name_prefix == "alias/platform"
     assert config.deletion_protection_default is False
     assert config.pending_window_days_default == 21
@@ -685,9 +704,15 @@ def test_an_alias_on_another_services_key_is_not_adopted() -> None:
     import dataclasses
 
     driver, client = _driver()
-    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
-    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+    first = driver.provision(
+        dataclasses.replace(_spec({"alias": "alias/shared-native"}), managed_service_id=SERVICE_ID)
+    )
+    second = driver.provision(
+        dataclasses.replace(
+            _spec({"alias": "alias/shared-native"}), managed_service_id="22222222-2222-4222-8222-222222222222"
+        )
+    )
 
     assert first.ok, first.message
-    assert not second.ok and "refusing to adopt" in second.message
+    assert not second.ok and "ownership does not match" in second.message
     assert client.names().count("create_key") == 1
