@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+from types import SimpleNamespace
 
+import django_ratelimit.core as ratelimit_core
 import pytest
 from django.conf import settings
 from django.core.cache import cache
@@ -81,12 +83,23 @@ def test_main_transport_still_requires_authentication(client, settings):
     assert response.status_code == 403
 
 
-def test_discovery_remains_rate_limited_per_ip(client, settings):
+def test_discovery_remains_rate_limited_per_ip(client, settings, monkeypatch):
     settings.RATELIMIT_ENABLE = True
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "public-install-discovery-rate-test",
+        },
+    }
+    # Exercise the real limiter and HTTP transport in one fixed counter window.
+    # Runner speed must not let the 31st request fall into the next window.
+    now = [1_790_000_000]
+    monkeypatch.setattr(ratelimit_core, "time", SimpleNamespace(time=lambda: now[0]))
     cache.clear()
     responses = [_post(client, "{ __typename }", REMOTE_ADDR="192.0.2.240") for _ in range(31)]
     assert all(response.status_code == 200 for response in responses[:30])
     assert responses[-1].status_code == 429
+    assert _post(client, "{ __typename }", REMOTE_ADDR="192.0.2.241").status_code == 200
     auth_response = client.post(
         f"/{settings.BASE_URL}gql/config/auth/",
         data=json.dumps({"query": "{ __typename }"}),
@@ -95,3 +108,5 @@ def test_discovery_remains_rate_limited_per_ip(client, settings):
     )
     assert auth_response.status_code == 200
     assert not auth_response.json().get("errors")
+    now[0] += 61
+    assert _post(client, "{ __typename }", REMOTE_ADDR="192.0.2.240").status_code == 200

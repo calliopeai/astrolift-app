@@ -134,7 +134,15 @@ def _find_active_runs_in_group(pipeline: Pipeline, group: str, *, exclude_run: P
 
 
 def _cancel_runs(runs: list, *, reason: str) -> None:
-    from astrolift_pipelines.cancellation import cancel_pipeline_run
+    from astrolift_pipelines.run_contracts import PipelineContractError, request_pipeline_cancellation
 
     for run in runs:
-        cancel_pipeline_run(run, actor_display="concurrency-policy")
+        current = request_pipeline_cancellation(
+            run,
+            expected_version=run.version,
+            workflow_id=run.temporal_workflow_id,
+            temporal_run_id=run.temporal_run_id,
+            trusted_internal=True,
+        )
+        if current.cancellation_status == "uncertain":
+            raise PipelineContractError(current.cancellation_last_error)

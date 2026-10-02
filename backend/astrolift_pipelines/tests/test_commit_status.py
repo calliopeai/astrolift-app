@@ -499,8 +499,8 @@ def test_every_run_status_transition_posts_a_commit_status():
 def test_observed_cancellation_posts_commit_status_at_the_worker():
     """The fourth transition, pinned by name rather than by shape.
 
-    `cancel_pipeline_run` settles the run through the state machine, which
-    assigns from a variable, so the sweep above cannot see it. Without this
+    The worker settles observed cancellation through the state machine,
+    which assigns from a variable, so the sweep above cannot see it. Without this
     a cancelled run would leave a `pending` check on the commit forever --
     the worst of the four outcomes, because a branch-protection rule waits
     on it indefinitely.
@@ -510,8 +510,8 @@ def test_observed_cancellation_posts_commit_status_at_the_worker():
     )
 
     assert target is not None, (
-        "cancellation.cancel_pipeline_run is gone or renamed; this ratchet is "
-        "now blind. Point it at whatever cancels a run instead."
+        "The worker terminal-state writer is gone or renamed; point this "
+        "ratchet at the activity that records observed cancellation."
     )
     assert run_status_sites.calls_any(target, _POSTER_NAMES), (
         "the cancel service settles a run without posting a commit status, so "

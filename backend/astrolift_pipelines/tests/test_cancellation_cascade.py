@@ -11,9 +11,8 @@ import inspect
 import pytest
 
 from astrolift_identity.models import Organization
-from astrolift_pipelines.cancellation import cancel_pipeline_run
 from astrolift_pipelines.models import Job, JobRun, Pipeline, PipelineRun, Step, StepRun
-from astrolift_pipelines.run_contracts import PipelineContractError
+from astrolift_pipelines.run_contracts import PipelineContractError, request_pipeline_cancellation
 from astrolift_workflows.activities.pipeline_job_spawn import _mark_pipeline_run_failed_sync
 
 pytestmark = pytest.mark.django_db
@@ -32,7 +31,13 @@ def test_missing_exact_engine_identity_never_cascades(run_status, job_status):
     step = Step.objects.create(job=job, step_id="hold", position=0, run="sleep 30")
     step_run = StepRun.objects.create(job_run=job_run, step=step, status="running")
     with pytest.raises(PipelineContractError, match="engine execution"):
-        cancel_pipeline_run(run)
+        request_pipeline_cancellation(
+            run,
+            expected_version=run.version,
+            workflow_id=run.temporal_workflow_id,
+            temporal_run_id=run.temporal_run_id,
+            trusted_internal=True,
+        )
     run.refresh_from_db()
     job_run.refresh_from_db()
     step_run.refresh_from_db()
