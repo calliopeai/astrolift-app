@@ -1799,10 +1799,15 @@ class RegistryQuery:
         from core.scope_args import read_guid
 
         guid = read_guid({"id": workload_id}, "id")
-        if guid is None:
+        org_id = _caller_org_id()
+        if guid is None or org_id is None:
             return None
         workload = (
-            Workload.objects.filter(guid=guid, registered_app__in=live_app_rows(RegisteredApp.objects.all()))
+            Workload.objects.filter(
+                guid=guid,
+                registered_app__organization_id=org_id,
+                registered_app__in=live_app_rows(RegisteredApp.objects.all()),
+            )
             .select_related("registered_app__organization", "registered_app__project")
             .first()
         )
