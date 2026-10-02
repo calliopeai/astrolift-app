@@ -945,6 +945,97 @@
           "pulled": "Pulled the repo's workflow file. It's now the baseline.",
           "refreshed": "Drift re-checked — {state}."
         }
+      },
+      "ciSetup": {
+        "agentTitle": "Agent source delivery",
+        "agentDescription": "Agent pushes freeze an immutable package snapshot; they do not deploy a standing app or start a run. The next dispatch uses the latest successful snapshot and the image named by that package.",
+        "agentSyncTitle": "Push → package sync",
+        "agentSyncHint": "Signed source webhook · deploy branch only · exact manifest or opted-in federation bundle.",
+        "agentAutomatic": "Automatic on push",
+        "agentConfig": "Config and scripts",
+        "agentConfigHint": "Frozen from the selected chrooted source slice.",
+        "agentImage": "Container image",
+        "agentImageHint": "Published separately by the repo's image CI.",
+        "agentRuns": "Runs",
+        "agentRunsHint": "Never auto-started by a source push.",
+        "appHint": "Stable app identifier — embed in the deploy webhook payload so the platform routes correctly.",
+        "apiHint": "Public base URL of the Astrolift platform API. The deploy webhook is POSTed here.",
+        "tokenHint": "App-scoped bearer token. Shown once at mint time on the deploy-tokens page.",
+        "manageTokens": "Manage deploy tokens",
+        "yamlCopied": "Reference workflow YAML copied.",
+        "copyTextFailed": "Copy failed — select the text and copy manually.",
+        "title": "CI setup",
+        "description": "Review the app's CI secrets and workflow before syncing it to the source repository.",
+        "managedWorkflow": "Managed CI workflow",
+        "referenceWorkflow": "Reference GitHub Actions workflow",
+        "reviewBeforeSync": "Review before syncing",
+        "pasteInto": "paste into <path>.github/workflows/astrolift-ci.yml</path>",
+        "workflowUnavailable": "Workflow unavailable. Check the app's CI configuration and refresh its current workflow preview.",
+        "copyYaml": "Copy workflow YAML",
+        "pushRotate": "Push & rotate",
+        "rotateTitle": "Push CI secrets to the repo?",
+        "rotateDescription": "This rotates the deploy token. The old token will stop working immediately.",
+        "validateTitle": "Validate CI secrets",
+        "validateDescription": "Check what GitHub Actions actually sees today — no changes, just a read.",
+        "validate": "Validate",
+        "current": "current",
+        "stale": "set, stale",
+        "notSet": "not set",
+        "unknownDate": "Date unavailable",
+        "pushRotateDescription": "Seal and upload all five values to GitHub Actions secrets in one shot. Rotates the deploy token as part of the round-trip.",
+        "secretNameHint": "GitHub Actions secret name",
+        "open": "Open",
+        "valueCopied": "{name} copied.",
+        "copyValueFailed": "Copy failed — select the value and copy manually.",
+        "pending": "pending provisioning…",
+        "copy": "Copy",
+        "copied": "Copied",
+        "syncTitle": "Sync workflow file",
+        "syncDescription": "Commits the rendered <path>workflow file</path> to the deploy branch. Idempotent — re-clicks on an in-sync repo are a no-op.",
+        "webhookTitle": "Source webhook",
+        "installed": "installed · {relative}",
+        "notInstalled": "not installed",
+        "webhookDescription": "Registers the push-event webhook on the source repo pointing at the platform's receiver URL. Re-click to rotate the HMAC secret without spawning a duplicate hook.",
+        "refreshWebhook": "Refresh webhook",
+        "installWebhook": "Install webhook",
+        "providers": {
+          "aws": {
+            "pushHint": "IAM role the GitHub Actions runner assumes via OIDC to push images. Provisioned by Astrolift on cluster bootstrap.",
+            "registryHint": "Amazon ECR repository URI this app pushes to. Tag with the commit SHA per build."
+          },
+          "gcp": {
+            "pushHint": "Workload Identity Federation provider resource the runner authenticates against via OIDC. Provisioned by Astrolift on cluster bootstrap.",
+            "registryHint": "Google Artifact Registry path this app pushes to (e.g. us-docker.pkg.dev/PROJECT/REPO/app). Tag with the commit SHA per build."
+          },
+          "azure": {
+            "pushHint": "Entra ID application (client) id with a GitHub federated credential. The runner logs in via OIDC — no client secret stored. Provisioned by Astrolift on cluster bootstrap.",
+            "registryHint": "Azure Container Registry login server this app pushes to (e.g. myregistry.azurecr.io). Tag with the commit SHA per build."
+          },
+          "k8s_native": {
+            "pushHint": "Registry password or robot-account token used for docker login. Pair it with an ASTROLIFT_REGISTRY_USERNAME secret on the repo.",
+            "registryHint": "Container registry URI this app pushes to. Any OCI-compliant registry the cluster can pull from. Tag with the commit SHA per build."
+          }
+        },
+        "feedback": {
+          "pushFailed": "Couldn't push CI secrets.",
+          "pushed": "Pushed {count, plural, one {# secret} other {# secrets}} to {repo} — new token's last 4: {last4}",
+          "validateFailed": "Couldn't validate CI secrets.",
+          "validated": "All {count, plural, one {# secret is} other {# secrets are}} set and current on {repo}.",
+          "partiallyValidated": "Healthy secrets on {repo}: {healthy}/{total}.",
+          "syncFailed": "Couldn't sync the workflow file.",
+          "inSync": "Already up to date.",
+          "protectedPr": "Branch is protected — opened a PR.",
+          "viewPr": "View PR",
+          "created": "Created",
+          "updated": "Updated",
+          "syncedCommit": "{verb} {filename} (commit {commit}).",
+          "synced": "{verb} {filename}.",
+          "webhookFailed": "Couldn't install the source webhook.",
+          "installed": "Installed",
+          "refreshed": "Refreshed",
+          "webhookUrl": "{verb} push webhook → {url}",
+          "webhook": "{verb} push webhook."
+        }
       }
     },
     "wizard": {

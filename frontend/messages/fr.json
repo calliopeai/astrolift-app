@@ -2705,6 +2705,97 @@
           "pulled": "Le fichier du workflow a été importé depuis le dépôt. Il sert désormais de référence.",
           "refreshed": "Écarts vérifiés à nouveau : {state}."
         }
+      },
+      "ciSetup": {
+        "agentTitle": "Livraison du code de l’agent",
+        "agentDescription": "Les pushes de l’agent figent un instantané immuable du paquet ; ils ne déploient pas d’application permanente et ne lancent pas d’exécution. Le prochain lancement utilise le dernier instantané réussi et l’image indiquée dans ce paquet.",
+        "agentSyncTitle": "Push → synchronisation du paquet",
+        "agentSyncHint": "Webhook source signé · branche de déploiement uniquement · manifeste exact ou paquet fédéré activé explicitement.",
+        "agentAutomatic": "Automatique à chaque push",
+        "agentConfig": "Configuration et scripts",
+        "agentConfigHint": "Figés depuis la portion de code sélectionnée et isolée par chroot.",
+        "agentImage": "Image du conteneur",
+        "agentImageHint": "Publiée séparément par la CI d’images du dépôt.",
+        "agentRuns": "Exécutions",
+        "agentRunsHint": "Un push du code ne les lance jamais automatiquement.",
+        "appHint": "Identifiant stable de l’application : incluez-le dans le corps du webhook de déploiement pour que la plateforme le route correctement.",
+        "apiHint": "URL de base publique de l’API Astrolift. Le webhook de déploiement envoie un POST à cette adresse.",
+        "tokenHint": "Jeton bearer limité à l’application. Affiché une seule fois lors de sa création sur la page des jetons de déploiement.",
+        "manageTokens": "Gérer les jetons de déploiement",
+        "yamlCopied": "YAML du workflow de référence copié.",
+        "copyTextFailed": "Échec de la copie : sélectionnez le texte et copiez-le manuellement.",
+        "title": "Configuration CI",
+        "description": "Vérifiez les secrets CI et le workflow de l’application avant de les synchroniser avec le dépôt.",
+        "managedWorkflow": "Workflow CI géré",
+        "referenceWorkflow": "Workflow de référence GitHub Actions",
+        "reviewBeforeSync": "Vérifier avant de synchroniser",
+        "pasteInto": "coller dans <path>.github/workflows/astrolift-ci.yml</path>",
+        "workflowUnavailable": "Workflow indisponible. Vérifiez la configuration CI de l’application et actualisez l’aperçu du workflow actuel.",
+        "copyYaml": "Copier le YAML du workflow",
+        "pushRotate": "Envoyer et renouveler",
+        "rotateTitle": "Envoyer les secrets CI au dépôt ?",
+        "rotateDescription": "Cette action renouvelle le jeton de déploiement. L’ancien jeton cesse immédiatement de fonctionner.",
+        "validateTitle": "Valider les secrets CI",
+        "validateDescription": "Vérifiez ce que GitHub Actions voit actuellement : lecture seule, aucune modification.",
+        "validate": "Valider",
+        "current": "à jour",
+        "stale": "défini, obsolète",
+        "notSet": "non défini",
+        "unknownDate": "Date indisponible",
+        "pushRotateDescription": "Chiffre et envoie les cinq valeurs aux secrets GitHub Actions en une seule opération. Le jeton de déploiement est renouvelé pendant l’opération.",
+        "secretNameHint": "Nom du secret GitHub Actions",
+        "open": "Ouvrir",
+        "valueCopied": "{name} copié.",
+        "copyValueFailed": "Échec de la copie : sélectionnez la valeur et copiez-la manuellement.",
+        "pending": "provisionnement en attente…",
+        "copy": "Copier",
+        "copied": "Copié",
+        "syncTitle": "Synchroniser le fichier du workflow",
+        "syncDescription": "Enregistre le <path>fichier du workflow</path> généré sur la branche de déploiement. Opération idempotente : la répéter sur un dépôt synchronisé ne change rien.",
+        "webhookTitle": "Webhook source",
+        "installed": "installé · {relative}",
+        "notInstalled": "non installé",
+        "webhookDescription": "Enregistre le webhook de push du dépôt vers l’URL de réception de la plateforme. Répétez l’opération pour renouveler le secret HMAC sans créer de webhook supplémentaire.",
+        "refreshWebhook": "Actualiser le webhook",
+        "installWebhook": "Installer le webhook",
+        "providers": {
+          "aws": {
+            "pushHint": "Rôle IAM assumé par GitHub Actions via OIDC pour publier des images. Provisionné par Astrolift lors de l’initialisation du cluster.",
+            "registryHint": "URI du dépôt Amazon ECR vers lequel cette application publie ses images. Utilisez le SHA du commit comme tag pour chaque build."
+          },
+          "gcp": {
+            "pushHint": "Ressource du fournisseur Workload Identity Federation auprès de laquelle l’exécuteur s’authentifie via OIDC. Provisionnée par Astrolift lors de l’initialisation du cluster.",
+            "registryHint": "Chemin Google Artifact Registry vers lequel cette application publie ses images (par exemple us-docker.pkg.dev/PROJECT/REPO/app). Utilisez le SHA du commit comme tag pour chaque build."
+          },
+          "azure": {
+            "pushHint": "ID d’application (client) Entra ID avec une identité fédérée GitHub. L’exécuteur se connecte via OIDC, sans secret client stocké. Provisionné par Astrolift lors de l’initialisation du cluster.",
+            "registryHint": "Serveur de connexion Azure Container Registry vers lequel cette application publie ses images (par exemple myregistry.azurecr.io). Utilisez le SHA du commit comme tag pour chaque build."
+          },
+          "k8s_native": {
+            "pushHint": "Mot de passe du registre ou jeton de compte robot pour docker login. Ajoutez également le secret ASTROLIFT_REGISTRY_USERNAME au dépôt.",
+            "registryHint": "URI du registre de conteneurs vers lequel cette application publie ses images. Tout registre compatible OCI accessible au cluster convient. Utilisez le SHA du commit comme tag pour chaque build."
+          }
+        },
+        "feedback": {
+          "pushFailed": "Impossible d’envoyer les secrets CI.",
+          "pushed": "{count, plural, one {# secret envoyé} other {# secrets envoyés}} à {repo} ; quatre derniers caractères du nouveau jeton : {last4}",
+          "validateFailed": "Impossible de valider les secrets CI.",
+          "validated": "{count, plural, one {# secret est défini et à jour} other {Les # secrets sont définis et à jour}} sur {repo}.",
+          "partiallyValidated": "Secrets valides sur {repo} : {healthy}/{total}.",
+          "syncFailed": "Impossible de synchroniser le fichier du workflow.",
+          "inSync": "Déjà à jour.",
+          "protectedPr": "La branche est protégée : une PR a été ouverte.",
+          "viewPr": "Voir la PR",
+          "created": "Créé",
+          "updated": "Mis à jour",
+          "syncedCommit": "{verb} : {filename} (commit {commit}).",
+          "synced": "{verb} : {filename}.",
+          "webhookFailed": "Impossible d’installer le webhook source.",
+          "installed": "Installé",
+          "refreshed": "Actualisé",
+          "webhookUrl": "{verb} : webhook de push → {url}",
+          "webhook": "{verb} : webhook de push."
+        }
       }
     },
     "frame": {

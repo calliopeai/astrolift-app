@@ -2705,6 +2705,97 @@
           "pulled": "저장소의 워크플로 파일을 가져왔습니다. 이제 이 파일이 기준입니다.",
           "refreshed": "차이를 다시 확인했습니다: {state}."
         }
+      },
+      "ciSetup": {
+        "agentTitle": "에이전트 소스 전달",
+        "agentDescription": "에이전트 푸시는 변경되지 않는 패키지 스냅샷을 고정합니다. 상시 실행 앱을 배포하거나 실행을 시작하지는 않습니다. 다음 요청은 마지막으로 성공한 스냅샷과 해당 패키지에 지정된 이미지를 사용합니다.",
+        "agentSyncTitle": "푸시 → 패키지 동기화",
+        "agentSyncHint": "서명된 소스 웹훅 · 배포 브랜치만 · 정확한 매니페스트 또는 명시적으로 활성화한 페더레이션 번들.",
+        "agentAutomatic": "푸시할 때 자동 실행",
+        "agentConfig": "설정과 스크립트",
+        "agentConfigHint": "선택한 chroot 소스 범위에서 고정합니다.",
+        "agentImage": "컨테이너 이미지",
+        "agentImageHint": "저장소의 이미지 CI에서 별도로 게시합니다.",
+        "agentRuns": "실행",
+        "agentRunsHint": "소스 푸시로 자동 시작되지 않습니다.",
+        "appHint": "앱의 고정 식별자입니다. 플랫폼이 올바르게 전달하도록 배포 웹훅 본문에 포함하세요.",
+        "apiHint": "Astrolift API의 공개 기본 URL입니다. 배포 웹훅은 이 주소로 POST를 보냅니다.",
+        "tokenHint": "앱으로 범위가 제한된 Bearer 토큰입니다. 배포 토큰 페이지에서 생성할 때 한 번만 표시됩니다.",
+        "manageTokens": "배포 토큰 관리",
+        "yamlCopied": "참조 워크플로 YAML을 복사했습니다.",
+        "copyTextFailed": "복사하지 못했습니다. 텍스트를 선택하여 직접 복사하세요.",
+        "title": "CI 설정",
+        "description": "소스 저장소에 동기화하기 전에 앱의 CI 시크릿과 워크플로를 검토하세요.",
+        "managedWorkflow": "관리형 CI 워크플로",
+        "referenceWorkflow": "GitHub Actions 참조 워크플로",
+        "reviewBeforeSync": "동기화 전에 검토",
+        "pasteInto": "<path>.github/workflows/astrolift-ci.yml</path>에 붙여넣기",
+        "workflowUnavailable": "워크플로를 사용할 수 없습니다. 앱의 CI 설정을 확인하고 현재 워크플로 미리보기를 새로고침하세요.",
+        "copyYaml": "워크플로 YAML 복사",
+        "pushRotate": "전송 및 교체",
+        "rotateTitle": "CI 시크릿을 저장소에 전송할까요?",
+        "rotateDescription": "배포 토큰이 교체됩니다. 이전 토큰은 즉시 사용할 수 없게 됩니다.",
+        "validateTitle": "CI 시크릿 검증",
+        "validateDescription": "GitHub Actions에서 현재 확인되는 값을 검사합니다. 읽기만 하며 변경하지 않습니다.",
+        "validate": "검증",
+        "current": "최신",
+        "stale": "설정됨, 오래됨",
+        "notSet": "설정되지 않음",
+        "unknownDate": "날짜를 확인할 수 없음",
+        "pushRotateDescription": "다섯 값을 암호화하여 GitHub Actions 시크릿에 한 번에 전송합니다. 이 작업 중에 배포 토큰도 교체됩니다.",
+        "secretNameHint": "GitHub Actions 시크릿 이름",
+        "open": "열기",
+        "valueCopied": "{name}을(를) 복사했습니다.",
+        "copyValueFailed": "복사하지 못했습니다. 값을 선택하여 직접 복사하세요.",
+        "pending": "프로비저닝 대기 중…",
+        "copy": "복사",
+        "copied": "복사됨",
+        "syncTitle": "워크플로 파일 동기화",
+        "syncDescription": "생성된 <path>워크플로 파일</path>을 배포 브랜치에 커밋합니다. 같은 작업을 반복해도 동기화된 저장소는 변경되지 않습니다.",
+        "webhookTitle": "소스 웹훅",
+        "installed": "설치됨 · {relative}",
+        "notInstalled": "설치되지 않음",
+        "webhookDescription": "소스 저장소의 푸시 웹훅이 플랫폼 수신 URL을 가리키도록 등록합니다. 다시 실행하면 웹훅을 중복 생성하지 않고 HMAC 시크릿을 교체합니다.",
+        "refreshWebhook": "웹훅 새로고침",
+        "installWebhook": "웹훅 설치",
+        "providers": {
+          "aws": {
+            "pushHint": "GitHub Actions 실행기가 OIDC를 통해 맡아 이미지 게시에 사용하는 IAM 역할입니다. 클러스터 초기 설정 시 Astrolift가 프로비저닝합니다.",
+            "registryHint": "이 앱이 이미지를 게시하는 Amazon ECR 저장소 URI입니다. 빌드마다 커밋 SHA를 태그로 사용하세요."
+          },
+          "gcp": {
+            "pushHint": "실행기가 OIDC로 인증하는 Workload Identity Federation 공급자 리소스입니다. 클러스터 초기 설정 시 Astrolift가 프로비저닝합니다.",
+            "registryHint": "이 앱이 이미지를 게시하는 Google Artifact Registry 경로입니다(예: us-docker.pkg.dev/PROJECT/REPO/app). 빌드마다 커밋 SHA를 태그로 사용하세요."
+          },
+          "azure": {
+            "pushHint": "GitHub 페더레이션 자격 증명이 있는 Entra ID 애플리케이션 ID(클라이언트 ID)입니다. 실행기는 OIDC로 로그인하므로 클라이언트 시크릿을 저장하지 않습니다. 클러스터 초기 설정 시 Astrolift가 프로비저닝합니다.",
+            "registryHint": "이 앱이 이미지를 게시하는 Azure Container Registry 로그인 서버입니다(예: myregistry.azurecr.io). 빌드마다 커밋 SHA를 태그로 사용하세요."
+          },
+          "k8s_native": {
+            "pushHint": "docker login에 사용하는 레지스트리 비밀번호 또는 로봇 계정 토큰입니다. 저장소의 ASTROLIFT_REGISTRY_USERNAME 시크릿과 함께 사용하세요.",
+            "registryHint": "이 앱이 이미지를 게시하는 컨테이너 레지스트리 URI입니다. 클러스터에서 이미지를 가져올 수 있는 OCI 호환 레지스트리를 사용할 수 있습니다. 빌드마다 커밋 SHA를 태그로 사용하세요."
+          }
+        },
+        "feedback": {
+          "pushFailed": "CI 시크릿을 전송할 수 없습니다.",
+          "pushed": "{repo}에 시크릿 {count}개를 전송했습니다. 새 토큰의 마지막 네 문자: {last4}",
+          "validateFailed": "CI 시크릿을 검증할 수 없습니다.",
+          "validated": "{repo}의 시크릿 {count}개가 모두 설정되었으며 최신입니다.",
+          "partiallyValidated": "{repo}의 유효한 시크릿: {healthy}/{total}.",
+          "syncFailed": "워크플로 파일을 동기화할 수 없습니다.",
+          "inSync": "이미 최신입니다.",
+          "protectedPr": "브랜치가 보호되어 있어 PR을 열었습니다.",
+          "viewPr": "PR 보기",
+          "created": "생성됨",
+          "updated": "업데이트됨",
+          "syncedCommit": "{verb}: {filename}(커밋 {commit}).",
+          "synced": "{verb}: {filename}.",
+          "webhookFailed": "소스 웹훅을 설치할 수 없습니다.",
+          "installed": "설치됨",
+          "refreshed": "새로고침됨",
+          "webhookUrl": "{verb}: 푸시 웹훅 → {url}",
+          "webhook": "{verb}: 푸시 웹훅."
+        }
       }
     },
     "frame": {

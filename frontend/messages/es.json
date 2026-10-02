@@ -2705,6 +2705,97 @@
           "pulled": "Se trajo el archivo del flujo del repositorio. Ahora es la base.",
           "refreshed": "Cambios comprobados de nuevo: {state}."
         }
+      },
+      "ciSetup": {
+        "agentTitle": "Entrega del código del agente",
+        "agentDescription": "Los pushes del agente fijan una instantánea inmutable del paquete; no despliegan una aplicación permanente ni inician una ejecución. El siguiente envío usa la última instantánea correcta y la imagen indicada por ese paquete.",
+        "agentSyncTitle": "Push → sincronización del paquete",
+        "agentSyncHint": "Webhook de origen firmado · solo la rama de despliegue · manifiesto exacto o paquete federado habilitado explícitamente.",
+        "agentAutomatic": "Automático con cada push",
+        "agentConfig": "Configuración y scripts",
+        "agentConfigHint": "Fijados a partir de la sección de código seleccionada y aislada mediante chroot.",
+        "agentImage": "Imagen del contenedor",
+        "agentImageHint": "Publicada por separado por el CI de imágenes del repositorio.",
+        "agentRuns": "Ejecuciones",
+        "agentRunsHint": "Un push del código nunca las inicia automáticamente.",
+        "appHint": "Identificador estable de la aplicación: inclúyelo en el cuerpo del webhook de despliegue para que la plataforma lo dirija correctamente.",
+        "apiHint": "URL base pública de la API de Astrolift. El webhook de despliegue envía un POST a esta dirección.",
+        "tokenHint": "Token bearer limitado a la aplicación. Se muestra una sola vez al crearlo en la página de tokens de despliegue.",
+        "manageTokens": "Gestionar tokens de despliegue",
+        "yamlCopied": "YAML del flujo de referencia copiado.",
+        "copyTextFailed": "No se pudo copiar: selecciona el texto y cópialo manualmente.",
+        "title": "Configuración de CI",
+        "description": "Revisa los secretos de CI y el flujo de la aplicación antes de sincronizarlos con el repositorio.",
+        "managedWorkflow": "Flujo de CI administrado",
+        "referenceWorkflow": "Flujo de referencia de GitHub Actions",
+        "reviewBeforeSync": "Revisar antes de sincronizar",
+        "pasteInto": "pegar en <path>.github/workflows/astrolift-ci.yml</path>",
+        "workflowUnavailable": "Flujo no disponible. Revisa la configuración de CI de la aplicación y actualiza la vista previa del flujo actual.",
+        "copyYaml": "Copiar YAML del flujo",
+        "pushRotate": "Enviar y rotar",
+        "rotateTitle": "¿Enviar los secretos de CI al repositorio?",
+        "rotateDescription": "Se rotará el token de despliegue. El token anterior dejará de funcionar inmediatamente.",
+        "validateTitle": "Validar secretos de CI",
+        "validateDescription": "Comprueba lo que GitHub Actions ve actualmente: solo se lee, no se cambia nada.",
+        "validate": "Validar",
+        "current": "actualizado",
+        "stale": "configurado, desactualizado",
+        "notSet": "sin configurar",
+        "unknownDate": "Fecha no disponible",
+        "pushRotateDescription": "Cifra y envía los cinco valores a los secretos de GitHub Actions en una sola operación. El token de despliegue se rota durante la operación.",
+        "secretNameHint": "Nombre del secreto de GitHub Actions",
+        "open": "Abrir",
+        "valueCopied": "{name} copiado.",
+        "copyValueFailed": "No se pudo copiar: selecciona el valor y cópialo manualmente.",
+        "pending": "aprovisionamiento pendiente…",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "syncTitle": "Sincronizar archivo del flujo",
+        "syncDescription": "Guarda el <path>archivo del flujo</path> generado en la rama de despliegue. La operación es idempotente: repetirla cuando el repositorio está sincronizado no cambia nada.",
+        "webhookTitle": "Webhook de origen",
+        "installed": "instalado · {relative}",
+        "notInstalled": "no instalado",
+        "webhookDescription": "Registra el webhook de push en el repositorio para que apunte a la URL receptora de la plataforma. Repite la operación para rotar el secreto HMAC sin crear otro webhook.",
+        "refreshWebhook": "Actualizar webhook",
+        "installWebhook": "Instalar webhook",
+        "providers": {
+          "aws": {
+            "pushHint": "Rol de IAM que GitHub Actions asume mediante OIDC para publicar imágenes. Astrolift lo aprovisiona al inicializar el clúster.",
+            "registryHint": "URI del repositorio de Amazon ECR al que esta aplicación publica imágenes. Usa el SHA del commit como etiqueta en cada compilación."
+          },
+          "gcp": {
+            "pushHint": "Recurso del proveedor de Workload Identity Federation con el que el ejecutor se autentica mediante OIDC. Astrolift lo aprovisiona al inicializar el clúster.",
+            "registryHint": "Ruta de Google Artifact Registry a la que esta aplicación publica imágenes (por ejemplo, us-docker.pkg.dev/PROJECT/REPO/app). Usa el SHA del commit como etiqueta en cada compilación."
+          },
+          "azure": {
+            "pushHint": "ID de aplicación (cliente) de Entra ID con una credencial federada de GitHub. El ejecutor inicia sesión mediante OIDC, sin almacenar un secreto de cliente. Astrolift lo aprovisiona al inicializar el clúster.",
+            "registryHint": "Servidor de inicio de sesión de Azure Container Registry al que esta aplicación publica imágenes (por ejemplo, myregistry.azurecr.io). Usa el SHA del commit como etiqueta en cada compilación."
+          },
+          "k8s_native": {
+            "pushHint": "Contraseña del registro o token de una cuenta robot para docker login. Añade también el secreto ASTROLIFT_REGISTRY_USERNAME al repositorio.",
+            "registryHint": "URI del registro de contenedores al que esta aplicación publica imágenes. Puede ser cualquier registro compatible con OCI al que el clúster tenga acceso. Usa el SHA del commit como etiqueta en cada compilación."
+          }
+        },
+        "feedback": {
+          "pushFailed": "No se pudieron enviar los secretos de CI.",
+          "pushed": "Se enviaron {count, plural, one {# secreto} other {# secretos}} a {repo}; últimos cuatro caracteres del nuevo token: {last4}",
+          "validateFailed": "No se pudieron validar los secretos de CI.",
+          "validated": "{count, plural, one {# secreto está configurado y actualizado} other {Los # secretos están configurados y actualizados}} en {repo}.",
+          "partiallyValidated": "Secretos válidos en {repo}: {healthy}/{total}.",
+          "syncFailed": "No se pudo sincronizar el archivo del flujo.",
+          "inSync": "Ya está actualizado.",
+          "protectedPr": "La rama está protegida: se abrió un PR.",
+          "viewPr": "Ver PR",
+          "created": "Creado",
+          "updated": "Actualizado",
+          "syncedCommit": "{verb} el archivo {filename} (commit {commit}).",
+          "synced": "{verb} el archivo {filename}.",
+          "webhookFailed": "No se pudo instalar el webhook de origen.",
+          "installed": "Instalado",
+          "refreshed": "Actualizado",
+          "webhookUrl": "{verb} webhook de push → {url}",
+          "webhook": "{verb} webhook de push."
+        }
       }
     },
     "frame": {

@@ -2705,6 +2705,97 @@
           "pulled": "リポジトリのワークフローファイルを取り込みました。これが新しい基準になります。",
           "refreshed": "差分を再確認しました: {state}。"
         }
+      },
+      "ciSetup": {
+        "agentTitle": "エージェントのソース配信",
+        "agentDescription": "エージェントのプッシュでは、変更されないパッケージのスナップショットを保存します。常駐アプリのデプロイや実行の開始は行いません。次の起動では、最後に成功したスナップショットと、そのパッケージに指定されたイメージを使用します。",
+        "agentSyncTitle": "プッシュ → パッケージの同期",
+        "agentSyncHint": "署名付きソース Webhook · デプロイブランチのみ · 指定のマニフェストまたは明示的に有効化したフェデレーションバンドル。",
+        "agentAutomatic": "プッシュ時に自動実行",
+        "agentConfig": "設定とスクリプト",
+        "agentConfigHint": "選択した chroot 内のソース範囲から固定します。",
+        "agentImage": "コンテナイメージ",
+        "agentImageHint": "リポジトリのイメージ CI から別途公開します。",
+        "agentRuns": "実行",
+        "agentRunsHint": "ソースのプッシュでは自動的に開始しません。",
+        "appHint": "アプリの固定識別子です。プラットフォームが正しく振り分けられるよう、デプロイ Webhook の本文に含めてください。",
+        "apiHint": "Astrolift API の公開ベース URL です。デプロイ Webhook はここに POST を送信します。",
+        "tokenHint": "アプリに限定された Bearer トークンです。デプロイトークンのページで作成時に一度だけ表示されます。",
+        "manageTokens": "デプロイトークンを管理",
+        "yamlCopied": "参照ワークフローの YAML をコピーしました。",
+        "copyTextFailed": "コピーできませんでした。テキストを選択して手動でコピーしてください。",
+        "title": "CI の設定",
+        "description": "ソースリポジトリへ同期する前に、アプリの CI シークレットとワークフローを確認してください。",
+        "managedWorkflow": "管理対象の CI ワークフロー",
+        "referenceWorkflow": "GitHub Actions の参照ワークフロー",
+        "reviewBeforeSync": "同期する前に確認",
+        "pasteInto": "<path>.github/workflows/astrolift-ci.yml</path> に貼り付け",
+        "workflowUnavailable": "ワークフローを表示できません。アプリの CI 設定を確認し、現在のワークフローのプレビューを更新してください。",
+        "copyYaml": "ワークフローの YAML をコピー",
+        "pushRotate": "送信して更新",
+        "rotateTitle": "CI シークレットをリポジトリに送信しますか？",
+        "rotateDescription": "デプロイトークンが更新されます。以前のトークンは直ちに使えなくなります。",
+        "validateTitle": "CI シークレットを検証",
+        "validateDescription": "GitHub Actions が現在参照している値を確認します。読み取りのみで、変更は行いません。",
+        "validate": "検証",
+        "current": "最新",
+        "stale": "設定済み・古い",
+        "notSet": "未設定",
+        "unknownDate": "日付を確認できません",
+        "pushRotateDescription": "5 つの値を暗号化し、GitHub Actions のシークレットにまとめて送信します。この操作でデプロイトークンも更新されます。",
+        "secretNameHint": "GitHub Actions のシークレット名",
+        "open": "開く",
+        "valueCopied": "{name} をコピーしました。",
+        "copyValueFailed": "コピーできませんでした。値を選択して手動でコピーしてください。",
+        "pending": "プロビジョニング待ち…",
+        "copy": "コピー",
+        "copied": "コピー済み",
+        "syncTitle": "ワークフローファイルを同期",
+        "syncDescription": "生成した <path>ワークフローファイル</path>をデプロイブランチにコミットします。同じ操作を繰り返しても、同期済みのリポジトリには変更を加えません。",
+        "webhookTitle": "ソース Webhook",
+        "installed": "設定済み · {relative}",
+        "notInstalled": "未設定",
+        "webhookDescription": "ソースリポジトリのプッシュ Webhook を、プラットフォームの受信 URL に向けて登録します。再実行すると Webhook を重複作成せずに HMAC シークレットを更新します。",
+        "refreshWebhook": "Webhook を更新",
+        "installWebhook": "Webhook を設定",
+        "providers": {
+          "aws": {
+            "pushHint": "GitHub Actions のランナーが OIDC 経由で引き受け、イメージの公開に使用する IAM ロールです。クラスターの初期設定時に Astrolift が作成します。",
+            "registryHint": "このアプリがイメージを公開する Amazon ECR リポジトリの URI です。ビルドごとにコミット SHA をタグとして使用してください。"
+          },
+          "gcp": {
+            "pushHint": "ランナーが OIDC で認証する Workload Identity Federation プロバイダーのリソースです。クラスターの初期設定時に Astrolift が作成します。",
+            "registryHint": "このアプリがイメージを公開する Google Artifact Registry のパスです（例: us-docker.pkg.dev/PROJECT/REPO/app）。ビルドごとにコミット SHA をタグとして使用してください。"
+          },
+          "azure": {
+            "pushHint": "GitHub のフェデレーション資格情報を持つ Entra ID のアプリケーション ID（クライアント ID）です。ランナーは OIDC でログインするため、クライアントシークレットは保存しません。クラスターの初期設定時に Astrolift が作成します。",
+            "registryHint": "このアプリがイメージを公開する Azure Container Registry のログインサーバーです（例: myregistry.azurecr.io）。ビルドごとにコミット SHA をタグとして使用してください。"
+          },
+          "k8s_native": {
+            "pushHint": "docker login に使うレジストリのパスワードまたはロボットアカウントのトークンです。リポジトリの ASTROLIFT_REGISTRY_USERNAME シークレットと組み合わせてください。",
+            "registryHint": "このアプリがイメージを公開するコンテナレジストリの URI です。クラスターがイメージを取得できる OCI 準拠のレジストリを指定できます。ビルドごとにコミット SHA をタグとして使用してください。"
+          }
+        },
+        "feedback": {
+          "pushFailed": "CI シークレットを送信できませんでした。",
+          "pushed": "{repo} にシークレットを {count} 件送信しました。新しいトークンの末尾 4 文字: {last4}",
+          "validateFailed": "CI シークレットを検証できませんでした。",
+          "validated": "{repo} のシークレット {count} 件はすべて設定済みで、最新です。",
+          "partiallyValidated": "{repo} の有効なシークレット: {healthy}/{total}。",
+          "syncFailed": "ワークフローファイルを同期できませんでした。",
+          "inSync": "すでに最新です。",
+          "protectedPr": "ブランチが保護されているため、PR を開きました。",
+          "viewPr": "PR を表示",
+          "created": "作成済み",
+          "updated": "更新済み",
+          "syncedCommit": "{verb}: {filename}（コミット {commit}）。",
+          "synced": "{verb}: {filename}。",
+          "webhookFailed": "ソース Webhook を設定できませんでした。",
+          "installed": "設定済み",
+          "refreshed": "更新済み",
+          "webhookUrl": "{verb}: プッシュ Webhook → {url}",
+          "webhook": "{verb}: プッシュ Webhook。"
+        }
       }
     },
     "frame": {
