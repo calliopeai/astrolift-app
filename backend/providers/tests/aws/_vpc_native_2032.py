@@ -71,7 +71,7 @@ def native_vpc():
     original = VPCs.create_vpc_endpoint
 
     def capture_native_target(response):
-        # Moto6 drops three documented request/response fields. Preserve them
+        # Moto5.2.2 drops three documented request/response fields. Preserve them
         # on its real native model; IDs, tags, VPCs, ENIs and effects remain Moto.
         # This does not attest PrivateLink/RAM authorization or connectivity.
         result = original(response)
