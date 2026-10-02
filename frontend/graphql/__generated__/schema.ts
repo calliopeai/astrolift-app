@@ -5831,6 +5831,7 @@ export type AstroliftZentinelleDisconnectMutationResult = {
 export type AttachProjectManagedServiceInput = {
   agentEnvironmentSpecSlug: InputMaybe<Scalars['String']['input']>;
   appEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['GUID']['input'];
 };
 
@@ -6520,6 +6521,7 @@ export type DeprovisionClusterModelInput = {
 
 export type DeprovisionManagedServiceInput = {
   deleteData: Scalars['Boolean']['input'];
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   forceDestroy: Scalars['Boolean']['input'];
   id: Scalars['GUID']['input'];
 };
@@ -6533,6 +6535,8 @@ export type DeregisterAppInput = {
 
 export type DetachProjectManagedServiceInput = {
   attachmentId: Scalars['GUID']['input'];
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
+  managedServiceId: InputMaybe<Scalars['GUID']['input']>;
 };
 
 export type DetachSecretBundleInput = {
@@ -12456,6 +12460,7 @@ export type RemoveOrganizationAllowlistDomainInput = {
 };
 
 export type ReprovisionManagedServiceInput = {
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['GUID']['input'];
 };
 
@@ -13201,6 +13206,7 @@ export type UpdateManagedDomainInput = {
 
 export type UpdateManagedServiceInput = {
   config: InputMaybe<Scalars['JSON']['input']>;
+  expectedContextRevision: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   name: InputMaybe<Scalars['String']['input']>;
 };

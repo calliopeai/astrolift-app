@@ -6224,6 +6224,7 @@ type AstroliftZentinelleDisconnectMutationResult {
 
 input AttachProjectManagedServiceInput {
   managedServiceId: GUID!
+  expectedContextRevision: String = null
   agentEnvironmentSpecSlug: String = null
   appEnvironmentId: GUID = null
 }
@@ -6939,6 +6940,7 @@ input DeprovisionManagedServiceInput {
   id: GUID!
   deleteData: Boolean! = false
   forceDestroy: Boolean! = false
+  expectedContextRevision: String = null
 }
 
 input DeregisterAppInput {
@@ -6950,6 +6952,8 @@ input DeregisterAppInput {
 
 input DetachProjectManagedServiceInput {
   attachmentId: GUID!
+  managedServiceId: GUID = null
+  expectedContextRevision: String = null
 }
 
 input DetachSecretBundleInput {
@@ -9051,6 +9055,7 @@ input RemoveOrganizationAllowlistDomainInput {
 
 input ReprovisionManagedServiceInput {
   managedServiceId: GUID!
+  expectedContextRevision: String = null
 }
 
 input RequestAttestationChallengeInput {
@@ -9768,6 +9773,7 @@ input UpdateManagedDomainInput {
 
 input UpdateManagedServiceInput {
   id: GUID!
+  expectedContextRevision: String = null
   config: JSON = null
   name: String = null
 }

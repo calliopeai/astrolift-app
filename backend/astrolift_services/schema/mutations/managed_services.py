@@ -51,6 +51,7 @@ from astrolift_services.schema.mutations.types import (
     _ManagedResourceAdoptionPayload,
     _ManagedServiceDeletedPayload,
 )
+from astrolift_services.schema.resource_actions import reviewed_resource_action
 from astrolift_services.schema.types import (
     ManagedServiceAttachmentType,
     ManagedServiceConnectionKeyType,
@@ -497,6 +498,7 @@ class ManagedServiceMutations:
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
+    @reviewed_resource_action("managed_service_id")
     def attach_project_managed_service(
         self,
         info: Info,
@@ -578,6 +580,7 @@ class ManagedServiceMutations:
         operation=_attachment_operation,
     )
     @tenant_scoped()
+    @reviewed_resource_action("attachment_id", attachment=True)
     def detach_project_managed_service(
         self,
         info: Info,
@@ -614,6 +617,7 @@ class ManagedServiceMutations:
         operation=managed_service_operation("input.id"),
     )
     @tenant_scoped()
+    @reviewed_resource_action("id")
     def update_project_managed_service(
         self,
         info: Info,
@@ -701,6 +705,7 @@ class ManagedServiceMutations:
         operation=managed_service_operation("input.managed_service_id"),
     )
     @tenant_scoped()
+    @reviewed_resource_action("managed_service_id")
     def reprovision_project_managed_service(
         self,
         info: Info,
@@ -731,6 +736,7 @@ class ManagedServiceMutations:
         operation=managed_service_operation("input.id"),
     )
     @tenant_scoped()
+    @reviewed_resource_action("id")
     def deprovision_project_managed_service(
         self,
         info: Info,
