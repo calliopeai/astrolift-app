@@ -99,9 +99,20 @@ describe("translated global previews", () => {
     }
   );
 
-  it("formats German resources and USD while preserving driver caveats and the actual failed-preview logs route", () => {
+  it("formats German resources and USD while preserving caveats and loading the exact failed-preview logs", () => {
     const onError = vi.fn();
-    const preview = PREVIEWS[3];
+    const preview = {
+      ...PREVIEWS[3],
+      environmentStatus: "available",
+      environment: {
+        ...PREVIEWS[0].environment!,
+        previewId: PREVIEWS[3].id,
+        previewVersion: PREVIEWS[3].version,
+        appSlug: PREVIEWS[3].registeredAppSlug,
+        namespace: PREVIEWS[3].namespace,
+      },
+    };
+    const onLoadLogs = vi.fn();
     render(
       <NextIntlClientProvider
         locale="de"
@@ -111,7 +122,7 @@ describe("translated global previews", () => {
         onError={onError}
       >
         <TooltipProvider>
-          <PreviewDetailScreen {...previewDetailProps({ preview })} />
+          <PreviewDetailScreen {...previewDetailProps({ preview, onLoadLogs })} />
         </TooltipProvider>
       </NextIntlClientProvider>
     );
@@ -121,10 +132,9 @@ describe("translated global previews", () => {
     expect(screen.getByText("ungefähr")).toBeInTheDocument();
     for (const note of preview.estimatedCostNotes)
       expect(screen.getByText(note)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Logs öffnen" })).toHaveAttribute(
-      "href",
-      `/apps/${preview.registeredAppSlug}/logs`
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Logs öffnen" }));
+    expect(onLoadLogs).toHaveBeenCalledOnce();
+    expect(document.querySelector(`a[href="/apps/${preview.registeredAppSlug}/logs"]`)).toBeNull();
     expect(onError).not.toHaveBeenCalled();
   });
 
@@ -136,6 +146,7 @@ describe("translated global previews", () => {
       for (const key of leaves(en.lists.previews))
         expect(
           t.rich(key as Parameters<typeof t.rich>[0], {
+            count: 20,
             pr: 412,
             namespace: "preview-checkout-412",
             hostname: "pr-412-checkout.example",
