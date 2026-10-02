@@ -19,6 +19,8 @@
 
 import { AlertTriangleIcon, Loader2Icon, PlugZapIcon, RefreshCwIcon } from "lucide-react";
 
+import { useTranslations } from "next-intl";
+
 import { Button } from "@/components/ui/button";
 import type { AstroliftAppAutowireStatus } from "@/graphql/registry/registry.types";
 
@@ -31,20 +33,13 @@ export type AutowireStatusBannerViewProps = ReturnType<typeof useAutowireRetry> 
   autowire?: AstroliftAppAutowireStatus | null;
 };
 
-const STEP_LABELS: { key: "ciWorkflow" | "webhook" | "secrets"; label: string }[] = [
-  { key: "ciWorkflow", label: "CI workflow" },
-  { key: "webhook", label: "Source webhook" },
-  { key: "secrets", label: "Deploy secret" },
-];
-
-// Per-status copy. `phantom` is the webhook-only "marked installed but nothing
-// delivers" state the issue reports.
-const STATUS_COPY: Record<string, string> = {
+const STEPS = ["ciWorkflow", "webhook", "secrets"] as const;
+const STATUS_KEYS = {
   ok: "wired",
-  missing: "not set up",
-  error: "failed",
-  phantom: "not delivering",
-};
+  missing: "missing",
+  error: "error",
+  phantom: "phantom",
+} as const;
 
 export function AutowireStatusBannerView({
   sourceKind,
@@ -53,6 +48,7 @@ export function AutowireStatusBannerView({
   retrying,
   onRetry,
 }: AutowireStatusBannerViewProps) {
+  const t = useTranslations("apps.overview.autowire");
   // Autowire only applies to git-sourced apps with a repo.
   if (!autowire) return null;
   if (sourceKind !== "github" && sourceKind !== "gitlab") return null;
@@ -64,18 +60,18 @@ export function AutowireStatusBannerView({
       <Notice
         tone="warning"
         icon={PlugZapIcon}
-        title="Connect for auto-deploy"
-        description="This app is registered but not wired to its repo. Connect the GitHub App (or an org GitHub connection) so Astrolift can push the CI workflow, install the webhook, and deploy on every push."
+        title={t("connectTitle")}
+        description={t("connectDescription")}
         actions={
           <Button asChild size="sm" variant="outline">
-            <a href="/settings/source-providers">Connect</a>
+            <a href="/settings/source-providers">{t("connect")}</a>
           </Button>
         }
       />
     );
   }
 
-  const failing = STEP_LABELS.map((s) => ({ ...s, status: autowire[s.key] })).filter(
+  const failing = STEPS.map((key) => ({ key, status: autowire[key] })).filter(
     (s) => s.status !== "ok"
   );
 
@@ -87,8 +83,8 @@ export function AutowireStatusBannerView({
     <Notice
       tone="warning"
       icon={AlertTriangleIcon}
-      title="Autowire incomplete"
-      description="A git push won't auto-deploy until every step is wired. Retry to complete the setup."
+      title={t("incompleteTitle")}
+      description={t("incompleteDescription")}
       actions={
         <Button
           type="button"
@@ -103,14 +99,19 @@ export function AutowireStatusBannerView({
           ) : (
             <RefreshCwIcon className="size-4" />
           )}
-          Retry autowire
+          {t("retry")}
         </Button>
       }
     >
       <ul className="flex flex-wrap gap-x-4 gap-y-1">
         {failing.map((s) => (
           <li key={s.key}>
-            {s.label}: <span className="font-mono">{STATUS_COPY[s.status] ?? s.status}</span>
+            {t(`steps.${s.key}`)}:{" "}
+            <span className="font-mono">
+              {Object.hasOwn(STATUS_KEYS, s.status)
+                ? t(`statuses.${STATUS_KEYS[s.status as keyof typeof STATUS_KEYS]}`)
+                : s.status}
+            </span>
           </li>
         ))}
       </ul>

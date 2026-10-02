@@ -2618,6 +2618,32 @@
         "emptyTitle": "没有源代码仓库",
         "emptyDescription": "连接仓库，使代码推送可以构建并部署此应用。",
         "emptyAction": "打开设置"
+      },
+      "noticesLabel": "通知",
+      "autowire": {
+        "connectTitle": "连接自动部署",
+        "connectDescription": "此应用已注册，但尚未连接到仓库。连接 GitHub App（或组织的 GitHub 连接），让 Astrolift 添加 CI 工作流、安装 Webhook，并在每次推送时部署。",
+        "connect": "连接",
+        "incompleteTitle": "自动配置未完成",
+        "incompleteDescription": "所有步骤连接完成后，git push 才会触发自动部署。请重试以完成配置。",
+        "retry": "重试自动配置",
+        "steps": {
+          "ciWorkflow": "CI 工作流",
+          "webhook": "仓库 Webhook",
+          "secrets": "部署密钥"
+        },
+        "statuses": {
+          "wired": "已连接",
+          "missing": "未配置",
+          "error": "失败",
+          "phantom": "未投递"
+        },
+        "feedback": {
+          "failed": "重试失败",
+          "wired": "自动部署已连接",
+          "connect": "请连接 GitHub App 或组织连接，以配置自动部署",
+          "attention": "部分自动配置步骤仍需处理"
+        }
       }
     },
     "frame": {

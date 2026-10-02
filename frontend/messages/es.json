@@ -2618,6 +2618,32 @@
         "emptyTitle": "No hay repositorio de código",
         "emptyDescription": "Conecta un repositorio para compilar y desplegar esta aplicación al publicar cambios.",
         "emptyAction": "Abrir configuración"
+      },
+      "noticesLabel": "Avisos",
+      "autowire": {
+        "connectTitle": "Conectar el despliegue automático",
+        "connectDescription": "Esta aplicación está registrada, pero aún no está conectada a su repositorio. Conecta la GitHub App (o una conexión de GitHub de la organización) para que Astrolift publique el flujo de CI, instale el webhook y despliegue con cada push.",
+        "connect": "Conectar",
+        "incompleteTitle": "Configuración automática incompleta",
+        "incompleteDescription": "Los cambios enviados con git push no se desplegarán automáticamente hasta que todos los pasos estén conectados. Reintenta para completar la configuración.",
+        "retry": "Reintentar la configuración",
+        "steps": {
+          "ciWorkflow": "Flujo de CI",
+          "webhook": "Webhook del repositorio",
+          "secrets": "Secreto de despliegue"
+        },
+        "statuses": {
+          "wired": "conectado",
+          "missing": "sin configurar",
+          "error": "falló",
+          "phantom": "sin entregas"
+        },
+        "feedback": {
+          "failed": "El reintento falló",
+          "wired": "Despliegue automático conectado",
+          "connect": "Conecta una GitHub App o una conexión de la organización para activar el despliegue automático",
+          "attention": "Algunos pasos de la configuración automática aún requieren atención"
+        }
       }
     },
     "frame": {

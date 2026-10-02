@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import { expect, within } from "storybook/test";
 
 import {
@@ -59,5 +62,28 @@ export const LongStrings: Story = {
       sourceRepo={`acme/${LONG}`}
       autowire={{ ...AUTOWIRE_FAILING, detail: `${LONG} ${LONG} ${LONG}` }}
     />
+  ),
+};
+
+export const FrenchRecovery: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AutowireStatusBannerView
+        {...AUTOWIRE}
+        autowire={{
+          ...AUTOWIRE_FAILING,
+          webhook: "rate_limited",
+          detail: "RAW_PROVIDER_DIAGNOSTIC",
+        }}
+      />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const JapaneseConnect: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <AutowireStatusBannerView {...AUTOWIRE} autowire={AUTOWIRE_NOT_CONNECTED} />
+    </NextIntlClientProvider>
   ),
 };

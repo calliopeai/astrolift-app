@@ -2618,6 +2618,32 @@
         "emptyTitle": "ソースリポジトリがありません",
         "emptyDescription": "リポジトリを接続すると、プッシュ時にこのアプリをビルドしてデプロイできます。",
         "emptyAction": "設定を開く"
+      },
+      "noticesLabel": "通知",
+      "autowire": {
+        "connectTitle": "自動デプロイを接続",
+        "connectDescription": "このアプリは登録されていますが、リポジトリにはまだ接続されていません。GitHub App（または組織の GitHub 接続）を接続すると、Astrolift が CI ワークフローを追加し、Webhook を設定して、プッシュのたびにデプロイできます。",
+        "connect": "接続",
+        "incompleteTitle": "自動設定が未完了",
+        "incompleteDescription": "すべての手順が接続されるまで、git push で自動デプロイは実行されません。再試行して設定を完了してください。",
+        "retry": "自動設定を再試行",
+        "steps": {
+          "ciWorkflow": "CI ワークフロー",
+          "webhook": "リポジトリの Webhook",
+          "secrets": "デプロイ用シークレット"
+        },
+        "statuses": {
+          "wired": "接続済み",
+          "missing": "未設定",
+          "error": "失敗",
+          "phantom": "配信されていません"
+        },
+        "feedback": {
+          "failed": "再試行に失敗しました",
+          "wired": "自動デプロイを接続しました",
+          "connect": "GitHub App または組織の接続を接続して、自動デプロイを設定してください",
+          "attention": "自動設定の一部の手順を確認する必要があります"
+        }
       }
     },
     "frame": {

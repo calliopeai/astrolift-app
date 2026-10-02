@@ -2618,6 +2618,32 @@
         "emptyTitle": "소스 저장소가 없습니다",
         "emptyDescription": "저장소를 연결하면 푸시할 때 앱을 빌드하고 배포할 수 있습니다.",
         "emptyAction": "설정 열기"
+      },
+      "noticesLabel": "알림",
+      "autowire": {
+        "connectTitle": "자동 배포 연결",
+        "connectDescription": "이 앱은 등록되었지만 아직 저장소에 연결되지 않았습니다. GitHub App 또는 조직의 GitHub 연결을 연결하면 Astrolift가 CI 워크플로를 추가하고 웹훅을 설치하여 푸시할 때마다 배포할 수 있습니다.",
+        "connect": "연결",
+        "incompleteTitle": "자동 설정 미완료",
+        "incompleteDescription": "모든 단계가 연결되어야 git push로 자동 배포가 실행됩니다. 다시 시도하여 설정을 완료하세요.",
+        "retry": "자동 설정 재시도",
+        "steps": {
+          "ciWorkflow": "CI 워크플로",
+          "webhook": "저장소 웹훅",
+          "secrets": "배포 시크릿"
+        },
+        "statuses": {
+          "wired": "연결됨",
+          "missing": "설정되지 않음",
+          "error": "실패",
+          "phantom": "전달되지 않음"
+        },
+        "feedback": {
+          "failed": "재시도 실패",
+          "wired": "자동 배포가 연결되었습니다",
+          "connect": "GitHub App 또는 조직 연결을 연결하여 자동 배포를 설정하세요",
+          "attention": "일부 자동 설정 단계를 아직 확인해야 합니다"
+        }
       }
     },
     "frame": {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -23,6 +24,7 @@ interface RetryResp {
  * reflects the new step states. The data half of AutowireStatusBannerView.
  */
 export function useAutowireRetry(appSlug: string) {
+  const t = useTranslations("apps.overview.autowire.feedback");
   const [retry, { loading }] = useMutation<RetryResp>(RETRY_ASTROLIFT_AUTOWIRE, {
     refetchQueries: [{ query: GET_APP, variables: { slug: appSlug, includeDrift: true } }],
     awaitRefetchQueries: true,
@@ -33,18 +35,18 @@ export function useAutowireRetry(appSlug: string) {
       const { data } = await retry({ variables: { input: { appSlug } } });
       const payload = data?.retryAstroliftAutowire;
       if (!payload?.ok) {
-        toast.error(payload?.errors?.[0]?.message ?? "Retry failed");
+        toast.error(payload?.errors?.[0]?.message ?? t("failed"));
         return;
       }
       if (payload.data?.allOk) {
-        toast.success("Auto-deploy wired up");
+        toast.success(t("wired"));
       } else if (!payload.data?.connected) {
-        toast.message("Connect a GitHub App or org connection to wire auto-deploy");
+        toast.message(t("connect"));
       } else {
-        toast.warning(payload.data?.detail || "Some autowire steps still need attention");
+        toast.warning(payload.data?.detail || t("attention"));
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Retry failed");
+      toast.error(e instanceof Error ? e.message : t("failed"));
     }
   }
 

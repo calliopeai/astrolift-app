@@ -2618,6 +2618,32 @@
         "emptyTitle": "Aucun dépôt source",
         "emptyDescription": "Connectez un dépôt pour compiler et déployer cette application à chaque envoi de code.",
         "emptyAction": "Ouvrir les paramètres"
+      },
+      "noticesLabel": "Avis",
+      "autowire": {
+        "connectTitle": "Connecter le déploiement automatique",
+        "connectDescription": "Cette application est enregistrée, mais elle n’est pas reliée à son dépôt. Connectez la GitHub App (ou une connexion GitHub de l’organisation) pour qu’Astrolift publie le workflow CI, installe le webhook et déploie à chaque push.",
+        "connect": "Connecter",
+        "incompleteTitle": "Configuration automatique incomplète",
+        "incompleteDescription": "Un git push ne déclenchera pas de déploiement automatique tant que toutes les étapes ne sont pas reliées. Réessayez pour terminer la configuration.",
+        "retry": "Réessayer la configuration",
+        "steps": {
+          "ciWorkflow": "Workflow CI",
+          "webhook": "Webhook du dépôt",
+          "secrets": "Secret de déploiement"
+        },
+        "statuses": {
+          "wired": "relié",
+          "missing": "non configuré",
+          "error": "échec",
+          "phantom": "aucune livraison"
+        },
+        "feedback": {
+          "failed": "La nouvelle tentative a échoué",
+          "wired": "Déploiement automatique connecté",
+          "connect": "Connectez une GitHub App ou une connexion de l’organisation pour activer le déploiement automatique",
+          "attention": "Certaines étapes de la configuration automatique nécessitent encore votre attention"
+        }
       }
     },
     "frame": {
