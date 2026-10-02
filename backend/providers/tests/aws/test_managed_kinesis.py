@@ -11,7 +11,7 @@ from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, 
 from aws.managed._base import ManagedServiceError
 from aws.managed.stream_kinesis import KinesisConfig, KinesisDriver
 
-STREAM_NAME = "platform-steadymd-triage-prod-events"
+STREAM_NAME = "platform-11111111111141118111111111111111"
 STREAM_ARN = f"arn:aws:kinesis:us-west-2:123456789012:stream/{STREAM_NAME}"
 CONSUMER_ARN = f"{STREAM_ARN}/consumer/triage:1234"
 KEY_ARN = "arn:aws:kms:us-west-2:123456789012:key/key-1"
@@ -19,15 +19,16 @@ KEY_ARN = "arn:aws:kms:us-west-2:123456789012:key/key-1"
 
 _OWNED_TAGS = [
     {"Key": "astrolift.io/managed-by", "Value": "platform"},
-    {"Key": "astrolift.io/organization", "Value": "steadymd"},
+    {"Key": "astrolift.io/organization", "Value": "example"},
     {"Key": "astrolift.io/app", "Value": "triage"},
+    {"Key": "astrolift.io/managed_service_id", "Value": "11111111-1111-4111-8111-111111111111"},
 ]
 
 
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
-        "organization_slug": "steadymd",
+        "organization_slug": "example",
         "app_id": "app-1",
         "app_slug": "triage",
         "environment_id": "env-1",
@@ -39,7 +40,7 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "11111111-1111-4111-8111-111111111111",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -461,3 +462,41 @@ def test_a_platform_stream_of_another_org_is_not_adopted():
 
     assert not result.ok and "outside this resource declaration" in result.message
     client.add_tags_to_stream.assert_not_called()
+
+
+@pytest.mark.parametrize("mismatch", ["name", "arn", "owner", "duplicate_owner"])
+def test_creation_response_and_live_owner_must_prove_the_exact_target_before_reconcile(mismatch):
+    client = _client()
+    if mismatch == "name":
+        client.describe_stream_summary.return_value["StreamDescriptionSummary"]["StreamName"] = "foreign-name"
+    elif mismatch == "arn":
+        client.describe_stream_summary.return_value["StreamDescriptionSummary"]["StreamARN"] = (
+            "arn:aws:kinesis:us-west-2:123456789012:stream/foreign-name"
+        )
+    else:
+        tags = [dict(row) for row in _OWNED_TAGS]
+        if mismatch == "owner":
+            tags[-1]["Value"] = "22222222-2222-4222-8222-222222222222"
+        else:
+            tags.append({"Key": "astrolift.io/managed_service_id", "Value": "22222222-2222-4222-8222-222222222222"})
+        client.list_tags_for_resource.return_value = {"Tags": tags}
+    result = KinesisDriver(config=_config(), client=client).provision(_spec())
+    assert not result.ok
+    client.add_tags_to_stream.assert_not_called()
+    client.start_stream_encryption.assert_not_called()
+    client.register_stream_consumer.assert_not_called()
+
+
+@pytest.mark.parametrize("region,partition", [("cn-north-1", "aws-cn"), ("us-gov-west-1", "aws-us-gov")])
+def test_recorded_partition_and_legacy_name_are_preserved_during_real_driver_reconcile(region, partition):
+    from dataclasses import replace
+
+    name = "Legacy.Stream_Name"
+    arn = f"arn:{partition}:kinesis:{region}:123456789012:stream/{name}"
+    client = _client(StreamName=name, StreamARN=arn, StreamModeDetails={"StreamMode": "ON_DEMAND"})
+    client.create_stream.side_effect = _error("ResourceInUseException", "CreateStream")
+    driver = KinesisDriver(config=replace(_config(), region=region), client=client)
+    result = driver.provision(_spec(recorded_handle=f"stream/{arn}"))
+    assert result.ok and result.handle == f"stream/{arn}"
+    assert client.create_stream.call_args.kwargs["StreamName"] == name
+    assert client.add_tags_to_stream.call_args.kwargs["StreamARN"] == arn

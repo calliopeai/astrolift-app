@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,7 +25,15 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import (
+    ManagedServiceError,
+    assert_resource_arn,
+    handle_for,
+    live_ownership_refusal,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "stream"
@@ -79,7 +88,7 @@ class KinesisDriver(ManagedServiceDriver):
                 ["missing_account_id"],
             )
         name = self._stream_name(spec)
-        arn = self._stream_arn(name)
+        arn = parse_handle(spec.recorded_handle)[1] if spec.recorded_handle else self._stream_arn(name)
         request = self._create_request(name, spec)
         created = False
         try:
@@ -92,8 +101,9 @@ class KinesisDriver(ManagedServiceDriver):
         try:
             self._await_active(name)
             summary = self._summary(arn)
-            arn = str(summary.get("StreamARN") or arn)
-            if not created and not self._is_own_stream(arn, spec):
+            if str(summary.get("StreamARN") or "") != arn or str(summary.get("StreamName") or "") != name:
+                raise ManagedServiceError("live Kinesis stream identity does not match the recorded target")
+            if not self._is_own_stream(arn, spec):
                 raise ManagedServiceError(
                     f"stream {name} already exists outside this resource declaration",
                 )
@@ -609,10 +619,10 @@ class KinesisDriver(ManagedServiceDriver):
 
     def _is_own_stream(self, arn: str, spec: ProvisionSpec) -> bool:
         """Platform-made is not enough to adopt: it must be this service's (#1961)."""
-        if not self._is_managed_resource(arn):
-            return False
         tags = self._kinesis.list_tags_for_resource(ResourceARN=arn).get("Tags") or []
-        return adoption_refusal(tags, spec, resource="Kinesis stream") is None
+        return (
+            live_ownership_refusal(tags, managed_service_id=spec.managed_service_id, resource="Kinesis stream") is None
+        )
 
     def _summary(self, arn: str) -> dict[str, Any]:
         response = self._kinesis.describe_stream_summary(StreamARN=arn)
@@ -706,24 +716,35 @@ class KinesisDriver(ManagedServiceDriver):
         return ""
 
     def _stream_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            "-".join(
-                part
-                for part in (
-                    self._config.stream_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "stream",
-                )
-                if part
-            ),
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            kind, arn = parse_handle(spec.recorded_handle)
+            name = _stream_name_from_arn(arn)
+            if kind != KIND or re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name) is None:
+                raise ManagedServiceError("recorded Kinesis handle does not match the stream driver")
+            assert_resource_arn(
+                arn,
+                service="kinesis",
+                region=self._config.region,
+                account=self._config.account_id,
+                resource=f"stream/{name}",
+            )
+            if arn != self._stream_arn(name):
+                raise ManagedServiceError("recorded Kinesis ARN partition does not match the configured region")
+            return name
+        return physical_name(
+            spec.managed_service_id,
+            prefix=self._config.stream_name_prefix,
+            max_length=128,
         )
 
     def _stream_arn(self, name: str) -> str:
         if not self._config.account_id:
             raise ManagedServiceError("Kinesis requires the AWS account_id to construct a stable stream ARN")
-        return f"arn:aws:kinesis:{self._config.region}:{self._config.account_id}:stream/{name}"
+        from botocore.session import get_session
+
+        partition = get_session().get_partition_for_region(self._config.region)
+        return f"arn:{partition}:kinesis:{self._config.region}:{self._config.account_id}:stream/{name}"
 
 
 def _desired_shards(cfg: dict[str, Any], *, size: str) -> int | None:
@@ -734,16 +755,6 @@ def _desired_shards(cfg: dict[str, Any], *, size: str) -> int | None:
 
 def _stream_name_from_arn(arn: str) -> str:
     return arn.rsplit("/", 1)[-1]
-
-
-def _name(value: str) -> str:
-    clean = "".join(char if char.isalnum() or char in "-_." else "-" for char in value)
-    while "--" in clean:
-        clean = clean.replace("--", "-")
-    clean = clean.strip("-_.")
-    if not clean:
-        raise ManagedServiceError("Kinesis stream name cannot be empty")
-    return clean[:128].rstrip("-_.")
 
 
 def _json_document(value: Any, *, field: str) -> str:
