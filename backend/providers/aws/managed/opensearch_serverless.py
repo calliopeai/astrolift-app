@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -24,7 +25,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 _COLLECTION_TYPES = {"SEARCH", "VECTORSEARCH"}
@@ -368,7 +376,9 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
         kms_key = str(cfg.get("kms_key_arn") or self._config.kms_key_arn)
         if kms_key:
             encryption["KmsARN"] = kms_key
-        self._ensure_policy("security", "encryption", self._policy_name("e", name), encryption)
+        policies: list[tuple[str, str, str, Any]] = [
+            ("security", "encryption", self._policy_name("e", name), encryption)
+        ]
 
         public = bool(cfg.get("public_access", self._config.public_access_default))
         endpoint_ids = list(cfg.get("vpc_endpoint_ids") or self._config.vpc_endpoint_ids)
@@ -399,7 +409,7 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
                         "SourceServices": source_services,
                     }
                 )
-        self._ensure_policy("security", "network", self._policy_name("n", name), network)
+        policies.append(("security", "network", self._policy_name("n", name), network))
 
         principals = list(cfg.get("data_access_principals") or self._config.data_access_principals)
         if not principals and self._config.account_id:
@@ -423,9 +433,15 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
                 "Principal": principals,
             }
         ]
-        self._ensure_policy("access", "data", self._policy_name("d", name), access)
+        policies.append(("access", "data", self._policy_name("d", name), access))
+        for family, policy_type, policy_name, policy in policies:
+            self._ensure_policy(family, policy_type, policy_name, policy, validate_only=True)
+        for family, policy_type, policy_name, policy in policies:
+            self._ensure_policy(family, policy_type, policy_name, policy)
 
-    def _ensure_policy(self, family: str, policy_type: str, name: str, policy: Any) -> None:
+    def _ensure_policy(
+        self, family: str, policy_type: str, name: str, policy: Any, *, validate_only: bool = False
+    ) -> None:
         desired = _json(policy)
         getter = self._aoss.get_access_policy if family == "access" else self._aoss.get_security_policy
         creator = self._aoss.create_access_policy if family == "access" else self._aoss.create_security_policy
@@ -436,12 +452,21 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
         except Exception as exc:
             if not _not_found(exc):
                 raise
+            if validate_only:
+                return
             creator(
                 type=policy_type,
                 name=name,
                 description=f"Astrolift managed {policy_type} policy",
                 policy=desired,
             )
+            return
+        targets = _policy_targets(detail.get("policy"))
+        if not targets <= _policy_targets(policy):
+            raise ManagedServiceError(
+                "recorded OpenSearch policy targets a different collection; refusing to rewrite it"
+            )
+        if validate_only:
             return
         if _json(detail.get("policy")) == desired:
             return
@@ -471,13 +496,15 @@ class OpenSearchServerlessDriver(ManagedServiceDriver):
             deleter(type=policy_type, name=policy_name)
 
     def _collection_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            self._config.collection_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or self.kind,
+        name = managed_name_for(
+            spec,
+            kind=self.kind,
+            prefix=self._config.collection_name_prefix,
+            max_len=30,
         )
+        if re.fullmatch(r"[a-z][a-z0-9-]{1,30}[a-z0-9]", name) is None:
+            raise ManagedServiceError("recorded OpenSearch collection name is invalid")
+        return name
 
     @staticmethod
     def _policy_name(prefix: str, name: str) -> str:
@@ -538,6 +565,34 @@ def _json(value: Any) -> str:
         except json.JSONDecodeError:
             return value
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _policy_targets(value: Any) -> set[str]:
+    if isinstance(value, str):
+        if len(value) > 65_536:
+            raise ManagedServiceError("OpenSearch policy target is unverifiable")
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ManagedServiceError("OpenSearch policy target is unverifiable") from exc
+    blocks = [value] if isinstance(value, dict) else value
+    if not isinstance(blocks, list) or not blocks:
+        raise ManagedServiceError("OpenSearch policy target is unverifiable")
+    targets: set[str] = set()
+    for block in blocks:
+        rules = block.get("Rules") if isinstance(block, dict) else None
+        if not isinstance(rules, list) or not rules:
+            raise ManagedServiceError("OpenSearch policy target is unverifiable")
+        for rule in rules:
+            resources = rule.get("Resource") if isinstance(rule, dict) else None
+            if (
+                not isinstance(resources, list)
+                or not resources
+                or not all(isinstance(item, str) and item for item in resources)
+            ):
+                raise ManagedServiceError("OpenSearch policy target is unverifiable")
+            targets.update(resources)
+    return targets
 
 
 def _aoss_tags(spec: ProvisionSpec) -> list[dict[str, str]]:
