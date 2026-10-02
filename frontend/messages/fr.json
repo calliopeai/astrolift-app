@@ -7059,5 +7059,76 @@
       "failed": "Impossible de joindre le superviseur",
       "unconfirmed": "Le serveur n’a pas renvoyé d’ID de message en file d’attente. Vérifiez la tâche en cours avant de renvoyer le message."
     }
+  },
+  "agentOverview": {
+    "latestRun": "Dernière exécution",
+    "notRun": "Pas encore exécuté",
+    "notRunDescription": "Utilisez Exécuter maintenant ci-dessus. L’exécution apparaît ici avec son état en direct.",
+    "openRun": "Ouvrir l’exécution",
+    "status": "État",
+    "run": "Exécution",
+    "started": "Démarrage",
+    "took": "Durée",
+    "notYet": "Pas encore",
+    "running": "En cours",
+    "notFinished": "Non terminée",
+    "runtime": "Environnement d’exécution",
+    "configuration": "Configuration",
+    "image": "Image",
+    "notSet": "Non défini",
+    "runMode": "Mode d’exécution",
+    "brief": "Instructions",
+    "assembled": "Assemblées",
+    "noneYet": "Pas encore disponibles",
+    "skills": "Compétences",
+    "tools": "Outils",
+    "recentRuns": "Exécutions récentes",
+    "inFleet": "Dans la flotte",
+    "fleetDescription": "{name} parmi {count, plural, one {# agent} other {# agents}}, regroupés par projet",
+    "unknownDate": "Date inconnue",
+    "statuses": {
+      "running": "En cours",
+      "queued": "En file d’attente",
+      "pending": "En attente",
+      "completed": "Terminée",
+      "succeeded": "Réussie",
+      "failed": "Échouée",
+      "timed_out": "Délai dépassé",
+      "cancelled": "Annulée",
+      "canceled": "Annulée"
+    }
+  },
+  "agentNavigation": {
+    "sectionsLabel": "Sections",
+    "sections": {
+      "build": "Build",
+      "run-mode": "Mode d’exécution et déclencheurs",
+      "config": "Éditeur de configuration",
+      "manifest": "Manifeste",
+      "webhooks": "Webhooks CI / CD",
+      "model-access": "Accès au modèle",
+      "skills": "Compétences",
+      "tools": "Outils",
+      "live": "Exécutions en direct",
+      "metrics": "Métriques",
+      "deployments": "Historique des déploiements",
+      "members": "Membres",
+      "tokens": "Jetons de déploiement",
+      "security": "Analyses de sécurité",
+      "guardrails": "Garde-fous",
+      "general": "Général",
+      "environments": "Environnements",
+      "domains": "Domaines",
+      "managed-services": "Services gérés",
+      "danger-zone": "Zone dangereuse"
+    },
+    "descriptions": {
+      "build": "L’origine de l’image de l’agent et les instructions avec lesquelles il démarre.",
+      "run-mode": "Comment l’agent s’exécute (une fois, sur un planning, comme service ou en boucle) et ce qui le déclenche.",
+      "config": "Le fichier de configuration de l’agent tel qu’il est enregistré par la plateforme.",
+      "manifest": "Le manifeste Kubernetes généré par la plateforme pour l’agent.",
+      "webhooks": "Les webhooks qui avertissent les systèmes CI et CD lors du déploiement de l’agent.",
+      "model-access": "Comment l’agent accède à son modèle et si ses exécutions peuvent être suivies en direct."
+    }
   }
 }

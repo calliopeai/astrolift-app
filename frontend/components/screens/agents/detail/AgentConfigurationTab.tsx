@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { type SettingsSectionSpec, SettingsPage } from "@/components/settings/SettingsPage";
@@ -20,16 +21,6 @@ export type AgentConfigurationSection =
 /** Each section's body, rendered by the route's containers; only the active one mounts. */
 export type AgentConfigurationSlots = Partial<Record<AgentConfigurationSection, React.ReactNode>>;
 
-const DESCRIPTIONS: Record<AgentConfigurationSection, string> = {
-  build: "Where the agent's image comes from, and the brief it starts from.",
-  "run-mode":
-    "How the agent runs (once, on a schedule, as a service or a loop) and what triggers it.",
-  config: "The agent's configuration file, as the platform stores it.",
-  manifest: "The Kubernetes manifest the platform renders for the agent.",
-  webhooks: "Webhooks that tell CI and CD systems when the agent deploys.",
-  "model-access": "How the agent reaches its model, and whether its runs can be watched live.",
-};
-
 export interface AgentConfigurationTabProps {
   section: SectionSelection;
   slots: AgentConfigurationSlots;
@@ -44,15 +35,21 @@ export interface AgentConfigurationTabProps {
  * draws the header and the tab row. Pure.
  */
 export function AgentConfigurationTab({ section, slots }: AgentConfigurationTabProps) {
+  const t = useTranslations("agentNavigation");
   const sections: SettingsSectionSpec[] = (AGENT_TAB_SECTIONS.configuration ?? [])
     .filter((s) => slots[s.id as AgentConfigurationSection] != null)
     .map((s) => {
       const id = s.id as AgentConfigurationSection;
       return {
         id,
-        title: s.label,
+        title: t(`sections.${id}`),
         content: (
-          <Section title={s.label} description={DESCRIPTIONS[id]} divided className="min-w-0">
+          <Section
+            title={t(`sections.${id}`)}
+            description={t(`descriptions.${id}`)}
+            divided
+            className="min-w-0"
+          >
             {slots[id]}
           </Section>
         ),

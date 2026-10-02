@@ -7136,5 +7136,76 @@
       "failed": "Could not reach the overseer",
       "unconfirmed": "The server did not return a queued-message ID. Check the running task before sending again."
     }
+  },
+  "agentOverview": {
+    "latestRun": "Latest run",
+    "notRun": "Not run yet",
+    "notRunDescription": "Use Run now above. The run shows here with a live status.",
+    "openRun": "Open run",
+    "status": "Status",
+    "run": "Run",
+    "started": "Started",
+    "took": "Took",
+    "notYet": "Not yet",
+    "running": "Running",
+    "notFinished": "Not finished",
+    "runtime": "Runtime",
+    "configuration": "Configuration",
+    "image": "Image",
+    "notSet": "Not set",
+    "runMode": "Run mode",
+    "brief": "Brief",
+    "assembled": "Assembled",
+    "noneYet": "None yet",
+    "skills": "Skills",
+    "tools": "Tools",
+    "recentRuns": "Recent runs",
+    "inFleet": "In the fleet",
+    "fleetDescription": "{name} among {count, plural, one {# agent} other {# agents}}, grouped by project",
+    "unknownDate": "Unknown date",
+    "statuses": {
+      "running": "Running",
+      "queued": "Queued",
+      "pending": "Pending",
+      "completed": "Completed",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "timed_out": "Timed out",
+      "cancelled": "Cancelled",
+      "canceled": "Canceled"
+    }
+  },
+  "agentNavigation": {
+    "sectionsLabel": "Sections",
+    "sections": {
+      "build": "Build",
+      "run-mode": "Run mode & triggers",
+      "config": "Config editor",
+      "manifest": "Manifest",
+      "webhooks": "CI / CD webhooks",
+      "model-access": "Model access",
+      "skills": "Skills",
+      "tools": "Tools",
+      "live": "Live runs",
+      "metrics": "Metrics",
+      "deployments": "Deploy history",
+      "members": "Members",
+      "tokens": "Deploy tokens",
+      "security": "Security scans",
+      "guardrails": "Guardrails",
+      "general": "General",
+      "environments": "Environments",
+      "domains": "Domains",
+      "managed-services": "Managed services",
+      "danger-zone": "Danger zone"
+    },
+    "descriptions": {
+      "build": "Where the agent’s image comes from, and the brief it starts from.",
+      "run-mode": "How the agent runs (once, on a schedule, as a service or a loop) and what triggers it.",
+      "config": "The agent’s configuration file, as the platform stores it.",
+      "manifest": "The Kubernetes manifest the platform renders for the agent.",
+      "webhooks": "Webhooks that tell CI and CD systems when the agent deploys.",
+      "model-access": "How the agent reaches its model, and whether its runs can be watched live."
+    }
   }
 }

@@ -11,16 +11,32 @@ import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FleetView } from "@/components/viz/FleetView";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { runModeLabel } from "./AgentFrame";
-import { runDot, runDuration, titleCase } from "./agent-runs-list";
+import { runDot, runDuration } from "./agent-runs-list";
 import { agentSectionHref, agentTabHref } from "./agent-tabs-model";
 import type { AgentOverviewProps, AgentOverviewTask } from "./use-agent-overview";
+
+const KNOWN_STATUSES = new Set([
+  "running",
+  "queued",
+  "pending",
+  "completed",
+  "succeeded",
+  "failed",
+  "timed_out",
+  "cancelled",
+  "canceled",
+]);
+const runLabel = (status: string, t: (key: string) => string) =>
+  KNOWN_STATUSES.has(status.toLowerCase()) ? t(`statuses.${status.toLowerCase()}`) : status;
 
 const runHref = (t: AgentOverviewTask) => `/agents/runs/${encodeURIComponent(t.id)}`;
 
 function RunLine({ task }: { task: AgentOverviewTask }) {
+  const t = useTranslations("agentOverview");
+  const format = useFormatters();
   const took = runDuration(task.startedAt, task.finishedAt);
   return (
     <span className="flex min-w-0 items-center gap-3">
@@ -28,15 +44,19 @@ function RunLine({ task }: { task: AgentOverviewTask }) {
       <span className="min-w-0 flex-1 truncate font-mono text-xs" title={task.id}>
         {task.id}
       </span>
-      <span className="text-muted-foreground shrink-0 text-xs">{titleCase(task.status)}</span>
+      <span className="text-muted-foreground shrink-0 text-xs">
+        {runLabel(task.status, (key) => t(key))}
+      </span>
       <span className="text-muted-foreground w-12 shrink-0 text-right font-mono text-xs tabular-nums">
         {took ?? ""}
       </span>
       <span
-        className="text-muted-foreground w-20 shrink-0 text-right font-mono text-xs"
+        className="text-muted-foreground w-28 shrink-0 truncate text-right font-mono text-xs"
         title={task.createdAt}
       >
-        {formatRelativeAge(task.createdAt)}
+        {Number.isFinite(Date.parse(task.createdAt))
+          ? format.formatRelativeTime(task.createdAt)
+          : t("unknownDate")}
       </span>
     </span>
   );
@@ -62,6 +82,9 @@ export function AgentOverviewView({
   sendingInput,
   onSendInput,
 }: AgentOverviewProps) {
+  const t = useTranslations("agentOverview");
+  const frame = useTranslations("agentFrame");
+  const format = useFormatters();
   const latest = runs.rows[0] ?? null;
   const running = runs.rows.find((t) => t.status.toLowerCase() === "running") ?? null;
   const skills = detail?.skills ?? [];
@@ -71,7 +94,7 @@ export function AgentOverviewView({
   return (
     <PanelGrid>
       <Panel
-        title="Latest run"
+        title={t("latestRun")}
         icon={<PlayIcon className="size-4" />}
         span={6}
         loading={runs.loading}
@@ -82,8 +105,8 @@ export function AgentOverviewView({
             ? null
             : {
                 icon: <PlayIcon className="size-5" />,
-                title: "Not run yet",
-                description: "Use Run now above. The run shows here with a live status.",
+                title: t("notRun"),
+                description: t("notRunDescription"),
               }
         }
         actions={
@@ -92,7 +115,7 @@ export function AgentOverviewView({
               href={runHref(latest)}
               className="text-primary text-xs font-medium hover:underline"
             >
-              Open run
+              {t("openRun")}
             </Link>
           )
         }
@@ -100,23 +123,27 @@ export function AgentOverviewView({
         {latest && (
           <div className="flex min-w-0 flex-col gap-4">
             <dl className="grid min-w-0 grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              <Fact label="Status">
+              <Fact label={t("status")}>
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   <StatusDot status={runDot(latest.status)} />
                   <span className="truncate" title={latest.status}>
-                    {titleCase(latest.status)}
+                    {runLabel(latest.status, (key) => t(key))}
                   </span>
                 </span>
               </Fact>
-              <Fact label="Run" mono title={latest.id}>
+              <Fact label={t("run")} mono title={latest.id}>
                 <span className="block truncate">{latest.id}</span>
               </Fact>
-              <Fact label="Started" mono title={latest.startedAt ?? undefined}>
-                {latest.startedAt ? formatRelativeAge(latest.startedAt) : "Not yet"}
+              <Fact label={t("started")} mono title={latest.startedAt ?? undefined}>
+                {latest.startedAt
+                  ? Number.isFinite(Date.parse(latest.startedAt))
+                    ? format.formatRelativeTime(latest.startedAt)
+                    : t("unknownDate")
+                  : t("notYet")}
               </Fact>
-              <Fact label="Took" mono>
+              <Fact label={t("took")} mono>
                 {runDuration(latest.startedAt, latest.finishedAt) ??
-                  (latest.status.toLowerCase() === "running" ? "Running" : "Not finished")}
+                  (latest.status.toLowerCase() === "running" ? t("running") : t("notFinished"))}
               </Fact>
             </dl>
             {running && (
@@ -127,7 +154,7 @@ export function AgentOverviewView({
       </Panel>
 
       <Panel
-        title="Runtime"
+        title={t("runtime")}
         icon={<CpuIcon className="size-4" />}
         span={6}
         loading={detailLoading}
@@ -138,37 +165,39 @@ export function AgentOverviewView({
             href={agentTabHref(slug, "configuration")}
             className="text-primary text-xs font-medium hover:underline"
           >
-            Configuration
+            {t("configuration")}
           </Link>
         }
       >
         <dl className="grid min-w-0 grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          <Fact label="Image" mono title={detail?.imageRef || undefined} wide>
-            <span className="[overflow-wrap:anywhere]">{detail?.imageRef || "Not set"}</span>
+          <Fact label={t("image")} mono title={detail?.imageRef || undefined} wide>
+            <span className="[overflow-wrap:anywhere]">{detail?.imageRef || t("notSet")}</span>
           </Fact>
-          <Fact label="Run mode">{runModeLabel(agent.runFamily, agent.runMode)}</Fact>
-          <Fact label="Brief">{detail?.brief ? "Assembled" : "None yet"}</Fact>
-          <Fact label="Skills" mono>
+          <Fact label={t("runMode")}>
+            {runModeLabel(agent.runFamily, agent.runMode, (key) => frame(key))}
+          </Fact>
+          <Fact label={t("brief")}>{detail?.brief ? t("assembled") : t("noneYet")}</Fact>
+          <Fact label={t("skills")} mono>
             <Link
               href={agentSectionHref(slug, "skills", "skills")}
               className="hover:text-primary hover:underline"
             >
-              {skills.length}
+              {format.formatNumber(skills.length)}
             </Link>
           </Fact>
-          <Fact label="Tools" mono>
+          <Fact label={t("tools")} mono>
             <Link
               href={agentSectionHref(slug, "skills", "tools")}
               className="hover:text-primary hover:underline"
             >
-              {tools}
+              {format.formatNumber(tools)}
             </Link>
           </Fact>
         </dl>
       </Panel>
 
       <ListSummary<AgentOverviewTask>
-        title="Recent runs"
+        title={t("recentRuns")}
         icon={<HistoryIcon className="size-4" />}
         span={6}
         count={runs.count}
@@ -188,11 +217,11 @@ export function AgentOverviewView({
             snapshot={fleet}
             selectedAgentId={agent.id}
             onSelectAgent={onSelectAgent}
-            title="In the fleet"
-            description={`${agent.name} among ${fleet.agents.length} agents, grouped by project`}
+            title={t("inFleet")}
+            description={t("fleetDescription", { name: agent.name, count: fleet.agents.length })}
           />
         ) : (
-          <Panel title="In the fleet" icon={<ActivityIcon className="size-4" />} loading />
+          <Panel title={t("inFleet")} icon={<ActivityIcon className="size-4" />} loading />
         )}
       </div>
     </PanelGrid>

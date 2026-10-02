@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { DetailTabSections } from "@/components/detail/DetailTabSections";
@@ -22,13 +23,14 @@ export interface AgentTabSectionsProps {
  * SettingsPage's own section nav instead. Pure.
  */
 export function AgentTabSections({ slug, tab, active, children }: AgentTabSectionsProps) {
+  const t = useTranslations("agentNavigation");
   const sections = (AGENT_TAB_SECTIONS[tab] ?? []).map((s) => ({
     id: s.id,
-    label: s.label,
+    label: t(`sections.${s.id}`),
     href: agentSectionHref(slug, tab, s.id),
   }));
   return (
-    <DetailTabSections ariaLabel="Sections" sections={sections} active={active}>
+    <DetailTabSections ariaLabel={t("sectionsLabel")} sections={sections} active={active}>
       {children}
     </DetailTabSections>
   );

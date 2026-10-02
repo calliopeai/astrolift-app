@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -106,5 +109,19 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <Tab slots={{ ...SLOTS, build: <AgentBuildScreen {...BUILD_LONG} /> }} />
     </div>
+  ),
+};
+
+export const JapaneseConfiguration: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <Tab
+        initial="model-access"
+        slots={{
+          build: <Slot label="LITERAL_BUILD" />,
+          "model-access": <Slot label="LITERAL_MODEL" />,
+        }}
+      />
+    </NextIntlClientProvider>
   ),
 };

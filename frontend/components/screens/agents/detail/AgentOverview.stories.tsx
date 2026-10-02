@@ -1,4 +1,5 @@
 import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
 import ja from "@/messages/ja.json";
 
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
@@ -155,6 +156,35 @@ export const JapaneseInputRefused: Story = {
         fleet={null}
         runs={{ ...OVERVIEW.runs, rows: RUNNING_TASKS }}
         onSendInput={async () => false}
+      />
+    </NextIntlClientProvider>
+  ),
+};
+
+export const FrenchRuntime: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <AgentOverviewView {...OVERVIEW} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseUnknownRun: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <AgentOverviewView
+        {...OVERVIEW}
+        fleet={null}
+        runs={{
+          ...OVERVIEW.runs,
+          rows: [
+            {
+              ...TASKS[0],
+              status: "future_status_v2",
+              startedAt: "malformed",
+              createdAt: "malformed",
+            },
+          ],
+        }}
       />
     </NextIntlClientProvider>
   ),
