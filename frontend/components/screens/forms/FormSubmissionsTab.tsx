@@ -4,6 +4,7 @@ import { QueryError } from "@/components/QueryError";
 
 import { type ReactNode, useMemo, useState } from "react";
 import { Loader2Icon, XIcon } from "lucide-react";
+import { useTimeZone } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 import { Sparkline } from "@/components/viz";
 import type { FormSubmission } from "@/graphql/forms/forms.types";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { buildSubmissionsSparkline, type SparklinePoint } from "./submissions-sparkline";
 
 const PAGE_SIZE = 25;
 
@@ -252,33 +254,9 @@ function formatLeaf(v: unknown): string {
 
 // ─── sparkline ────────────────────────────────────────────────────────
 
-type SparklinePoint = { day: string; count: number };
-
 function useSparkline(submissions: FormSubmission[]): SparklinePoint[] {
-  return useMemo(() => buildSparkline(submissions), [submissions]);
-}
-
-function buildSparkline(submissions: FormSubmission[]): SparklinePoint[] {
-  const counts = new Map<string, number>();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Initialize 30-day window so the sparkline always renders a line.
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    counts.set(d.toISOString().slice(0, 10), 0);
-  }
-
-  for (const sub of submissions) {
-    if (!sub.submittedAt) continue;
-    const day = sub.submittedAt.slice(0, 10);
-    if (counts.has(day)) {
-      counts.set(day, (counts.get(day) ?? 0) + 1);
-    }
-  }
-
-  return [...counts.entries()].map(([day, count]) => ({ day, count }));
+  const timeZone = useTimeZone() ?? "UTC";
+  return useMemo(() => buildSubmissionsSparkline(submissions, timeZone), [submissions, timeZone]);
 }
 
 function SubmissionsSparkline({ data, total }: { data: SparklinePoint[]; total: number }) {
