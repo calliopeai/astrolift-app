@@ -123,3 +123,58 @@ export const Translations: Story = {
     </div>
   ),
 };
+
+export const ImportedFlowise: Story = {
+  ...Review,
+  args: {
+    ...Review.args!,
+    kind: "checkpoint",
+    targets: ["flow_humaninputagentflow_0"],
+    backEdge: {
+      to: "flow_humaninputagentflow_0",
+      when: "always",
+      max_rounds: 5,
+      on_exhausted: "continue",
+      source_format: "flowise_loop_1_2",
+      source_target: "humanInputAgentflow_0",
+      source_label: "Continue this round?",
+      fallback_message: "Bounded import done",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText(en.workflowBounds.target)).toBeDisabled();
+    await expect(canvas.getByLabelText("At round limit")).toHaveValue("continue");
+    const rounds = canvas.getByLabelText("Maximum rounds (1–20)");
+    await userEvent.clear(rounds);
+    await userEvent.type(rounds, "2");
+    await expect(rounds).toHaveValue(2);
+    await expect(canvas.getByText('Source fallback: "Bounded import done"')).toBeInTheDocument();
+  },
+};
+
+export const ImportedTranslations: Story = {
+  render: () => (
+    <div className="grid w-full max-w-3xl grid-cols-1 gap-6 md:grid-cols-2">
+      {(
+        [
+          ["en", en],
+          ["es", es],
+          ["de", de],
+          ["fr", fr],
+          ["ja", ja],
+          ["ko", ko],
+          ["pt-BR", pt],
+          ["zh-Hans", zh],
+        ] as const
+      ).map(([locale, messages]) => (
+        <section key={locale} data-locale={locale} className="min-w-0">
+          <h2>{locale}</h2>
+          <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC">
+            <Editor {...(ImportedFlowise.args as BoundedStageOptionsProps)} />
+          </NextIntlClientProvider>
+        </section>
+      ))}
+    </div>
+  ),
+};

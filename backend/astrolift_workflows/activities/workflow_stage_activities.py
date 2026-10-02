@@ -98,7 +98,10 @@ def _get_workflow_stages_sync(
 
     from astrolift_operations.models import WorkflowRun
     from astrolift_registry.models import Workload
-    from workflows.composition import MAX_WORKFLOW_NESTING_DEPTH, resolve_child_definition
+    from workflows.composition import (
+        MAX_WORKFLOW_NESTING_DEPTH,
+        resolve_child_definition,
+    )
     from workflows.models import WorkflowDefinition, WorkflowStage
 
     run = None
@@ -307,7 +310,10 @@ def _create_nested_workflow_run_sync(
 
     from astrolift_operations.models import WorkflowRun
     from core.run_trigger import RunTrigger
-    from workflows.composition import MAX_WORKFLOW_NESTING_DEPTH, resolve_child_definition
+    from workflows.composition import (
+        MAX_WORKFLOW_NESTING_DEPTH,
+        resolve_child_definition,
+    )
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
     with transaction.atomic():
@@ -408,7 +414,7 @@ def _execution_metadata(run, stage, context: dict | None) -> dict:
             raise ValueError("invalid round cause")
         if not isinstance(cause["edge"], str) or not 1 <= len(cause["edge"]) <= 203:
             raise ValueError("invalid round edge")
-        if cause["reason"] not in {"gate_rejected", "stage_failed", "output_equals", "max_rounds_exhausted"}:
+        if cause["reason"] not in {"gate_rejected", "stage_failed", "output_equals", "always", "max_rounds_exhausted"}:
             raise ValueError("invalid round reason")
         cap = cause["max_rounds"]
         if isinstance(cap, bool) or not isinstance(cap, int) or not 1 <= cap <= 20:

@@ -7016,6 +7016,10 @@
     "edgeBound": "Rückkehr {edgeRound} von {max}",
     "roundTitle": "Runde {round}",
     "branchStarted": "Beginn: {time}",
-    "max_rounds_exhausted": "Rundengrenze erreicht"
+    "max_rounds_exhausted": "Rundengrenze erreicht",
+    "always": "Jeder abgeschlossene Durchlauf",
+    "continue": "Mit Fallback-Ergebnis abschließen",
+    "importedHint": "Der importierte Loop v1.2 behält sein Ziel und seine Abschlussrichtlinie. Bearbeiten Sie das native Manifest, um die Quellzuordnung zu ändern.",
+    "importedFallback": "Fallback der Quelle"
   }
 }

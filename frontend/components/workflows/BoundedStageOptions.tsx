@@ -38,13 +38,10 @@ export function BoundedStageOptions({
   const raw = backEdge as Partial<WorkflowBackEdge> | null;
   const edge =
     valid ??
-    (raw &&
-    typeof raw.to === "string" &&
-    typeof raw.max_rounds === "number" &&
-    ["gate_rejected", "stage_failed", "output_equals"].includes(raw.when ?? "") &&
-    ["fail", "escalate"].includes(raw.on_exhausted ?? "fail")
+    (raw && typeof raw.max_rounds === "number" && readBackEdge({ ...raw, max_rounds: 1 })
       ? (raw as WorkflowBackEdge)
       : null);
+  const imported = edge?.source_format === "flowise_loop_1_2";
   const rawPresent = Boolean(
     backEdge && typeof backEdge === "object" && Object.keys(backEdge).length
   );
@@ -64,6 +61,7 @@ export function BoundedStageOptions({
     ...(kind === "human_gate" ? ["gate_rejected" as const] : []),
     ...(["agent_dispatch", "workflow"].includes(kind) ? ["stage_failed" as const] : []),
     "output_equals",
+    ...(edge?.when === "always" ? ["always" as const] : []),
   ];
   const control = "border-input bg-background h-8 w-full rounded-md border px-2 text-xs";
   return (
@@ -128,6 +126,7 @@ export function BoundedStageOptions({
                 id={`${id}-target`}
                 className={control}
                 value={edge.to}
+                disabled={imported}
                 onChange={(e) => patchEdge({ to: e.target.value })}
               >
                 {!targets.includes(edge.to) && <option value={edge.to}>{edge.to}</option>}
@@ -146,6 +145,7 @@ export function BoundedStageOptions({
                 id={`${id}-trigger`}
                 className={control}
                 value={edge.when}
+                disabled={imported}
                 onChange={(e) => {
                   const when = e.target.value as WorkflowBackEdge["when"];
                   onChange({
@@ -192,12 +192,14 @@ export function BoundedStageOptions({
                 id={`${id}-exhausted`}
                 className={control}
                 value={edge.on_exhausted}
+                disabled={imported}
                 onChange={(e) =>
                   patchEdge({ on_exhausted: e.target.value as WorkflowBackEdge["on_exhausted"] })
                 }
               >
                 <option value="fail">{t("fail")}</option>
                 <option value="escalate">{t("escalate")}</option>
+                {imported && <option value="continue">{t("continue")}</option>}
               </select>
             </div>
           </div>
@@ -231,6 +233,17 @@ export function BoundedStageOptions({
                   </p>
                 )}
               </div>
+            </div>
+          )}
+          {imported && (
+            <div className="text-muted-foreground flex min-w-0 flex-col gap-1 text-xs break-words">
+              <p>{t("importedHint")}</p>
+              <code>{edge.source_target}</code>
+              {"fallback_message" in edge && (
+                <p>
+                  {t("importedFallback")}: {JSON.stringify(edge.fallback_message)}
+                </p>
+              )}
             </div>
           )}
           <p className="text-muted-foreground text-xs">{t("roundHint")}</p>

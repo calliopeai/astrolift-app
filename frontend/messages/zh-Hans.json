@@ -7013,6 +7013,10 @@
     "edgeBound": "第 {edgeRound} 次返回，共 {max} 次",
     "roundTitle": "第 {round} 轮",
     "branchStarted": "开始时间：{time}",
-    "max_rounds_exhausted": "已达到轮数上限"
+    "max_rounds_exhausted": "已达到轮数上限",
+    "always": "每次完成的执行",
+    "continue": "使用回退结果完成",
+    "importedHint": "导入的 Loop v1.2 保留其返回目标和完成策略。要更改源映射，请编辑原生清单。",
+    "importedFallback": "源回退结果"
   }
 }

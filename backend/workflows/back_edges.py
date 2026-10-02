@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from typing import Any
 
 from workflows.stage_limits import validate_stage_attempts
@@ -19,13 +20,31 @@ class LoopContractError(ValueError):
     pass
 
 
+def flowise_output_key(node_id: str) -> str:
+    """Stable ASCII identity used by the verified source-node mapping."""
+    ascii_id = (
+        unicodedata.normalize("NFKD", node_id).encode("ascii", "ignore").decode("ascii")
+    )
+    slug = re.sub(r"[^\w\s-]", "", ascii_id.lower())
+    slug = re.sub(r"[-\s]+", "-", slug).strip("-_")
+    return f"flow_{slug}"[:100]
+
+
 def validate_back_edge(value: Any, *, kind: str) -> dict:
     if value == {}:
         return {}
     if not isinstance(value, dict):
         raise LoopContractError("back_edge must be an object")
     required = {"to", "when", "max_rounds"}
-    allowed = required | {"on_exhausted", "path", "value"}
+    allowed = required | {
+        "on_exhausted",
+        "path",
+        "value",
+        "source_format",
+        "source_target",
+        "source_label",
+        "fallback_message",
+    }
     if not required <= value.keys() or value.keys() - allowed:
         raise LoopContractError(
             "back_edge requires to, when and max_rounds; unknown fields are invalid"
@@ -43,9 +62,9 @@ def validate_back_edge(value: Any, *, kind: str) -> dict:
             f"back_edge.max_rounds must be an integer between 1 and {MAX_LOOP_ROUNDS}"
         )
     when = value["when"]
-    if when not in ("gate_rejected", "stage_failed", "output_equals"):
+    if when not in ("gate_rejected", "stage_failed", "output_equals", "always"):
         raise LoopContractError(
-            "back_edge.when must be gate_rejected, stage_failed or output_equals"
+            "back_edge.when must be gate_rejected, stage_failed, output_equals or always"
         )
     if when == "gate_rejected" and kind != "human_gate":
         raise LoopContractError("gate_rejected back-edges require a human_gate stage")
@@ -53,10 +72,57 @@ def validate_back_edge(value: Any, *, kind: str) -> dict:
         raise LoopContractError(
             "stage_failed back-edges require an agent_dispatch or workflow stage"
         )
+    if when == "always" and kind != "checkpoint":
+        raise LoopContractError("always back-edges require a checkpoint control stage")
     exhausted = value.get("on_exhausted", "fail")
-    if exhausted not in ("fail", "escalate"):
-        raise LoopContractError("back_edge.on_exhausted must be fail or escalate")
+    if exhausted not in ("fail", "escalate", "continue"):
+        raise LoopContractError(
+            "back_edge.on_exhausted must be fail, escalate or supported imported continue"
+        )
     edge = {"to": target, "when": when, "max_rounds": rounds, "on_exhausted": exhausted}
+    source_required = {"source_format", "source_target", "source_label"}
+    source_fields = source_required | {"fallback_message"}
+    if source_fields & value.keys():
+        if (
+            not source_required <= value.keys()
+            or when != "always"
+            or value["source_format"] != "flowise_loop_1_2"
+        ):
+            raise LoopContractError("unsupported imported loop output contract")
+        if (
+            not isinstance(value["source_target"], str)
+            or not 1 <= len(value["source_target"]) <= 100
+        ):
+            raise LoopContractError(
+                "imported loop requires its exact source node target"
+            )
+        if (
+            not isinstance(value["source_label"], str)
+            or len(value["source_label"]) > 1000
+        ):
+            raise LoopContractError(
+                "imported loop requires its source target display label"
+            )
+        if target != flowise_output_key(value["source_target"]):
+            raise LoopContractError(
+                "imported loop source target must match its canonical return output key"
+            )
+        fallback = value.get("fallback_message")
+        if fallback is not None and (
+            not isinstance(fallback, str) or len(fallback) > 4096
+        ):
+            raise LoopContractError(
+                "imported loop fallback_message must be a bounded string or null"
+            )
+        if isinstance(fallback, str) and "{{" in fallback:
+            raise LoopContractError(
+                "imported fallback variables require source runtime resolution"
+            )
+        edge.update({field: value[field] for field in source_fields if field in value})
+    if exhausted == "continue" and not source_required <= edge.keys():
+        raise LoopContractError(
+            "continue is available only for the supported imported loop output contract"
+        )
     if when == "output_equals":
         path = value.get("path")
         if (
@@ -167,6 +233,8 @@ def validate_loop_plan(
 
 
 def edge_matches(edge: dict, output: Any, *, stage_failed: bool = False) -> bool:
+    if edge["when"] == "always":
+        return not stage_failed
     if edge["when"] == "stage_failed":
         return stage_failed
     if edge["when"] == "gate_rejected":

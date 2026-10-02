@@ -28,10 +28,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import tomllib
 from typing import Any
 
 import tomli_w
+import tomllib
 
 from astrolift_manifest.parser import (
     ManifestError,
@@ -40,7 +40,11 @@ from astrolift_manifest.parser import (
 )
 from astrolift_manifest.types import SkillRef
 from core.run_input_contract import InputContractError, no_input_schema, validate_schema
-from workflows.back_edges import LoopContractError, validate_back_edge, validate_loop_plan
+from workflows.back_edges import (
+    LoopContractError,
+    validate_back_edge,
+    validate_loop_plan,
+)
 from workflows.models import WorkflowDefinition, WorkflowStage
 from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attempts
 
@@ -377,7 +381,7 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
             row["on_failure"] = stage.on_failure
         if stage.back_edge:
             edge = validate_back_edge(stage.back_edge, kind=stage.kind)
-            if "value" in edge and edge["value"] is None:
+            if any(value is None for value in edge.values()):
                 # TOML has no null literal. Preserve typed JSON null rather
                 # than deleting the condition or turning it into a string.
                 row["back_edge_json"] = json.dumps(edge, sort_keys=True, separators=(",", ":"))

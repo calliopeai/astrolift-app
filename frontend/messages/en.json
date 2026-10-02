@@ -7093,6 +7093,10 @@
     "edgeBound": "Return {edgeRound} of {max}",
     "roundTitle": "Round {round}",
     "branchStarted": "Started {time}",
-    "max_rounds_exhausted": "Round limit reached"
+    "max_rounds_exhausted": "Round limit reached",
+    "always": "Every completed pass",
+    "continue": "Complete with fallback output",
+    "importedHint": "Imported Loop v1.2 preserves its target and completion policy. Edit the native manifest to change the source mapping.",
+    "importedFallback": "Source fallback"
   }
 }

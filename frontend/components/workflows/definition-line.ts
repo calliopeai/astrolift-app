@@ -127,7 +127,9 @@ export function definitionLine(
             : "condition",
       ...(edge.when === "output_equals"
         ? { condition: `${edge.path} = ${JSON.stringify(edge.value)}` }
-        : {}),
+        : edge.when === "always"
+          ? { condition: "always" }
+          : {}),
       maxRounds: edge.max_rounds,
       kind: "back-edge",
     });

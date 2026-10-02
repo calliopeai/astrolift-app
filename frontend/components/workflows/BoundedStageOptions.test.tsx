@@ -112,3 +112,41 @@ it("shows an existing typed null condition as null", () => {
   );
   expect(screen.getByLabelText(en.workflowBounds.value)).toHaveValue("null");
 });
+
+it("preserves imported source semantics when editing its bounded cap", () => {
+  const onChange = vi.fn();
+  const edge = {
+    to: "flow_humaninputagentflow_0",
+    when: "always",
+    max_rounds: 5,
+    on_exhausted: "continue",
+    source_format: "flowise_loop_1_2",
+    source_target: "humanInputAgentflow_0",
+    source_label: "Continue this round?",
+    fallback_message: null,
+  };
+  render(
+    <NextIntlClientProvider locale="en" messages={en}>
+      <BoundedStageOptions
+        kind="checkpoint"
+        maxAttempts={3}
+        backEdge={edge}
+        targets={["flow_humaninputagentflow_0", "another"]}
+        disabled={false}
+        onChange={onChange}
+      />
+    </NextIntlClientProvider>
+  );
+  for (const key of ["target", "trigger", "exhausted"] as const)
+    expect(screen.getByLabelText(en.workflowBounds[key])).toBeDisabled();
+  expect(screen.getByLabelText(en.workflowBounds.trigger)).toHaveValue("always");
+  expect(screen.getByLabelText(en.workflowBounds.exhausted)).toHaveValue("continue");
+  fireEvent.change(screen.getByLabelText(en.workflowBounds.rounds), { target: { value: "2" } });
+  expect(onChange).toHaveBeenLastCalledWith({ backEdge: { ...edge, max_rounds: 2 } });
+  expect(readBackEdge({ ...edge, to: "another" })).toBeNull();
+  expect(readBackEdge({ ...edge, source_label: undefined })).toBeNull();
+  expect(readBackEdge({ ...edge, source_format: undefined })).toBeNull();
+  expect(
+    readBackEdge({ to: "draft", when: "always", max_rounds: 2, on_exhausted: "continue" })
+  ).toBeNull();
+});

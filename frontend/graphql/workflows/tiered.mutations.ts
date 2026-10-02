@@ -336,6 +336,8 @@ export const IMPORT_WORKFLOW_MANIFEST = gql`
           environmentSpecSlug
           skills
           onFailure
+          maxAttempts
+          backEdge
           timeout
           fanOut
           prompt

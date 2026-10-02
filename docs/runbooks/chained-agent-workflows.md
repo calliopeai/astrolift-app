@@ -320,3 +320,38 @@ TOML has no `null` literal. A condition comparing an output field to JSON `null`
 exports as `back_edge_json = '<JSON object>'`; importing that representation
 restores the same typed condition. Supplying both `back_edge` and
 `back_edge_json` is refused. The YAML and GraphQL forms use their native `null`.
+
+
+## Imported bounded control loops
+
+Flowise `loopAgentflow` node version `1.2` maps to an explicit checkpoint return
+control when it is the only Loop, at the end of one connected sequential track.
+Its integer `maxLoopCount` (default 5, accepted range 1–20) becomes `max_rounds`,
+including the initial pass. The imported contract uses `when = "always"` and
+`on_exhausted = "continue"`; native review loops still default to failure and
+may explicitly escalate. Every pass publishes the source node ID, cap, optional
+`fallbackMessage`, and source control content. At the cap, `content` contains the
+nonempty fallback or the source default completion message, then the workflow
+completes. Source target and label remain separate from the canonical return
+output key and are preserved through TOML/YAML export, review and execution.
+
+The mapping is based on the pinned upstream [Loop v1.2 component](https://github.com/FlowiseAI/Flowise/blob/9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb/packages/components/nodes/agentflow/Loop/Loop.ts)
+and [AgentFlow scheduler](https://github.com/FlowiseAI/Flowise/blob/9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb/packages/server/src/utils/buildAgentflow.ts).
+The importer refuses source state updates, state-bearing starts, unresolved
+fallback variables, forward routes after the Loop, conditional/parallel tracks,
+multiple Loops, unknown node versions and unresolved graph cycles. Ordinary
+model/tool/configuration gaps remain visible for operator review; importing the
+control does not install the original model or reproduce its agent configuration.
+
+The visual editor keeps imported target, trigger and cap-completion policy
+read-only, and allows the round cap to be changed without discarding the source
+output contract. Changing that source mapping requires editing the native
+manifest; mismatched source node and canonical return target are rejected.
+
+Langflow's [collection Loop](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/flow_controls/loop.py)
+processes Data/Message/DataFrame items in an isolated body and aggregates a `done`
+output. Its [conditional router](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/flow_controls/conditional_router.py)
+has separate message outputs and branch-exclusion state. These source constructs
+currently have no equivalent import mapping and must be reviewed as unsupported;
+unresolved cycles are rejected instead of flattened. Bounded collection/body
+scheduling and conditional-router import remain unfinished acceptance work.

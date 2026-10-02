@@ -7013,6 +7013,10 @@
     "edgeBound": "戻り {edgeRound} / {max}",
     "roundTitle": "ラウンド {round}",
     "branchStarted": "開始: {time}",
-    "max_rounds_exhausted": "ラウンド上限に到達"
+    "max_rounds_exhausted": "ラウンド上限に到達",
+    "always": "完了した各パス",
+    "continue": "フォールバック結果で完了",
+    "importedHint": "インポートした Loop v1.2 は戻り先と完了ポリシーを保持します。元の対応付けを変更するにはネイティブマニフェストを編集してください。",
+    "importedFallback": "元のフォールバック"
   }
 }

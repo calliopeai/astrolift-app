@@ -414,3 +414,95 @@ async def test_real_unconfigured_agent_fanout_records_owned_branches_and_incompl
     assert all(row.round_number == 1 and row.status == "failed" for row in branches)
     assert parent.output["count"] == 2 and parent.output["complete"] is False
     await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
+
+
+@pytest.mark.parametrize(
+    "cap,fallback", [(1, "Bounded import done"), (2, None), (5, ""), (2, "__absent__")]
+)
+async def test_actual_flowise_import_roundtrip_executes_and_preserves_cap_output(
+    temporal_env, cap, fallback
+):
+    from workflows.importers.flowise import FlowiseImporter
+    from workflows.manifest import (
+        create_definition_from_manifest,
+        emit_workflow_manifest,
+        parse_workflow_manifest,
+    )
+    from workflows.tests.test_flowise_bounded_loops_2156 import source_loop
+
+    def prepare():
+        source = source_loop(cap=cap, fallback=fallback)
+        if fallback == "__absent__":
+            source["nodes"][2]["data"]["inputs"].pop("fallbackMessage")
+        imported = FlowiseImporter().import_flow(source)
+        parsed = parse_workflow_manifest(emit_workflow_manifest(imported.manifest))
+        org = Organization.objects.create(
+            name="Imported loop integration", slug="imported-loop-integration"
+        )
+        definition = create_definition_from_manifest(
+            parsed, organization=org, is_enabled=True
+        )
+        run = WorkflowRun.objects.create(
+            organization=org,
+            workflow_definition=definition,
+            workflow_kind="WorkflowDefinitionRunWorkflow",
+            workflow_id=f"imported-loop-{uuid.uuid4()}",
+            run_id="",
+            status="running",
+        )
+        gate = definition.stages.get(kind="human_gate")
+        return definition.pk, run.pk, run.workflow_id, gate.pk
+
+    plan = await sync_to_async(prepare)()
+    _, run_id, _, stage_id = plan
+    async with temporal_worker(
+        temporal_env, workflows=[WorkflowDefinitionRunWorkflow], activities=REGISTERED
+    ):
+        handle = await start(temporal_env, plan)
+        for round_number in range(1, cap + 1):
+            row = await wait_execution(run_id, stage_id, round_number=round_number)
+            await handle.signal(
+                "human_gate_decision",
+                {
+                    "execution_id": str(row.pk),
+                    "decision": "approved",
+                    "note": "Continue",
+                },
+            )
+        result = await asyncio.wait_for(handle.result(), 45)
+        history = await handle.fetch_history()
+    assert result.ok
+    expected = {
+        "nodeID": "humanInputAgentflow_0",
+        "maxLoopCount": cap,
+        "fallbackMessage": fallback,
+        "content": fallback
+        or f"Loop completed after reaching maximum iteration count of {cap}.",
+    }
+    if fallback == "__absent__":
+        expected.pop("fallbackMessage")
+        expected["content"] = (
+            f"Loop completed after reaching maximum iteration count of {cap}."
+        )
+    assert result.data["final_output"] == expected
+    rows = await sync_to_async(list)(
+        WorkflowStageExecution.objects.filter(workflow_run_id=run_id)
+        .order_by("pk")
+        .values("stage__kind", "round_number", "status", "caused_by", "output")
+    )
+    assert [
+        (row["stage__kind"], row["round_number"], row["status"]) for row in rows
+    ] == [
+        (kind, round_number, "completed")
+        for round_number in range(1, cap + 1)
+        for kind in ("human_gate", "checkpoint")
+    ]
+    assert rows[-1]["output"] == {"checkpoint": expected}
+    assert all(
+        row["output"]["checkpoint"]["content"]
+        == "Loop back to Continue this round? (humanInputAgentflow_0)"
+        for row in rows[:-1]
+        if row["stage__kind"] == "checkpoint"
+    )
+    assert all(row["caused_by"].get("reason") == "always" for row in rows[2:])
+    await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)

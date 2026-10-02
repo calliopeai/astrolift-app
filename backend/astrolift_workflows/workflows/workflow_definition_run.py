@@ -600,7 +600,21 @@ class WorkflowDefinitionRunWorkflow:
                             "human gate rejected", data={"execution_id": output["execution_id"]}
                         )
                 elif kind == KIND_CHECKPOINT:
-                    output = await self._run_checkpoint(input, stage, previous_output)
+                    control = validate_back_edge(stage.get("back_edge") or {}, kind=kind)
+                    checkpoint_input = previous_output
+                    if control.get("source_format") == "flowise_loop_1_2":
+                        checkpoint_input = {
+                            "content": f"Loop back to {control['source_label']} ({control['source_target']})",
+                            "nodeID": control["source_target"],
+                            "maxLoopCount": control["max_rounds"],
+                            **({"fallbackMessage": control["fallback_message"]} if "fallback_message" in control else {}),
+                        }
+                        edge_id = f"{stage['output_key']}->{control['to']}"
+                        if edge_returns.get(edge_id, 0) + 1 >= control["max_rounds"]:
+                            checkpoint_input["content"] = control.get("fallback_message") or (
+                                f"Loop completed after reaching maximum iteration count of {control['max_rounds']}."
+                            )
+                    output = await self._run_checkpoint(input, stage, checkpoint_input)
                 elif kind == KIND_AGGREGATION:
                     output = await self._run_aggregation(input, stage, fanout_sources)
                     fanout_sources = []
@@ -669,6 +683,8 @@ class WorkflowDefinitionRunWorkflow:
         self, stage: dict, edge: dict, edge_id: str, records: list, output: Any
     ) -> None:
         cause = {"edge": edge_id, "reason": "max_rounds_exhausted", "max_rounds": edge["max_rounds"], "edge_round": edge["max_rounds"]}
+        if edge["on_exhausted"] == "continue":
+            return
         if edge["on_exhausted"] == "escalate":
             self._execution_context = {**self._execution_context, "caused_by": cause}
             execution_id = await self._open_execution(stage, 1)

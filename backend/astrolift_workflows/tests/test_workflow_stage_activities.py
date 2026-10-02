@@ -1734,6 +1734,11 @@ async def test_temporal_closure_during_dispatch_cleans_up_after_spawn(
     from astrolift_workflows.workflows.workflow_definition_run import WorkflowDefinitionRunWorkflow
     from core.testing.temporal import temporal_worker
 
+    # A newly dispatched definition execution has an exact definition mirror.
+    # Legacy unbound histories exercise their original context=None path.
+    run.workflow_definition = definition
+    await sync_to_async(run.save)(update_fields=["workflow_definition", "updated_at", "version"])
+
     entered, release = Event(), Event()
     stopped = []
 

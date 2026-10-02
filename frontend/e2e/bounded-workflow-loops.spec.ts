@@ -45,3 +45,42 @@ test("the fan-out timeline exposes each branch start time", async ({ page }) => 
   );
   await expect(page.getByText(/^Started /)).toHaveCount(3);
 });
+
+test("imported Flowise controls retain source identity and fallback when changing cap", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=workflows-boundedstageoptions--imported-flowise&viewMode=story");
+  const t = labels("en");
+  for (const key of ["target", "trigger", "exhausted"])
+    await expect(page.getByLabel(t[key])).toBeDisabled();
+  await page.getByLabel(t.rounds).fill("2");
+  await expect(page.getByLabel(t.rounds)).toHaveValue("2");
+  await expect(page.getByLabel(t.target)).toHaveValue("flow_humaninputagentflow_0");
+  await expect(page.getByLabel(t.exhausted)).toHaveValue("continue");
+  await expect(page.getByText('Source fallback: "Bounded import done"')).toBeVisible();
+});
+
+for (const locale of ["en", "es", "de", "fr", "ja", "ko", "pt-BR", "zh-Hans"]) {
+  test(`imported source controls preserve target and completion policy in ${locale}`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(
+      "/iframe.html?id=workflows-boundedstageoptions--imported-translations&viewMode=story"
+    );
+    const section = page.locator(`[data-locale="${locale}"]`);
+    const t = labels(locale);
+    await expect(section.getByText(t.importedHint)).toBeVisible();
+    for (const key of ["target", "trigger", "exhausted"])
+      await expect(section.getByLabel(t[key])).toBeDisabled();
+    await section.getByLabel(t.rounds).fill("2");
+    await expect(section.getByLabel(t.rounds)).toHaveValue("2");
+    await expect(section.getByLabel(t.target)).toHaveValue("flow_humaninputagentflow_0");
+    await expect(section.getByLabel(t.exhausted)).toHaveValue("continue");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+    expect(errors).toEqual([]);
+  });
+}

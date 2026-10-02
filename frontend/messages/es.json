@@ -7016,6 +7016,10 @@
     "edgeBound": "Retorno {edgeRound} de {max}",
     "roundTitle": "Ronda {round}",
     "branchStarted": "Inicio: {time}",
-    "max_rounds_exhausted": "Límite de rondas alcanzado"
+    "max_rounds_exhausted": "Límite de rondas alcanzado",
+    "always": "Cada pasada completada",
+    "continue": "Completar con el resultado alternativo",
+    "importedHint": "Loop v1.2 importado conserva su destino y política de finalización. Edita el manifiesto nativo para cambiar la correspondencia de origen.",
+    "importedFallback": "Alternativa de origen"
   }
 }

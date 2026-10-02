@@ -238,21 +238,68 @@ def test_real_pg_repeated_activity_has_one_round_attempt_and_refuses_foreign_sta
         _create_stage_execution_sync(str(run.pk), str(stage.pk), 21, context)
 
 
-@pytest.mark.parametrize("value", [None,False,True,0,1.5,"", "null"])
+@pytest.mark.parametrize("value", [None, False, True, 0, 1.5, "", "null"])
 def test_toml_preserves_typed_scalar_conditions_including_json_null(value):
-    from workflows.manifest import ParsedWorkflowManifest, WorkflowDefSpec, WorkflowStageSpec
+    from workflows.manifest import (
+        ParsedWorkflowManifest,
+        WorkflowDefSpec,
+        WorkflowStageSpec,
+    )
 
     parsed = ParsedWorkflowManifest(
-        definition=WorkflowDefSpec(slug="typed-condition",name="Typed condition",pattern="chained"),
+        definition=WorkflowDefSpec(
+            slug="typed-condition", name="Typed condition", pattern="chained"
+        ),
         stages=[
-            WorkflowStageSpec(order=0,kind="checkpoint",output_key="draft"),
-            WorkflowStageSpec(order=1,kind="checkpoint",output_key="check",back_edge={
-                "to":"draft","when":"output_equals","max_rounds":2,"on_exhausted":"fail",
-                "path":"value","value":value,
-            }),
+            WorkflowStageSpec(order=0, kind="checkpoint", output_key="draft"),
+            WorkflowStageSpec(
+                order=1,
+                kind="checkpoint",
+                output_key="check",
+                back_edge={
+                    "to": "draft",
+                    "when": "output_equals",
+                    "max_rounds": 2,
+                    "on_exhausted": "fail",
+                    "path": "value",
+                    "value": value,
+                },
+            ),
         ],
     )
     encoded = emit_workflow_manifest(parsed)
     assert parse_workflow_manifest(encoded) == parsed
     if value is None:
         assert "back_edge_json" in encoded
+
+
+@pytest.mark.django_db(transaction=True)
+def test_new_bounded_execution_refuses_an_unbound_run_mirror():
+    from astrolift_identity.models import Organization
+    from astrolift_operations.models import WorkflowRun
+    from astrolift_workflows.activities.workflow_stage_activities import (
+        _create_stage_execution_sync,
+    )
+    from workflows.models import (
+        WorkflowDefinition,
+        WorkflowStage,
+        WorkflowStageExecution,
+    )
+
+    org = Organization.objects.create(name="Unbound run", slug="unbound-run")
+    definition = WorkflowDefinition.objects.create(
+        organization=org, name="Unbound", slug="unbound", model_label=""
+    )
+    stage = WorkflowStage.objects.create(
+        definition=definition, kind="checkpoint", order=0
+    )
+    run = WorkflowRun.objects.create(
+        organization=org,
+        workflow_kind="WorkflowDefinitionRunWorkflow",
+        workflow_id="unbound-run",
+        run_id="",
+        status="running",
+    )
+    with pytest.raises(ValueError, match="does not belong"):
+        _create_stage_execution_sync(str(run.pk), str(stage.pk), 1, {"round_number": 1})
+    assert not WorkflowStageExecution.objects.filter(workflow_run=run).exists()

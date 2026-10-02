@@ -7016,6 +7016,10 @@
     "edgeBound": "Retour {edgeRound} sur {max}",
     "roundTitle": "Tour {round}",
     "branchStarted": "Début : {time}",
-    "max_rounds_exhausted": "Limite des tours atteinte"
+    "max_rounds_exhausted": "Limite des tours atteinte",
+    "always": "Chaque passage terminé",
+    "continue": "Terminer avec le résultat de repli",
+    "importedHint": "Le Loop v1.2 importé conserve sa cible et sa politique de fin. Modifiez le manifeste natif pour changer la correspondance source.",
+    "importedFallback": "Repli source"
   }
 }

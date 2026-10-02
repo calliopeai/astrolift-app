@@ -7013,6 +7013,10 @@
     "edgeBound": "Retorno {edgeRound} de {max}",
     "roundTitle": "Rodada {round}",
     "branchStarted": "Início: {time}",
-    "max_rounds_exhausted": "Limite de rodadas atingido"
+    "max_rounds_exhausted": "Limite de rodadas atingido",
+    "always": "Cada passagem concluída",
+    "continue": "Concluir com o resultado alternativo",
+    "importedHint": "O Loop v1.2 importado preserva o destino e a política de conclusão. Edite o manifesto nativo para alterar o mapeamento de origem.",
+    "importedFallback": "Alternativa de origem"
   }
 }

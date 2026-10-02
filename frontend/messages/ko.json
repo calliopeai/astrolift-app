@@ -7013,6 +7013,10 @@
     "edgeBound": "반환 {edgeRound} / {max}",
     "roundTitle": "라운드 {round}",
     "branchStarted": "시작: {time}",
-    "max_rounds_exhausted": "라운드 한도에 도달함"
+    "max_rounds_exhausted": "라운드 한도에 도달함",
+    "always": "완료된 매 실행",
+    "continue": "대체 결과로 완료",
+    "importedHint": "가져온 Loop v1.2는 대상과 완료 정책을 유지합니다. 원본 매핑을 변경하려면 네이티브 매니페스트를 편집하세요.",
+    "importedFallback": "원본 대체 결과"
   }
 }
