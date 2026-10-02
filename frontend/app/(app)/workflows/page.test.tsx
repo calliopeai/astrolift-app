@@ -5,6 +5,9 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { workflowsFormerTabTarget } from "@/components/screens/workflows/list/workflows-list";
+import { GET_ME } from "@/graphql/user/user.queries";
+import { REVIEW_WORKFLOW_START } from "@/graphql/reviewed-starts/reviewed.queries";
+import { START_REVIEWED_WORKFLOW } from "@/graphql/reviewed-starts/reviewed.mutations";
 
 import { WorkflowsClient } from "./workflows-client";
 
@@ -12,6 +15,8 @@ const state = vi.hoisted(() => ({
   query: "",
   canAudit: false,
   runDefinition: vi.fn(),
+  review: vi.fn(),
+  start: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
   definitions: [
@@ -92,8 +97,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@apollo/client/react", () => ({
-  useQuery: () => ({
-    data: { workflowsPage: { items: [], nextCursor: null, totalCount: 0 } },
+  useApolloClient: () => ({ query: state.review, mutate: state.start }),
+  useQuery: (query: unknown) => ({
+    data:
+      query === GET_ME
+        ? { me: { id: "actor-1" } }
+        : { workflowsPage: { items: [], nextCursor: null, totalCount: 0 } },
     loading: false,
     refetch: vi.fn(),
   }),
@@ -143,6 +152,7 @@ function openMenu(name: string) {
 
 describe("Workflows list", () => {
   beforeEach(() => {
+    sessionStorage.clear();
     state.query = "";
     state.canAudit = false;
     state.definitionRuns = [];
@@ -152,6 +162,39 @@ describe("Workflows list", () => {
     state.runDefinition.mockResolvedValue({
       data: { runWorkflowDefinition: { ok: true, errors: [] } },
     });
+    state.review.mockReset().mockResolvedValue({
+      data: {
+        workflowDefinitionById: {
+          guid: "workflow-1",
+          revision: "reviewed-revision",
+          definition: state.definitions[0],
+          inputContract: {
+            schema: { type: "object", additionalProperties: false },
+            digest: "reviewed-schema",
+            supported: true,
+            error: "",
+            fields: [],
+            acceptsInputs: false,
+            supportsSimpleForm: true,
+          },
+        },
+      },
+    });
+    state.start.mockReset().mockResolvedValue({
+      data: {
+        startWorkflowDefinition: {
+          ok: true,
+          errors: [],
+          data: {
+            id: "execution-1",
+            requestId: "request-1",
+            dispatchStatus: "submitted",
+            temporalWorkflowId: "reviewed-engine",
+            temporalRunId: "reviewed-engine-run",
+          },
+        },
+      },
+    });
   });
 
   it("lists an imported definition directly and starts one without a configured wrapper", async () => {
@@ -159,7 +202,7 @@ describe("Workflows list", () => {
 
     expect(screen.getByRole("link", { name: /EMR Triage/ })).toHaveAttribute(
       "href",
-      "/workflows/emr-triage"
+      "/workflows/emr-triage?definitionId=workflow-1"
     );
     expect(screen.getByText("steadymd/smd-agents/workflows/emr-triage.toml")).toBeInTheDocument();
 
@@ -167,11 +210,37 @@ describe("Workflows list", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Run now" }));
 
     await waitFor(() =>
-      expect(state.runDefinition).toHaveBeenCalledWith({
-        variables: { workflowSlug: "emr-triage", triggerPayload: null },
+      expect(state.review).toHaveBeenCalledWith({
+        query: REVIEW_WORKFLOW_START,
+        variables: { id: "workflow-1" },
+        fetchPolicy: "no-cache",
       })
     );
-    await waitFor(() => expect(state.push).toHaveBeenCalledWith("/workflows/emr-triage/runs"));
+    expect(state.start).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Start reviewed run" }));
+    await waitFor(() =>
+      expect(state.start).toHaveBeenCalledWith({
+        mutation: START_REVIEWED_WORKFLOW,
+        variables: {
+          input: {
+            definitionId: "workflow-1",
+            expectedRevision: "reviewed-revision",
+            expectedInputSchemaDigest: "reviewed-schema",
+            requestId: expect.any(String),
+            inputs: {},
+            confirmed: true,
+          },
+        },
+      })
+    );
+    expect(
+      await screen.findByText(
+        "The engine accepted this execution. This does not mean the run has finished."
+      )
+    ).toBeVisible();
+    expect(state.runDefinition).not.toHaveBeenCalled();
+    expect(state.push).not.toHaveBeenCalled();
   });
 
   it("shows a definition's run state without audit access, and keeps raw Temporal behind it", async () => {
