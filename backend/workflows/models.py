@@ -597,6 +597,11 @@ class WorkflowStage(BaseCoreModel):
         default=OnFailure.FAIL,
         help_text="What to do if this stage fails.",
     )
+    back_edge = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Optional bounded return edge to an earlier stage output_key; max_rounds is required.",
+    )
     max_attempts = models.PositiveSmallIntegerField(
         default=3,
         validators=[MinValueValidator(1), MaxValueValidator(20)],
@@ -883,6 +888,16 @@ class WorkflowStageExecution(BaseCoreModel):
         default=Status.PENDING,
         db_index=True,
     )
+    round_number = models.PositiveSmallIntegerField(default=1)
+    caused_by = models.JSONField(default=dict, blank=True)
+    fanout_parent_execution = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="fanout_children",
+    )
+    fanout_index = models.PositiveSmallIntegerField(null=True, blank=True)
     attempt_number = models.IntegerField(
         default=1,
         help_text="1-based retry count — incremented each time the stage is retried.",

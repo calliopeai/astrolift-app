@@ -100,6 +100,21 @@ def validate_workflow_composition(
     root_label = definition.slug or str(definition.pk)
 
     def visit(current: WorkflowDefinition, path: list[int], labels: list[str], depth: int) -> None:
+        from workflows.back_edges import validate_loop_plan
+
+        validate_loop_plan(
+            [
+                {
+                    "order": stage.order,
+                    "kind": stage.kind,
+                    "output_key": stage.output_key,
+                    "back_edge": stage.back_edge,
+                }
+                for stage in current.stages.filter(deleted_at__isnull=True).order_by("order")
+            ],
+            pattern_kind=current.pattern_kind,
+            require_review_loop=False,
+        )
         invalid = (
             current.stages.filter(deleted_at__isnull=True)
             .exclude(kind=WorkflowStage.StageKind.WORKFLOW)

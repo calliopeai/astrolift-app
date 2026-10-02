@@ -242,3 +242,62 @@ its `execution` payload reports current closure and cleanup independently. A
 response with pending cleanup must not be displayed as fully stopped. Exact
 Temporal reads and controls bound connection establishment to five seconds and
 the individual RPC to three seconds; unavailable services never imply success.
+
+## Bounded return edges and review rounds
+
+A workflow can return to an earlier stage using `back_edge`. Both endpoints
+must have explicit, unique `output_key` values; positional return targets are
+refused. One outgoing return edge is allowed per stage:
+
+```toml
+[[stage]]
+kind = "agent_dispatch"
+agent = "writer"
+output_key = "draft"
+on_failure = "retry"
+max_attempts = 4
+
+[[stage]]
+kind = "human_gate"
+output_key = "review"
+prompt = "Approve this draft?"
+timeout = 86400
+back_edge = { to = "draft", when = "gate_rejected", max_rounds = 5, on_exhausted = "escalate" }
+```
+
+`max_rounds` includes the initial pass and must be an integer from 1 to 20.
+Rejection runs the producing segment again, then opens a new review gate.
+Approval continues forward. Intermediate retries do not consume review rounds.
+`stage_failed` applies after an agent or nested workflow exhausts its configured
+attempts. `output_equals` compares a dotted object `path` to a JSON scalar
+`value`; missing, nonfinite or incompatible data stops as unavailable.
+The exhaustion policy is `fail` or `escalate`. Escalation waits for the existing
+operator-clear signal within the stage's timeout and never opens another round.
+
+Each edge has a lifetime budget that overlapping edges cannot reset. The
+reviewed plan also refuses more than 1,000 stage visits or 500 execution units,
+counting attempt budgets and potential fan-out branches. Dynamic fan-out reserves
+its full 50-branch ceiling and refuses missing items or oversized collections.
+Failure or missing branch results stop as incomplete instead of producing an
+empty successful aggregation.
+
+Agents receive feedback under `_astrolift_workflow.loop.feedback`, alongside
+`edge`, `max_rounds`, `edge_round` and the global `round_number`. Named outputs
+from the segment being revised are removed before its next pass. The normal
+prior result remains the chained input; rejection feedback is passed separately.
+`workflowStageExecutions` records `roundNumber`, typed `causedBy`, `attemptNumber`,
+`fanoutStageId`, `fanoutParentExecutionGuid` and `fanoutIndex`. Global rounds
+increase whenever any return edge fires; `causedBy.edgeRound` identifies one
+edge's progress toward its `maxRounds` ceiling. Branches retain their actual
+start times and share an explicit parent execution.
+
+TOML and repository YAML retain the `back_edge`, `max_attempts` and `output_key`
+fields. Plans are frozen with the reviewed revision before dispatch; later stage
+edits cannot change that run's budgets. Temporal's
+`workflow-bounded-back-edges-v1` patch preserves forward-only execution for older
+histories. Historical rows default to round 1 without a cause and cannot prove
+past loop or branch attribution. Existing organization copies of review templates
+need an explicit reviewed edge before a new bounded run; the platform `rasd`
+and `moderate` templates now declare three-round review edges.
+`supervisor_worker` and `advisor` are unsupported executor patterns and are
+refused on new runs.

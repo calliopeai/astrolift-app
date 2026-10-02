@@ -283,6 +283,7 @@ def _freeze_plans(run, definition, graph=None) -> dict:
             review_organization_id=run.organization_id,
             review_definition_graph=graph,
             review_agent_workloads=workloads,
+            review_bounded_loops=True,
         )
         plans[str(item.pk)] = plan
         for stage in plan["stages"]:

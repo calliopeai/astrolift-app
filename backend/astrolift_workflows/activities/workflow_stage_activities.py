@@ -86,6 +86,7 @@ def _get_workflow_stages_sync(
     review_organization_id: int | None = None,
     review_definition_graph: dict | None = None,
     review_agent_workloads: dict | None = None,
+    review_bounded_loops: bool = False,
 ) -> dict:
     """Return the definition's stages as ordered plain dicts.
 
@@ -113,6 +114,10 @@ def _get_workflow_stages_sync(
             ancestry = [str(value) for value in (workflow_ancestry or [])]
             if definition_id in ancestry or len(ancestry) > MAX_WORKFLOW_NESTING_DEPTH:
                 raise RuntimeError("The reviewed nested workflow ancestry is invalid")
+            if review_bounded_loops:
+                from workflows.back_edges import validate_loop_plan
+
+                validate_loop_plan(frozen["stages"], pattern_kind=frozen["pattern_kind"])
             return frozen
 
     definitions = WorkflowDefinition.objects.filter(
@@ -250,8 +255,10 @@ def _get_workflow_stages_sync(
                 "kind": stage.kind,
                 "on_failure": stage.on_failure,
                 "max_attempts": stage.max_attempts,
+                "back_edge": dict(stage.back_edge),
                 "timeout_seconds": int(stage.timeout_seconds),
                 "fan_out_count": stage.fan_out_count,
+                "fan_out_dynamic": stage.fan_out_dynamic,
                 "skill_refs": list(skill_refs),
                 "agent_definition_id": workload.pk if workload is not None else None,
                 "has_agent_definition": workload is not None,
@@ -269,6 +276,10 @@ def _get_workflow_stages_sync(
 
     for stage in stages:
         validate_stage_attempts(stage["max_attempts"])
+    if review_bounded_loops:
+        from workflows.back_edges import validate_loop_plan
+
+        validate_loop_plan(stages, pattern_kind=definition.pattern_kind)
     output_keys = [stage["output_key"] for stage in stages]
     duplicates = sorted({key for key in output_keys if output_keys.count(key) > 1})
     if duplicates:
@@ -373,10 +384,61 @@ def _record_nested_workflow_start_sync(
     run.save(update_fields=["run_id", "updated_at", "version"])
 
 
+def _execution_metadata(run, stage, context: dict | None) -> dict:
+    """Validate the durable stage identity and optional fan-out parent."""
+    if context is None:
+        return {}
+    from workflows.models import WorkflowStageExecution
+
+    if not isinstance(context, dict) or context.keys() - {
+        "round_number",
+        "caused_by",
+        "fanout_parent_execution_id",
+        "fanout_index",
+    }:
+        raise ValueError("invalid stage execution context")
+    if run.workflow_definition_id != stage.definition_id:
+        raise ValueError("stage does not belong to this workflow definition")
+    round_number = context.get("round_number", 1)
+    if isinstance(round_number, bool) or not isinstance(round_number, int) or not 1 <= round_number <= 1000:
+        raise ValueError("invalid stage round")
+    cause = context.get("caused_by") or {}
+    if cause:
+        if not isinstance(cause, dict) or set(cause) != {"edge", "reason", "max_rounds", "edge_round"}:
+            raise ValueError("invalid round cause")
+        if not isinstance(cause["edge"], str) or not 1 <= len(cause["edge"]) <= 203:
+            raise ValueError("invalid round edge")
+        if cause["reason"] not in {"gate_rejected", "stage_failed", "output_equals", "max_rounds_exhausted"}:
+            raise ValueError("invalid round reason")
+        cap = cause["max_rounds"]
+        if isinstance(cap, bool) or not isinstance(cap, int) or not 1 <= cap <= 20:
+            raise ValueError("invalid round bound")
+        edge_round = cause["edge_round"]
+        if isinstance(edge_round, bool) or not isinstance(edge_round, int) or not 1 <= edge_round <= cap:
+            raise ValueError("invalid edge round")
+    parent_id = context.get("fanout_parent_execution_id")
+    index = context.get("fanout_index")
+    if parent_id is not None:
+        if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < 50:
+            raise ValueError("invalid fan-out branch")
+        parent = WorkflowStageExecution.objects.get(pk=parent_id, workflow_run=run, stage=stage)
+        if parent.fanout_parent_execution_id is not None or parent.status != "running":
+            raise ValueError("fan-out parent is not open")
+    elif index is not None:
+        raise ValueError("fan-out branch has no parent")
+    return {
+        "round_number": round_number,
+        "caused_by": cause,
+        "fanout_parent_execution_id": parent_id,
+        "fanout_index": index,
+    }
+
+
 def _create_stage_execution_sync(
     workflow_run_id: str,
     stage_id: str,
     attempt_number: int,
+    context: dict | None = None,
 ) -> str:
     """Create a RUNNING ``WorkflowStageExecution`` and point the run's
     ``current_stage_execution`` at it. Returns the execution pk as str."""
@@ -392,15 +454,35 @@ def _create_stage_execution_sync(
             raise RuntimeError("Cannot open a stage on a closed workflow")
         stage = WorkflowStage.objects.get(pk=int(stage_id))
 
+        if context is not None:
+            from workflows.stage_limits import validate_stage_attempts
+
+            validate_stage_attempts(attempt_number)
         attempt = max(1, int(attempt_number))
-        execution = WorkflowStageExecution.objects.create(
+        metadata = _execution_metadata(run, stage, context)
+        execution_fields = dict(
             slug=_unique_slug(f"wfse-{run.pk}-{stage.pk}-a{attempt}"),
             workflow_run=run,
             stage=stage,
             status=WorkflowStageExecution.Status.RUNNING,
             attempt_number=attempt,
             started_at=timezone.now(),
+            **metadata,
         )
+        if context is None:
+            execution = WorkflowStageExecution.objects.create(**execution_fields)
+        else:
+            parent = metadata.get("fanout_parent_execution_id") or 0
+            branch = metadata.get("fanout_index")
+            branch = "parent" if branch is None else branch
+            exhaustion = int(metadata["caused_by"].get("reason") == "max_rounds_exhausted")
+            key = f"wfse-{run.pk}-{stage.pk}-r{metadata['round_number']}-a{attempt}-p{parent}-b{branch}-e{exhaustion}"
+            execution_fields.pop("slug")
+            execution, created = WorkflowStageExecution.objects.get_or_create(
+                slug=key, defaults=execution_fields
+            )
+            if not created:
+                return str(execution.pk)
 
         run.current_stage_execution = execution
         run.save(update_fields=["current_stage_execution", "updated_at", "version"])
@@ -1113,6 +1195,7 @@ def _snapshot_checkpoint_sync(
     workflow_run_id: str,
     stage_id: str,
     previous_output: dict | None,
+    context: dict | None = None,
 ) -> str:
     """Create an already-COMPLETED checkpoint execution that snapshots the
     prior stage's output. Returns the execution pk."""
@@ -1121,6 +1204,10 @@ def _snapshot_checkpoint_sync(
     from astrolift_operations.models import WorkflowRun
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
+    if context is not None:
+        execution_id = _create_stage_execution_sync(workflow_run_id, stage_id, 1, context)
+        _update_stage_execution_sync(execution_id, "completed", {"checkpoint": previous_output or {}}, None)
+        return execution_id
     run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
     now = timezone.now()
@@ -1143,6 +1230,7 @@ def _aggregate_fan_out_sync(
     workflow_run_id: str,
     stage_id: str,
     source_execution_ids: list[str],
+    context: dict | None = None,
 ) -> dict:
     """Merge the outputs of the fan-out source executions and persist an
     AGGREGATION execution linking them via ``fan_out_sources``.
@@ -1157,7 +1245,11 @@ def _aggregate_fan_out_sync(
 
     run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
-    sources = list(WorkflowStageExecution.objects.filter(pk__in=[int(s) for s in source_execution_ids]))
+    sources = list(
+        WorkflowStageExecution.objects.filter(pk__in=[int(s) for s in source_execution_ids], workflow_run=run)
+    )
+    if context is not None and len(sources) != len(set(source_execution_ids)):
+        raise ValueError("fan-out source execution is unavailable")
 
     merged: list[dict] = []
     ok_count = 0
@@ -1179,6 +1271,12 @@ def _aggregate_fan_out_sync(
         "total": len(sources),
     }
 
+    if context is not None:
+        execution_id = _create_stage_execution_sync(workflow_run_id, stage_id, 1, context)
+        _update_stage_execution_sync(execution_id, "completed", aggregated, None)
+        execution = WorkflowStageExecution.objects.get(pk=execution_id)
+        execution.fan_out_sources.set(sources)
+        return {**aggregated, "execution_id": execution_id}
     now = timezone.now()
     execution = WorkflowStageExecution.objects.create(
         slug=_unique_slug(f"wfse-{run.pk}-{stage.pk}-agg"),
@@ -1287,6 +1385,7 @@ async def get_workflow_stages(params: str | dict) -> dict:
         params.get("stage_bindings"),
         params.get("workflow_definition_id"),
         params.get("workflow_ancestry"),
+        review_bounded_loops=bool(params.get("bounded_loops", False)),
     )
 
 
@@ -1327,12 +1426,15 @@ async def create_stage_execution(
     workflow_run_id: str,
     stage_id: str,
     attempt_number: int = 1,
+    context: dict | None = None,
 ) -> str:
     """Create a RUNNING WorkflowStageExecution; return its pk as str."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_create_stage_execution_sync)(workflow_run_id, stage_id, attempt_number)
+    return await sync_to_async(_create_stage_execution_sync)(
+        workflow_run_id, stage_id, attempt_number, context
+    )
 
 
 @activity.defn(name="astrolift.workflow_stage.update_stage_execution")
@@ -1434,12 +1536,13 @@ async def snapshot_checkpoint(
     workflow_run_id: str,
     stage_id: str,
     previous_output: dict | None = None,
+    context: dict | None = None,
 ) -> str:
     """Create a COMPLETED checkpoint execution snapshotting prior output."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_snapshot_checkpoint_sync)(workflow_run_id, stage_id, previous_output)
+    return await sync_to_async(_snapshot_checkpoint_sync)(workflow_run_id, stage_id, previous_output, context)
 
 
 @activity.defn(name="astrolift.workflow_stage.aggregate_fan_out")
@@ -1447,12 +1550,15 @@ async def aggregate_fan_out(
     workflow_run_id: str,
     stage_id: str,
     source_execution_ids: list[str],
+    context: dict | None = None,
 ) -> dict:
     """Merge fan-out source outputs into one AGGREGATION execution."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_aggregate_fan_out_sync)(workflow_run_id, stage_id, source_execution_ids)
+    return await sync_to_async(_aggregate_fan_out_sync)(
+        workflow_run_id, stage_id, source_execution_ids, context
+    )
 
 
 @activity.defn(name="astrolift.workflow_stage.mark_workflow_run")

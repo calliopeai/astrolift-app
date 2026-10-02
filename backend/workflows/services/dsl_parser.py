@@ -43,10 +43,16 @@ The upsert lives in ``workflow_sync``.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 import yaml
 
+from workflows.back_edges import (
+    LoopContractError,
+    validate_back_edge,
+    validate_loop_plan,
+)
 from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attempts
 
 # Valid choices mirror WorkflowDefinition.PatternKind and
@@ -55,9 +61,9 @@ from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attemp
 # load time (keeps this importable in non-Django contexts like tests
 # that don't need the full ORM stack).
 _VALID_PATTERN_KINDS = frozenset(
-    {"single", "chained", "fan_out", "supervisor_worker", "review_loop", "advisor"}
+    {"single", "chained", "fan_out", "review_loop"}
 )
-_VALID_STAGE_KINDS = frozenset({"agent_dispatch", "human_gate", "checkpoint", "aggregation"})
+_VALID_STAGE_KINDS = frozenset({"agent_dispatch", "human_gate", "checkpoint", "aggregation", "workflow"})
 _VALID_ON_FAILURE = frozenset({"fail", "retry", "skip", "escalate"})
 
 # Default states/transitions injected when the author omits them. The
@@ -181,6 +187,11 @@ def _parse_stage_entry(entry: Any, workflow_index: int, stage_index: int) -> dic
     on_failure = str(entry.get("on_failure", "fail")).lower()
 
     try:
+        back_edge = validate_back_edge(entry.get("back_edge", {}), kind=kind)
+    except LoopContractError as exc:
+        raise DslParseError(f"{path}.back_edge: {exc}") from exc
+
+    try:
         max_attempts = validate_stage_attempts(entry.get("max_attempts", DEFAULT_STAGE_ATTEMPTS))
     except ValueError as exc:
         raise DslParseError(f"{path}.max_attempts: {exc}") from exc
@@ -193,13 +204,30 @@ def _parse_stage_entry(entry: Any, workflow_index: int, stage_index: int) -> dic
             f"{path}.timeout_seconds: must be an integer, got {timeout_seconds_raw!r}"
         ) from exc
 
+    text_fields = {}
+    for field in ("agent_ref", "workflow_ref", "environment_spec_slug", "role", "prompt", "output_key"):
+        value = entry.get(field, "")
+        if not isinstance(value, str):
+            raise DslParseError(f"{path}.{field}: must be a string")
+        text_fields[field] = value
+    approvers = entry.get("approvers", [])
+    if not isinstance(approvers, list) or any(not isinstance(value, str) for value in approvers):
+        raise DslParseError(f"{path}.approvers: must be a list of strings")
+    fan_out_dynamic = entry.get("fan_out_dynamic", False)
+    if not isinstance(fan_out_dynamic, bool):
+        raise DslParseError(f"{path}.fan_out_dynamic: must be a boolean")
+
     return {
+        **text_fields,
+        "approvers": approvers,
+        "fan_out_dynamic": fan_out_dynamic,
         "order": stage_index,
         "kind": kind,
         "skill_refs": skill_refs,
         "fan_out_count": fan_out_count,
         "on_failure": on_failure,
         "max_attempts": max_attempts,
+        "back_edge": back_edge,
         "timeout_seconds": timeout_seconds,
     }
 
@@ -256,6 +284,10 @@ def validate_workflow_dsl(definition: dict) -> list[str]:
                 f"{stage_path}.timeout_seconds must be a positive integer, " f"got {timeout_seconds!r}"
             )
 
+    try:
+        validate_loop_plan(stages, pattern_kind=pattern_kind, require_review_loop=False)
+    except LoopContractError as exc:
+        errors.append(str(exc))
     return errors
 
 
@@ -264,3 +296,15 @@ def _require_str(d: dict, key: str, path: str) -> str:
     if not isinstance(value, str) or not value:
         raise DslParseError(f"{path}.{key}: required string is missing or empty")
     return value
+
+
+def emit_workflows_dsl(definitions: list[dict]) -> str:
+    """Emit the full parsed authoring contract, including immutable return targets."""
+    rows = deepcopy(definitions)
+    for definition in rows:
+        errors = validate_workflow_dsl(definition)
+        if errors:
+            raise DslParseError("; ".join(errors))
+        for stage in definition["stages"]:
+            stage.pop("order", None)
+    return yaml.safe_dump({"workflows": rows}, sort_keys=False, allow_unicode=True)

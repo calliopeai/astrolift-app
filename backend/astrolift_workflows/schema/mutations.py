@@ -671,6 +671,8 @@ class WorkflowsMutation:
         role: str | None = None,
         on_failure: str | None = None,
         timeout_seconds: int | None = None,
+        max_attempts: int | None = None,
+        back_edge: JSON | None = None,
         agent_definition_guid: str | None = None,
         agent_ref: str | None = None,
         workflow_ref: str | None = None,
@@ -704,6 +706,20 @@ class WorkflowsMutation:
             if on_failure not in {c[0] for c in WorkflowStage.OnFailure.choices}:
                 return _failure("on_failure", f'Invalid on_failure "{on_failure}"')
             stage.on_failure = on_failure
+        if max_attempts is not None:
+            from workflows.stage_limits import validate_stage_attempts
+
+            try:
+                stage.max_attempts = validate_stage_attempts(max_attempts)
+            except ValueError as exc:
+                return _failure("max_attempts", str(exc))
+        if back_edge is not None:
+            from workflows.back_edges import validate_back_edge
+
+            try:
+                stage.back_edge = validate_back_edge(back_edge, kind=stage.kind)
+            except ValueError as exc:
+                return _failure("back_edge", str(exc))
         if role is not None:
             stage.role = role
         if timeout_seconds is not None:
@@ -776,7 +792,14 @@ class WorkflowsMutation:
 
         stage.deleted_at = timezone.now()
         stage.deleted_by = info.context.user
-        stage.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
+        try:
+            with transaction.atomic():
+                stage.save(update_fields=["deleted_at", "deleted_by", "updated_at", "version"])
+                from workflows.composition import validate_workflow_composition
+
+                validate_workflow_composition(stage.definition)
+        except ValueError as exc:
+            return _failure("back_edge", str(exc))
         return MutationResult.success()
 
     @strawberry.mutation(
@@ -807,8 +830,30 @@ class WorkflowsMutation:
 
         stages = {str(s.guid): s for s in definition.stages.filter(deleted_at__isnull=True)}
         requested = [str(g) for g in stage_guids]
-        if set(requested) != set(stages):
+        if len(requested) != len(stages) or set(requested) != set(stages):
             return _failure("stage_guids", "stage_guids must list exactly the definition's stages")
+
+        from workflows.back_edges import validate_loop_plan
+
+        try:
+            validate_loop_plan(
+                [
+                    {
+                        "order": index,
+                        "kind": stages[guid].kind,
+                        "output_key": stages[guid].output_key,
+                        "max_attempts": stages[guid].max_attempts,
+                        "fan_out_count": stages[guid].fan_out_count,
+                        "fan_out_dynamic": stages[guid].fan_out_dynamic,
+                        "back_edge": stages[guid].back_edge,
+                    }
+                    for index, guid in enumerate(requested)
+                ],
+                pattern_kind=definition.pattern_kind,
+                require_review_loop=False,
+            )
+        except ValueError as exc:
+            return _failure("back_edge", str(exc))
 
         # Two-phase to dodge the (definition, order) unique constraint: park
         # stages at negative orders, then assign final positions.

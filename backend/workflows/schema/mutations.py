@@ -502,7 +502,9 @@ class Mutation:
         # fan_out / ...). It existed on the model but had no creation arg, so
         # every API-created definition was stuck on the default "single" —
         # fan-out workflows were undefinable via the platform.
-        valid_patterns = {c[0] for c in WorkflowDefinition.PatternKind.choices}
+        from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
+
+        valid_patterns = SUPPORTED_EXECUTOR_PATTERNS
         if pattern_kind is not None and pattern_kind not in valid_patterns:
             return MutationResult(
                 ok=False,
@@ -584,7 +586,9 @@ class Mutation:
                 )
 
         if pattern_kind is not None:
-            valid_patterns = {c[0] for c in WorkflowDefinition.PatternKind.choices}
+            from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
+
+            valid_patterns = SUPPORTED_EXECUTOR_PATTERNS
             if pattern_kind not in valid_patterns:
                 return MutationResult(
                     ok=False,
@@ -750,6 +754,7 @@ class Mutation:
         on_failure: str = "fail",
         timeout_seconds: int = 300,
         max_attempts: int = 3,
+        back_edge: strawberry.scalars.JSON | None = None,
         agent_definition_guid: str | None = None,
         agent_ref: str | None = None,
         workflow_ref: str | None = None,
@@ -851,6 +856,7 @@ class Mutation:
             on_failure=on_failure,
             timeout_seconds=timeout_seconds,
             max_attempts=max_attempts,
+            back_edge=back_edge if back_edge is not None else {},
             agent_definition=agent_definition,
             agent_ref=resolved_agent_ref,
             workflow_ref=(workflow_ref or "").strip(),
@@ -1010,6 +1016,7 @@ class Mutation:
                     on_failure=stage.on_failure,
                     timeout_seconds=stage.timeout_seconds,
                     max_attempts=stage.max_attempts,
+                    back_edge=stage.back_edge,
                     prompt=stage.prompt,
                     output_key=stage.output_key,
                     approvers=list(stage.approvers or []),

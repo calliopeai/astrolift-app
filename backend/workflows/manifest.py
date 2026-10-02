@@ -40,6 +40,7 @@ from astrolift_manifest.parser import (
 )
 from astrolift_manifest.types import SkillRef
 from core.run_input_contract import InputContractError, no_input_schema, validate_schema
+from workflows.back_edges import LoopContractError, validate_back_edge, validate_loop_plan
 from workflows.models import WorkflowDefinition, WorkflowStage
 from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attempts
 
@@ -84,6 +85,7 @@ class WorkflowStageSpec:
     environment_spec_slug: str | None = None
     skills: list[str] = dataclasses.field(default_factory=list)
     on_failure: str = _DEFAULT_ON_FAILURE
+    back_edge: dict = dataclasses.field(default_factory=dict)
     max_attempts: int = DEFAULT_STAGE_ATTEMPTS
     timeout: int = _DEFAULT_TIMEOUT
     fan_out: int | str = 0
@@ -136,6 +138,14 @@ def parse_workflow_manifest(toml_str: str) -> ParsedWorkflowManifest:
             "output_key values must be unique: " + ", ".join(duplicates),
             path="stage.output_key",
         )
+    try:
+        validate_loop_plan(
+            [dataclasses.asdict(stage) for stage in stages],
+            pattern_kind=definition.pattern,
+            require_review_loop=False,
+        )
+    except LoopContractError as exc:
+        raise ManifestError(str(exc), path="stage.back_edge") from exc
     return ParsedWorkflowManifest(definition=definition, stages=stages)
 
 
@@ -232,6 +242,11 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
         )
 
     try:
+        back_edge = validate_back_edge(d.get("back_edge", {}), kind=kind)
+    except LoopContractError as exc:
+        raise ManifestError(str(exc), path=f"{base}.back_edge") from exc
+
+    try:
         max_attempts = validate_stage_attempts(d.get("max_attempts", DEFAULT_STAGE_ATTEMPTS))
     except ValueError as exc:
         raise ManifestError(str(exc), path=f"{base}.max_attempts") from exc
@@ -264,6 +279,7 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
         skills=skills,
         on_failure=on_failure,
         max_attempts=max_attempts,
+        back_edge=back_edge,
         timeout=timeout,
         fan_out=fan_out,
         prompt=prompt,
@@ -351,6 +367,8 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
             row["skills"] = list(stage.skills)
         if stage.on_failure != _DEFAULT_ON_FAILURE:
             row["on_failure"] = stage.on_failure
+        if stage.back_edge:
+            row["back_edge"] = validate_back_edge(stage.back_edge, kind=stage.kind)
         if stage.max_attempts != DEFAULT_STAGE_ATTEMPTS:
             row["max_attempts"] = validate_stage_attempts(stage.max_attempts)
         if stage.timeout != _DEFAULT_TIMEOUT:
@@ -410,6 +428,7 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
                 skills=list(stage.skill_refs or []),
                 on_failure=stage.on_failure,
                 max_attempts=stage.max_attempts,
+                back_edge=dict(stage.back_edge),
                 timeout=stage.timeout_seconds,
                 fan_out=fan_out,
                 prompt=stage.prompt or None,
@@ -507,6 +526,7 @@ def create_definition_from_manifest(
             skill_refs=list(stage.skills),
             on_failure=stage.on_failure,
             max_attempts=validate_stage_attempts(stage.max_attempts),
+            back_edge=validate_back_edge(stage.back_edge, kind=stage.kind),
             timeout_seconds=stage.timeout,
             fan_out_count=fan_out_count,
             fan_out_dynamic=fan_out_dynamic,
@@ -601,6 +621,7 @@ def replace_definition_content(
         stage_row.workflow_ref = stage_spec.workflow or ""
         stage_row.environment_spec_slug = stage_spec.environment_spec_slug or ""
         stage_row.skill_refs = list(stage_spec.skills)
+        stage_row.back_edge = validate_back_edge(stage_spec.back_edge, kind=stage_spec.kind)
         stage_row.max_attempts = validate_stage_attempts(stage_spec.max_attempts)
         stage_row.on_failure = stage_spec.on_failure
         stage_row.timeout_seconds = stage_spec.timeout
@@ -620,6 +641,7 @@ def replace_definition_content(
                 "skill_refs",
                 "on_failure",
                 "max_attempts",
+                "back_edge",
                 "timeout_seconds",
                 "fan_out_count",
                 "fan_out_dynamic",
