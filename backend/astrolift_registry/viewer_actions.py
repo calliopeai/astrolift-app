@@ -20,6 +20,7 @@ from astrolift_identity.permission_resolver import (
 )
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_lifecycle.visibility import cluster_owned_and_live, live_app_rows
+from astrolift_lifecycle.workload_targets import WorkloadActionTarget, action_target
 from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.scopes import _credential_app_ids, _credential_scope
 from core.permissions import (
@@ -37,6 +38,7 @@ class ActionPermission:
     allowed: bool
     code: str = ""
     reason: str = ""
+    target: WorkloadActionTarget | None = None
 
 
 def workload_viewer_permissions(workloads) -> dict[int, ActionPermission]:
@@ -57,7 +59,9 @@ def _workload_viewer_permissions(ids, tenant):
     }
     apps = live_app_rows(RegisteredApp.objects.all())
     rows = list(
-        Workload.objects.filter(pk__in=ids, registered_app__in=apps).select_related("registered_app__project")
+        Workload.objects.filter(pk__in=ids, registered_app__in=apps).select_related(
+            "registered_app__project", "registered_app__organization"
+        )
     )
     app_ids = {row.registered_app_id for row in rows}
     chains = _app_scope_chains(tenant, app_ids)
@@ -90,6 +94,7 @@ def _workload_viewer_permissions(ids, tenant):
                 False, "PRECONDITION", "workload has no coherent live primary environment"
             )
             continue
+        target = action_target(row, environment)
         scope = PermissionScope(ScopeKind.APP, app_id)
         try:
             _credential_scope(scope, Permission.APP_DEPLOY, allowed_app_ids=allowed_app_ids)
@@ -122,7 +127,27 @@ def _workload_viewer_permissions(ids, tenant):
                 ):
                     _check_permission_decision(Permission.APP_DEPLOY, scope, decide)
         except PermissionDenied as exc:
-            result[row.pk] = ActionPermission(False, "PERMISSION_DENIED", exc.reason)
+            result[row.pk] = ActionPermission(False, "PERMISSION_DENIED", exc.reason, target=target)
         else:
-            result[row.pk] = ActionPermission(True)
+            result[row.pk] = ActionPermission(True, target=target)
     return result
+
+
+def exact_workload_viewer_permission(workload, environment) -> ActionPermission:
+    from core.permissions import check_permission
+
+    target = action_target(workload, environment)
+    if target is None:
+        return ActionPermission(False, "PRECONDITION", "workload environment target is unavailable")
+    from astrolift_registry.scopes import _app_scope
+
+    try:
+        for approvals in (0, None):
+            with operation_attributes(**environment_context(environment, approvals=approvals).attributes()):
+                check_permission(
+                    Permission.APP_DEPLOY,
+                    scope=_app_scope(pk=workload.registered_app_id, permission=Permission.APP_DEPLOY),
+                )
+    except PermissionDenied as exc:
+        return ActionPermission(False, "PERMISSION_DENIED", exc.reason, target=target)
+    return ActionPermission(True, target=target)

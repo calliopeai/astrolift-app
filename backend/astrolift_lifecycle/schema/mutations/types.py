@@ -10,6 +10,7 @@ from astrolift_lifecycle.schema.types import (
     DeploymentType,
     DeployTokenType,
 )
+from astrolift_registry.schema.types import WorkloadActionTargetType
 
 
 @strawberry.input
@@ -526,12 +527,24 @@ class ForceRedeployPayload:
 @strawberry.input
 class RestartWorkloadInput:
     workload_id: GUID
+    environment_id: GUID | None = None
+    if_match_environment_version: int | None = None
+    expected_cluster_id: GUID | None = None
+    if_match_cluster_version: int | None = None
+    if_match_app_version: int | None = None
+    expected_namespace: str | None = None
 
 
 @strawberry.input
 class ScaleWorkloadInput:
     workload_id: GUID
     replicas: int
+    environment_id: GUID | None = None
+    if_match_environment_version: int | None = None
+    expected_cluster_id: GUID | None = None
+    if_match_cluster_version: int | None = None
+    if_match_app_version: int | None = None
+    expected_namespace: str | None = None
 
 
 @strawberry.type(name="AstroliftWorkloadOpPayload")
@@ -550,6 +563,13 @@ class _WorkloadOpPayload:
     new_revision: int | None
     desired_replicas: int | None
     ready_replicas: int | None
+    operation_id: GUID | None = None
+    target: WorkloadActionTargetType | None = None
+    workload_version: int | None = None
+    accepted: bool = True
+    completed: bool | None = strawberry.field(
+        default=None, description="Null: the cluster accepted a patch; rollout completion is not established."
+    )
 
 
 @strawberry.input

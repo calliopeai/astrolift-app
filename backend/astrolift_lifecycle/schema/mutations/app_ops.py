@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import cast
+from uuid import uuid4
 
 import strawberry
 from strawberry.types import Info
@@ -34,11 +35,18 @@ from astrolift_lifecycle.schema.mutations.types import (
     _WorkloadOpPayload,
 )
 from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
+from astrolift_lifecycle.workload_targets import (
+    action_audit_extras,
+    action_audit_target,
+    action_target,
+    check_target_match,
+)
 from astrolift_registry.models import RegisteredApp
+from astrolift_registry.schema.types import workload_action_target_to_type
 from astrolift_registry.scopes import app_scope_by_slug, app_scope_by_workload_guid
+from astrolift_registry.viewer_actions import ActionPermission
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
-from core.optimistic import check_version_match
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
@@ -152,7 +160,7 @@ class AppOpsMutations:
     # surface beyond what manual deploys already need.
 
     @strawberry.field
-    @mutation_audit(action="app.workload.restart")
+    @mutation_audit(action="app.workload.restart", target=action_audit_target, extras=action_audit_extras)
     @require_permission(
         Permission.APP_DEPLOY,
         scope=app_scope_by_workload_guid("input.workload_id", permission=Permission.APP_DEPLOY),
@@ -182,10 +190,24 @@ class AppOpsMutations:
         # Org-scope the by-guid lookup before the cluster restart side
         # effect: Workload reaches the org via registered_app. Fails closed
         # (NOT_FOUND) when org_id is None (#1183).
-        with locked_workload(str(input.workload_id)) as (workload, environment):
+        from core.scope_args import read_guid
+
+        if input.environment_id is not None and read_guid({"id": input.environment_id}, "id") is None:
+            return gql_failure(ErrorCode.VALIDATION.value, "environmentId must be a GUID")
+        if (
+            input.expected_cluster_id is not None
+            and read_guid({"id": input.expected_cluster_id}, "id") is None
+        ):
+            return gql_failure(ErrorCode.VALIDATION.value, "expectedClusterId must be a GUID")
+        lock = (
+            locked_workload(str(input.workload_id), environment_guid=str(input.environment_id))
+            if input.environment_id is not None
+            else locked_workload(str(input.workload_id))
+        )
+        with lock as (workload, environment):
             if workload is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "workload not found")
-            mismatch = check_version_match(workload, if_match_version=if_match_version, kind="Workload")
+            mismatch = check_target_match(workload, environment, input, if_match_version=if_match_version)
             if mismatch is not None:
                 return mismatch
             if environment is None:
@@ -194,9 +216,12 @@ class AppOpsMutations:
                     gql_failure(ErrorCode.PRECONDITION.value, "workload has no active environment"),
                 )
             recheck_action(Permission.APP_DEPLOY, workload, environment)
+            target = workload_action_target_to_type(
+                action_target(workload, environment), ActionPermission(True)
+            )
 
             try:
-                result = rollout_restart_workload(workload)
+                result = rollout_restart_workload(workload, environment=environment)
             except K8sOpError as exc:
                 return gql_failure(exc.code, exc.message)
             workload.save(update_fields=["updated_at", "version"])
@@ -206,11 +231,14 @@ class AppOpsMutations:
                     new_revision=result.new_revision,
                     desired_replicas=None,
                     ready_replicas=None,
+                    operation_id=str(uuid4()),
+                    target=target,
+                    workload_version=workload.version,
                 ),
             )
 
     @strawberry.field
-    @mutation_audit(action="app.workload.scale")
+    @mutation_audit(action="app.workload.scale", target=action_audit_target, extras=action_audit_extras)
     @require_permission(
         Permission.APP_DEPLOY,
         scope=app_scope_by_workload_guid("input.workload_id", permission=Permission.APP_DEPLOY),
@@ -239,10 +267,24 @@ class AppOpsMutations:
         # Org-scope the by-guid lookup before the cluster scale side effect:
         # Workload reaches the org via registered_app. Fails closed
         # (NOT_FOUND) when org_id is None (#1183).
-        with locked_workload(str(input.workload_id)) as (workload, environment):
+        from core.scope_args import read_guid
+
+        if input.environment_id is not None and read_guid({"id": input.environment_id}, "id") is None:
+            return gql_failure(ErrorCode.VALIDATION.value, "environmentId must be a GUID")
+        if (
+            input.expected_cluster_id is not None
+            and read_guid({"id": input.expected_cluster_id}, "id") is None
+        ):
+            return gql_failure(ErrorCode.VALIDATION.value, "expectedClusterId must be a GUID")
+        lock = (
+            locked_workload(str(input.workload_id), environment_guid=str(input.environment_id))
+            if input.environment_id is not None
+            else locked_workload(str(input.workload_id))
+        )
+        with lock as (workload, environment):
             if workload is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "workload not found")
-            mismatch = check_version_match(workload, if_match_version=if_match_version, kind="Workload")
+            mismatch = check_target_match(workload, environment, input, if_match_version=if_match_version)
             if mismatch is not None:
                 return mismatch
             if environment is None:
@@ -251,9 +293,12 @@ class AppOpsMutations:
                     gql_failure(ErrorCode.PRECONDITION.value, "workload has no active environment"),
                 )
             recheck_action(Permission.APP_DEPLOY, workload, environment)
+            target = workload_action_target_to_type(
+                action_target(workload, environment), ActionPermission(True)
+            )
 
             try:
-                result = scale_workload(workload, int(input.replicas))
+                result = scale_workload(workload, int(input.replicas), environment=environment)
             except K8sOpError as exc:
                 return gql_failure(exc.code, exc.message)
             workload.save(update_fields=["updated_at", "version"])
@@ -263,6 +308,9 @@ class AppOpsMutations:
                     new_revision=None,
                     desired_replicas=result.current_replicas,
                     ready_replicas=result.ready_replicas,
+                    operation_id=str(uuid4()),
+                    target=target,
+                    workload_version=workload.version,
                 ),
             )
 

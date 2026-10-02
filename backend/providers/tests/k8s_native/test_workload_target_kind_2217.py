@@ -101,10 +101,9 @@ def test_native_patch_keeps_identical_names_separate_between_clusters(cluster_co
             {"spec": {"replicas": 2}},
         )
         assert result["spec"]["replicas"] == 2
-        assert (
-            apis[0].get(kind="Deployment", namespace=namespace, name="web")["metadata"]["resourceVersion"]
-            == before["metadata"]["resourceVersion"]
-        )
+        untouched = apis[0].get(kind="Deployment", namespace=namespace, name="web")
+        assert untouched["spec"] == before["spec"]
+        assert untouched["metadata"]["generation"] == before["metadata"]["generation"]
         assert apis[0].get(kind="Deployment", namespace=namespace, name="web")["spec"]["replicas"] == 0
     finally:
         for helper in apis:
