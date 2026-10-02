@@ -11,6 +11,7 @@ import {
   WaypointsIcon,
   XCircleIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -94,9 +95,10 @@ export function AgentRunDetail({
   onHardStop,
   interactions,
 }: AgentRunDetailProps) {
+  const t = useTranslations("agentRecovery.run");
   const [killOpen, setKillOpen] = React.useState(false);
   const [open, setOpen] = React.useState<Open>(null);
-  const title = `run ${taskId.slice(0, 8)}`;
+  const title = t("title", { id: taskId.slice(0, 8) });
   // Agents ▾ › Runs › <agent> › run a1b2c3d4, the agent from the task itself.
   const crumbs = agentRunCrumbs(task, { label: title });
 
@@ -115,16 +117,16 @@ export function AgentRunDetail({
     return (
       <RunMissing
         crumbs={crumbs}
-        title="Agent run"
+        title={t("agentRun")}
         icon={<ScrollIcon className="size-4" />}
         error={error ? { message: error } : null}
         onRetry={onRetry}
         empty={{
           icon: <ScrollIcon className="size-5" />,
-          title: "Run not found",
-          description: "This agent run may not exist, or you may not have access to it.",
+          title: t("notFound"),
+          description: t("notFoundDescription"),
           actionHref: "/tasks?kind=agent",
-          actionLabel: "Open agent runs",
+          actionLabel: t("openRuns"),
         }}
       />
     );
@@ -142,31 +144,33 @@ export function AgentRunDetail({
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+        <Button variant="outline" size="icon" className="size-8" aria-label={t("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
         <DropdownMenuItem onSelect={() => setOpen("map")}>
           <WaypointsIcon className="size-4" />
-          Interaction map
+          {t("interactionMap")}
         </DropdownMenuItem>
         {canWatch && (
           <DropdownMenuItem onSelect={() => setOpen("live")}>
             <MonitorPlayIcon className="size-4" />
-            Watch live
+            {t("watchLive")}
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
-          onSelect={() => {
-            navigator.clipboard
-              .writeText(task.id)
-              .then(() => toast.success("Run ID copied."))
-              .catch(() => toast.error("Couldn't copy to clipboard."));
+          onSelect={async () => {
+            try {
+              await navigator.clipboard.writeText(task.id);
+              toast.success(t("idCopied"));
+            } catch {
+              toast.error(t("copyFailed"));
+            }
           }}
         >
           <CopyIcon className="size-4" />
-          Copy run ID
+          {t("copyId")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -181,37 +185,37 @@ export function AgentRunDetail({
         durationMs={span(task.startedAt, task.finishedAt ?? (terminal ? null : now))}
         context={
           <span className="font-mono">
-            created <DetailTimestamp iso={task.createdAt} />
+            {t("createdContext")} <DetailTimestamp iso={task.createdAt} />
           </span>
         }
         primaryAction={
           !terminal ? (
             <Button size="sm" variant="destructive" onClick={() => setKillOpen(true)}>
               <XCircleIcon className="size-4" />
-              Kill agent
+              {t("kill")}
             </Button>
           ) : undefined
         }
         menu={menu}
         steps={agentRunSteps(task, interactions.interactions, now)}
         stepsError={interactions.error}
-        failure={failureMessage ? { title: "Run failed", reason: failureMessage } : null}
+        failure={failureMessage ? { title: t("runFailed"), reason: failureMessage } : null}
         log={{
-          title: "Log",
+          title: t("log"),
           lines: agentLogLines(logs, task.startedAt ?? task.createdAt),
           loading: logsLoading,
           error: logsError,
           onRetry: onRetryLogs,
           onDownload: logs.length > 0 ? onDownloadLogs : undefined,
           emptyHint: failureMessage
-            ? "No pod logs: the run failed before a pod started. The reason is on the left."
+            ? t("spawnLogEmpty")
             : terminal
-              ? "This run wrote no log output."
-              : "No output yet. Lines appear here once the run's pod writes them.",
+              ? t("terminalLogEmpty")
+              : t("liveLogEmpty"),
           actions: canWatch ? (
             <Button type="button" size="sm" variant="outline" onClick={() => setOpen("live")}>
               <MonitorPlayIcon className="size-4" />
-              Watch live
+              {t("watchLive")}
             </Button>
           ) : undefined,
         }}
@@ -219,25 +223,25 @@ export function AgentRunDetail({
 
       <PanelGrid>
         <Panel
-          title="Details"
+          title={t("details")}
           icon={<InfoIcon className="size-4" />}
           span={6}
           actions={
             <Button type="button" size="sm" variant="outline" onClick={() => setOpen("map")}>
               <WaypointsIcon className="size-4" />
-              Interaction map
+              {t("interactionMap")}
               <span className="text-muted-foreground font-mono tabular-nums">{calls}</span>
             </Button>
           }
         >
           <DefinitionList
             items={[
-              { term: "Run ID", description: <Identifier value={task.id} form="full" /> },
-              { term: "Created", description: <DetailTimestamp iso={task.createdAt} /> },
-              { term: "Started", description: <DetailTimestamp iso={task.startedAt} /> },
-              { term: "Finished", description: <DetailTimestamp iso={task.finishedAt} /> },
+              { term: t("runId"), description: <Identifier value={task.id} form="full" /> },
+              { term: t("created"), description: <DetailTimestamp iso={task.createdAt} /> },
+              { term: t("started"), description: <DetailTimestamp iso={task.startedAt} /> },
+              { term: t("finished"), description: <DetailTimestamp iso={task.finishedAt} /> },
               {
-                term: "Pod",
+                term: t("pod"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {task.podName || "—"}
@@ -245,7 +249,7 @@ export function AgentRunDetail({
                 ),
               },
               {
-                term: "Namespace",
+                term: t("namespace"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {task.namespace || "—"}
@@ -253,7 +257,7 @@ export function AgentRunDetail({
                 ),
               },
               {
-                term: "Callback URL",
+                term: t("callbackUrl"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {task.callbackUrl || "—"}
@@ -261,12 +265,12 @@ export function AgentRunDetail({
                 ),
               },
               {
-                term: "Live session",
+                term: t("liveSession"),
                 description: task.vncEnabled ? (
                   canWatch ? (
-                    "live now"
+                    t("liveNow")
                   ) : (
-                    "VNC-capable"
+                    t("vncCapable")
                   )
                 ) : (
                   <span className="text-muted-foreground">—</span>
@@ -276,15 +280,15 @@ export function AgentRunDetail({
           />
         </Panel>
         <Panel
-          title="Result"
+          title={t("result")}
           icon={<BracesIcon className="size-4" />}
           span={6}
           empty={
             task.result == null
               ? {
                   icon: <BracesIcon className="size-5" />,
-                  title: "No result yet",
-                  description: "A finished run records its output payload here.",
+                  title: t("noResult"),
+                  description: t("noResultDescription"),
                 }
               : null
           }
@@ -300,11 +304,9 @@ export function AgentRunDetail({
       <Sheet open={open !== null} onOpenChange={(next) => !next && setOpen(null)}>
         <SheetContent side="right" className="flex w-full flex-col gap-4 sm:max-w-3xl">
           <SheetHeader>
-            <SheetTitle>{open === "live" ? "Live agent session" : "Interaction map"}</SheetTitle>
+            <SheetTitle>{open === "live" ? t("liveTitle") : t("interactionMap")}</SheetTitle>
             <SheetDescription className="font-mono text-xs [overflow-wrap:anywhere]">
-              {open === "live"
-                ? task.id
-                : "Control-plane activity: the API, tool calls, gates and signals."}
+              {open === "live" ? task.id : t("mapDescription")}
             </SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
@@ -313,7 +315,7 @@ export function AgentRunDetail({
               <div className="flex h-full min-h-0 flex-col gap-3">
                 <Button asChild size="sm" variant="outline" className="self-start">
                   <Link href={vncPopout} target="_blank" rel="noreferrer">
-                    Pop out
+                    {t("popout")}
                     <ExternalLinkIcon className="size-3.5" />
                   </Link>
                 </Button>
@@ -327,9 +329,9 @@ export function AgentRunDetail({
       <ConfirmDialog
         open={killOpen}
         onOpenChange={setKillOpen}
-        title="Kill this agent task?"
-        description="Astrolift will delete the Kubernetes Job and its per-task Secret. The run is marked cancelled only after the cluster confirms deletion; a failed deletion leaves the run active and reports the error."
-        confirmLabel="Kill agent"
+        title={t("killTitle")}
+        description={t("killDescription")}
+        confirmLabel={t("kill")}
         destructive
         onConfirm={onHardStop}
       />

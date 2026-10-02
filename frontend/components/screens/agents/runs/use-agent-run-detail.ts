@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -35,6 +36,7 @@ const LOG_TAIL = 200;
  * this same query, so the page fetches the log once.
  */
 export function useAgentRunDetail(taskId: string) {
+  const t = useTranslations("agentRecovery.feedback");
   const {
     data: taskData,
     loading,
@@ -68,12 +70,14 @@ export function useAgentRunDetail(taskId: string) {
     const { data } = await cancelTask({ variables: { id: taskId } });
     const result = data?.cancelTask;
     if (!result?.ok) {
-      throw new Error(result?.errors?.[0]?.message ?? "Agent task could not be stopped");
+      throw new Error(result?.errors?.[0]?.message ?? t("stopFailed"));
     }
-    await refetchTask();
-    toast.success("Agent task stopped", {
-      description: "The workload was deleted and the task is now cancelled.",
-    });
+    toast.success(t("stopped"), { description: t("stoppedDescription") });
+    try {
+      await refetchTask();
+    } catch {
+      toast.warning(t("stopRefreshFailed"));
+    }
   }
 
   // Once the run reaches a terminal state neither the task nor its logs will
