@@ -6452,5 +6452,32 @@
     "kibibytes": "{value} KiB/s",
     "mebibytes": "{value} MiB/s",
     "gibibytes": "{value} GiB/s"
+  },
+  "clusterHealthTab": {
+    "liveHelp": "Pod phases and recent warning events in managed namespaces, refreshed every 30 seconds.",
+    "workloadHelp": "Deployment readiness and 24-hour restart counts in managed namespaces, refreshed every 30 seconds.",
+    "warnings": "Recent warnings",
+    "noWarnings": "No warning events reported",
+    "noWarningsHelp": "An empty report does not establish cluster health.",
+    "workload": "Workload",
+    "namespace": "Namespace",
+    "readiness": "Ready / desired",
+    "restarts24h": "Restarts in 24h",
+    "deployed": "Last deploy",
+    "workloads": "Workloads",
+    "state": "State",
+    "restarts": "Restarts",
+    "ready": "Ready",
+    "degraded": "Degraded",
+    "down": "Down",
+    "inactive": "Inactive",
+    "unknown": "Unknown",
+    "restarted": "Restarted in 24h",
+    "search": "Search workloads, namespaces…",
+    "all": "All",
+    "mine": "Mine",
+    "unhealthy": "Unhealthy",
+    "mineNote": "Workloads belong to this cluster, so the Mine view is empty.",
+    "noDeployTime": "Not reported"
   }
 }

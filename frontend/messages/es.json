@@ -6375,5 +6375,32 @@
     "kibibytes": "{value} KiB/s",
     "mebibytes": "{value} MiB/s",
     "gibibytes": "{value} GiB/s"
+  },
+  "clusterHealthTab": {
+    "liveHelp": "Fases de pods y avisos recientes en los espacios de nombres administrados, actualizados cada 30 segundos.",
+    "workloadHelp": "Disponibilidad de los despliegues y reinicios en 24 horas en los espacios de nombres administrados, actualizados cada 30 segundos.",
+    "warnings": "Avisos recientes",
+    "noWarnings": "No se informaron avisos",
+    "noWarningsHelp": "Un informe vacío no confirma el estado del clúster.",
+    "workload": "Carga de trabajo",
+    "namespace": "Espacio de nombres",
+    "readiness": "Listas / deseadas",
+    "restarts24h": "Reinicios en 24 h",
+    "deployed": "Último despliegue",
+    "workloads": "Cargas de trabajo",
+    "state": "Estado",
+    "restarts": "Reinicios",
+    "ready": "Lista",
+    "degraded": "Degradada",
+    "down": "Caída",
+    "inactive": "Inactiva",
+    "unknown": "Desconocido",
+    "restarted": "Reiniciada en 24 h",
+    "search": "Buscar cargas de trabajo, espacios de nombres…",
+    "all": "Todas",
+    "mine": "Mías",
+    "unhealthy": "Con problemas",
+    "mineNote": "Las cargas de trabajo pertenecen a este clúster, por lo que la vista Mías está vacía.",
+    "noDeployTime": "No informado"
   }
 }

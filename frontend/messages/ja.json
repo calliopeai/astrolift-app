@@ -6372,5 +6372,32 @@
     "kibibytes": "{value} KiB/s",
     "mebibytes": "{value} MiB/s",
     "gibibytes": "{value} GiB/s"
+  },
+  "clusterHealthTab": {
+    "liveHelp": "管理対象の名前空間のPodフェーズと最近の警告を30秒ごとに更新します。",
+    "workloadHelp": "管理対象の名前空間のDeploymentの準備状況と24時間の再起動数を30秒ごとに更新します。",
+    "warnings": "最近の警告",
+    "noWarnings": "警告の報告はありません",
+    "noWarningsHelp": "空のレポートはクラスターの正常性を保証しません。",
+    "workload": "ワークロード",
+    "namespace": "名前空間",
+    "readiness": "準備済み / 希望数",
+    "restarts24h": "24時間の再起動数",
+    "deployed": "最終デプロイ",
+    "workloads": "ワークロード",
+    "state": "状態",
+    "restarts": "再起動",
+    "ready": "準備完了",
+    "degraded": "一部利用不可",
+    "down": "利用不可",
+    "inactive": "非稼働",
+    "unknown": "不明",
+    "restarted": "24時間以内に再起動",
+    "search": "ワークロード、名前空間を検索…",
+    "all": "すべて",
+    "mine": "自分の項目",
+    "unhealthy": "問題あり",
+    "mineNote": "ワークロードはこのクラスターに属するため、自分の項目は空です。",
+    "noDeployTime": "報告なし"
   }
 }

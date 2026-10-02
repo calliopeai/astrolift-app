@@ -6375,5 +6375,32 @@
     "kibibytes": "{value} KiB/s",
     "mebibytes": "{value} MiB/s",
     "gibibytes": "{value} GiB/s"
+  },
+  "clusterHealthTab": {
+    "liveHelp": "Phases des pods et avertissements récents dans les espaces de noms gérés, actualisés toutes les 30 secondes.",
+    "workloadHelp": "Disponibilité des déploiements et redémarrages sur 24 heures dans les espaces de noms gérés, actualisés toutes les 30 secondes.",
+    "warnings": "Avertissements récents",
+    "noWarnings": "Aucun avertissement signalé",
+    "noWarningsHelp": "Un rapport vide ne confirme pas la santé du cluster.",
+    "workload": "Charge de travail",
+    "namespace": "Espace de noms",
+    "readiness": "Prêtes / souhaitées",
+    "restarts24h": "Redémarrages sur 24 h",
+    "deployed": "Dernier déploiement",
+    "workloads": "Charges de travail",
+    "state": "État",
+    "restarts": "Redémarrages",
+    "ready": "Prête",
+    "degraded": "Dégradée",
+    "down": "Indisponible",
+    "inactive": "Inactive",
+    "unknown": "Inconnu",
+    "restarted": "Redémarrée sur 24 h",
+    "search": "Rechercher des charges, des espaces de noms…",
+    "all": "Toutes",
+    "mine": "Les miennes",
+    "unhealthy": "En difficulté",
+    "mineNote": "Les charges appartiennent à ce cluster ; la vue Les miennes est donc vide.",
+    "noDeployTime": "Non signalé"
   }
 }

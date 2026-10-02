@@ -7,6 +7,10 @@
   Publish exact-target review metadata and accepted-versus-completed outcomes;
   native Kubernetes clients retain independent cluster configuration (#2217).
 
+- Translate the full cluster Health tab, workload filters and warning panels in
+  all eight locales. Keep malformed observations unknown, zero-sized deployments
+  neutral and failed cached refreshes visible with independent retries (#2145).
+
 - Preserve actual shared-model deletion outcomes while an independent resource
   admission check completes. Target, version and authority changes still invalidate
   deletion reviews; resource drafts and admission observations gate updates (#2148).

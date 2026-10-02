@@ -6372,5 +6372,32 @@
     "kibibytes": "{value} KiB/s",
     "mebibytes": "{value} MiB/s",
     "gibibytes": "{value} GiB/s"
+  },
+  "clusterHealthTab": {
+    "liveHelp": "管理命名空间中的 Pod 阶段和近期警告，每 30 秒刷新。",
+    "workloadHelp": "管理命名空间中的 Deployment 就绪情况和 24 小时重启次数，每 30 秒刷新。",
+    "warnings": "近期警告",
+    "noWarnings": "没有报告警告事件",
+    "noWarningsHelp": "空报告不能证明集群处于健康状态。",
+    "workload": "工作负载",
+    "namespace": "命名空间",
+    "readiness": "就绪 / 期望",
+    "restarts24h": "24 小时重启次数",
+    "deployed": "最近部署",
+    "workloads": "工作负载",
+    "state": "状态",
+    "restarts": "重启",
+    "ready": "就绪",
+    "degraded": "降级",
+    "down": "不可用",
+    "inactive": "未运行",
+    "unknown": "未知",
+    "restarted": "24 小时内重启",
+    "search": "搜索工作负载、命名空间…",
+    "all": "全部",
+    "mine": "我的",
+    "unhealthy": "存在问题",
+    "mineNote": "工作负载属于此集群，因此“我的”视图为空。",
+    "noDeployTime": "未报告"
   }
 }

@@ -6375,5 +6375,32 @@
     "kibibytes": "{value} KiB/s",
     "mebibytes": "{value} MiB/s",
     "gibibytes": "{value} GiB/s"
+  },
+  "clusterHealthTab": {
+    "liveHelp": "Pod-Phasen und aktuelle Warnungen in verwalteten Namespaces, alle 30 Sekunden aktualisiert.",
+    "workloadHelp": "Deployment-Bereitschaft und Neustarts innerhalb von 24 Stunden in verwalteten Namespaces, alle 30 Sekunden aktualisiert.",
+    "warnings": "Aktuelle Warnungen",
+    "noWarnings": "Keine Warnungen gemeldet",
+    "noWarningsHelp": "Ein leerer Bericht bestätigt nicht den Zustand des Clusters.",
+    "workload": "Workload",
+    "namespace": "Namespace",
+    "readiness": "Bereit / gewünscht",
+    "restarts24h": "Neustarts in 24 Std.",
+    "deployed": "Letztes Deployment",
+    "workloads": "Workloads",
+    "state": "Status",
+    "restarts": "Neustarts",
+    "ready": "Bereit",
+    "degraded": "Beeinträchtigt",
+    "down": "Ausgefallen",
+    "inactive": "Inaktiv",
+    "unknown": "Unbekannt",
+    "restarted": "Neustart in 24 Std.",
+    "search": "Workloads und Namespaces suchen…",
+    "all": "Alle",
+    "mine": "Meine",
+    "unhealthy": "Beeinträchtigt",
+    "mineNote": "Die Workloads gehören diesem Cluster, deshalb ist die Ansicht Meine leer.",
+    "noDeployTime": "Nicht gemeldet"
   }
 }

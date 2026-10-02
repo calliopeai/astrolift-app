@@ -6372,5 +6372,32 @@
     "kibibytes": "{value} KiB/s",
     "mebibytes": "{value} MiB/s",
     "gibibytes": "{value} GiB/s"
+  },
+  "clusterHealthTab": {
+    "liveHelp": "Fases dos pods e avisos recentes nos namespaces gerenciados, atualizados a cada 30 segundos.",
+    "workloadHelp": "Prontidão dos deployments e reinícios em 24 horas nos namespaces gerenciados, atualizados a cada 30 segundos.",
+    "warnings": "Avisos recentes",
+    "noWarnings": "Nenhum aviso informado",
+    "noWarningsHelp": "Um relatório vazio não confirma a integridade do cluster.",
+    "workload": "Carga de trabalho",
+    "namespace": "Namespace",
+    "readiness": "Prontas / desejadas",
+    "restarts24h": "Reinícios em 24 h",
+    "deployed": "Último deployment",
+    "workloads": "Cargas de trabalho",
+    "state": "Estado",
+    "restarts": "Reinícios",
+    "ready": "Pronta",
+    "degraded": "Degradada",
+    "down": "Indisponível",
+    "inactive": "Inativa",
+    "unknown": "Desconhecido",
+    "restarted": "Reiniciada em 24 h",
+    "search": "Buscar cargas de trabalho, namespaces…",
+    "all": "Todas",
+    "mine": "Minhas",
+    "unhealthy": "Com problemas",
+    "mineNote": "As cargas de trabalho pertencem a este cluster, por isso a visualização Minhas está vazia.",
+    "noDeployTime": "Não informado"
   }
 }

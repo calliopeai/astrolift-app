@@ -21,8 +21,11 @@ export function useClusterHealth(clusterId: string, eventLimit: number) {
   const { data, loading, error, refetch } = useQuery<HealthResp>(CLUSTER_HEALTH, {
     variables: { clusterId, eventLimit: grow.limit },
     pollInterval: 30000,
+    fetchPolicy: "cache-and-network",
+    notifyOnNetworkStatusChange: true,
   });
-  const payload = data?.astroliftClusterHealth;
+  const reported = data?.astroliftClusterHealth;
+  const payload = reported?.clusterId === clusterId ? reported : null;
   const events = payload?.events ?? [];
   return {
     pods: payload?.pods ?? [],
@@ -30,7 +33,7 @@ export function useClusterHealth(clusterId: string, eventLimit: number) {
     loading,
     error: error?.message ?? null,
     refetch: () => {
-      void refetch();
+      void refetch().catch(() => {});
     },
     moreEvents: grow.feed(events.length, loading),
   };
