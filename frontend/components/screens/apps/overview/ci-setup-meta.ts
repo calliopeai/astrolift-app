@@ -117,7 +117,7 @@ const providerCiMeta: Record<string, ProviderCiMeta> = {
 
 /** Unbound providers retain familiar secret labels; no AWS workflow is invented. */
 export function resolveProviderCiMeta(slug: string): ProviderCiMeta {
-  return providerCiMeta[slug] ?? providerCiMeta.aws;
+  return Object.hasOwn(providerCiMeta, slug) ? providerCiMeta[slug] : providerCiMeta.aws;
 }
 
 /** Badge presentation per drift state. Unknown states fall back to the
@@ -165,7 +165,7 @@ export function renderWorkflowYaml(
     deployBranch,
   }: { providerSlug: string; renderedText?: string | null; deployBranch?: string | null }
 ): string | null {
-  if (providerSlug === "aws" || !(providerSlug in providerCiMeta)) {
+  if (providerSlug === "aws" || !Object.hasOwn(providerCiMeta, providerSlug)) {
     return renderedText?.trim() ? renderedText : null;
   }
   return `name: astrolift deploy

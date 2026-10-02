@@ -36,8 +36,22 @@ describe("CI workflow region", () => {
     expect(screen.getByText(/Workflow unavailable/)).toBeInTheDocument();
   });
 
-  it.each(["aws", "", "unknown"])("does not invent a workflow for provider %s", (providerSlug) => {
-    expect(renderWorkflowYaml(resolveProviderCiMeta(providerSlug), { providerSlug })).toBeNull();
+  it.each(["aws", "", "unknown", "constructor", "__proto__"])(
+    "does not invent a workflow for provider %s",
+    (providerSlug) => {
+      expect(renderWorkflowYaml(resolveProviderCiMeta(providerSlug), { providerSlug })).toBeNull();
+    }
+  );
+
+  it.each(["constructor", "__proto__"])("uses neutral metadata for opaque provider %s", (slug) => {
+    const meta = resolveProviderCiMeta(slug);
+    expect(meta.pushCredentialEnv).toBe("ASTROLIFT_PUSH_ROLE_ARN");
+    expect(typeof meta.renderWorkflowSteps).toBe("function");
+    render(<CiSetupSectionView {...CI_SETUP_EU} providerPluginSlug={slug} />);
+    fireEvent.click(screen.getByText("Managed CI workflow"));
+    expect(screen.getByText((_, element) => element?.tagName === "PRE").textContent).toBe(
+      CI_SETUP_EU.ciWorkflowSyncStatus!.renderedText
+    );
   });
 
   it.each([".gitlab-ci.yml", "bitbucket-pipelines.yml", ".gitea/workflows/astrolift-ci.yml"])(
