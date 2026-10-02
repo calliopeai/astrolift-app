@@ -142,7 +142,7 @@ def _build_labels(
     if namespace:
         labels: dict[str, str] = {"namespace": sanitize_label_value(namespace)}
     else:
-        labels: dict[str, str] = {"app": sanitize_label_value(app_slug)}
+        labels = {"app": sanitize_label_value(app_slug)}
     if environment_name and not namespace:
         # environment label is app-instrumentation convention; skip for
         # namespace-scoped k8s metric queries.

@@ -3,6 +3,7 @@
 import dataclasses
 import datetime as dt
 import math
+from collections.abc import Callable
 
 from astrolift_drivers.registry import DriverNotFound
 from astrolift_lifecycle.models import AppEnvironment
@@ -27,8 +28,11 @@ from astrolift_registry.models import Workload
 from core.cluster_observability import _auth_for_cluster, _driver_for_cluster, namespace_for_environment
 from core.schema.enums import ObservabilityPanelReason
 from providers._sdk.edge_metrics import edge_metrics_for_ingress_class
+from providers._sdk.workload_metrics import MetricContainer
 
-_SIGNAL_PLAN = (
+_SIGNAL_PLAN: tuple[
+    tuple[GoldenSignalKind, str, Callable[..., prom_queries.QueryPlan], dict[str, float]], ...
+] = (
     (GoldenSignalKind.TRAFFIC, "rps", prom_queries.build_request_rate_query, {}),
     (GoldenSignalKind.ERRORS, "ratio", prom_queries.build_error_rate_query, {}),
     (GoldenSignalKind.LATENCY_P50, "seconds", prom_queries.build_latency_quantile_query, {"quantile": 0.50}),
@@ -53,6 +57,8 @@ def _reason(value):
 
 
 def _unavailable(signal, reason):
+    measurement = signal.measurement
+    assert measurement is not None
     configured = reason in {
         GoldenSignalUnavailableReason.NOT_CONFIGURED,
         GoldenSignalUnavailableReason.NOT_INSTRUMENTED,
@@ -79,7 +85,7 @@ def _unavailable(signal, reason):
         signal,
         samples=[],
         reason=panel,
-        measurement=dataclasses.replace(signal.measurement, available=False, unavailable_reason=reason),
+        measurement=dataclasses.replace(measurement, available=False, unavailable_reason=reason),
     )
 
 
@@ -157,6 +163,7 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
             reason=ObservabilityPanelReason.NOT_CONFIGURED,
             signals=[_unavailable(signal, missing) for signal in signals],
         )
+    assert environment is not None and cluster is not None
     cfg, caps = cluster.provider_config or {}, cluster.capabilities or {}
     endpoint = str(cfg.get("prometheus_endpoint") or caps.get("prometheus_endpoint") or "").strip()
     if not endpoint:
@@ -174,7 +181,8 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
         and (not workload or row.get("name") == workload.slug)
         for row in declared
     )
-    members, member_error = None, None
+    members: list[MetricContainer] = []
+    member_error = None
     observed = None
     if workload:
         try:
@@ -205,6 +213,8 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
             )
     for index, (kind, _, builder, extra) in enumerate(_SIGNAL_PLAN):
         signal = signals[index]
+        measurement = signal.measurement
+        assert measurement is not None
         resource = _RESOURCES.get(kind)
         source = (
             GoldenSignalSource.CADVISOR_KUBE_STATE_METRICS
@@ -222,17 +232,18 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
             if resource or (edge and not workload)
             else GoldenSignalIdentityBasis.SOURCE_LABELS
         )
-        signal.measurement = dataclasses.replace(
-            signal.measurement,
+        measurement = dataclasses.replace(
+            measurement,
             source=source,
             identity_basis=basis,
             membership_observed_at=observed if resource else None,
         )
+        signal.measurement = measurement
         if resource and workload:
             if member_error:
                 signals[index] = _unavailable(signal, member_error)
                 continue
-            signal.measurement.containers = [
+            measurement.containers = [
                 MetricContainerIdentity(
                     pod_name=member.pod_name,
                     pod_uid=member.pod_uid,
@@ -241,7 +252,7 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
                 )
                 for member in members
             ]
-            signal.measurement.usage_unit = "cores" if resource == "cpu" else "bytes"
+            measurement.usage_unit = "cores" if resource == "cpu" else "bytes"
             try:
                 measured = measure_resource(
                     endpoint=endpoint,
@@ -258,11 +269,11 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
                 continue
             signal.samples = _points(measured.samples)
             signal.promql = measured.promql
-            signal.measurement.usage_samples, signal.measurement.limit_samples = (
+            measurement.usage_samples, measurement.limit_samples = (
                 _points(measured.usage),
                 _points(measured.limits),
             )
-            signal.measurement.measurement_start = dt.datetime.fromtimestamp(measured.start, dt.UTC)
+            measurement.measurement_start = dt.datetime.fromtimestamp(measured.start, dt.UTC)
         else:
             if workload and member_error:
                 signals[index] = _unavailable(signal, member_error)
@@ -307,7 +318,7 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
                 signals[index] = _unavailable(signal, _reason(getattr(exc, "reason", "QUERY_ERROR")))
                 continue
         if signal.samples:
-            signal.measurement.available = True
+            measurement.available = True
         else:
             reason = (
                 GoldenSignalUnavailableReason.NOT_INSTRUMENTED
@@ -330,28 +341,27 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
         for signal in signals:
             if signal.name in _RESOURCES:
                 continue
+            measurement = signal.measurement
+            assert measurement is not None
             if configured:
-                signal.measurement.source = GoldenSignalSource.CLOUDWATCH_ALB
-                signal.measurement.identity_basis = GoldenSignalIdentityBasis.NAMESPACE
+                measurement.source = GoldenSignalSource.CLOUDWATCH_ALB
+                measurement.identity_basis = GoldenSignalIdentityBasis.NAMESPACE
                 if signal.name == GoldenSignalKind.LATENCY_P90:
                     signal.reason = ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER
-                    signal.measurement.unavailable_reason = (
-                        GoldenSignalUnavailableReason.NOT_SUPPORTED_BY_PROVIDER
-                    )
+                    measurement.unavailable_reason = GoldenSignalUnavailableReason.NOT_SUPPORTED_BY_PROVIDER
                     continue
             if signal.samples and signal.promql.startswith("# CloudWatch"):
                 signal.reason = ObservabilityPanelReason.OK
                 signal.measurement = dataclasses.replace(
-                    signal.measurement,
+                    measurement,
                     available=True,
                     source=GoldenSignalSource.CLOUDWATCH_ALB,
                     identity_basis=GoldenSignalIdentityBasis.NAMESPACE,
                     unavailable_reason=None,
                 )
             elif (
-                configured
-                and signal.measurement.unavailable_reason != GoldenSignalUnavailableReason.PROVIDER_ERROR
+                configured and measurement.unavailable_reason != GoldenSignalUnavailableReason.PROVIDER_ERROR
             ):
                 signal.reason = ObservabilityPanelReason.NO_DATA_YET
-                signal.measurement.unavailable_reason = GoldenSignalUnavailableReason.NO_DATA_YET
+                measurement.unavailable_reason = GoldenSignalUnavailableReason.NO_DATA_YET
     return _envelope(signals)

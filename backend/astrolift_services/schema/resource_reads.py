@@ -18,7 +18,7 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from astrolift_graphql import GUID, PageType, search_q
-from astrolift_graphql.pagination import clamp_limit, keyset_page
+from astrolift_graphql.pagination import KeysetPage, clamp_limit, keyset_page
 from astrolift_identity.api_tokens import get_current_api_token
 from astrolift_identity.operation_context import UNKNOWN, OperationContext, environment_context
 from astrolift_identity.operation_visibility import _operation_policies, visible_operation_rows
@@ -294,7 +294,9 @@ def _page(qs, *, scope, limit, after, convert):
         from astrolift_graphql.pagination import encode_cursor
 
         cursor = encode_cursor(created, guid)
-    page = keyset_page(qs, cursor=cursor, limit=clamp_limit(limit))
+    page: KeysetPage[ManagedService | ManagedServiceAttachment] = keyset_page(
+        qs, cursor=cursor, limit=clamp_limit(limit)
+    )
     next_cursor = None
     if page.next_cursor and page.rows:
         anchor = page.rows[-1]
