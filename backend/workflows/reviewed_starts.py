@@ -424,16 +424,18 @@ def dispatch_start(row):
             definition = (
                 WorkflowDefinition.visible_to_org(current.organization_id)
                 .select_for_update(of=("self",))
+                .select_related("project__team")
                 .get(pk=current.definition_id)
             )
             stages = list(
                 WorkflowStage.objects.select_for_update().filter(
                     definition=definition, deleted_at__isnull=True
-                )
+                )[: MAX_REVIEWED_STAGES + 1]
             )
+            graph = _definition_graph(definition, stages=stages, lock=True)
             stale = (
                 not definition.is_enabled
-                or definition_revision(definition, stages=stages) != current.definition_revision
+                or definition_revision(definition, graph=graph) != current.definition_revision
             )
             if stale:
                 handle = recover_workflow_once(
@@ -446,7 +448,7 @@ def dispatch_start(row):
             else:
                 # Re-evaluate authority at submission, including nested definitions
                 # and agent targets; the encrypted reviewed plan remains immutable.
-                _freeze_plans(current.execution, definition)
+                _freeze_plans(current.execution, definition, graph=graph)
                 handle = start_workflow_once(
                     "WorkflowDefinitionRunWorkflow", [argument], workflow_id=current.execution.workflow_id
                 )

@@ -7897,9 +7897,9 @@ type Mutation {
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
 
   """
-  Run an agent WorkflowDefinition's stages durably via Temporal (WorkflowDefinitionRunWorkflow). Creates the WorkflowInstance + WorkflowRun mirror rows and enqueues the stage executor.
+  Compatibility entry for reviewed Definition starts. Requires exact definitionId, revision, input schema digest, caller requestId and confirmation; prefer startWorkflowDefinition.
   """
-  runWorkflowDefinition(workflowSlug: String!, triggerPayload: JSON = null): RunWorkflowDefinitionResult!
+  runWorkflowDefinition(workflowSlug: String!, triggerPayload: JSON = null, definitionId: GUID = null, expectedRevision: String = null, expectedInputSchemaDigest: String = null, requestId: String = null, confirmed: Boolean = false): RunWorkflowDefinitionResult!
 
   """Transition a workflow instance to a new state."""
   transitionWorkflow(instanceId: ID!, toState: String!, note: String! = ""): MutationResult!
@@ -9139,6 +9139,9 @@ type RunWorkflowDefinitionResult {
   errors: [ValidationError!]!
   workflowRunId: ID
   temporalWorkflowId: String
+  temporalRunId: String
+  requestId: String
+  dispatchStatus: String
 }
 
 type RunWorkflowResult {

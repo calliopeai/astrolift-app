@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Annotated
+
 import strawberry
 
 from astrolift_graphql import GUID
-from astrolift_workflows.schema.workflow_config_types import WorkflowDefinitionSummaryType, definition_summary
 from core.run_input_contract import input_contract
+
+if TYPE_CHECKING:
+    from astrolift_workflows.schema.workflow_config_types import WorkflowDefinitionSummaryType
 
 JSON = strawberry.scalars.JSON
 
@@ -38,7 +42,9 @@ class ReviewedWorkflowDefinition:
     guid: GUID
     revision: str
     input_contract: RunInputContract
-    definition: WorkflowDefinitionSummaryType
+    definition: Annotated[
+        WorkflowDefinitionSummaryType, strawberry.lazy("astrolift_workflows.schema.workflow_config_types")
+    ]
 
 
 @strawberry.input(name="StartWorkflowDefinitionInput")
@@ -67,6 +73,7 @@ class WorkflowDefinitionStartType:
 
 
 def review_to_type(definition, *, environment_models=None):
+    from astrolift_workflows.schema.workflow_config_types import definition_summary
     from workflows.reviewed_starts import definition_revision
 
     contract = input_contract(definition.input_schema)

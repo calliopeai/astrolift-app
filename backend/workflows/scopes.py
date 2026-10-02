@@ -184,6 +184,13 @@ def definition_scope_by_guid(field: str = "definition_id", permission=Permission
     return _scope
 
 
+def legacy_reviewed_definition_scope(args):
+    """Legacy compatibility arguments authorize the exact GUID when supplied."""
+    if read_arg(args, "definition_id") is not None:
+        return definition_scope_by_guid()(args)
+    return definition_scope_by_slug("workflow_slug", enabled_only=True)(args)
+
+
 def definition_start_scope(field: str = "request_id"):
     def _scope(args):
         from workflows.reviewed_starts import find_start

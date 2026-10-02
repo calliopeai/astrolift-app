@@ -50,7 +50,15 @@ SENSITIVE_KEYS = {
     "private_key",
     "privatekey",
 }
-SECRET_VALUE_KEYS = {"value", "values", "plaintext", "env_vars", "envvars"}
+SECRET_VALUE_KEYS = {
+    "value",
+    "values",
+    "plaintext",
+    "env_vars",
+    "envvars",
+    "trigger_payload",
+    "triggerpayload",
+}
 
 # Arguments that carry a whole manifest/dotenv document rather than one
 # isolated secret value (#1920): ``updateManifest.rawManifest``,

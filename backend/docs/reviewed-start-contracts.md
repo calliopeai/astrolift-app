@@ -66,6 +66,15 @@ branch reference can move.
 
 Legacy `triggerPipelineRun` and `cancelPipelineRun` signatures remain additive,
 but clients without reviewed identity and confirmation receive `PRECONDITION`.
+Legacy `runWorkflowDefinition(workflowSlug, triggerPayload)` also refuses effects
+without reviewed proof. Prefer `startWorkflowDefinition`; compatibility callers
+may add nullable `definitionId`, `expectedRevision`, `expectedInputSchemaDigest`,
+`requestId` and `confirmed: true`. The supplied GUID must own the exact supplied
+slug. It never falls back to an organization copy sharing that slug. The legacy
+result retains `workflowRunId` and `temporalWorkflowId` and adds nullable
+`temporalRunId`, `requestId` and `dispatchStatus` for uncertain response recovery.
+This affects Definition starts only; configured `runWorkflow` and real agent-task
+dispatch remain separate APIs.
 For cancellation first read `astroliftPipelineRun(id)` and send `runId`,
 `expectedVersion`, `temporalWorkflowId`, `temporalRunId` and `confirmed: true`.
 The exact engine execution must still be running; a later incarnation with the

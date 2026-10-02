@@ -44,6 +44,85 @@ def execute(world, query, variables=None):
 
 REVIEW = "query($id:GUID!){workflowDefinitionById(id:$id){guid revision definition{guid isEnabled organizationGuid} inputContract{schema digest supported acceptsInputs supportsSimpleForm fields{name kind required hasDefault default enumValues constraints sensitive simple}}}}"
 START = "mutation($input:StartWorkflowDefinitionInput!){startWorkflowDefinition(input:$input){ok errors{code message} data{id requestId definitionId organizationId executionId temporalWorkflowId temporalRunId dispatchStatus}}}"
+LEGACY = "mutation($id:GUID,$slug:String!,$revision:String,$digest:String,$key:String,$payload:JSON,$confirmed:Boolean!){runWorkflowDefinition(workflowSlug:$slug,triggerPayload:$payload,definitionId:$id,expectedRevision:$revision,expectedInputSchemaDigest:$digest,requestId:$key,confirmed:$confirmed){ok errors{field messages} workflowRunId temporalWorkflowId temporalRunId requestId dispatchStatus}}"
+
+
+def legacy_input(world):
+    return {
+        "id": str(world.definition.guid),
+        "slug": world.definition.slug,
+        "revision": definition_revision(world.definition),
+        "digest": digest(world.definition.input_schema),
+        "key": "legacy-exact-request",
+        "payload": {},
+        "confirmed": True,
+    }
+
+
+@pytest.mark.parametrize("missing", ["id", "revision", "digest", "key", "confirmed"])
+def test_legacy_missing_review_proof_refuses_effects(world, missing):
+    variables = legacy_input(world)
+    variables[missing] = False if missing == "confirmed" else None
+    result = execute(world, LEGACY, variables)
+    assert result.errors is None
+    legacy = result.data["runWorkflowDefinition"]
+    assert legacy["ok"] is False
+    assert legacy["errors"][0]["messages"][0].startswith("PRECONDITION:")
+    assert not WorkflowDefinitionStart.objects.exists()
+
+
+def test_complete_legacy_proof_forwards_exact_global_guid_and_reconciles_same_key(world):
+    world.definition.organization = None
+    world.definition.save()
+    replacement = WorkflowDefinition.objects.create(
+        name="Same-slug organization copy", slug=world.definition.slug, organization=world.org, model_label=""
+    )
+    WorkflowStage.objects.create(definition=replacement, slug="same-slug-stage", order=0, kind="checkpoint")
+    variables = legacy_input(world)
+    first = execute(world, LEGACY, variables)
+    assert first.errors is None
+    first = first.data["runWorkflowDefinition"]
+    assert first["ok"] is False
+    assert first["dispatchStatus"] == "uncertain"
+    assert first["workflowRunId"] and first["temporalWorkflowId"]
+    second = execute(world, LEGACY, variables)
+    assert second.errors is None
+    assert second.data["runWorkflowDefinition"]["workflowRunId"] == first["workflowRunId"]
+    row = WorkflowDefinitionStart.objects.get()
+    assert row.definition_id == world.definition.pk
+    assert row.definition_id != replacement.pk
+
+
+@pytest.mark.parametrize("changed", ["slug", "revision", "digest", "payload"])
+def test_legacy_proof_and_inputs_cannot_be_implicitly_substituted(world, changed):
+    variables = legacy_input(world)
+    variables[changed] = {"unknown": "private-invalid-input"} if changed == "payload" else "different"
+    result = execute(world, LEGACY, variables)
+    assert result.errors is None
+    assert result.data["runWorkflowDefinition"]["ok"] is False
+    assert not WorkflowDefinitionStart.objects.exists()
+
+
+def test_legacy_payload_is_encrypted_and_redacted_across_audit_and_debug(world, caplog, settings):
+    marker = "PRIVATE-LEGACY-WORKFLOW-PAYLOAD"
+    world.definition.input_schema = {
+        "type": "object",
+        "properties": {"label": {"type": "string"}},
+        "additionalProperties": False,
+    }
+    world.definition.save()
+    variables = legacy_input(world)
+    variables["payload"] = {"label": marker}
+    result = execute(world, LEGACY, variables)
+    assert result.errors is None
+    row = WorkflowDefinitionStart.objects.get()
+    assert marker.encode() not in bytes(row.payload_ciphertext)
+    assert marker not in caplog.text
+    assert marker not in str(list(MutationAuditLog.objects.values("variables", "errors")))
+    from core.tests.test_secret_leak_channels_1920 import _log_request
+
+    settings.DEBUG = True
+    assert marker not in _log_request(LEGACY, variables, {"data": result.data})
 
 
 def test_exact_review_has_explicit_no_input_contract(world):
