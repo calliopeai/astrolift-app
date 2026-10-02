@@ -43,8 +43,13 @@ export interface PodTarget {
  * resolves to a live target instead of pinning a name that no longer exists —
  * which matters most for the URL case, since a pod name is inherently
  * short-lived and a deep link outlives the pod it names (#1250).
+ * Shell callers use strictSelection: a vanished explicit selection is refused
+ * instead of choosing a different pod or container.
  */
-export function usePodTarget(slug: string): PodTarget {
+export function usePodTarget(
+  slug: string,
+  options?: { environmentName?: string | null; enabled?: boolean; strictSelection?: boolean }
+): PodTarget {
   // PodExpander deep-links a specific pod ("open shell" / "open logs" on an
   // expanded pod row). Honouring it is the whole point of the link: without
   // it the operator picks the misbehaving replica, clicks through, and lands
@@ -55,7 +60,8 @@ export function usePodTarget(slug: string): PodTarget {
   const urlContainer = searchParams?.get("container") || null;
 
   const pods = useQuery<PodsResp>(LIST_APP_PODS, {
-    variables: { appSlug: slug },
+    variables: { appSlug: slug, environmentName: options?.environmentName ?? null },
+    skip: options?.enabled === false,
     pollInterval: POD_POLL_MS,
     fetchPolicy: "cache-and-network",
   });
@@ -67,8 +73,11 @@ export function usePodTarget(slug: string): PodTarget {
 
   const [pickedPod, setPickedPod] = React.useState<string | null>(null);
   const selectedPod: string | null = React.useMemo(() => {
-    return selectPodName(podRows, pickedPod ?? urlPod);
-  }, [pickedPod, urlPod, podRows]);
+    const preferred = pickedPod ?? urlPod;
+    if (options?.strictSelection && preferred && !podRows.some((pod) => pod.name === preferred))
+      return null;
+    return selectPodName(podRows, preferred);
+  }, [pickedPod, urlPod, podRows, options?.strictSelection]);
 
   const podContainers: string[] = React.useMemo(() => {
     const pod = podRows.find((p) => p.name === selectedPod);
@@ -82,8 +91,10 @@ export function usePodTarget(slug: string): PodTarget {
 
   const [pickedContainer, setPickedContainer] = React.useState<string | null>(null);
   const selectedContainer: string | null = React.useMemo(() => {
-    return selectContainerName(podContainers, selectedPodWorkload, pickedContainer ?? urlContainer);
-  }, [pickedContainer, urlContainer, podContainers, selectedPodWorkload]);
+    const preferred = pickedContainer ?? urlContainer;
+    if (options?.strictSelection && preferred && !podContainers.includes(preferred)) return null;
+    return selectContainerName(podContainers, selectedPodWorkload, preferred);
+  }, [pickedContainer, urlContainer, podContainers, selectedPodWorkload, options?.strictSelection]);
 
   const podsLoading = pods.loading && podRows.length === 0;
 

@@ -1292,6 +1292,24 @@ type AstroliftAppEnvironmentPage {
   pageSize: Int
 }
 
+type AstroliftAppExecTarget {
+  workloadId: GUID!
+  workloadVersion: Int!
+  appId: GUID!
+  appVersion: Int!
+  environmentId: GUID!
+  environmentName: String!
+  environmentVersion: Int!
+  clusterId: GUID!
+  clusterVersion: Int!
+  namespace: String!
+  podName: String!
+  podUid: String!
+  container: String!
+  podBinding: String!
+  resumable: Boolean!
+}
+
 type AstroliftAppGoldenSignal {
   name: GoldenSignalKind!
   rangeSeconds: Int!
@@ -8346,6 +8364,7 @@ type Query {
   astroliftWorkloads(appSlug: String = null): [AstroliftWorkload!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage.")
   astroliftWorkloadsPage(appSlug: String = null, search: String = null, kinds: [String!] = null, limit: Int! = 50, after: String = null, filter: AstroliftWorkloadsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftWorkloadPage!
   astroliftWorkload(appSlug: String!, slug: String!): AstroliftWorkload
+  astroliftAppExecTarget(appSlug: String!, workloadSlug: String!, environmentId: GUID!, podName: String!, container: String!): AstroliftAppExecTarget
   astroliftWorkloadActionTarget(workloadId: GUID!, environmentId: GUID = null): AstroliftWorkloadActionTarget
   astroliftWorkloadScalingStatus(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadScalingStatus
   astroliftContainers(workloadSlug: String = null): [AstroliftContainer!]!

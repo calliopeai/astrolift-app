@@ -1254,6 +1254,24 @@ export type AstroliftAppEnvironmentPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftAppExecTarget = {
+  appId: Scalars['GUID']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  container: Scalars['String']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  namespace: Scalars['String']['output'];
+  podBinding: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  podUid: Scalars['String']['output'];
+  resumable: Scalars['Boolean']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
+};
+
 export type AstroliftAppGoldenSignal = {
   name: GoldenSignalKind;
   promql: Scalars['String']['output'];
@@ -9718,6 +9736,7 @@ export type Query = {
   astroliftAppDoctor: AstroliftAppDoctorReport;
   astroliftAppDomains: Array<AstroliftAppDomain>;
   astroliftAppEndpointMetrics: Array<AstroliftAppEndpointMetric>;
+  astroliftAppExecTarget?: Maybe<AstroliftAppExecTarget>;
   astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
@@ -10411,6 +10430,15 @@ export type QueryAstroliftAppEndpointMetricsArgs = {
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppExecTargetArgs = {
+  appSlug: Scalars['String']['input'];
+  container: Scalars['String']['input'];
+  environmentId: Scalars['GUID']['input'];
+  podName: Scalars['String']['input'];
+  workloadSlug: Scalars['String']['input'];
 };
 
 
