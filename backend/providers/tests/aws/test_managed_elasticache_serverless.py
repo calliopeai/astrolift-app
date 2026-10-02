@@ -31,7 +31,7 @@ class FakeElastiCache:
         return {"ServerlessCaches": [self.caches[name]]}
 
     def list_tags_for_resource(self, **kwargs):
-        for cache in self.caches.values():
+        for cache in [*self.caches.values(), *self.users.values(), *self.groups.values()]:
             if cache["ARN"] == kwargs["ResourceName"]:
                 return {"TagList": cache.get("Tags", [])}
         return {"TagList": []}
@@ -81,7 +81,11 @@ class FakeElastiCache:
 
     def create_user_group(self, **kwargs):
         self.calls.append(("CreateUserGroup", kwargs))
-        self.groups[kwargs["UserGroupId"]] = {**kwargs, "Status": "active"}
+        self.groups[kwargs["UserGroupId"]] = {
+            **kwargs,
+            "Status": "active",
+            "ARN": f"arn:aws:elasticache:us-west-2:123456789012:usergroup:{kwargs['UserGroupId']}",
+        }
 
     def delete_user_group(self, **kwargs):
         self.calls.append(("DeleteUserGroup", kwargs))
@@ -133,6 +137,7 @@ class FakeSecrets:
 
 def spec(**config: Any) -> ProvisionSpec:
     return ProvisionSpec(
+        managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456789",
         organization_id="org",
         organization_slug="acme",
         app_id="app",
@@ -289,8 +294,12 @@ def test_provision_does_not_adopt_another_services_cache():
     import dataclasses
 
     subject, ec, _ = driver()
-    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
-    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+    first = subject.provision(spec())
+    second = subject.provision(
+        dataclasses.replace(
+            spec(), managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456780", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
@@ -323,3 +332,54 @@ def test_restore_seeds_the_cache_from_the_retained_snapshot_only():
     assert restored.ok, restored.message
     create = next(payload for operation, payload in ec.calls if operation == "CreateServerlessCache")
     assert create["SnapshotArnsToRestore"] == [retained]
+
+
+@pytest.mark.parametrize("target", ["user", "group", "membership", "untagged"])
+def test_existing_access_resources_require_exact_owner_and_membership(target):
+    import dataclasses
+
+    subject, ec, _ = driver()
+    owner = spec()
+    name = subject._cache_name(owner)
+    assert subject.provision(owner).ok
+    ec.caches.clear()
+    user_id, group_id = subject._user_id(name), subject._group_id(name)
+    foreign = "8b7e2c6b-0b93-4126-a121-abc123456780"
+    resource = ec.users[user_id] if target in {"user", "untagged"} else ec.groups[group_id]
+    if target == "membership":
+        resource["UserIds"] = ["another-user"]
+    elif target == "untagged":
+        resource["Tags"] = []
+    else:
+        resource["Tags"] = [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/managed_service_id", "Value": foreign},
+        ]
+    before = dataclasses.replace(owner, recorded_handle=f"redis/{name}")
+    creates = len([op for op, _ in ec.calls if op == "CreateServerlessCache"])
+    result = subject.provision(before)
+    assert not result.ok
+    assert len([op for op, _ in ec.calls if op == "CreateServerlessCache"]) == creates
+    assert ec.users[user_id] is resource or ec.groups[group_id] is resource
+    if target == "membership":
+        assert ec.groups[group_id]["UserIds"] == ["another-user"]
+    elif target == "untagged":
+        assert resource["Tags"] == []
+    else:
+        assert resource["Tags"][-1]["Value"] == foreign
+
+
+def test_long_prefix_near_identical_service_ids_keep_distinct_cache_and_access_names():
+    import dataclasses
+
+    subject, ec, _ = driver()
+    subject._config = dataclasses.replace(subject._config, cache_name_prefix="p" * 300)
+    rows = [spec(), dataclasses.replace(spec(), managed_service_id="8b7e2c6b-0b93-4126-a121-abc123456788")]
+    results = [subject.provision(row) for row in rows]
+    assert all(result.ok for result in results)
+    assert len(ec.caches) == len(ec.users) == len(ec.groups) == 2
+    for row, result in zip(rows, results, strict=True):
+        name = result.handle.partition("/")[2]
+        assert name.endswith(row.managed_service_id.replace("-", "")) and len(name) <= 38
+        for identifier in [subject._user_id(name), subject._group_id(name)]:
+            assert identifier.endswith(row.managed_service_id.replace("-", "")) and len(identifier) <= 40
