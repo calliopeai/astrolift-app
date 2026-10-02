@@ -13,6 +13,8 @@ import {
   numberedPageVariables,
 } from "@/components/screens/agents/skills/catalog";
 import { ADAPTERS } from "@/components/screens/agents/skills/tool-adapters";
+import type { Crumb } from "@/components/shell/ShellHeader";
+import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
 export const TOOLS_LIST: ListDefinition = {
   id: "agents.tools",
@@ -32,12 +34,70 @@ export const TOOLS_LIST: ListDefinition = {
     ],
     {
       mineNote:
-        "Mine means tools you registered. Tools from before Astrolift recorded who registered them show only in All.",
+        "Mine means tools you registered. Tools from before Astrolift recorded who registered them are not included in Mine.",
     }
   ),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
+
+const ADAPTER_VALUES = new Set(ADAPTERS.map((adapter) => adapter.value as string));
+
+export function localizedToolAdapter(t: (key: string) => string, value: string): string {
+  return ADAPTER_VALUES.has(value) ? t(value) : value;
+}
+
+export function localizedToolsList(t: (key: string) => string): ListDefinition {
+  return {
+    ...TOOLS_LIST,
+    fields: TOOLS_LIST.fields.map((field) => ({
+      ...field,
+      label: field.key === "skill" || field.key === "adapter" ? t(field.key) : field.label,
+      options: field.options?.map((option) => ({
+        ...option,
+        label: localizedToolAdapter(t, option.value),
+      })),
+    })),
+    searchPlaceholder: t("search"),
+    views: TOOLS_LIST.views.map((view) => ({
+      ...view,
+      label: ["all", "mine", "builtin", "custom"].includes(view.key) ? t(view.key) : view.label,
+      note: view.key === "mine" ? t("mineNote") : view.note,
+    })),
+  };
+}
+
+export function localizedToolsCrumbs(t: (key: string) => string): Crumb[] {
+  const keys = new Set([
+    "agents",
+    "fleet",
+    "approvals",
+    "workflows",
+    "runs",
+    "functions",
+    "skills",
+    "tools",
+    "environment-specs",
+    "models",
+    "workloads",
+  ]);
+  const nav = NAV.map((area) =>
+    area.key === "agents"
+      ? {
+          ...area,
+          label: t("agents"),
+          groups: area.groups.map((group) => ({
+            ...group,
+            functions: group.functions.map((item) => ({
+              ...item,
+              label: keys.has(item.key) ? t(item.key === "tools" ? "title" : item.key) : item.label,
+            })),
+          })),
+        }
+      : area
+  );
+  return [areaSwitcher(nav, "agents", "tools"), { label: t("title") }];
+}
 
 export interface ToolDefsFilter {
   skill?: string[];

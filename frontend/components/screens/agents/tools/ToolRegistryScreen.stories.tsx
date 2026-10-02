@@ -1,10 +1,14 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 
 import { LONG_TOOLS, MANY_TOOLS, serveTools, TOOLS } from "./agent-tools.fixtures";
-import { TOOLS_LIST } from "./tools-list";
+import { localizedToolsList } from "./tools-list";
 import { ToolRegistryScreen, type ToolRegistryScreenProps } from "./ToolRegistryScreen";
 import type { ToolRegistryTool } from "./use-tool-registry";
 
@@ -23,7 +27,8 @@ type Props = Partial<Omit<ToolRegistryScreenProps, "list">> & {
 
 /** The screen over fixture tools, filtered and paged the way the server does it. */
 function Tools({ tools = TOOLS, initial, ...patch }: Props) {
-  const list = useLocalListState(TOOLS_LIST, initial);
+  const t = useTranslations("agentToolRegistry");
+  const list = useLocalListState(localizedToolsList(t), initial);
   const { rows, totalCount } = serveTools(tools, {
     filters: list.filters,
     q: list.state.q,
@@ -88,5 +93,41 @@ export const Width768: Story = {
     <div style={{ width: 768 }}>
       <Tools tools={[...LONG_TOOLS, ...MANY_TOOLS]} />
     </div>
+  ),
+};
+
+export const FrenchFull: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <Tools />
+    </NextIntlClientProvider>
+  ),
+};
+export const FrenchMine: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <Tools initial={{ view: "mine" }} />
+    </NextIntlClientProvider>
+  ),
+};
+export const FrenchEmpty: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <Tools tools={[]} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseReadFailed: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <Tools tools={[]} error={{ message: "RAW_TOOL_READ_DIAGNOSTIC" }} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseUnknownAdapter: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <Tools tools={[{ ...TOOLS[0], adapter: "__proto__", createdAt: "RAW_INVALID_DATE" }]} />
+    </NextIntlClientProvider>
   ),
 };
