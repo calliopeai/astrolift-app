@@ -7103,5 +7103,76 @@
       "failed": "監督者に接続できませんでした",
       "unconfirmed": "キューに追加されたメッセージの ID が返されませんでした。再送信する前に、実行中のタスクを確認してください。"
     }
+  },
+  "agentOverview": {
+    "latestRun": "最新の実行",
+    "notRun": "まだ実行されていません",
+    "notRunDescription": "上の「今すぐ実行」を使ってください。ここに実行の現在の状態が表示されます。",
+    "openRun": "実行を開く",
+    "status": "状態",
+    "run": "実行",
+    "started": "開始",
+    "took": "所要時間",
+    "notYet": "未開始",
+    "running": "実行中",
+    "notFinished": "未完了",
+    "runtime": "ランタイム",
+    "configuration": "設定",
+    "image": "イメージ",
+    "notSet": "未設定",
+    "runMode": "実行モード",
+    "brief": "指示内容",
+    "assembled": "構成済み",
+    "noneYet": "まだありません",
+    "skills": "スキル",
+    "tools": "ツール",
+    "recentRuns": "最近の実行",
+    "inFleet": "フリート内",
+    "fleetDescription": "{name} を含む {count} 個のエージェント（プロジェクト別）",
+    "unknownDate": "日付不明",
+    "statuses": {
+      "running": "実行中",
+      "queued": "キュー待ち",
+      "pending": "保留中",
+      "completed": "完了",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "timed_out": "タイムアウト",
+      "cancelled": "キャンセル済み",
+      "canceled": "キャンセル済み"
+    }
+  },
+  "agentNavigation": {
+    "sectionsLabel": "セクション",
+    "sections": {
+      "build": "ビルド",
+      "run-mode": "実行モードとトリガー",
+      "config": "設定エディター",
+      "manifest": "マニフェスト",
+      "webhooks": "CI / CD Webhook",
+      "model-access": "モデルへのアクセス",
+      "skills": "スキル",
+      "tools": "ツール",
+      "live": "ライブ実行",
+      "metrics": "メトリクス",
+      "deployments": "デプロイ履歴",
+      "members": "メンバー",
+      "tokens": "デプロイトークン",
+      "security": "セキュリティスキャン",
+      "guardrails": "ガードレール",
+      "general": "一般",
+      "environments": "環境",
+      "domains": "ドメイン",
+      "managed-services": "管理対象サービス",
+      "danger-zone": "危険な操作"
+    },
+    "descriptions": {
+      "build": "エージェントのイメージの取得元と、開始時に使う指示内容です。",
+      "run-mode": "エージェントの実行方式（1 回、スケジュール、サービス、繰り返し）とトリガーです。",
+      "config": "プラットフォームに保存されているエージェントの設定ファイルです。",
+      "manifest": "プラットフォームがエージェント用に生成する Kubernetes マニフェストです。",
+      "webhooks": "エージェントのデプロイ時に CI と CD システムへ通知する Webhook です。",
+      "model-access": "エージェントがモデルへアクセスする方法と、実行をライブ表示できるかどうかです。"
+    }
   }
 }

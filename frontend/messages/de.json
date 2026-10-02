@@ -7106,5 +7106,76 @@
       "failed": "Die Aufsicht konnte nicht erreicht werden",
       "unconfirmed": "Der Server hat keine ID für die eingereihte Nachricht zurückgegeben. Prüfen Sie die laufende Aufgabe, bevor Sie erneut senden."
     }
+  },
+  "agentOverview": {
+    "latestRun": "Letzte Ausführung",
+    "notRun": "Noch nicht ausgeführt",
+    "notRunDescription": "Verwenden Sie oben Jetzt ausführen. Die Ausführung erscheint hier mit ihrem aktuellen Status.",
+    "openRun": "Ausführung öffnen",
+    "status": "Status",
+    "run": "Ausführung",
+    "started": "Gestartet",
+    "took": "Dauer",
+    "notYet": "Noch nicht",
+    "running": "Läuft",
+    "notFinished": "Nicht beendet",
+    "runtime": "Laufzeitumgebung",
+    "configuration": "Konfiguration",
+    "image": "Image",
+    "notSet": "Nicht festgelegt",
+    "runMode": "Ausführungsmodus",
+    "brief": "Anweisungen",
+    "assembled": "Zusammengestellt",
+    "noneYet": "Noch keine",
+    "skills": "Fähigkeiten",
+    "tools": "Werkzeuge",
+    "recentRuns": "Letzte Ausführungen",
+    "inFleet": "In der Flotte",
+    "fleetDescription": "{name} unter {count, plural, one {# Agenten} other {# Agenten}}, nach Projekt gruppiert",
+    "unknownDate": "Unbekanntes Datum",
+    "statuses": {
+      "running": "Läuft",
+      "queued": "Eingereiht",
+      "pending": "Ausstehend",
+      "completed": "Abgeschlossen",
+      "succeeded": "Erfolgreich",
+      "failed": "Fehlgeschlagen",
+      "timed_out": "Zeitüberschreitung",
+      "cancelled": "Abgebrochen",
+      "canceled": "Abgebrochen"
+    }
+  },
+  "agentNavigation": {
+    "sectionsLabel": "Bereiche",
+    "sections": {
+      "build": "Build",
+      "run-mode": "Ausführungsmodus und Auslöser",
+      "config": "Konfigurationseditor",
+      "manifest": "Manifest",
+      "webhooks": "CI / CD-Webhooks",
+      "model-access": "Modellzugriff",
+      "skills": "Fähigkeiten",
+      "tools": "Werkzeuge",
+      "live": "Live-Ausführungen",
+      "metrics": "Metriken",
+      "deployments": "Bereitstellungsverlauf",
+      "members": "Mitglieder",
+      "tokens": "Bereitstellungstoken",
+      "security": "Sicherheitsprüfungen",
+      "guardrails": "Schutzregeln",
+      "general": "Allgemein",
+      "environments": "Umgebungen",
+      "domains": "Domains",
+      "managed-services": "Verwaltete Dienste",
+      "danger-zone": "Gefahrenbereich"
+    },
+    "descriptions": {
+      "build": "Woher das Agenten-Image stammt und mit welchen Anweisungen es startet.",
+      "run-mode": "Wie der Agent ausgeführt wird (einmal, nach Zeitplan, als Dienst oder in einer Schleife) und was ihn auslöst.",
+      "config": "Die Konfigurationsdatei des Agenten, wie sie auf der Plattform gespeichert ist.",
+      "manifest": "Das Kubernetes-Manifest, das die Plattform für den Agenten erzeugt.",
+      "webhooks": "Webhooks, die CI- und CD-Systeme über die Bereitstellung des Agenten informieren.",
+      "model-access": "Wie der Agent sein Modell erreicht und ob seine Ausführungen live beobachtet werden können."
+    }
   }
 }

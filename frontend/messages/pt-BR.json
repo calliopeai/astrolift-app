@@ -7103,5 +7103,76 @@
       "failed": "Não foi possível acessar o supervisor",
       "unconfirmed": "O servidor não retornou um ID de mensagem enfileirada. Verifique a tarefa em execução antes de enviar novamente."
     }
+  },
+  "agentOverview": {
+    "latestRun": "Última execução",
+    "notRun": "Ainda não executado",
+    "notRunDescription": "Use Executar agora acima. A execução aparece aqui com seu estado atual.",
+    "openRun": "Abrir execução",
+    "status": "Estado",
+    "run": "Execução",
+    "started": "Início",
+    "took": "Duração",
+    "notYet": "Ainda não",
+    "running": "Em execução",
+    "notFinished": "Não finalizada",
+    "runtime": "Ambiente de execução",
+    "configuration": "Configuração",
+    "image": "Imagem",
+    "notSet": "Não definido",
+    "runMode": "Modo de execução",
+    "brief": "Instruções",
+    "assembled": "Montadas",
+    "noneYet": "Ainda não há",
+    "skills": "Habilidades",
+    "tools": "Ferramentas",
+    "recentRuns": "Execuções recentes",
+    "inFleet": "Na frota",
+    "fleetDescription": "{name} entre {count, plural, one {# agente} other {# agentes}}, agrupados por projeto",
+    "unknownDate": "Data desconhecida",
+    "statuses": {
+      "running": "Em execução",
+      "queued": "Na fila",
+      "pending": "Pendente",
+      "completed": "Concluída",
+      "succeeded": "Bem-sucedida",
+      "failed": "Falhou",
+      "timed_out": "Tempo esgotado",
+      "cancelled": "Cancelada",
+      "canceled": "Cancelada"
+    }
+  },
+  "agentNavigation": {
+    "sectionsLabel": "Seções",
+    "sections": {
+      "build": "Build",
+      "run-mode": "Modo de execução e gatilhos",
+      "config": "Editor de configuração",
+      "manifest": "Manifesto",
+      "webhooks": "Webhooks CI / CD",
+      "model-access": "Acesso ao modelo",
+      "skills": "Habilidades",
+      "tools": "Ferramentas",
+      "live": "Execuções ao vivo",
+      "metrics": "Métricas",
+      "deployments": "Histórico de deploys",
+      "members": "Membros",
+      "tokens": "Tokens de deploy",
+      "security": "Verificações de segurança",
+      "guardrails": "Proteções",
+      "general": "Geral",
+      "environments": "Ambientes",
+      "domains": "Domínios",
+      "managed-services": "Serviços gerenciados",
+      "danger-zone": "Zona de perigo"
+    },
+    "descriptions": {
+      "build": "A origem da imagem do agente e as instruções usadas para iniciar.",
+      "run-mode": "Como o agente executa (uma vez, agendado, como serviço ou em repetição) e o que o aciona.",
+      "config": "O arquivo de configuração do agente conforme armazenado na plataforma.",
+      "manifest": "O manifesto do Kubernetes gerado pela plataforma para o agente.",
+      "webhooks": "Webhooks que avisam os sistemas de CI e CD quando o agente é implantado.",
+      "model-access": "Como o agente acessa seu modelo e se suas execuções podem ser acompanhadas ao vivo."
+    }
   }
 }

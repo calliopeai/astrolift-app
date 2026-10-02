@@ -32,7 +32,8 @@ export const RUN_STATUS_DOT: Record<string, RunDot> = {
 };
 
 export function runDot(status: string): RunDot {
-  return RUN_STATUS_DOT[status.toLowerCase()] ?? "muted";
+  const key = status.toLowerCase();
+  return Object.hasOwn(RUN_STATUS_DOT, key) ? RUN_STATUS_DOT[key] : "muted";
 }
 
 export function titleCase(value: string): string {

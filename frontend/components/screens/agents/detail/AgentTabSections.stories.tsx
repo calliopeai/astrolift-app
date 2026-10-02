@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
@@ -57,5 +60,15 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <AgentTabSections {...args} />
     </div>
+  ),
+};
+
+export const FrenchAccess: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AgentTabSections slug="literal-agent" tab="access" active="tokens">
+        <div>LITERAL_CONTENT</div>
+      </AgentTabSections>
+    </NextIntlClientProvider>
   ),
 };
