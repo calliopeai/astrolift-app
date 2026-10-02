@@ -25,6 +25,17 @@ built-in templates and is not the tenant configuration path.
 | `prompt` | `prompt` | Agent instruction overlay, or the approval question on a human gate. |
 | `output_key` | `output_key` | Key used in the run's `named_outputs` map. Defaults to `stage_<order>`. |
 | `workflow` | `workflow_ref` | Visible child definition invoked by a `kind = "workflow"` stage. |
+| `max_attempts` | `max_attempts` | Initial dispatch plus retries for an agent or nested-workflow stage; an integer from 1 to 20, default 3. |
+
+`on_failure = "retry"` uses the stage's `max_attempts` count. A count of 1
+allows the initial dispatch and no retry. Exhausting the count fails the run;
+the stage cannot retry indefinitely. This is a dispatch attempt bound, separate
+from a review loop's rounds. Other failure policies retain their own semantics:
+`skip` proceeds after failure and `escalate` waits for an operator within the
+stage timeout. The attempt count is included in the reviewed definition revision
+and frozen plan, so editing a definition does not change an already reserved run.
+Existing Temporal histories and earlier frozen plans retain their three-attempt
+behavior.
 
 A configured `Workflow.stage_bindings` may override a definition without
 editing it. Bindings are keyed by stage order:
@@ -47,6 +58,18 @@ Resolution precedence is binding override, then stage default. The executor
 freezes the resolved packet before dispatch. A local `agent` slug can therefore
 be imported before its workload exists and resolves when a matching workload is
 later registered in the run's organization.
+
+For an explicitly reviewed target, use `agent = "guid:<workload-guid>"` or
+`workflow = "guid:<definition-guid>"` in TOML. GUIDs must have their canonical
+lowercase UUID spelling. Storage, TOML export/re-import and repository sync
+preserve that reference. Two apps may each have an agent called `worker`; a
+GUID reference selects the reviewed workload. A child workflow rename also
+preserves its GUID. An unavailable, deleted or foreign target is refused,
+including when a new target uses its former slug. Child project visibility and
+the current caller's workflow-trigger and agent-dispatch grants still apply.
+Configured stage binding overrides remain explicit choices in the reviewed
+plan; a conflicting default agent mapping is refused. GUID references establish
+target identity, not equivalence to an imported framework's model/tool behavior.
 
 Each agent receives its immediate predecessor at the top level for backward
 compatibility and an explicit `_astrolift_workflow` object:
@@ -231,3 +254,225 @@ its `execution` payload reports current closure and cleanup independently. A
 response with pending cleanup must not be displayed as fully stopped. Exact
 Temporal reads and controls bound connection establishment to five seconds and
 the individual RPC to three seconds; unavailable services never imply success.
+
+## Bounded return edges and review rounds
+
+A workflow can return to an earlier stage using `back_edge`. Both endpoints
+must have explicit, unique `output_key` values; positional return targets are
+refused. One outgoing return edge is allowed per stage:
+
+```toml
+[[stage]]
+kind = "agent_dispatch"
+agent = "writer"
+output_key = "draft"
+on_failure = "retry"
+max_attempts = 4
+
+[[stage]]
+kind = "human_gate"
+output_key = "review"
+prompt = "Approve this draft?"
+timeout = 86400
+back_edge = { to = "draft", when = "gate_rejected", max_rounds = 5, on_exhausted = "escalate" }
+```
+
+`max_rounds` includes the initial pass and must be an integer from 1 to 20.
+Rejection runs the producing segment again, then opens a new review gate.
+Approval continues forward. Intermediate retries do not consume review rounds.
+`stage_failed` applies after an agent or nested workflow exhausts its configured
+attempts. `output_equals` compares a dotted object `path` to a JSON scalar
+`value`; missing, nonfinite or incompatible data stops as unavailable.
+The exhaustion policy is `fail` or `escalate`. Escalation waits for the existing
+operator-clear signal within the stage's timeout and never opens another round.
+
+Each edge has a lifetime budget that overlapping edges cannot reset. The
+reviewed plan also refuses more than 1,000 stage visits or 500 execution units,
+counting attempt budgets and potential fan-out branches. Dynamic fan-out reserves
+its full 50-branch ceiling and refuses missing items or oversized collections.
+Failure or missing branch results stop as incomplete instead of producing an
+empty successful aggregation.
+
+Agents receive feedback under `_astrolift_workflow.loop.feedback`, alongside
+`edge`, `max_rounds`, `edge_round` and the global `round_number`. Named outputs
+from the segment being revised are removed before its next pass. The normal
+prior result remains the chained input; rejection feedback is passed separately.
+`workflowStageExecutions` records `roundNumber`, typed `causedBy`, `attemptNumber`,
+`fanoutStageId`, `fanoutParentExecutionGuid` and `fanoutIndex`. Global rounds
+increase whenever any return edge fires; `causedBy.edgeRound` identifies one
+edge's progress toward its `maxRounds` ceiling. Branches retain their actual
+start times and share an explicit parent execution.
+
+TOML and repository YAML retain the `back_edge`, `max_attempts` and `output_key`
+fields. Plans are frozen with the reviewed revision before dispatch; later stage
+edits cannot change that run's budgets. Temporal's
+`workflow-bounded-back-edges-v1` patch preserves forward-only execution for older
+histories. Historical rows default to round 1 without a cause and cannot prove
+past loop or branch attribution. Existing organization copies of review templates
+need an explicit reviewed edge before a new bounded run; the platform `rasd`
+and `moderate` templates now declare three-round review edges.
+`supervisor_worker` and `advisor` are unsupported executor patterns and are
+refused on new runs.
+
+In the Builder's Stages editor, **Execution bounds** separates maximum attempts
+from the return edge's maximum rounds. Give the producer and review stage explicit
+output keys, enable the return, then choose the earlier key and the trigger.
+Output-field conditions accept a JSON string, number, boolean or `null`; invalid
+JSON never submits a stage mutation. The Code view exports the same authored
+limits and return targets. The run timeline uses recorded rounds and causes,
+shows an edge's round ceiling, and exposes branch start times. Reordered stage
+visits or repeated agent names do not establish a loop or branch identity.
+
+New authoring choices exclude `supervisor_worker` and `advisor`; their legacy
+records remain readable. Creating or cloning another definition or configured
+workflow with either unsupported pattern is refused instead of labelling an
+ordinary sequence as a supervisor or advisor implementation.
+
+TOML has no `null` literal. A condition comparing an output field to JSON `null`
+exports as `back_edge_json = '<JSON object>'`; importing that representation
+restores the same typed condition. Supplying both `back_edge` and
+`back_edge_json` is refused. The YAML and GraphQL forms use their native `null`.
+
+
+## Imported bounded control loops
+
+Flowise `loopAgentflow` node version `1.2` maps to an explicit checkpoint return
+control when it is the only Loop, at the end of one connected sequential track.
+Its integer `maxLoopCount` (default 5, accepted range 1–20) becomes `max_rounds`,
+including the initial pass. The imported contract uses `when = "always"` and
+`on_exhausted = "continue"`; native review loops still default to failure and
+may explicitly escalate. Every pass publishes the source node ID, cap, optional
+`fallbackMessage`, and source control content. At the cap, `content` contains the
+nonempty fallback or the source default completion message, then the workflow
+completes. Source target and label remain separate from the canonical return
+output key and are preserved through TOML/YAML export, review and execution.
+
+The mapping is based on the pinned upstream [Loop v1.2 component](https://github.com/FlowiseAI/Flowise/blob/9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb/packages/components/nodes/agentflow/Loop/Loop.ts)
+and [AgentFlow scheduler](https://github.com/FlowiseAI/Flowise/blob/9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb/packages/server/src/utils/buildAgentflow.ts).
+The importer refuses source state updates, state-bearing starts, unresolved
+fallback variables, forward routes after the Loop, conditional/parallel tracks,
+multiple Loops, unknown node versions and unresolved graph cycles. Ordinary
+model/tool/configuration gaps remain visible for operator review; importing the
+control does not install the original model or reproduce its agent configuration.
+
+The visual editor keeps imported target, trigger and cap-completion policy
+read-only, and allows the round cap to be changed without discarding the source
+output contract. Changing that source mapping requires editing the native
+manifest; mismatched source node and canonical return target are rejected.
+
+## Serial collection bodies
+
+A `collection` stage declares a forward body ending at an explicit output key.
+Its `max_items` is required, from 1 to 50. Choose exactly one of `items`, an
+ordered array of JSON records, or `items_path`, a dotted field in the preceding
+output (the dispatch input for an initial stage). An empty array completes with
+zero items. Missing data, non-record items and data exceeding the cap are
+unavailable and dispatch no body stages; data is never truncated.
+
+```toml
+[workflow]
+slug = "serial-review"
+name = "Serial item review"
+pattern = "chained"
+
+[[stage]]
+order = 0
+kind = "collection"
+output_key = "item_each"
+iteration_json = '{"max_items":4,"items_path":"items","body_end":"review"}'
+
+[[stage]]
+order = 1
+kind = "agent_dispatch"
+agent = "worker"
+output_key = "draft"
+on_failure = "retry"
+max_attempts = 2
+
+[[stage]]
+order = 2
+kind = "human_gate"
+output_key = "review"
+timeout = 3600
+```
+
+Configure the agent binding using the definition's existing agent picker or
+reviewed binding controls before starting. The collection engine forwards that
+exact workload binding, environment recipe, skills and prompt to each item;
+matching a slug in another app does not substitute its workload. A `workflow`
+body stage similarly uses the exact bound nested definition. Every body must be
+a contiguous forward range of agent, nested-workflow, checkpoint, human-gate or
+record-format stages. Nested collections, parallel body stages and edges that
+enter or leave a body range are refused. A bounded review return entirely inside
+the body is supported; its local rounds and attempts apply independently to each
+item. Returning to the outer collection repeats the collection under the outer
+edge's lifetime cap. The reviewed plan multiplies item counts, attempts and
+return visits before any dispatch and enforces the global execution budget.
+
+Each item runs in a separate durable child workflow, in order. Its exact parent
+execution, zero-based item index and child workflow identity are persisted.
+Approving a gate with its execution GUID signals that item, after the usual
+organization, actor and approval checks. The next item waits for the current
+body to finish. The timeline displays recorded one-based item labels separately
+from parallel branches and review rounds; it does not infer them from stage names.
+
+The parent output includes `results` in input order, `item_execution_ids`,
+`finished_count`, `complete` and the frozen `collection` binding. Complete means
+every body finished under its authored failure policy: a skipped failed agent or
+a cleared escalation retains that outcome and does not become a successful agent
+result. A failed body stops later items and exposes `complete: false`. Abort or
+cancellation closes the outstanding run and executions. Inputs and collected
+outputs must be finite JSON, with string object keys, at most 32 nesting levels,
+16,384 nodes and 256 KiB encoded size; an oversized aggregate fails explicitly.
+
+An `abort` signal while an item is blocked cancels that item's Temporal child,
+waits for its closure, and then fails the parent with an incomplete collection.
+Its open stage mirrors are failed, matching the parent abort outcome. SDK
+cancellation settles the parent and open stage mirrors as cancelled. Both stop
+later items. Signal acceptance is only an acknowledgement; read the terminal
+run and execution metadata to establish completion.
+
+The Stage editor exposes the maximum item count and forward body end, preserving
+literal source records during cap edits. Dynamic inputs expose `items_path`.
+TOML uses `iteration_json` to preserve JSON `null`; YAML and GraphQL retain the
+same typed contract. Imported target bindings are read-only in the visual editor.
+
+### Supported Langflow collection import
+
+The supported mapping is based on Langflow commit
+[`f9b283243d2fdd8502cb4ffd606c3058cff5017e`](https://github.com/langflow-ai/langflow/tree/f9b283243d2fdd8502cb4ffd606c3058cff5017e):
+[CreateList](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/processing/create_list.py),
+[Loop](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/flow_controls/loop.py),
+[the isolated Loop body scheduler](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/base/flow_controls/loop_utils.py),
+[Parser](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/processing/parser.py),
+and [TypeConverter](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/components/processing/converter.py).
+
+Import requires one exact `CreateList` collection edge into `Loop.data`, an
+`item` edge into `Parser.input_data`, and `Parser.parsed_text` feedback into
+`Loop.item`. An optional `Loop.done` edge may feed TypeConverter's explicit JSON
+conversion without automatic parsing. Handle node IDs and input/output names
+must agree, including Langflow's encoded handle representation. A default
+`max_items` of 50 becomes explicit in the native contract; an optional source
+`astrolift_max_items` field can lower it. Source component code, when present,
+must match the pinned built-in implementation.
+
+The importer preserves ordered text records, plain named Parser fields, missing
+fields as empty strings and the ordered final record table. A record includes
+the deterministic execution timestamp matching the pinned Message data shape.
+TOML/YAML export and re-import preserve the literal records, cap, body binding,
+pattern and separator. The native engine then actually executes each Parser body;
+import does not merely flatten the source feedback cycle into a stage list.
+
+Custom component code, state, routers, nested Loop graphs, Stringify mode,
+unresolved variables and other source body component types remain unsupported
+and are rejected explicitly. Broader Langflow agent/workflow source translation
+is not certified by the native agent/workflow body support. The Langflow runtime
+itself is not invoked by these import tests. Conditional-router message outputs
+and branch-exclusion state remain outside this supported mapping.
+
+The collection proof uses real PostgreSQL 15.15 and Temporal: source import and
+authoring round-trip, ordered body completion, exact nested-workflow binding,
+gate delivery through the actual GraphQL mutation, worker restart, malformed
+input refusal before dispatch, and exact agent preparation with bounded
+unavailable-target failures. Successful container-backed agent execution needs a
+reachable cluster and is not established by an unavailable-target proof.

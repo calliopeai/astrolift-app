@@ -215,7 +215,12 @@ def test_reachable_cloudwatch_with_no_traffic_is_no_data_yet(permission_resolver
     signals = _by_kind(_signals(org, app))
 
     for kind in _RED:
-        assert signals[kind].reason == ObservabilityPanelReason.NO_DATA_YET, kind
+        expected = (
+            ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER
+            if kind == GoldenSignalKind.LATENCY_P90
+            else ObservabilityPanelReason.NO_DATA_YET
+        )
+        assert signals[kind].reason == expected, kind
 
 
 def test_cloudwatch_is_not_consulted_when_prometheus_has_http_data(permission_resolver, monkeypatch):

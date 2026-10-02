@@ -18,8 +18,7 @@ import {
  * Logs & metrics · Secrets · Access · Settings. Each tab is its own route
  * under `/agents/[agentSlug]`; the former BROCS pillar pages and the app
  * platform pages an agent carried (`owns`) redirect into the tab that took
- * them, and still light it up. Labels are the text itself: the agents area
- * has no i18n namespace yet.
+ * them, and still light it up. Labels default to English metadata; the connected frame supplies localized labels.
  */
 export type AgentTabKey =
   | "overview"
@@ -150,8 +149,13 @@ export function resolveAgentTab(pathname: string, slug: string): AgentTabKey {
 }
 
 /** The row as `DetailTab`s. */
-export function agentTabs(slug: string, pathname: string): DetailTab[] {
-  return detailTabs(AGENT_TABS, AGENT_BASE, enc(slug), pathname, (label) => label);
+export function agentTabs(
+  slug: string,
+  pathname: string,
+  label?: (key: AgentTabKey) => string
+): DetailTab[] {
+  const tabs = label ? AGENT_TABS.map((tab) => ({ ...tab, label: label(tab.key) })) : AGENT_TABS;
+  return detailTabs(tabs, AGENT_BASE, enc(slug), pathname, (label) => label);
 }
 
 /** The section a tab's query selects, or its default. */

@@ -6,6 +6,7 @@ pattern     = "review_loop"
 description = "Assess, score, gate on a human reviewer, then decide."
 
 [[stage]]
+output_key = "stage_0"
 kind = "agent_dispatch"
 role = "assessor"
 
@@ -15,9 +16,11 @@ role = "scorer"
 
 [[stage]]
 kind      = "human_gate"
+output_key = "review"
 prompt    = "Approve the assessment and score before deciding?"
 approvers = ["team:reviewers"]
 timeout   = 86400
+back_edge = { to = "stage_0", when = "gate_rejected", max_rounds = 3, on_exhausted = "escalate" }
 
 [[stage]]
 kind = "agent_dispatch"

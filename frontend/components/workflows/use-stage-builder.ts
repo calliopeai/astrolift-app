@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +25,8 @@ import type {
   WorkflowManifestPreview,
 } from "@/graphql/workflows/tiered.types";
 
+import { edgeFromDraft } from "./back-edge";
+
 import type { StageDraft } from "./StageBuilder";
 import { useAgentWorkloadOptions, useSkillOptions } from "./use-picker-options";
 
@@ -43,6 +47,7 @@ function reportResult(result: TieredMutationResult | null | undefined, fallback:
  * data half of StageBuilder.
  */
 export function useStageBuilder(slug: string) {
+  const t = useTranslations("workflowBounds");
   const router = useRouter();
   const { org } = useActiveOrg();
   const orgId = org?.id ?? null;
@@ -68,6 +73,13 @@ export function useStageBuilder(slug: string) {
 
   const onSaveStage = useCallback(
     async (guid: string, draft: StageDraft) => {
+      let backEdge: unknown;
+      try {
+        backEdge = edgeFromDraft(draft.backEdge, draft.backEdgeValueJson);
+      } catch {
+        toast.error(t("invalidCondition"));
+        return;
+      }
       setBusyGuid(guid);
       try {
         const { data } = await updateStage({
@@ -77,6 +89,9 @@ export function useStageBuilder(slug: string) {
             role: draft.role.trim() !== "" ? draft.role.trim() : null,
             onFailure: draft.onFailure,
             timeoutSeconds: draft.timeoutSeconds,
+            maxAttempts: draft.maxAttempts ?? 3,
+            backEdge: backEdge ?? {},
+            iteration: draft.iteration ?? {},
             agentDefinitionGuid: draft.agentDefinitionGuid,
             agentRef: draft.agentRef.trim(),
             workflowRef: draft.workflowRef.trim(),
@@ -96,7 +111,7 @@ export function useStageBuilder(slug: string) {
         setBusyGuid(null);
       }
     },
-    [updateStage, refetchStages]
+    [updateStage, refetchStages, t]
   );
 
   const onDeleteStage = useCallback(
@@ -134,6 +149,13 @@ export function useStageBuilder(slug: string) {
   /** Resolves true once the stage exists, so the add form can close. */
   const onCreateStage = useCallback(
     async (draft: StageDraft): Promise<boolean> => {
+      let backEdge: unknown;
+      try {
+        backEdge = edgeFromDraft(draft.backEdge, draft.backEdgeValueJson);
+      } catch {
+        toast.error(t("invalidCondition"));
+        return false;
+      }
       const nextOrder = sorted.length > 0 ? Math.max(...sorted.map((s) => s.order)) + 1 : 0;
       const { data } = await createStage({
         variables: {
@@ -143,6 +165,9 @@ export function useStageBuilder(slug: string) {
           role: draft.role.trim() !== "" ? draft.role.trim() : null,
           onFailure: draft.onFailure,
           timeoutSeconds: draft.timeoutSeconds,
+          maxAttempts: draft.maxAttempts ?? 3,
+          backEdge: backEdge ?? {},
+          iteration: draft.iteration ?? {},
           agentDefinitionGuid: draft.agentDefinitionGuid,
           agentRef: draft.agentRef.trim() || null,
           workflowRef: draft.workflowRef.trim() || null,
@@ -161,7 +186,7 @@ export function useStageBuilder(slug: string) {
       }
       return false;
     },
-    [createStage, slug, sorted, refetchStages]
+    [createStage, slug, sorted, refetchStages, t]
   );
 
   const onClone = useCallback(async () => {

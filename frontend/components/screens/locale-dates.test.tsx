@@ -1,3 +1,4 @@
+import { RESOURCE, RESOURCE_DETAIL } from "./projects/resource-reads.fixtures";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
@@ -50,9 +51,11 @@ describe("screen dates honor the configured locale and time zone", () => {
         <TokenDates />
         <ProjectResourcesScreen
           {...RESOURCES}
-          services={[
-            { ...RESOURCES.services[0], operationKind: "provision", operationCompletedAt: at },
-          ]}
+          resourceDetail={{
+            ...RESOURCE_DETAIL,
+            target: RESOURCE,
+            current: { ...RESOURCE, operationKind: "provision", operationCompletedAt: at },
+          }}
         />
       </NextIntlClientProvider>
     );

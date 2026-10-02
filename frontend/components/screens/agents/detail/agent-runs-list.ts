@@ -32,7 +32,8 @@ export const RUN_STATUS_DOT: Record<string, RunDot> = {
 };
 
 export function runDot(status: string): RunDot {
-  return RUN_STATUS_DOT[status.toLowerCase()] ?? "muted";
+  const key = status.toLowerCase();
+  return Object.hasOwn(RUN_STATUS_DOT, key) ? RUN_STATUS_DOT[key] : "muted";
 }
 
 export function titleCase(value: string): string {
@@ -87,6 +88,32 @@ export const AGENT_RUNS_LIST: ListDefinition = {
   paging: "cursor",
   pageSizes: [25, 50, 100],
 };
+
+export function localizedAgentRunsList(
+  t: (key: string) => string,
+  activity: (key: string) => string
+): ListDefinition {
+  const knownViews = new Set(["all", "mine", "running", "failed", "queued"]);
+  return {
+    ...AGENT_RUNS_LIST,
+    fields: AGENT_RUNS_LIST.fields.map((field) => ({
+      ...field,
+      label: field.key === "status" ? t("status") : field.label,
+      options: field.options?.map((option) => ({
+        ...option,
+        label: Object.hasOwn(RUN_STATUS_DOT, option.value)
+          ? activity(`statuses.${option.value}`)
+          : option.label,
+      })),
+    })),
+    searchPlaceholder: t("search"),
+    views: AGENT_RUNS_LIST.views.map((view) => ({
+      ...view,
+      label: knownViews.has(view.key) ? t(`views.${view.key}`) : view.label,
+      note: view.key === "mine" ? t("mineNote") : view.note,
+    })),
+  };
+}
 
 /**
  * The page query's variables. `startedBy` (Mine) has no server argument and

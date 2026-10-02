@@ -145,8 +145,8 @@ def test_cpu_saturation_query_renders_expected_promql() -> None:
     assert plan.rate_window == "5m"
     assert plan.promql == (
         'sum(rate(container_cpu_usage_seconds_total{app="hello-world",environment="prod"}[5m])) '
-        "/ clamp_min(sum(kube_pod_container_resource_limits"
-        '{app="hello-world",environment="prod",resource="cpu"}), 1e-9)'
+        "/ (sum(kube_pod_container_resource_limits"
+        '{app="hello-world",environment="prod",resource="cpu"}) > 0)'
     )
 
 
@@ -253,8 +253,8 @@ def test_cpu_saturation_with_workload() -> None:
     )
     assert plan.promql == (
         'sum(rate(container_cpu_usage_seconds_total{app="hello-world",environment="prod",workload="scheduler"}[1m])) '
-        "/ clamp_min(sum(kube_pod_container_resource_limits"
-        '{app="hello-world",environment="prod",workload="scheduler",resource="cpu"}), 1e-9)'
+        "/ (sum(kube_pod_container_resource_limits"
+        '{app="hello-world",environment="prod",workload="scheduler",resource="cpu"}) > 0)'
     )
 
 

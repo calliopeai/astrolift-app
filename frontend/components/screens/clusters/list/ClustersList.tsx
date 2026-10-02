@@ -16,7 +16,7 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import type { Column, EmptyStateSpec } from "@/components/data-table";
+import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import { StatusDot } from "@/components/StatusDot";
@@ -25,15 +25,12 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
-import {
-  formatHeartbeatAge,
-  heartbeatPresentation,
-  type HeartbeatStatus,
-} from "@/lib/cluster-heartbeat";
+import { type HeartbeatStatus } from "@/lib/cluster-heartbeat";
+import { useClusterHeartbeat } from "@/lib/i18n/cluster-heartbeat";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
-import { clusterCrumbs, LIFECYCLE_LABEL, type Lifecycle, providerLabel } from "./clusters-list";
+import { localizedClusterCrumbs, type Lifecycle, providerLabel } from "./clusters-list";
 import type { ClusterActions } from "./use-cluster-actions";
 import { useUnregisterReview } from "./use-unregister-review";
 import type { ClusterRow } from "./use-clusters-list";
@@ -50,15 +47,6 @@ export type ClustersListProps = ClusterActions & {
   onRetry: () => void;
   /** The register flow: a page, since it asks for more than three fields (spec 44 §5.4). */
   registerHref: string;
-};
-
-const EMPTY: EmptyStateSpec = {
-  icon: <LayersIcon className="size-5" />,
-  title: "No clusters registered",
-  description:
-    "Register a tenant Kubernetes cluster to record its metadata, then bring it into management once its prerequisites are installed.",
-  learnMoreHref: "/documentation/cluster-prerequisites",
-  learnMoreLabel: "Cluster prerequisites",
 };
 
 // The row's link is an ::after overlay stretched across the whole row, and
@@ -78,11 +66,12 @@ const LIFECYCLE_BADGE: Record<
 
 /** The lifecycle badge; on error its tooltip carries the failure, so it can be fixed from the list. */
 export function LifecycleBadge({ lifecycle, error }: { lifecycle: Lifecycle; error?: string }) {
+  const t = useTranslations("clusters.chrome");
   const p = LIFECYCLE_BADGE[lifecycle] ?? LIFECYCLE_BADGE.registered;
   const badge = (
     <Badge variant={p.variant} className="gap-1">
       {p.icon}
-      {LIFECYCLE_LABEL[lifecycle] ?? lifecycle}
+      {t.has(`lifecycle.${lifecycle}`) ? t(`lifecycle.${lifecycle}`) : lifecycle}
     </Badge>
   );
   if (lifecycle === "error" && error) {
@@ -110,14 +99,15 @@ export function HeartbeatBadge({
   ageSeconds: number | null | undefined;
 }) {
   const s = status ?? "never_seen";
-  const p = heartbeatPresentation(s);
-  const age = formatHeartbeatAge(ageSeconds ?? null);
+  const t = useTranslations("clusters.list");
+  const connection = useTranslations("clusterConnection");
+  const p = useClusterHeartbeat(s, ageSeconds ?? null);
   const tip =
     s === "never_seen"
-      ? "No keep-alive agent has reported yet"
-      : age
-        ? `Last heartbeat ${age}`
-        : "No recent heartbeat";
+      ? connection("noAgentHelp")
+      : p.age
+        ? t("heartbeatLast", { age: p.age })
+        : t("heartbeatNone");
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -137,7 +127,7 @@ export function HeartbeatBadge({
 }
 
 interface LifecycleAction {
-  label: string;
+  labelKey: "refresh" | "retry" | "bring";
   icon: React.ReactNode;
   run: () => void;
   disabled: boolean;
@@ -154,7 +144,7 @@ export function lifecycleAction(
       return null;
     case "managed":
       return {
-        label: "Refresh setup",
+        labelKey: "refresh",
         icon: <RefreshCcwIcon className="size-4" />,
         run: () => void onRefresh(c, false),
         disabled: refreshing,
@@ -162,7 +152,7 @@ export function lifecycleAction(
       };
     case "error":
       return {
-        label: "Retry",
+        labelKey: "retry",
         icon: <PlayIcon className="size-4" />,
         run: () => void onBring(c),
         disabled: bringing,
@@ -170,7 +160,7 @@ export function lifecycleAction(
       };
     default:
       return {
-        label: "Bring into management",
+        labelKey: "bring",
         icon: <PlayIcon className="size-4" />,
         run: () => void onBring(c),
         disabled: bringing,
@@ -231,6 +221,9 @@ export function ClustersList(props: ClustersListProps) {
   } = props;
   const fmt = useFormatters();
   const t = useTranslations("clusters.unregister");
+  const copy = useTranslations("clusters.list");
+  const chrome = useTranslations("clusters.chrome");
+  const actions = useTranslations("clusters.actions");
   const unregister = useUnregisterReview(
     rows,
     JSON.stringify([
@@ -246,7 +239,7 @@ export function ClustersList(props: ClustersListProps) {
   const columns: Column<ClusterRow>[] = [
     {
       id: "cluster",
-      header: "Cluster",
+      header: copy("columns.cluster"),
       sortKey: "name",
       cellClassName: "max-w-80",
       // The active dot folds into this cell: the first column carries the
@@ -267,7 +260,7 @@ export function ClustersList(props: ClustersListProps) {
     },
     {
       id: "status",
-      header: "Status",
+      header: copy("columns.status"),
       sortKey: "status",
       cell: (c) => (
         <span className={cn(ABOVE_ROW_LINK, "inline-flex")}>
@@ -280,7 +273,7 @@ export function ClustersList(props: ClustersListProps) {
     },
     {
       id: "provider",
-      header: "Provider",
+      header: copy("columns.provider"),
       sortKey: "provider",
       cell: (c) => (
         <Badge variant="outline" className="font-mono" title={providerLabel(c.providerPluginSlug)}>
@@ -290,7 +283,7 @@ export function ClustersList(props: ClustersListProps) {
     },
     {
       id: "region",
-      header: "Region",
+      header: copy("columns.region"),
       sortKey: "region",
       cellClassName: "max-w-48",
       cell: (c) => (
@@ -301,7 +294,7 @@ export function ClustersList(props: ClustersListProps) {
     },
     {
       id: "ingress",
-      header: "Ingress",
+      header: copy("columns.ingress"),
       cellClassName: "max-w-48",
       cell: (c) => (
         <span className="block min-w-0 truncate font-mono text-xs" title={c.ingressClass}>
@@ -311,7 +304,7 @@ export function ClustersList(props: ClustersListProps) {
     },
     {
       id: "live",
-      header: "Live",
+      header: copy("columns.live"),
       sortKey: "live",
       cell: (c) => (
         <span className={cn(ABOVE_ROW_LINK, "inline-flex")}>
@@ -321,11 +314,11 @@ export function ClustersList(props: ClustersListProps) {
     },
     {
       id: "lastProbe",
-      header: "Last probe",
+      header: copy("columns.lastProbe"),
       sortKey: "lastProbe",
       cell: (c) => (
         <span className="text-muted-foreground font-mono text-xs">
-          {c.capabilitiesProbedAt ? fmt.formatDateTime(c.capabilitiesProbedAt) : "never"}
+          {c.capabilitiesProbedAt ? fmt.formatDateTime(c.capabilitiesProbedAt) : copy("never")}
         </span>
       ),
     },
@@ -333,7 +326,7 @@ export function ClustersList(props: ClustersListProps) {
       // Who registered it: what the Mine view filters on. The server has no
       // sort on it, so the header does not sort.
       id: "registeredBy",
-      header: "Registered by",
+      header: copy("columns.registeredBy"),
       cellClassName: "max-w-48",
       cell: (c) => (
         <span
@@ -353,14 +346,14 @@ export function ClustersList(props: ClustersListProps) {
         {c.lifecycle === "managing" && (
           <DropdownMenuItem disabled>
             <Loader2Icon className="size-4 animate-spin" />
-            Setup in progress…
+            {actions("inProgress")}
           </DropdownMenuItem>
         )}
         {action && (
           <Can permission="cluster.manage">
             <DropdownMenuItem onSelect={action.run} disabled={action.disabled || busy}>
               {action.icon}
-              {action.label}
+              {actions(action.labelKey)}
             </DropdownMenuItem>
           </Can>
         )}
@@ -373,7 +366,7 @@ export function ClustersList(props: ClustersListProps) {
               }}
             >
               <RefreshCcwIcon className="size-4" />
-              Refresh setup with full preflight
+              {actions("fullPreflight")}
             </DropdownMenuItem>
           </Can>
         )}
@@ -395,21 +388,21 @@ export function ClustersList(props: ClustersListProps) {
     <>
       <ListPage<ClusterRow>
         header={{
-          crumbs: clusterCrumbs(),
-          title: "Clusters",
+          crumbs: localizedClusterCrumbs(chrome),
+          title: chrome("clusters"),
           primaryAction: (
             <Can permission="cluster.register">
               <Button size="sm" asChild>
                 <Link href={registerHref}>
                   <PlusIcon className="size-4" />
-                  Register cluster
+                  {copy("register")}
                 </Link>
               </Button>
             </Can>
           ),
         }}
         list={list}
-        label="Clusters"
+        label={chrome("clusters")}
         columns={columns}
         rows={rows}
         getRowId={(c) => c.id}
@@ -421,7 +414,13 @@ export function ClustersList(props: ClustersListProps) {
         error={error}
         onRetry={onRetry}
         // No create action here: it would show to viewers without cluster.register.
-        empty={EMPTY}
+        empty={{
+          icon: <LayersIcon className="size-5" />,
+          title: copy("emptyTitle"),
+          description: copy("emptyDescription"),
+          learnMoreHref: "/documentation/cluster-prerequisites",
+          learnMoreLabel: copy("emptyLink"),
+        }}
         totalCount={totalCount}
       />
 

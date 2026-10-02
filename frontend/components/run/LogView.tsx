@@ -17,6 +17,7 @@
 
 import { ArrowDownToLineIcon, DownloadIcon, ScrollTextIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { classifyLogLevel, type LogLevel } from "@/components/observability/LogViewer";
 import { Panel } from "@/components/panel/Panel";
@@ -66,16 +67,17 @@ const LEVEL: Record<LogLevel, { label: string; className: string }> = {
 
 export function LogView({
   lines,
-  title = "Log",
+  title,
   onDownload,
   loading = false,
   error,
   onRetry,
-  emptyHint = "No output yet.",
+  emptyHint,
   actions,
   paneClassName = "h-96",
   className,
 }: LogViewProps) {
+  const t = useTranslations("runLog");
   const pane = React.useRef<HTMLDivElement | null>(null);
   const follow = useFollow(lines.length);
   const { following, pin } = follow;
@@ -91,7 +93,7 @@ export function LogView({
 
   return (
     <Panel
-      title={title}
+      title={title ?? t("title")}
       icon={<ScrollTextIcon className="size-4" />}
       loading={loading && lines.length === 0}
       error={lines.length === 0 ? error : null}
@@ -108,7 +110,7 @@ export function LogView({
             aria-pressed={follow.following}
             onClick={() => follow.setFollowing(!follow.following)}
           >
-            Follow
+            {t("follow")}
           </Button>
           {onDownload && (
             <Button
@@ -118,8 +120,8 @@ export function LogView({
               className="size-8"
               onClick={onDownload}
               disabled={lines.length === 0}
-              aria-label="Download log"
-              title="Download log"
+              aria-label={t("download")}
+              title={t("download")}
             >
               <DownloadIcon className="size-4" />
             </Button>
@@ -132,7 +134,7 @@ export function LogView({
           ref={pane}
           onScroll={follow.onScroll}
           role="log"
-          aria-label={title}
+          aria-label={title ?? t("title")}
           aria-live={follow.following ? "polite" : "off"}
           tabIndex={0}
           className={cn(
@@ -141,7 +143,9 @@ export function LogView({
           )}
         >
           {lines.length === 0 ? (
-            <p className="text-muted-foreground px-4 italic">{emptyHint}</p>
+            <p className="text-muted-foreground px-4 italic">
+              {emptyHint === undefined ? t("empty") : emptyHint}
+            </p>
           ) : (
             chunks.map((chunk, i) => <Chunk key={i} lines={chunk} />)
           )}
@@ -154,9 +158,11 @@ export function LogView({
             onClick={() => follow.setFollowing(true)}
           >
             <ArrowDownToLineIcon className="size-3.5" />
-            Jump to latest
+            {t("jump")}
             {follow.unseen > 0 && (
-              <span className="font-mono tabular-nums">· {follow.unseen} new</span>
+              <span className="font-mono tabular-nums">
+                · {t("newLines", { count: follow.unseen })}
+              </span>
             )}
           </Button>
         )}
@@ -186,14 +192,23 @@ const Chunk = React.memo(
 );
 
 function Row({ line }: { line: LogLine }) {
-  const level = line.level ?? classifyLogLevel(line.message);
+  const supplied = line.level ?? classifyLogLevel(line.message);
+  const key = typeof supplied === "string" ? supplied.toLowerCase() : "other";
+  const known = Object.hasOwn(LEVEL, key);
+  const level = known ? (key as LogLevel) : "other";
+  const label = known ? LEVEL[level].label : typeof supplied === "string" ? supplied : "";
   const time = formatLogTime(line.ts);
   return (
     <div data-level={level} className="hover:bg-muted/50 flex min-w-0 gap-3 px-4">
       <time dateTime={time.full} title={time.full} className="text-muted-foreground shrink-0">
         {time.short}
       </time>
-      <span className={cn("w-7 shrink-0", LEVEL[level].className)}>{LEVEL[level].label}</span>
+      <span
+        className={cn("w-7 shrink-0 truncate", LEVEL[level].className)}
+        title={typeof supplied === "string" ? supplied : undefined}
+      >
+        {label}
+      </span>
       <span className="min-w-0 flex-1 [overflow-wrap:anywhere] whitespace-pre-wrap">
         {line.message}
       </span>

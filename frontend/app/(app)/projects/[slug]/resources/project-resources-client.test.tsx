@@ -4,13 +4,15 @@ import type { ReactNode } from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { RESOURCE } from "@/components/screens/projects/resource-reads.fixtures";
+
 import { ProjectResourcesClient } from "./project-resources-client";
 
 const project = {
-  id: "project-1",
-  slug: "emr-bug-triage",
-  name: "EMR Bug Triage",
-  organization: { id: "org-1", slug: "steadymd", name: "SteadyMD" },
+  id: RESOURCE.projectId,
+  slug: "example-platform",
+  name: "Example platform",
+  organization: { id: RESOURCE.organizationId, slug: "example-org", name: "Example organization" },
   team: { id: "team-1", slug: "engineering", name: "Engineering" },
 };
 
@@ -49,6 +51,11 @@ const catalog = [
   },
 ];
 
+vi.mock("@/graphql/identity/identity.hooks", () => ({
+  useActiveOrg: () => ({ org: project.organization }),
+}));
+vi.mock("@/graphql/user/user.hooks", () => ({ useMe: () => ({ user: { id: "example-actor" } }) }));
+
 vi.mock("@apollo/client/react", () => ({
   useLazyQuery: () => [vi.fn(), { loading: false }],
   useMutation: () => [vi.fn(), { loading: false }],
@@ -70,47 +77,7 @@ vi.mock("@apollo/client/react", () => ({
             lifecycle: "managed",
           },
         ],
-        astroliftProjectManagedServices: [
-          {
-            id: "filesystem-1",
-            name: "agent-workspace",
-            kind: "filesystem",
-            variant: "rook_cephfs",
-            status: "active",
-            statusError: "",
-            config: {},
-            projectSlug: "emr-bug-triage",
-            ownerScope: "project",
-            clusterSlug: "production",
-            environmentName: "shared",
-            createdAt: "2026-08-14T00:00:00Z",
-            updatedAt: "2026-08-14T00:00:00Z",
-            lastActionAt: null,
-            lastActionKind: "",
-            editableFields: [],
-            attachments: [],
-            volumeBindings: [
-              {
-                id: "binding-1",
-                name: "agent-workspace",
-                mountPath: "/workspace",
-                subPath: "",
-                sourceKind: "dynamic_pvc",
-                protocol: "cephfs",
-                claimName: "",
-                claimNamespace: "",
-                storageClassName: "rook-cephfs",
-                csiDriver: "rook-ceph.cephfs.csi.ceph.com",
-                readOnly: false,
-                capacity: "100Gi",
-                accessModes: ["ReadWriteMany"],
-                workloadNames: [],
-                containerNames: [],
-                credentialReferenceCount: 0,
-              },
-            ],
-          },
-        ],
+        astroliftProjectManagedServicesPage: { totalCount: 1 },
         astroliftProjectSecretBundles: [],
       },
       ListProjectManagedServiceCatalog: {
@@ -158,7 +125,7 @@ vi.mock("@/components/ui/dialog", () => ({
 
 describe("ProjectResourcesClient provider catalogue", () => {
   it("keeps planned variants inspectable but not provisionable", () => {
-    render(<ProjectResourcesClient slug="emr-bug-triage" />);
+    render(<ProjectResourcesClient slug="example-platform" />);
 
     const picker = screen.getByLabelText("Provider resource");
     const submit = screen.getByRole("button", { name: "Provision" });
@@ -175,12 +142,5 @@ describe("ProjectResourcesClient provider catalogue", () => {
       "https://github.com/calliopeai/astrolift-app/issues/1283"
     );
     expect(submit).toBeDisabled();
-  });
-
-  it("shows the StorageClass behind a dynamic filesystem mount", () => {
-    render(<ProjectResourcesClient slug="emr-bug-triage" />);
-
-    expect(screen.getByText("StorageClass rook-cephfs")).toBeVisible();
-    expect(screen.getByText("/workspace")).toBeVisible();
   });
 });

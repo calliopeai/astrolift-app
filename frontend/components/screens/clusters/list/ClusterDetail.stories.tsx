@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import german from "@/messages/de.json";
+import japanese from "@/messages/ja.json";
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
@@ -94,4 +97,27 @@ export const UnregisterRefused: Story = {
     await expect(refusedUnregister).toHaveBeenCalledTimes(1);
     await expect(body.getByRole("alertdialog")).toBeVisible();
   },
+};
+
+export const GermanWidth768: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="de" messages={german}>
+      <div style={{ width: 768 }}>
+        <ClusterDetail
+          {...detailProps({
+            slug: LONG_CLUSTER.slug,
+            cluster: LONG_CLUSTER,
+            renderLiveStats: liveStats,
+          })}
+        />
+      </div>
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseRegistered: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={japanese}>
+      <ClusterDetail {...detailProps({ slug: CLUSTERS[2].slug, cluster: CLUSTERS[2] })} />
+    </NextIntlClientProvider>
+  ),
 };

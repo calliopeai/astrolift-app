@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import {
@@ -38,4 +42,40 @@ export const SkillsSummary: Story = {
 
 export const SkillsSummaryEmpty: Story = {
   render: () => <AgentBuildScreen {...BUILD_EMPTY} skillsHref="/agents/support-bot/skills" />,
+};
+
+export const FrenchBuild: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <AgentBuildScreen {...BUILD} skillsHref="/agents/bdr-outreach/skills" />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseReadFailed: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <AgentBuildScreen {...BUILD_ERROR} skillsHref="/agents/bdr-outreach/skills" />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseUnknownAdapter: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <AgentBuildScreen
+        {...BUILD_LONG}
+        brief={{ ...BUILD_LONG.brief!, createdAt: "RAW_INVALID_DATE" }}
+        skills={BUILD_LONG.skills.map((b) => ({
+          ...b,
+          toolDefs: b.toolDefs.map((tool) => ({ ...tool, adapter: "__proto__" })),
+        }))}
+      />
+    </NextIntlClientProvider>
+  ),
+};
+export const FrenchEmpty: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <AgentBuildScreen {...BUILD_EMPTY} />
+    </NextIntlClientProvider>
+  ),
 };

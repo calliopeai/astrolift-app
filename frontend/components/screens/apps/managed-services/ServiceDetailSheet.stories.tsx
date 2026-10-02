@@ -61,3 +61,21 @@ export const LongStrings: Story = {
     />
   ),
 };
+
+export const ExactReadLoading: Story = {
+  render: () => (
+    <ServiceDetailSheet service={SERVICE_ROW} current={null} loading onOpenChange={noop} />
+  ),
+};
+export const ExactReadRefused: Story = {
+  render: () => (
+    <ServiceDetailSheet
+      service={SERVICE_ROW}
+      current={null}
+      refused
+      onRetry={noop}
+      onOpenChange={noop}
+      metrics={<p>Runtime metrics must remain hidden</p>}
+    />
+  ),
+};

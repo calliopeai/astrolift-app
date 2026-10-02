@@ -30,7 +30,6 @@ import dataclasses
 import datetime as dt
 import logging
 from collections import defaultdict
-from collections.abc import Callable
 from typing import Any
 
 import strawberry
@@ -212,6 +211,7 @@ def _backfill_from_cloudwatch(
         AppEnvironment.objects.filter(
             registered_app=app,
             deleted_at__isnull=True,
+            **({"name": environment_name} if environment_name else {}),
         )
         .select_related("tenant_cluster__provider_plugin")
         .order_by("name")
@@ -248,7 +248,27 @@ def _backfill_from_cloudwatch(
         )
     except Exception as exc:
         log.warning("cloudwatch fallback: dispatch failed app=%s err=%s", app.slug, exc)
-        return out, False
+        from astrolift_observability.schema.types import (
+            GoldenSignalSource,
+            GoldenSignalUnavailableReason,
+        )
+
+        return [
+            dataclasses.replace(
+                signal,
+                reason=ObservabilityPanelReason.ERROR,
+                measurement=dataclasses.replace(
+                    signal.measurement,
+                    source=GoldenSignalSource.CLOUDWATCH_ALB,
+                    available=False,
+                    unavailable_reason=GoldenSignalUnavailableReason.PROVIDER_ERROR,
+                ),
+            )
+            if signal.measurement is not None
+            and signal.name.value.startswith(("traffic", "errors", "latency"))
+            else signal
+            for signal in out
+        ], True
 
     has_data = any(bool(v) for v in cw_data.values())
     log.warning(
@@ -275,24 +295,17 @@ def _backfill_from_cloudwatch(
         "latency_p95": "seconds",
         "latency_p99": "seconds",
     }
-    # p90 kept for wire compat — alias it to the p95 CloudWatch series
-    _CW_ALIAS: dict[GoldenSignalKind, list] = {
-        GoldenSignalKind.LATENCY_P90: cw_data.get("latency_p95", []),
-    }
-
     # Rebuild the list: swap in CloudWatch data for any HTTP signal
     patched: list[AppGoldenSignal] = []
     for sig in out:
         # sig.name is a GoldenSignalKind enum instance
         cw_key = next((k for k, kind_enum in _CW_KIND_MAP.items() if kind_enum == sig.name), None)
-        alias_pairs = _CW_ALIAS.get(sig.name)  # type: ignore[arg-type]
         cw_pairs = cw_data.get(cw_key, []) if cw_key else []
-        if cw_pairs or alias_pairs:
-            pairs = cw_pairs or alias_pairs or []
+        if cw_pairs:
+            pairs = cw_pairs
             patched.append(
-                AppGoldenSignal(
-                    name=sig.name,
-                    range_seconds=seconds,
+                dataclasses.replace(
+                    sig,
                     samples=_samples_from_pairs(pairs),
                     promql=f"# CloudWatch ALB — {sig.name.value if hasattr(sig.name, 'value') else sig.name}",
                     unit=_CW_UNIT_MAP.get(cw_key or "", sig.unit),
@@ -415,17 +428,18 @@ class GoldenSignalsQuery:
         saturation) over ``range_seconds`` for ``app_slug`` (+ env +
         optional workload).
 
-        Latency expands to three rows — p50, p90, p99 — so the FE can
+        Latency expands to four rows — p50, p90, p95, p99 — so the FE can
         render them as a stacked line without a second round-trip.
 
-        ``workload_slug`` narrows the Prometheus query to one workload
-        (``api`` / ``worker`` / ``scheduler`` / ...). Omit to roll up
-        every workload under the app (pre-#422 behavior).
+        ``workload_slug`` requires verified runtime ownership and canonical
+        instrumentation IDs. Resource series bind physical container IDs
+        and pod UIDs. Omit for explicitly labeled app-environment totals.
 
         Returns a reason-discriminated envelope (#1111):
         NOT_CONFIGURED when the app/cluster has no Prometheus endpoint,
-        ERROR when Prometheus errors, NO_DATA_YET when every signal
-        came back empty, OK otherwise.
+        ERROR when no signal is available and a read failed, NO_DATA_YET
+        when every signal came back empty, OK when any signal is available.
+        Each signal retains its independent source, scope and failure reason.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
         tenant = get_current_tenant()
@@ -436,180 +450,30 @@ class GoldenSignalsQuery:
                 deleted_at__isnull=True,
             )
             .select_related("organization")
-            .only("id", "slug", "k8s_namespace", "manifest_normalized", "organization__slug")
+            .only(
+                "id",
+                "guid",
+                "slug",
+                "k8s_namespace",
+                "manifest_normalized",
+                "organization__slug",
+                "organization__guid",
+            )
             .first()
         )
         if app is None:
             return AppGoldenSignalsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, signals=[])
 
-        endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
-        if endpoint is None:
-            return AppGoldenSignalsResult(reason=ObservabilityPanelReason.NOT_CONFIGURED, signals=[])
+        from astrolift_observability.golden_signals import golden_signals_for_app
 
-        now = _now_utc()
-        end_unix = int(now.timestamp())
-        start_unix = end_unix - seconds
-        step = prom_queries.pick_step_seconds(seconds)
-
-        # cAdvisor / kube-state-metrics series carry namespace/pod/container
-        # labels, not the app-instrumentation "app" label. Pass the app's
-        # Kubernetes namespace so saturation queries use the correct selector.
-        app_namespace = namespace_for_app_environment(app, environment_name)
-
-        # Edge-sourced RED (#1224, spec 08 §6.1): when the app's cluster
-        # ingress variant has an edge-metrics mapping, traffic / errors /
-        # latency come from the ingress controller's metrics keyed by the
-        # app's namespace — an uninstrumented app gets full panels. Variants
-        # without a mapping yet fall back to the legacy app-metric queries.
-        edge = prom_client.resolve_edge_metrics(app=app, environment_name=environment_name)
-        red_extra = {"edge": edge, "namespace": app_namespace}
-
-        builders: list[tuple[GoldenSignalKind, str, Callable[..., prom_queries.QueryPlan], dict]] = [
-            (
-                GoldenSignalKind.TRAFFIC,
-                "rps",
-                prom_queries.build_request_rate_query,
-                {**red_extra},
-            ),
-            (
-                GoldenSignalKind.ERRORS,
-                "ratio",
-                prom_queries.build_error_rate_query,
-                {**red_extra},
-            ),
-            (
-                GoldenSignalKind.LATENCY_P50,
-                "seconds",
-                prom_queries.build_latency_quantile_query,
-                {"quantile": 0.50, **red_extra},
-            ),
-            (
-                GoldenSignalKind.LATENCY_P90,
-                "seconds",
-                prom_queries.build_latency_quantile_query,
-                {"quantile": 0.90, **red_extra},
-            ),
-            # #640 — p95 is the SLO-canonical default for the latency
-            # tile. Keep p90 in the wire shape so legacy dashboards
-            # don't break; the FE renders three at a time by default
-            # (p50, p95, p99) and exposes p90 via the PromQL disclosure.
-            (
-                GoldenSignalKind.LATENCY_P95,
-                "seconds",
-                prom_queries.build_latency_quantile_query,
-                {"quantile": 0.95, **red_extra},
-            ),
-            (
-                GoldenSignalKind.LATENCY_P99,
-                "seconds",
-                prom_queries.build_latency_quantile_query,
-                {"quantile": 0.99, **red_extra},
-            ),
-            (
-                GoldenSignalKind.SATURATION_CPU,
-                "ratio",
-                prom_queries.build_cpu_saturation_query,
-                {"namespace": app_namespace},
-            ),
-            # #642 — memory saturation completes the SATURATION pair.
-            # Same PromQL shape as CPU but on working-set bytes vs the
-            # memory limit. >100% means OOM is imminent.
-            (
-                GoldenSignalKind.SATURATION_MEMORY,
-                "ratio",
-                prom_queries.build_memory_saturation_query,
-                {"namespace": app_namespace},
-            ),
-        ]
-
-        out: list[AppGoldenSignal] = []
-        for kind, unit, builder, extra in builders:
-            plan = builder(
-                app_slug=app.slug,
-                environment_name=environment_name,
-                workload_slug=workload_slug,
-                range_seconds=seconds,
-                **extra,
-            )
-            try:
-                series = prom_client.query_range_series(
-                    endpoint=endpoint,
-                    promql=plan.promql,
-                    start_unix=start_unix,
-                    end_unix=end_unix,
-                    step_seconds=step,
-                )
-            except PrometheusError:
-                # Any single signal failing kills the panel. A live
-                # endpoint that errors on query is an unexpected fault
-                # (bad PromQL, Prometheus down) — ERROR, not "no data".
-                log.warning(
-                    "golden_signals: prometheus query failed for app %s (%s)",
-                    app.slug,
-                    kind,
-                )
-                return AppGoldenSignalsResult(reason=ObservabilityPanelReason.ERROR, signals=[])
-
-            # Aggregate queries return at most one row. If Prometheus
-            # returns zero rows the signal is empty but present so the
-            # FE can render the card skeleton with the PromQL.
-            pairs = series[0][1] if series else []
-            out.append(
-                AppGoldenSignal(
-                    name=kind,
-                    range_seconds=seconds,
-                    samples=_samples_from_pairs(pairs),
-                    promql=plan.promql,
-                    unit=unit,
-                )
-            )
-
-        # CloudWatch ALB fallback for HTTP signals.
-        #
-        # Prometheus only has Traffic / Errors / Latency when the app
-        # exposes http_requests_total (application-level instrumentation).
-        # On AWS clusters every managed app sits behind an ALB that emits
-        # RequestCount, HTTPCode_Target_5XX_Count, and TargetResponseTime
-        # to CloudWatch automatically — no app changes needed.
-        #
-        # If ALL three HTTP signal kinds came back empty from Prometheus,
-        # try CloudWatch and backfill whichever signals it can supply.
-        signals_by_kind = {sig.name: sig for sig in out}
-        http_all_empty = all(
-            not signals_by_kind[k].samples for k in _HTTP_SIGNAL_KINDS if k in signals_by_kind
+        return golden_signals_for_app(
+            app=app,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+            seconds=seconds,
+            now=_now_utc(),
+            cloudwatch_fallback=_backfill_from_cloudwatch,
         )
-        cloudwatch_source = False
-        if http_all_empty:
-            out, cloudwatch_source = _backfill_from_cloudwatch(
-                out=out,
-                app=app,
-                environment_name=environment_name,
-                app_namespace=app_namespace,
-                start_unix=start_unix,
-                end_unix=end_unix,
-                step=step,
-                seconds=seconds,
-            )
-
-        # Per-signal reason (#1708). An empty RED panel has two very
-        # different causes and the panel used to render both as "no data
-        # for this window", which reads as "the app has no traffic".
-        # With no edge mapping, no app instrumentation and no ALB
-        # fallback there is nothing for the query to select — say so.
-        red_source = _red_source_configured(app=app, edge=edge, cloudwatch=cloudwatch_source)
-        out = [
-            dataclasses.replace(
-                sig,
-                reason=_signal_reason(sig, red_source=red_source),
-            )
-            for sig in out
-        ]
-
-        # Endpoint is live and every query succeeded; if no signal
-        # carries a sample the app just isn't emitting metrics yet.
-        has_data = any(sig.samples for sig in out)
-        reason = ObservabilityPanelReason.OK if has_data else ObservabilityPanelReason.NO_DATA_YET
-        return AppGoldenSignalsResult(reason=reason, signals=out)
 
     @strawberry.field
     @require_permission(
@@ -1011,6 +875,7 @@ class GoldenSignalsQuery:
         info: Info,
         managed_service_id: strawberry.ID,
         range_seconds: int | None = None,
+        expected_context_revision: str | None = None,
     ) -> ManagedServiceMetrics | None:
         """Time-series metrics for one managed-service row (#645 + #646).
 
@@ -1024,18 +889,46 @@ class GoldenSignalsQuery:
         same shape as the golden-signals empty state.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        tenant = get_current_tenant()
-        svc = (
-            ManagedService.objects.select_related("registered_app", "app_environment")
-            .filter(
-                guid=str(managed_service_id),
-                registered_app__organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
+        if expected_context_revision is not None:
+            from graphql import GraphQLError
+
+            from astrolift_identity import abac
+            from astrolift_services.schema.resource_reads import (
+                check_context_revision,
+                context_row,
+                resource_scope,
             )
-            .first()
-        )
-        if svc is None:
-            return None
+            from core.permissions import check_permission
+
+            svc = context_row(managed_service_id)
+            if svc is None or not svc.registered_app_id or not svc.app_environment_id:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            check_context_revision(svc, expected_context_revision)
+            cluster = svc.effective_cluster
+            if cluster is None:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            with abac.operation_attributes(
+                environment=svc.effective_environment_name, region=cluster.region or None, approvals=0
+            ):
+                check_permission(Permission.APP_READ, scope=resource_scope("id")({"id": managed_service_id}))
+
+        else:
+            tenant = get_current_tenant()
+            svc = (
+                ManagedService.objects.select_related("registered_app", "app_environment")
+                .filter(
+                    guid=str(managed_service_id),
+                    registered_app__organization_id=tenant.organization_id,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            if svc is None:
+                return None
 
         kind = svc.kind
         if kind == ManagedService.Kind.POSTGRES:
@@ -1050,11 +943,24 @@ class GoldenSignalsQuery:
         else:
             return None
 
-        endpoint = prom_client.resolve_prometheus_endpoint(
-            app=svc.registered_app,
-            environment_name=svc.app_environment.name,
-        )
-        if endpoint is None:
+        if expected_context_revision is None:
+            endpoint = prom_client.resolve_prometheus_endpoint(
+                app=svc.registered_app, environment_name=svc.app_environment.name
+            )
+        else:
+            # Capture the reviewed cluster directly. Environment-name resolution
+            # could otherwise follow a moved or replacement environment.
+            config = cluster.provider_config or {}
+            capabilities = cluster.capabilities or {}
+            endpoint = config.get("prometheus_endpoint") or capabilities.get("prometheus_endpoint")
+            endpoint = endpoint.strip() if isinstance(endpoint, str) else None
+            current = context_row(managed_service_id)
+            if current is None:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            check_context_revision(current, expected_context_revision)
+        if not endpoint:
             # Same envelope shape as the populated case, with an empty
             # series list — the FE renders the "metrics not yet
             # flowing" callout inside the panel.
@@ -1105,6 +1011,14 @@ class GoldenSignalsQuery:
                     source=source,
                 )
             )
+
+        if expected_context_revision is not None:
+            latest = context_row(managed_service_id)
+            if latest is None:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            check_context_revision(latest, expected_context_revision)
 
         return ManagedServiceMetrics(
             managed_service_id=managed_service_id,

@@ -60,6 +60,9 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "apps.dependency_context",
     "providers.reference_read",
     "workloads.environment_targets",
+    "previews.exact_identity",
+    "previews.reviewed_routes",
+    "previews.explicit_runtime_cost",
     # Deploy pipeline (start/promote/rollback/teardown).
     "deploys.start",
     "deploys.promote",
@@ -76,6 +79,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "workflows.reviewed_definition_starts",
     "workflows.definition_input_contracts",
     "workflows.definition_start_recovery",
+    "workflows.bounded_review_loops",
+    "workflows.serial_collections",
     "pipelines.reviewed_starts",
     "pipelines.versioned_start_requests",
     "pipelines.start_request_recovery",

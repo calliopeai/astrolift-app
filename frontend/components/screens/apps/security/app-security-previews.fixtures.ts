@@ -245,6 +245,9 @@ export const EDITOR_CHANGED: AccessEditorViewProps = {
 // ─── Previews ────────────────────────────────────────────────────────────────
 
 const PREVIEW_BASE: AstroliftPreviewEnvironment = {
+  version: 1,
+  environmentStatus: "unavailable",
+  runtimeStatus: "available",
   id: "pv-1",
   registeredAppSlug: "checkout",
   prNumber: 412,

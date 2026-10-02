@@ -78,7 +78,7 @@ async def test_nested_definition_executes_as_linked_temporal_child(temporal_env,
         }
 
     @activity.defn(name="astrolift.workflow_stage.create_stage_execution")
-    async def create_execution(workflow_run_id, stage_id, attempt_number=1):
+    async def create_execution(workflow_run_id, stage_id, attempt_number=1, context=None):
         return f"execution-{workflow_run_id}-{stage_id}-{attempt_number}"
 
     @activity.defn(name="astrolift.workflow_stage.create_nested_workflow_run")
@@ -98,7 +98,7 @@ async def test_nested_definition_executes_as_linked_temporal_child(temporal_env,
         calls["starts"].append((child_id, temporal_run_id))
 
     @activity.defn(name="astrolift.workflow_stage.snapshot_checkpoint")
-    async def checkpoint(workflow_run_id, stage_id, previous_output=None):
+    async def checkpoint(workflow_run_id, stage_id, previous_output=None, context=None):
         return f"checkpoint-{workflow_run_id}-{stage_id}"
 
     @activity.defn(name="astrolift.workflow_stage.update_stage_execution")

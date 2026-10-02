@@ -54,6 +54,9 @@ class WorkflowManifestStageType:
     environment_spec_slug: str | None
     skills: list[str]
     on_failure: str
+    max_attempts: int
+    iteration: strawberry.scalars.JSON
+    back_edge: strawberry.scalars.JSON
     timeout: int
     # Tri-state rendered as a string: "0" (none), "N" (static), "dynamic".
     fan_out: str
@@ -121,6 +124,9 @@ def _preview_type(parsed: ParsedWorkflowManifest) -> WorkflowManifestPreviewType
                 environment_spec_slug=s.environment_spec_slug,
                 skills=list(s.skills),
                 on_failure=s.on_failure,
+                max_attempts=s.max_attempts,
+                back_edge=s.back_edge,
+                iteration=s.iteration,
                 timeout=s.timeout,
                 fan_out=str(s.fan_out),
                 prompt=s.prompt,

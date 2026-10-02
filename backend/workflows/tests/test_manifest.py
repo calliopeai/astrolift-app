@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-
 from astrolift_manifest.parser import ManifestError
+
 from workflows.manifest import (
     ParsedWorkflowManifest,
     WorkflowDefSpec,
@@ -122,6 +122,10 @@ def test_every_pattern_kind_parses(pattern):
 @pytest.mark.parametrize("kind", [c.value for c in WorkflowStage.StageKind])
 def test_every_stage_kind_parses(kind):
     child = '\nworkflow = "child"' if kind == WorkflowStage.StageKind.WORKFLOW else ""
+    if kind == WorkflowStage.StageKind.COLLECTION:
+        child = '\noutput_key = "each"\niteration_json = \'{"max_items":1,"items":[],"body_end":"body"}\'\n\n[[stage]]\nkind = "checkpoint"\noutput_key = "body"'
+    elif kind == WorkflowStage.StageKind.FORMAT_RECORD:
+        child = '\niteration_json = \'{"source_format":"langflow_parser","pattern":"{text}","separator":""}\''
     toml = f'[workflow]\nslug = "w"\nname = "W"\npattern = "single"\n\n[[stage]]\nkind = "{kind}"{child}\n'
     parsed = parse_workflow_manifest(toml)
     assert parsed.stages[0].kind == kind

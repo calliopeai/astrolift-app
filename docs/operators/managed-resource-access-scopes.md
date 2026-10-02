@@ -37,5 +37,49 @@ credential.
 
 The ten project-resource MCP tools use the same scoped targets and persisted
 operation facts as their GraphQL mutations. A denied scope is returned through
-the normal MCP `permission_denied` envelope and audit decision. Tool schemas,
-GraphQL arguments and response shapes remain unchanged.
+the normal MCP `permission_denied` envelope and audit decision. The existing
+MCP request schemas remain compatible. The additive GraphQL metadata
+and reviewed-context contracts below require a matching server/client release.
+
+## Metadata, consumers and reviewed runtime reads
+
+Basic project triage uses `astroliftProjectManagedServicesPage`, independently
+authorized `astroliftProjectManagedServiceAttachmentsPage`, and exact
+`astroliftProjectManagedService(projectId, id)` reads. App-owned detail uses
+`astroliftManagedService(id)`. An exact GUID never resolves a same-name
+replacement. Pages bind their scope/filters into the cursor; removed anchors or
+changed scope require restarting the page rather than guessing continuation.
+Consumer counts reflect visibility, not all subscriptions in the installation.
+
+Metadata exposes owner/placement GUIDs and versions, status, timestamps,
+`contextRevision` and operation receipts. It excludes provider configuration,
+connection material and unrequested grants. Pricing remains an explicit
+independently permitted read with amount, currency, source, fetch time and
+approximation evidence; missing evidence is unavailable rather than zero cost.
+
+Attach, detach, update, reprovision and deprovision accept a nullable
+`expectedContextRevision`. Reviewed clients submit the fresh metadata revision;
+the server checks credentials and current policy and locks the service/parents
+before writes. Reviewed worker operations also revalidate their operation token,
+owner, placement and desired configuration before provider effects. Legacy
+histories without proof retain their compatibility path. An accepted/enqueued
+operation does not certify completion or provider convergence.
+
+Workflow start and receipt annotation are separate. Once the engine accepts a
+start, saving its run ID uses nonblocking locks on the reviewed service and its
+parents. Contention, a replaced operation or an annotation failure leaves the
+run ID unconfirmed; it does not convert an accepted start into a failed one.
+Worker operations retain their blocking safety fences. Enqueue on transaction
+commit is not a durable dispatch outbox.
+
+For app-owned generic exporter metrics, pass that same revision to
+`astroliftAppManagedServiceMetrics(managedServiceId, expectedContextRevision)`.
+The server checks current placement and authority, reads the captured cluster
+endpoint directly, and refuses samples if context changes during collection.
+These exporter charts do not certify physical workload CPU/memory identity; see
+[workload measurement scope](./workload-golden-signals.md).
+
+Web clients clear resource metadata, cursors, samples and captured handlers on
+actor/organization/context changes. Runtime requests are no-cache and disable
+in-flight deduplication, including when switching back to a prior actor. Missing
+or refused context cannot mount runtime charts or enable writes.

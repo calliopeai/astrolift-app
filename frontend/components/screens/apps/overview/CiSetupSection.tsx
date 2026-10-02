@@ -4,19 +4,17 @@ import {
   CheckIcon,
   ChevronDownIcon,
   CopyIcon,
-  DownloadIcon,
   ExternalLinkIcon,
   FileCheck2Icon,
-  GitPullRequestIcon,
   KeyIcon,
   Loader2Icon,
-  RefreshCwIcon,
   ShieldCheckIcon,
   TerminalIcon,
   UploadCloudIcon,
   WebhookIcon,
   XIcon,
 } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
@@ -30,12 +28,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { AstroliftCiWorkflowSyncStatus } from "@/graphql/__generated__/schema";
 
 import {
-  DRIFT_BADGE,
-  DRIFT_HINT,
   formatRelativeWebhookInstall,
   renderWorkflowYaml,
   resolveProviderCiMeta,
 } from "./ci-setup-meta";
+import { WorkflowSyncStatusControl } from "./WorkflowSyncStatusControl";
 import type { CiSetupData, usePushAndRotate } from "./use-ci-setup";
 
 /**
@@ -115,6 +112,7 @@ export function CiSetupSectionView({
   syncFile,
   webhook,
 }: CiSetupSectionViewProps) {
+  const t = useTranslations("apps.overview.ciSetup");
   if (agentMode) {
     const automatic = Boolean(sourceWebhookInstalledAt);
     return (
@@ -122,25 +120,16 @@ export function CiSetupSectionView({
         title={
           <span className="flex items-center gap-2">
             <WebhookIcon className="text-primary size-4" />
-            Agent source delivery
+            {t("agentTitle")}
           </span>
         }
-        description={
-          <>
-            Agent pushes freeze an immutable package snapshot; they do not deploy a standing app or
-            start a run. The next dispatch uses the latest successful snapshot and the image named
-            by that package.
-          </>
-        }
+        description={<>{t("agentDescription")}</>}
       >
         <div className="bg-card space-y-3 rounded-md border p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium">Push → package sync</p>
-              <p className="text-muted-foreground text-xs">
-                Signed source webhook · deploy branch only · exact manifest or opted-in federation
-                bundle.
-              </p>
+              <p className="text-sm font-medium">{t("agentSyncTitle")}</p>
+              <p className="text-muted-foreground text-xs">{t("agentSyncHint")}</p>
             </div>
             <span
               className={
@@ -149,25 +138,21 @@ export function CiSetupSectionView({
                   : "bg-warning/10 text-warning-fg rounded-full px-2 py-1 text-xs font-medium"
               }
             >
-              {automatic ? "Automatic on push" : "Webhook not installed"}
+              {automatic ? t("agentAutomatic") : t("notInstalled")}
             </span>
           </div>
           <div className="grid gap-2 text-xs md:grid-cols-3">
             <div className="bg-muted/40 rounded p-2">
-              <p className="font-medium">Config and scripts</p>
-              <p className="text-muted-foreground">
-                Frozen from the selected chrooted source slice.
-              </p>
+              <p className="font-medium">{t("agentConfig")}</p>
+              <p className="text-muted-foreground">{t("agentConfigHint")}</p>
             </div>
             <div className="bg-muted/40 rounded p-2">
-              <p className="font-medium">Container image</p>
-              <p className="text-muted-foreground">
-                Published separately by the repo&rsquo;s image CI.
-              </p>
+              <p className="font-medium">{t("agentImage")}</p>
+              <p className="text-muted-foreground">{t("agentImageHint")}</p>
             </div>
             <div className="bg-muted/40 rounded p-2">
-              <p className="font-medium">Runs</p>
-              <p className="text-muted-foreground">Never auto-started by a source push.</p>
+              <p className="font-medium">{t("agentRuns")}</p>
+              <p className="text-muted-foreground">{t("agentRunsHint")}</p>
             </div>
           </div>
         </div>
@@ -188,34 +173,37 @@ export function CiSetupSectionView({
   }
 
   const meta = resolveProviderCiMeta(providerPluginSlug);
+  const providerKey = ["gcp", "azure", "k8s_native"].includes(providerPluginSlug)
+    ? providerPluginSlug
+    : "aws";
 
   const rows: SecretRow[] = [
     {
       name: meta.pushCredentialEnv,
       value: pushCredentialRef,
-      hint: meta.pushCredentialHint,
+      hint: t(`providers.${providerKey}.pushHint`),
     },
     {
       name: meta.registryEnv,
       value: registryUri,
-      hint: meta.registryHint,
+      hint: t(`providers.${providerKey}.registryHint`),
     },
     {
       name: "ASTROLIFT_APP_SLUG",
       value: appSlug,
-      hint: "Stable app identifier — embed in the deploy webhook payload so the platform routes correctly.",
+      hint: t("appHint"),
     },
     {
       name: "ASTROLIFT_API_URL",
       value: apiUrl,
-      hint: "Public base URL of the Astrolift platform API. The deploy webhook is POSTed here.",
+      hint: t("apiHint"),
     },
     {
       name: "ASTROLIFT_DEPLOY_TOKEN",
       value: null,
-      hint: "App-scoped bearer token. Shown once at mint time on the deploy-tokens page.",
+      hint: t("tokenHint"),
       externalHref: tokensHref,
-      externalLabel: "Manage deploy tokens",
+      externalLabel: t("manageTokens"),
     },
   ];
 
@@ -230,9 +218,9 @@ export function CiSetupSectionView({
     if (!workflowYaml) return;
     try {
       await navigator.clipboard.writeText(workflowYaml);
-      toast.success("Reference workflow YAML copied.");
+      toast.success(t("yamlCopied"));
     } catch {
-      toast.error("Copy failed — select the text and copy manually.");
+      toast.error(t("copyTextFailed"));
     }
   }
 
@@ -241,14 +229,10 @@ export function CiSetupSectionView({
       title={
         <span className="flex items-center gap-2">
           <TerminalIcon className="text-primary size-4" />
-          CI setup
+          {t("title")}
         </span>
       }
-      description={
-        <>
-          Review the app&rsquo;s CI secrets and workflow before syncing it to the source repository.
-        </>
-      }
+      description={<>{t("description")}</>}
     >
       <TooltipProvider>
         <div className="bg-card overflow-hidden rounded-md border">
@@ -267,22 +251,23 @@ export function CiSetupSectionView({
         <summary className="hover:bg-muted/50 flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
           <span className="flex items-center gap-2">
             <ChevronDownIcon className="size-4 transition-transform group-open:rotate-180" />
-            {managedWorkflow ? "Managed CI workflow" : "Reference GitHub Actions workflow"}
+            {managedWorkflow ? t("managedWorkflow") : t("referenceWorkflow")}
           </span>
           <span className="text-muted-foreground text-2xs">
             {managedWorkflow ? (
-              ciWorkflowSyncStatus?.path || "Review before syncing"
+              ciWorkflowSyncStatus?.path || t("reviewBeforeSync")
             ) : (
               <>
-                paste into <span className="font-mono">.github/workflows/astrolift-ci.yml</span>
+                {t.rich("pasteInto", {
+                  path: (chunks) => <span className="font-mono">{chunks}</span>,
+                })}
               </>
             )}
           </span>
         </summary>
         <div className="border-t">
           <pre className="bg-background text-2xs overflow-x-auto p-4 font-mono leading-relaxed">
-            {workflowYaml ??
-              "Workflow unavailable. Check the app's CI configuration and refresh its current workflow preview."}
+            {workflowYaml ?? t("workflowUnavailable")}
           </pre>
           <div className="flex justify-end border-t p-3">
             <Button
@@ -293,7 +278,7 @@ export function CiSetupSectionView({
               className="gap-1.5"
             >
               <CopyIcon className="size-3.5" />
-              Copy workflow YAML
+              {t("copyYaml")}
             </Button>
           </div>
         </div>
@@ -316,168 +301,6 @@ export function CiSetupSectionView({
   );
 }
 
-function WorkflowSyncStatusControl({
-  status,
-  pushing,
-  pulling,
-  refreshing,
-  reconciling,
-  onRefresh,
-  onPush,
-  onReconcile,
-  onPull,
-}: { status: AstroliftCiWorkflowSyncStatus } & CiSetupData["workflowSync"]) {
-  const [confirmPullOpen, setConfirmPullOpen] = React.useState(false);
-  const [comparing, setComparing] = React.useState(false);
-
-  const badge = DRIFT_BADGE[status.state] ?? DRIFT_BADGE.unknown;
-  const hint = DRIFT_HINT[status.state] ?? DRIFT_HINT.unknown;
-  const busy = pushing || pulling || refreshing || reconciling;
-  // A reconcile PR only makes sense for a drifted (hand-edited) file.
-  const canReconcile = status.state === "repo_drift" || status.state === "conflict";
-
-  async function handlePull() {
-    await onPull();
-    setComparing(true);
-  }
-
-  return (
-    <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium">Managed workflow sync</p>
-            <span
-              className={
-                "text-2xs inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium " +
-                badge.className
-              }
-            >
-              {badge.label}
-            </span>
-            {status.syncedTemplateVersion != null &&
-            status.syncedTemplateVersion !== status.currentTemplateVersion ? (
-              <span className="text-muted-foreground text-2xs">
-                template v{status.syncedTemplateVersion} → v{status.currentTemplateVersion}
-              </span>
-            ) : null}
-          </div>
-          <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>
-          {status.checkedAt ? (
-            <p className="text-muted-foreground text-2xs mt-0.5">
-              last checked {formatRelativeWebhookInstall(status.checkedAt)}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      <Can permission="app.update">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onRefresh}
-            disabled={busy}
-            className="gap-1.5"
-          >
-            {refreshing ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCwIcon className="size-3.5" />
-            )}
-            Check
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setConfirmPullOpen(true)}
-            disabled={busy}
-            className="gap-1.5"
-          >
-            {pulling ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <DownloadIcon className="size-3.5" />
-            )}
-            Pull from repo
-          </Button>
-          <Button size="sm" variant="outline" onClick={onPush} disabled={busy} className="gap-1.5">
-            {pushing ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <UploadCloudIcon className="size-3.5" />
-            )}
-            Push to repo
-          </Button>
-          {canReconcile ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onReconcile}
-              disabled={busy}
-              className="gap-1.5"
-            >
-              {reconciling ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <GitPullRequestIcon className="size-3.5" />
-              )}
-              Open reconcile PR
-            </Button>
-          ) : null}
-        </div>
-      </Can>
-
-      {status.repoText && status.renderedText && status.repoText !== status.renderedText ? (
-        <div className="border-border rounded-md border">
-          <button
-            type="button"
-            onClick={() => setComparing((v) => !v)}
-            className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs"
-          >
-            <span>
-              Compare the repo&apos;s file with what a push would send
-              {status.repoTextPulledAt
-                ? ` (pulled ${formatRelativeWebhookInstall(status.repoTextPulledAt)})`
-                : ""}
-            </span>
-            <span aria-hidden>{comparing ? "−" : "+"}</span>
-          </button>
-          {comparing ? (
-            <div className="grid gap-3 border-t p-3 md:grid-cols-2">
-              <div className="min-w-0">
-                <p className="text-muted-foreground text-2xs mb-1 font-medium uppercase">
-                  In the repo
-                </p>
-                <pre className="bg-muted/40 max-h-72 overflow-auto rounded-sm p-2 text-xs leading-relaxed">
-                  {status.repoText}
-                </pre>
-              </div>
-              <div className="min-w-0">
-                <p className="text-muted-foreground text-2xs mb-1 font-medium uppercase">
-                  What a push would send
-                </p>
-                <pre className="bg-muted/40 max-h-72 overflow-auto rounded-sm p-2 text-xs leading-relaxed">
-                  {status.renderedText}
-                </pre>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      <ConfirmDialog
-        open={confirmPullOpen}
-        onOpenChange={setConfirmPullOpen}
-        title="Pull the repo's workflow file?"
-        description="Astrolift reads the file from the deploy branch, stores it, and treats it as the baseline, so it stops being reported as changed. Nothing is written to the repo."
-        confirmLabel="Pull from repo"
-        onConfirm={handlePull}
-      />
-    </div>
-  );
-}
-
 export interface PushAndRotateButtonViewProps extends ReturnType<typeof usePushAndRotate> {
   size?: "sm" | "default";
   variant?: "default" | "outline";
@@ -496,8 +319,9 @@ export function PushAndRotateButtonView({
   onPushAndRotate,
   size = "sm",
   variant = "default",
-  label = "Push & rotate",
+  label,
 }: PushAndRotateButtonViewProps) {
+  const t = useTranslations("apps.overview.ciSetup");
   const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   return (
@@ -514,14 +338,14 @@ export function PushAndRotateButtonView({
         ) : (
           <UploadCloudIcon className="size-3.5" />
         )}
-        {label}
+        {label ?? t("pushRotate")}
       </Button>
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Push CI secrets to the repo?"
-        description="This rotates the deploy token. The old token will stop working immediately."
-        confirmLabel="Push & rotate"
+        title={t("rotateTitle")}
+        description={t("rotateDescription")}
+        confirmLabel={t("pushRotate")}
         onConfirm={onPushAndRotate}
       />
     </>
@@ -529,14 +353,14 @@ export function PushAndRotateButtonView({
 }
 
 function ValidateCiSecretsAction({ validating, results, onValidate }: CiSetupData["validate"]) {
+  const t = useTranslations("apps.overview.ciSetup");
+  const format = useFormatter();
   return (
     <div className="flex flex-col gap-3 rounded-md border border-dashed p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium">Validate CI secrets</p>
-          <p className="text-muted-foreground text-xs">
-            Check what GitHub Actions actually sees today — no changes, just a read.
-          </p>
+          <p className="text-sm font-medium">{t("validateTitle")}</p>
+          <p className="text-muted-foreground text-xs">{t("validateDescription")}</p>
         </div>
         <Button
           size="sm"
@@ -550,7 +374,7 @@ function ValidateCiSecretsAction({ validating, results, onValidate }: CiSetupDat
           ) : (
             <ShieldCheckIcon className="size-3.5" />
           )}
-          Validate
+          {t("validate")}
         </Button>
       </div>
       {results && results.results.length > 0 ? (
@@ -564,20 +388,26 @@ function ValidateCiSecretsAction({ validating, results, onValidate }: CiSetupDat
               <span className="inline-flex items-center gap-1.5">
                 {r.isSet && r.isCurrent ? (
                   <span className="text-success-fg inline-flex items-center gap-1">
-                    <CheckIcon className="size-3" /> current
+                    <CheckIcon className="size-3" /> {t("current")}
                   </span>
                 ) : r.isSet ? (
                   <span className="text-warning-fg inline-flex items-center gap-1">
-                    <CheckIcon className="size-3" /> set, stale
+                    <CheckIcon className="size-3" /> {t("stale")}
                   </span>
                 ) : (
                   <span className="text-danger-fg inline-flex items-center gap-1">
-                    <XIcon className="size-3" /> not set
+                    <XIcon className="size-3" /> {t("notSet")}
                   </span>
                 )}
                 {r.updatedAt ? (
                   <span className="text-muted-foreground">
-                    {new Date(r.updatedAt).toLocaleDateString()}
+                    {Number.isFinite(new Date(r.updatedAt).getTime())
+                      ? format.dateTime(new Date(r.updatedAt), {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : t("unknownDate")}
                   </span>
                 ) : null}
               </span>
@@ -590,14 +420,12 @@ function ValidateCiSecretsAction({ validating, results, onValidate }: CiSetupDat
 }
 
 function PushAndRotateAction(props: ReturnType<typeof usePushAndRotate>) {
+  const t = useTranslations("apps.overview.ciSetup");
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
       <div className="min-w-0">
-        <p className="text-sm font-medium">Push & rotate</p>
-        <p className="text-muted-foreground text-xs">
-          Seal and upload all five values to GitHub Actions secrets in one shot. Rotates the deploy
-          token as part of the round-trip.
-        </p>
+        <p className="text-sm font-medium">{t("pushRotate")}</p>
+        <p className="text-muted-foreground text-xs">{t("pushRotateDescription")}</p>
       </div>
       <PushAndRotateButtonView {...props} />
     </div>
@@ -613,6 +441,7 @@ function SecretRowItem({
   isLast: boolean;
   loading: boolean;
 }) {
+  const t = useTranslations("apps.overview.ciSetup");
   return (
     <div
       className={
@@ -628,7 +457,7 @@ function SecretRowItem({
         <TooltipContent side="top">
           <span>{row.hint}</span>
           <br />
-          <span className="text-background/70">GitHub Actions secret name</span>
+          <span className="text-background/70">{t("secretNameHint")}</span>
         </TooltipContent>
       </Tooltip>
 
@@ -642,6 +471,7 @@ function SecretRowItem({
 }
 
 function SecretValue({ row, loading }: { row: SecretRow; loading: boolean }) {
+  const t = useTranslations("apps.overview.ciSetup");
   const [copied, setCopied] = React.useState(false);
 
   if (row.value === null) {
@@ -654,7 +484,7 @@ function SecretValue({ row, loading }: { row: SecretRow; loading: boolean }) {
           <Button size="sm" variant="ghost" asChild className="shrink-0 gap-1.5">
             <Link href={row.externalHref}>
               <ExternalLinkIcon className="size-3.5" />
-              {row.externalLabel ?? "Open"}
+              {row.externalLabel ?? t("open")}
             </Link>
           </Button>
         )}
@@ -673,10 +503,10 @@ function SecretValue({ row, loading }: { row: SecretRow; loading: boolean }) {
     try {
       await navigator.clipboard.writeText(row.value!);
       setCopied(true);
-      toast.success(`${row.name} copied.`);
+      toast.success(t("valueCopied", { name: row.name }));
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Copy failed — select the value and copy manually.");
+      toast.error(t("copyValueFailed"));
     }
   }
 
@@ -687,7 +517,7 @@ function SecretValue({ row, loading }: { row: SecretRow; loading: boolean }) {
           {row.value}
         </code>
       ) : (
-        <span className="text-muted-foreground text-xs italic">pending provisioning…</span>
+        <span className="text-muted-foreground text-xs italic">{t("pending")}</span>
       )}
       <Button
         size="sm"
@@ -697,20 +527,22 @@ function SecretValue({ row, loading }: { row: SecretRow; loading: boolean }) {
         className="shrink-0 gap-1.5"
       >
         {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
-        {copied ? "Copied" : "Copy"}
+        {copied ? t("copied") : t("copy")}
       </Button>
     </div>
   );
 }
 
 function SyncWorkflowFileAction({ workflowPath, syncing, onSync }: CiSetupData["syncFile"]) {
+  const t = useTranslations("apps.overview.ciSetup");
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
       <div className="min-w-0">
-        <p className="text-sm font-medium">Sync workflow file</p>
+        <p className="text-sm font-medium">{t("syncTitle")}</p>
         <p className="text-muted-foreground text-xs">
-          Commits the rendered <span className="font-mono">{workflowPath}</span> to the deploy
-          branch. Idempotent — re-clicks on an in-sync repo are a no-op.
+          {t.rich("syncDescription", {
+            path: () => <span className="font-mono">{workflowPath}</span>,
+          })}
         </p>
       </div>
       <Button size="sm" variant="outline" onClick={onSync} disabled={syncing} className="gap-1.5">
@@ -719,7 +551,7 @@ function SyncWorkflowFileAction({ workflowPath, syncing, onSync }: CiSetupData["
         ) : (
           <FileCheck2Icon className="size-3.5" />
         )}
-        Sync workflow file
+        {t("syncTitle")}
       </Button>
     </div>
   );
@@ -735,31 +567,32 @@ function InstallSourceWebhookAction({
   installing,
   onInstall,
 }: { sourceWebhookInstalledAt: string | null } & CiSetupData["webhook"]) {
+  const t = useTranslations("apps.overview.ciSetup");
+  const relativeText = useTranslations("apps.overview.ciWorkflow.relative");
   const installed = Boolean(sourceWebhookInstalledAt);
   const relative = sourceWebhookInstalledAt
-    ? formatRelativeWebhookInstall(sourceWebhookInstalledAt)
+    ? formatRelativeWebhookInstall(sourceWebhookInstalledAt, (key, values) =>
+        relativeText(key, values)
+      )
     : null;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium">Source webhook</p>
+          <p className="text-sm font-medium">{t("webhookTitle")}</p>
           {installed ? (
             <span className="bg-success/10 text-2xs text-success-fg inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
               <CheckIcon className="size-3" />
-              installed · {relative}
+              {t("installed", { relative: relative ?? "" })}
             </span>
           ) : (
             <span className="bg-warning/10 text-2xs text-warning-fg inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
-              not installed
+              {t("notInstalled")}
             </span>
           )}
         </div>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Registers the push-event webhook on the source repo pointing at the platform&rsquo;s
-          receiver URL. Re-click to rotate the HMAC secret without spawning a duplicate hook.
-        </p>
+        <p className="text-muted-foreground mt-0.5 text-xs">{t("webhookDescription")}</p>
       </div>
       <Button
         size="sm"
@@ -773,7 +606,7 @@ function InstallSourceWebhookAction({
         ) : (
           <WebhookIcon className="size-3.5" />
         )}
-        {installed ? "Refresh webhook" : "Install webhook"}
+        {installed ? t("refreshWebhook") : t("installWebhook")}
       </Button>
     </div>
   );

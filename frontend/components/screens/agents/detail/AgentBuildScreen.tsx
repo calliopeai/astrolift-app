@@ -9,6 +9,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ListSummary } from "@/components/list/ListSummary";
@@ -22,7 +23,7 @@ import type {
   AstroliftToolDef,
 } from "@/graphql/agents/agents.types";
 import type { AstroliftContainer, AstroliftWorkload } from "@/graphql/registry/registry.types";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 /** The container fields the Build tab shows. */
 export type BuildContainer = Pick<
@@ -58,11 +59,7 @@ export interface AgentBuildScreenProps {
 // Tool-adapter display labels, kept in sync with the skill/tool registry
 // surfaces (`/agents/tools`, `/agents/skills/[id]`). Free `String!` on the
 // schema, so unknown adapters fall through to the raw value.
-const ADAPTER_LABELS: Record<string, string> = {
-  python_fn: "Python function",
-  http_endpoint: "HTTP endpoint",
-  mcp_server: "MCP server",
-};
+const ADAPTER_KEYS = new Set(["python_fn", "http_endpoint", "mcp_server"]);
 
 function prettyJson(v: unknown): string {
   try {
@@ -105,6 +102,8 @@ export function AgentBuildScreen({
   skills,
   skillsHref,
 }: AgentBuildScreenProps) {
+  const t = useTranslations("agentBuild");
+  const format = useFormatters();
   return (
     <div className="space-y-5">
       {/* Source / repo — from the resolved agent row. */}
@@ -112,12 +111,12 @@ export function AgentBuildScreen({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <GitBranchIcon className="size-4" />
-            Source
+            {t("source")}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
           <Field
-            label="Repository"
+            label={t("repository")}
             mono
             value={
               agent.sourceRepo ? (
@@ -138,7 +137,7 @@ export function AgentBuildScreen({
               )
             }
           />
-          <Field label="App" mono value={`${agent.projectSlug}/${agent.appSlug}`} />
+          <Field label={t("app")} mono value={`${agent.projectSlug}/${agent.appSlug}`} />
         </CardContent>
       </Card>
 
@@ -147,7 +146,7 @@ export function AgentBuildScreen({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <PackageIcon className="size-4" />
-            Image
+            {t("image")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -155,18 +154,18 @@ export function AgentBuildScreen({
             <Skeleton className="h-16 w-full" />
           ) : primary ? (
             <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-              <Field label="Image ref" mono value={primary.imageRef || "—"} />
-              <Field label="Dockerfile" mono value={primary.dockerfilePath || "—"} />
-              <Field label="Build context" mono value={primary.buildContext || "—"} />
+              <Field label={t("imageRef")} mono value={primary.imageRef || "—"} />
+              <Field label={t("dockerfile")} mono value={primary.dockerfilePath || "—"} />
+              <Field label={t("buildContext")} mono value={primary.buildContext || "—"} />
               <Field
-                label="Container"
+                label={t("container")}
                 mono
                 value={
                   <span className="inline-flex items-center gap-1.5">
                     {primary.name}
                     {primary.isPrimary && (
                       <Badge variant="secondary" className="text-xs">
-                        primary
+                        {t("primary")}
                       </Badge>
                     )}
                   </span>
@@ -174,9 +173,7 @@ export function AgentBuildScreen({
               />
             </dl>
           ) : (
-            <p className="text-muted-foreground text-sm">
-              No container is registered for this agent yet.
-            </p>
+            <p className="text-muted-foreground text-sm">{t("noContainer")}</p>
           )}
         </CardContent>
       </Card>
@@ -187,7 +184,7 @@ export function AgentBuildScreen({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <FileCodeIcon className="size-4" />
-            Manifest
+            {t("manifest")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
@@ -195,12 +192,14 @@ export function AgentBuildScreen({
             {workloadLoading ? (
               <Skeleton className="h-4 w-48" />
             ) : workload ? (
-              <>
-                <span className="font-mono">{workload.kind}</span> workload declared in{" "}
-                <span className="font-mono">astrolift.toml</span>.
-              </>
+              t.rich("declared", {
+                workloadKind: workload.kind,
+                filename: "astrolift.toml",
+                kind: (chunks) => <span className="font-mono">{chunks}</span>,
+                file: (chunks) => <span className="font-mono">{chunks}</span>,
+              })
             ) : (
-              "Manifest preview is available on the app's workload page."
+              t("manifestOnApp")
             )}
           </div>
           <Link
@@ -208,7 +207,7 @@ export function AgentBuildScreen({
             className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
           >
             <BoxIcon className="size-4" />
-            Open workload manifest
+            {t("openManifest")}
           </Link>
         </CardContent>
       </Card>
@@ -218,25 +217,27 @@ export function AgentBuildScreen({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <BookOpenIcon className="size-4" />
-            Brief
+            {t("brief")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {detailLoading ? (
             <Skeleton className="h-24 w-full" />
           ) : detailError ? (
-            <p className="text-muted-foreground text-sm">
-              The brief could not be loaded right now.
-            </p>
+            <p className="text-muted-foreground text-sm">{t("briefFailed")}</p>
           ) : brief ? (
             <div className="space-y-3">
               <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                <Field label="Content hash" mono value={brief.contentHash || "—"} />
+                <Field label={t("contentHash")} mono value={brief.contentHash || "—"} />
                 <Field
-                  label="Assembled"
+                  label={t("assembled")}
                   value={
                     brief.createdAt ? (
-                      <span title={brief.createdAt}>{formatRelativeAge(brief.createdAt)}</span>
+                      <span title={brief.createdAt}>
+                        {Number.isFinite(Date.parse(brief.createdAt))
+                          ? format.formatRelativeTime(brief.createdAt)
+                          : t("unknownDate")}
+                      </span>
                     ) : (
                       "—"
                     )
@@ -245,7 +246,7 @@ export function AgentBuildScreen({
               </dl>
               <div>
                 <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
-                  Configuration
+                  {t("configuration")}
                 </p>
                 <pre className="bg-muted text-muted-foreground max-h-80 overflow-auto rounded-md p-3 font-mono text-xs">
                   {prettyJson(brief.config)}
@@ -255,8 +256,8 @@ export function AgentBuildScreen({
           ) : (
             <EmptyState
               icon={<BookOpenIcon className="size-5" />}
-              title="No brief defined"
-              description="This agent has no assembled brief yet. A brief is composed when the agent's skills are bound and its system prompt is generated."
+              title={t("noBrief")}
+              description={t("noBriefDescription")}
             />
           )}
         </CardContent>
@@ -264,7 +265,7 @@ export function AgentBuildScreen({
 
       {skillsHref ? (
         <ListSummary
-          title="Skills & tools"
+          title={t("skillsTools")}
           icon={<WrenchIcon className="size-4" />}
           count={detailLoading || detailError ? null : skills.length}
           rows={skills}
@@ -273,20 +274,20 @@ export function AgentBuildScreen({
             <span className="flex min-w-0 items-baseline justify-between gap-3">
               <span className="min-w-0 truncate font-medium">{b.skill.name}</span>
               <span className="text-muted-foreground shrink-0 font-mono text-xs">
-                {b.toolDefs.length} {b.toolDefs.length === 1 ? "tool" : "tools"}
+                {t("toolCount", { count: b.toolDefs.length })}
               </span>
             </span>
           )}
           rowHref={(b) => `/agents/skills/${b.skill.id}`}
           viewAllHref={skillsHref}
           loading={detailLoading}
-          error={detailError ? "Skills could not be loaded right now." : null}
+          error={detailError ? t("skillsFailed") : null}
           empty={{
             icon: <WrenchIcon className="size-5" />,
-            title: "No skills attached",
-            description: "Skills and their tools are managed in the org-wide registries.",
+            title: t("noSkills"),
+            description: t("summaryDescription"),
             actionHref: "/agents/skills",
-            actionLabel: "Skill registry",
+            actionLabel: t("skillRegistry"),
           }}
         />
       ) : (
@@ -294,10 +295,10 @@ export function AgentBuildScreen({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <WrenchIcon className="size-4" />
-              Skills &amp; tools
+              {t("skillsTools")}
               {skills.length > 0 && (
                 <Badge variant="outline" className="text-muted-foreground ml-1 text-xs">
-                  {skills.length}
+                  {format.formatNumber(skills.length)}
                 </Badge>
               )}
             </CardTitle>
@@ -306,7 +307,7 @@ export function AgentBuildScreen({
             {detailLoading ? (
               <Skeleton className="h-24 w-full" />
             ) : detailError ? (
-              <p className="text-muted-foreground text-sm">Skills could not be loaded right now.</p>
+              <p className="text-muted-foreground text-sm">{t("skillsFailed")}</p>
             ) : skills.length > 0 ? (
               <div className="divide-y">
                 {skills.map((binding) => (
@@ -316,21 +317,21 @@ export function AgentBuildScreen({
             ) : (
               <EmptyState
                 icon={<WrenchIcon className="size-5" />}
-                title="No skills attached"
-                description="This agent has no skills bound to it yet. Skills and their tool definitions are managed in the org-wide registries."
+                title={t("noSkills")}
+                description={t("noSkillsDescription")}
                 secondary={
                   <div className="flex flex-wrap justify-center gap-3">
                     <Link
                       href="/agents/skills"
                       className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
                     >
-                      Skill registry
+                      {t("skillRegistry")}
                     </Link>
                     <Link
                       href="/agents/tools"
                       className="inline-flex items-center gap-1 text-sm text-[var(--brand-primary)] hover:underline"
                     >
-                      Tool registry
+                      {t("toolRegistry")}
                     </Link>
                   </div>
                 }
@@ -350,6 +351,7 @@ export function AgentBuildScreen({
  * it appears.
  */
 function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
+  const t = useTranslations("agentBuild");
   const { skill, toolDefs } = binding;
   return (
     <div className="space-y-3 py-4 first:pt-0 last:pb-0">
@@ -361,12 +363,12 @@ function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
         <span className="text-muted-foreground text-xs">v{skill.skillVersion}</span>
         {skill.isGlobal && (
           <Badge variant="outline" className="text-xs">
-            Global
+            {t("global")}
           </Badge>
         )}
         {!skill.isActive && (
           <Badge variant="secondary" className="text-xs">
-            Inactive
+            {t("inactive")}
           </Badge>
         )}
       </div>
@@ -380,7 +382,7 @@ function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
           ))}
         </div>
       ) : (
-        <p className="text-muted-foreground text-xs">No tools registered for this skill.</p>
+        <p className="text-muted-foreground text-xs">{t("noTools")}</p>
       )}
     </div>
   );
@@ -391,6 +393,7 @@ function SkillBlock({ binding }: { binding: AstroliftAgentSkill }) {
  * badge, and handler ref. Matches the tool-registry row shape.
  */
 function ToolRow({ tool }: { tool: AstroliftToolDef }) {
+  const t = useTranslations("agentBuild");
   return (
     <div className="flex items-center gap-4 text-sm">
       <WrenchIcon className="text-muted-foreground size-4 shrink-0" />
@@ -401,7 +404,7 @@ function ToolRow({ tool }: { tool: AstroliftToolDef }) {
         )}
       </div>
       <Badge variant="secondary" className="shrink-0 text-xs">
-        {ADAPTER_LABELS[tool.adapter] ?? tool.adapter}
+        {ADAPTER_KEYS.has(tool.adapter) ? t(tool.adapter) : tool.adapter}
       </Badge>
       {tool.handlerRef && (
         <span className="text-muted-foreground hidden max-w-[180px] shrink-0 truncate font-mono text-xs sm:inline">

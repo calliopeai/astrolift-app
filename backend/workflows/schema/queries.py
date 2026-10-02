@@ -137,6 +137,8 @@ class Query:
             WorkflowStageExecution.objects.filter(workflow_run=run)
             .select_related(
                 "stage",
+                "fanout_parent_execution__stage",
+                "collection_parent_execution__stage",
                 "agent_run",
                 "child_workflow_run",
                 "child_workflow_run__workflow_definition",

@@ -2,6 +2,7 @@
 
 import { Activity, CheckCircle2Icon, DatabaseIcon, LayersIcon, ServerIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,38 +67,39 @@ export function ClusterLiveStats({
   metrics: m,
   metricsLoading,
 }: ClusterLiveStatsProps) {
+  const t = useTranslations("clusters.detail.stats");
   const hasLiveData = m?.available;
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
       <StatTile
-        label="Apps bound"
+        label={t("appsBound")}
         value={appCount ?? "—"}
         icon={<LayersIcon className="size-4" />}
         loading={appLoading}
       />
       <StatTile
-        label="Nodes"
+        label={t("nodes")}
         value={hasLiveData && m.nodeCount !== null ? m.nodeCount : "—"}
         icon={<ServerIcon className="size-4" />}
         loading={metricsLoading}
       />
       <StatTile
-        label="Pods running"
+        label={t("podsRunning")}
         value={hasLiveData ? pct(m.podRunningRatio) : "—"}
         icon={<CheckCircle2Icon className="size-4" />}
         valueClass={hasLiveData ? healthTone(m.podRunningRatio) : "text-muted-foreground"}
         loading={metricsLoading}
       />
       <StatTile
-        label="CPU"
+        label={t("cpu")}
         value={hasLiveData ? pct(m.cpuUtilization) : "—"}
         icon={<Activity className="size-4" />}
         valueClass={hasLiveData ? utilizationTone(m.cpuUtilization) : "text-muted-foreground"}
         loading={metricsLoading}
       />
       <StatTile
-        label="Memory"
+        label={t("memory")}
         value={hasLiveData ? pct(m.memoryUtilization) : "—"}
         icon={<DatabaseIcon className="size-4" />}
         valueClass={hasLiveData ? utilizationTone(m.memoryUtilization) : "text-muted-foreground"}

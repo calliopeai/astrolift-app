@@ -82,6 +82,7 @@ def seed_workflow_catalogue(WorkflowDefinition, WorkflowStage) -> SeedResult:
 
         for stage in parsed.stages:
             fan_out_count, fan_out_dynamic = _fan_out_columns(stage.fan_out)
+            historical_fields = {field.name for field in WorkflowStage._meta.fields}
             WorkflowStage.objects.update_or_create(
                 definition=definition,
                 order=stage.order,
@@ -93,9 +94,21 @@ def seed_workflow_catalogue(WorkflowDefinition, WorkflowStage) -> SeedResult:
                     "agent_definition": None,
                     "skill_refs": list(stage.skills),
                     "on_failure": stage.on_failure,
+                    # Historical models used by the original catalogue migration
+                    # predate this field; live seeding preserves the authored cap.
+                    **{
+                        key: value
+                        for key, value in {
+                            "max_attempts": stage.max_attempts,
+                            "back_edge": stage.back_edge,
+                            "iteration": stage.iteration,
+                        }.items()
+                        if key in historical_fields
+                    },
                     "timeout_seconds": stage.timeout,
                     "fan_out_count": fan_out_count,
                     "fan_out_dynamic": fan_out_dynamic,
+                    **({"output_key": stage.output_key or ""} if "output_key" in historical_fields else {}),
                     "prompt": stage.prompt or "",
                     "approvers": list(stage.approvers),
                 },

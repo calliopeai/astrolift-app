@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { useListState } from "@/components/list/use-list-state";
@@ -8,7 +9,7 @@ import { LIST_CLUSTERS_PAGE } from "@/graphql/clusters/clusters.queries";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 import type { ClusterHeartbeatFields } from "@/lib/cluster-heartbeat";
 
-import { CLUSTERS_LIST, clustersPageVariables } from "./clusters-list";
+import { localizedClustersList, clustersPageVariables } from "./clusters-list";
 import { useClusterActions } from "./use-cluster-actions";
 
 // The schema types heartbeatStatus as a plain String; narrow it to the four
@@ -43,7 +44,10 @@ const HEARTBEAT_POLL_INTERVAL_MS = 30000;
  * (`clustersPageVariables` of the default list state); keep the two in step.
  */
 export function useClustersList() {
-  const list = useListState(CLUSTERS_LIST);
+  const t = useTranslations("clusters.list");
+  const lifecycle = useTranslations("clusters.chrome");
+  const definition = React.useMemo(() => localizedClustersList(t, lifecycle), [t, lifecycle]);
+  const list = useListState(definition);
   const { state } = list;
   const variables = clustersPageVariables({
     q: state.q,

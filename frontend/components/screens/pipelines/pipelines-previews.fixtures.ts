@@ -270,7 +270,23 @@ export function secretsProps(
 
 export const PREVIEWS: AstroliftPreviewEnvironment[] = [
   {
+    version: 1,
+    environmentStatus: "available",
+    runtimeStatus: "available",
     id: "9b2f4c1e-0a7d-4e3b-8c6f-1d2e3f4a5b6c",
+    environment: {
+      previewId: "9b2f4c1e-0a7d-4e3b-8c6f-1d2e3f4a5b6c",
+      previewVersion: 1,
+      appId: "e8b8a188-ace8-487b-829d-07265e08161e",
+      appVersion: 1,
+      appSlug: "checkout-api",
+      environmentId: "56a42a19-f98b-420d-a00d-13e1ca90d971",
+      environmentVersion: 1,
+      environmentName: "review-target",
+      clusterId: "a2ad1a47-54fd-4bc8-84d9-43da3cd5c88f",
+      clusterVersion: 1,
+      namespace: "pv-checkout-api-pr-412",
+    },
     registeredAppSlug: "checkout-api",
     namespace: "pv-checkout-api-pr-412",
     prNumber: 412,
@@ -297,6 +313,9 @@ export const PREVIEWS: AstroliftPreviewEnvironment[] = [
     estimatedCostNotes: [],
   },
   {
+    version: 1,
+    environmentStatus: "unavailable",
+    runtimeStatus: "available",
     id: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
     registeredAppSlug: "web-frontend",
     namespace: "pv-web-frontend-pr-88",
@@ -324,6 +343,9 @@ export const PREVIEWS: AstroliftPreviewEnvironment[] = [
     estimatedCostNotes: [],
   },
   {
+    version: 1,
+    environmentStatus: "unavailable",
+    runtimeStatus: "available",
     id: "7e8f9a0b-1c2d-4e3f-a4b5-c6d7e8f9a0b1",
     registeredAppSlug: "checkout-api",
     namespace: "pv-checkout-api-pr-398",
@@ -351,6 +373,9 @@ export const PREVIEWS: AstroliftPreviewEnvironment[] = [
     estimatedCostNotes: [],
   },
   {
+    version: 1,
+    environmentStatus: "unavailable",
+    runtimeStatus: "available",
     id: "3a4b5c6d-7e8f-4a9b-8c0d-1e2f3a4b5c6d",
     registeredAppSlug: "search-indexer",
     namespace: "pv-search-indexer-pr-17",

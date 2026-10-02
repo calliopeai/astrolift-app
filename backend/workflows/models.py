@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -513,6 +514,8 @@ class WorkflowStage(BaseCoreModel):
         AGGREGATION = "aggregation"
         # Execute another WorkflowDefinition as a linked Temporal child run.
         WORKFLOW = "workflow"
+        COLLECTION = "collection"
+        FORMAT_RECORD = "format_record"
 
     class OnFailure(models.TextChoices):
         FAIL = "fail"
@@ -596,6 +599,21 @@ class WorkflowStage(BaseCoreModel):
         default=OnFailure.FAIL,
         help_text="What to do if this stage fails.",
     )
+    iteration = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Bounded serial body range or supported record formatter configuration.",
+    )
+    back_edge = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Optional bounded return edge to an earlier stage output_key; max_rounds is required.",
+    )
+    max_attempts = models.PositiveSmallIntegerField(
+        default=3,
+        validators=[MinValueValidator(1), MaxValueValidator(20)],
+        help_text="Maximum attempts per stage visit, including its initial dispatch (1–20).",
+    )
     timeout_seconds = models.IntegerField(
         default=300,
         help_text="Maximum wall-clock time for this stage before it times out.",
@@ -629,6 +647,10 @@ class WorkflowStage(BaseCoreModel):
             models.UniqueConstraint(
                 fields=["definition", "order"],
                 name="workflowstage_definition_order_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(max_attempts__gte=1, max_attempts__lte=20),
+                name="workflowstage_attempts_bounded",
             ),
         ]
         indexes = [
@@ -709,13 +731,17 @@ class Workflow(BaseCoreModel):
             bound = bool(binding and binding.get("agent_workload_id"))
             if not bound and stage.agent_definition_id is None and stage.agent_ref:
                 from astrolift_registry.models import Workload
+                from workflows.target_references import references_filter
 
-                bound = Workload.objects.filter(
-                    registered_app__organization_id=self.organization_id,
-                    slug=stage.agent_ref,
-                    kind=Workload.Kind.AGENT,
-                    deleted_at__isnull=True,
-                ).exists()
+                bound = (
+                    Workload.objects.filter(
+                        registered_app__organization_id=self.organization_id,
+                        kind=Workload.Kind.AGENT,
+                        deleted_at__isnull=True,
+                    )
+                    .filter(references_filter([stage.agent_ref]))
+                    .exists()
+                )
             if not bound and stage.agent_definition_id is None:
                 unbound.append((stage.order, stage.role or ""))
         return unbound
@@ -873,6 +899,21 @@ class WorkflowStageExecution(BaseCoreModel):
         default=Status.PENDING,
         db_index=True,
     )
+    round_number = models.PositiveSmallIntegerField(default=1)
+    caused_by = models.JSONField(default=dict, blank=True)
+    fanout_parent_execution = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="fanout_children",
+    )
+    fanout_index = models.PositiveSmallIntegerField(null=True, blank=True)
+    collection_parent_execution = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="collection_children"
+    )
+    collection_index = models.PositiveSmallIntegerField(null=True, blank=True)
+    collection_workflow_id = models.CharField(max_length=512, blank=True, default="")
     attempt_number = models.IntegerField(
         default=1,
         help_text="1-based retry count — incremented each time the stage is retried.",

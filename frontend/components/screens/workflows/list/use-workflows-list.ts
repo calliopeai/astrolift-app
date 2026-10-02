@@ -123,9 +123,16 @@ export function useWorkflowsList() {
   const configured = configuredQ.data?.workflowsPage.items;
   const all: WorkflowRow[] = useMemo(
     () =>
-      joinWorkflows(configured ?? [], definitionsQ.definitions, runsQ.runs, {
-        runsComplete: runsQ.runs.length < DEFINITION_RUNS_LIMIT,
-      }),
+      joinWorkflows(
+        configured ?? [],
+        definitionsQ.definitions.filter(
+          (d) => !d.isGlobal || !["supervisor_worker", "advisor"].includes(d.patternKind)
+        ),
+        runsQ.runs,
+        {
+          runsComplete: runsQ.runs.length < DEFINITION_RUNS_LIMIT,
+        }
+      ),
     [configured, definitionsQ.definitions, runsQ.runs]
   );
   const { rows, totalCount } = selectWorkflows(all, {

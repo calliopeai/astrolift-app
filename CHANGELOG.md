@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Read preview details by exact GUID, including older previews beyond the recent
+  discovery window. Return the persisted environment identity and reviewed log
+  route; retired, replaced or foreign targets never fall back to another
+  environment. Keep pricing and runtime enrichment explicitly requested (#2206).
+
+- Page project resource and consumer metadata independently, with exact GUID
+  ownership and reviewed context revisions. Keep basic reads free of credentials,
+  configuration and grants. Fence existing-resource mutations and worker effects
+  to the reviewed owner, placement and operation; bind app-owned metrics to fresh
+  actor/organization/placement context and discard stale responses (#2207).
+
+- Derive new physical names from service UUIDs in the covered SQL, Redis/cache,
+  classic OpenSearch and CNPG drivers. Preserve recorded targets through renames
+  and reprovisioning, check generated child ownership and refuse CNPG create/update
+  races. Narrow OpenSearch names hash the full UUID; the remaining provider naming
+  audit stays open (#2032).
+
 - Translate cluster registration controls, help and request feedback in all eight
   locales. Preserve edited authentication drafts across provider/auth steps and
   locale changes; malformed credential JSON receives a generic local error
@@ -14,6 +31,18 @@
   Definition/pipeline starts require additive reviewed proof; cancellation
   distinguishes engine acknowledgement, observed closure and recorded-cluster
   cleanup. Publish capability discovery and reviewed web controls (#2236, #2204).
+
+- Localize cluster list headings, filters, lifecycle menus and overview controls
+  across all eight locales. Keep ordinary refresh and full preflight distinct,
+  with translated request feedback and unchanged provider/auth identifiers,
+  target routes and server diagnostics (#2145).
+
+- Report per-signal golden-metric scope, source and canonical identities.
+  Bind workload CPU/memory usage and limits to verified current pod/controller
+  ownership, pod UIDs and runtime container IDs. Require canonical GUID labels
+  for workload request metrics; refuse missing, partial or ambiguous data instead
+  of reporting healthy zeros. Keep mixed measurements visible and publish
+  collector/redeploy requirements and authenticated CLI examples (#2219).
 
 - Bind reviewed workload restart and scale requests to an explicit environment,
   cluster and namespace with version preconditions and current credential checks.

@@ -36,7 +36,7 @@ async def test_cancel_pending_gate_finalizes_before_temporal_closes(temporal_env
         }
 
     @activity.defn(name="astrolift.workflow_stage.create_stage_execution")
-    async def create_execution(run_id, stage_id, attempt):
+    async def create_execution(run_id, stage_id, attempt, context=None):
         opened.set()
         return "gate-1"
 

@@ -35,22 +35,10 @@ export const PATTERNS: PatternOption[] = [
     diagram: "[ Dispatch ] → ⌈ B ⌉ → [ Aggregate ]\n              ⌊ C ⌋",
   },
   {
-    value: "supervisor_worker",
-    label: "Supervisor / Worker",
-    description: "Supervisor agent plans and routes work to specialised workers.",
-    diagram: "[ Plan ] → [ Route ] → ⌈ Worker ⌉ → [ Aggregate ]",
-  },
-  {
     value: "review_loop",
     label: "Review loop",
     description: "Agent produces output, human reviews, agent revises, up to N rounds.",
     diagram: "[ Draft ] ⟷ [ Human gate ] → [ Deliver ]",
-  },
-  {
-    value: "advisor",
-    label: "Advisor",
-    description: "Agent advises but humans retain final decision authority.",
-    diagram: "[ Analyse ] → [ Recommend ] → [ Human gate ]",
   },
 ];
 
@@ -126,6 +114,9 @@ export function manifestLineStages(
     agent: string | null;
     workflow: string | null;
     onFailure: string;
+    maxAttempts?: number;
+    backEdge?: unknown;
+    outputKey?: string | null;
     fanOut: string;
   }[]
 ) {
@@ -142,6 +133,9 @@ export function manifestLineStages(
       // A fan-out that is not a number is sized from data at run time.
       fanOutDynamic: count === null && s.fanOut.trim() !== "" && s.fanOut.trim() !== "0",
       onFailure: s.onFailure,
+      maxAttempts: s.maxAttempts,
+      backEdge: s.backEdge,
+      outputKey: s.outputKey ?? "",
       agentName: s.agent,
     };
   });

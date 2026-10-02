@@ -16,9 +16,8 @@ class TimeSeriesPoint:
     """One sample on a Prometheus-derived time-series.
 
     ``ts`` is the sample's UNIX wall-clock; ``value`` is the numeric
-    sample. ``value`` may be 0 for a missing / NaN sample (the upstream
-    Prometheus client coerces ``"NaN"`` payloads to 0 so the wire shape
-    is uniform).
+    sample. Strict golden-signal reads reject nonfinite payloads
+    instead of interpreting them as healthy zero measurements.
     """
 
     ts: dt.datetime
@@ -51,6 +50,90 @@ class GoldenSignalKind(enum.Enum):
     SATURATION_MEMORY = "saturation_memory"
 
 
+@strawberry.enum
+class GoldenSignalScope(enum.Enum):
+    APP_ENVIRONMENT = "app_environment"
+    WORKLOAD = "workload"
+    UNRESOLVED = "unresolved"
+
+
+@strawberry.enum
+class GoldenSignalSource(enum.Enum):
+    APP_INSTRUMENTATION = "app_instrumentation"
+    EDGE_PROMETHEUS = "edge_prometheus"
+    CLOUDWATCH_ALB = "cloudwatch_alb"
+    CADVISOR_KUBE_STATE_METRICS = "cadvisor_kube_state_metrics"
+    NONE = "none"
+
+
+@strawberry.enum
+class GoldenSignalIdentityBasis(enum.Enum):
+    SOURCE_LABELS = "source_labels"
+    NAMESPACE = "namespace"
+    VERIFIED_RUNTIME = "verified_runtime"
+    UNRESOLVED = "unresolved"
+
+
+@strawberry.enum
+class GoldenSignalUnavailableReason(enum.Enum):
+    ENVIRONMENT_NOT_FOUND = "environment_not_found"
+    WORKLOAD_NOT_FOUND = "workload_not_found"
+    TARGET_NOT_OWNED = "target_not_owned"
+    NOT_CONFIGURED = "not_configured"
+    NOT_SUPPORTED_BY_PROVIDER = "not_supported_by_provider"
+    PERMISSION_DENIED = "permission_denied"
+    OWNERSHIP_UNVERIFIED = "ownership_unverified"
+    NO_PODS = "no_pods"
+    PARTIAL_MEMBERSHIP = "partial_membership"
+    MEMBERSHIP_LIMIT_EXCEEDED = "membership_limit_exceeded"
+    MISSING_USAGE = "missing_usage"
+    MISSING_LIMITS = "missing_limits"
+    PARTIAL_DATA = "partial_data"
+    AMBIGUOUS_SERIES = "ambiguous_series"
+    INVALID_DATA = "invalid_data"
+    QUERY_ERROR = "query_error"
+    PROVIDER_ERROR = "provider_error"
+    NO_DATA_YET = "no_data_yet"
+    NOT_INSTRUMENTED = "not_instrumented"
+
+
+@strawberry.type(name="AstroliftGoldenSignalTarget")
+class GoldenSignalTarget:
+    organization_id: str
+    app_id: str
+    app_slug: str
+    environment_id: str | None
+    environment_name: str | None
+    cluster_id: str | None
+    namespace: str | None
+    workload_id: str | None = None
+    workload_slug: str | None = None
+
+
+@strawberry.type(name="AstroliftMetricContainerIdentity")
+class MetricContainerIdentity:
+    pod_name: str
+    pod_uid: str
+    container_name: str
+    container_id: str
+
+
+@strawberry.type(name="AstroliftGoldenSignalMeasurement")
+class GoldenSignalMeasurement:
+    effective_scope: GoldenSignalScope
+    source: GoldenSignalSource
+    identity_basis: GoldenSignalIdentityBasis
+    available: bool
+    target: GoldenSignalTarget
+    unavailable_reason: GoldenSignalUnavailableReason | None = None
+    membership_observed_at: dt.datetime | None = None
+    measurement_start: dt.datetime | None = None
+    containers: list[MetricContainerIdentity] = strawberry.field(default_factory=list)
+    usage_unit: str | None = None
+    usage_samples: list[TimeSeriesPoint] = strawberry.field(default_factory=list)
+    limit_samples: list[TimeSeriesPoint] = strawberry.field(default_factory=list)
+
+
 @strawberry.type(name="AstroliftAppGoldenSignal")
 class AppGoldenSignal:
     """One golden-signal time-series for one app/env over one window."""
@@ -64,6 +147,7 @@ class AppGoldenSignal:
     unit: str
     """Display unit hint for the FE: ``"rps"``, ``"ratio"``,
     ``"seconds"``, ``"percent"``."""
+    measurement: GoldenSignalMeasurement | None = None
     reason: ObservabilityPanelReason = ObservabilityPanelReason.OK
     """Why *this* signal is empty (#1708).
 

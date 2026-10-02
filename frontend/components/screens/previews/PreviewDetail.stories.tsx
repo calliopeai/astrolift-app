@@ -20,7 +20,7 @@ export const Loading: Story = {
   render: () => <PreviewDetailScreen {...previewDetailProps({ preview: null, loading: true })} />,
 };
 
-/** No preview with this id in the list window, or no permission to see it. */
+/** Exact GUID missing, deleted, or not visible to this viewer. */
 export const NotFound: Story = {
   render: () => <PreviewDetailScreen {...previewDetailProps({ preview: null })} />,
 };
@@ -29,6 +29,55 @@ export const ErrorState: Story = {
   render: () => (
     <PreviewDetailScreen
       {...previewDetailProps({ preview: null, error: { message: "upstream timed out" } })}
+    />
+  ),
+};
+
+export const RuntimeNotRequested: Story = {
+  render: () => (
+    <PreviewDetailScreen
+      {...previewDetailProps({ preview: { ...PREVIEWS[0], runtimeStatus: "not_requested" } })}
+    />
+  ),
+};
+
+export const RuntimeUnavailable: Story = {
+  render: () => (
+    <PreviewDetailScreen
+      {...previewDetailProps({
+        preview: { ...PREVIEWS[0], runtimeStatus: "unavailable", estimatedDailyCostUsd: null },
+      })}
+    />
+  ),
+};
+
+export const RetiredBinding: Story = {
+  render: () => (
+    <PreviewDetailScreen
+      {...previewDetailProps({ preview: { ...PREVIEWS[0], environmentStatus: "retired" } })}
+    />
+  ),
+};
+
+export const ExactLogsLoaded: Story = {
+  render: () => (
+    <PreviewDetailScreen
+      {...previewDetailProps({
+        logsRequested: true,
+        logs: {
+          reason: "OK",
+          historicalAvailable: true,
+          items: [
+            {
+              timestamp: "2026-10-02T01:00:00Z",
+              message: "Preview application ready",
+              level: "info",
+              podName: "canonical-preview-web",
+              container: "web",
+            },
+          ],
+        },
+      })}
     />
   ),
 };

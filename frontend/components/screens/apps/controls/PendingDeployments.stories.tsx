@@ -42,6 +42,13 @@ export const SingleCandidate: Story = {
   render: () => <PendingDeploymentsView {...PENDING} pending={[PENDING_DEPLOYMENT]} />,
 };
 
+/** Builds without an image tag retain the deployment ID in the queue and confirmation. */
+export const EmptyImageTag: Story = {
+  render: () => (
+    <PendingDeploymentsView {...PENDING} pending={[{ ...PENDING_DEPLOYMENT, imageTag: "" }]} />
+  ),
+};
+
 export const LongStrings: Story = {
   render: () => (
     <PendingDeploymentsView

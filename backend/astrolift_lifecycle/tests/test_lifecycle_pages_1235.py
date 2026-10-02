@@ -746,12 +746,8 @@ def test_preview_environments_walk_reaches_every_row(app, env, org, permission_r
     assert len(walked) == 9
 
 
-def test_preview_environments_price_only_the_page(app, env, org, permission_resolver, pod_calls):
-    """Enrichment runs on the sliced rows, never the whole queryset.
-
-    ``_preview_with_cost`` costs one live cluster round-trip per row, so
-    enriching before the slice would make pagination *more* expensive than
-    the capped list it replaces."""
+def test_preview_environments_page_never_prices_catalog(app, env, org, permission_resolver, pod_calls):
+    """Browsing a page never performs runtime enrichment; exact detail opts in."""
     permission_resolver.grant(Permission.APP_READ)
     for n in range(12):
         _preview(app, env, n)
@@ -761,7 +757,7 @@ def test_preview_environments_price_only_the_page(app, env, org, permission_reso
 
     assert len(page.items) == 3
     assert page.total_count == 12
-    assert len(pod_calls) == 3, f"priced {len(pod_calls)} rows to serve a 3-row page"
+    assert pod_calls == [], "catalog browsing must not list live pods"
 
 
 def test_preview_environments_search_narrows_total_count(app, env, org, permission_resolver):
