@@ -1273,6 +1273,7 @@ export type AstroliftAppExecTarget = {
 };
 
 export type AstroliftAppGoldenSignal = {
+  measurement?: Maybe<AstroliftGoldenSignalMeasurement>;
   name: GoldenSignalKind;
   promql: Scalars['String']['output'];
   rangeSeconds: Scalars['Int']['output'];
@@ -2845,6 +2846,33 @@ export type AstroliftFormSubmissionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftGoldenSignalMeasurement = {
+  available: Scalars['Boolean']['output'];
+  containers: Array<AstroliftMetricContainerIdentity>;
+  effectiveScope: GoldenSignalScope;
+  identityBasis: GoldenSignalIdentityBasis;
+  limitSamples: Array<AstroliftTimeSeriesPoint>;
+  measurementStart?: Maybe<Scalars['DateTime']['output']>;
+  membershipObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  source: GoldenSignalSource;
+  target: AstroliftGoldenSignalTarget;
+  unavailableReason?: Maybe<GoldenSignalUnavailableReason>;
+  usageSamples: Array<AstroliftTimeSeriesPoint>;
+  usageUnit?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftGoldenSignalTarget = {
+  appId: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterId?: Maybe<Scalars['String']['output']>;
+  environmentId?: Maybe<Scalars['String']['output']>;
+  environmentName?: Maybe<Scalars['String']['output']>;
+  namespace?: Maybe<Scalars['String']['output']>;
+  organizationId: Scalars['String']['output'];
+  workloadId?: Maybe<Scalars['String']['output']>;
+  workloadSlug?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftGrantPreview = {
   action: Scalars['String']['output'];
   /** Whether the caller's grant ceiling allows it. */
@@ -3506,6 +3534,13 @@ export type AstroliftMembersListFilter = {
   scopeKind: InputMaybe<Array<Scalars['String']['input']>>;
   /** Team slugs or ids the person is on. */
   team: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
+export type AstroliftMetricContainerIdentity = {
+  containerId: Scalars['String']['output'];
+  containerName: Scalars['String']['output'];
+  podName: Scalars['String']['output'];
+  podUid: Scalars['String']['output'];
 };
 
 export type AstroliftModelEndpointTest = {
@@ -6733,6 +6768,12 @@ export type GenerateSshDeployKeyInput = {
   name: Scalars['String']['input'];
 };
 
+export type GoldenSignalIdentityBasis =
+  | 'NAMESPACE'
+  | 'SOURCE_LABELS'
+  | 'UNRESOLVED'
+  | 'VERIFIED_RUNTIME';
+
 export type GoldenSignalKind =
   | 'ERRORS'
   | 'LATENCY_P50'
@@ -6742,6 +6783,39 @@ export type GoldenSignalKind =
   | 'SATURATION_CPU'
   | 'SATURATION_MEMORY'
   | 'TRAFFIC';
+
+export type GoldenSignalScope =
+  | 'APP_ENVIRONMENT'
+  | 'UNRESOLVED'
+  | 'WORKLOAD';
+
+export type GoldenSignalSource =
+  | 'APP_INSTRUMENTATION'
+  | 'CADVISOR_KUBE_STATE_METRICS'
+  | 'CLOUDWATCH_ALB'
+  | 'EDGE_PROMETHEUS'
+  | 'NONE';
+
+export type GoldenSignalUnavailableReason =
+  | 'AMBIGUOUS_SERIES'
+  | 'ENVIRONMENT_NOT_FOUND'
+  | 'INVALID_DATA'
+  | 'MEMBERSHIP_LIMIT_EXCEEDED'
+  | 'MISSING_LIMITS'
+  | 'MISSING_USAGE'
+  | 'NOT_CONFIGURED'
+  | 'NOT_INSTRUMENTED'
+  | 'NOT_SUPPORTED_BY_PROVIDER'
+  | 'NO_DATA_YET'
+  | 'NO_PODS'
+  | 'OWNERSHIP_UNVERIFIED'
+  | 'PARTIAL_DATA'
+  | 'PARTIAL_MEMBERSHIP'
+  | 'PERMISSION_DENIED'
+  | 'PROVIDER_ERROR'
+  | 'QUERY_ERROR'
+  | 'TARGET_NOT_OWNED'
+  | 'WORKLOAD_NOT_FOUND';
 
 export type GrantRoleInput = {
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;

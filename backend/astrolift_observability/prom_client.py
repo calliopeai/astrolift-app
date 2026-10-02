@@ -110,6 +110,7 @@ def query_range_series(
     end_unix: int,
     step_seconds: int,
     label_key: str | None = None,
+    strict: bool = False,
 ) -> list[tuple[str, list[tuple[float, float]]]]:
     """Run ``query_range`` and return a list of
     ``(series_label, [(ts, value), ...])`` tuples.
@@ -129,6 +130,7 @@ def query_range_series(
         start_unix=start_unix,
         end_unix=end_unix,
         step_seconds=step_seconds,
+        strict=strict,
     )
     import math
 

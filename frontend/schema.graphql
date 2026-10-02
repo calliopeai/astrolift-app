@@ -1316,6 +1316,7 @@ type AstroliftAppGoldenSignal {
   samples: [AstroliftTimeSeriesPoint!]!
   promql: String!
   unit: String!
+  measurement: AstroliftGoldenSignalMeasurement
   reason: AstroliftObservabilityPanelReason!
 }
 
@@ -2946,6 +2947,33 @@ type AstroliftFormSubmissionMutationResult {
   data: AstroliftFormSubmission
 }
 
+type AstroliftGoldenSignalMeasurement {
+  effectiveScope: GoldenSignalScope!
+  source: GoldenSignalSource!
+  identityBasis: GoldenSignalIdentityBasis!
+  available: Boolean!
+  target: AstroliftGoldenSignalTarget!
+  unavailableReason: GoldenSignalUnavailableReason
+  membershipObservedAt: DateTime
+  measurementStart: DateTime
+  containers: [AstroliftMetricContainerIdentity!]!
+  usageUnit: String
+  usageSamples: [AstroliftTimeSeriesPoint!]!
+  limitSamples: [AstroliftTimeSeriesPoint!]!
+}
+
+type AstroliftGoldenSignalTarget {
+  organizationId: String!
+  appId: String!
+  appSlug: String!
+  environmentId: String
+  environmentName: String
+  clusterId: String
+  namespace: String
+  workloadId: String
+  workloadSlug: String
+}
+
 type AstroliftGrantPreview {
   ok: Boolean!
   errors: [String!]!
@@ -3666,6 +3694,13 @@ input AstroliftMembersListFilter {
 
   """Last active: 7d, 30d, 90d (within), stale (not in 90 days) or never."""
   active: String = null
+}
+
+type AstroliftMetricContainerIdentity {
+  podName: String!
+  podUid: String!
+  containerName: String!
+  containerId: String!
 }
 
 type AstroliftModelEndpointTest {
@@ -7155,6 +7190,13 @@ input GenerateSshDeployKeyInput {
   appSlug: String = null
 }
 
+enum GoldenSignalIdentityBasis {
+  SOURCE_LABELS
+  NAMESPACE
+  VERIFIED_RUNTIME
+  UNRESOLVED
+}
+
 enum GoldenSignalKind {
   TRAFFIC
   ERRORS
@@ -7164,6 +7206,42 @@ enum GoldenSignalKind {
   LATENCY_P99
   SATURATION_CPU
   SATURATION_MEMORY
+}
+
+enum GoldenSignalScope {
+  APP_ENVIRONMENT
+  WORKLOAD
+  UNRESOLVED
+}
+
+enum GoldenSignalSource {
+  APP_INSTRUMENTATION
+  EDGE_PROMETHEUS
+  CLOUDWATCH_ALB
+  CADVISOR_KUBE_STATE_METRICS
+  NONE
+}
+
+enum GoldenSignalUnavailableReason {
+  ENVIRONMENT_NOT_FOUND
+  WORKLOAD_NOT_FOUND
+  TARGET_NOT_OWNED
+  NOT_CONFIGURED
+  NOT_SUPPORTED_BY_PROVIDER
+  PERMISSION_DENIED
+  OWNERSHIP_UNVERIFIED
+  NO_PODS
+  PARTIAL_MEMBERSHIP
+  MEMBERSHIP_LIMIT_EXCEEDED
+  MISSING_USAGE
+  MISSING_LIMITS
+  PARTIAL_DATA
+  AMBIGUOUS_SERIES
+  INVALID_DATA
+  QUERY_ERROR
+  PROVIDER_ERROR
+  NO_DATA_YET
+  NOT_INSTRUMENTED
 }
 
 input GrantRoleInput {

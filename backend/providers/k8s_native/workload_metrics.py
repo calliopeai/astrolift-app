@@ -1,5 +1,6 @@
 """Read exact pod/container incarnations and verify the controller chain."""
 
+import time
 from uuid import UUID
 
 from _sdk.workload_metrics import (
@@ -45,6 +46,11 @@ def metric_containers(*, auth, namespace, app_slug, app_id, environment_id, work
     if kind is None:
         raise MetricMembershipUnavailable("NOT_SUPPORTED_BY_PROVIDER")
     api_client = build_api_client(auth)
+    # A bounded inventory is also a bounded read: do not spend ten seconds
+    # on each owner when a provider is unhealthy. Disable transport retries.
+    api_client.configuration.retries = 0
+    api_client.rest_client.pool_manager.connection_pool_kw["retries"] = 0
+    deadline = time.monotonic() + 10
     core, apps, batch = client.CoreV1Api(api_client), client.AppsV1Api(api_client), client.BatchV1Api(api_client)
     readers = {
         "ReplicaSet": apps.read_namespaced_replica_set,
@@ -55,6 +61,14 @@ def metric_containers(*, auth, namespace, app_slug, app_id, environment_id, work
         "CronJob": batch.read_namespaced_cron_job,
     }
     cache = {}
+
+    def timeout():
+        # This pinned Kubernetes REST client only honors scalar INTEGER
+        # timeouts. A float is silently ignored; round down to retain budget.
+        remaining = int(deadline - time.monotonic())
+        if remaining <= 0:
+            raise MetricMembershipUnavailable("PROVIDER_ERROR")
+        return remaining
 
     def assert_identity(metadata):
         labels = metadata.labels or {}
@@ -74,7 +88,7 @@ def metric_containers(*, auth, namespace, app_slug, app_id, environment_id, work
                 raise MetricMembershipUnavailable("OWNERSHIP_UNVERIFIED")
             visited.add(key)
             if key not in cache:
-                cache[key] = readers[ref.kind](name=ref.name, namespace=namespace, _request_timeout=10)
+                cache[key] = readers[ref.kind](name=ref.name, namespace=namespace, _request_timeout=timeout())
             owner = cache[key].metadata
             if _uid(owner.uid) != key[2] or owner.deletion_timestamp is not None:
                 raise MetricMembershipUnavailable("OWNERSHIP_UNVERIFIED")
@@ -89,7 +103,7 @@ def metric_containers(*, auth, namespace, app_slug, app_id, environment_id, work
             namespace=namespace,
             label_selector=f"astrolift.dev/app={app_slug},astrolift.dev/workload={workload_slug}",
             limit=_MAX_PODS + 1,
-            _request_timeout=10,
+            _request_timeout=timeout(),
         )
         if page.metadata._continue or len(page.items) > _MAX_PODS:
             raise MetricMembershipUnavailable("MEMBERSHIP_LIMIT_EXCEEDED")
@@ -104,6 +118,8 @@ def metric_containers(*, auth, namespace, app_slug, app_id, environment_id, work
             uid = _uid(metadata.uid)
             statuses = {row.name: row for row in pod.status.container_statuses or []}
             for spec in pod.spec.containers or []:
+                if len(out) >= _MAX_CONTAINERS:
+                    raise MetricMembershipUnavailable("MEMBERSHIP_LIMIT_EXCEEDED")
                 row = statuses.get(spec.name)
                 running = getattr(getattr(row, "state", None), "running", None)
                 runtime_id = (getattr(row, "container_id", "") or "").partition("://")[2]
@@ -116,8 +132,6 @@ def metric_containers(*, auth, namespace, app_slug, app_id, environment_id, work
                 ):
                     raise MetricMembershipUnavailable("PARTIAL_MEMBERSHIP")
                 out.append(MetricContainer(metadata.name, uid, spec.name, runtime_id, running.started_at.timestamp()))
-            if len(out) > _MAX_CONTAINERS:
-                raise MetricMembershipUnavailable("MEMBERSHIP_LIMIT_EXCEEDED")
         if not out:
             raise MetricMembershipUnavailable("NO_PODS")
         return tuple(out)

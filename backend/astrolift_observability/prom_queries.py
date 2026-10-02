@@ -220,6 +220,7 @@ def build_request_rate_query(
     workload_slug: str | None = None,
     edge: EdgeMetricsMapping | None = None,
     namespace: str | None = None,
+    identity_labels: dict[str, str] | None = None,
 ) -> QueryPlan:
     """Traffic — requests / second.
 
@@ -247,6 +248,7 @@ def build_request_rate_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        extra=identity_labels,
     )
     expr = f"sum(rate(http_requests_total{_render_label_match(labels)}[{rate_window}]))"
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
@@ -260,6 +262,7 @@ def build_error_rate_query(
     workload_slug: str | None = None,
     edge: EdgeMetricsMapping | None = None,
     namespace: str | None = None,
+    identity_labels: dict[str, str] | None = None,
 ) -> QueryPlan:
     """Errors — 5xx rate / total rate.
 
@@ -296,6 +299,7 @@ def build_error_rate_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        extra=identity_labels,
     )
     base_match = _render_label_match(labels)
     err_match = _render_label_match_with_extra(labels, 'code=~"5.."')
@@ -315,6 +319,7 @@ def build_latency_quantile_query(
     workload_slug: str | None = None,
     edge: EdgeMetricsMapping | None = None,
     namespace: str | None = None,
+    identity_labels: dict[str, str] | None = None,
 ) -> QueryPlan:
     """Latency — histogram_quantile over the request-latency bucket
     histogram; edge-sourced when ``edge`` + ``namespace`` are given.
@@ -347,6 +352,7 @@ def build_latency_quantile_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        extra=identity_labels,
     )
     match = _render_label_match(labels)
     expr = (
@@ -386,7 +392,7 @@ def build_cpu_saturation_query(
     limits_match = _render_label_match_with_extra(labels, f'resource="cpu"{container_filter}')
     expr = (
         f"sum(rate(container_cpu_usage_seconds_total{usage_match}[{rate_window}])) "
-        f"/ clamp_min(sum(kube_pod_container_resource_limits{limits_match}), 1e-9)"
+        f"/ (sum(kube_pod_container_resource_limits{limits_match}) > 0)"
     )
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
 
@@ -418,7 +424,7 @@ def build_memory_saturation_query(
     limits_match = _render_label_match_with_extra(labels, f'resource="memory"{container_filter}')
     expr = (
         f"sum(container_memory_working_set_bytes{usage_match}) "
-        f"/ clamp_min(sum(kube_pod_container_resource_limits{limits_match}), 1e-9)"
+        f"/ (sum(kube_pod_container_resource_limits{limits_match}) > 0)"
     )
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
 
