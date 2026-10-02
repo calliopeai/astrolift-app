@@ -3,12 +3,14 @@
 import asyncio
 import re
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from temporalio.api.enums.v1 import EventType
+from temporalio.client import WorkflowHistory
 from temporalio.worker import Replayer, Worker
 
 from astrolift_identity.models import Organization
@@ -175,6 +177,13 @@ async def test_real_import_authoring_and_serial_parser_done_preserve_order_and_r
     assert [row.output for row in items] == outputs["results"]
     assert await sync_to_async(lambda: WorkflowRun.objects.get(pk=plan[2]).status)() == "completed"
     await replay_family(temporal_env, history)
+
+
+async def test_actual_pre_abort_collection_parent_and_item_histories_still_replay():
+    folder = Path(__file__).parent / "fixtures" / "serial_collection_pre_abort_2156"
+    for name in ("parent", "item"):
+        history = WorkflowHistory.from_json("archived-collection", (folder / f"{name}.json").read_text())
+        await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
 
 
 @pytest.mark.parametrize("payload", [{}, {"items": None}, {"items": [{}] * 4}, {"items": ["bad"]}])
@@ -592,4 +601,41 @@ async def test_cancel_pending_serial_body_closes_parent_and_item_without_startin
     )
     assert executions[1].collection_index == 0
     assert await sync_to_async(lambda: WorkflowRun.objects.get(pk=plan[2]).status)() == "cancelled"
+    await replay_family(temporal_env, history)
+
+
+async def test_abort_signal_settles_pending_collection_child_without_gate_timeout_or_next_item(
+    temporal_env,
+):
+    plan = await sync_to_async(create_plan)(kind="human_gate")
+    async with temporal_worker(
+        temporal_env, workflows=[WorkflowDefinitionRunWorkflow], activities=REGISTERED
+    ):
+        handle = await start(temporal_env, plan, {"items": [{"text": "pending"}, {"text": "never"}]})
+        first = await wait_gate(plan[2], 0)
+        child = temporal_env.client.get_workflow_handle(first.collection_workflow_id)
+        for _ in range(200):
+            child_history = await child.fetch_history()
+            if any(event.event_type == EventType.EVENT_TYPE_TIMER_STARTED for event in child_history.events):
+                break
+            await asyncio.sleep(0.02)
+        else:
+            pytest.fail("the real item did not enter its durable gate wait")
+        await handle.signal("abort")
+        with temporal_env.auto_time_skipping_disabled():
+            result = await asyncio.wait_for(handle.result(), 3)
+        history = await handle.fetch_history()
+        child_history = await child.fetch_history()
+    assert not result.ok and result.data["status"] == "incomplete"
+    assert result.data["finished_count"] == 0
+    executions = await rows(plan[2])
+    assert len(executions) == 2
+    assert executions[0].status == "failed" and executions[0].ended_at is not None
+    assert executions[0].output["complete"] is False
+    # Abort is a failed workflow, while the blocked SDK child is cancelled.
+    assert executions[1].status == "failed" and executions[1].ended_at is not None
+    assert executions[1].collection_index == 0
+    assert await sync_to_async(lambda: WorkflowRun.objects.get(pk=plan[2]).status)() == "failed"
+    assert child_history.events[-1].event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED
+    assert result.message == "aborted by signal"
     await replay_family(temporal_env, history)

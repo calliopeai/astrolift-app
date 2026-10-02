@@ -827,7 +827,14 @@ class WorkflowDefinitionRunWorkflow:
                 "_astrolift_collection_item": item,
             }
             try:
-                result = await workflow.execute_child_workflow(
+                # Existing collection histories awaited the child directly.
+                # New histories observe abort while the item is blocked, and
+                # await its cancellation before settling the parent records.
+                observe_abort = workflow.patched("serial-collection-abort-v1")
+                start_child = (
+                    workflow.start_child_workflow if observe_abort else workflow.execute_child_workflow
+                )
+                child_or_result = await start_child(
                     WorkflowDefinitionRunWorkflow.run,
                     WorkflowDefinitionRunInput(
                         workflow_definition_slug=input.workflow_definition_slug,
@@ -845,6 +852,34 @@ class WorkflowDefinitionRunWorkflow:
                         seconds=500 * (max(1, max(s["timeout_seconds"] for s in body)) + 86400) + 120
                     ),
                 )
+                if observe_abort:
+                    child = child_or_result
+                    try:
+                        await workflow.wait_condition(
+                            lambda child=child: self._abort_requested or child.done()
+                        )
+                    except asyncio.CancelledError:
+                        child.cancel()
+                        try:
+                            await child
+                        except (Exception, asyncio.CancelledError):
+                            pass
+                        raise
+                    if self._abort_requested:
+                        child.cancel()
+                        try:
+                            await child
+                        except Exception as exc:
+                            if _parent_cancelled(exc):
+                                raise asyncio.CancelledError() from exc
+                            # Expected child cancellation; parent abort is the outcome.
+                        except asyncio.CancelledError:
+                            if asyncio.current_task().cancelling():
+                                raise
+                        raise _WorkflowAbort("aborted by signal", data={"status": "incomplete"})
+                    result = await child
+                else:
+                    result = child_or_result
                 data = result.data or {}
                 records = data.get("outputs") or []
                 execution_id = records[-1].get("execution_id") if records else None
@@ -860,6 +895,11 @@ class WorkflowDefinitionRunWorkflow:
             except Exception as exc:
                 if _parent_cancelled(exc):
                     raise asyncio.CancelledError() from exc
+                message = (
+                    exc.message
+                    if isinstance(exc, _WorkflowAbort)
+                    else "serial collection body did not complete"
+                )
                 await workflow.execute_activity(
                     update_stage_execution,
                     args=[
@@ -870,13 +910,13 @@ class WorkflowDefinitionRunWorkflow:
                             "finished_count": len(outputs),
                             "complete": False,
                         },
-                        "serial collection body did not complete",
+                        message,
                     ],
                     start_to_close_timeout=_DB_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 raise _WorkflowAbort(
-                    "serial collection body did not complete",
+                    message,
                     data={"status": "incomplete", "finished_count": len(outputs)},
                 ) from exc
         output = {
