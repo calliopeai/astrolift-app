@@ -2677,6 +2677,7 @@ def _managed_config_uncredentialed(
                 subnet_ids = discovered_subnets
         return VpcEndpointConfig(
             region=region,
+            account_id=str(pc.get("account_id", "")),
             vpc_id=vpc_id,
             subnet_ids=subnet_ids,
             security_group_ids=list(pc.get("vpc_endpoint_security_group_ids") or []),
