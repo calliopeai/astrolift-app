@@ -553,3 +553,47 @@ def test_real_http_reviewed_scale_returns_and_audits_exact_identity(world, kind_
             after[environment.pk]["metadata"]["generation"]
             == before[environment.pk]["metadata"]["generation"]
         )
+
+
+def test_deleted_explicit_environment_never_falls_back_but_legacy_primary_remains_nondeleted(world):
+    from astrolift_lifecycle.services.k8s_ops import _primary_environment_for_workload
+
+    target = reviewed(world, world.primary)
+    world.primary.delete()
+    assert code(invoke(world, target, "restart")) == "PRECONDITION"
+    with subject(world):
+        explicit = RegistryQuery().astrolift_workload_action_target(
+            make_info(world.user),
+            workload_id=str(world.workload.guid),
+            environment_id=str(world.primary.guid),
+        )
+        primary = RegistryQuery().astrolift_workload_action_target(
+            make_info(world.user),
+            workload_id=str(world.workload.guid),
+        )
+        permission = workload_viewer_permissions([world.workload])[world.workload.pk]
+        service_primary = _primary_environment_for_workload(world.workload)
+    assert explicit is None
+    assert primary.environment_id == str(world.selected.guid)
+    assert permission.allowed and permission.target.environment_id == str(world.selected.guid)
+    assert service_primary.pk == world.selected.pk
+
+
+def test_invalid_first_live_mapping_refuses_primary_without_later_live_fallback(world):
+    foreign = Organization.objects.create(name="Other target", slug="other-live-target-2217")
+    world.cluster_a.organization = foreign
+    world.cluster_a.save()
+    assert world.cluster_a.is_active and world.primary.deleted_at is None
+    with subject(world):
+        permission = workload_viewer_permissions([world.workload])[world.workload.pk]
+        primary = RegistryQuery().astrolift_workload_action_target(
+            make_info(world.user),
+            workload_id=str(world.workload.guid),
+        )
+        mutation = LifecycleMutation().restart_astrolift_workload(
+            make_info(world.user),
+            RestartWorkloadInput(workload_id=str(world.workload.guid)),
+        )
+    assert not permission.allowed and permission.code == "PRECONDITION" and permission.target is None
+    assert primary is None and code(mutation) == "PRECONDITION"
+    assert reviewed(world, world.remote).environment_id == str(world.remote.guid)

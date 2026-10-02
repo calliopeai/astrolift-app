@@ -71,7 +71,10 @@ Deployment names remain Kubernetes names: this does not promise an atomic
 Deployment UID precondition against external delete/recreate operations.
 
 For compatibility, existing web and CLI callers that omit `environmentId`
-retain the first active environment ordered by database ID. They can continue
+retain the first nondeleted environment ordered by database ID. If that first
+live mapping is inactive or otherwise invalid, review and mutation refuse it;
+neither path silently selects a later live row. An explicit deleted environment
+GUID is always refused without sibling fallback. They can continue
 using optional `ifMatchVersion`. `AstroliftWorkload.primaryActionTarget` describes
 only that compatibility target. Clients that display an explicit environment,
 including native clients, must use its exact review query and all preconditions;

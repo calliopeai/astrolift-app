@@ -95,6 +95,11 @@ def _workload_viewer_permissions(ids, tenant):
             )
             continue
         target = action_target(row, environment)
+        if target is None:
+            result[row.pk] = ActionPermission(
+                False, "PRECONDITION", "workload has no coherent live primary environment"
+            )
+            continue
         scope = PermissionScope(ScopeKind.APP, app_id)
         try:
             _credential_scope(scope, Permission.APP_DEPLOY, allowed_app_ids=allowed_app_ids)

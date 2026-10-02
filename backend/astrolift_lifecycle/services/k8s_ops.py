@@ -103,21 +103,20 @@ def resolve_replica_bounds(env: AppEnvironment | None) -> tuple[int, int]:
 
 
 def _primary_environment_for_workload(workload: Workload) -> AppEnvironment | None:
-    """Compatibility target for callers that omit the environment.
+    """First nondeleted environment for callers that omit the environment.
 
     Explicit callers pass the already verified, locked environment; this
-    function is only the deliberately retained primary-environment path.
+    function is only the deliberately retained primary-environment path. A
+    invalid first live row is returned so validation refuses it without
+    silently selecting a later live environment.
 
-    Returns None when the app has no active environments (the caller
+    Returns None when the app has no nondeleted environments (the caller
     raises a structured NOT_FOUND / PRECONDITION).
     """
     from astrolift_lifecycle.models import AppEnvironment
 
     return (
-        AppEnvironment.objects.filter(
-            registered_app=workload.registered_app,
-            deleted_at__isnull=True,
-        )
+        AppEnvironment.objects.filter(registered_app=workload.registered_app)
         .select_related("tenant_cluster", "registered_app")
         .order_by("id")
         .first()
