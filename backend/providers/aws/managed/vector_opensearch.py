@@ -63,6 +63,7 @@ from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
     handle_for,
+    managed_name_for,
     parse_handle,
     tags_for,
 )
@@ -675,21 +676,7 @@ class OpenSearchVectorDriver(ManagedServiceDriver):
             ) from exc
 
     def _domain_name_for(self, *, spec: ProvisionSpec) -> str:
-        # OpenSearch domain names: lowercase, 3-28 chars, must start
-        # with a letter, allow [a-z0-9-]. Aggressive truncation
-        # because the prefix + slugs blow past 28 fast.
-        raw = (
-            f"{self._config.domain_name_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-{spec.service_handle_hint or 'v'}"
-        ).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-")
-        if not clean or not clean[0].isalpha():
-            clean = "v" + clean
-        return clean[:28]
+        return managed_name_for(spec, kind=KIND, prefix=self._config.domain_name_prefix, max_len=28)
 
     def _secret_name_for(self, *, domain_name: str) -> str:
         return f"{self._config.secrets_manager_prefix}/{domain_name}/master"
