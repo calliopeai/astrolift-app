@@ -123,17 +123,17 @@ export function useDeployments() {
   async function runAction(kind: ActionKind, d: AstroliftDeployment, reason?: string) {
     if (kind === "approve") {
       const { data } = await approve({ variables: { input: { id: d.id } } });
-      feedback.report("approve", data?.approveDeployment, true);
+      feedback.report("approve", data?.approveDeployment);
     } else if (kind === "abort") {
       // abort requires a non-empty reason at the backend boundary (#419).
       const { data } = await abort({ variables: { input: { id: d.id, reason: reason ?? "" } } });
-      feedback.report("abort", data?.abortDeployment, true);
+      feedback.report("abort", data?.abortDeployment);
     } else if (kind === "rollback") {
       const { data } = await rollback({ variables: { input: { id: d.id } } });
-      feedback.report("rollbackConfirm", data?.rollbackDeployment, true);
+      feedback.report("rollbackConfirm", data?.rollbackDeployment);
     } else if (kind === "redeploy") {
       const { data } = await redeploy({ variables: { input: { id: d.id } } });
-      feedback.report("redeploy", data?.redeployApp, true);
+      feedback.report("redeploy", data?.redeployApp);
     }
   }
 

@@ -30,11 +30,9 @@ export function useDeploymentFeedback() {
     result:
       | { ok: boolean; errors: { message: string }[]; data?: { status: string } | null }
       | null
-      | undefined,
-    ignoreMissing = false
+      | undefined
   ) {
     if (!result) {
-      if (ignoreMissing) return;
       throw new Error(failed(action));
     }
     if (!result.ok) throw new Error(result.errors[0]?.message ?? failed(action));

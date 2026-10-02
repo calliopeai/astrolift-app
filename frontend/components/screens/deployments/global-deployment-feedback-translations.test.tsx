@@ -60,7 +60,7 @@ const fieldResolver: GraphQLFieldResolver<Record<string, unknown>, unknown> = (
   if (isEnumType(type)) return type.getValues()[0].name;
   return type.name === "Boolean" ? false : ["Int", "Float"].includes(type.name) ? 0 : "";
 };
-type Mode = "success" | "refused" | "fallback" | "transport" | "unknown" | "absent";
+type Mode = "success" | "refused" | "fallback" | "transport" | "unknown" | "absent" | "null";
 function harness(locale: string, initial: Mode = "success") {
   let mode = initial;
   const requests: { operationName: string; variables: Record<string, unknown> }[] = [];
@@ -105,7 +105,13 @@ function harness(locale: string, initial: Mode = "success") {
         fieldResolver,
       });
       expect("errors" in result ? result.errors : undefined).toBeUndefined();
-      return new Response(JSON.stringify(mutation && mode === "absent" ? { data: {} } : result), {
+      const response =
+        mutation && mode === "absent"
+          ? { data: {} }
+          : mutation && mode === "null"
+            ? { data: Object.fromEntries(Object.keys(result.data ?? {}).map((key) => [key, null])) }
+            : result;
+      return new Response(JSON.stringify(response), {
         headers: { "Content-Type": "application/json" },
       });
     },
@@ -187,6 +193,29 @@ describe.each(locales)("global deployment feedback in %s", (locale) => {
           result.current.runAction(action, DEPLOY_RUNNING, "LITERAL_USER_REASON")
         ).rejects.toThrow("RAW_SERVER_REFUSAL");
       });
+      expect(h.intlErrors).not.toHaveBeenCalled();
+      unmount();
+    }
+  );
+  it.each(["approve", "abort", "rollback", "redeploy"] as const)(
+    "refuses %s without an acknowledgement and permits a retry",
+    async (action) => {
+      const h = harness(locale, "absent");
+      const t = translator(locale, "apps.deployments.actions");
+      const translatedAction = action === "rollback" ? "rollbackConfirm" : action;
+      const { result, unmount } = renderHook(() => useDeployments(), { wrapper: h.Wrapper });
+      for (const mode of ["absent", "null"] as const) {
+        h.mode(mode);
+        await act(async () => {
+          await expect(
+            result.current.runAction(action, DEPLOY_RUNNING, "LITERAL_USER_REASON")
+          ).rejects.toThrow(t("failed", { action: t(translatedAction) }));
+        });
+        expect(feedback.success).not.toHaveBeenCalled();
+      }
+      h.mode("success");
+      await act(() => result.current.runAction(action, DEPLOY_RUNNING, "LITERAL_USER_REASON"));
+      expect(feedback.success).toHaveBeenCalledTimes(1);
       expect(h.intlErrors).not.toHaveBeenCalled();
       unmount();
     }
