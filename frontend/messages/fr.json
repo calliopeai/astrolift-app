@@ -3458,16 +3458,16 @@
       },
       "actions": {
         "label": "Actions",
-        "more": "More actions",
-        "approve": "Approve",
-        "abort": "Cancel",
-        "rollback": "Rollback",
-        "redeploy": "Redeploy",
-        "viewLogs": "View detail / logs",
-        "viewCommit": "View commit",
-        "copyGuid": "Copy deployment ID",
-        "copyOk": "Deployment ID copied.",
-        "copyFail": "Couldn't copy to clipboard."
+        "more": "Autres actions",
+        "approve": "Approuver",
+        "abort": "Annuler",
+        "rollback": "Restaurer",
+        "redeploy": "Redéployer",
+        "viewLogs": "Voir les détails / journaux",
+        "viewCommit": "Voir le commit",
+        "copyGuid": "Copier l’ID du déploiement",
+        "copyOk": "ID du déploiement copié.",
+        "copyFail": "Impossible de copier dans le presse-papiers."
       },
       "bulk": {
         "selectAllLabel": "Select all visible deployments",
@@ -3529,23 +3529,41 @@
         "redeployConfirm": "Redeploy"
       },
       "startSheet": {
-        "title": "Start deployment",
-        "description": "Submits a new rollout to Temporal. If the environment requires approvals, the deployment lands as pending_approval and the workflow doesn't start until enough approvers sign off.",
-        "appLabel": "App",
-        "appPlaceholder": "Choose an app",
-        "envLabel": "Environment",
-        "envPlaceholder": "Choose an environment",
-        "tagLabel": "Image tag",
-        "tagPlaceholder": "v1.4.2 or sha-abc123",
-        "digestLabel": "Image digest (optional)",
+        "title": "Lancer un déploiement",
+        "description": "Soumet un nouveau déploiement à Temporal. Si l’environnement exige des approbations, le déploiement reste en pending_approval et le workflow ne démarre qu’après un nombre suffisant d’approbations.",
+        "appLabel": "Application",
+        "appPlaceholder": "Choisir une application",
+        "envLabel": "Environnement",
+        "envPlaceholder": "Choisir un environnement",
+        "tagLabel": "Tag de l’image",
+        "tagPlaceholder": "v1.4.2 ou sha-abc123",
+        "digestLabel": "Empreinte de l’image (facultative)",
         "digestPlaceholder": "sha256:...",
-        "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
-        "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} approval(s)",
-        "paused": "paused",
-        "cancel": "Cancel",
-        "submit": "Start deployment",
-        "submitting": "Starting…"
+        "digestHint": "Si elle est renseignée, le workflow inclut cette empreinte dans le manifeste pour garantir une cible immuable.",
+        "triggerLabel": "Déclencheur",
+        "approvalsSuffix": "{count, plural, one {# approbation} other {# approbations}}",
+        "paused": "en pause",
+        "cancel": "Annuler",
+        "submit": "Lancer un déploiement",
+        "submitting": "Lancement…",
+        "steps": {
+          "target": "Cible",
+          "image": "Image",
+          "review": "Vérification"
+        },
+        "stepsLabel": "Étapes du déploiement",
+        "validationApp": "Choisissez l’application à déployer.",
+        "validationEnv": "Choisissez un environnement.",
+        "validationTag": "Saisissez le tag de l’image à déployer.",
+        "loadingApps": "Chargement des applications…",
+        "noEnvironments": "Cette application n’a pas encore d’environnement. Associez-la d’abord à un cluster.",
+        "reviewDescription": "Cette action lance un déploiement. Vérifiez ce qui va être déployé.",
+        "back": "Retour",
+        "continue": "Continuer",
+        "approvalWarning": "{env} nécessite {count, plural, one {# approbation} other {# approbations}} avant le lancement du déploiement.",
+        "pausedWarning": "Les déploiements vers {env} sont en pause. Un déploiement lancé ici s’exécute quand même ; les déclencheurs CI et push restent bloqués.",
+        "started": "Déploiement lancé : {status}",
+        "startFailed": "Le déploiement n’a pas pu être lancé."
       }
     },
     "deploymentDetail": {
@@ -3613,7 +3631,8 @@
         "retireConfirm": "Retirer le déploiement",
         "success": "Déploiement écarté",
         "failed": "Échec de la suppression"
-      }
+      },
+      "openCiRun": "Ouvrir l’exécution CI"
     },
     "environments": {
       "title": "Environnements",

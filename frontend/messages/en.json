@@ -2937,11 +2937,29 @@
         "digestPlaceholder": "sha256:...",
         "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
         "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} approval(s)",
+        "approvalsSuffix": "{count, plural, one {# approval} other {# approvals}}",
         "paused": "paused",
         "cancel": "Cancel",
         "submit": "Start deployment",
-        "submitting": "Starting…"
+        "submitting": "Starting…",
+        "steps": {
+          "target": "Target",
+          "image": "Image",
+          "review": "Review"
+        },
+        "stepsLabel": "Deployment steps",
+        "validationApp": "Pick the app to deploy.",
+        "validationEnv": "Pick an environment.",
+        "validationTag": "Enter the image tag to deploy.",
+        "loadingApps": "Loading apps…",
+        "noEnvironments": "This app has no environments yet. Bind it to a cluster first.",
+        "reviewDescription": "This starts a rollout. Check what is about to deploy.",
+        "back": "Back",
+        "continue": "Continue",
+        "approvalWarning": "{env} needs {count, plural, one {# approval} other {# approvals}} before the rollout starts.",
+        "pausedWarning": "Deploys to {env} are paused. A deployment started here still runs; CI and push triggers stay blocked.",
+        "started": "Deployment started: {status}",
+        "startFailed": "The deployment could not be started."
       }
     },
     "deploymentDetail": {
@@ -3009,7 +3027,8 @@
         "retireConfirm": "Retire deployment",
         "success": "Deployment dismissed",
         "failed": "Delete failed"
-      }
+      },
+      "openCiRun": "Open CI run"
     },
     "environments": {
       "title": "Environments",

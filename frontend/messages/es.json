@@ -3457,17 +3457,17 @@
         "history": "History"
       },
       "actions": {
-        "label": "Actions",
-        "more": "More actions",
-        "approve": "Approve",
-        "abort": "Cancel",
-        "rollback": "Rollback",
-        "redeploy": "Redeploy",
-        "viewLogs": "View detail / logs",
-        "viewCommit": "View commit",
-        "copyGuid": "Copy deployment ID",
-        "copyOk": "Deployment ID copied.",
-        "copyFail": "Couldn't copy to clipboard."
+        "label": "Acciones",
+        "more": "Más acciones",
+        "approve": "Aprobar",
+        "abort": "Cancelar",
+        "rollback": "Revertir",
+        "redeploy": "Volver a desplegar",
+        "viewLogs": "Ver detalles / registros",
+        "viewCommit": "Ver commit",
+        "copyGuid": "Copiar ID del despliegue",
+        "copyOk": "ID del despliegue copiado.",
+        "copyFail": "No se pudo copiar al portapapeles."
       },
       "bulk": {
         "selectAllLabel": "Select all visible deployments",
@@ -3529,23 +3529,41 @@
         "redeployConfirm": "Redeploy"
       },
       "startSheet": {
-        "title": "Start deployment",
-        "description": "Submits a new rollout to Temporal. If the environment requires approvals, the deployment lands as pending_approval and the workflow doesn't start until enough approvers sign off.",
-        "appLabel": "App",
-        "appPlaceholder": "Choose an app",
-        "envLabel": "Environment",
-        "envPlaceholder": "Choose an environment",
-        "tagLabel": "Image tag",
-        "tagPlaceholder": "v1.4.2 or sha-abc123",
-        "digestLabel": "Image digest (optional)",
+        "title": "Iniciar despliegue",
+        "description": "Envía un nuevo despliegue a Temporal. Si el entorno requiere aprobaciones, el despliegue queda en pending_approval y el flujo no comienza hasta que haya suficientes aprobaciones.",
+        "appLabel": "Aplicación",
+        "appPlaceholder": "Elige una aplicación",
+        "envLabel": "Entorno",
+        "envPlaceholder": "Elige un entorno",
+        "tagLabel": "Etiqueta de imagen",
+        "tagPlaceholder": "v1.4.2 o sha-abc123",
+        "digestLabel": "Resumen de imagen (opcional)",
         "digestPlaceholder": "sha256:...",
-        "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
-        "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} approval(s)",
-        "paused": "paused",
-        "cancel": "Cancel",
-        "submit": "Start deployment",
-        "submitting": "Starting…"
+        "digestHint": "Si se especifica, el flujo incluirá este resumen en el manifiesto para fijar un destino inmutable.",
+        "triggerLabel": "Disparador",
+        "approvalsSuffix": "{count, plural, one {# aprobación} other {# aprobaciones}}",
+        "paused": "pausado",
+        "cancel": "Cancelar",
+        "submit": "Iniciar despliegue",
+        "submitting": "Iniciando…",
+        "steps": {
+          "target": "Destino",
+          "image": "Imagen",
+          "review": "Revisar"
+        },
+        "stepsLabel": "Pasos del despliegue",
+        "validationApp": "Elige la aplicación que quieres desplegar.",
+        "validationEnv": "Elige un entorno.",
+        "validationTag": "Introduce la etiqueta de la imagen que quieres desplegar.",
+        "loadingApps": "Cargando aplicaciones…",
+        "noEnvironments": "Esta aplicación aún no tiene entornos. Vincúlala primero a un clúster.",
+        "reviewDescription": "Se iniciará un despliegue. Revisa lo que se va a desplegar.",
+        "back": "Atrás",
+        "continue": "Continuar",
+        "approvalWarning": "{env} necesita {count, plural, one {# aprobación} other {# aprobaciones}} antes de iniciar el despliegue.",
+        "pausedWarning": "Los despliegues en {env} están pausados. Un despliegue iniciado aquí se ejecutará; los disparadores de CI y push seguirán bloqueados.",
+        "started": "Despliegue iniciado: {status}",
+        "startFailed": "No se pudo iniciar el despliegue."
       }
     },
     "deploymentDetail": {
@@ -3613,7 +3631,8 @@
         "retireConfirm": "Retirar despliegue",
         "success": "Despliegue descartado",
         "failed": "Error al eliminar"
-      }
+      },
+      "openCiRun": "Abrir ejecución de CI"
     },
     "environments": {
       "title": "Entornos",

@@ -3457,17 +3457,17 @@
         "history": "History"
       },
       "actions": {
-        "label": "Actions",
-        "more": "More actions",
-        "approve": "Approve",
-        "abort": "Cancel",
-        "rollback": "Rollback",
-        "redeploy": "Redeploy",
-        "viewLogs": "View detail / logs",
-        "viewCommit": "View commit",
-        "copyGuid": "Copy deployment ID",
-        "copyOk": "Deployment ID copied.",
-        "copyFail": "Couldn't copy to clipboard."
+        "label": "Ações",
+        "more": "Mais ações",
+        "approve": "Aprovar",
+        "abort": "Cancelar",
+        "rollback": "Reverter",
+        "redeploy": "Reimplantar",
+        "viewLogs": "Ver detalhes / logs",
+        "viewCommit": "Ver commit",
+        "copyGuid": "Copiar ID da implantação",
+        "copyOk": "ID da implantação copiado.",
+        "copyFail": "Não foi possível copiar para a área de transferência."
       },
       "bulk": {
         "selectAllLabel": "Select all visible deployments",
@@ -3529,23 +3529,41 @@
         "redeployConfirm": "Redeploy"
       },
       "startSheet": {
-        "title": "Start deployment",
-        "description": "Submits a new rollout to Temporal. If the environment requires approvals, the deployment lands as pending_approval and the workflow doesn't start until enough approvers sign off.",
-        "appLabel": "App",
-        "appPlaceholder": "Choose an app",
-        "envLabel": "Environment",
-        "envPlaceholder": "Choose an environment",
-        "tagLabel": "Image tag",
-        "tagPlaceholder": "v1.4.2 or sha-abc123",
-        "digestLabel": "Image digest (optional)",
+        "title": "Iniciar implantação",
+        "description": "Envia uma nova implantação ao Temporal. Se o ambiente exigir aprovações, a implantação ficará em pending_approval e o fluxo só começará quando houver aprovações suficientes.",
+        "appLabel": "Aplicativo",
+        "appPlaceholder": "Escolher um aplicativo",
+        "envLabel": "Ambiente",
+        "envPlaceholder": "Escolher um ambiente",
+        "tagLabel": "Tag da imagem",
+        "tagPlaceholder": "v1.4.2 ou sha-abc123",
+        "digestLabel": "Digest da imagem (opcional)",
         "digestPlaceholder": "sha256:...",
-        "digestHint": "When set, this digest is what the workflow renders into the manifest — guaranteed-immutable target.",
-        "triggerLabel": "Trigger",
-        "approvalsSuffix": "{count} approval(s)",
-        "paused": "paused",
-        "cancel": "Cancel",
-        "submit": "Start deployment",
-        "submitting": "Starting…"
+        "digestHint": "Quando informado, o fluxo inclui este digest no manifesto para garantir um destino imutável.",
+        "triggerLabel": "Gatilho",
+        "approvalsSuffix": "{count, plural, one {# aprovação} other {# aprovações}}",
+        "paused": "pausado",
+        "cancel": "Cancelar",
+        "submit": "Iniciar implantação",
+        "submitting": "Iniciando…",
+        "steps": {
+          "target": "Destino",
+          "image": "Imagem",
+          "review": "Revisão"
+        },
+        "stepsLabel": "Etapas da implantação",
+        "validationApp": "Escolha o aplicativo a implantar.",
+        "validationEnv": "Escolha um ambiente.",
+        "validationTag": "Informe a tag da imagem a implantar.",
+        "loadingApps": "Carregando aplicativos…",
+        "noEnvironments": "Este aplicativo ainda não tem ambientes. Vincule-o primeiro a um cluster.",
+        "reviewDescription": "Esta ação inicia uma implantação. Confira o que será implantado.",
+        "back": "Voltar",
+        "continue": "Continuar",
+        "approvalWarning": "{env} precisa de {count, plural, one {# aprovação} other {# aprovações}} antes do início da implantação.",
+        "pausedWarning": "As implantações em {env} estão pausadas. Uma implantação iniciada aqui ainda será executada; os gatilhos de CI e push continuarão bloqueados.",
+        "started": "Implantação iniciada: {status}",
+        "startFailed": "Não foi possível iniciar a implantação."
       }
     },
     "deploymentDetail": {
@@ -3613,7 +3631,8 @@
         "retireConfirm": "Aposentar implantação",
         "success": "Implantação descartada",
         "failed": "Falha ao excluir"
-      }
+      },
+      "openCiRun": "Abrir execução de CI"
     },
     "environments": {
       "title": "Ambientes",

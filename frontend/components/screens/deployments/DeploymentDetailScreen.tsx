@@ -113,6 +113,7 @@ export function DeploymentDetailScreen({
   onDelete,
 }: DeploymentDetailScreenProps) {
   const t = useTranslations("lists.deploymentDetail");
+  const actionLabel = useTranslations("lists.deployments.actions");
   const [confirmAbort, setConfirmAbort] = React.useState(false);
   const [confirmRollback, setConfirmRollback] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -206,7 +207,7 @@ export function DeploymentDetailScreen({
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+        <Button variant="outline" size="icon" className="size-8" aria-label={actionLabel("more")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -221,7 +222,7 @@ export function DeploymentDetailScreen({
           <DropdownMenuItem asChild>
             <a href={commitHref} target="_blank" rel="noopener noreferrer">
               <ExternalLinkIcon className="size-4" />
-              View commit
+              {actionLabel("viewCommit")}
             </a>
           </DropdownMenuItem>
         )}
@@ -229,7 +230,7 @@ export function DeploymentDetailScreen({
           <DropdownMenuItem asChild>
             <a href={d.ciRunUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLinkIcon className="size-4" />
-              Open CI run
+              {t("openCiRun")}
             </a>
           </DropdownMenuItem>
         )}
@@ -237,12 +238,12 @@ export function DeploymentDetailScreen({
           onSelect={() => {
             navigator.clipboard
               .writeText(d.id)
-              .then(() => toast.success("Deployment ID copied."))
-              .catch(() => toast.error("Couldn't copy to clipboard."));
+              .then(() => toast.success(actionLabel("copyOk")))
+              .catch(() => toast.error(actionLabel("copyFail")));
           }}
         >
           <CopyIcon className="size-4" />
-          Copy deployment ID
+          {actionLabel("copyGuid")}
         </DropdownMenuItem>
         {canDeleteThis && (
           <>
