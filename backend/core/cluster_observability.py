@@ -2596,6 +2596,7 @@ def _managed_config_uncredentialed(
 
         return LambdaConfig(
             region=region,
+            account_id=str(pc.get("account_id", "")),
             role_path_prefix=str(pc.get("faas_role_path_prefix", "/")),
             default_architecture=str(pc.get("faas_default_architecture", "arm64")),
             log_retention_days=int(pc.get("faas_log_retention_days", 14)),
