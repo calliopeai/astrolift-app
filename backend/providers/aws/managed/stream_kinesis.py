@@ -128,15 +128,17 @@ class KinesisDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="stream_kinesis")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, arn = parse_handle(spec.handle)
+        arn = self._handle_arn(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg, size=spec.size or "", partial=True)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_kinesis_config"])
         try:
-            summary = self._summary(arn)
-            self._reconcile(arn, summary, cfg, size=spec.size or "")
+            summary = self._owned_summary(arn, spec.managed_service_id)
+            self._reconcile(arn, summary, cfg, size=spec.size or "", managed_service_id=spec.managed_service_id)
             self._await_active(_stream_name_from_arn(arn))
+        except ManagedServiceError as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_or_config_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, "Kinesis stream not found", ["not_found"])
@@ -156,10 +158,12 @@ class KinesisDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, arn = parse_handle(spec.handle)
+        arn = self._handle_arn(spec.handle)
         name = _stream_name_from_arn(arn)
         try:
-            self._summary(arn)
+            self._owned_summary(arn, spec.managed_service_id)
+        except ManagedServiceError as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, f"Kinesis stream {name} already gone")
@@ -188,7 +192,7 @@ class KinesisDriver(ManagedServiceDriver):
             external = [
                 consumer
                 for consumer in consumers
-                if not self._is_managed_resource(str(consumer.get("ConsumerARN") or ""))
+                if not self._is_managed_resource(str(consumer.get("ConsumerARN") or ""), spec.managed_service_id)
             ]
             if external and not force_destroy:
                 return DeprovisionResult(
@@ -199,7 +203,9 @@ class KinesisDriver(ManagedServiceDriver):
                     retryable=False,
                 )
             for consumer in consumers:
-                if force_destroy or self._is_managed_resource(str(consumer.get("ConsumerARN") or "")):
+                if force_destroy or self._is_managed_resource(
+                    str(consumer.get("ConsumerARN") or ""), spec.managed_service_id
+                ):
                     self._kinesis.deregister_stream_consumer(
                         ConsumerARN=str(consumer["ConsumerARN"]),
                     )
@@ -421,6 +427,7 @@ class KinesisDriver(ManagedServiceDriver):
         size: str,
         spec: ProvisionSpec | None = None,
         newly_created: bool = False,
+        managed_service_id: str = "",
     ) -> None:
         name = str(summary.get("StreamName") or _stream_name_from_arn(arn))
         if spec is not None:
@@ -498,7 +505,9 @@ class KinesisDriver(ManagedServiceDriver):
             summary = self._summary(arn)
         self._reconcile_monitoring(arn, summary, cfg, name=name)
         self._reconcile_policy(arn, cfg)
-        self._reconcile_consumers(arn, cfg, spec=spec)
+        self._reconcile_consumers(
+            arn, cfg, spec=spec, managed_service_id=spec.managed_service_id if spec else managed_service_id
+        )
 
     def _reconcile_encryption(
         self,
@@ -581,12 +590,20 @@ class KinesisDriver(ManagedServiceDriver):
         cfg: dict[str, Any],
         *,
         spec: ProvisionSpec | None,
+        managed_service_id: str,
     ) -> None:
         if "consumers" not in cfg:
             return
         current = {str(row.get("ConsumerName") or ""): row for row in self._consumers(arn)}
         desired = {str(name) for name in cfg.get("consumers") or []}
-        tags = tags_for(spec) if spec is not None else []
+        tags = (
+            tags_for(spec)
+            if spec is not None
+            else [
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": managed_service_id},
+            ]
+        )
         for name in sorted(desired - set(current)):
             request: dict[str, Any] = {"StreamARN": arn, "ConsumerName": name}
             if tags:
@@ -595,7 +612,7 @@ class KinesisDriver(ManagedServiceDriver):
         if cfg.get("prune_consumers"):
             for name in sorted(set(current) - desired):
                 consumer_arn = str(current[name].get("ConsumerARN") or "")
-                if consumer_arn and self._is_managed_resource(consumer_arn):
+                if consumer_arn and self._is_managed_resource(consumer_arn, managed_service_id):
                     self._kinesis.deregister_stream_consumer(ConsumerARN=consumer_arn)
 
     def _consumers(self, arn: str) -> list[dict[str, Any]]:
@@ -611,11 +628,11 @@ class KinesisDriver(ManagedServiceDriver):
             if not token:
                 return rows
 
-    def _is_managed_resource(self, arn: str) -> bool:
+    def _is_managed_resource(self, arn: str, identity: str) -> bool:
         if not arn:
             return False
-        tags = self._kinesis.list_tags_for_resource(ResourceARN=arn).get("Tags") or []
-        return any(tag.get("Key") == "astrolift.io/managed-by" and tag.get("Value") == "platform" for tag in tags)
+        tags = self._kinesis.list_tags_for_resource(ResourceARN=arn).get("Tags")
+        return live_ownership_refusal(tags, managed_service_id=identity, resource="Kinesis consumer") is None
 
     def _is_own_stream(self, arn: str, spec: ProvisionSpec) -> bool:
         """Platform-made is not enough to adopt: it must be this service's (#1961)."""
@@ -718,25 +735,43 @@ class KinesisDriver(ManagedServiceDriver):
     def _stream_name(self, spec: ProvisionSpec) -> str:
         managed_service_identity(spec.managed_service_id)
         if spec.recorded_handle:
-            kind, arn = parse_handle(spec.recorded_handle)
-            name = _stream_name_from_arn(arn)
-            if kind != KIND or re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name) is None:
-                raise ManagedServiceError("recorded Kinesis handle does not match the stream driver")
-            assert_resource_arn(
-                arn,
-                service="kinesis",
-                region=self._config.region,
-                account=self._config.account_id,
-                resource=f"stream/{name}",
-            )
-            if arn != self._stream_arn(name):
-                raise ManagedServiceError("recorded Kinesis ARN partition does not match the configured region")
-            return name
+            return _stream_name_from_arn(self._handle_arn(spec.recorded_handle))
         return physical_name(
             spec.managed_service_id,
             prefix=self._config.stream_name_prefix,
             max_length=128,
         )
+
+    def _handle_arn(self, handle: str) -> str:
+        kind, arn = parse_handle(handle)
+        name = _stream_name_from_arn(arn)
+        if kind != KIND or re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name) is None:
+            raise ManagedServiceError("recorded Kinesis handle does not match the stream driver")
+        assert_resource_arn(
+            arn,
+            service="kinesis",
+            region=self._config.region,
+            account=self._config.account_id,
+            resource=f"stream/{name}",
+        )
+        if arn != self._stream_arn(name):
+            raise ManagedServiceError("recorded Kinesis ARN partition does not match the configured region")
+        return arn
+
+    def _owned_summary(self, arn: str, identity: str) -> dict[str, Any]:
+        summary = self._summary(arn)
+        if str(summary.get("StreamARN") or "") != arn or str(summary.get("StreamName") or "") != _stream_name_from_arn(
+            arn
+        ):
+            raise ManagedServiceError("live Kinesis stream identity does not match the recorded target")
+        refusal = live_ownership_refusal(
+            self._kinesis.list_tags_for_resource(ResourceARN=arn).get("Tags"),
+            managed_service_id=identity,
+            resource="Kinesis stream",
+        )
+        if refusal:
+            raise ManagedServiceError(refusal)
+        return summary
 
     def _stream_arn(self, name: str) -> str:
         if not self._config.account_id:

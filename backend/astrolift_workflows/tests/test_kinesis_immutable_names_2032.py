@@ -13,7 +13,12 @@ from botocore.validate import validate_parameters
 from moto import mock_aws
 
 from astrolift_drivers.registry import PluginManifest, PluginRegistry
-from astrolift_workflows.activities.managed_service_lifecycle import _provision_sync, build_provision_spec
+from astrolift_workflows.activities.managed_service_lifecycle import (
+    _deprovision_sync,
+    _provision_sync,
+    _update_sync,
+    build_provision_spec,
+)
 from astrolift_workflows.tests.test_recorded_handle_exclusive_2086 import _service
 
 pytestmark = pytest.mark.django_db
@@ -164,4 +169,33 @@ def test_recorded_other_kind_account_region_or_resource_never_creates_fallback(c
     row.save(update_fields=["backend_ref"])
     with pytest.raises(ManagedServiceError):
         _provision_sync(row.pk)
+    assert cloud.api.list_streams()["StreamNames"] == []
+
+
+def test_actual_lifecycle_refuses_foreign_stream_updates_and_force_deletion(cloud):
+    first, second = new_service("owner"), new_service("contender")
+    initial = _provision_sync(first.pk)
+    assert initial["ok"]
+    first.backend_ref = initial["handle"]
+    first.save(update_fields=["backend_ref"])
+    second.backend_ref = initial["handle"]
+    second.config = {"retention_hours": 72, "managed_service_id": str(first.guid)}
+    second.save(update_fields=["backend_ref", "config"])
+    arn = initial["handle"].partition("/")[2]
+    summary = cloud.api.describe_stream_summary(StreamARN=arn)["StreamDescriptionSummary"]
+    tags = cloud.api.list_tags_for_resource(ResourceARN=arn)["Tags"]
+    updated = _update_sync(second.pk)
+    deleted = _deprovision_sync(second.pk, delete_data=True, force_destroy=True)
+    assert not updated["ok"] and not updated["retryable"]
+    assert not deleted["ok"] and not deleted["retryable"]
+    assert cloud.api.describe_stream_summary(StreamARN=arn)["StreamDescriptionSummary"] == summary
+    assert cloud.api.list_tags_for_resource(ResourceARN=arn)["Tags"] == tags
+    first.config = {"retention_hours": 72}
+    first.save(update_fields=["config"])
+    assert _update_sync(first.pk)["ok"]
+    assert (
+        cloud.api.describe_stream_summary(StreamARN=arn)["StreamDescriptionSummary"]["RetentionPeriodHours"]
+        == 72
+    )
+    assert _deprovision_sync(first.pk, delete_data=True, force_destroy=True)["ok"]
     assert cloud.api.list_streams()["StreamNames"] == []
