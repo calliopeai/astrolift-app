@@ -200,7 +200,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "service_handle_hint": "primary-db",
         "size": "small",
         "binding_id": "binding-guid",
-        "managed_service_id": "service-guid",
+        "managed_service_id": "11111111-1111-4111-8111-111111111111",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -228,7 +228,7 @@ def test_provision_creates_cluster_primary_secret_and_native_options(
     assert cluster["databaseVersion"] == "POSTGRES_17"
     assert cluster["annotations"] == {"owner": "platform"}
     assert cluster["labels"]["custom"] == "yes"
-    assert cluster["labels"]["astrolift-managed-service-id"] == "service-guid"
+    assert cluster["labels"]["astrolift-managed-service-id"] == "11111111-1111-4111-8111-111111111111"
     primary = next(iter(cloud.instances.values()))
     assert primary["activationPolicy"] == "ALWAYS"
     assert primary["machineConfig"]["machineType"] == "n2-highmem-2"
@@ -261,6 +261,52 @@ def test_provision_is_idempotent(driver: AlloyDBPostgresDriver, cloud: FakeAlloy
     assert first.handle == second.handle
     assert len([call for call in cloud.calls if call[0] == "create_cluster"]) == 1
     assert len([call for call in cloud.calls if call[0] == "create_instance"]) == 1
+
+
+@pytest.mark.parametrize("owner", ["foreign", "conflicting", "missing"])
+def test_provision_refuses_foreign_or_unproven_primary(
+    driver: AlloyDBPostgresDriver, cloud: FakeAlloyDBClient, owner: str
+) -> None:
+    first = driver.provision(_spec())
+    assert first.ok
+    primary = next(iter(cloud.instances.values()))
+    if owner == "foreign":
+        for key in ("astrolift-managed-service-id", "astrolift_io_managed_service_id"):
+            primary["labels"][key] = "22222222-2222-4222-8222-222222222222"
+    elif owner == "conflicting":
+        primary["labels"]["astrolift_io_managed_service_id"] = "22222222-2222-4222-8222-222222222222"
+    else:
+        primary["labels"] = {"astrolift-managed-by": "platform"}
+    before = len(cloud.calls)
+    refused = driver.provision(_spec())
+    assert not refused.ok and refused.errors == ["resource_not_owned"]
+    assert not any(operation.startswith(("create", "patch", "delete")) for operation, _ in cloud.calls[before:])
+
+
+def test_restore_refuses_foreign_primary(driver: AlloyDBPostgresDriver, cloud: FakeAlloyDBClient) -> None:
+    first = driver.provision(_spec())
+    snapshot = driver.snapshot(ServiceHandle(first.handle))
+    target = _spec(managed_service_id="22222222-2222-4222-8222-222222222222")
+    restored = driver.restore(snapshot, target)
+    assert restored.ok
+    name = f"{driver._cluster_name(_parse_handle(restored.handle))}/instances/primary"
+    cloud.instances[name]["labels"]["astrolift-managed-service-id"] = _spec().managed_service_id
+    before = len(cloud.calls)
+    refused = driver.restore(snapshot, target)
+    assert not refused.ok and refused.errors == ["resource_not_owned"]
+    assert not any(
+        operation.startswith(("create", "patch", "delete", "restore")) for operation, _ in cloud.calls[before:]
+    )
+
+
+def test_provision_does_not_accept_a_foreign_read_pool(driver: AlloyDBPostgresDriver, cloud: FakeAlloyDBClient) -> None:
+    spec = _spec(config={"read_pools": [{"id": "analytics"}]})
+    first = driver.provision(spec)
+    assert first.ok
+    pool = next(item for item in cloud.instances.values() if item["instanceType"] == "READ_POOL")
+    pool["labels"]["astrolift-managed-service-id"] = "22222222-2222-4222-8222-222222222222"
+    refused = driver.provision(spec)
+    assert not refused.ok and "not owned" in refused.message
 
 
 def test_primary_instance_id_is_immutable(
@@ -419,7 +465,9 @@ def test_snapshot_and_restore(
     provisioned = driver.provision(_spec())
     snapshot = driver.snapshot(ServiceHandle(provisioned.handle))
     assert snapshot.snapshot_id in cloud.backups
-    restored = driver.restore(snapshot, _spec(service_handle_hint="restored"))
+    restored = driver.restore(
+        snapshot, _spec(service_handle_hint="restored", managed_service_id="22222222-2222-4222-8222-222222222222")
+    )
     assert restored.ok and restored.ready
     restore_call = next(value for name, value in cloud.calls if name == "restore_cluster")
     assert restore_call["body"]["backupSource"]["backupName"] == snapshot.snapshot_id
@@ -432,7 +480,7 @@ def test_restore_resumes_after_cluster_creation(
 ) -> None:
     provisioned = driver.provision(_spec())
     snapshot = driver.snapshot(ServiceHandle(provisioned.handle))
-    target = _spec(service_handle_hint="retry-target")
+    target = _spec(service_handle_hint="retry-target", managed_service_id="22222222-2222-4222-8222-222222222222")
     first = driver.restore(snapshot, target)
     assert first.ok
     target_id = _parse_handle(first.handle)
