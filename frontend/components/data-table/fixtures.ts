@@ -21,6 +21,8 @@ export function fakeController<TRow>(
     pageIndex: 0,
     hasNext: false,
     hasPrev: false,
+    after: null,
+    nextCursor: overrides.hasNext ? "fixture-next" : null,
     next: noop,
     prev: noop,
     pageSize: 25,

@@ -347,3 +347,19 @@ def test_attachment_counts_exclude_currently_deleted_or_refused_consumers(world,
                 attachments(world)
         else:
             assert attachments(world).total_count == 0
+
+
+def test_missing_attachment_target_is_refused_not_an_empty_consumer_page(world):
+    grant(world, Permission.PROJECT_READ, Permission.APP_READ, kind="ORG", target=world.org.pk)
+    world.service.delete()
+    with subject(world):
+        for read in (
+            lambda: attachments(world),
+            lambda: query.astrolift_managed_service_attachments_page(
+                make_info(world.user), managed_service_id=GUID(str(world.service.guid))
+            ),
+        ):
+            with pytest.raises(GraphQLError) as error:
+                read()
+            assert error.value.extensions["code"] == "TARGET_UNAVAILABLE"
+            assert "RESOURCE_PRIVATE_MARKER" not in str(error.value)

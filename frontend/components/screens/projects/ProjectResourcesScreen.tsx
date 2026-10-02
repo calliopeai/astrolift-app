@@ -3,10 +3,8 @@
 import {
   BoxIcon,
   ChevronRightIcon,
-  CircleDollarSignIcon,
   EyeIcon,
   EyeOffIcon,
-  ExternalLinkIcon,
   KeyRoundIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -38,9 +36,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Textarea } from "@/components/ui/textarea";
 
-import { useFormatters } from "@/lib/i18n/formatters";
-
 import type { useProjectResources } from "./use-project-resources";
+
+import { ProjectManagedResourceList } from "./ProjectManagedResourceList";
+import { ManagedResourceDetail } from "./ManagedResourceDetail";
 
 export type ProjectResourcesScreenProps = ReturnType<typeof useProjectResources> & {
   /**
@@ -65,9 +64,10 @@ export function ProjectResourcesScreen({
   canWriteSecrets,
   canReadSecrets,
   clusters,
-  services,
+  resourceTable,
+  resourceDetail,
+  onOpenResource,
   bundles,
-  resourcesLoading,
   agents,
   projectAppEnvironments,
   effectiveClusterId,
@@ -78,23 +78,12 @@ export function ProjectResourcesScreen({
   catalogEntries,
   catalogLoading,
   catalogError,
-  costPreviews,
-  costPreviewLoading,
-  onCostPreview,
   revealed,
   onToggleReveal,
-  consumerService,
-  setConsumerService,
   consumerBundle,
   setConsumerBundle,
   provisioning,
   onProvision,
-  onReprovision,
-  onDeprovision,
-  attachingConsumer,
-  detachingConsumer,
-  onAttachServiceConsumer,
-  onDetachServiceConsumer,
   creatingBundle,
   onCreateBundle,
   onSetBundleKey,
@@ -108,8 +97,7 @@ export function ProjectResourcesScreen({
   onDetachBundleConsumer,
   section,
 }: ProjectResourcesScreenProps) {
-  const fmt = useFormatters();
-  const tOperation = useTranslations("projectResources.operation");
+  const resourceCopy = useTranslations("projectResources.reads");
   const [resourceOpen, setResourceOpen] = React.useState(false);
   const [bundleOpen, setBundleOpen] = React.useState(false);
   const [resourceCatalogId, setResourceCatalogId] = React.useState("");
@@ -151,8 +139,8 @@ export function ProjectResourcesScreen({
     );
   }
 
-  const activeServices = services.filter((row) => row.status === "active").length;
-  const failedServices = services.filter((row) => row.status === "failed").length;
+  const activeServices = resourceTable.rows.filter((row) => row.status === "active").length;
+  const failedServices = resourceTable.rows.filter((row) => row.status === "failed").length;
 
   async function submitResource(event: React.FormEvent) {
     event.preventDefault();
@@ -223,8 +211,8 @@ export function ProjectResourcesScreen({
         <StatTile
           icon={BoxIcon}
           label="Managed resources"
-          value={services.length}
-          footer={`${activeServices} active`}
+          value={resourceTable.totalCount ?? "—"}
+          footer={resourceCopy("activeOnPage", { count: activeServices })}
         />
         <StatTile
           icon={KeyRoundIcon}
@@ -236,7 +224,7 @@ export function ProjectResourcesScreen({
           icon={RefreshCwIcon}
           label="Needs attention"
           value={failedServices}
-          footer="failed provisioning or lifecycle operations"
+          footer={resourceCopy("failedOnPage")}
           className={failedServices ? "border-warning-border" : undefined}
         />
       </div>
@@ -256,172 +244,8 @@ export function ProjectResourcesScreen({
                     multiple apps and workflow agents.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-2">
-                  {resourcesLoading ? (
-                    <Skeleton className="col-span-full h-32" />
-                  ) : services.length === 0 ? (
-                    <div className="text-muted-foreground col-span-full rounded-lg border border-dashed p-8 text-center text-sm">
-                      No project resources yet.
-                    </div>
-                  ) : (
-                    services.map((service) => (
-                      <article key={service.id} className="rounded-lg border p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="font-medium">{service.name}</h3>
-                            <p className="text-muted-foreground mt-1 text-xs">
-                              {service.kind.replace(/_/g, " ")} · {service.clusterSlug}
-                            </p>
-                          </div>
-                          <Badge
-                            variant={service.status === "failed" ? "destructive" : "secondary"}
-                            className="capitalize"
-                          >
-                            {service.status}
-                          </Badge>
-                        </div>
-                        {service.statusError && (
-                          <p className="text-danger-fg mt-2 text-xs">{service.statusError}</p>
-                        )}
-                        {service.operationKind && (
-                          <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-                            <p>
-                              {tOperation("label")}{" "}
-                              <span className="font-medium">{service.operationKind}</span>
-                              {service.operationCompletedAt
-                                ? ` · ${tOperation("completed", { at: fmt.formatDateTime(service.operationCompletedAt) })}`
-                                : ` · ${tOperation("running")}`}
-                            </p>
-                            {service.operationWorkflowId && (
-                              <p className="truncate font-mono" title={service.operationWorkflowId}>
-                                {service.operationWorkflowId}
-                                {service.operationRunId ? ` · ${service.operationRunId}` : ""}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        <div className="mt-3 flex flex-wrap gap-1">
-                          {service.attachments.map((attachment) => (
-                            <Badge key={attachment.id} variant="outline">
-                              {attachment.consumerSlug}
-                            </Badge>
-                          ))}
-                          {service.attachments.length === 0 && (
-                            <span className="text-muted-foreground text-xs">Not attached yet</span>
-                          )}
-                        </div>
-                        {service.volumeBindings.length > 0 && (
-                          <div className="bg-muted/30 mt-3 space-y-2 rounded-md border p-3">
-                            <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-                              Runtime mounts
-                            </p>
-                            {service.volumeBindings.map((binding) => (
-                              <div
-                                key={binding.id}
-                                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
-                              >
-                                <code>{binding.mountPath}</code>
-                                <Badge variant="outline">{binding.protocol}</Badge>
-                                <span className="text-muted-foreground">
-                                  {binding.sourceKind === "csi"
-                                    ? binding.csiDriver
-                                    : binding.sourceKind === "dynamic_pvc"
-                                      ? `StorageClass ${binding.storageClassName}`
-                                      : `${binding.claimNamespace}/${binding.claimName}`}
-                                </span>
-                                {binding.readOnly && <Badge variant="secondary">read only</Badge>}
-                                {binding.credentialReferenceCount > 0 && (
-                                  <span className="text-muted-foreground">
-                                    {binding.credentialReferenceCount} credential refs
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {costPreviews[service.id] && (
-                          <div className="bg-muted/30 mt-3 rounded-md border p-3 text-xs">
-                            {costPreviews[service.id].available ? (
-                              <>
-                                <span className="font-medium">
-                                  {costPreviews[service.id].approximate ? "Approx. " : ""}
-                                  {new Intl.NumberFormat(undefined, {
-                                    style: "currency",
-                                    currency: costPreviews[service.id].currency,
-                                  }).format(costPreviews[service.id].monthlyTotal ?? 0)}
-                                  /month
-                                </span>
-                                {costPreviews[service.id].pricingSourceUrl && (
-                                  <a
-                                    className="ml-2 underline underline-offset-2"
-                                    href={costPreviews[service.id].pricingSourceUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    pricing source
-                                  </a>
-                                )}
-                                {costPreviews[service.id].notes[0] && (
-                                  <p className="text-muted-foreground mt-1">
-                                    {costPreviews[service.id].notes[0]}
-                                  </p>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                Cost unavailable:{" "}
-                                {costPreviews[service.id].message ||
-                                  costPreviews[service.id].reason}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={costPreviewLoading}
-                            onClick={() => onCostPreview(service.id)}
-                          >
-                            <CircleDollarSignIcon className="size-3" /> Cost preview
-                          </Button>
-                          {service.providerPortalUrl && (
-                            <Button size="sm" variant="outline" asChild>
-                              <a href={service.providerPortalUrl} target="_blank" rel="noreferrer">
-                                <ExternalLinkIcon className="size-3" /> Provider portal
-                              </a>
-                            </Button>
-                          )}
-                        </div>
-                        {canUpdate && (
-                          <div className="mt-3 flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setConsumerService(service)}
-                            >
-                              <UnplugIcon className="size-3" /> Consumers
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => onReprovision(service.id)}
-                            >
-                              <RefreshCwIcon className="size-3" /> Reprovision
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-danger-fg"
-                              onClick={() => onDeprovision(service)}
-                            >
-                              <Trash2Icon className="size-3" /> Deprovision
-                            </Button>
-                          </div>
-                        )}
-                      </article>
-                    ))
-                  )}
+                <CardContent>
+                  <ProjectManagedResourceList controller={resourceTable} onOpen={onOpenResource} />
                 </CardContent>
               </Card>
             ),
@@ -839,124 +663,14 @@ export function ProjectResourcesScreen({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={consumerService !== null}
-        onOpenChange={(open) => {
-          if (!open) setConsumerService(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Resource consumers</DialogTitle>
-            <DialogDescription>
-              Attach {consumerService?.name} to multiple apps and agents inside this project.
-            </DialogDescription>
-          </DialogHeader>
-          {consumerService && (
-            <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">
-              <div className="space-y-2">
-                <Label>Attached</Label>
-                {consumerService.attachments.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No consumers attached.</p>
-                ) : (
-                  consumerService.attachments.map((attachment) => (
-                    <div
-                      key={attachment.id}
-                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                    >
-                      <span>
-                        {attachment.consumerSlug} · {attachment.environmentName}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-danger-fg"
-                        disabled={detachingConsumer}
-                        onClick={() => onDetachServiceConsumer(consumerService.id, attachment.id)}
-                      >
-                        <Trash2Icon className="size-3" /> Detach
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Available agents</Label>
-                {agents
-                  .filter(
-                    (agent) =>
-                      !consumerService.attachments.some(
-                        (row) => row.consumerKind === "agent" && row.consumerSlug === agent.slug
-                      )
-                  )
-                  .map((agent) => (
-                    <div
-                      key={agent.id}
-                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                    >
-                      <span>{agent.name}</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={attachingConsumer}
-                        onClick={() =>
-                          onAttachServiceConsumer(consumerService.id, {
-                            agentEnvironmentSpecSlug: agent.slug,
-                            appEnvironmentId: null,
-                          })
-                        }
-                      >
-                        Attach
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-              <div className="space-y-2">
-                <Label>Available app environments</Label>
-                {projectAppEnvironments
-                  .filter(
-                    (env) =>
-                      env.clusterSlug === consumerService.clusterSlug &&
-                      !consumerService.attachments.some(
-                        (row) =>
-                          row.consumerKind === "app" &&
-                          row.consumerSlug === env.registeredAppSlug &&
-                          row.environmentName === env.name
-                      )
-                  )
-                  .map((env) => (
-                    <div
-                      key={env.id}
-                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                    >
-                      <span>
-                        {env.registeredAppSlug} · {env.name}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={attachingConsumer}
-                        onClick={() =>
-                          onAttachServiceConsumer(consumerService.id, {
-                            agentEnvironmentSpecSlug: null,
-                            appEnvironmentId: env.id,
-                          })
-                        }
-                      >
-                        Attach
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConsumerService(null)}>
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ManagedResourceDetail
+        key={
+          resourceDetail.target
+            ? `${resourceDetail.target.id}:${resourceDetail.target.contextRevision}`
+            : "closed"
+        }
+        {...resourceDetail}
+      />
 
       <Dialog
         open={consumerBundle !== null}

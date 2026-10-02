@@ -1,3 +1,5 @@
+import { fakeController } from "@/components/data-table/fixtures";
+import { RESOURCE, RESOURCE_DETAIL } from "./resource-reads.fixtures";
 import type {
   AstroliftAgentListItem,
   AstroliftAgentLiveStatus,
@@ -531,7 +533,10 @@ export const RESOURCES: ProjectResourcesScreenProps = {
   canWriteSecrets: true,
   canReadSecrets: true,
   clusters: CLUSTERS,
-  services: SERVICES,
+  resourceTable: fakeController({ rows: [RESOURCE], totalCount: 251, hasNext: true }),
+  resourceDetail: { ...RESOURCE_DETAIL, target: null, current: null },
+  onOpenResource: noop,
+  refreshResources: noop,
   bundles: BUNDLES,
   resourcesLoading: false,
   agents: AGENTS.map(({ id, slug, name }) => ({ id, slug, name })),
@@ -544,23 +549,12 @@ export const RESOURCES: ProjectResourcesScreenProps = {
   catalogEntries: CATALOG,
   catalogLoading: false,
   catalogError: false,
-  costPreviews: COST_PREVIEWS,
-  costPreviewLoading: false,
-  onCostPreview: asyncNoop,
   revealed: { "bundle-1:JIRA_URL": "https://steadymd.atlassian.net" },
   onToggleReveal: asyncNoop,
-  consumerService: null,
-  setConsumerService: noop,
   consumerBundle: null,
   setConsumerBundle: noop,
   provisioning: false,
   onProvision: yes,
-  onReprovision: asyncNoop,
-  onDeprovision: asyncNoop,
-  attachingConsumer: false,
-  detachingConsumer: false,
-  onAttachServiceConsumer: asyncNoop,
-  onDetachServiceConsumer: asyncNoop,
   creatingBundle: false,
   onCreateBundle: yes,
   onSetBundleKey: yes,
@@ -576,8 +570,7 @@ export const RESOURCES: ProjectResourcesScreenProps = {
 
 export const RESOURCES_EMPTY: ProjectResourcesScreenProps = {
   ...RESOURCES,
-  services: [],
+  resourceTable: fakeController({ rows: [] }),
   bundles: [],
-  costPreviews: {},
   revealed: {},
 };

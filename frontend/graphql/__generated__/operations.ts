@@ -16247,6 +16247,7 @@ export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key
 
 export type PreviewManagedServiceCostQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
@@ -16277,7 +16278,7 @@ export type ListProjectResourcesQueryVariables = Exact<{
 }>;
 
 
-export type ListProjectResourcesQuery = { astroliftProjectResourceClusters: Array<{ id: string, slug: string, name: string, providerPluginSlug: string, region: string, isActive: boolean, lifecycle: string }>, astroliftProjectManagedServices: Array<{ id: string, name: string, kind: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, providerPortalUrl: string, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, attachments: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }>, astroliftProjectSecretBundles: Array<{ id: string, slug: string, name: string, backendRef: string, projectSlug?: string | null, clusterSlug?: string | null, keyCount: number, keyNames: Array<string>, lastKnownKeysAt?: string | null, createdAt: string, consumers: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }> };
+export type ListProjectResourcesQuery = { astroliftProjectResourceClusters: Array<{ id: string, slug: string, name: string, providerPluginSlug: string, region: string, isActive: boolean, lifecycle: string }>, astroliftProjectManagedServicesPage: { totalCount?: number | null }, astroliftProjectSecretBundles: Array<{ id: string, slug: string, name: string, backendRef: string, projectSlug?: string | null, clusterSlug?: string | null, keyCount: number, keyNames: Array<string>, lastKnownKeysAt?: string | null, createdAt: string, consumers: Array<{ id: string, consumerKind: string, consumerSlug: string, environmentName: string }> }> };
 
 export type ListProjectManagedServiceCatalogQueryVariables = Exact<{
   projectId: Scalars['GUID']['input'];

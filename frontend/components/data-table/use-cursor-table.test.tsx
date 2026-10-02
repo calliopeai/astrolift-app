@@ -322,3 +322,22 @@ describe("useCursorTable", () => {
     expect(result.current.rows).toEqual([]);
   });
 });
+
+it("discards the server cursor chain after an explicit mutation/refresh reset", () => {
+  apollo.respond = pagedSource(251, 25);
+  const { result, rerender } = renderHook(
+    ({ resetKey }) => useCursorTable<Row>({ query: QUERY, extract, resetKey }),
+    { initialProps: { resetKey: 0 } }
+  );
+  act(() => result.current.next());
+  expect(lastCall().after).toBe("25");
+  apollo.error = { message: "STALE_CURSOR" };
+  rerender({ resetKey: 0 });
+  expect(result.current.state).toBe("error");
+  apollo.error = undefined;
+  rerender({ resetKey: 1 });
+  expect(lastCall().after).toBeUndefined();
+  expect(lastCall().resetKey).toBeUndefined();
+  expect(result.current.pageIndex).toBe(0);
+  expect(result.current.hasPrev).toBe(false);
+});

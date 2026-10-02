@@ -515,10 +515,10 @@ class ManagedResourceReadsQuery:
         after: str | None = None,
     ) -> PageType[ManagedServiceAttachmentContext] | None:
         row = context_row(managed_service_id, project_id=project_id)
-        return (
-            _attachments(row, expected_context_revision=expected_context_revision, limit=limit, after=after)
-            if row
-            else None
+        if row is None:
+            raise GraphQLError("Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"})
+        return _attachments(
+            row, expected_context_revision=expected_context_revision, limit=limit, after=after
         )
 
     @strawberry.field
@@ -537,8 +537,8 @@ class ManagedResourceReadsQuery:
         after: str | None = None,
     ) -> PageType[ManagedServiceAttachmentContext] | None:
         row = context_row(managed_service_id)
-        return (
-            _attachments(row, expected_context_revision=expected_context_revision, limit=limit, after=after)
-            if row
-            else None
+        if row is None:
+            raise GraphQLError("Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"})
+        return _attachments(
+            row, expected_context_revision=expected_context_revision, limit=limit, after=after
         )
