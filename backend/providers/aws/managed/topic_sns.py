@@ -34,6 +34,7 @@ from aws.managed._base import (
     parse_handle,
     tags_for,
 )
+from aws.managed._sns_children import assert_listed_subscription_parent, assert_subscription_parent
 from aws.session import aws_client
 
 KIND = "topic"
@@ -113,8 +114,9 @@ class SNSTopicDriver(ManagedServiceDriver):
                     raise ManagedServiceError("SNS creation response does not match the exact topic target") from None
                 self._topic(topic_arn)
             self._assert_owner(topic_arn, spec.managed_service_id)
+            subscriptions = self._subscriptions(topic_arn) if "subscriptions" in cfg else []
             self._reconcile_topic(topic_arn, cfg)
-            pending = self._reconcile_subscriptions(topic_arn, cfg)
+            pending = self._reconcile_subscriptions(topic_arn, cfg, existing=subscriptions)
         except Exception as exc:
             return ProvisionResult(False, "", f"provision SNS topic: {exc}", [str(exc)])
         message = f"SNS {'FIFO' if self.FIFO else 'standard'} topic {topic_name} available"
@@ -143,8 +145,9 @@ class SNSTopicDriver(ManagedServiceDriver):
                     "SNS FIFO high-throughput scope cannot be reverted from MessageGroup to Topic",
                     ["irreversible_fifo_throughput_scope"],
                 )
+            subscriptions = self._subscriptions(topic_arn) if "subscriptions" in cfg else []
             self._reconcile_topic(topic_arn, cfg)
-            pending = self._reconcile_subscriptions(topic_arn, cfg)
+            pending = self._reconcile_subscriptions(topic_arn, cfg, existing=subscriptions)
         except ManagedServiceError as exc:
             return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
@@ -423,11 +426,14 @@ class SNSTopicDriver(ManagedServiceDriver):
                 DataProtectionPolicy=document,
             )
 
-    def _reconcile_subscriptions(self, topic_arn: str, cfg: dict[str, Any]) -> int:
+    def _reconcile_subscriptions(
+        self, topic_arn: str, cfg: dict[str, Any], *, existing: list[dict[str, Any]] | None = None
+    ) -> int:
         if "subscriptions" not in cfg:
             return 0
         desired = list(cfg.get("subscriptions") or [])
-        existing = self._subscriptions(topic_arn)
+        if existing is None:
+            existing = self._subscriptions(topic_arn)
         by_identity = {(str(item.get("Protocol") or ""), str(item.get("Endpoint") or "")): item for item in existing}
         wanted: set[tuple[str, str]] = set()
         pending = 0
@@ -448,6 +454,8 @@ class SNSTopicDriver(ManagedServiceDriver):
                     ReturnSubscriptionArn=True,
                 )
                 subscription_arn = str(response.get("SubscriptionArn") or "")
+                if subscription_arn:
+                    assert_subscription_parent(subscription_arn, topic_arn)
             if not subscription_arn or _pending_subscription(subscription_arn):
                 pending += 1
                 continue
@@ -472,7 +480,9 @@ class SNSTopicDriver(ManagedServiceDriver):
             if token:
                 request["NextToken"] = token
             response = self._sns.list_subscriptions_by_topic(**request)
-            rows.extend(response.get("Subscriptions") or [])
+            for item in response.get("Subscriptions") or []:
+                assert_listed_subscription_parent(item, topic_arn)
+                rows.append(item)
             token = str(response.get("NextToken") or "")
             if not token:
                 return rows
