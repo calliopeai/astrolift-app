@@ -21,6 +21,7 @@ import json
 import uuid
 
 import pytest
+from asgiref.sync import sync_to_async
 from django.test import RequestFactory
 
 from astrolift_identity.models import Organization
@@ -65,6 +66,16 @@ def _make_pr_payload(clone_url: str, branch: str = "feature/foo") -> dict:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def unavailable_engine(settings):
+    """These receiver tests exercise durable reservation during an outage.
+
+    CI runs a real Temporal server, so absence of a developer's local server
+    cannot define the expected HTTP response. Live dispatch is tested below.
+    """
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
 
 
 @pytest.fixture
@@ -325,3 +336,60 @@ def test_gitlab_missing_token_returns_403(factory, gitlab_org, pipeline, push_tr
     response = pipeline_gitlab_webhook(request, gitlab_org.slug)
     assert response.status_code == 403
     assert PipelineRun.objects.count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("event", ["github_push", "github_pull_request", "gitlab_push"])
+async def test_available_engine_accepts_and_recovers_exact_delivery(
+    factory, gitlab_org, pipeline, temporal_env, monkeypatch, event
+):
+    """A live engine returns 200; retrying the delivery joins the same start."""
+    from astrolift_workflows import client
+
+    async def connect():
+        return temporal_env.client
+
+    monkeypatch.setattr(client, "_get_client_async", connect)
+    monkeypatch.setattr(client, "_temporal_enabled", lambda: True)
+
+    if event == "gitlab_push":
+        pipeline.repo_url = "https://gitlab.com/acme/myapp"
+        await sync_to_async(pipeline.save)(update_fields=["repo_url"])
+        request = factory.post(
+            f"/webhooks/pipelines/gitlab/{gitlab_org.slug}/",
+            data=json.dumps(_gitlab_push_payload()).encode(),
+            content_type="application/json",
+            HTTP_X_GITLAB_EVENT="Push Hook",
+            HTTP_X_GITLAB_TOKEN="gitlab-secret-123",
+        )
+        receiver = pipeline_gitlab_webhook
+        kind = "push"
+    else:
+        kind = "pull_request" if event == "github_pull_request" else "push"
+        payload = (
+            _make_pr_payload(pipeline.repo_url)
+            if kind == "pull_request"
+            else _make_push_payload(pipeline.repo_url)
+        )
+        request = _post(factory, gitlab_org.slug, payload, event=kind)
+        receiver = pipeline_github_webhook
+    await sync_to_async(Trigger.objects.create)(pipeline=pipeline, kind=kind, config={})
+
+    response = await sync_to_async(receiver)(request, gitlab_org.slug)
+    assert response.status_code == 200
+    run = await sync_to_async(PipelineRun.objects.get)(pipeline=pipeline)
+    assert run.dispatch_status == "submitted"
+    assert run.temporal_run_id
+    handle = temporal_env.client.get_workflow_handle(run.temporal_workflow_id, run_id=run.temporal_run_id)
+    try:
+        description = await handle.describe()
+        assert description.workflow_type == "PipelineRunWorkflow"
+        assert description.run_id == run.temporal_run_id
+        repeated = await sync_to_async(receiver)(request, gitlab_org.slug)
+        assert repeated.status_code == 200
+        assert await sync_to_async(PipelineRun.objects.filter(pipeline=pipeline).count)() == 1
+        recovered = await sync_to_async(PipelineRun.objects.get)(pipeline=pipeline)
+        assert recovered.temporal_workflow_id == run.temporal_workflow_id
+        assert recovered.temporal_run_id == run.temporal_run_id
+    finally:
+        await handle.terminate(reason="disposable webhook acceptance cleanup")

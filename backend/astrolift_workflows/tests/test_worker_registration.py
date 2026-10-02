@@ -152,12 +152,40 @@ def test_the_pipeline_workflow_specifically_is_registered():
 
 
 def test_the_name_a_caller_starts_matches_the_definition():
-    """`webhook_views` starts the workflow by the string
-    "PipelineRunWorkflow". If the decorator's `name=` ever diverges from
-    that literal, registration stops helping."""
-    src = pathlib.Path("astrolift_workflows/workflows/pipeline_run.py").read_text()
+    """The webhook delegates to the durable service, whose engine name must
+    match the actual registered Temporal definition for starts and recovery."""
+    from astrolift_workflows.workflows.pipeline_run import PipelineRunWorkflow
 
-    assert '@workflow.defn(name="PipelineRunWorkflow")' in src
+    definition_name = getattr(PipelineRunWorkflow, "__temporal_workflow_definition").name
+    assert PipelineRunWorkflow in WORKFLOWS
 
-    caller = pathlib.Path("astrolift_pipelines/webhook_views.py").read_text()
-    assert '"PipelineRunWorkflow"' in caller
+    def function(path, name):
+        module = ast.parse(pathlib.Path(path).read_text())
+        return next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == name)
+
+    webhook = function("astrolift_pipelines/webhook_views.py", "_dispatch_pipeline_run")
+    assert any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "astrolift_pipelines.run_contracts"
+        and any(alias.name == "dispatch_pipeline_run" for alias in node.names)
+        for node in ast.walk(webhook)
+    )
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "dispatch_pipeline_run"
+        for node in ast.walk(webhook)
+    )
+
+    dispatch = function("astrolift_pipelines/run_contracts.py", "dispatch_pipeline_run")
+    calls = {
+        node.func.id: node
+        for node in ast.walk(dispatch)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in {"start_workflow_once", "recover_workflow_once"}
+    }
+    assert set(calls) == {"start_workflow_once", "recover_workflow_once"}
+    for call in calls.values():
+        assert isinstance(call.args[0], ast.Constant)
+        assert call.args[0].value == definition_name
