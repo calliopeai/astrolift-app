@@ -30,7 +30,11 @@ export function ServiceDetailSheet({
       onRetry={detail.retry}
       metrics={
         detail.current ? (
-          <ManagedServiceMetrics key={detail.scopeKey} managedServiceId={detail.current.id} />
+          <ManagedServiceMetrics
+            key={detail.scopeKey}
+            managedServiceId={detail.current.id}
+            expectedContextRevision={detail.current.contextRevision}
+          />
         ) : null
       }
     />

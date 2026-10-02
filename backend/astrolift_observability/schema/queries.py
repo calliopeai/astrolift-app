@@ -875,6 +875,7 @@ class GoldenSignalsQuery:
         info: Info,
         managed_service_id: strawberry.ID,
         range_seconds: int | None = None,
+        expected_context_revision: str | None = None,
     ) -> ManagedServiceMetrics | None:
         """Time-series metrics for one managed-service row (#645 + #646).
 
@@ -888,18 +889,46 @@ class GoldenSignalsQuery:
         same shape as the golden-signals empty state.
         """
         seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
-        tenant = get_current_tenant()
-        svc = (
-            ManagedService.objects.select_related("registered_app", "app_environment")
-            .filter(
-                guid=str(managed_service_id),
-                registered_app__organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
+        if expected_context_revision is not None:
+            from graphql import GraphQLError
+
+            from astrolift_identity import abac
+            from astrolift_services.schema.resource_reads import (
+                check_context_revision,
+                context_row,
+                resource_scope,
             )
-            .first()
-        )
-        if svc is None:
-            return None
+            from core.permissions import check_permission
+
+            svc = context_row(managed_service_id)
+            if svc is None or not svc.registered_app_id or not svc.app_environment_id:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            check_context_revision(svc, expected_context_revision)
+            cluster = svc.effective_cluster
+            if cluster is None:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            with abac.operation_attributes(
+                environment=svc.effective_environment_name, region=cluster.region or None, approvals=0
+            ):
+                check_permission(Permission.APP_READ, scope=resource_scope("id")({"id": managed_service_id}))
+
+        else:
+            tenant = get_current_tenant()
+            svc = (
+                ManagedService.objects.select_related("registered_app", "app_environment")
+                .filter(
+                    guid=str(managed_service_id),
+                    registered_app__organization_id=tenant.organization_id,
+                    deleted_at__isnull=True,
+                )
+                .first()
+            )
+            if svc is None:
+                return None
 
         kind = svc.kind
         if kind == ManagedService.Kind.POSTGRES:
@@ -914,11 +943,24 @@ class GoldenSignalsQuery:
         else:
             return None
 
-        endpoint = prom_client.resolve_prometheus_endpoint(
-            app=svc.registered_app,
-            environment_name=svc.app_environment.name,
-        )
-        if endpoint is None:
+        if expected_context_revision is None:
+            endpoint = prom_client.resolve_prometheus_endpoint(
+                app=svc.registered_app, environment_name=svc.app_environment.name
+            )
+        else:
+            # Capture the reviewed cluster directly. Environment-name resolution
+            # could otherwise follow a moved or replacement environment.
+            config = cluster.provider_config or {}
+            capabilities = cluster.capabilities or {}
+            endpoint = config.get("prometheus_endpoint") or capabilities.get("prometheus_endpoint")
+            endpoint = endpoint.strip() if isinstance(endpoint, str) else None
+            current = context_row(managed_service_id)
+            if current is None:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            check_context_revision(current, expected_context_revision)
+        if not endpoint:
             # Same envelope shape as the populated case, with an empty
             # series list — the FE renders the "metrics not yet
             # flowing" callout inside the panel.
@@ -969,6 +1011,14 @@ class GoldenSignalsQuery:
                     source=source,
                 )
             )
+
+        if expected_context_revision is not None:
+            latest = context_row(managed_service_id)
+            if latest is None:
+                raise GraphQLError(
+                    "Managed resource is unavailable", extensions={"code": "TARGET_UNAVAILABLE"}
+                )
+            check_context_revision(latest, expected_context_revision)
 
         return ManagedServiceMetrics(
             managed_service_id=managed_service_id,

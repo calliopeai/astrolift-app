@@ -99,10 +99,11 @@ export const GET_APP_STATUS_CODE_BREAKDOWN = gql`
  * list and render one panel per supported binding.
  */
 export const GET_MANAGED_SERVICE_METRICS = gql`
-  query GetManagedServiceMetrics($managedServiceId: ID!, $rangeSeconds: Int) {
+  query GetManagedServiceMetrics($managedServiceId: ID!, $rangeSeconds: Int, $expectedContextRevision: String) {
     astroliftAppManagedServiceMetrics(
       managedServiceId: $managedServiceId
       rangeSeconds: $rangeSeconds
+      expectedContextRevision: $expectedContextRevision
     ) {
       managedServiceId
       kind

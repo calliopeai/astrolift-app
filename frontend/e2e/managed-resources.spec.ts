@@ -57,3 +57,14 @@ test("long exact identifiers remain within the 768px sheet", async ({ page }) =>
     )
   ).toBeLessThanOrEqual(1);
 });
+
+test("refused metrics context shows unavailable without old samples or zero charts", async ({
+  page,
+}) => {
+  await page.goto(
+    "/iframe.html?id=patterns-observability-managedservicemetricspanel--refused-context&viewMode=story"
+  );
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.locator(".recharts-wrapper")).toHaveCount(0);
+  await expect(page.getByRole("button")).toHaveCount(0);
+});

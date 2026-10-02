@@ -8807,7 +8807,7 @@ type Query {
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
-  astroliftAppManagedServiceMetrics(managedServiceId: ID!, rangeSeconds: Int = null): AstroliftManagedServiceMetrics
+  astroliftAppManagedServiceMetrics(managedServiceId: ID!, rangeSeconds: Int = null, expectedContextRevision: String = null): AstroliftManagedServiceMetrics
   astroliftPodResourceUsage(appSlug: String!, podName: String!, environmentName: String = null, rangeSeconds: Int = null): AstroliftPodResourceUsage
   astroliftAppMetricNames(appSlug: String!, environmentName: String = null, lookbackSeconds: Int! = 3600, limit: Int! = 200): AstroliftAppMetricNames!
   astroliftExecutePromql(appSlug: String!, query: String!, startUnix: Int!, endUnix: Int!, stepSeconds: Int!, environmentName: String = null): AstroliftExecutePromqlResult!

@@ -10782,6 +10782,7 @@ export type QueryAstroliftAppLogsArgs = {
 
 
 export type QueryAstroliftAppManagedServiceMetricsArgs = {
+  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['ID']['input'];
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
 };

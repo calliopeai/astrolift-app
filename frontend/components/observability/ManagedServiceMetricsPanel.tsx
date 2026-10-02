@@ -18,6 +18,7 @@
 
 import { BrainCircuitIcon, ChartSplineIcon, DatabaseIcon, HardDriveIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import {
   CartesianGrid,
   Line,
@@ -141,7 +142,15 @@ export function ManagedServiceMetricsPanel({
   onRangeChange: setRange,
   data,
   loading: isLoading,
+  error,
 }: ManagedServiceMetricsPanelProps) {
+  const copy = useTranslations("metrics");
+  if (error)
+    return (
+      <p role="alert" className="text-muted-foreground text-sm">
+        {copy("metricsUnavailable")}
+      </p>
+    );
   // Resolver returned null → unsupported kind. Skip render entirely
   // rather than blank out the page; the caller usually iterates an
   // app's full ManagedService list and renders only the ones we
