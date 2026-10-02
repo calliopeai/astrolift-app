@@ -1,6 +1,7 @@
 "use client";
 
 import { ActivityIcon, CpuIcon, HistoryIcon, Loader2Icon, PlayIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 
@@ -231,6 +232,7 @@ function OverseerInput({
   onSendInput: AgentOverviewProps["onSendInput"];
   sending: boolean;
 }) {
+  const t = useTranslations("agentFrame.input");
   const [message, setMessage] = React.useState("");
   const [sent, setSent] = React.useState<string[]>([]);
 
@@ -246,7 +248,7 @@ function OverseerInput({
 
   return (
     <form onSubmit={submit} className="flex min-w-0 flex-col gap-2 border-t pt-4">
-      <p className="text-xs font-medium">Message the running agent</p>
+      <p className="text-xs font-medium">{t("title")}</p>
       {sent.length > 0 && (
         <ul className="flex max-h-24 min-w-0 flex-col gap-1 overflow-y-auto">
           {sent.map((entry, index) => (
@@ -263,18 +265,16 @@ function OverseerInput({
         <Textarea
           value={message}
           onChange={(event) => setMessage(event.target.value)}
-          placeholder="Send a follow-up to the running agent…"
+          placeholder={t("placeholder")}
           disabled={sending}
           rows={2}
-          aria-label="Overseer message"
+          aria-label={t("ariaLabel")}
         />
         <Button type="submit" size="sm" disabled={!message.trim() || sending}>
-          {sending ? <Loader2Icon className="size-4 animate-spin" /> : "Send"}
+          {sending ? <Loader2Icon className="size-4 animate-spin" /> : t("send")}
         </Button>
       </div>
-      <p className="text-muted-foreground text-xs">
-        Queued and delivered at the agent&rsquo;s next turn boundary.
-      </p>
+      <p className="text-muted-foreground text-xs">{t("hint")}</p>
     </form>
   );
 }

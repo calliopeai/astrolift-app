@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
@@ -133,5 +137,33 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <AgentFrame {...args} />
     </div>
+  ),
+};
+
+export const FrenchRunRefused: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <AgentFrame {...FRAME} model={fr.agentFrame.managedModel} onRun={async () => false}>
+        <div>LITERAL_CONTENT</div>
+      </AgentFrame>
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseFailure: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <AgentFrame {...FAILING_FRAME} model={ja.agentFrame.managedModel}>
+        <div>LITERAL_CONTENT</div>
+      </AgentFrame>
+    </NextIntlClientProvider>
+  ),
+};
+export const FrenchLoadError: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <AgentFrame {...FRAME} agent={null} error="RAW_SERVER_DIAGNOSTIC">
+        <div>LITERAL_CONTENT</div>
+      </AgentFrame>
+    </NextIntlClientProvider>
   ),
 };

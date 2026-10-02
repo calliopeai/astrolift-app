@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
@@ -141,5 +144,18 @@ export const At768: Story = {
     <div style={{ width: 768 }}>
       <AgentOverviewView {...args} />
     </div>
+  ),
+};
+
+export const JapaneseInputRefused: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <AgentOverviewView
+        {...OVERVIEW}
+        fleet={null}
+        runs={{ ...OVERVIEW.runs, rows: RUNNING_TASKS }}
+        onSendInput={async () => false}
+      />
+    </NextIntlClientProvider>
   ),
 };
