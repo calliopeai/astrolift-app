@@ -3662,7 +3662,26 @@
         "memory": "메모리(합계)",
         "pods": "파드",
         "dailyCost": "예상 일일 비용",
-        "approximate": "근사치"
+        "approximate": "근사치",
+        "environment": "환경",
+        "loadResources": "리소스 및 비용 불러오기",
+        "resourcesUnavailable": "현재 리소스 사용량과 예상 비용을 확인할 수 없습니다.",
+        "resourcesNotRequested": "필요할 때 현재 리소스 사용량과 예상 비용을 불러오세요.",
+        "previewLogs": "미리보기 로그",
+        "loadLogs": "로그 불러오기",
+        "logsEmpty": "이 시간 범위에 로그가 없습니다.",
+        "logsUnavailable": "이 환경의 과거 로그를 확인할 수 없습니다.",
+        "logsNotRequested": "이 환경의 최근 30분 로그를 최대 200줄 불러옵니다.",
+        "previewDeployments": "미리보기 배포",
+        "loadDeployments": "배포 불러오기",
+        "deploymentsEmpty": "이 환경에 배포가 없습니다.",
+        "deploymentsNotRequested": "이 미리보기 환경의 최신 배포를 불러오세요.",
+        "deploymentsBounded": "최신 배포 {count}개를 표시합니다.",
+        "binding": {
+          "available": "사용 가능",
+          "retired": "종료됨",
+          "unavailable": "환경을 사용할 수 없음"
+        }
       }
     }
   },

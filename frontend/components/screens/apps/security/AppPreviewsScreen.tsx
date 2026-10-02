@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
+import { previewHasAvailableBinding } from "@/components/screens/previews/preview-binding";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyBadge } from "@/components/CopyBadge";
 import { type Column } from "@/components/data-table";
@@ -283,7 +284,7 @@ export function AppPreviewsScreen({
       header: t("columns.hostname"),
       cellClassName: "relative z-10 max-w-72",
       cell: (p) =>
-        p.status === "running" ? (
+        p.status === "running" && previewHasAvailableBinding(p) ? (
           <CopyBadge
             value={p.hostname}
             openHref={`https://${p.hostname}`}
@@ -559,11 +560,15 @@ function SpendSummary({ spend }: { spend: AppPreviewsScreenProps["spend"] }) {
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
       <span>
         <span className="text-muted-foreground">{t("spend.daily")} </span>
-        <span className="font-mono">{fmt.formatCurrency(spend.dailyTotal)}</span>
+        <span className="font-mono">
+          {spend.priced > 0 ? fmt.formatCurrency(spend.dailyTotal) : "—"}
+        </span>
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="text-muted-foreground">{t("spend.monthly")} </span>
-        <span className="font-mono">{fmt.formatCurrency(spend.monthlyProjection)}</span>
+        <span className="font-mono">
+          {spend.priced > 0 ? fmt.formatCurrency(spend.monthlyProjection) : "—"}
+        </span>
         {spend.approximate > 0 && (
           <Badge variant="outline" className="text-2xs gap-1 uppercase">
             <AlertTriangleIcon className="size-3" />

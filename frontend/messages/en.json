@@ -3070,7 +3070,26 @@
         "memory": "Memory (aggregate)",
         "pods": "Pods",
         "dailyCost": "Est. daily cost",
-        "approximate": "approximate"
+        "approximate": "approximate",
+        "environment": "Environment",
+        "loadResources": "Load resources and cost",
+        "resourcesUnavailable": "Current resource use and estimated cost are unavailable.",
+        "resourcesNotRequested": "Load current resource use and estimated cost when needed.",
+        "previewLogs": "Preview logs",
+        "loadLogs": "Load logs",
+        "logsEmpty": "No log lines in this time window.",
+        "logsUnavailable": "Historical logs are unavailable for this environment.",
+        "logsNotRequested": "Load up to 200 log lines from the last 30 minutes for this environment.",
+        "previewDeployments": "Preview deployments",
+        "loadDeployments": "Load deployments",
+        "deploymentsEmpty": "No deployments for this environment.",
+        "deploymentsNotRequested": "Load the latest deployments for this preview environment.",
+        "deploymentsBounded": "Showing the latest {count} deployments.",
+        "binding": {
+          "available": "Available",
+          "retired": "Retired",
+          "unavailable": "Environment unavailable"
+        }
       }
     },
     "approval": {

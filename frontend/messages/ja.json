@@ -3662,7 +3662,26 @@
         "memory": "メモリ（合計）",
         "pods": "Pod 数",
         "dailyCost": "推定日額コスト",
-        "approximate": "概算"
+        "approximate": "概算",
+        "environment": "環境",
+        "loadResources": "リソースと費用を読み込む",
+        "resourcesUnavailable": "現在のリソース使用量と推定費用を取得できません。",
+        "resourcesNotRequested": "必要に応じて現在のリソース使用量と推定費用を読み込めます。",
+        "previewLogs": "プレビューのログ",
+        "loadLogs": "ログを読み込む",
+        "logsEmpty": "この期間のログはありません。",
+        "logsUnavailable": "この環境の過去のログを取得できません。",
+        "logsNotRequested": "この環境の直近30分のログを最大200行読み込みます。",
+        "previewDeployments": "プレビューのデプロイ",
+        "loadDeployments": "デプロイを読み込む",
+        "deploymentsEmpty": "この環境のデプロイはありません。",
+        "deploymentsNotRequested": "このプレビュー環境の最新のデプロイを読み込みます。",
+        "deploymentsBounded": "最新の{count}件のデプロイを表示しています。",
+        "binding": {
+          "available": "利用可能",
+          "retired": "終了済み",
+          "unavailable": "環境を利用できません"
+        }
       }
     }
   },

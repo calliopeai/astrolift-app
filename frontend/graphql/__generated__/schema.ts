@@ -3893,10 +3893,40 @@ export type AstroliftPreviewAggregateResources = {
   podCount: Scalars['Int']['output'];
 };
 
+export type AstroliftPreviewDeployment = {
+  appId: Scalars['GUID']['output'];
+  commitSha: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentId: Scalars['GUID']['output'];
+  id: Scalars['GUID']['output'];
+  imageTag: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+  triggerKind: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftPreviewDeploymentPage = {
+  items: Array<AstroliftPreviewDeployment>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftPreviewEnvironment = {
   aggregateResources: AstroliftPreviewAggregateResources;
   branch: Scalars['String']['output'];
   commitSha: Scalars['String']['output'];
+  environment?: Maybe<AstroliftPreviewEnvironmentTarget>;
+  /** available, retired or unavailable; retired targets cannot route logs. */
+  environmentStatus: Scalars['String']['output'];
   estimatedCostApproximate: Scalars['Boolean']['output'];
   estimatedCostNotes: Array<Scalars['String']['output']>;
   estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
@@ -3917,10 +3947,14 @@ export type AstroliftPreviewEnvironment = {
   prNumber: Scalars['Int']['output'];
   prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
+  /** not_requested, available or unavailable; basic reads do not query pods or pricing. */
+  runtimeStatus: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
   status: Scalars['String']['output'];
   tornDownAt?: Maybe<Scalars['DateTime']['output']>;
   ttlUntil: Scalars['DateTime']['output'];
+  /** Version of this exact preview binding. */
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftPreviewEnvironmentCounts = {
@@ -3948,6 +3982,20 @@ export type AstroliftPreviewEnvironmentPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftPreviewEnvironmentTarget = {
+  appId: Scalars['GUID']['output'];
+  appSlug: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  namespace: Scalars['String']['output'];
+  previewId: Scalars['GUID']['output'];
+  previewVersion: Scalars['Int']['output'];
 };
 
 /** The previews list's declared filters. Unset fields do not filter; list values match any. */
@@ -9860,8 +9908,10 @@ export type Query = {
   astroliftPolicy?: Maybe<AstroliftPolicy>;
   astroliftPolicyConditionCatalog: AstroliftPolicyConditionCatalog;
   astroliftPolicySimulation: AstroliftPolicySimulation;
+  astroliftPreviewDeploymentsPage: AstroliftPreviewDeploymentPage;
+  astroliftPreviewEnvironment?: Maybe<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentCounts: AstroliftPreviewEnvironmentCounts;
-  /** @deprecated Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage. */
+  /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPreviewEnvironmentsPage for browsing and astroliftPreviewEnvironment for exact detail. */
   astroliftPreviewEnvironments: Array<AstroliftPreviewEnvironment>;
   astroliftPreviewEnvironmentsPage: AstroliftPreviewEnvironmentPage;
   astroliftPrincipalSearch: AstroliftPrincipalPage;
@@ -10432,8 +10482,12 @@ export type QueryAstroliftAppLogsArgs = {
   appSlug: Scalars['String']['input'];
   cursor?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
+  expectedEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
+  ifMatchEnvironmentVersion?: InputMaybe<Scalars['Int']['input']>;
+  ifMatchPreviewVersion?: InputMaybe<Scalars['Int']['input']>;
   level?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  previewId?: InputMaybe<Scalars['GUID']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   since: Scalars['DateTime']['input'];
   until: Scalars['DateTime']['input'];
@@ -11183,6 +11237,22 @@ export type QueryAstroliftPolicySimulationArgs = {
   days?: InputMaybe<Scalars['Int']['input']>;
   draft: AstroliftPolicyDraftInput;
   limit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryAstroliftPreviewDeploymentsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  expectedEnvironmentId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  ifMatchPreviewVersion: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftPreviewEnvironmentArgs = {
+  id: Scalars['GUID']['input'];
+  includeRuntimeCost?: Scalars['Boolean']['input'];
 };
 
 

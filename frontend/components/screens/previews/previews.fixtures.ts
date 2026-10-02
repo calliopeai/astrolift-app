@@ -37,6 +37,18 @@ export function previewDetailProps(
     loading: false,
     error: null,
     onRetry: noop,
+    runtimeLoading: false,
+    onLoadRuntime: noop,
+    logs: null,
+    logsError: null,
+    logsLoading: false,
+    logsRequested: false,
+    onLoadLogs: noop,
+    deployments: null,
+    deploymentsError: null,
+    deploymentsLoading: false,
+    deploymentsRequested: false,
+    onLoadDeployments: noop,
     ...extra,
   };
 }

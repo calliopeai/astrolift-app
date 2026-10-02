@@ -3662,7 +3662,26 @@
         "memory": "Arbeitsspeicher (gesamt)",
         "pods": "Pods",
         "dailyCost": "Geschätzte Tageskosten",
-        "approximate": "ungefähr"
+        "approximate": "ungefähr",
+        "environment": "Umgebung",
+        "loadResources": "Ressourcen und Kosten laden",
+        "resourcesUnavailable": "Aktuelle Ressourcennutzung und geschätzte Kosten sind nicht verfügbar.",
+        "resourcesNotRequested": "Aktuelle Ressourcennutzung und geschätzte Kosten bei Bedarf laden.",
+        "previewLogs": "Vorschauprotokolle",
+        "loadLogs": "Protokolle laden",
+        "logsEmpty": "Keine Protokollzeilen in diesem Zeitraum.",
+        "logsUnavailable": "Historische Protokolle sind für diese Umgebung nicht verfügbar.",
+        "logsNotRequested": "Bis zu 200 Protokollzeilen der letzten 30 Minuten für diese Umgebung laden.",
+        "previewDeployments": "Vorschaubereitstellungen",
+        "loadDeployments": "Bereitstellungen laden",
+        "deploymentsEmpty": "Keine Bereitstellungen für diese Umgebung.",
+        "deploymentsNotRequested": "Die neuesten Bereitstellungen für diese Vorschauumgebung laden.",
+        "deploymentsBounded": "Die neuesten {count} Bereitstellungen werden angezeigt.",
+        "binding": {
+          "available": "Verfügbar",
+          "retired": "Stillgelegt",
+          "unavailable": "Umgebung nicht verfügbar"
+        }
       }
     }
   },

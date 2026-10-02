@@ -745,6 +745,22 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
 const PREVIEW_ENVIRONMENT_FIELDS = gql`
   fragment PreviewEnvironmentFields on AstroliftPreviewEnvironment {
     id
+    version
+    environmentStatus
+    runtimeStatus
+    environment {
+      previewId
+      previewVersion
+      appId
+      appVersion
+      appSlug
+      environmentId
+      environmentVersion
+      environmentName
+      clusterId
+      clusterVersion
+      namespace
+    }
     registeredAppSlug
     prNumber
     branch
@@ -758,6 +774,14 @@ const PREVIEW_ENVIRONMENT_FIELDS = gql`
     sourceUrl
     prUrl
     isManual
+    isPinned
+    pinnedAt
+    pinnedByEmail
+    pinReason
+    openedByLogin
+    openedByUserId
+    openedByMe
+    failureReason
     aggregateResources {
       cpuCores
       memoryBytes
@@ -766,6 +790,86 @@ const PREVIEW_ENVIRONMENT_FIELDS = gql`
     estimatedDailyCostUsd
     estimatedCostNotes
     estimatedCostApproximate
+  }
+`;
+
+/** Exact identity lookup: basic reads never query runtime pods or pricing. */
+export const GET_PREVIEW_ENVIRONMENT = gql`
+  ${PREVIEW_ENVIRONMENT_FIELDS}
+  query GetPreviewEnvironment($id: GUID!, $includeRuntimeCost: Boolean! = false) {
+    astroliftPreviewEnvironment(id: $id, includeRuntimeCost: $includeRuntimeCost) {
+      ...PreviewEnvironmentFields
+    }
+  }
+`;
+
+export const GET_PREVIEW_LOGS = gql`
+  query GetPreviewLogs(
+    $appSlug: String!
+    $previewId: GUID!
+    $expectedEnvironmentId: GUID!
+    $ifMatchPreviewVersion: Int!
+    $ifMatchEnvironmentVersion: Int!
+    $since: DateTime!
+    $until: DateTime!
+    $limit: Int! = 200
+  ) {
+    astroliftAppLogs(
+      appSlug: $appSlug
+      previewId: $previewId
+      expectedEnvironmentId: $expectedEnvironmentId
+      ifMatchPreviewVersion: $ifMatchPreviewVersion
+      ifMatchEnvironmentVersion: $ifMatchEnvironmentVersion
+      since: $since
+      until: $until
+      limit: $limit
+    ) {
+      reason
+      historicalAvailable
+      items {
+        timestamp
+        message
+        level
+        podName
+        container
+      }
+    }
+  }
+`;
+
+export const GET_PREVIEW_DEPLOYMENTS_PAGE = gql`
+  query GetPreviewDeploymentsPage(
+    $id: GUID!
+    $expectedEnvironmentId: GUID!
+    $ifMatchPreviewVersion: Int!
+    $ifMatchEnvironmentVersion: Int!
+    $limit: Int! = 20
+    $after: String
+  ) {
+    astroliftPreviewDeploymentsPage(
+      id: $id
+      expectedEnvironmentId: $expectedEnvironmentId
+      ifMatchPreviewVersion: $ifMatchPreviewVersion
+      ifMatchEnvironmentVersion: $ifMatchEnvironmentVersion
+      limit: $limit
+      after: $after
+    ) {
+      nextCursor
+      totalCount
+      items {
+        id
+        version
+        appId
+        environmentId
+        status
+        triggerKind
+        commitSha
+        imageTag
+        createdAt
+        startedAt
+        endedAt
+      }
+    }
   }
 `;
 

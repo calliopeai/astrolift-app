@@ -3662,7 +3662,26 @@
         "memory": "Memória (total)",
         "pods": "Pods",
         "dailyCost": "Custo diário estimado",
-        "approximate": "aproximado"
+        "approximate": "aproximado",
+        "environment": "Ambiente",
+        "loadResources": "Carregar recursos e custo",
+        "resourcesUnavailable": "O uso atual de recursos e o custo estimado estão indisponíveis.",
+        "resourcesNotRequested": "Carregue o uso atual de recursos e o custo estimado quando precisar.",
+        "previewLogs": "Logs da prévia",
+        "loadLogs": "Carregar logs",
+        "logsEmpty": "Nenhuma linha de log neste intervalo.",
+        "logsUnavailable": "Os logs históricos estão indisponíveis para este ambiente.",
+        "logsNotRequested": "Carregue até 200 linhas dos últimos 30 minutos deste ambiente.",
+        "previewDeployments": "Implantações da prévia",
+        "loadDeployments": "Carregar implantações",
+        "deploymentsEmpty": "Nenhuma implantação para este ambiente.",
+        "deploymentsNotRequested": "Carregue as implantações mais recentes deste ambiente de prévia.",
+        "deploymentsBounded": "Exibindo as {count} implantações mais recentes.",
+        "binding": {
+          "available": "Disponível",
+          "retired": "Desativado",
+          "unavailable": "Ambiente indisponível"
+        }
       }
     }
   },

@@ -3662,7 +3662,26 @@
         "memory": "内存（总计）",
         "pods": "Pod 数",
         "dailyCost": "预估每日费用",
-        "approximate": "近似值"
+        "approximate": "近似值",
+        "environment": "环境",
+        "loadResources": "加载资源和费用",
+        "resourcesUnavailable": "当前资源用量和预估费用不可用。",
+        "resourcesNotRequested": "需要时可加载当前资源用量和预估费用。",
+        "previewLogs": "预览日志",
+        "loadLogs": "加载日志",
+        "logsEmpty": "此时间段内没有日志。",
+        "logsUnavailable": "此环境的历史日志不可用。",
+        "logsNotRequested": "加载此环境最近30分钟内最多200行日志。",
+        "previewDeployments": "预览部署",
+        "loadDeployments": "加载部署",
+        "deploymentsEmpty": "此环境没有部署。",
+        "deploymentsNotRequested": "加载此预览环境的最新部署。",
+        "deploymentsBounded": "正在显示最近的{count}次部署。",
+        "binding": {
+          "available": "可用",
+          "retired": "已停用",
+          "unavailable": "环境不可用"
+        }
       }
     }
   },

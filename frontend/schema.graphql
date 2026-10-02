@@ -4080,6 +4080,37 @@ type AstroliftPreviewAggregateResources {
   podCount: Int!
 }
 
+type AstroliftPreviewDeployment {
+  id: GUID!
+  version: Int!
+  appId: GUID!
+  environmentId: GUID!
+  status: String!
+  triggerKind: String!
+  commitSha: String!
+  imageTag: String!
+  createdAt: DateTime!
+  startedAt: DateTime
+  endedAt: DateTime
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftPreviewDeploymentPage {
+  items: [AstroliftPreviewDeployment!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type AstroliftPreviewEnvironment {
   id: GUID!
   registeredAppSlug: String!
@@ -4103,6 +4134,18 @@ type AstroliftPreviewEnvironment {
   estimatedDailyCostUsd: Float
   estimatedCostNotes: [String!]!
   estimatedCostApproximate: Boolean!
+
+  """Version of this exact preview binding."""
+  version: Int!
+
+  """available, retired or unavailable; retired targets cannot route logs."""
+  environmentStatus: String!
+  environment: AstroliftPreviewEnvironmentTarget
+
+  """
+  not_requested, available or unavailable; basic reads do not query pods or pricing.
+  """
+  runtimeStatus: String!
   openedByLogin: String!
   openedByUserId: String
   openedByMe: Boolean!
@@ -4142,6 +4185,20 @@ type AstroliftPreviewEnvironmentPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type AstroliftPreviewEnvironmentTarget {
+  previewId: GUID!
+  previewVersion: Int!
+  appId: GUID!
+  appVersion: Int!
+  appSlug: String!
+  environmentId: GUID!
+  environmentVersion: Int!
+  environmentName: String!
+  clusterId: GUID!
+  clusterVersion: Int!
+  namespace: String!
 }
 
 """
@@ -8374,7 +8431,9 @@ type Query {
   astroliftCommandRuns(appSlug: String = null, limit: Int! = 100): [AstroliftCommandRun!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftCommandRunsPage.")
   astroliftCommandRunsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null, filter: AstroliftCommandRunsFilter = null): AstroliftCommandRunPage!
   astroliftCommandRun(id: String!): AstroliftCommandRun
-  astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st, and prices every one of them on read. Use astroliftPreviewEnvironmentsPage.")
+  astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPreviewEnvironmentsPage for browsing and astroliftPreviewEnvironment for exact detail.")
+  astroliftPreviewEnvironment(id: GUID!, includeRuntimeCost: Boolean! = false): AstroliftPreviewEnvironment
+  astroliftPreviewDeploymentsPage(id: GUID!, expectedEnvironmentId: GUID!, ifMatchPreviewVersion: Int!, ifMatchEnvironmentVersion: Int!, limit: Int! = 50, after: String = null): AstroliftPreviewDeploymentPage!
   astroliftPreviewEnvironmentsPage(appSlug: String = null, search: String = null, statuses: [String!] = null, limit: Int! = 50, after: String = null, filter: AstroliftPreviewEnvironmentsFilter = null, sort: String = null): AstroliftPreviewEnvironmentPage!
   astroliftPreviewEnvironmentCounts(appSlug: String = null, search: String = null): AstroliftPreviewEnvironmentCounts!
   astroliftDeploymentMetrics(windowDays: Int! = 30): AstroliftDeploymentMetrics!
@@ -8486,7 +8545,7 @@ type Query {
   astroliftAppTraces(appSlug: String!, since: String!, until: String!, environmentName: String = null, service: String = null, operation: String = null, minDurationMs: Float = null, status: String = null, limit: Int = null): [AstroliftAppTrace!]!
   astroliftTraceSpans(appSlug: String!, traceId: String!, environmentName: String = null): [AstroliftTraceSpan!]!
   astroliftAppEndpointMetrics(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppEndpointMetric!]!
-  astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null): AstroliftAppLogPage!
+  astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogPage!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
