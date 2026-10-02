@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -57,9 +58,10 @@ const FIELDS: RegisterField[] = [
  * regions query.
  */
 export function useRegisterCluster() {
+  const t = useTranslations("clusters.registration");
   const plugins = useQuery<{
     astroliftProviderPlugins: AstroliftProviderPlugin[];
-  }>(LIST_PROVIDER_PLUGINS);
+  }>(LIST_PROVIDER_PLUGINS, { fetchPolicy: "cache-first" });
   const pluginList = plugins.data?.astroliftProviderPlugins ?? [];
 
   const [pluginSlug, setPluginSlug] = React.useState("");
@@ -98,7 +100,7 @@ export function useRegisterCluster() {
   async function onRegister(input: RegisterClusterInput): Promise<RegisterResult> {
     const { data } = await register({ variables: { input } });
     if (data?.registerTenantCluster.ok) {
-      toast.success(`Registered ${input.slug}`);
+      toast.success(t("registered", { slug: input.slug }));
       router.push(`/clusters/${data.registerTenantCluster.data?.slug ?? input.slug}`);
       return { ok: true };
     }
@@ -110,7 +112,7 @@ export function useRegisterCluster() {
       else rest.push(e.message);
     }
     const formError =
-      rest.join(" ") || (Object.keys(fieldErrors).length === 0 ? "Registration failed." : null);
+      rest.join(" ") || (Object.keys(fieldErrors).length === 0 ? t("failed") : null);
     return { ok: false, fieldErrors, formError };
   }
 

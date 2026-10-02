@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -26,7 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import { clusterCrumbs } from "./clusters-list";
+import { localizedClusterCrumbs } from "./clusters-list";
 import type {
   ProviderRegion,
   RegisterField,
@@ -57,39 +58,43 @@ const SLUG = /^[a-z0-9-]+$/;
 // providers/k8s_native/observability.py::build_api_client (and _config_for for
 // exec_plugin). Auto-seeded into the field so operators see the right shape
 // instead of pasting a structurally-valid-but-wrong blob (#902).
-const AUTH_CONFIG_EXAMPLES: Record<string, string> = {
-  kubeconfig: JSON.stringify({ kubeconfig: "<paste your full kubeconfig YAML here>" }, null, 2),
-  service_account_token: JSON.stringify(
-    {
-      token: "<serviceaccount bearer token>",
-      ca_cert: "<cluster CA — PEM or base64, optional if set on the row>",
-    },
-    null,
-    2
-  ),
-  exec_plugin: JSON.stringify(
-    { region: "<cloud region>", cluster_name: "<cloud cluster name>" },
-    null,
-    2
-  ),
-};
-
-function authConfigHint(authMethod: string): string {
+function authConfigExample(authMethod: string, t: ReturnType<typeof useTranslations>): string {
   switch (authMethod) {
     case "kubeconfig":
-      return "Keys: kubeconfig (full kubeconfig YAML, required); context (optional, to pick a non-default context). Use “Paste kubeconfig” below to escape a raw kubeconfig into JSON.";
+      return JSON.stringify({ kubeconfig: `<${t("exampleKubeconfig")}>` }, null, 2);
     case "service_account_token":
-      return "Keys: token (ServiceAccount bearer token, required); ca_cert (cluster CA, PEM or base64, optional). The API server URL goes in the “API endpoint” field above, not here.";
+      return JSON.stringify(
+        { token: `<${t("exampleToken")}>`, ca_cert: `<${t("exampleCa")}>` },
+        null,
+        2
+      );
     case "exec_plugin":
-      return "Cloud-managed clusters (EKS/GKE/AKS) mint tokens for you; the platform derives region + cluster_name from the provider binding. Only override here if they differ.";
+      return JSON.stringify(
+        { region: `<${t("exampleRegion")}>`, cluster_name: `<${t("exampleCluster")}>` },
+        null,
+        2
+      );
     default:
-      return "Driver-specific JSON, validated when you register.";
+      return "{}";
+  }
+}
+
+function authConfigHint(authMethod: string, t: ReturnType<typeof useTranslations>): string {
+  switch (authMethod) {
+    case "kubeconfig":
+      return t("hintKubeconfig");
+    case "service_account_token":
+      return t("hintServiceAccount");
+    case "exec_plugin":
+      return t("hintExecPlugin");
+    default:
+      return t("hintOther");
   }
 }
 
 const STEPS = [
-  { n: 1, label: "Cluster" },
-  { n: 2, label: "Connection" },
+  { n: 1, key: "cluster" },
+  { n: 2, key: "connection" },
 ] as const;
 
 /** Which step holds a field, so a refused register opens where its error is. */
@@ -161,6 +166,8 @@ export function RegisterClusterPage({
   initialStep = 1,
   initialErrors = {},
 }: RegisterClusterPageProps) {
+  const t = useTranslations("clusters.registration");
+  const chrome = useTranslations("clusters.chrome");
   const [step, setStep] = React.useState<1 | 2>(initialStep);
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
@@ -168,7 +175,9 @@ export function RegisterClusterPage({
   const [region, setRegion] = React.useState("");
   const [endpoint, setEndpoint] = React.useState("");
   const [authMethod, setAuthMethod] = React.useState("kubeconfig");
-  const [authConfigText, setAuthConfigText] = React.useState(AUTH_CONFIG_EXAMPLES.kubeconfig);
+  const [authConfigText, setAuthConfigText] = React.useState(() =>
+    authConfigExample("kubeconfig", t)
+  );
   // Once the operator edits the JSON we stop auto-swapping the example on
   // method change, so we never clobber real input.
   const [authConfigTouched, setAuthConfigTouched] = React.useState(false);
@@ -188,7 +197,7 @@ export function RegisterClusterPage({
   function handleAuthMethodChange(next: string) {
     setAuthMethod(next);
     clear("authMethod");
-    if (!authConfigTouched) setAuthConfigText(AUTH_CONFIG_EXAMPLES[next] ?? "{}");
+    if (!authConfigTouched) setAuthConfigText(authConfigExample(next, t));
   }
 
   // Wrap a raw kubeconfig (multi-line YAML) into the escaped JSON envelope —
@@ -205,11 +214,11 @@ export function RegisterClusterPage({
 
   function validateCluster(): Errors {
     const e: Errors = {};
-    if (!name.trim()) e.name = "Give the cluster a name.";
+    if (!name.trim()) e.name = t("nameRequired");
     const s = slug || slugify(name);
-    if (!s) e.slug = "A slug is required.";
-    else if (!SLUG.test(s)) e.slug = "Lowercase letters, digits and hyphens only.";
-    if (!pluginSlug) e.providerPluginSlug = "Pick a provider plugin.";
+    if (!s) e.slug = t("slugRequired");
+    else if (!SLUG.test(s)) e.slug = t("slugInvalid");
+    if (!pluginSlug) e.providerPluginSlug = t("pluginRequired");
     return e;
   }
 
@@ -230,14 +239,16 @@ export function RegisterClusterPage({
       return;
     }
     if (endpoint.trim() && !URL.canParse(endpoint.trim())) {
-      setErrors({ endpoint: "Enter a full URL, such as https://kube.example.com." });
+      setErrors({ endpoint: t("endpointInvalid") });
       return;
     }
     let authConfig: unknown = {};
     try {
       authConfig = JSON.parse(authConfigText.trim() || "{}");
-    } catch (err) {
-      setErrors({ authConfig: err instanceof Error ? err.message : "Invalid auth config JSON." });
+    } catch {
+      // A JavaScript parse error may echo credentials from the input. Keep local
+      // validation generic; server diagnostics are still displayed unchanged.
+      setErrors({ authConfig: t("authConfigInvalid") });
       return;
     }
     let result: RegisterResult;
@@ -253,7 +264,7 @@ export function RegisterClusterPage({
         authConfig,
       });
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Registration failed.");
+      setFormError(err instanceof Error ? err.message : t("failed"));
       return;
     }
     if (result.ok) return;
@@ -268,10 +279,10 @@ export function RegisterClusterPage({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <ShellHeader
-        crumbs={clusterCrumbs("Register cluster")}
-        title="Register cluster"
+        crumbs={localizedClusterCrumbs(chrome, t("title"))}
+        title={t("title")}
         context={
-          <ol aria-label="Steps" className="inline-flex flex-wrap items-center gap-2">
+          <ol aria-label={t("steps")} className="inline-flex flex-wrap items-center gap-2">
             {STEPS.map((s, i) => (
               <li
                 key={s.n}
@@ -286,18 +297,14 @@ export function RegisterClusterPage({
                     ·
                   </span>
                 )}
-                <span className="font-mono">{s.n}</span> {s.label}
+                <span className="font-mono">{s.n}</span> {t(s.key)}
               </li>
             ))}
           </ol>
         }
       />
 
-      <p className="text-muted-foreground max-w-2xl text-sm">
-        Bind a Kubernetes cluster to the platform. The control plane probes its capabilities on
-        register and stores the result on the row; schedules and apps consult it during deploy
-        planning.
-      </p>
+      <p className="text-muted-foreground max-w-2xl text-sm">{t("description")}</p>
 
       <form
         onSubmit={step === 1 ? next : submit}
@@ -315,9 +322,9 @@ export function RegisterClusterPage({
         )}
 
         {step === 1 ? (
-          <>
+          <React.Fragment key="cluster">
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <Field id="name" label="Display name" error={errors.name}>
+              <Field id="name" label={t("name")} error={errors.name}>
                 <Input
                   id="name"
                   value={name}
@@ -330,7 +337,7 @@ export function RegisterClusterPage({
                   {...invalid("name", errors.name)}
                 />
               </Field>
-              <Field id="slug" label="Slug" error={errors.slug}>
+              <Field id="slug" label={t("slug")} error={errors.slug}>
                 <Input
                   id="slug"
                   value={slug}
@@ -347,10 +354,8 @@ export function RegisterClusterPage({
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
               <Field
                 id="plugin"
-                label="Provider plugin"
-                error={
-                  errors.providerPluginSlug ?? (noPlugins ? "No plugins registered." : undefined)
-                }
+                label={t("plugin")}
+                error={errors.providerPluginSlug ?? (noPlugins ? t("noPlugins") : undefined)}
               >
                 <Select
                   value={pluginSlug}
@@ -365,7 +370,7 @@ export function RegisterClusterPage({
                     {...invalid("plugin", errors.providerPluginSlug)}
                   >
                     <SelectValue
-                      placeholder={noPlugins ? "No plugins registered" : "Select plugin"}
+                      placeholder={noPlugins ? t("noPluginsPlaceholder") : t("selectPlugin")}
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -390,10 +395,10 @@ export function RegisterClusterPage({
                 error={errors.region}
               />
             </div>
-          </>
+          </React.Fragment>
         ) : (
-          <>
-            <Field id="endpoint" label="API endpoint" error={errors.endpoint}>
+          <React.Fragment key="connection">
+            <Field id="endpoint" label={t("endpoint")} error={errors.endpoint}>
               <Input
                 id="endpoint"
                 value={endpoint}
@@ -408,7 +413,7 @@ export function RegisterClusterPage({
               />
             </Field>
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <Field id="auth-method" label="Auth method" error={errors.authMethod}>
+              <Field id="auth-method" label={t("authMethod")} error={errors.authMethod}>
                 <Select value={authMethod} onValueChange={handleAuthMethodChange}>
                   <SelectTrigger id="auth-method" className="w-full min-w-0 font-mono">
                     <SelectValue />
@@ -426,7 +431,7 @@ export function RegisterClusterPage({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field id="ingress" label="Ingress class" error={errors.ingressClass}>
+              <Field id="ingress" label={t("ingressClass")} error={errors.ingressClass}>
                 <Input
                   id="ingress"
                   value={ingressClass}
@@ -443,9 +448,9 @@ export function RegisterClusterPage({
                 example, so operators don't paste a valid-but-wrong shape. */}
             <Field
               id="auth-config"
-              label="Auth config (JSON)"
+              label={t("authConfig")}
               error={errors.authConfig}
-              help={authConfigHint(authMethod)}
+              help={authConfigHint(authMethod, t)}
             >
               <Textarea
                 id="auth-config"
@@ -466,7 +471,7 @@ export function RegisterClusterPage({
             {authMethod === "kubeconfig" && (
               <div className="border-border min-w-0 space-y-2 rounded-md border border-dashed p-3">
                 <Label htmlFor="raw-kubeconfig" className="text-xs">
-                  Paste kubeconfig
+                  {t("pasteKubeconfig")}
                 </Label>
                 <Textarea
                   id="raw-kubeconfig"
@@ -483,31 +488,31 @@ export function RegisterClusterPage({
                   disabled={!rawKubeconfig.trim()}
                   onClick={applyRawKubeconfig}
                 >
-                  Convert to auth config
+                  {t("convertAuthConfig")}
                 </Button>
               </div>
             )}
-          </>
+          </React.Fragment>
         )}
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" asChild className="mr-auto">
-            <Link href={cancelHref}>Cancel</Link>
+            <Link href={cancelHref}>{t("cancel")}</Link>
           </Button>
           {step === 2 && (
             <Button type="button" variant="outline" onClick={() => setStep(1)}>
               <ArrowLeftIcon className="size-4" />
-              Back
+              {t("back")}
             </Button>
           )}
           {step === 1 ? (
             <Button type="submit" disabled={noPlugins}>
-              Continue
+              {t("continue")}
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (
             <Button type="submit" disabled={registering || noPlugins}>
-              {registering ? "Registering…" : "Register cluster"}
+              {registering ? t("registering") : t("title")}
             </Button>
           )}
         </div>
@@ -542,17 +547,13 @@ function RegionPicker({
   loading: boolean;
   error?: string;
 }) {
+  const t = useTranslations("clusters.registration");
   if (pluginSlug === "k8s_native") return null;
 
   const selected = regions.find((r) => r.id === value) ?? null;
 
   return (
-    <Field
-      id="region"
-      label="Region"
-      error={error}
-      help="Pick a region or type one in. Free-text is accepted for regions not in the list."
-    >
+    <Field id="region" label={t("region")} error={error} help={t("regionHelp")}>
       <Combobox<ProviderRegion>
         items={regions}
         itemToStringLabel={(r) => r.id}
@@ -565,15 +566,13 @@ function RegionPicker({
       >
         <ComboboxInput
           id="region"
-          placeholder={loading ? "Loading regions…" : "us-west-2"}
+          placeholder={loading ? t("regionsLoading") : "us-west-2"}
           className="font-mono text-xs"
           {...invalid("region", error)}
         />
         <ComboboxContent>
           <ComboboxEmpty>
-            {value
-              ? `Use "${value}" (not in the list — that's fine)`
-              : "No matching regions — type one in."}
+            {value ? t("regionCustom", { region: value }) : t("regionsEmpty")}
           </ComboboxEmpty>
           <ComboboxList>
             {(item: ProviderRegion) => (
