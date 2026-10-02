@@ -94,6 +94,30 @@ export type AgentRunSpecInput = {
   scheduledScaleTo: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type AgentTaskCallbackMode =
+  | 'FULL'
+  | 'NOTIFY';
+
+export type AgentTaskCallbackPolicy = {
+  allowedHosts: Array<Scalars['String']['output']>;
+};
+
+export type AgentTaskCallbackPolicyMutationResult = {
+  data?: Maybe<AgentTaskCallbackPolicy>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AgentTaskCallbackSecret = {
+  name: Scalars['String']['output'];
+};
+
+export type AgentTaskCallbackSecretMutationResult = {
+  data?: Maybe<AgentTaskCallbackSecret>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type Alertruledeletedpayload = {
   deleted: Scalars['Boolean']['output'];
   id: Scalars['GUID']['output'];
@@ -677,6 +701,9 @@ export type AstroliftAgentStartupDiagnostic = {
 export type AstroliftAgentTask = {
   agentName: Scalars['String']['output'];
   agentSlug: Scalars['String']['output'];
+  callbackAttempts: Scalars['Int']['output'];
+  callbackLastError?: Maybe<Scalars['String']['output']>;
+  callbackStatus?: Maybe<Scalars['String']['output']>;
   callbackUrl: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   dispatcher?: Maybe<AstroliftAgentTaskDispatcher>;
@@ -6939,6 +6966,7 @@ export type Mutation = {
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
   cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
+  configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -7120,6 +7148,7 @@ export type Mutation = {
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
+  redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
   refreshCiWorkflowSyncStatus: AstroliftCiWorkflowSyncStatusMutationResult;
   refreshClusterManagement: AstroliftTenantClusterMutationResult;
@@ -7196,6 +7225,7 @@ export type Mutation = {
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
   setAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
+  setAgentTaskCallbackSecret: AgentTaskCallbackSecretMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   setAppAccess: AstroliftAppAccessMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
@@ -7532,6 +7562,11 @@ export type MutationClearEnvironmentSettingArgs = {
 export type MutationCloneWorkflowDefinitionArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationConfigureAgentTaskCallbacksArgs = {
+  allowedHosts: Array<Scalars['String']['input']>;
 };
 
 
@@ -8336,6 +8371,11 @@ export type MutationRecordClusterBootstrapRunArgs = {
 };
 
 
+export type MutationRedeliverAgentTaskCallbackArgs = {
+  taskId: Scalars['GUID']['input'];
+};
+
+
 export type MutationRedeployAppArgs = {
   ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: DeploymentByIdInput;
@@ -8717,6 +8757,12 @@ export type MutationSetAgentBundleSecretValueArgs = {
 export type MutationSetAgentSecretValueArgs = {
   envSpecSlug: Scalars['String']['input'];
   envVar: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+};
+
+
+export type MutationSetAgentTaskCallbackSecretArgs = {
+  name: Scalars['String']['input'];
   value: Scalars['String']['input'];
 };
 
@@ -9601,6 +9647,7 @@ export type Query = {
   agentTask?: Maybe<AstroliftAgentTask>;
   agentTaskBacklog?: Maybe<AstroliftAgentTaskBacklog>;
   agentTaskByClientRequestId?: Maybe<AstroliftAgentTask>;
+  agentTaskCallbackPolicy: AgentTaskCallbackPolicy;
   agentTaskEvents: Array<AstroliftAgentTaskEvent>;
   agentTaskInputMessage?: Maybe<AstroliftAgentTaskInputMessage>;
   agentTaskInteractions: Array<AstroliftAgentInteraction>;
@@ -12181,7 +12228,11 @@ export type RotateZentinelleGatewayCredentialInput = {
 
 export type RunAstroliftAgentInput = {
   agentSlug: Scalars['String']['input'];
+  callbackMode: AgentTaskCallbackMode;
+  callbackSecretRef: InputMaybe<Scalars['String']['input']>;
+  callbackUrl: InputMaybe<Scalars['String']['input']>;
   clientRequestId: InputMaybe<Scalars['String']['input']>;
+  correlationId: InputMaybe<Scalars['String']['input']>;
   environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
   timeoutSeconds: InputMaybe<Scalars['Int']['input']>;
   triggerPayload: InputMaybe<Scalars['JSON']['input']>;

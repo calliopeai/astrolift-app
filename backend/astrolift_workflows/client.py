@@ -99,20 +99,42 @@ def _task_queue() -> str:
 
 
 @async_to_sync
-async def _start(workflow: str, *, args: list[Any], workflow_id: str, task_queue: str) -> tuple[str, str]:
-    client = await _get_client_async()
-    from temporalio.common import WorkflowIDReusePolicy
-
-    handle = await client.start_workflow(
-        workflow,
-        *args,
-        id=workflow_id,
-        task_queue=task_queue,
-        # Supersede any still-running workflow with the same ID so a
-        # new deploy can always start even if the previous one is mid-
-        # cancel (e.g. operator aborted but Temporal hasn't drained yet).
-        id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+async def _start(
+    workflow: str,
+    *,
+    args: list[Any],
+    workflow_id: str,
+    task_queue: str,
+    replace_running: bool = True,
+) -> tuple[str, str]:
+    client = (
+        await _get_client_async()
+        if replace_running
+        else await asyncio.wait_for(_get_client_async(), timeout=5)
     )
+    from temporalio.common import WorkflowIDReusePolicy
+    from temporalio.exceptions import WorkflowAlreadyStartedError
+
+    try:
+        handle = await client.start_workflow(
+            workflow,
+            args=args,
+            id=workflow_id,
+            task_queue=task_queue,
+            # Deploy callers retain their existing replacement behavior.
+            # Durable outbox callers join running work and may recover only
+            # failed executions, preserving its timer and in-flight lease.
+            id_reuse_policy=(
+                WorkflowIDReusePolicy.TERMINATE_IF_RUNNING
+                if replace_running
+                else WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY
+            ),
+            **({} if replace_running else {"rpc_timeout": timedelta(seconds=3)}),
+        )
+    except WorkflowAlreadyStartedError as exc:
+        if replace_running:
+            raise
+        return workflow_id, exc.run_id or ""
     return handle.id, handle.result_run_id or handle.first_execution_run_id or ""
 
 
@@ -142,6 +164,7 @@ def start_workflow(
     *,
     workflow_id: str,
     task_queue: str | None = None,
+    replace_running: bool = True,
 ) -> WorkflowHandle:
     """Submit a workflow start. No-op (logs only) when Temporal is disabled."""
     if not _temporal_enabled():
@@ -153,7 +176,13 @@ def start_workflow(
         return WorkflowHandle(workflow_id=workflow_id, run_id="", enqueued=False)
 
     queue = task_queue or _task_queue()
-    wf_id, run_id = _start(workflow_name, args=args, workflow_id=workflow_id, task_queue=queue)
+    wf_id, run_id = _start(
+        workflow_name,
+        args=args,
+        workflow_id=workflow_id,
+        task_queue=queue,
+        replace_running=replace_running,
+    )
     return WorkflowHandle(workflow_id=wf_id, run_id=run_id, enqueued=True)
 
 

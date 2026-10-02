@@ -117,6 +117,7 @@ class AgentTask(BaseCoreModel):
     input_wait_budget_seconds = models.PositiveIntegerField(default=0)
     # Terminal outputs — only one is populated depending on outcome.
     result = models.JSONField(null=True, blank=True)
+    completion_usage = models.JSONField(default=dict, blank=True)
     failure = models.JSONField(null=True, blank=True)
     event_sequence = models.PositiveIntegerField(default=0)
     event_bytes = models.PositiveIntegerField(default=0)
@@ -357,6 +358,15 @@ class AgentTask(BaseCoreModel):
                 "version",
             ]
             task.save(update_fields=fields)
+            if new_status in {
+                self.Status.COMPLETED,
+                self.Status.FAILED,
+                self.Status.TIMED_OUT,
+                self.Status.CANCELLED,
+            }:
+                from astrolift_agents.services.task_completion_callbacks import freeze_callback
+
+                freeze_callback(task)
             for field in fields:
                 setattr(self, field, getattr(task, field))
         try:

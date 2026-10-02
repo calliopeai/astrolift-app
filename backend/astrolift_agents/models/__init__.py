@@ -27,6 +27,10 @@ from astrolift_agents.models.skill import (
     ToolDef,
     WorkloadToolDef,
 )
+from astrolift_agents.models.task_completion_callback import (
+    AgentTaskCallbackPolicy,
+    AgentTaskCompletionCallback,
+)
 from astrolift_agents.models.task_meter import TaskMeteringRecord
 from astrolift_agents.models.task_token import TaskToken
 from astrolift_agents.models.workflow_trigger import WorkflowSchedule, WorkflowWebhook
@@ -46,6 +50,8 @@ __all__ = [
     "AgentSecretBundleRef",
     "AgentSkillRef",
     "AgentTask",
+    "AgentTaskCallbackPolicy",
+    "AgentTaskCompletionCallback",
     "AgentTaskEvent",
     "AgentTaskInputMessage",
     "AgentTaskInputReply",
