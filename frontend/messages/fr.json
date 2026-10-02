@@ -7220,5 +7220,39 @@
     "download": "Télécharger le journal",
     "jump": "Aller au plus récent",
     "newLines": "{count, plural, one {# nouvelle} other {# nouvelles}}"
+  },
+  "agentRunTab": {
+    "run": "Exécution",
+    "status": "État",
+    "started": "Début",
+    "finished": "Fin",
+    "took": "Durée",
+    "notYet": "Pas encore",
+    "unknownDate": "Date inconnue",
+    "runningNow": "En cours maintenant",
+    "runs": "Exécutions",
+    "noRuns": "Aucune exécution pour le moment",
+    "noRunsDescription": "Utilisez Exécuter maintenant ci-dessus pour en lancer une. Elle apparaîtra ici avec son état en direct.",
+    "openRun": "Ouvrir l’exécution",
+    "watchLive": "Voir en direct",
+    "openLive": "Ouvrir la session en direct dans un nouvel onglet",
+    "watchLogs": "Voir les journaux",
+    "sessionTitle": "Session de l’agent en direct",
+    "logsTitle": "Journaux de l’agent en direct",
+    "search": "Rechercher des IDs d’exécution…",
+    "mineNote": "Pour le moment, la vue «Les miennes» affiche toutes les exécutions de cet agent : leur initiateur n’est pas encore enregistré.",
+    "views": {
+      "all": "Toutes",
+      "mine": "Les miennes",
+      "running": "En cours",
+      "failed": "En échec",
+      "queued": "En file d’attente"
+    },
+    "terminal": {
+      "readFailed": "Impossible de charger les journaux :",
+      "label": "Journaux d’exécution de l’agent",
+      "waiting": "En attente de sortie…",
+      "empty": "Aucune sortie disponible pour cette exécution."
+    }
   }
 }

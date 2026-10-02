@@ -7220,5 +7220,39 @@
     "download": "Protokoll herunterladen",
     "jump": "Zum neuesten Eintrag",
     "newLines": "{count, plural, one {# neuer Eintrag} other {# neue Einträge}}"
+  },
+  "agentRunTab": {
+    "run": "Ausführung",
+    "status": "Status",
+    "started": "Gestartet",
+    "finished": "Beendet",
+    "took": "Dauer",
+    "notYet": "Noch nicht",
+    "unknownDate": "Unbekanntes Datum",
+    "runningNow": "Wird gerade ausgeführt",
+    "runs": "Ausführungen",
+    "noRuns": "Noch keine Ausführungen",
+    "noRunsDescription": "Starten Sie oben mit Jetzt ausführen. Die Ausführung erscheint hier mit ihrem Live-Status.",
+    "openRun": "Ausführung öffnen",
+    "watchLive": "Live ansehen",
+    "openLive": "Live-Sitzung in einem neuen Tab öffnen",
+    "watchLogs": "Protokolle ansehen",
+    "sessionTitle": "Live-Sitzung des Agents",
+    "logsTitle": "Live-Protokolle des Agents",
+    "search": "Ausführungs-IDs suchen…",
+    "mineNote": "Die Ansicht „Meine“ zeigt derzeit alle Ausführungen dieses Agents: Es wird noch nicht erfasst, wer sie gestartet hat.",
+    "views": {
+      "all": "Alle",
+      "mine": "Meine",
+      "running": "Laufend",
+      "failed": "Fehlgeschlagen",
+      "queued": "In der Warteschlange"
+    },
+    "terminal": {
+      "readFailed": "Protokolle konnten nicht geladen werden:",
+      "label": "Ausführungsprotokolle des Agents",
+      "waiting": "Warten auf Ausgabe…",
+      "empty": "Für diese Ausführung ist keine Ausgabe verfügbar."
+    }
   }
 }

@@ -1,3 +1,6 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import {
@@ -40,4 +43,26 @@ export const NoOutputRecorded: Story = {
 
 export const LoadError: Story = {
   render: () => <LiveLogTerminal {...base} lines={null} error="Response not successful: 504" />,
+};
+
+export const FrenchWaiting: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <LiveLogTerminal {...base} lines={null} loading />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseUnavailable: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <LiveLogTerminal {...base} running={false} lines={[]} />
+    </NextIntlClientProvider>
+  ),
+};
+export const FrenchReadError: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <LiveLogTerminal {...base} lines={null} error="RAW_LOG_DIAGNOSTIC" />
+    </NextIntlClientProvider>
+  ),
 };

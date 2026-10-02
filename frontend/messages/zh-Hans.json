@@ -7217,5 +7217,39 @@
     "download": "下载日志",
     "jump": "跳转到最新",
     "newLines": "{count, number} 条新日志"
+  },
+  "agentRunTab": {
+    "run": "运行",
+    "status": "状态",
+    "started": "开始",
+    "finished": "结束",
+    "took": "用时",
+    "notYet": "尚未",
+    "unknownDate": "日期未知",
+    "runningNow": "正在运行",
+    "runs": "运行",
+    "noRuns": "暂无运行",
+    "noRunsDescription": "使用上方的“立即运行”开始一次运行。运行状态会实时显示在这里。",
+    "openRun": "打开运行",
+    "watchLive": "实时查看",
+    "openLive": "在新标签页中打开实时会话",
+    "watchLogs": "查看日志",
+    "sessionTitle": "智能体实时会话",
+    "logsTitle": "智能体实时日志",
+    "search": "搜索运行 ID…",
+    "mineNote": "目前“我的”会显示此智能体的所有运行，因为尚未记录谁发起了运行。",
+    "views": {
+      "all": "全部",
+      "mine": "我的",
+      "running": "运行中",
+      "failed": "失败",
+      "queued": "已排队"
+    },
+    "terminal": {
+      "readFailed": "无法加载日志：",
+      "label": "智能体运行日志",
+      "waiting": "正在等待输出…",
+      "empty": "此运行的输出不可用。"
+    }
   }
 }
