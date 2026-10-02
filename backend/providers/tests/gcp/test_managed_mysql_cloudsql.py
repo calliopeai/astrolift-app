@@ -171,6 +171,7 @@ def _spec(**overrides) -> ProvisionSpec:
         tenant_cluster_id="gcp-prod",
         service_handle_hint="my",
         size="small",
+        managed_service_id="00000000-0000-4000-8000-000000000001",
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -514,11 +515,15 @@ def test_binding_schema_lists_all_env_vars(driver):
 
 
 def test_provision_does_not_adopt_another_services_resource(driver) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    """An immutable name is a locator, never authority to adopt another owner."""
     import dataclasses
 
-    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
-    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="00000000-0000-4000-8000-000000000001"))
+    second = driver.provision(
+        dataclasses.replace(
+            _spec(), managed_service_id="00000000-0000-4000-8000-000000000002", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and "refusing to adopt" in second.message
