@@ -17,6 +17,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.inputs import ReviewedManagedServiceBinding
+from astrolift_workflows.managed_service_review import reviewed_service_call
 from astrolift_workflows.spanner_ownership import (
     clear_cleanup,
     container_exclusive,
@@ -598,13 +600,16 @@ def _mark_status_sync(managed_service_id: int, status: str) -> None:
 @activity.defn(name="astrolift.managed_service.mark_deprovisioning")
 async def mark_managed_service_deprovisioning(
     managed_service_id: int,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> None:
     from asgiref.sync import sync_to_async
 
     from astrolift_services.models import ManagedService
 
-    await sync_to_async(_mark_status_sync)(
+    await sync_to_async(reviewed_service_call)(
+        _mark_status_sync,
         managed_service_id,
+        reviewed_binding,
         ManagedService.Status.DEPROVISIONING,
     )
 
@@ -776,6 +781,7 @@ async def deprovision_managed_service(
     managed_service_id: int,
     delete_data: bool,
     force_destroy: bool,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> dict[str, Any]:
     """Call the driver's ``deprovision`` with the two-axis safety flags.
 
@@ -788,8 +794,10 @@ async def deprovision_managed_service(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    result = await sync_to_async(_deprovision_sync)(
+    result = await sync_to_async(reviewed_service_call)(
+        _deprovision_sync,
         managed_service_id,
+        reviewed_binding,
         delete_data,
         force_destroy,
     )
@@ -836,6 +844,7 @@ def _finalize_sync(managed_service_id: int) -> None:
 @activity.defn(name="astrolift.managed_service.finalize_deletion")
 async def finalize_managed_service_deletion(
     managed_service_id: int,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> None:
     """Soft-delete the ``ManagedService`` row.
 
@@ -846,7 +855,7 @@ async def finalize_managed_service_deletion(
     """
     from asgiref.sync import sync_to_async
 
-    await sync_to_async(_finalize_sync)(managed_service_id)
+    await sync_to_async(reviewed_service_call)(_finalize_sync, managed_service_id, reviewed_binding)
 
 
 # ---- provision (#1001) ---------------------------------------------
@@ -860,13 +869,16 @@ async def finalize_managed_service_deletion(
 @activity.defn(name="astrolift.managed_service.mark_provisioning")
 async def mark_managed_service_provisioning(
     managed_service_id: int,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> None:
     from asgiref.sync import sync_to_async
 
     from astrolift_services.models import ManagedService
 
-    await sync_to_async(_mark_status_sync)(
+    await sync_to_async(reviewed_service_call)(
+        _mark_status_sync,
         managed_service_id,
+        reviewed_binding,
         ManagedService.Status.PROVISIONING,
     )
 
@@ -1004,14 +1016,18 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
 
 
 @activity.defn(name="astrolift.managed_service.update")
-async def update_managed_service(managed_service_id: int) -> dict[str, Any]:
+async def update_managed_service(
+    managed_service_id: int, reviewed_binding: ReviewedManagedServiceBinding | None = None
+) -> dict[str, Any]:
     """Apply the row's desired config through ``ManagedServiceDriver.update``."""
     from asgiref.sync import sync_to_async
     from temporalio.exceptions import ApplicationError
 
     activity.heartbeat()
     try:
-        result = await sync_to_async(_update_sync)(managed_service_id)
+        result = await sync_to_async(reviewed_service_call)(
+            _update_sync, managed_service_id, reviewed_binding
+        )
     except (TypeError, ValueError) as exc:
         raise ApplicationError(str(exc), non_retryable=True) from exc
     log.info(
@@ -1031,6 +1047,7 @@ async def update_managed_service(managed_service_id: int) -> dict[str, Any]:
 @activity.defn(name="astrolift.managed_service.provision")
 async def provision_managed_service(
     managed_service_id: int,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> dict[str, Any]:
     """Resolve the ``managed:<kind>:<variant>`` driver and call
     ``provision``. Idempotent — drivers probe for an existing resource
@@ -1043,7 +1060,9 @@ async def provision_managed_service(
     from temporalio.exceptions import ApplicationError
 
     try:
-        result = await sync_to_async(_provision_sync)(managed_service_id)
+        result = await sync_to_async(reviewed_service_call)(
+            _provision_sync, managed_service_id, reviewed_binding
+        )
     except ManagedServicePreflightError as exc:
         raise ApplicationError(str(exc), non_retryable=True) from exc
     log.info(
@@ -1105,6 +1124,7 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
 async def check_managed_service_ready(
     managed_service_id: int,
     handle: str,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> str:
     """One readiness probe of the backing resource. The workflow polls this
     (with a timer between calls) until ``available`` so finalize materializes
@@ -1113,7 +1133,9 @@ async def check_managed_service_ready(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_check_ready_sync)(managed_service_id, handle)
+    return await sync_to_async(reviewed_service_call)(
+        _check_ready_sync, managed_service_id, reviewed_binding, handle
+    )
 
 
 def _connection_secret_path(svc: Any) -> str:
@@ -1199,12 +1221,16 @@ def _finalize_update_sync(managed_service_id: int, handle: str) -> list[int]:
 
 
 @activity.defn(name="astrolift.managed_service.finalize_update")
-async def finalize_managed_service_update(managed_service_id: int, handle: str) -> list[int]:
+async def finalize_managed_service_update(
+    managed_service_id: int, handle: str, reviewed_binding: ReviewedManagedServiceBinding | None = None
+) -> list[int]:
     """Persist the applied config, flip to ACTIVE, and report which binding
     rows carry a value the workload has not seen yet (spec 06 §4.8 step 6)."""
     from asgiref.sync import sync_to_async
 
-    return await sync_to_async(_finalize_update_sync)(managed_service_id, handle)
+    return await sync_to_async(reviewed_service_call)(
+        _finalize_update_sync, managed_service_id, reviewed_binding, handle
+    )
 
 
 def _managed_binding_for(svc: Any) -> Any:
@@ -1374,6 +1400,7 @@ def _sync_binding_rows(svc: Any) -> list[int]:
 async def finalize_managed_service_provision(
     managed_service_id: int,
     handle: str,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> list[int]:
     """Persist the driver's backend handle and flip the row to ACTIVE.
 
@@ -1387,7 +1414,9 @@ async def finalize_managed_service_provision(
     """
     from asgiref.sync import sync_to_async
 
-    return await sync_to_async(_finalize_provision_sync)(managed_service_id, handle)
+    return await sync_to_async(reviewed_service_call)(
+        _finalize_provision_sync, managed_service_id, reviewed_binding, handle
+    )
 
 
 def _mark_failed_sync(managed_service_id: int, error: str) -> None:
@@ -1409,12 +1438,13 @@ def _mark_failed_sync(managed_service_id: int, error: str) -> None:
 async def mark_managed_service_failed(
     managed_service_id: int,
     error: str,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> None:
     """Flip the row to FAILED with the error surfaced on ``status_error``
     so the operator sees why provisioning didn't complete."""
     from asgiref.sync import sync_to_async
 
-    await sync_to_async(_mark_failed_sync)(managed_service_id, error)
+    await sync_to_async(reviewed_service_call)(_mark_failed_sync, managed_service_id, reviewed_binding, error)
 
 
 def _dependent_app_environment_ids(svc: Any, rebound_binding_ids: list[int]) -> tuple[int, ...]:
@@ -1565,12 +1595,15 @@ def _bounce_dependent_workloads_sync(
 async def bounce_workloads_bound_to_managed_service(
     managed_service_id: int,
     rebound_binding_ids: list[int],
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
 ) -> int:
     """Restart the workloads consuming the bindings finalize just rewrote."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    return await sync_to_async(_bounce_dependent_workloads_sync)(
+    return await sync_to_async(reviewed_service_call)(
+        _bounce_dependent_workloads_sync,
         managed_service_id,
+        reviewed_binding,
         rebound_binding_ids,
     )

@@ -1,5 +1,6 @@
 """Pin reviewed project-resource actions through their database writes (#2207)."""
 
+from contextvars import ContextVar
 from dataclasses import replace
 from functools import wraps
 
@@ -21,6 +22,8 @@ from astrolift_services.scopes import _credential_scope
 from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind, check_permission
 from core.tenancy import get_current_tenant
 
+reviewed_resource_dispatch = ContextVar("reviewed_resource_dispatch", default=False)
+
 
 def _stale():
     return failure("STALE_TARGET", "Managed resource context changed; review its exact GUID again")
@@ -41,9 +44,9 @@ def reviewed_resource_action(field, *, attachment=False):
             if expected is None:
                 return fn(self, info, input)
             tenant = get_current_tenant()
-            org_id = tenant.organization_id if tenant else None
-            if not org_id:
+            if tenant is None or tenant.organization_id is None:
                 return _stale()
+            org_id = tenant.organization_id
             service_guid = getattr(input, field)
             selected_attachment = None
             if attachment:
@@ -103,12 +106,15 @@ def reviewed_resource_action(field, *, attachment=False):
                     .first()
                 )
                 if (
-                    not all((org, team, project, cluster, locked))
+                    not all((org, team, project, cluster))
+                    or locked is None
                     or locked["project_id"] != initial["project_id"]
                     or locked["tenant_cluster_id"] != initial["tenant_cluster_id"]
                 ):
                     return _stale()
                 if attachment:
+                    if selected_attachment is None:
+                        return _stale()
                     current_attachment = (
                         ManagedServiceAttachment.objects.select_for_update()
                         .filter(pk=selected_attachment["pk"], managed_service_id=initial["pk"])
@@ -161,7 +167,11 @@ def reviewed_resource_action(field, *, attachment=False):
                                 PermissionScope(ScopeKind.PROJECT, project.pk), (Permission.PROJECT_UPDATE,)
                             )
                             check_permission(Permission.PROJECT_UPDATE, scope=scope)
-                            return fn(self, info, input)
+                            dispatch_marker = reviewed_resource_dispatch.set(True)
+                            try:
+                                return fn(self, info, input)
+                            finally:
+                                reviewed_resource_dispatch.reset(dispatch_marker)
                 finally:
                     if marker is not None:
                         reset_current_api_token(marker)

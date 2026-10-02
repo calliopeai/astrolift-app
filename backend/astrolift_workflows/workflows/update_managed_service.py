@@ -37,6 +37,11 @@ def _truncate(message: str, *, limit: int = 4000) -> str:
     return message if len(message) <= limit else message[: limit - 3] + "..."
 
 
+def _reviewed_args(input, arguments):
+    # Omitted proof preserves the serialized arguments of legacy histories.
+    return arguments if input.reviewed_binding is None else [*arguments, input.reviewed_binding]
+
+
 @workflow.defn(name="UpdateManagedServiceWorkflow")
 class UpdateManagedServiceWorkflow:
     @workflow.run
@@ -45,7 +50,7 @@ class UpdateManagedServiceWorkflow:
         try:
             result = await workflow.execute_activity(
                 update_managed_service,
-                svc_id,
+                args=_reviewed_args(input, [svc_id]),
                 start_to_close_timeout=_UPDATE_TIMEOUT,
                 retry_policy=_UPDATE_RETRY,
             )
@@ -53,7 +58,7 @@ class UpdateManagedServiceWorkflow:
             message = _truncate(f"update_managed_service failed: {exc}")
             await workflow.execute_activity(
                 mark_managed_service_failed,
-                args=[svc_id, message],
+                args=_reviewed_args(input, [svc_id, message]),
                 start_to_close_timeout=_QUICK_TIMEOUT,
                 retry_policy=_STATUS_RETRY,
             )
@@ -64,7 +69,7 @@ class UpdateManagedServiceWorkflow:
             for _ in range(60):
                 state = await workflow.execute_activity(
                     check_managed_service_ready,
-                    args=[svc_id, handle],
+                    args=_reviewed_args(input, [svc_id, handle]),
                     start_to_close_timeout=_QUICK_TIMEOUT,
                     retry_policy=_STATUS_RETRY,
                 )
@@ -74,7 +79,7 @@ class UpdateManagedServiceWorkflow:
                     message = f"managed service backend update failed: state={state}"
                     await workflow.execute_activity(
                         mark_managed_service_failed,
-                        args=[svc_id, message],
+                        args=_reviewed_args(input, [svc_id, message]),
                         start_to_close_timeout=_QUICK_TIMEOUT,
                         retry_policy=_STATUS_RETRY,
                     )
@@ -84,7 +89,7 @@ class UpdateManagedServiceWorkflow:
                 message = "managed service backend update timed out waiting for available state"
                 await workflow.execute_activity(
                     mark_managed_service_failed,
-                    args=[svc_id, message],
+                    args=_reviewed_args(input, [svc_id, message]),
                     start_to_close_timeout=_QUICK_TIMEOUT,
                     retry_policy=_STATUS_RETRY,
                 )
@@ -92,7 +97,7 @@ class UpdateManagedServiceWorkflow:
 
         rebound = await workflow.execute_activity(
             finalize_managed_service_update,
-            args=[svc_id, handle],
+            args=_reviewed_args(input, [svc_id, handle]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
@@ -102,7 +107,7 @@ class UpdateManagedServiceWorkflow:
         # returns an empty list and restarts nobody.
         await workflow.execute_activity(
             bounce_workloads_bound_to_managed_service,
-            args=[svc_id, rebound or []],
+            args=_reviewed_args(input, [svc_id, rebound or []]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )

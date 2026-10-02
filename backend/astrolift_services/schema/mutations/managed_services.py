@@ -51,7 +51,7 @@ from astrolift_services.schema.mutations.types import (
     _ManagedResourceAdoptionPayload,
     _ManagedServiceDeletedPayload,
 )
-from astrolift_services.schema.resource_actions import reviewed_resource_action
+from astrolift_services.schema.resource_actions import reviewed_resource_action, reviewed_resource_dispatch
 from astrolift_services.schema.types import (
     ManagedServiceAttachmentType,
     ManagedServiceConnectionKeyType,
@@ -246,10 +246,92 @@ def _workflow_actor(info: Info):
     )
 
 
+def _reviewed_enqueue(svc, workflow_name, payload, *, update=False):
+    """Commit the reviewed state before handing its immutable binding to a worker.
+
+    This is an enqueue acknowledgement, not a durable dispatch outbox. Failure
+    after commit remains visible as FAILED; no success/completion is inferred.
+    """
+    from astrolift_workflows.client import start_workflow
+    from astrolift_workflows.managed_service_review import capture_reviewed_binding, reviewed_service_call
+
+    if not update:
+        svc.operation_kind = "deprovision" if workflow_name.startswith("Deprovision") else "provision"
+        svc.operation_workflow_id = f"{workflow_name}-{svc.guid}"
+        svc.operation_run_id = ""
+        svc.operation_started_at = timezone.now()
+        svc.operation_completed_at = None
+        svc.save(
+            update_fields=[
+                "operation_kind",
+                "operation_workflow_id",
+                "operation_run_id",
+                "operation_started_at",
+                "operation_completed_at",
+                "updated_at",
+                "version",
+            ]
+        )
+    binding = capture_reviewed_binding(svc.pk)
+    from dataclasses import replace
+
+    payload = replace(payload, reviewed_binding=binding)
+    service_pk = svc.pk
+    workflow_id = f"{workflow_name}-{svc.guid}"
+
+    def record_receipt(service_id, run_id):
+        current = ManagedService.objects.get(pk=service_id)
+        current.operation_run_id = run_id
+        current.save(update_fields=["operation_run_id", "updated_at", "version"])
+        svc.operation_run_id = run_id
+
+    def record_failure(service_id):
+        current = ManagedService.objects.get(pk=service_id)
+        current.status = ManagedService.Status.FAILED
+        current.status_error = "Managed-resource workflow could not be enqueued"
+        current.operation_completed_at = timezone.now()
+        current.save(
+            update_fields=[
+                "status",
+                "status_error",
+                "operation_completed_at",
+                "updated_at",
+                "version",
+            ]
+        )
+
+    def enqueue():
+        try:
+            handle = start_workflow(workflow_name, args=[payload], workflow_id=workflow_id)
+            if not handle.enqueued:
+                raise RuntimeError("Managed-resource workflow was not enqueued")
+        except Exception:
+            # A moved target must not receive even the enqueue-failure status.
+            reviewed_service_call(record_failure, service_pk, binding)
+            raise RuntimeError("Managed-resource workflow could not be enqueued") from None
+        # A fast completion/deletion or later owner change must not turn an
+        # accepted engine start into a fabricated enqueue failure.
+        from temporalio.exceptions import ApplicationError
+
+        try:
+            reviewed_service_call(record_receipt, service_pk, binding, str(handle.run_id or ""))
+        except ApplicationError:
+            pass
+
+    transaction.on_commit(enqueue)
+
+
 def _start_project_service_provision(info: Info, svc: ManagedService) -> None:
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import ProvisionManagedServiceInput as ProvisionInput
 
+    if reviewed_resource_dispatch.get():
+        _reviewed_enqueue(
+            svc,
+            "ProvisionManagedServiceWorkflow",
+            ProvisionInput(managed_service_id=svc.pk, actor=_workflow_actor(info)),
+        )
+        return
     start_workflow(
         "ProvisionManagedServiceWorkflow",
         args=[ProvisionInput(managed_service_id=svc.pk, actor=_workflow_actor(info))],
@@ -267,6 +349,18 @@ def _start_project_service_deprovision(
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import DeprovisionManagedServiceInput as DeprovisionInput
 
+    if reviewed_resource_dispatch.get():
+        _reviewed_enqueue(
+            svc,
+            "DeprovisionManagedServiceWorkflow",
+            DeprovisionInput(
+                managed_service_id=svc.pk,
+                actor=_workflow_actor(info),
+                delete_data=delete_data,
+                force_destroy=force_destroy,
+            ),
+        )
+        return
     start_workflow(
         "DeprovisionManagedServiceWorkflow",
         args=[
@@ -285,6 +379,14 @@ def _start_service_update(info: Info, svc: ManagedService) -> None:
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import UpdateManagedServiceInput as UpdateInput
 
+    if reviewed_resource_dispatch.get():
+        _reviewed_enqueue(
+            svc,
+            "UpdateManagedServiceWorkflow",
+            UpdateInput(managed_service_id=svc.pk, actor=_workflow_actor(info)),
+            update=True,
+        )
+        return
     workflow_id = f"UpdateManagedServiceWorkflow-{svc.guid}"
     handle = start_workflow(
         "UpdateManagedServiceWorkflow",

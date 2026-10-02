@@ -101,6 +101,11 @@ def _redact(message: str) -> str:
     return _URI_CREDENTIAL_RE.sub(r"\1***redacted***\3", redacted)
 
 
+def _reviewed_args(input, arguments):
+    # Omitted proof preserves the serialized arguments of legacy histories.
+    return arguments if input.reviewed_binding is None else [*arguments, input.reviewed_binding]
+
+
 @workflow.defn(name="ProvisionManagedServiceWorkflow")
 class ProvisionManagedServiceWorkflow:
     @workflow.run
@@ -109,7 +114,7 @@ class ProvisionManagedServiceWorkflow:
 
         await workflow.execute_activity(
             mark_managed_service_provisioning,
-            svc_id,
+            args=_reviewed_args(input, [svc_id]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
@@ -117,7 +122,7 @@ class ProvisionManagedServiceWorkflow:
         try:
             result = await workflow.execute_activity(
                 provision_managed_service,
-                svc_id,
+                args=_reviewed_args(input, [svc_id]),
                 start_to_close_timeout=_PROVISION_TIMEOUT,
                 retry_policy=_PROVISION_RETRY,
             )
@@ -128,7 +133,7 @@ class ProvisionManagedServiceWorkflow:
             message = _truncate(f"provision_managed_service failed: {_redact(_cause(exc))}")
             await workflow.execute_activity(
                 mark_managed_service_failed,
-                args=[svc_id, message],
+                args=_reviewed_args(input, [svc_id, message]),
                 start_to_close_timeout=_QUICK_TIMEOUT,
                 retry_policy=_STATUS_RETRY,
             )
@@ -154,7 +159,7 @@ class ProvisionManagedServiceWorkflow:
             for _ in range(60):
                 state = await workflow.execute_activity(
                     check_managed_service_ready,
-                    args=[svc_id, handle],
+                    args=_reviewed_args(input, [svc_id, handle]),
                     start_to_close_timeout=_QUICK_TIMEOUT,
                     retry_policy=_STATUS_RETRY,
                 )
@@ -164,7 +169,7 @@ class ProvisionManagedServiceWorkflow:
                     msg = f"managed service backend not ready: state={state}"
                     await workflow.execute_activity(
                         mark_managed_service_failed,
-                        args=[svc_id, msg],
+                        args=_reviewed_args(input, [svc_id, msg]),
                         start_to_close_timeout=_QUICK_TIMEOUT,
                         retry_policy=_STATUS_RETRY,
                     )
@@ -174,7 +179,7 @@ class ProvisionManagedServiceWorkflow:
                 msg = "managed service backend timed out waiting for available state"
                 await workflow.execute_activity(
                     mark_managed_service_failed,
-                    args=[svc_id, msg],
+                    args=_reviewed_args(input, [svc_id, msg]),
                     start_to_close_timeout=_QUICK_TIMEOUT,
                     retry_policy=_STATUS_RETRY,
                 )
@@ -182,7 +187,7 @@ class ProvisionManagedServiceWorkflow:
 
         rebound = await workflow.execute_activity(
             finalize_managed_service_provision,
-            args=[svc_id, handle],
+            args=_reviewed_args(input, [svc_id, handle]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
@@ -194,7 +199,7 @@ class ProvisionManagedServiceWorkflow:
         # cannot be patched does not fail an otherwise-good provision.
         await workflow.execute_activity(
             bounce_workloads_bound_to_managed_service,
-            args=[svc_id, rebound or []],
+            args=_reviewed_args(input, [svc_id, rebound or []]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
