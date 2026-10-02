@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pytest
+
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from aws.managed.aurora import AuroraConfig, AuroraMySQLDriver, AuroraPostgresDriver
 
@@ -58,6 +60,8 @@ class FakeRDS:
         instance_id = kwargs["DBInstanceIdentifier"]
         self.instances[instance_id] = {
             "DBInstanceIdentifier": instance_id,
+            "DBClusterIdentifier": kwargs["DBClusterIdentifier"],
+            "TagList": kwargs.get("Tags", []),
             "DBInstanceStatus": "creating",
         }
         cluster = self.clusters[kwargs["DBClusterIdentifier"]]
@@ -134,6 +138,7 @@ def spec(**config):
         service_handle_hint="primary",
         size="medium",
         config=config,
+        managed_service_id="00000000-0000-4000-8000-000000000001",
     )
 
 
@@ -157,7 +162,7 @@ def test_serverless_provision_reconciles_cluster_and_writer():
     result = subject.provision(spec(min_acu=1.5, max_acu=12.0))
     again = subject.provision(spec(min_acu=1.5, max_acu=12.0))
 
-    assert result.ok and result.handle == "postgres/astrolift-acme-api-prod-primary"
+    assert result.ok and result.handle == "postgres/astrolift-00000000000040008000000000000001"
     assert again.ok
     assert len(rds.cluster_creates) == 1
     assert len(rds.instance_creates) == 1
@@ -225,7 +230,12 @@ def test_snapshot_and_restore_copy_credentials_and_create_writer():
     subject, rds, sm = driver()
     source = subject.provision(spec())
     snap = subject.snapshot(ServiceHandle(source.handle))
-    target = replace(spec(), app_slug="restored", service_handle_hint="copy")
+    target = replace(
+        spec(),
+        app_slug="restored",
+        service_handle_hint="copy",
+        managed_service_id="00000000-0000-4000-8000-000000000002",
+    )
 
     restored = subject.restore(snap, target)
 
@@ -241,3 +251,57 @@ def test_catalog_binding_schema_is_variant_specific_without_constructor():
     mysql = AuroraMySQLDriver.binding_schema.__wrapped__(object.__new__(AuroraMySQLDriver))
     assert "POSTGRES_HOST" in pg.env_vars and "MYSQL_HOST" not in pg.env_vars
     assert "MYSQL_HOST" in mysql.env_vars and "POSTGRES_HOST" not in mysql.env_vars
+
+
+@pytest.mark.parametrize("change", ["cluster", "owner", "missing_tags"])
+def test_existing_writer_must_match_recorded_cluster_and_service(change):
+    subject, rds, _ = driver()
+    first = subject.provision(spec())
+    assert first.ok
+    cluster_id = first.handle.partition("/")[2]
+    writer = rds.instances[subject._writer_id(cluster_id)]
+    if change == "cluster":
+        writer["DBClusterIdentifier"] = "another-cluster"
+    elif change == "owner":
+        writer["TagList"] = [
+            {"Key": "astrolift.io/managed-by", "Value": "platform"},
+            {"Key": "astrolift.io/managed_service_id", "Value": "00000000-0000-4000-8000-000000000002"},
+        ]
+    else:
+        writer.pop("TagList")
+    refused = subject.provision(replace(spec(), recorded_handle=first.handle))
+    assert not refused.ok and refused.errors == ["ownership_refused"]
+    assert len(rds.instance_creates) == len(rds.cluster_creates) == 1
+
+
+def test_new_parent_and_writer_keep_entire_identity_even_with_long_prefix():
+    subject, rds, _ = driver()
+    subject._config = replace(subject._config, cluster_name_prefix="p" * 300)
+    identities = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"]
+    results = [subject.provision(replace(spec(), managed_service_id=identity)) for identity in identities]
+    assert all(result.ok for result in results)
+    assert len(rds.cluster_creates) == len(rds.instance_creates) == 2
+    for identity, result in zip(identities, results, strict=True):
+        cluster_id = result.handle.partition("/")[2]
+        writer_id = subject._writer_id(cluster_id)
+        assert cluster_id.endswith(identity.replace("-", ""))
+        assert writer_id.endswith(identity.replace("-", "") + "-writer")
+        assert len(cluster_id) <= 56 and len(writer_id) <= 63
+
+
+def test_legacy_truncated_writer_locator_remains_but_cannot_adopt_other_cluster():
+    subject, rds, _ = driver()
+    first_name = "p" * 56 + "-one"
+    second_name = "p" * 56 + "-two"
+    first = subject.provision(replace(spec(), recorded_handle="postgres/" + first_name))
+    assert first.ok
+    assert subject._writer_id(first_name) == subject._writer_id(second_name)
+    refused = subject.provision(
+        replace(
+            spec(), managed_service_id="00000000-0000-4000-8000-000000000002", recorded_handle="postgres/" + second_name
+        )
+    )
+    assert not refused.ok and refused.errors == ["ownership_refused"]
+    writer = rds.instances[subject._writer_id(first_name)]
+    assert writer["DBClusterIdentifier"] == first_name
+    assert len(rds.instance_creates) == 1

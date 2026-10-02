@@ -20,6 +20,9 @@ pytestmark = pytest.mark.django_db
         ("gcp", "mysql_cloudsql", "mysql"),
         ("azure", "postgres_flexible", "postgres"),
         ("azure", "mysql_flexible", "mysql"),
+        ("aws", "aurora", "postgres"),
+        ("aws", "aurora", "mysql"),
+        ("aws", "mssql_rds", "mssql"),
     ]
 )
 def cloud(request, monkeypatch):
@@ -35,7 +38,7 @@ def cloud(request, monkeypatch):
         class Driver(cls):
             def __init__(self, *, config):
                 super().__init__(config=config, sql_client=api, secrets_client=secrets)
-    else:
+    elif family == "azure":
         cls = fixture.AzurePostgresFlexibleDriver if kind == "postgres" else fixture.AzureMySQLFlexibleDriver
         config = fixture.AzurePostgresConfig if kind == "postgres" else fixture.AzureMySQLConfig
         api, secrets = fixture.FakeMgmtClient(), fixture.FakeSecretClient()
@@ -52,9 +55,32 @@ def cloud(request, monkeypatch):
         class Driver(cls):
             pass
 
+    else:
+        if variant == "aurora":
+            original, api, secrets = fixture.driver(
+                engine="aurora-postgresql" if kind == "postgres" else "aurora-mysql"
+            )
+            resources, prefix, maximum = api.clusters, "cluster_name_prefix", 63
+        else:
+            original, api, secrets = fixture.driver()
+            resources, prefix, maximum = api.instances, "instance_name_prefix", 63
+        cls, cfg = type(original), original._config
+
+        class Driver(cls):
+            def __init__(self, *, config):
+                super().__init__(config=config, rds_client=api, secrets_client=secrets)
+
+    actual_variant = {
+        "postgres_cloudsql": "cloudsql",
+        "mysql_cloudsql": "cloudsql",
+        "postgres_flexible": "azure_pg_flex",
+        "mysql_flexible": "azure_mysql_flex",
+        "aurora": "aurora_postgres" if kind == "postgres" else "aurora_mysql",
+        "mssql_rds": "rds_sqlserver_express",
+    }[variant]
     state = SimpleNamespace(
         family=family,
-        variant=variant,
+        variant=actual_variant,
         kind=kind,
         cls=Driver,
         cfg=cfg,
@@ -64,7 +90,18 @@ def cloud(request, monkeypatch):
         prefix=prefix,
         maximum=maximum,
     )
-    monkeypatch.setattr("astrolift_drivers.registry.plugins.get", lambda *_: Driver)
+    from astrolift_drivers.registry import PluginManifest, PluginRegistry
+
+    registry = PluginRegistry()
+    registry.register(
+        PluginManifest(
+            plugin_id=family,
+            display_name=family,
+            version="fixture",
+            drivers={f"managed:{kind}:{actual_variant}": Driver},
+        )
+    )
+    monkeypatch.setattr("astrolift_drivers.registry.plugins", registry)
     monkeypatch.setattr("core.cluster_observability.managed_config_for", lambda *_, **__: state.cfg)
     return state
 
@@ -79,7 +116,19 @@ def new_service(cloud, org_slug, app_slug="api"):
     return svc
 
 
+def labels(cloud, resource):
+    if cloud.family == "aws":
+        return {row["Key"]: row["Value"] for row in resource["TagList"]}
+    return resource.settings["userLabels"] if cloud.family == "gcp" else resource.tags
+
+
+def owner_label(cloud):
+    return "astrolift.io/managed_service_id" if cloud.family == "aws" else "astrolift-managed-service-id"
+
+
 def creates(cloud):
+    if cloud.family == "aws":
+        return cloud.api.cluster_creates if cloud.variant.startswith("aurora") else cloud.api.creates
     return (
         [kw for op, kw in cloud.api.calls if op == "insert"]
         if cloud.family == "gcp"
@@ -114,8 +163,7 @@ def test_two_saved_orgs_with_colliding_old_names_both_provision(cloud, collision
     for svc, name in zip((first, second), names, strict=True):
         assert name.endswith(svc.guid.hex) and len(name) <= cloud.maximum
         resource = cloud.resources[name]
-        labels = resource.settings["userLabels"] if cloud.family == "gcp" else resource.tags
-        assert labels["astrolift-managed-service-id"] == str(svc.guid)
+        assert labels(cloud, resource)[owner_label(cloud)] == str(svc.guid)
     assert all(
         _provision_sync(svc.pk)["handle"] == result["handle"]
         for svc, result in zip((first, second), results, strict=True)
@@ -132,7 +180,10 @@ def test_recorded_legacy_name_and_resource_survive_changed_prefix_and_slugs(clou
     seeded = cloud.cls(config=cloud.cfg).provision(spec)
     assert seeded.ok and seeded.handle == legacy
     resource = cloud.resources["old-human-resource"]
-    resource.preserved_marker = "existing-provider-data"
+    if isinstance(resource, dict):
+        resource["preserved_marker"] = "existing-provider-data"
+    else:
+        resource.preserved_marker = "existing-provider-data"
     svc.backend_ref = legacy
     svc.save(update_fields=["backend_ref"])
     svc.registered_app.slug = "renamed-app"
@@ -141,7 +192,9 @@ def test_recorded_legacy_name_and_resource_survive_changed_prefix_and_slugs(clou
     result = _provision_sync(svc.pk)
     assert result["ok"] and result["handle"] == legacy
     assert len(creates(cloud)) == 1 and len(cloud.resources) == 1
-    assert cloud.resources["old-human-resource"].preserved_marker == "existing-provider-data"
+    retained = cloud.resources["old-human-resource"]
+    marker = retained["preserved_marker"] if isinstance(retained, dict) else retained.preserved_marker
+    assert marker == "existing-provider-data"
     svc.refresh_from_db()
     assert svc.backend_ref == legacy
 
@@ -157,14 +210,15 @@ def test_foreign_recorded_target_is_refused_without_creating_or_overwriting(clou
     assert not refused["ok"] and len(creates(cloud)) == 1
     name = result["handle"].partition("/")[2]
     resource = cloud.resources[name]
-    labels = resource.settings["userLabels"] if cloud.family == "gcp" else resource.tags
-    assert labels["astrolift-managed-service-id"] == str(owner.guid)
+    assert labels(cloud, resource)[owner_label(cloud)] == str(owner.guid)
 
 
 def test_recorded_handle_for_another_kind_is_refused_before_provider_calls(cloud):
     svc = new_service(cloud, "wrong-kind")
     svc.backend_ref = "other_kind/original-resource"
     svc.save(update_fields=["backend_ref"])
-    with pytest.raises(ValueError, match="recorded"):
+    from aws.managed._base import ManagedServiceError
+
+    with pytest.raises(ManagedServiceError if cloud.family == "aws" else ValueError, match="recorded"):
         _provision_sync(svc.pk)
     assert creates(cloud) == [] and cloud.resources == {}
