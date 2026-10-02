@@ -137,7 +137,12 @@ def measure_resource(
             sum(points[ts] for points in usage.values()),
             sum(points[ts] for points in limits.values()),
         )
-        samples.append((ts, current / bound))
+        if not math.isfinite(current) or not math.isfinite(bound):
+            raise ResourceUnavailable("INVALID_DATA")
+        ratio = current / bound
+        if not math.isfinite(ratio):
+            raise ResourceUnavailable("INVALID_DATA")
+        samples.append((ts, ratio))
         usages.append((ts, current))
         bounds.append((ts, bound))
     return ResourceMeasurement(
