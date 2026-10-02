@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import uuid
 
 import pytest
 from django.test import RequestFactory
@@ -118,6 +119,7 @@ def _post(factory, org_slug, payload, event="push", secret=b"test-secret-123"):
         data=body,
         content_type="application/json",
         HTTP_X_GITHUB_EVENT=event,
+        HTTP_X_GITHUB_DELIVERY=str(uuid.uuid4()),
         HTTP_X_HUB_SIGNATURE_256=sig,
     )
 
@@ -133,11 +135,10 @@ def test_valid_push_triggers_pipeline_run(factory, org, pipeline, push_trigger):
 
     response = pipeline_github_webhook(request, org.slug)
 
-    assert response.status_code == 200
+    assert response.status_code == 503
     data = json.loads(response.content)
-    assert data["status"] == "ok"
-    assert len(data["dispatched"]) == 1
-    assert data["dispatched"][0]["pipeline"] == "ci"
+    assert data["status"] == "retry"
+    assert data["dispatched"] == []
 
     run = PipelineRun.objects.get(pipeline=pipeline)
     assert run.trigger_kind == "push"
@@ -243,8 +244,9 @@ def test_pull_request_event_matches_pr_trigger(factory, org, pipeline):
     request = _post(factory, org.slug, payload, event="pull_request")
     response = pipeline_github_webhook(request, org.slug)
     data = json.loads(response.content)
-    assert data["status"] == "ok"
-    assert len(data["dispatched"]) == 1
+    assert response.status_code == 503
+    assert data["status"] == "retry"
+    assert data["dispatched"] == []
     run = PipelineRun.objects.get(pipeline=pipeline)
     assert run.trigger_kind == "pull_request"
     assert run.trigger_ref == "fix/bug-42"
@@ -293,8 +295,9 @@ def test_gitlab_valid_token_dispatches(factory, gitlab_org, pipeline, push_trigg
         HTTP_X_GITLAB_TOKEN="gitlab-secret-123",
     )
     response = pipeline_gitlab_webhook(request, gitlab_org.slug)
-    assert response.status_code == 200
+    assert response.status_code == 503
     assert PipelineRun.objects.count() == 1
+    assert PipelineRun.objects.get().dispatch_status == "uncertain"
 
 
 def test_gitlab_bad_token_returns_403(factory, gitlab_org, pipeline, push_trigger):

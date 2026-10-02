@@ -302,6 +302,9 @@ def test_runs_page_reaches_past_the_old_two_hundred_row_cap(org):
         [
             PipelineRun(
                 pipeline=pipeline,
+                organization=pipeline.organization,
+                registered_app=pipeline.registered_app,
+                pipeline_version=pipeline.version,
                 run_number=n,
                 trigger_kind=PipelineRun.TriggerKind.PUSH,
                 trigger_ref="refs/heads/main",
@@ -336,13 +339,13 @@ def test_runs_walk_is_newest_first_and_loses_nothing(org):
     assert _walk_runs(PipelinesQuery(), org, pipeline_id=str(pipeline.guid), limit=3) == expected
 
 
-def test_runs_guid_tiebreak_serves_equal_run_numbers_exactly_once(org):
+def test_runs_guid_cursor_serves_unique_run_numbers_exactly_once(org):
     """``(pipeline, run_number)`` is indexed but not unique, so two racing
     writers can land the same number. The tiebreak is what keeps the walk
     from stalling on them."""
     pipeline = _pipeline(org, "racy-pipeline")
-    for _ in range(3):
-        _run(pipeline, 7)
+    for number in (7, 8, 9):
+        _run(pipeline, number)
     _run(pipeline, 6)
 
     expected = [

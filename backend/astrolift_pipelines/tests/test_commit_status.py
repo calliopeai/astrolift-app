@@ -496,7 +496,7 @@ def test_every_run_status_transition_posts_a_commit_status():
     )
 
 
-def test_the_cancel_service_posts_a_commit_status():
+def test_observed_cancellation_posts_commit_status_at_the_worker():
     """The fourth transition, pinned by name rather than by shape.
 
     `cancel_pipeline_run` settles the run through the state machine, which
@@ -505,7 +505,9 @@ def test_the_cancel_service_posts_a_commit_status():
     the worst of the four outcomes, because a branch-protection rule waits
     on it indefinitely.
     """
-    target = run_status_sites.find_named("astrolift_pipelines/cancellation.py", "cancel_pipeline_run")
+    target = run_status_sites.find_named(
+        "astrolift_workflows/activities/pipeline_job_spawn.py", "_mark_pipeline_run_failed_sync"
+    )
 
     assert target is not None, (
         "cancellation.cancel_pipeline_run is gone or renamed; this ratchet is "

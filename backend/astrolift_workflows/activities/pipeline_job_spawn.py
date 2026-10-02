@@ -83,6 +83,13 @@ def _mark_pipeline_run_running_sync(pipeline_run_id: int) -> dict:
     from astrolift_pipelines.toml_fetcher import TomlFetchError, fetch_pipeline_toml
 
     run = PipelineRun.objects.select_related("pipeline__organization").get(pk=pipeline_run_id)
+    if run.request_id and (
+        run.pipeline.version != run.pipeline_version
+        or run.pipeline.organization_id != run.organization_id
+        or run.pipeline.registered_app_id != run.registered_app_id
+        or run.pipeline.deleted_at is not None
+    ):
+        return {"error": "The reviewed pipeline or immutable owner changed before execution", "jobs": []}
     run.status = PipelineRun.Status.RUNNING
     run.started_at = timezone.now()
     run.save(update_fields=["status", "started_at", "updated_at", "version"])
@@ -194,13 +201,19 @@ def _mark_pipeline_run_failed_sync(pipeline_run_id: int, reason: str) -> None:
     from astrolift_pipelines.models import PipelineRun
 
     run = PipelineRun.objects.get(pk=pipeline_run_id)
-    run.status = PipelineRun.Status.FAILURE
+    if reason == "cancelled by signal":
+        run.status = PipelineRun.Status.CANCELLED
+    else:
+        run.status = PipelineRun.Status.FAILURE
     run.finished_at = timezone.now()
     run.save(update_fields=["status", "finished_at", "updated_at", "version"])
     _record_run_metric(run)
     _post_commit_status(run)
+    from astrolift_pipelines.state_machine import _emit_pipeline_run_event
+
+    _emit_pipeline_run_event(run, run.status, actor_display="workflow-worker")
     log.info(
-        "pipeline_run_failed id=%s reason=%s",
+        "pipeline_run_finished id=%s reason=%s",
         pipeline_run_id,
         reason,
     )
@@ -252,7 +265,7 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
         [StepRun(job_run=job_run, step=step, status=StepRun.Status.PENDING) for step in steps]
     )
 
-    org_slug = run.pipeline.organization.slug
+    org_slug = (run.organization if run.organization_id else run.pipeline.organization).slug
     namespace = _pipeline_namespace(org_slug)
     k8s_job_name = _k8s_job_name(run, job)
 
@@ -275,11 +288,25 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
         secret_names = []
 
     try:
-        client = _get_cluster_client(run, job)
         # The secret helpers take a TenantCluster, not a client: they apply
         # through the cluster driver. The parameter was being passed `client`
         # (#1614), so its name and its contents disagreed.
         secret_cluster = _resolve_cluster(run, job)
+        job_run.cluster = secret_cluster
+        job_run.k8s_namespace = namespace
+        job_run.temporal_activity_id = k8s_job_name
+        job_run.cleanup_status = "pending"
+        job_run.save(
+            update_fields=[
+                "cluster",
+                "k8s_namespace",
+                "temporal_activity_id",
+                "cleanup_status",
+                "updated_at",
+                "version",
+            ]
+        )
+        client = _recorded_job_client(job_run)
         _ensure_pipeline_namespace(client, namespace, org_slug)
 
         secret_env: list[dict] = []
@@ -292,7 +319,12 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
             secret_env = make_env_from_refs(k8s_secret, sorted(bundle))
 
         manifest = _build_job_manifest(k8s_job_name, namespace, job, run, script, secret_env)
-        client.server_side_apply(manifest, field_manager="astrolift-pipelines")
+        client.server_side_apply(namespace=namespace, manifest=manifest, dry_run=False)
+        receipt = client.get(kind="Job", namespace=namespace, name=k8s_job_name)
+        job_run.k8s_job_uid = str((receipt or {}).get("metadata", {}).get("uid") or "")
+        if not job_run.k8s_job_uid:
+            raise RuntimeError("The cluster did not return the spawned job identity")
+        job_run.save(update_fields=["k8s_job_uid", "updated_at", "version"])
     except Exception as exc:
         job_run.status = JobRun.Status.FAILURE
         job_run.finished_at = timezone.now()
@@ -302,12 +334,11 @@ def _spawn_pipeline_job_sync(pipeline_run_id: int, job_id_str: str) -> int:
         # credential in the namespace with no pod that needs it and no
         # poll that will ever clean up, since poll only runs for a job
         # that started.
-        if secret_names:
-            _cleanup_secrets_quietly(job_run, namespace, run)
-        raise RuntimeError(f"spawn_pipeline_job failed for {job_id_str!r}: {exc}") from exc
+        _cleanup_secrets_quietly(job_run, namespace, run)
+        raise RuntimeError(f"spawn_pipeline_job failed for {job_id_str!r}") from exc
 
     job_run.temporal_activity_id = k8s_job_name
-    job_run.save(update_fields=["temporal_activity_id", "updated_at", "version"])
+    job_run.save(update_fields=["temporal_activity_id", "k8s_job_uid", "updated_at", "version"])
 
     log.info(
         "spawned k8s Job name=%s namespace=%s job_run_id=%s",
@@ -340,13 +371,18 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         return {"completed": False, "failed": True, "exit_code": None}
 
     run = job_run.pipeline_run
-    org_slug = run.pipeline.organization.slug
     k8s_job_name = job_run.temporal_activity_id
-    namespace = _pipeline_namespace(org_slug)
+    namespace = job_run.k8s_namespace
 
     try:
-        client = _get_cluster_client(run)
+        client = _recorded_job_client(job_run)
         status = client.get(kind="Job", namespace=namespace, name=k8s_job_name)
+        if (
+            status is None
+            or status.get("metadata", {}).get("uid") != job_run.k8s_job_uid
+            or status.get("metadata", {}).get("labels", {}).get("astrolift.io/pipeline-run-id") != str(run.pk)
+        ):
+            raise RuntimeError("The recorded job identity is unavailable or changed")
         job_status = status.get("status") or {}
     except Exception as exc:  # noqa: BLE001 — treat fetch failures as transient
         log.warning("poll_pipeline_job: get failed job_run_id=%s: %s", job_run_id, exc)
@@ -372,8 +408,7 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
         _record_job_metric(job_run)
         # Delete the K8s Job after success — keeps the pipeline namespace tidy.
-        _delete_k8s_job(client, namespace, k8s_job_name)
-        _cleanup_secrets_quietly(job_run, namespace, run, client=client)
+        _cleanup_recorded_quietly(job_run)
         return {"completed": True, "failed": False, "exit_code": 0}
 
     if job_failed or (failed_count > 0 and active == 0):
@@ -391,11 +426,7 @@ def _poll_pipeline_job_sync(job_run_id: int) -> dict:
         job_run.finished_at = timezone.now()
         job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
         _record_job_metric(job_run)
-        _delete_k8s_job(client, namespace, k8s_job_name)
-        # Beside the Job delete on this branch too: a per-run Secret that
-        # outlives the pod is a plaintext credential sitting in a
-        # namespace, and the failure path is the one that gets forgotten.
-        _cleanup_secrets_quietly(job_run, namespace, run, client=client)
+        _cleanup_recorded_quietly(job_run)
         return {"completed": False, "failed": True, "exit_code": exit_code}
 
     # Still running.
@@ -531,10 +562,16 @@ def _capture_job_logs(*, job_run: Any, run: Any, pod: dict | None) -> None:
         # Routed by the job, not the org default: the pod ran on whichever
         # cluster its `runs_on` selected, and reading logs from a different
         # one would come back empty rather than wrong-looking.
-        cluster = _resolve_cluster(run, job_run.job)
+        cluster = job_run.cluster
+        if (
+            cluster is None
+            or cluster.deleted_at is not None
+            or cluster.organization_id not in (None, run.organization_id)
+        ):
+            raise RuntimeError("The recorded log cluster is unavailable")
         lines = async_to_sync(fetch_pod_log_tail)(
             cluster=cluster,
-            namespace=_pipeline_namespace(run.pipeline.organization.slug),
+            namespace=job_run.k8s_namespace,
             pod_name=pod_name,
             tail=PIPELINE_LOG_LINES,
         )
@@ -603,28 +640,29 @@ def _redact_secrets(*, job_run: Any, run: Any, body: str) -> str | None:
 
 
 def _cleanup_secrets_quietly(job_run: Any, namespace: str, run: Any, *, client: Any = None) -> None:
-    """Delete this job run's K8s Secret. Never raises.
-
-    Secret cleanup must not change a run's verdict, which is already
-    decided by the time this is called — but it must also not be skipped,
-    because what is left behind is a plaintext credential in a namespace
-    the pod that needed it has already left.
-    """
-    from astrolift_pipelines.secret_plumbing import cleanup_job_secrets
-
+    """Clean a failed spawn only on its recorded cluster; never guess a job UID."""
+    if job_run.k8s_job_uid:
+        _cleanup_recorded_quietly(job_run)
+        return
     try:
-        cleanup_job_secrets(
-            job_run,
-            namespace=namespace,
-            cluster=_resolve_cluster(run),
-        )
-    except Exception:  # noqa: BLE001
-        log.warning(
-            "cleanup_job_secrets: left behind for job_run=%s in %s",
-            job_run.pk,
-            namespace,
-            exc_info=True,
-        )
+        client = _recorded_job_client(job_run)
+        namespace = job_run.k8s_namespace
+        if not namespace:
+            raise RuntimeError("The recorded namespace is unavailable")
+        name = f"pipeline-job-{job_run.guid}-secrets"
+        secret = client.get(kind="Secret", namespace=namespace, name=name)
+        if secret is not None:
+            metadata = secret.get("metadata", {})
+            if metadata.get("labels", {}).get("astrolift.dev/pipeline-job-run") != str(job_run.guid):
+                raise RuntimeError("The secret owner changed")
+            client.delete(kind="Secret", namespace=namespace, name=name, uid=metadata.get("uid"))
+    except Exception:  # noqa: BLE001 — retain a sanitized, observable failed cleanup
+        pass
+    # Apply may have succeeded even if its receipt was lost. Without that UID
+    # we cannot prove which job is ours, so never report successful cleanup.
+    job_run.cleanup_status = "failed"
+    job_run.cleanup_last_error = "Spawn cleanup could not verify the recorded resource identity"
+    job_run.save(update_fields=["cleanup_status", "cleanup_last_error", "updated_at", "version"])
 
 
 def _cancel_pipeline_job_sync(job_run_id: int) -> None:
@@ -636,32 +674,119 @@ def _cancel_pipeline_job_sync(job_run_id: int) -> None:
         "pipeline_run__pipeline__organization",
     ).get(pk=job_run_id)
 
-    if job_run.status in (
-        JobRun.Status.CANCELLED,
-        JobRun.Status.SUCCESS,
-        JobRun.Status.FAILURE,
-    ):
+    if job_run.status == JobRun.Status.CANCELLED and job_run.cleanup_status == "complete":
         return
 
-    run = job_run.pipeline_run
-    org_slug = run.pipeline.organization.slug
-    k8s_job_name = job_run.temporal_activity_id
-    namespace = _pipeline_namespace(org_slug)
-
     try:
-        client = _get_cluster_client(run)
-        _delete_k8s_job(client, namespace, k8s_job_name)
-        # The third terminal path. A cancelled job leaves exactly the same
-        # plaintext credential behind as a failed one, and poll never runs
-        # again to notice.
-        _cleanup_secrets_quietly(job_run, namespace, run, client=client)
-    except Exception:  # noqa: BLE001 — best-effort
-        pass
+        _cleanup_reviewed_pipeline_job(job_run)
+        job_run.cleanup_status = "complete"
+        job_run.cleanup_last_error = ""
+    except Exception:
+        job_run.cleanup_status = "failed"
+        job_run.cleanup_last_error = "Resource cleanup could not be verified on the recorded cluster"
 
     job_run.status = JobRun.Status.CANCELLED
     job_run.finished_at = timezone.now()
-    job_run.save(update_fields=["status", "finished_at", "updated_at", "version"])
+    job_run.save(
+        update_fields=[
+            "status",
+            "finished_at",
+            "cleanup_status",
+            "cleanup_last_error",
+            "updated_at",
+            "version",
+        ]
+    )
+    from astrolift_pipelines.models import StepRun
+
+    StepRun.objects.filter(job_run=job_run, status__in=["pending", "running"]).update(
+        status="cancelled", finished_at=job_run.finished_at, updated_at=job_run.finished_at
+    )
     _record_job_metric(job_run)
+    from astrolift_pipelines.state_machine import _emit_job_run_event
+
+    _emit_job_run_event(job_run, job_run.status, actor_display="workflow-worker")
+
+
+def _cleanup_recorded_quietly(job_run):
+    try:
+        _cleanup_reviewed_pipeline_job(job_run)
+        job_run.cleanup_status = "complete"
+        job_run.cleanup_last_error = ""
+    except Exception:
+        job_run.cleanup_status = "failed"
+        job_run.cleanup_last_error = "Resource cleanup could not be verified on the recorded cluster"
+    job_run.save(update_fields=["cleanup_status", "cleanup_last_error", "updated_at", "version"])
+
+
+def _cleanup_reviewed_pipeline_job(job_run):
+    """Delete only the recorded incarnation, then prove jobs/pods/secrets absent."""
+    import time
+
+    cluster = job_run.cluster
+    if (
+        cluster is None
+        or cluster.deleted_at is not None
+        or not job_run.k8s_namespace
+        or not job_run.temporal_activity_id
+        or not job_run.k8s_job_uid
+    ):
+        raise RuntimeError("The recorded resource identity is unavailable")
+    if cluster.organization_id not in (None, job_run.pipeline_run.organization_id):
+        raise RuntimeError("The recorded cluster no longer belongs to this organization")
+    client = _recorded_job_client(job_run)
+    namespace = job_run.k8s_namespace
+    name = job_run.temporal_activity_id
+    resource = client.get(kind="Job", namespace=namespace, name=name)
+    if resource is not None:
+        metadata = resource.get("metadata", {})
+        if str(metadata.get("uid")) != job_run.k8s_job_uid or metadata.get("labels", {}).get(
+            "astrolift.io/pipeline-run-id"
+        ) != str(job_run.pipeline_run_id):
+            raise RuntimeError("The job incarnation changed")
+        client.delete(
+            kind="Job",
+            namespace=namespace,
+            name=name,
+            propagation_policy="Foreground",
+            uid=job_run.k8s_job_uid,
+        )
+    secret_name = f"pipeline-job-{job_run.guid}-secrets"
+    secret = client.get(kind="Secret", namespace=namespace, name=secret_name)
+    if secret is not None:
+        metadata = secret.get("metadata", {})
+        if metadata.get("labels", {}).get("astrolift.dev/pipeline-job-run") != str(job_run.guid):
+            raise RuntimeError("The secret owner changed")
+        client.delete(kind="Secret", namespace=namespace, name=secret_name, uid=metadata.get("uid"))
+    for _ in range(20):
+        job = client.get(kind="Job", namespace=namespace, name=name)
+        pods = [
+            pod
+            for pod in client.list(kind="Pod", namespace=namespace)
+            if any(
+                owner.get("uid") == job_run.k8s_job_uid
+                for owner in pod.get("metadata", {}).get("ownerReferences", [])
+            )
+        ]
+        secret = client.get(kind="Secret", namespace=namespace, name=secret_name)
+        if job is None and not pods and secret is None:
+            return
+        time.sleep(0.25)
+    raise RuntimeError("Resource cleanup is still pending")
+
+
+def _recorded_job_client(job_run):
+    from core.cluster_management import _context_for_cluster, _driver_for_cluster
+
+    cluster = job_run.cluster
+    if (
+        cluster is None
+        or cluster.deleted_at is not None
+        or cluster.organization_id not in (None, job_run.pipeline_run.organization_id)
+    ):
+        raise RuntimeError("The recorded pipeline cluster is unavailable")
+    driver = _driver_for_cluster(cluster)
+    return driver._k8s(_context_for_cluster(cluster).slug)
 
 
 def _mark_job_run_cancelled_sync(job_run_id: int) -> None:
@@ -736,7 +861,13 @@ def _resolve_cluster(run: Any, job: Any = None) -> Any:
     """
     from astrolift_pipelines.dispatch_router import route
 
-    org = run.pipeline.organization
+    org = run.organization if getattr(run, "organization_id", None) else run.pipeline.organization
+    if getattr(run, "request_id", None) and (
+        run.pipeline.organization_id != run.organization_id
+        or run.pipeline.registered_app_id != run.registered_app_id
+        or run.pipeline.deleted_at is not None
+    ):
+        raise RuntimeError("The pipeline immutable owner changed before job dispatch")
     runs_on = str(getattr(job, "runs_on", "") or "") if job is not None else ""
 
     decision = route(runs_on or "astrolift/default", org)
@@ -801,9 +932,13 @@ def _get_cluster_client(run: Any, job: Any = None) -> Any:
 
 def _ensure_pipeline_namespace(client: Any, namespace: str, org_slug: str) -> None:
     """Create the pipeline namespace and apply a ResourceQuota if absent."""
-    try:
-        client.get(kind="Namespace", name=namespace, namespace="")
-    except Exception:  # noqa: BLE001 — NotFoundError or similar
+    existing = client.get(kind="Namespace", name=namespace, namespace=None)
+    if (
+        existing is not None
+        and existing.get("metadata", {}).get("labels", {}).get("astrolift.io/org-slug") != org_slug
+    ):
+        raise RuntimeError("The pipeline namespace belongs to a different owner")
+    if existing is None:
         ns_manifest = {
             "apiVersion": "v1",
             "kind": "Namespace",
@@ -816,7 +951,7 @@ def _ensure_pipeline_namespace(client: Any, namespace: str, org_slug: str) -> No
                 },
             },
         }
-        client.server_side_apply(ns_manifest, field_manager="astrolift-pipelines")
+        client.server_side_apply(namespace=None, manifest=ns_manifest, dry_run=False)
 
         quota_manifest = {
             "apiVersion": "v1",
@@ -827,7 +962,7 @@ def _ensure_pipeline_namespace(client: Any, namespace: str, org_slug: str) -> No
             },
             "spec": {"hard": _DEFAULT_RESOURCE_QUOTA},
         }
-        client.server_side_apply(quota_manifest, field_manager="astrolift-pipelines")
+        client.server_side_apply(namespace=namespace, manifest=quota_manifest, dry_run=False)
 
 
 def _build_job_manifest(

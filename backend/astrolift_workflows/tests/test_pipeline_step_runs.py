@@ -67,7 +67,21 @@ def _scaffold(suffix: str, step_specs: list[dict]):
     )
     run = PipelineRun.objects.create(pipeline=pipeline, run_number=1, status=PipelineRun.Status.RUNNING)
     job = Job.objects.create(pipeline=pipeline, job_id="build", name="Build", container_image="alpine")
-    job_run = JobRun.objects.create(pipeline_run=run, job=job, status=JobRun.Status.RUNNING)
+    from astrolift_clusters.models import ProviderPlugin, TenantCluster
+
+    plugin, _ = ProviderPlugin.objects.get_or_create(
+        slug="k8s_native", defaults={"name": "Native", "plugin_version": "test"}
+    )
+    cluster = TenantCluster.objects.create(
+        organization=org,
+        provider_plugin=plugin,
+        name="Recorded log fixture",
+        slug=f"log-fixture-{suffix}",
+        lifecycle="managed",
+    )
+    job_run = JobRun.objects.create(
+        pipeline_run=run, job=job, cluster=cluster, k8s_namespace=NAMESPACE, status=JobRun.Status.RUNNING
+    )
     for spec in step_specs:
         step = Step.objects.create(job=job, **spec)
         StepRun.objects.create(job_run=job_run, step=step, status=StepRun.Status.PENDING)

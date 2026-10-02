@@ -3218,6 +3218,28 @@ type AstroliftJobRun {
   startedAt: DateTime
   finishedAt: DateTime
   createdAt: DateTime!
+  logKind: String!
+  logTruncated: Boolean!
+  stepsTruncated: Boolean!
+  cleanupStatus: String!
+  cleanupLastError: String
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftJobRunPage {
+  items: [AstroliftJobRun!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 type AstroliftLaunchTaskResult {
@@ -3834,6 +3856,8 @@ type AstroliftPipeline {
   triggers: [AstroliftTrigger!]!
   createdAt: DateTime!
   updatedAt: DateTime!
+  version: Int!
+  organizationId: GUID
 }
 
 type AstroliftPipelineMutationResult {
@@ -3870,6 +3894,21 @@ type AstroliftPipelineRun {
   startedAt: DateTime
   finishedAt: DateTime
   createdAt: DateTime!
+  version: Int!
+  pipelineId: GUID
+  organizationId: GUID
+  appId: GUID
+  pipelineVersion: Int!
+  requestId: String
+  temporalWorkflowId: String!
+  temporalRunId: String
+  dispatchStatus: String!
+  dispatchLastError: String
+  cancellationStatus: String!
+  cancellationObservedAt: DateTime
+  cancellationLastError: String
+  cleanupStatus: String!
+  jobsTruncated: Boolean!
 }
 
 type AstroliftPipelineRunMutationResult {
@@ -5340,6 +5379,23 @@ type AstroliftStepRun {
   startedAt: DateTime
   finishedAt: DateTime
   createdAt: DateTime!
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftStepRunPage {
+  items: [AstroliftStepRun!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 type AstroliftTaskRun {
@@ -7785,8 +7841,9 @@ type Mutation {
   updatePipeline(id: GUID!, input: UpdatePipelineInput!): AstroliftPipelineMutationResult!
   deletePipeline(id: GUID!): AstroliftPipelineMutationResult!
   createTrigger(input: CreateTriggerInput!): AstroliftTriggerMutationResult!
-  triggerPipelineRun(pipelineId: GUID!, ref: String = null): AstroliftPipelineRunMutationResult!
-  cancelPipelineRun(runId: GUID!): AstroliftPipelineRunMutationResult!
+  startPipelineRun(input: StartPipelineRunInput!): AstroliftPipelineRunMutationResult!
+  triggerPipelineRun(pipelineId: GUID!, ref: String = null, requestId: String = null, expectedVersion: Int = null, confirmed: Boolean! = false): AstroliftPipelineRunMutationResult!
+  cancelPipelineRun(runId: GUID!, expectedVersion: Int = null, temporalWorkflowId: String = null, temporalRunId: String = null, confirmed: Boolean! = false): AstroliftPipelineRunMutationResult!
   configureAgentTaskCallbacks(allowedHosts: [String!]!): AgentTaskCallbackPolicyMutationResult!
   setAgentTaskCallbackSecret(name: String!, value: String!): AgentTaskCallbackSecretMutationResult!
   redeliverAgentTaskCallback(taskId: GUID!): AstroliftAgentTaskMutationResult!
@@ -7831,6 +7888,11 @@ type Mutation {
   updateOrgSkillRepo(input: UpdateOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
   removeOrgSkillRepo(input: RemoveOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
 
+  """
+  Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response.
+  """
+  startWorkflowDefinition(input: StartWorkflowDefinitionInput!): WorkflowDefinitionStartMutationResult!
+
   """Start a workflow for an object."""
   startWorkflow(workflowSlug: String!, modelLabel: String!, objectId: Int!): StartWorkflowResult!
 
@@ -7846,10 +7908,10 @@ type Mutation {
   overrideWorkflowState(instanceId: ID!, toState: String!, note: String! = ""): MutationResult!
 
   """Create a new workflow definition (platform operator only)."""
-  createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false, patternKind: String = null): MutationResult!
+  createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false, patternKind: String = null, inputSchema: JSON = null): MutationResult!
 
   """Update an org-owned workflow definition (globals are read-only)."""
-  updateWorkflowDefinition(slug: String!, name: String = null, description: String = null, modelLabel: String = null, states: JSON = null, transitions: JSON = null, isEnabled: Boolean = null, patternKind: String = null): MutationResult!
+  updateWorkflowDefinition(slug: String!, name: String = null, description: String = null, modelLabel: String = null, states: JSON = null, transitions: JSON = null, isEnabled: Boolean = null, patternKind: String = null, inputSchema: JSON = null): MutationResult!
 
   """Soft-delete an org-owned workflow definition by slug."""
   deleteWorkflowDefinition(slug: String!): MutationResult!
@@ -8537,6 +8599,9 @@ type Query {
   formDefinition(slug: String!): AstroliftFormDefinition
   formSubmissions(slug: String!, status: String = null): [AstroliftFormSubmission!]!
   formFieldTypes: [String!]!
+  pipelineJobRunsPage(runId: GUID!, limit: Int! = 20, after: String = null): AstroliftJobRunPage!
+  pipelineStepRunsPage(runId: GUID!, jobRunId: GUID!, limit: Int! = 50, after: String = null): AstroliftStepRunPage!
+  pipelineStartRequest(pipelineId: GUID!, requestId: String!): AstroliftPipelineRun
   astroliftPipelineSecrets(pipelineId: GUID!): [AstroliftPipelineSecret!]!
   astroliftPipelines(limit: Int! = 100): [AstroliftPipeline!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftPipelinesPage.")
   astroliftPipelinesPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftPipelinePage!
@@ -8633,6 +8698,16 @@ type Query {
   One visible workflow definition by slug (prefers the org's over a global).
   """
   workflowDefinition(slug: String!, orgId: ID = null): WorkflowDefinitionSummary
+
+  """
+  Review one exact definition GUID and its canonical input/revision contract; no slug substitution.
+  """
+  workflowDefinitionById(id: GUID!): ReviewedWorkflowDefinition
+
+  """
+  Reconcile the authenticated actor's original reviewed start request without dispatching another run.
+  """
+  workflowDefinitionStartRequest(requestId: String!): WorkflowDefinitionStart
 
   """Runs (tier 3) of one configured Workflow, newest first."""
   workflowRuns(workflowId: ID!, orgId: ID = null): [WorkflowRun!]!
@@ -8920,6 +8995,13 @@ input RevealManagedServiceConnectionInput {
   managedServiceId: GUID!
 }
 
+type ReviewedWorkflowDefinition {
+  guid: GUID!
+  revision: String!
+  inputContract: RunInputContract!
+  definition: WorkflowDefinitionSummary!
+}
+
 input RevokeApiTokenInput {
   id: GUID!
 }
@@ -9015,6 +9097,28 @@ input RunAstroliftAgentInput {
   callbackSecretRef: String = null
   correlationId: String = null
   callbackMode: AgentTaskCallbackMode! = FULL
+}
+
+type RunInputContract {
+  schema: JSON
+  digest: String!
+  supported: Boolean!
+  error: String!
+  fields: [RunInputField!]!
+  acceptsInputs: Boolean!
+  supportsSimpleForm: Boolean!
+}
+
+type RunInputField {
+  name: String!
+  kind: String!
+  required: Boolean!
+  hasDefault: Boolean!
+  default: JSON
+  sensitive: Boolean!
+  simple: Boolean!
+  enumValues: JSON
+  constraints: JSON!
 }
 
 input RunJobOnceInput {
@@ -9249,6 +9353,23 @@ input StartDeploymentInput {
   prNumber: Int = null
   commitAuthorAvatarUrl: String = null
   strategy: String = null
+}
+
+input StartPipelineRunInput {
+  pipelineId: GUID!
+  expectedVersion: Int!
+  requestId: String!
+  ref: String = null
+  confirmed: Boolean! = false
+}
+
+input StartWorkflowDefinitionInput {
+  definitionId: GUID!
+  expectedRevision: String!
+  expectedInputSchemaDigest: String!
+  requestId: String!
+  inputs: JSON = null
+  confirmed: Boolean! = false
 }
 
 type StartWorkflowResult {
@@ -9805,6 +9926,26 @@ input WorkflowDefinitionRunsFilter {
   true: runs the viewer started. false: runs someone or something else did.
   """
   startedByMe: Boolean = null
+}
+
+type WorkflowDefinitionStart {
+  id: GUID!
+  requestId: String!
+  definitionId: GUID!
+  organizationId: GUID!
+  definitionRevision: String!
+  inputSchemaDigest: String!
+  executionId: GUID!
+  temporalWorkflowId: String!
+  temporalRunId: String
+  dispatchStatus: String!
+  dispatchLastError: String
+}
+
+type WorkflowDefinitionStartMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: WorkflowDefinitionStart
 }
 
 type WorkflowDefinitionSummary {

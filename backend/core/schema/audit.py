@@ -74,6 +74,7 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "RegisterTenantClusterInput.authConfig",
         "RunAstroliftAgentInput.callbackUrl",
         "RunAstroliftAgentInput.triggerPayload",
+        "StartWorkflowDefinitionInput.inputs",
     }
 )
 

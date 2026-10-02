@@ -48,6 +48,36 @@ def definition_scope(definition, org_id: int | None) -> PermissionScope:
     return project_scope(definition.project if definition is not None else None, org_id)
 
 
+def reviewed_definition_scope(definition, org_id, permission=Permission.WORKFLOW_TRIGGER):
+    from astrolift_identity.api_tokens import get_current_api_token
+    from core.permissions import PermissionDenied
+
+    scope = definition_scope(definition, org_id)
+    token = get_current_api_token()
+    project = definition.project if definition is not None else None
+    if project is not None and (
+        project.deleted_at is not None
+        or project.organization_id != org_id
+        or project.team.deleted_at is not None
+        or project.team.organization_id != org_id
+    ):
+        raise PermissionDenied(permission, scope, "the reviewed definition owner is unavailable")
+    if token is not None:
+        if token.organization_id != org_id or (
+            token.team_id is not None
+            and (
+                project is None
+                or project.deleted_at is not None
+                or project.organization_id != org_id
+                or project.team_id != token.team_id
+                or project.team.deleted_at is not None
+                or project.team.organization_id != org_id
+            )
+        ):
+            raise PermissionDenied(permission, scope, "credential does not cover the reviewed definition")
+    return scope
+
+
 def run_scope(run, org_id: int | None) -> PermissionScope:
     """An ``astrolift_operations.WorkflowRun``'s owner: its app, else its definition's project."""
     if run.registered_app_id is not None:
@@ -131,6 +161,38 @@ def definition_scope_by_slug(field: str = "definition_slug", *, enabled_only: bo
         if enabled_only:
             rows = rows.filter(is_enabled=True)
         return definition_scope(rows.select_related("project").first(), org_id)
+
+    return _scope
+
+
+def definition_scope_by_guid(field: str = "definition_id", permission=Permission.WORKFLOW_TRIGGER):
+    def _scope(args):
+        from workflows.models import WorkflowDefinition
+
+        org_id = _org_id()
+        guid = read_guid(args, field)
+        definition = (
+            WorkflowDefinition.visible_to_org(org_id)
+            .select_related("project")
+            .filter(guid=guid, deleted_at__isnull=True)
+            .first()
+            if guid and org_id is not None
+            else None
+        )
+        return reviewed_definition_scope(definition, org_id, permission=permission)
+
+    return _scope
+
+
+def definition_start_scope(field: str = "request_id"):
+    def _scope(args):
+        from workflows.reviewed_starts import find_start
+
+        org_id = _org_id()
+        row = find_start(str(read_arg(args, field) or "")) if org_id is not None else None
+        return reviewed_definition_scope(
+            row.definition if row is not None else None, org_id, permission=Permission.WORKFLOW_READ
+        )
 
     return _scope
 

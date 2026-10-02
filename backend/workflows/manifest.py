@@ -27,6 +27,7 @@ structured error the app already raises), never a raw exception.
 from __future__ import annotations
 
 import dataclasses
+import json
 import tomllib
 from typing import Any
 
@@ -38,6 +39,7 @@ from astrolift_manifest.parser import (
     _parse_skills,
 )
 from astrolift_manifest.types import SkillRef
+from core.run_input_contract import InputContractError, no_input_schema, validate_schema
 from workflows.models import WorkflowDefinition, WorkflowStage
 
 # Valid value sets are sourced from the models so the serializer stays in
@@ -59,6 +61,7 @@ class WorkflowDefSpec:
     name: str
     pattern: str
     description: str = ""
+    input_schema: dict = dataclasses.field(default_factory=no_input_schema)
 
 
 @dataclasses.dataclass
@@ -149,7 +152,19 @@ def _parse_definition(d: dict[str, Any]) -> WorkflowDefSpec:
     if not isinstance(description, str):
         raise ManifestError("description must be a string", path="workflow.description")
 
-    return WorkflowDefSpec(slug=slug, name=name, pattern=pattern, description=description)
+    try:
+        input_schema = (
+            validate_schema(json.loads(d["input_schema_json"]))
+            if "input_schema_json" in d
+            else no_input_schema()
+        )
+    except (InputContractError, ValueError, TypeError) as exc:
+        raise ManifestError(
+            "input_schema_json must contain a supported JSON Schema object", path="workflow.input_schema_json"
+        ) from exc
+    return WorkflowDefSpec(
+        slug=slug, name=name, pattern=pattern, description=description, input_schema=input_schema
+    )
 
 
 def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
@@ -306,6 +321,10 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
     }
     if parsed.definition.description:
         workflow["description"] = parsed.definition.description
+    if parsed.definition.input_schema != no_input_schema():
+        workflow["input_schema_json"] = json.dumps(
+            parsed.definition.input_schema, sort_keys=True, separators=(",", ":")
+        )
 
     doc: dict[str, Any] = {"workflow": workflow}
 
@@ -357,6 +376,7 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
         name=definition.name or "",
         pattern=definition.pattern_kind,
         description=definition.description or "",
+        input_schema=definition.input_schema,
     )
 
     stages: list[WorkflowStageSpec] = []
@@ -445,6 +465,7 @@ def create_definition_from_manifest(
         slug=slug,
         description=parsed.definition.description or "",
         pattern_kind=parsed.definition.pattern,
+        input_schema=parsed.definition.input_schema,
         model_label="",
         is_enabled=is_enabled,
         created_by=created_by,
@@ -534,9 +555,18 @@ def replace_definition_content(
     definition.name = parsed.definition.name
     definition.description = parsed.definition.description or ""
     definition.pattern_kind = parsed.definition.pattern
+    definition.input_schema = parsed.definition.input_schema
     definition.updated_by = updated_by
     definition.save(
-        update_fields=["name", "description", "pattern_kind", "updated_by", "updated_at", "version"]
+        update_fields=[
+            "name",
+            "description",
+            "pattern_kind",
+            "input_schema",
+            "updated_by",
+            "updated_at",
+            "version",
+        ]
     )
 
     live = list(definition.stages.filter(deleted_at__isnull=True).order_by("order"))

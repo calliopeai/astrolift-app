@@ -30,6 +30,13 @@ class JobRun(BaseCoreModel):
         default=Status.PENDING,
     )
     temporal_activity_id = models.CharField(max_length=512, blank=True, default="")
+    cluster = models.ForeignKey(
+        "astrolift_clusters.TenantCluster", null=True, blank=True, on_delete=models.PROTECT
+    )
+    k8s_namespace = models.CharField(max_length=63, blank=True, default="")
+    k8s_job_uid = models.CharField(max_length=128, blank=True, default="")
+    cleanup_status = models.CharField(max_length=16, default="not_required")
+    cleanup_last_error = models.CharField(max_length=255, blank=True, default="")
     # The tail of the pod's output, captured when the Job settles and
     # before it is deleted (#1218). On JobRun rather than StepRun because
     # a job is one container: every step writes to the same stream, and

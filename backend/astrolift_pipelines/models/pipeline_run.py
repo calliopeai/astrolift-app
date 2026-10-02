@@ -26,6 +26,17 @@ class PipelineRun(BaseCoreModel):
         on_delete=models.CASCADE,
     )
     run_number = models.PositiveIntegerField()
+    organization = models.ForeignKey("astrolift_identity.Organization", null=True, on_delete=models.PROTECT)
+    registered_app = models.ForeignKey(
+        "astrolift_registry.RegisteredApp", null=True, blank=True, on_delete=models.PROTECT
+    )
+    actor_key = models.CharField(max_length=96, blank=True, default="")
+    # Null preserves untracked historical runs under the actor/request uniqueness constraint.
+    request_id = models.CharField(max_length=128, null=True, blank=True)  # noqa: DJ001
+    request_digest = models.CharField(max_length=64, blank=True, default="")
+    pipeline_version = models.PositiveIntegerField(default=0)
+    dispatch_status = models.CharField(max_length=16, default="reserved")
+    dispatch_last_error = models.CharField(max_length=255, blank=True, default="")
     trigger_kind = models.CharField(max_length=32, choices=TriggerKind.choices)
     trigger_ref = models.CharField(max_length=255, blank=True, default="")
     # The commit this run is *of*. `trigger_ref` is a branch or tag name,
@@ -43,6 +54,12 @@ class PipelineRun(BaseCoreModel):
     skip_secrets = models.BooleanField(default=False)
     trigger_actor = models.CharField(max_length=255, blank=True, default="")
     temporal_workflow_id = models.CharField(max_length=512, blank=True, default="")
+    temporal_run_id = models.CharField(max_length=128, blank=True, default="")
+    cancellation_status = models.CharField(max_length=32, default="not_requested")
+    cancellation_requested_at = models.DateTimeField(null=True, blank=True)
+    cancellation_observed_at = models.DateTimeField(null=True, blank=True)
+    cancellation_last_error = models.CharField(max_length=255, blank=True, default="")
+    cleanup_status = models.CharField(max_length=16, default="unknown")
     # What definition this run actually executed (#65, spec requirement 5).
     #
     # `trigger_ref` records the ref that fired the run, which is not the same
@@ -68,6 +85,12 @@ class PipelineRun(BaseCoreModel):
 
     class Meta:
         ordering = ["pipeline", "-run_number"]
+        constraints = [
+            models.UniqueConstraint(fields=["pipeline", "run_number"], name="pipeline_run_number_unique"),
+            models.UniqueConstraint(
+                fields=["organization", "actor_key", "request_id"], name="pipeline_start_request_unique"
+            ),
+        ]
         indexes = [
             models.Index(fields=["pipeline", "-run_number"], name="prun_pipeline_run_number_idx"),
             models.Index(fields=["status"], name="prun_status_idx"),
@@ -75,3 +98,10 @@ class PipelineRun(BaseCoreModel):
 
     def __str__(self) -> str:
         return f"{self.pipeline_id}#{self.run_number}"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            self.organization_id = self.pipeline.organization_id
+            self.registered_app_id = self.pipeline.registered_app_id
+            self.pipeline_version = self.pipeline.version
+        super().save(*args, **kwargs)

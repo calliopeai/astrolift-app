@@ -53,101 +53,24 @@ def get_job_timeout_seconds(job_run: JobRun) -> int:
 
 
 def cancel_pipeline_run(run: PipelineRun, *, actor_display: str = "operator") -> None:
-    """Cancel a pipeline run and all its job runs.
+    """Request exact cancellation; terminal state and cleanup belong to the worker."""
+    from astrolift_pipelines.run_contracts import PipelineContractError, request_pipeline_cancellation
 
-    1. Signals Temporal to stop the PipelineRunWorkflow.
-    2. Marks all pending/running job runs as CANCELLED.
-    3. Marks all pending/running step runs in those jobs as CANCELLED.
-    4. Transitions the PipelineRun itself to CANCELLED.
-    """
-    from django.utils import timezone
-
-    from astrolift_pipelines.models import JobRun, StepRun
-    from astrolift_pipelines.state_machine import (
-        InvalidTransition,
-        transition_job_run,
-        transition_pipeline_run,
+    current = request_pipeline_cancellation(
+        run,
+        expected_version=run.version,
+        workflow_id=run.temporal_workflow_id,
+        temporal_run_id=run.temporal_run_id,
+        trusted_internal=True,
     )
-
-    # Signal Temporal first (best-effort)
-    _signal_temporal_cancel(run)
-
-    now = timezone.now()
-
-    # Cancel all active job runs
-    active_job_runs = JobRun.objects.filter(
-        pipeline_run=run,
-        status__in=["pending", "running"],
-    )
-    for job_run in active_job_runs:
-        # Cancel steps within the job. No live path did this: the Temporal
-        # workflow's cancel handler cascades to JobRun and stops there, and
-        # `_settle_step_runs` only runs when a pod actually completed. So a
-        # cancelled run's steps read `running` forever, in every deployment.
-        #
-        # A bulk update rather than per-row saves because a job can have
-        # many steps and none of them needs an audit event of its own; the
-        # timestamps are set explicitly since `.update()` does not fire
-        # `auto_now`.
-        StepRun.objects.filter(
-            job_run=job_run,
-            status__in=["pending", "running"],
-        ).update(status="cancelled", finished_at=now, updated_at=now)
-
-        try:
-            transition_job_run(job_run, "cancelled", actor_display=actor_display)
-        except InvalidTransition:
-            pass  # Already in a terminal state — skip
-
-    # Transition the pipeline run
-    try:
-        transition_pipeline_run(run, "cancelled", actor_display=actor_display)
-    except InvalidTransition:
-        logger.info("pipelines.cancellation: run %s already in terminal state", run.guid)
-
-    # Metric and commit status live here, at the site that performs the
-    # transition, rather than at the caller. The mutation used to own them,
-    # which meant a second cancel entry point would have to remember both.
-    # Both swallow: the cancel is already committed.
-    from astrolift_pipelines.commit_status import post_commit_status_for_run
-    from astrolift_pipelines.metrics import record_run_completed
-
-    try:
-        record_run_completed(run)
-    except Exception:  # noqa: BLE001
-        logger.warning("pipeline metrics: pipeline_run=%s not recorded", run.pk, exc_info=True)
-    post_commit_status_for_run(run)
-
-    logger.info("pipelines.cancellation: PipelineRun %s cancelled by %s", run.guid, actor_display)
+    if current.cancellation_status == "uncertain":
+        raise PipelineContractError(current.cancellation_last_error)
 
 
 def _signal_temporal_cancel(run: PipelineRun) -> None:
-    """Signal the Temporal PipelineRunWorkflow to cancel.
+    from astrolift_workflows.client import signal_pipeline_execution
 
-    The signature here was wrong for as long as this module had no caller:
-    it passed ``arg=`` and ``task_queue=``, and the real signature is
-    ``signal_workflow(workflow_id, signal_name, *args)``. That is a
-    TypeError, and the bare ``except Exception: pass`` below meant it would
-    have raised on every call and reported nothing -- the cancel signal
-    would silently never reach Temporal. A test suite cannot catch that
-    while nothing calls the function.
-
-    Still best-effort: Temporal may be disabled or the workflow already
-    gone, and the database cascade below is what the operator sees. But it
-    logs now, because "swallowed silently" is how the above survived.
-    """
-    if not run.temporal_workflow_id:
-        return
-    try:
-        from astrolift_workflows.client import signal_workflow
-
-        signal_workflow(run.temporal_workflow_id, "cancel")
-    except Exception:  # noqa: BLE001
-        logger.warning(
-            "pipelines.cancellation: cancel signal failed for run %s",
-            run.guid,
-            exc_info=True,
-        )
+    signal_pipeline_execution(run.temporal_workflow_id, run.temporal_run_id)
 
 
 def build_k8s_job_with_timeout(job_manifest: dict, timeout_seconds: int) -> dict:
@@ -173,6 +96,7 @@ def check_timed_out_runs() -> int:
     from django.utils import timezone
 
     from astrolift_pipelines.models import JobRun
+    from astrolift_pipelines.run_contracts import PipelineContractError
     from astrolift_pipelines.state_machine import (
         InvalidTransition,
         transition_job_run,
@@ -204,5 +128,9 @@ def check_timed_out_runs() -> int:
                 cancel_pipeline_run(pipeline_run, actor_display="timeout-checker")
         except InvalidTransition:
             pass
+        except PipelineContractError:
+            logger.warning(
+                "pipelines.cancellation: exact cancellation unavailable for run %s", job_run.pipeline_run.guid
+            )
 
     return count

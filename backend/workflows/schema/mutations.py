@@ -9,8 +9,13 @@ from django.db.models import Q
 from graphql import GraphQLError
 from strawberry.types import Info
 
+from astrolift_graphql import MutationResultType
+from astrolift_graphql import failure as gql_failure
+from astrolift_graphql import success as gql_success
 from astrolift_identity.operation_context import agent_region_operation, instance_operation
+from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
+from core.mutations import ErrorCode, mutation_audit
 from core.permissions import (
     Permission,
     PermissionDenied,
@@ -25,8 +30,14 @@ from core.schema.common import MutationResult
 from core.schema.common import ValidationError as GQLValidationError
 from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
+from workflows.schema.reviewed_start_types import (
+    StartWorkflowDefinitionInput,
+    WorkflowDefinitionStartType,
+    start_to_type,
+)
 from workflows.schema.types import WorkflowDefinitionType, WorkflowStageType
 from workflows.scopes import (
+    definition_scope_by_guid,
     definition_scope_by_slug,
     instance_scope_by_id,
 )
@@ -188,6 +199,61 @@ def _unique_clone_slug(base_slug, org):
 
 @strawberry.type
 class Mutation:
+    @strawberry.mutation(
+        description="Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response."
+    )
+    @mutation_audit(action="workflow.definition.start")
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=definition_scope_by_guid("input.definition_id"),
+        operation=agent_region_operation,
+    )
+    @requires_elevation(action_label="Start a reviewed workflow definition")
+    @tenant_scoped()
+    def start_workflow_definition(
+        self, info: Info, input: StartWorkflowDefinitionInput
+    ) -> MutationResultType[WorkflowDefinitionStartType]:
+        from django.db import IntegrityError
+
+        from core.run_input_contract import InputContractError
+        from workflows.reviewed_starts import ReviewedStartError, dispatch_start, reserve_start
+
+        if not input.confirmed:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "Explicit confirmation of this reviewed workflow start is required",
+            )
+        try:
+            row = reserve_start(
+                definition_id=input.definition_id,
+                expected_revision=input.expected_revision,
+                expected_input_schema_digest=input.expected_input_schema_digest,
+                request_id=input.request_id,
+                inputs=input.inputs,
+                user=info.context.user,
+            )
+            row = dispatch_start(row)
+        except InputContractError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        except PermissionDenied:
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value, "Current authority does not permit this workflow start"
+            )
+        except ReviewedStartError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+        except IntegrityError:
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                "Concurrent requestId reservation; reconcile the same request before retrying",
+            )
+        except Exception:
+            return gql_failure(ErrorCode.INTERNAL.value, "Unable to reserve this workflow start")
+        if row.dispatch_status != "submitted":
+            result = gql_failure(ErrorCode.PRECONDITION.value, row.dispatch_last_error)
+            result.data = start_to_type(row)
+            return result
+        return gql_success(start_to_type(row))
+
     @strawberry.mutation(description="Start a workflow for an object.")
     @require_permission(Permission.WORKFLOW_TRIGGER, scope=definition_scope_by_slug("workflow_slug"))
     @tenant_scoped()
@@ -437,9 +503,18 @@ class Mutation:
         description: str | None = None,
         is_enabled: bool = False,
         pattern_kind: str | None = None,
+        input_schema: strawberry.scalars.JSON | None = None,
     ) -> MutationResult:
         user = info.context.user
         _require_platform_operator(user)
+        from core.run_input_contract import InputContractError, no_input_schema, validate_schema
+
+        try:
+            declared_schema = validate_schema(input_schema) if input_schema is not None else no_input_schema()
+        except InputContractError as exc:
+            return MutationResult(
+                ok=False, errors=[GQLValidationError(field="input_schema", messages=[str(exc)])]
+            )
 
         # pattern_kind drives the executor's composition (single / chained /
         # fan_out / ...). It existed on the model but had no creation arg, so
@@ -465,6 +540,7 @@ class Mutation:
             description=description or "",
             is_enabled=is_enabled,
             pattern_kind=pattern_kind or WorkflowDefinition.PatternKind.SINGLE,
+            input_schema=declared_schema,
             created_by=user,
             updated_by=user,
         )
@@ -500,6 +576,7 @@ class Mutation:
         transitions: strawberry.scalars.JSON | None = None,
         is_enabled: bool | None = None,
         pattern_kind: str | None = None,
+        input_schema: strawberry.scalars.JSON | None = None,
     ) -> MutationResult:
         user = info.context.user
 
@@ -513,6 +590,16 @@ class Mutation:
                 ok=False,
                 errors=[GQLValidationError(field=write_err[0], messages=[write_err[1]])],
             )
+
+        if input_schema is not None:
+            from core.run_input_contract import InputContractError, validate_schema
+
+            try:
+                workflow.input_schema = validate_schema(input_schema)
+            except InputContractError as exc:
+                return MutationResult(
+                    ok=False, errors=[GQLValidationError(field="input_schema", messages=[str(exc)])]
+                )
 
         if pattern_kind is not None:
             valid_patterns = {c[0] for c in WorkflowDefinition.PatternKind.choices}
@@ -906,6 +993,7 @@ class Mutation:
                 pattern_kind=source.pattern_kind,
                 states=source.states,
                 transitions=source.transitions,
+                input_schema=source.input_schema,
                 is_enabled=source.is_enabled,
                 created_by=user,
                 updated_by=user,

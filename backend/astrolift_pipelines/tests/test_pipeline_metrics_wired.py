@@ -335,7 +335,7 @@ def test_every_terminal_transition_anywhere_records():
     )
 
 
-def test_the_cancel_service_records():
+def test_observed_cancellation_records_at_the_worker():
     """Pinned by name, because the cancel path has no assignment shape.
 
     It settles the run through `state_machine.transition_pipeline_run`,
@@ -347,7 +347,9 @@ def test_the_cancel_service_records():
     GraphQL mutation; moving it to the service means a second cancel entry
     point cannot forget it.
     """
-    target = run_status_sites.find_named("astrolift_pipelines/cancellation.py", "cancel_pipeline_run")
+    target = run_status_sites.find_named(
+        "astrolift_workflows/activities/pipeline_job_spawn.py", "_mark_pipeline_run_failed_sync"
+    )
 
     assert target is not None, (
         "cancellation.cancel_pipeline_run is gone or renamed; this ratchet is "

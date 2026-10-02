@@ -134,29 +134,7 @@ def _find_active_runs_in_group(pipeline: Pipeline, group: str, *, exclude_run: P
 
 
 def _cancel_runs(runs: list, *, reason: str) -> None:
-    """Cancel a list of pipeline runs (mark as cancelled, signal Temporal)."""
-    from astrolift_pipelines.state_machine import transition_pipeline_run
+    from astrolift_pipelines.cancellation import cancel_pipeline_run
 
     for run in runs:
-        try:
-            transition_pipeline_run(run, "cancelled", actor_display="concurrency-policy")
-            _signal_temporal_cancel(run)
-        except Exception:  # noqa: BLE001
-            logger.exception("pipelines.concurrency: failed to cancel run %s", run.guid)
-
-
-def _signal_temporal_cancel(run) -> None:
-    """Signal the Temporal PipelineRunWorkflow to cancel, if running."""
-    if not run.temporal_workflow_id:
-        return
-    try:
-        from astrolift_workflows.client import signal_workflow
-
-        signal_workflow(
-            run.temporal_workflow_id,
-            signal_name="cancel",
-            arg={"reason": "concurrency_policy"},
-            task_queue="pipelines",
-        )
-    except Exception:  # noqa: BLE001
-        pass  # Temporal may not be running — cancel is best-effort
+        cancel_pipeline_run(run, actor_display="concurrency-policy")
