@@ -61,6 +61,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from azure.managed.tags import arm_tags_for as tags_for
 from azure.secrets_keyvault import key_vault_secret_ref
 
@@ -783,20 +784,9 @@ class AzurePostgresFlexibleDriver(ManagedServiceDriver):
             raise
 
     def _server_name_for(self, *, spec: ProvisionSpec) -> str:
-        # Postgres Flexible Server names: 3-63 chars, lowercase letters,
-        # numbers, hyphens; cannot start/end with hyphen.
-        parts = [
-            self._config.server_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "pg",
-        ]
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:63]
+        managed_service_identity(spec.managed_service_id)
+        recorded = recorded_resource_name(spec.recorded_handle, kind=KIND)
+        return recorded or physical_name(spec.managed_service_id, prefix=self._config.server_name_prefix, max_length=63)
 
     def _handle_for(self, *, server_name: str) -> str:
         return f"{KIND}/{server_name}"

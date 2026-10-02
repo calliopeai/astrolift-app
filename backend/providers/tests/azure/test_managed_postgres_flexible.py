@@ -35,7 +35,7 @@ from azure.managed.postgres_flexible import (
     _generate_master_password,
 )
 
-OWNER = "managed-service-guid"
+OWNER = "00000000-0000-4000-8000-000000000001"
 BINDING = "binding-guid"
 
 
