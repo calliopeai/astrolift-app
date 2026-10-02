@@ -190,6 +190,9 @@ def validate_loop_plan(
         raise LoopContractError(
             f"workflow return edges exceed {MAX_STAGE_VISITS} maximum stage visits"
         )
+    first_agent = next(
+        (stage for stage in stages if stage["kind"] == "agent_dispatch"), None
+    )
     execution_units = 0
     for stage, visits in zip(stages, visit_counts, strict=True):
         attempts = (
@@ -198,24 +201,24 @@ def validate_loop_plan(
             else 1
         )
         fanout_value = stage.get("fan_out", stage.get("fan_out_count"))
-        if fanout_value == "dynamic" or stage.get("fan_out_dynamic"):
+        dynamic = stage.get("fan_out_dynamic", False)
+        if type(dynamic) is not bool or isinstance(fanout_value, bool):
+            raise LoopContractError("fan-out must use explicit count and dynamic types")
+        # The executor chooses the first agent wherever it appears. Static
+        # positive counts take precedence; no explicit count makes that
+        # FAN_OUT-pattern agent dynamic, even without a dynamic stage flag.
+        if isinstance(fanout_value, int) and 1 <= fanout_value <= 50:
+            fanout = fanout_value
+        elif fanout_value == "dynamic" or dynamic:
+            if fanout_value not in (None, 0, "dynamic"):
+                raise LoopContractError(
+                    "fan-out must be bounded between 1 and 50 branches"
+                )
             fanout = 50
         elif fanout_value is None or fanout_value == 0:
-            fanout = 1
-        elif (
-            isinstance(fanout_value, bool)
-            or not isinstance(fanout_value, int)
-            or not 1 <= fanout_value <= 50
-        ):
-            raise LoopContractError("fan-out must be bounded between 1 and 50 branches")
+            fanout = 50 if pattern_kind == "fan_out" and stage is first_agent else 1
         else:
-            fanout = fanout_value
-        if (
-            stage["kind"] == "agent_dispatch"
-            and pattern_kind == "fan_out"
-            and stage is stages[0]
-        ):
-            fanout = max(fanout, 50)
+            raise LoopContractError("fan-out must be bounded between 1 and 50 branches")
         execution_units += visits * attempts * max(1, fanout)
     if execution_units > MAX_EXECUTION_UNITS:
         raise LoopContractError(

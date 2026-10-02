@@ -7,6 +7,7 @@ import uuid
 import pytest
 from asgiref.sync import sync_to_async
 from temporalio.api.enums.v1 import EventType
+from temporalio.client import WorkflowFailureError
 from temporalio.worker import Replayer, Worker
 
 from astrolift_identity.models import Organization
@@ -505,4 +506,141 @@ async def test_actual_flowise_import_roundtrip_executes_and_preserves_cap_output
         if row["stage__kind"] == "checkpoint"
     )
     assert all(row["caused_by"].get("reason") == "always" for row in rows[2:])
+    await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
+
+
+def prepare_stored_trailing_fanout_budget():
+    """A real reviewed reservation, then a historical oversized frozen plan."""
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import Project, Team
+    from astrolift_registry.models import RegisteredApp, Workload
+    from core.run_input_contract import canonical_bytes, digest
+    from core.secrets import encrypt_at_rest
+    from core.tenancy import TenantContext, tenant_context
+    from workflows.reviewed_starts import (
+        definition_revision,
+        request_payload,
+        reserve_start,
+    )
+
+    org = Organization.objects.create(name="Fanout budget", slug="fanout-budget")
+    user = get_user_model().objects.create_superuser(
+        username="fanout-budget", email="fanout@example.test", password="test"
+    )
+    team = Team.objects.create(organization=org, name="Budget", slug="budget")
+    project = Project.objects.create(
+        organization=org, team=team, name="Budget", slug="budget"
+    )
+    app = RegisteredApp.objects.create(
+        organization=org,
+        team=team,
+        project=project,
+        name="Budget",
+        slug="budget",
+        provisioning_status="ready",
+    )
+    agent = Workload.objects.create(
+        registered_app=app, name="Worker", slug="worker", kind=Workload.Kind.AGENT
+    )
+    definition = WorkflowDefinition.objects.create(
+        organization=org,
+        name="Fanout budget",
+        slug="fanout-budget",
+        model_label="",
+        pattern_kind="fan_out",
+        is_enabled=True,
+    )
+    WorkflowStage.objects.create(
+        definition=definition,
+        slug="budget-prepare",
+        order=0,
+        kind="checkpoint",
+        output_key="prepare",
+    )
+    stage = WorkflowStage.objects.create(
+        definition=definition,
+        slug="budget-worker",
+        order=1,
+        kind="agent_dispatch",
+        output_key="worker",
+        agent_definition=agent,
+        max_attempts=20,
+        fan_out_count=2,
+    )
+    with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
+        row = reserve_start(
+            definition_id=definition.guid,
+            expected_revision=definition_revision(definition),
+            expected_input_schema_digest=digest(definition.input_schema),
+            request_id="trailing-fanout-budget",
+            inputs={},
+            user=user,
+        )
+    payload = request_payload(row)
+    frozen_stage = payload["plans"][str(definition.pk)]["stages"][1]
+    assert frozen_stage["fan_out_count"] == 2
+    frozen_stage["fan_out_count"] = None
+    sealed = encrypt_at_rest(canonical_bytes(payload))
+    row.payload_backend_kind = sealed.backend_kind
+    row.payload_ciphertext = sealed.backend_ref
+    row.save(
+        update_fields=[
+            "payload_backend_kind",
+            "payload_ciphertext",
+            "updated_at",
+            "version",
+        ]
+    )
+    # The current live target remains valid; the old frozen envelope is what
+    # must be revalidated. Do not silently replace it with the live stages.
+    assert stage.fan_out_count == 2
+    return definition.pk, row.execution.pk, row.execution.workflow_id, stage.pk
+
+
+async def test_actual_frozen_budget_revalidation_refuses_before_any_dispatch(
+    temporal_env,
+):
+    from astrolift_agents.models import AgentTask
+    from workflows.back_edges import LoopContractError
+
+    plan = await sync_to_async(prepare_stored_trailing_fanout_budget)()
+    definition_id, run_id, _, _ = plan
+    with pytest.raises(LoopContractError, match="maximum execution units"):
+        await sync_to_async(activities._get_workflow_stages_sync)(
+            "fanout-budget",
+            str(run_id),
+            workflow_definition_id=str(definition_id),
+            review_bounded_loops=True,
+        )
+    before_tasks = await sync_to_async(AgentTask.objects.count)()
+    async with temporal_worker(
+        temporal_env,
+        workflows=[WorkflowDefinitionRunWorkflow],
+        activities=[activities.get_workflow_stages, activities.mark_workflow_run],
+    ):
+        handle = await start(temporal_env, plan)
+        with pytest.raises(WorkflowFailureError):
+            await asyncio.wait_for(handle.result(), 45)
+        history = await handle.fetch_history()
+    run = await sync_to_async(WorkflowRun.objects.get)(pk=run_id)
+    assert run.status == "failed"
+    assert await sync_to_async(AgentTask.objects.count)() == before_tasks
+    assert not await sync_to_async(
+        WorkflowStageExecution.objects.filter(workflow_run_id=run_id).exists
+    )()
+    scheduled = [
+        event.activity_task_scheduled_event_attributes.activity_type.name
+        for event in history.events
+        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+    ]
+    assert scheduled and set(scheduled) <= {
+        "astrolift.workflow_stage.get_workflow_stages",
+        "astrolift.workflow_stage.mark_workflow_run",
+    }
+    assert not any(
+        event.event_type
+        == EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED
+        for event in history.events
+    )
     await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)

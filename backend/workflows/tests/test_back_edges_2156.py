@@ -303,3 +303,67 @@ def test_new_bounded_execution_refuses_an_unbound_run_mirror():
     with pytest.raises(ValueError, match="does not belong"):
         _create_stage_execution_sync(str(run.pk), str(stage.pk), 1, {"round_number": 1})
     assert not WorkflowStageExecution.objects.filter(workflow_run=run).exists()
+
+
+@pytest.mark.parametrize(
+    "field", [{}, {"fan_out": 0}, {"fan_out_count": None}, {"fan_out_dynamic": True}]
+)
+def test_implicit_fanout_budget_follows_first_agent_after_preparation(field):
+    stages = [
+        {"order": 0, "kind": "checkpoint", "output_key": "prepare"},
+        {
+            "order": 1,
+            "kind": "agent_dispatch",
+            "output_key": "worker",
+            "max_attempts": 20,
+            **field,
+        },
+    ]
+    with pytest.raises(LoopContractError, match="maximum execution units"):
+        validate_loop_plan(stages, pattern_kind="fan_out")
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        {"fan_out": 2},
+        {"fan_out_count": 2},
+        {"fan_out_count": 2, "fan_out_dynamic": True},
+    ],
+)
+def test_explicit_small_fanout_uses_its_actual_static_count(field):
+    validate_loop_plan(
+        [
+            {"order": 0, "kind": "checkpoint", "output_key": "prepare"},
+            {
+                "order": 1,
+                "kind": "agent_dispatch",
+                "output_key": "worker",
+                "max_attempts": 20,
+                **field,
+            },
+        ],
+        pattern_kind="fan_out",
+    )
+
+
+def test_return_visits_multiply_trailing_implicit_agent_fanout_budget():
+    stages = [
+        {"order": 0, "kind": "checkpoint", "output_key": "prepare"},
+        {
+            "order": 1,
+            "kind": "agent_dispatch",
+            "output_key": "worker",
+            "max_attempts": 3,
+        },
+        {
+            "order": 2,
+            "kind": "human_gate",
+            "output_key": "review",
+            "back_edge": edge(to="prepare", max_rounds=4),
+        },
+    ]
+    with pytest.raises(LoopContractError, match="maximum execution units"):
+        validate_loop_plan(stages, pattern_kind="fan_out")
+    stages[1]["fan_out_count"] = 2
+    validate_loop_plan(stages, pattern_kind="fan_out")
