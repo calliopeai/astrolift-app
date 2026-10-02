@@ -103,6 +103,7 @@ def _get_workflow_stages_sync(
         resolve_child_definition,
     )
     from workflows.models import WorkflowDefinition, WorkflowStage
+    from workflows.target_references import reference_guid, reference_matches, references_filter
 
     run = None
     organization_id = review_organization_id
@@ -181,7 +182,12 @@ def _get_workflow_stages_sync(
                 workload = review_agent_workloads.get(stage.agent_definition_id)
             elif stage.agent_ref:
                 workload = next(
-                    (item for item in review_agent_workloads.values() if item.slug == stage.agent_ref), None
+                    (
+                        item
+                        for item in review_agent_workloads.values()
+                        if reference_matches(item, stage.agent_ref)
+                    ),
+                    None,
                 )
         elif workload_guid:
             workload = Workload.objects.filter(
@@ -214,17 +220,28 @@ def _get_workflow_stages_sync(
                     f"stage {stage.order} default agent is outside the run organization or unavailable"
                 )
         elif stage.agent_ref and organization_id is not None:
-            workload = Workload.objects.filter(
-                registered_app__organization_id=organization_id,
-                slug=stage.agent_ref,
-                kind=Workload.Kind.AGENT,
-                deleted_at__isnull=True,
-            ).first()
+            workload = (
+                Workload.objects.filter(
+                    registered_app__organization_id=organization_id,
+                    kind=Workload.Kind.AGENT,
+                    deleted_at__isnull=True,
+                )
+                .filter(references_filter([stage.agent_ref]))
+                .first()
+            )
 
         if stage.kind == WorkflowStage.StageKind.AGENT_DISPATCH and workload is None:
             raise RuntimeError(
                 f"stage {stage.order} has no resolvable agent; bind agent_workload_id or register {stage.agent_ref!r}"
             )
+
+        if (
+            workload is not None
+            and not workload_guid
+            and stage.agent_ref.startswith("guid:")
+            and str(workload.guid) != reference_guid(stage.agent_ref)
+        ):
+            raise RuntimeError(f"stage {stage.order} default agent differs from its explicit GUID reference")
 
         nested_definition = None
         if stage.kind == WorkflowStage.StageKind.WORKFLOW:

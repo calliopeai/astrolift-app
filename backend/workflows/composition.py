@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from django.db.models import Q
 
 from workflows.models import WorkflowDefinition, WorkflowStage
+from workflows.target_references import reference_matches, references_filter
 
 MAX_WORKFLOW_NESTING_DEPTH = 8
 
@@ -28,7 +29,7 @@ def resolve_child_definition_from_candidates(
     visible = [
         candidate
         for candidate in candidates
-        if candidate.slug == ref
+        if reference_matches(candidate, ref)
         and candidate.is_enabled
         and candidate.deleted_at is None
         and (
@@ -57,7 +58,7 @@ def resolve_child_definition_from_candidates(
 
 
 def resolve_child_definition(parent: WorkflowDefinition, workflow_ref: str) -> WorkflowDefinition | None:
-    """Resolve a child slug in the parent's tenant and project visibility.
+    """Resolve a child slug or explicit GUID in the parent's visibility.
 
     Organization-owned definitions shadow global templates. Project-owned
     parents may call definitions in the same project or reusable definitions
@@ -68,10 +69,9 @@ def resolve_child_definition(parent: WorkflowDefinition, workflow_ref: str) -> W
         return None
 
     definitions = WorkflowDefinition.objects.filter(
-        slug=ref,
         is_enabled=True,
         deleted_at__isnull=True,
-    )
+    ).filter(references_filter([ref]))
     if parent.organization_id is None:
         definitions = definitions.filter(organization__isnull=True)
     else:
@@ -171,11 +171,11 @@ def workflow_parent_references(child: WorkflowDefinition) -> list[WorkflowStage]
     candidates = (
         WorkflowStage.objects.filter(
             kind=WorkflowStage.StageKind.WORKFLOW,
-            workflow_ref=child.slug,
             deleted_at__isnull=True,
             definition__is_enabled=True,
             definition__deleted_at__isnull=True,
         )
+        .filter(Q(workflow_ref=child.slug) | Q(workflow_ref=f"guid:{child.guid}"))
         .exclude(definition=child)
         .select_related("definition")
         .order_by("definition__slug", "order")
