@@ -363,3 +363,95 @@ def test_missing_attachment_target_is_refused_not_an_empty_consumer_page(world):
                 read()
             assert error.value.extensions["code"] == "TARGET_UNAVAILABLE"
             assert "RESOURCE_PRIVATE_MARKER" not in str(error.value)
+
+
+def attachment_owner(w, row, project=None):
+    return query.astrolift_project_managed_service_attachment_owner(
+        make_info(w.user),
+        project_id=GUID(str((project or w.medops_project).guid)),
+        attachment_id=GUID(str(row.guid)),
+    )
+
+
+def test_exact_attachment_owner_requires_project_and_live_consumer_permissions(world):
+    grant(world, Permission.PROJECT_READ)
+    env = AppEnvironment.objects.create(
+        registered_app=world.medops_app, name="production", tenant_cluster=world.cluster
+    )
+    row = ManagedServiceAttachment.objects.create(
+        managed_service=world.service,
+        app_environment=env,
+        credential_ref="ATTACHMENT_PRIVATE_MARKER",
+        slice_handle="ATTACHMENT_PRIVATE_MARKER",
+    )
+    with subject(world):
+        assert attachment_owner(world, row) is None
+        binding = grant(world, Permission.APP_READ, slug="attachment-reader2207")
+        with CaptureQueriesContext(connection) as captured:
+            owner = attachment_owner(world, row)
+        assert str(owner.id) == str(world.service.guid)
+        assert owner.context_revision == detail(world).context_revision
+        assert "PRIVATE_MARKER" not in str(owner)
+        for sql in captured:
+            assert '"credential_ref"' not in sql["sql"]
+            assert '"slice_handle"' not in sql["sql"]
+            assert '"config"' not in sql["sql"]
+        binding.delete()
+        assert attachment_owner(world, row) is None
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["deleted", "consumer_deleted", "foreign_project", "moved_consumer", "moved_service", "malformed"],
+)
+def test_attachment_owner_never_follows_missing_foreign_or_changed_consumer(world, change):
+    grant(world, Permission.PROJECT_READ, kind="ORG", target=world.org.pk)
+    grant(world, Permission.APP_READ, kind="ORG", target=world.org.pk, slug="attachment-orgreader2207")
+    env = AppEnvironment.objects.create(
+        registered_app=world.medops_app, name="production", tenant_cluster=world.cluster
+    )
+    row = ManagedServiceAttachment.objects.create(managed_service=world.service, app_environment=env)
+    with subject(world):
+        assert attachment_owner(world, row) is not None
+        if change == "deleted":
+            row.delete()
+        elif change == "consumer_deleted":
+            env.delete()
+        elif change == "foreign_project":
+            assert attachment_owner(world, row, world.platform_project) is None
+            return
+        elif change == "moved_consumer":
+            world.medops_app.project = world.platform_project
+            world.medops_app.save()
+        elif change == "moved_service":
+            world.service.project = world.platform_project
+            world.service.save()
+        else:
+            row.guid = "bad-guid"
+        assert attachment_owner(world, row) is None
+
+
+def test_attachment_owner_graphql_projects_only_safe_exact_metadata(world):
+    from config.schema import schema
+
+    grant(world, Permission.PROJECT_READ)
+    grant(world, Permission.APP_READ, slug="attachment-graphql2207")
+    env = AppEnvironment.objects.create(
+        registered_app=world.medops_app, name="production", tenant_cluster=world.cluster
+    )
+    row = ManagedServiceAttachment.objects.create(
+        managed_service=world.service, app_environment=env, credential_ref="ATTACHMENT_PRIVATE_MARKER"
+    )
+    with subject(world):
+        result = schema.execute_sync(
+            """query($project:GUID!, $attachment:GUID!) {
+              astroliftProjectManagedServiceAttachmentOwner(projectId:$project, attachmentId:$attachment) {
+                id contextRevision ownerScope projectId clusterId
+              }
+            }""",
+            variable_values={"project": str(world.medops_project.guid), "attachment": str(row.guid)},
+            context_value=make_info(world.user).context,
+        )
+    assert result.errors is None
+    assert result.data["astroliftProjectManagedServiceAttachmentOwner"]["id"] == str(world.service.guid)
+    assert "PRIVATE_MARKER" not in str(result.data)

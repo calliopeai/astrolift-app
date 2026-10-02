@@ -8764,6 +8764,7 @@ type Query {
   clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
   clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
   clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
+  astroliftProjectManagedServiceAttachmentOwner(projectId: GUID!, attachmentId: GUID!): AstroliftManagedServiceContext
   astroliftProjectManagedServicesPage(projectId: GUID!, search: String = null, name: String = null, kinds: [String!] = null, statuses: [String!] = null, environmentName: String = null, clusterId: GUID = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceContextPage!
   astroliftProjectManagedService(projectId: GUID!, id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext
   astroliftManagedService(id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext

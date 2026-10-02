@@ -422,6 +422,33 @@ class ManagedResourceReadsQuery:
         scope=services_project_scope_by_guid("project_id", permissions=(Permission.PROJECT_READ,)),
     )
     @tenant_scoped()
+    def astrolift_project_managed_service_attachment_owner(
+        self, info: Info, project_id: GUID, attachment_id: GUID
+    ) -> ManagedServiceContext | None:
+        """Exact visible attachment owner for compatible, reviewed detach (#2207).
+
+        Neither attachment credentials nor provider configuration are loaded.
+        A missing/deleted/foreign/inaccessible attachment has no owner fallback.
+        """
+        tenant = get_current_tenant()
+        guid = _guid(attachment_id)
+        if guid is None or tenant is None:
+            return None
+        owner = (
+            _project_rows(project_id)
+            .filter(project__organization_id=tenant.organization_id, attachments__guid=guid)
+            .first()
+        )
+        if owner is None or not _attachment_rows(owner).filter(guid=guid).exists():
+            return None
+        return to_context(owner)
+
+    @strawberry.field
+    @require_permission(
+        Permission.PROJECT_READ,
+        scope=services_project_scope_by_guid("project_id", permissions=(Permission.PROJECT_READ,)),
+    )
+    @tenant_scoped()
     def astrolift_project_managed_services_page(
         self,
         info: Info,

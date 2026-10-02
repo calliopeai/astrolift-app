@@ -10181,6 +10181,7 @@ export type Query = {
   astroliftPreviewEnvironmentsPage: AstroliftPreviewEnvironmentPage;
   astroliftPrincipalSearch: AstroliftPrincipalPage;
   astroliftProjectManagedService?: Maybe<AstroliftManagedServiceContext>;
+  astroliftProjectManagedServiceAttachmentOwner?: Maybe<AstroliftManagedServiceContext>;
   astroliftProjectManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
   astroliftProjectManagedServiceCatalog: Array<AstroliftManagedServiceCatalogEntry>;
   astroliftProjectManagedServices: Array<AstroliftManagedService>;
@@ -11591,6 +11592,12 @@ export type QueryAstroliftPrincipalSearchArgs = {
 export type QueryAstroliftProjectManagedServiceArgs = {
   expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
+  projectId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftProjectManagedServiceAttachmentOwnerArgs = {
+  attachmentId: Scalars['GUID']['input'];
   projectId: Scalars['GUID']['input'];
 };
 
