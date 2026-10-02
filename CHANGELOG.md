@@ -15,6 +15,11 @@
   distinguishes engine acknowledgement, observed closure and recorded-cluster
   cleanup. Publish capability discovery and reviewed web controls (#2236, #2204).
 
+- Localize cluster list headings, filters, lifecycle menus and overview controls
+  across all eight locales. Keep ordinary refresh and full preflight distinct,
+  with translated request feedback and unchanged provider/auth identifiers,
+  target routes and server diagnostics (#2145).
+
 - Bind reviewed workload restart and scale requests to an explicit environment,
   cluster and namespace with version preconditions and current credential checks.
   Publish exact-target review metadata and accepted-versus-completed outcomes;

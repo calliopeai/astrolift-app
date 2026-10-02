@@ -6390,6 +6390,71 @@
       "exampleCa": "Cluster CA in PEM or base64; optional if already configured",
       "exampleRegion": "Cloud region",
       "exampleCluster": "Cloud cluster name"
+    },
+    "list": {
+      "columns": {
+        "cluster": "Cluster",
+        "status": "Status",
+        "provider": "Provider",
+        "region": "Region",
+        "ingress": "Ingress",
+        "live": "Live",
+        "lastProbe": "Last probe",
+        "registeredBy": "Registered by"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "offline": "Offline"
+      },
+      "searchPlaceholder": "Search clusters...",
+      "register": "Register cluster",
+      "emptyTitle": "No clusters registered",
+      "emptyDescription": "Register a tenant Kubernetes cluster to record its metadata, then bring it into management once its prerequisites are installed.",
+      "emptyLink": "Cluster prerequisites",
+      "never": "never",
+      "heartbeatLast": "Last heartbeat {age}",
+      "heartbeatNone": "No recent heartbeat"
+    },
+    "actions": {
+      "bring": "Bring into management",
+      "refresh": "Refresh setup",
+      "retry": "Retry",
+      "fullPreflight": "Refresh setup with full preflight",
+      "inProgress": "Setup in progress…",
+      "bringAccepted": "Bringing {slug} into management — this can take up to a minute.",
+      "refreshAccepted": "Refreshing {slug}",
+      "fullPreflightAccepted": "Refreshing {slug} (full preflight)",
+      "bringFailed": "Could not bring the cluster into management",
+      "refreshFailed": "Could not refresh cluster management"
+    },
+    "detail": {
+      "notFoundTitle": "No cluster with slug {slug}",
+      "notFoundDescription": "The cluster doesn’t exist or you don’t have permission to view it.",
+      "back": "Back to clusters",
+      "menuLabel": "Cluster actions",
+      "failureTitle": "Last management failure",
+      "failureHelp": "Fix the underlying issue and click Retry from Settings to re-run.",
+      "management": "Management",
+      "activeSince": "Active since {time}",
+      "probedAt": "Capabilities probed {time}",
+      "notManaged": "Not yet brought into management",
+      "auth": "Auth",
+      "capabilitiesTitle": "Capabilities",
+      "capabilitiesDescription": "Detected during the last capability probe. Refresh cluster management to update.",
+      "storageClasses": "Storage classes",
+      "metricsServer": "Metrics server",
+      "installed": "Installed",
+      "notDetected": "Not detected",
+      "actionRequired": "Action required",
+      "actionHelp": "This cluster isn’t managed yet. <settings>Go to Settings</settings> to bring it into management.",
+      "stats": {
+        "appsBound": "Apps bound",
+        "nodes": "Nodes",
+        "podsRunning": "Pods running",
+        "cpu": "CPU",
+        "memory": "Memory"
+      }
     }
   },
   "clusterConnection": {

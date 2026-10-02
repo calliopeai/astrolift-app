@@ -6313,6 +6313,71 @@
       "exampleCa": "CA du cluster en PEM ou base64 ; facultative si déjà configurée",
       "exampleRegion": "Région cloud",
       "exampleCluster": "Nom du cluster cloud"
+    },
+    "list": {
+      "columns": {
+        "cluster": "Cluster",
+        "status": "État",
+        "provider": "Fournisseur",
+        "region": "Région",
+        "ingress": "Entrée",
+        "live": "Connexion",
+        "lastProbe": "Dernière vérification",
+        "registeredBy": "Enregistré par"
+      },
+      "views": {
+        "all": "Tous",
+        "mine": "Les miens",
+        "offline": "Hors ligne"
+      },
+      "searchPlaceholder": "Rechercher des clusters...",
+      "register": "Enregistrer un cluster",
+      "emptyTitle": "Aucun cluster enregistré",
+      "emptyDescription": "Enregistrez un cluster Kubernetes de l’organisation pour conserver ses métadonnées, puis activez sa gestion une fois les prérequis installés.",
+      "emptyLink": "Prérequis du cluster",
+      "never": "jamais",
+      "heartbeatLast": "Dernier signal {age}",
+      "heartbeatNone": "Aucun signal récent"
+    },
+    "actions": {
+      "bring": "Activer la gestion",
+      "refresh": "Actualiser la configuration",
+      "retry": "Réessayer",
+      "fullPreflight": "Actualiser avec vérification préalable complète",
+      "inProgress": "Configuration en cours…",
+      "bringAccepted": "Activation de la gestion de {slug}. Cela peut prendre jusqu’à une minute.",
+      "refreshAccepted": "Actualisation de {slug}",
+      "fullPreflightAccepted": "Actualisation de {slug} (vérification préalable complète)",
+      "bringFailed": "Impossible d’activer la gestion du cluster",
+      "refreshFailed": "Impossible d’actualiser la gestion du cluster"
+    },
+    "detail": {
+      "notFoundTitle": "Aucun cluster avec l’identifiant {slug}",
+      "notFoundDescription": "Le cluster n’existe pas ou vous n’avez pas l’autorisation de le consulter.",
+      "back": "Retour aux clusters",
+      "menuLabel": "Actions du cluster",
+      "failureTitle": "Dernier échec de gestion",
+      "failureHelp": "Corrigez le problème et cliquez sur Réessayer dans les paramètres pour relancer.",
+      "management": "Gestion",
+      "activeSince": "Actif depuis {time}",
+      "probedAt": "Fonctionnalités vérifiées : {time}",
+      "notManaged": "Gestion pas encore activée",
+      "auth": "Authentification",
+      "capabilitiesTitle": "Fonctionnalités",
+      "capabilitiesDescription": "Détectées lors de la dernière vérification des fonctionnalités. Actualisez la gestion du cluster pour les mettre à jour.",
+      "storageClasses": "Classes de stockage",
+      "metricsServer": "Serveur de métriques",
+      "installed": "Installé",
+      "notDetected": "Non détecté",
+      "actionRequired": "Action requise",
+      "actionHelp": "Ce cluster n’est pas encore géré. <settings>Ouvrez les paramètres</settings> pour activer sa gestion.",
+      "stats": {
+        "appsBound": "Apps liées",
+        "nodes": "Nœuds",
+        "podsRunning": "Pods en cours",
+        "cpu": "CPU",
+        "memory": "Mémoire"
+      }
     }
   },
   "clusterConnection": {

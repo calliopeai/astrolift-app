@@ -6313,6 +6313,71 @@
       "exampleCa": "Cluster-CA als PEM oder base64; optional, falls bereits konfiguriert",
       "exampleRegion": "Cloud-Region",
       "exampleCluster": "Name des Cloud-Clusters"
+    },
+    "list": {
+      "columns": {
+        "cluster": "Cluster",
+        "status": "Status",
+        "provider": "Anbieter",
+        "region": "Region",
+        "ingress": "Eingang",
+        "live": "Verbindung",
+        "lastProbe": "Letzte Prüfung",
+        "registeredBy": "Registriert von"
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "offline": "Offline"
+      },
+      "searchPlaceholder": "Cluster suchen...",
+      "register": "Cluster registrieren",
+      "emptyTitle": "Keine Cluster registriert",
+      "emptyDescription": "Registriere einen Kubernetes-Cluster der Organisation, um seine Metadaten zu speichern. Aktiviere die Verwaltung, sobald die Voraussetzungen installiert sind.",
+      "emptyLink": "Cluster-Voraussetzungen",
+      "never": "nie",
+      "heartbeatLast": "Letzter Heartbeat {age}",
+      "heartbeatNone": "Kein aktueller Heartbeat"
+    },
+    "actions": {
+      "bring": "Verwaltung aktivieren",
+      "refresh": "Einrichtung aktualisieren",
+      "retry": "Erneut versuchen",
+      "fullPreflight": "Einrichtung mit vollständiger Vorprüfung aktualisieren",
+      "inProgress": "Einrichtung läuft…",
+      "bringAccepted": "Verwaltung für {slug} wird aktiviert. Dies kann bis zu einer Minute dauern.",
+      "refreshAccepted": "{slug} wird aktualisiert",
+      "fullPreflightAccepted": "{slug} wird aktualisiert (vollständige Vorprüfung)",
+      "bringFailed": "Die Cluster-Verwaltung konnte nicht aktiviert werden",
+      "refreshFailed": "Die Cluster-Verwaltung konnte nicht aktualisiert werden"
+    },
+    "detail": {
+      "notFoundTitle": "Kein Cluster mit der Kennung {slug}",
+      "notFoundDescription": "Der Cluster existiert nicht oder du hast keine Berechtigung, ihn anzuzeigen.",
+      "back": "Zurück zu Clustern",
+      "menuLabel": "Cluster-Aktionen",
+      "failureTitle": "Letzter Verwaltungsfehler",
+      "failureHelp": "Behebe das Problem und klicke unter Einstellungen auf Erneut versuchen.",
+      "management": "Verwaltung",
+      "activeSince": "Aktiv seit {time}",
+      "probedAt": "Funktionen geprüft: {time}",
+      "notManaged": "Verwaltung noch nicht aktiviert",
+      "auth": "Authentifizierung",
+      "capabilitiesTitle": "Funktionen",
+      "capabilitiesDescription": "Bei der letzten Funktionsprüfung erkannt. Aktualisiere die Cluster-Verwaltung, um sie erneut zu prüfen.",
+      "storageClasses": "Speicherklassen",
+      "metricsServer": "Metrikserver",
+      "installed": "Installiert",
+      "notDetected": "Nicht erkannt",
+      "actionRequired": "Aktion erforderlich",
+      "actionHelp": "Dieser Cluster wird noch nicht verwaltet. <settings>Öffne die Einstellungen</settings>, um die Verwaltung zu aktivieren.",
+      "stats": {
+        "appsBound": "Verknüpfte Apps",
+        "nodes": "Knoten",
+        "podsRunning": "Laufende Pods",
+        "cpu": "CPU",
+        "memory": "Arbeitsspeicher"
+      }
     }
   },
   "clusterConnection": {

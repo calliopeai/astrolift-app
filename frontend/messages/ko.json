@@ -6310,6 +6310,71 @@
       "exampleCa": "클러스터 CA (PEM 또는 base64). 이미 설정된 경우 생략 가능",
       "exampleRegion": "클라우드 리전",
       "exampleCluster": "클라우드 클러스터 이름"
+    },
+    "list": {
+      "columns": {
+        "cluster": "클러스터",
+        "status": "상태",
+        "provider": "공급자",
+        "region": "리전",
+        "ingress": "인그레스",
+        "live": "연결",
+        "lastProbe": "마지막 확인",
+        "registeredBy": "등록자"
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목",
+        "offline": "오프라인"
+      },
+      "searchPlaceholder": "클러스터 검색...",
+      "register": "클러스터 등록",
+      "emptyTitle": "등록된 클러스터가 없습니다",
+      "emptyDescription": "조직의 Kubernetes 클러스터를 등록하여 메타데이터를 저장하고 사전 요구 사항을 설치한 후 관리를 활성화하세요.",
+      "emptyLink": "클러스터 사전 요구 사항",
+      "never": "미실행",
+      "heartbeatLast": "마지막 하트비트: {age}",
+      "heartbeatNone": "최근 하트비트가 없습니다"
+    },
+    "actions": {
+      "bring": "관리 활성화",
+      "refresh": "설정 새로 고침",
+      "retry": "다시 시도",
+      "fullPreflight": "전체 사전 점검으로 설정 새로 고침",
+      "inProgress": "설정 진행 중…",
+      "bringAccepted": "{slug}의 관리를 활성화하는 중입니다. 최대 1분 정도 걸릴 수 있습니다.",
+      "refreshAccepted": "{slug} 새로 고침 중",
+      "fullPreflightAccepted": "{slug} 새로 고침 중(전체 사전 점검)",
+      "bringFailed": "클러스터 관리를 활성화하지 못했습니다",
+      "refreshFailed": "클러스터 관리를 새로 고치지 못했습니다"
+    },
+    "detail": {
+      "notFoundTitle": "식별자가 {slug}인 클러스터가 없습니다",
+      "notFoundDescription": "클러스터가 없거나 볼 권한이 없습니다.",
+      "back": "클러스터 목록으로 돌아가기",
+      "menuLabel": "클러스터 작업",
+      "failureTitle": "최근 관리 실패",
+      "failureHelp": "문제를 해결하고 설정에서 다시 시도를 클릭하여 재실행하세요.",
+      "management": "관리",
+      "activeSince": "{time}부터 활성 상태",
+      "probedAt": "기능 확인 시간: {time}",
+      "notManaged": "관리가 아직 활성화되지 않았습니다",
+      "auth": "인증",
+      "capabilitiesTitle": "기능",
+      "capabilitiesDescription": "마지막 기능 확인에서 감지한 내용입니다. 클러스터 관리를 새로 고쳐 업데이트하세요.",
+      "storageClasses": "스토리지 클래스",
+      "metricsServer": "메트릭 서버",
+      "installed": "설치됨",
+      "notDetected": "감지되지 않음",
+      "actionRequired": "작업 필요",
+      "actionHelp": "이 클러스터는 아직 관리되지 않습니다. <settings>설정으로 이동</settings>하여 관리를 활성화하세요.",
+      "stats": {
+        "appsBound": "연결된 앱",
+        "nodes": "노드",
+        "podsRunning": "실행 중인 Pod",
+        "cpu": "CPU",
+        "memory": "메모리"
+      }
     }
   },
   "clusterConnection": {

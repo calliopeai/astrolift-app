@@ -189,8 +189,10 @@ async function review(locale: string, kind: Kind) {
   const t = tFor(locale);
   const label =
     kind === "list"
-      ? tFor(locale, "shared.list")("rowActions", { label: "Clusters" })
-      : "Cluster actions";
+      ? tFor(locale, "shared.list")("rowActions", {
+          label: tFor(locale, "clusters.chrome")("clusters"),
+        })
+      : tFor(locale, "clusters.detail")("menuLabel");
   await userEvent.click(await screen.findByRole("button", { name: label }));
   await userEvent.click(screen.getByRole("menuitem", { name: t("action") }));
   await screen.findByRole("alertdialog");

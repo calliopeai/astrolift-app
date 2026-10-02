@@ -6310,6 +6310,71 @@
       "exampleCa": "集群 CA (PEM 或 base64)；如已配置则可省略",
       "exampleRegion": "云区域",
       "exampleCluster": "云集群名称"
+    },
+    "list": {
+      "columns": {
+        "cluster": "集群",
+        "status": "状态",
+        "provider": "提供商",
+        "region": "区域",
+        "ingress": "入口",
+        "live": "连接",
+        "lastProbe": "最近检查",
+        "registeredBy": "注册者"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "offline": "离线"
+      },
+      "searchPlaceholder": "搜索集群...",
+      "register": "注册集群",
+      "emptyTitle": "尚未注册集群",
+      "emptyDescription": "注册组织的 Kubernetes 集群以保存元数据，然后在安装先决条件后启用管理。",
+      "emptyLink": "集群先决条件",
+      "never": "从未",
+      "heartbeatLast": "最近心跳：{age}",
+      "heartbeatNone": "没有最近的心跳"
+    },
+    "actions": {
+      "bring": "启用管理",
+      "refresh": "刷新配置",
+      "retry": "重试",
+      "fullPreflight": "完整预检后刷新配置",
+      "inProgress": "正在配置…",
+      "bringAccepted": "正在为 {slug} 启用管理，可能需要一分钟。",
+      "refreshAccepted": "正在刷新 {slug}",
+      "fullPreflightAccepted": "正在刷新 {slug}（完整预检）",
+      "bringFailed": "无法启用集群管理",
+      "refreshFailed": "无法刷新集群管理"
+    },
+    "detail": {
+      "notFoundTitle": "没有标识为 {slug} 的集群",
+      "notFoundDescription": "集群不存在，或你没有查看权限。",
+      "back": "返回集群列表",
+      "menuLabel": "集群操作",
+      "failureTitle": "最近的管理失败",
+      "failureHelp": "解决问题后，在设置中点击“重试”以重新运行。",
+      "management": "管理",
+      "activeSince": "自 {time} 起处于活动状态",
+      "probedAt": "功能检查时间：{time}",
+      "notManaged": "尚未启用管理",
+      "auth": "认证",
+      "capabilitiesTitle": "功能",
+      "capabilitiesDescription": "上次功能检查中检测到的内容。刷新集群管理以更新。",
+      "storageClasses": "存储类",
+      "metricsServer": "指标服务器",
+      "installed": "已安装",
+      "notDetected": "未检测到",
+      "actionRequired": "需要操作",
+      "actionHelp": "此集群尚未启用管理。<settings>前往设置</settings>以启用管理。",
+      "stats": {
+        "appsBound": "已关联的应用",
+        "nodes": "节点",
+        "podsRunning": "运行中的 Pod",
+        "cpu": "CPU",
+        "memory": "内存"
+      }
     }
   },
   "clusterConnection": {

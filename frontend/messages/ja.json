@@ -6310,6 +6310,71 @@
       "exampleCa": "クラスター CA (PEM または base64)。設定済みの場合は省略可",
       "exampleRegion": "クラウドのリージョン",
       "exampleCluster": "クラウドのクラスター名"
+    },
+    "list": {
+      "columns": {
+        "cluster": "クラスター",
+        "status": "状態",
+        "provider": "プロバイダー",
+        "region": "リージョン",
+        "ingress": "イングレス",
+        "live": "接続",
+        "lastProbe": "最終確認",
+        "registeredBy": "登録者"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "offline": "オフライン"
+      },
+      "searchPlaceholder": "クラスターを検索...",
+      "register": "クラスターを登録",
+      "emptyTitle": "登録済みクラスターはありません",
+      "emptyDescription": "組織の Kubernetes クラスターを登録してメタデータを保存し、前提条件をインストールした後に管理を有効にします。",
+      "emptyLink": "クラスターの前提条件",
+      "never": "未実施",
+      "heartbeatLast": "最終ハートビート：{age}",
+      "heartbeatNone": "最近のハートビートはありません"
+    },
+    "actions": {
+      "bring": "管理を有効にする",
+      "refresh": "設定を更新",
+      "retry": "再試行",
+      "fullPreflight": "事前確認をすべて行って設定を更新",
+      "inProgress": "設定中…",
+      "bringAccepted": "{slug} の管理を有効にしています。最大 1 分ほどかかる場合があります。",
+      "refreshAccepted": "{slug} を更新中",
+      "fullPreflightAccepted": "{slug} を更新中（完全な事前確認）",
+      "bringFailed": "クラスターの管理を有効にできませんでした",
+      "refreshFailed": "クラスターの管理を更新できませんでした"
+    },
+    "detail": {
+      "notFoundTitle": "識別子 {slug} のクラスターはありません",
+      "notFoundDescription": "クラスターが存在しないか、表示する権限がありません。",
+      "back": "クラスター一覧に戻る",
+      "menuLabel": "クラスターの操作",
+      "failureTitle": "直近の管理エラー",
+      "failureHelp": "問題を修正し、設定で「再試行」をクリックして再実行してください。",
+      "management": "管理",
+      "activeSince": "{time} から稼働中",
+      "probedAt": "機能の確認日時：{time}",
+      "notManaged": "管理はまだ有効になっていません",
+      "auth": "認証",
+      "capabilitiesTitle": "機能",
+      "capabilitiesDescription": "前回の機能確認で検出された内容です。クラスター管理を更新すると最新の状態を確認できます。",
+      "storageClasses": "ストレージクラス",
+      "metricsServer": "メトリクスサーバー",
+      "installed": "インストール済み",
+      "notDetected": "未検出",
+      "actionRequired": "操作が必要です",
+      "actionHelp": "このクラスターはまだ管理されていません。<settings>設定を開いて</settings>管理を有効にしてください。",
+      "stats": {
+        "appsBound": "関連付けられたアプリ",
+        "nodes": "ノード",
+        "podsRunning": "実行中のPod",
+        "cpu": "CPU",
+        "memory": "メモリ"
+      }
     }
   },
   "clusterConnection": {

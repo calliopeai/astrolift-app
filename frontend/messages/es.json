@@ -6313,6 +6313,71 @@
       "exampleCa": "CA del clúster en PEM o base64; opcional si ya está configurada",
       "exampleRegion": "Región de la nube",
       "exampleCluster": "Nombre del clúster en la nube"
+    },
+    "list": {
+      "columns": {
+        "cluster": "Clúster",
+        "status": "Estado",
+        "provider": "Proveedor",
+        "region": "Región",
+        "ingress": "Entrada",
+        "live": "Conexión",
+        "lastProbe": "Última comprobación",
+        "registeredBy": "Registrado por"
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Míos",
+        "offline": "Sin conexión"
+      },
+      "searchPlaceholder": "Buscar clústeres...",
+      "register": "Registrar clúster",
+      "emptyTitle": "No hay clústeres registrados",
+      "emptyDescription": "Registra un clúster de Kubernetes de la organización para guardar sus metadatos y activa su gestión cuando estén instalados los requisitos previos.",
+      "emptyLink": "Requisitos previos del clúster",
+      "never": "nunca",
+      "heartbeatLast": "Último latido {age}",
+      "heartbeatNone": "No hay latidos recientes"
+    },
+    "actions": {
+      "bring": "Activar gestión",
+      "refresh": "Actualizar configuración",
+      "retry": "Reintentar",
+      "fullPreflight": "Actualizar configuración con comprobación completa",
+      "inProgress": "Configuración en curso…",
+      "bringAccepted": "Activando la gestión de {slug}; puede tardar hasta un minuto.",
+      "refreshAccepted": "Actualizando {slug}",
+      "fullPreflightAccepted": "Actualizando {slug} (comprobación completa)",
+      "bringFailed": "No se pudo activar la gestión del clúster",
+      "refreshFailed": "No se pudo actualizar la gestión del clúster"
+    },
+    "detail": {
+      "notFoundTitle": "No hay ningún clúster con el identificador {slug}",
+      "notFoundDescription": "El clúster no existe o no tienes permiso para verlo.",
+      "back": "Volver a los clústeres",
+      "menuLabel": "Acciones del clúster",
+      "failureTitle": "Último fallo de gestión",
+      "failureHelp": "Corrige el problema y pulsa Reintentar en Configuración para volver a ejecutar.",
+      "management": "Gestión",
+      "activeSince": "Activo desde {time}",
+      "probedAt": "Capacidades comprobadas: {time}",
+      "notManaged": "La gestión aún no está activada",
+      "auth": "Autenticación",
+      "capabilitiesTitle": "Capacidades",
+      "capabilitiesDescription": "Detectadas en la última comprobación de capacidades. Actualiza la gestión del clúster para actualizarlas.",
+      "storageClasses": "Clases de almacenamiento",
+      "metricsServer": "Servidor de métricas",
+      "installed": "Instalado",
+      "notDetected": "No detectado",
+      "actionRequired": "Se requiere una acción",
+      "actionHelp": "Este clúster aún no está gestionado. <settings>Ve a Configuración</settings> para activar su gestión.",
+      "stats": {
+        "appsBound": "Apps vinculadas",
+        "nodes": "Nodos",
+        "podsRunning": "Pods en ejecución",
+        "cpu": "CPU",
+        "memory": "Memoria"
+      }
     }
   },
   "clusterConnection": {
