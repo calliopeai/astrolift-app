@@ -20,6 +20,8 @@ pytestmark = pytest.mark.django_db
         ("gcp", "mysql_cloudsql", "mysql"),
         ("azure", "postgres_flexible", "postgres"),
         ("azure", "mysql_flexible", "mysql"),
+        ("gcp", "redis_memorystore", "redis"),
+        ("azure", "cache_redis", "redis"),
         ("aws", "aurora", "postgres"),
         ("aws", "aurora", "mysql"),
         ("aws", "mssql_rds", "mssql"),
@@ -29,18 +31,30 @@ def cloud(request, monkeypatch):
     family, variant, kind = request.param
     fixture = import_module(f"providers.tests.{family}.test_managed_{variant}")
     if family == "gcp":
-        cls = fixture.CloudSQLPostgresDriver if kind == "postgres" else fixture.CloudSQLMySQLDriver
-        config = fixture.CloudSQLConfig if kind == "postgres" else fixture.CloudSQLMySQLConfig
-        api, secrets = fixture.FakeSqlClient(), fixture.FakeSecretClient()
+        if kind == "redis":
+            cls, config = fixture.MemorystoreRedisDriver, fixture.MemorystoreConfig
+            api, transport, maximum = fixture.FakeRedisClient(), "redis_client", 40
+        else:
+            cls = fixture.CloudSQLPostgresDriver if kind == "postgres" else fixture.CloudSQLMySQLDriver
+            config = fixture.CloudSQLConfig if kind == "postgres" else fixture.CloudSQLMySQLConfig
+            api, transport, maximum = fixture.FakeSqlClient(), "sql_client", 98
+        secrets = fixture.FakeSecretClient()
         cfg = config(project_id="shared-test-project", region="us-west1")
-        resources, prefix, maximum = api.instances, "instance_name_prefix", 98
+        resources, prefix = api.instances, "instance_name_prefix"
 
         class Driver(cls):
             def __init__(self, *, config):
-                super().__init__(config=config, sql_client=api, secrets_client=secrets)
+                super().__init__(config=config, **{transport: api}, secrets_client=secrets)
     elif family == "azure":
-        cls = fixture.AzurePostgresFlexibleDriver if kind == "postgres" else fixture.AzureMySQLFlexibleDriver
-        config = fixture.AzurePostgresConfig if kind == "postgres" else fixture.AzureMySQLConfig
+        if kind == "redis":
+            cls, config = fixture.AzureCacheRedisDriver, fixture.AzureCacheRedisConfig
+        else:
+            cls = (
+                fixture.AzurePostgresFlexibleDriver
+                if kind == "postgres"
+                else fixture.AzureMySQLFlexibleDriver
+            )
+            config = fixture.AzurePostgresConfig if kind == "postgres" else fixture.AzureMySQLConfig
         api, secrets = fixture.FakeMgmtClient(), fixture.FakeSecretClient()
         cfg = config(
             subscription_id="shared-test-subscription",
@@ -50,7 +64,11 @@ def cloud(request, monkeypatch):
             mgmt_client=api,
             secret_client=secrets,
         )
-        resources, prefix, maximum = api.servers_obj.servers, "server_name_prefix", 63
+        resources, prefix, maximum = (
+            (api.redis_obj.caches, "cache_name_prefix", 63)
+            if kind == "redis"
+            else (api.servers_obj.servers, "server_name_prefix", 63)
+        )
 
         class Driver(cls):
             pass
@@ -76,6 +94,8 @@ def cloud(request, monkeypatch):
         "postgres_flexible": "azure_pg_flex",
         "mysql_flexible": "azure_mysql_flex",
         "aurora": "aurora_postgres" if kind == "postgres" else "aurora_mysql",
+        "redis_memorystore": "memorystore",
+        "cache_redis": "azure_cache_redis",
         "mssql_rds": "rds_sqlserver_express",
     }[variant]
     state = SimpleNamespace(
@@ -119,7 +139,9 @@ def new_service(cloud, org_slug, app_slug="api"):
 def labels(cloud, resource):
     if cloud.family == "aws":
         return {row["Key"]: row["Value"] for row in resource["TagList"]}
-    return resource.settings["userLabels"] if cloud.family == "gcp" else resource.tags
+    if cloud.family == "gcp":
+        return resource.labels if cloud.kind == "redis" else resource.settings["userLabels"]
+    return resource.tags
 
 
 def owner_label(cloud):
@@ -130,9 +152,11 @@ def creates(cloud):
     if cloud.family == "aws":
         return cloud.api.cluster_creates if cloud.variant.startswith("aurora") else cloud.api.creates
     return (
-        [kw for op, kw in cloud.api.calls if op == "insert"]
+        [kw for op, kw in cloud.api.calls if op == ("create_instance" if cloud.kind == "redis" else "insert")]
         if cloud.family == "gcp"
-        else cloud.api.servers_obj.create_calls
+        else (
+            cloud.api.redis_obj.create_calls if cloud.kind == "redis" else cloud.api.servers_obj.create_calls
+        )
     )
 
 
