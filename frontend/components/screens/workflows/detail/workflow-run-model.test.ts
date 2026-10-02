@@ -276,3 +276,31 @@ it("keeps branch start times and refuses identity mismatches", () => {
     placeExecutions(PLAN, [{ ...branch, fanoutStageId: "different-stage" }])[0]!.branch
   ).toBeNull();
 });
+
+it("reads collection item identity without inventing a parallel branch or a round", () => {
+  const rows = [
+    execution("item-one", 1, "checkpoint", {
+      roundNumber: 1,
+      collectionParentExecutionGuid: "collection-parent",
+      collectionStageId: "collection-stage",
+      collectionIndex: 0,
+    }),
+    execution("item-two", 1, "checkpoint", {
+      roundNumber: 1,
+      collectionParentExecutionGuid: "collection-parent",
+      collectionStageId: "collection-stage",
+      collectionIndex: 1,
+    }),
+  ];
+  const placed = placeExecutions([], rows);
+  expect(placed.map((row) => row.collectionItem)).toEqual([1, 2]);
+  expect(placed.map((row) => row.branch)).toEqual([null, null]);
+  expect(placed.map((row) => row.round)).toEqual([1, 1]);
+  expect(
+    runRounds([], rows, { live: false }, NOW)[0]!.items.map((row) => row.collectionItem)
+  ).toEqual([1, 2]);
+  expect(
+    placeExecutions([], [execution("unverified", 1, "checkpoint", { collectionIndex: 3 })])[0]!
+      .collectionItem
+  ).toBeNull();
+});

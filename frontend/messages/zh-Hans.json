@@ -7018,5 +7018,21 @@
     "continue": "使用回退结果完成",
     "importedHint": "导入的 Loop v1.2 保留其返回目标和完成策略。要更改源映射，请编辑原生清单。",
     "importedFallback": "源回退结果"
+  },
+  "workflowCollections": {
+    "collectionKind": "串行集合",
+    "title": "有界串行集合",
+    "formatKind": "记录格式化",
+    "serialHint": "按顺序为每个项目执行指定流程。所有项目按其失败策略结束后才完成。",
+    "cap": "最大项目数 (1–50)",
+    "bodyEnd": "流程最后的输出键",
+    "staticItems": "{count} 个固定来源项目",
+    "itemsPath": "输入集合字段",
+    "importedHint": "修改项目上限时，导入的记录和 Parser 流程保持不变。",
+    "invalid": "请选择有效的后续流程目标，并设置足以容纳来源集合的上限。",
+    "formatHint": "使用命名字段格式化 JSON 记录。结果包含生成的 UTC 时间戳。",
+    "pattern": "记录模板",
+    "separator": "分隔符 (JSON 字符串)",
+    "item": "集合项目 {index}"
   }
 }

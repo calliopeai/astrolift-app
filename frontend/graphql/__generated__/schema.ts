@@ -8092,6 +8092,7 @@ export type MutationCreateWorkflowStageArgs = {
   backEdge?: InputMaybe<Scalars['JSON']['input']>;
   environmentSpecSlug?: InputMaybe<Scalars['String']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
+  iteration?: InputMaybe<Scalars['JSON']['input']>;
   kind: Scalars['String']['input'];
   maxAttempts?: Scalars['Int']['input'];
   onFailure?: Scalars['String']['input'];
@@ -9575,6 +9576,7 @@ export type MutationUpdateWorkflowStageArgs = {
   backEdge?: InputMaybe<Scalars['JSON']['input']>;
   environmentSpecSlug?: InputMaybe<Scalars['String']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
+  iteration?: InputMaybe<Scalars['JSON']['input']>;
   kind?: InputMaybe<Scalars['String']['input']>;
   maxAttempts?: InputMaybe<Scalars['Int']['input']>;
   onFailure?: InputMaybe<Scalars['String']['input']>;
@@ -13739,6 +13741,7 @@ export type WorkflowManifestStageType = {
   backEdge: Scalars['JSON']['output'];
   environmentSpecSlug?: Maybe<Scalars['String']['output']>;
   fanOut: Scalars['String']['output'];
+  iteration: Scalars['JSON']['output'];
   kind: Scalars['String']['output'];
   maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];
@@ -13768,6 +13771,9 @@ export type WorkflowStageExecutionType = {
   childWorkflowDefinitionSlug?: Maybe<Scalars['String']['output']>;
   childWorkflowRunGuid?: Maybe<Scalars['String']['output']>;
   childWorkflowStatus?: Maybe<Scalars['String']['output']>;
+  collectionIndex?: Maybe<Scalars['Int']['output']>;
+  collectionParentExecutionGuid?: Maybe<Scalars['String']['output']>;
+  collectionStageId?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['DateTime']['output'];
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   errorMessage: Scalars['String']['output'];
@@ -13813,6 +13819,7 @@ export type WorkflowStageType = {
   environmentSpecSlug: Scalars['String']['output'];
   fanOutCount?: Maybe<Scalars['Int']['output']>;
   guid: Scalars['ID']['output'];
+  iteration: Scalars['JSON']['output'];
   kind: Scalars['String']['output'];
   maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];
@@ -13836,6 +13843,7 @@ export type WorkflowTopologyStage = {
   fanOutDynamic: Scalars['Boolean']['output'];
   guid: Scalars['String']['output'];
   hasPrompt: Scalars['Boolean']['output'];
+  iteration: Scalars['JSON']['output'];
   kind: Scalars['String']['output'];
   maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];

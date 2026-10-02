@@ -84,3 +84,31 @@ for (const locale of ["en", "es", "de", "fr", "ja", "ko", "pt-BR", "zh-Hans"]) {
     expect(errors).toEqual([]);
   });
 }
+
+for (const locale of ["en", "es", "de", "fr", "ja", "ko", "pt-BR", "zh-Hans"]) {
+  test(`serial collection controls preserve fixed source inputs in ${locale}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const messages = JSON.parse(
+      readFileSync(path.join("messages", `${locale}.json`), "utf8")
+    ).workflowCollections;
+    await page.goto(
+      "/iframe.html?id=workflows-collectionstageoptions--translations&viewMode=story"
+    );
+    const section = page.locator(`[data-locale="${locale}"]`);
+    await expect(section.getByLabel(messages.bodyEnd)).toBeDisabled();
+    await section.getByLabel(messages.cap).fill("4");
+    await expect(section.getByLabel("iteration JSON")).toContainText('"max_items":4');
+    await expect(section.getByLabel("iteration JSON")).toContainText('"text":"second"');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+  });
+}
+test("serial items are visibly separate from parallel branches", async ({ page }) => {
+  await page.goto(
+    "/iframe.html?id=screens-workflows-detail-workflowrunscreen--serial-collection&viewMode=story"
+  );
+  await expect(page.getByText("Collection item 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Collection item 2", { exact: true })).toBeVisible();
+  await expect(page.getByText(/branches settled/)).toHaveCount(0);
+});

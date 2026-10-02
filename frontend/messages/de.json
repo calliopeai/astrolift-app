@@ -7021,5 +7021,21 @@
     "continue": "Mit Fallback-Ergebnis abschließen",
     "importedHint": "Der importierte Loop v1.2 behält sein Ziel und seine Abschlussrichtlinie. Bearbeiten Sie das native Manifest, um die Quellzuordnung zu ändern.",
     "importedFallback": "Fallback der Quelle"
+  },
+  "workflowCollections": {
+    "collectionKind": "Serielle Sammlung",
+    "title": "Begrenzte serielle Sammlung",
+    "formatKind": "Datensatzformatierung",
+    "serialHint": "Führt den angegebenen Ablauf für jedes Element der Reihe nach aus. Fertig, wenn alle Elemente gemäß ihrer Fehlerregel beendet sind.",
+    "cap": "Maximale Elemente (1–50)",
+    "bodyEnd": "Letzter Ausgabeschlüssel des Ablaufs",
+    "staticItems": "{count} feste Quellelemente",
+    "itemsPath": "Feld der Eingabesammlung",
+    "importedHint": "Importierte Datensätze und der Parser-Ablauf bleiben beim Ändern der Grenze erhalten.",
+    "invalid": "Wähle ein gültiges späteres Ablaufziel und eine ausreichende Elementgrenze.",
+    "formatHint": "Formatiert einen JSON-Datensatz mit benannten Feldern. Das Ergebnis enthält einen UTC-Zeitstempel.",
+    "pattern": "Datensatzmuster",
+    "separator": "Trennzeichen (JSON-Zeichenfolge)",
+    "item": "Sammlungselement {index}"
   }
 }

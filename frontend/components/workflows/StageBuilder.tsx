@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 /**
  * Stage-based workflow definition builder (spec 40 §5.1, #970), the
  * workflow's Builder tab (spec 44 §5.2).
@@ -57,6 +59,7 @@ import {
 } from "lucide-react";
 
 import { BoundedStageOptions } from "./BoundedStageOptions";
+import { CollectionStageOptions } from "./CollectionStageOptions";
 
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
@@ -160,6 +163,7 @@ export type StageDraft = {
   timeoutSeconds: number;
   maxAttempts?: number;
   backEdge?: unknown;
+  iteration?: unknown;
   backEdgeValueJson?: string;
   prompt: string;
   outputKey: string;
@@ -185,6 +189,7 @@ function draftFromStage(stage: WorkflowStage): StageDraft {
     timeoutSeconds: stage.timeoutSeconds,
     maxAttempts: stage.maxAttempts ?? 3,
     backEdge: stage.backEdge ?? {},
+    iteration: stage.iteration ?? {},
     prompt: stage.prompt,
     outputKey: stage.outputKey,
     approvers: parseSkillRefs(stage.approvers),
@@ -205,6 +210,7 @@ function emptyDraft(): StageDraft {
     timeoutSeconds: 300,
     maxAttempts: 3,
     backEdge: {},
+    iteration: {},
     prompt: "",
     outputKey: "",
     approvers: [],
@@ -239,10 +245,21 @@ function StageEditorFields({
   orgScoped: string | null;
   disabled: boolean;
 }) {
+  const t = useTranslations("workflowCollections");
+  const followingKeys = useContext(StageTargetsContext)
+    .filter((stage) => stage.order > stageOrder && stage.outputKey)
+    .map((stage) => stage.outputKey);
   const previousKeys = useContext(StageTargetsContext)
     .filter((stage) => stage.order < stageOrder && stage.outputKey)
     .map((stage) => stage.outputKey);
-  const kindMeta = stageKindMeta(draft.kind);
+  const kindMeta = {
+    ...stageKindMeta(draft.kind),
+    ...(draft.kind === "collection"
+      ? { label: t("collectionKind") }
+      : draft.kind === "format_record"
+        ? { label: t("formatKind") }
+        : {}),
+  };
   const options = useContext(PickerOptionsContext);
   return (
     <div className="flex flex-col gap-3">
@@ -254,6 +271,14 @@ function StageEditorFields({
             onPatch({
               kind: v,
               workflowRef: v === "workflow" ? draft.workflowRef : "",
+              iteration:
+                v === draft.kind
+                  ? draft.iteration
+                  : v === "collection"
+                    ? { max_items: 10, body_end: followingKeys[0] ?? "", items_path: "items" }
+                    : v === "format_record"
+                      ? { source_format: "langflow_parser", pattern: "{text}", separator: "\n" }
+                      : {},
             })
           }
           disabled={disabled}
@@ -262,11 +287,16 @@ function StageEditorFields({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {STAGE_KINDS.map((k) => (
-              <SelectItem key={k.value} value={k.value}>
-                {k.label}
-              </SelectItem>
-            ))}
+            {(draft.kind === "collection" || followingKeys.length > 0
+              ? [...STAGE_KINDS, { value: "collection", label: t("collectionKind") }]
+              : STAGE_KINDS
+            )
+              .concat([{ value: "format_record", label: t("formatKind") }])
+              .map((k) => (
+                <SelectItem key={k.value} value={k.value}>
+                  {k.label}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
         {kindMeta.hint && <p className="text-muted-foreground text-2xs">{kindMeta.hint}</p>}
@@ -460,6 +490,13 @@ function StageEditorFields({
           />
         </div>
       </div>
+      <CollectionStageOptions
+        kind={draft.kind}
+        iteration={draft.iteration ?? {}}
+        targets={followingKeys}
+        disabled={disabled}
+        onChange={(iteration) => onPatch({ iteration })}
+      />
       <BoundedStageOptions
         kind={draft.kind}
         maxAttempts={draft.maxAttempts ?? 3}
@@ -503,7 +540,15 @@ function StageCard({
   onMove,
 }: StageCardProps) {
   const [draft, setDraft] = useState<StageDraft>(() => draftFromStage(stage));
-  const meta = stageKindMeta(stage.kind);
+  const t = useTranslations("workflowCollections");
+  const meta = {
+    ...stageKindMeta(stage.kind),
+    ...(stage.kind === "collection"
+      ? { label: t("collectionKind") }
+      : stage.kind === "format_record"
+        ? { label: t("formatKind") }
+        : {}),
+  };
   const KindIcon = meta.icon;
 
   return (

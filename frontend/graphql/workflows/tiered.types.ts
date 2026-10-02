@@ -62,6 +62,7 @@ export type WorkflowTopologyStage = {
   onFailure: string;
   maxAttempts?: number;
   backEdge?: unknown;
+  iteration?: unknown;
   timeoutSeconds: number;
 };
 
@@ -82,6 +83,7 @@ export type WorkflowStage = {
   onFailure: string;
   maxAttempts?: number;
   backEdge?: unknown;
+  iteration?: unknown;
   timeoutSeconds: number;
   createdAt: string;
   agentDefinitionGuid: string | null;
@@ -154,6 +156,9 @@ export type WorkflowStageExecution = {
   fanoutStageId?: string | null;
   fanoutParentExecutionGuid?: string | null;
   fanoutIndex?: number | null;
+  collectionIndex?: number | null;
+  collectionStageId?: string | null;
+  collectionParentExecutionGuid?: string | null;
   startedAt: string | null;
   endedAt: string | null;
   output: unknown;
@@ -194,6 +199,7 @@ export type WorkflowManifestStage = {
   onFailure: string;
   maxAttempts?: number;
   backEdge?: unknown;
+  iteration?: unknown;
   timeout: number;
   fanOut: string;
   prompt: string | null;

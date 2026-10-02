@@ -69,6 +69,7 @@ const DEFINITION_SUMMARY_FIELDS = `
     onFailure
     maxAttempts
     backEdge
+    iteration
     timeoutSeconds
   }
   createdAt
@@ -90,6 +91,7 @@ const STAGE_FIELDS = `
   onFailure
   maxAttempts
   backEdge
+  iteration
   timeoutSeconds
   createdAt
   agentDefinitionGuid
@@ -235,6 +237,9 @@ export const LIST_WORKFLOW_STAGE_EXECUTIONS = gql`
       fanoutStageId
       fanoutParentExecutionGuid
       fanoutIndex
+      collectionIndex
+      collectionStageId
+      collectionParentExecutionGuid
       startedAt
       endedAt
       output
@@ -293,6 +298,7 @@ export const PREVIEW_WORKFLOW_MANIFEST = gql`
         onFailure
         maxAttempts
         backEdge
+        iteration
         timeout
         fanOut
         prompt

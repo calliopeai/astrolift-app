@@ -127,6 +127,7 @@ export interface PlacedExecution {
   attempt: number;
   /** A fan-out's branch: which one, 1-based. */
   branch: number | null;
+  collectionItem: number | null;
   /** Why this execution happened again: the loop or retry, in words. */
   causedBy: { loopId: string; reason: string; maxRounds: number; edgeRound: number } | null;
 }
@@ -237,6 +238,14 @@ export function placeExecutions(
       round,
       attempt: Math.max(1, x.attemptNumber),
       branch,
+      collectionItem:
+        x.collectionParentExecutionGuid &&
+        x.collectionStageId &&
+        Number.isInteger(x.collectionIndex) &&
+        (x.collectionIndex ?? -1) >= 0 &&
+        (x.collectionIndex ?? 50) < 50
+          ? x.collectionIndex! + 1
+          : null,
       causedBy,
     });
   }
@@ -257,6 +266,7 @@ export interface RunBranchItem {
 }
 
 export interface RunStepItem {
+  collectionItem?: number | null;
   id: string;
   name: string;
   state: ExecState;
@@ -374,6 +384,7 @@ export function runRounds(
     r.items.push({
       id: x.guid,
       name: p.name,
+      collectionItem: p.collectionItem,
       state: p.state,
       durationMs: spanOf(x, now),
       attempt: p.attempt,

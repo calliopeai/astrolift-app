@@ -189,6 +189,7 @@ export const CREATE_WORKFLOW_STAGE = gql`
     $onFailure: String! = "fail"
     $maxAttempts: Int! = 3
     $backEdge: JSON
+    $iteration: JSON
     $timeoutSeconds: Int! = 300
     $agentDefinitionGuid: String
     $agentRef: String
@@ -208,6 +209,7 @@ export const CREATE_WORKFLOW_STAGE = gql`
       onFailure: $onFailure
       maxAttempts: $maxAttempts
       backEdge: $backEdge
+      iteration: $iteration
       timeoutSeconds: $timeoutSeconds
       agentDefinitionGuid: $agentDefinitionGuid
       agentRef: $agentRef
@@ -237,6 +239,7 @@ export const CREATE_WORKFLOW_STAGE = gql`
         onFailure
         maxAttempts
         backEdge
+        iteration
         timeoutSeconds
         createdAt
         agentDefinitionGuid
@@ -254,6 +257,7 @@ export const UPDATE_WORKFLOW_STAGE = gql`
     $onFailure: String
     $maxAttempts: Int
     $backEdge: JSON
+    $iteration: JSON
     $timeoutSeconds: Int
     $agentDefinitionGuid: String
     $agentRef: String
@@ -272,6 +276,7 @@ export const UPDATE_WORKFLOW_STAGE = gql`
       onFailure: $onFailure
       maxAttempts: $maxAttempts
       backEdge: $backEdge
+      iteration: $iteration
       timeoutSeconds: $timeoutSeconds
       agentDefinitionGuid: $agentDefinitionGuid
       agentRef: $agentRef
@@ -338,6 +343,7 @@ export const IMPORT_WORKFLOW_MANIFEST = gql`
           onFailure
           maxAttempts
           backEdge
+          iteration
           timeout
           fanOut
           prompt

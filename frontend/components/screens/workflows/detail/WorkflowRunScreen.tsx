@@ -466,7 +466,10 @@ export function WorkflowRunScreen({
 }
 
 function StepDetail({ item, gate }: { item: RunStepItem; gate: React.ReactNode }) {
+  const collectionT = useTranslations("workflowCollections");
   const parts: React.ReactNode[] = [];
+  if (item.collectionItem != null)
+    parts.push(<span key="collection">{collectionT("item", { index: item.collectionItem })}</span>);
   if (item.cause) parts.push(<span key="cause">{item.cause}</span>);
   if (item.error && item.branches.length === 0)
     parts.push(

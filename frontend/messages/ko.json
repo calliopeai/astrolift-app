@@ -7018,5 +7018,21 @@
     "continue": "대체 결과로 완료",
     "importedHint": "가져온 Loop v1.2는 대상과 완료 정책을 유지합니다. 원본 매핑을 변경하려면 네이티브 매니페스트를 편집하세요.",
     "importedFallback": "원본 대체 결과"
+  },
+  "workflowCollections": {
+    "collectionKind": "순차 컬렉션",
+    "title": "제한된 순차 컬렉션",
+    "formatKind": "레코드 형식 지정",
+    "serialHint": "지정된 본문을 각 항목에 순서대로 실행합니다. 모든 항목이 설정된 실패 정책에 따라 종료되면 완료됩니다.",
+    "cap": "최대 항목 수 (1–50)",
+    "bodyEnd": "본문의 마지막 출력 키",
+    "staticItems": "고정된 원본 항목 {count}개",
+    "itemsPath": "입력 컬렉션 필드",
+    "importedHint": "항목 한도를 변경해도 가져온 레코드와 Parser 본문은 유지됩니다.",
+    "invalid": "유효한 후속 본문 대상과 원본 컬렉션에 충분한 한도를 선택하세요.",
+    "formatHint": "이름이 지정된 필드로 JSON 레코드 형식을 지정합니다. 결과에는 UTC 타임스탬프가 포함됩니다.",
+    "pattern": "레코드 패턴",
+    "separator": "구분 기호 (JSON 문자열)",
+    "item": "컬렉션 항목 {index}"
   }
 }

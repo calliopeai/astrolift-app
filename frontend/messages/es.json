@@ -7021,5 +7021,21 @@
     "continue": "Completar con el resultado alternativo",
     "importedHint": "Loop v1.2 importado conserva su destino y política de finalización. Edita el manifiesto nativo para cambiar la correspondencia de origen.",
     "importedFallback": "Alternativa de origen"
+  },
+  "workflowCollections": {
+    "collectionKind": "Colección en serie",
+    "title": "Colección en serie acotada",
+    "formatKind": "Formateador de registros",
+    "serialHint": "Ejecuta el cuerpo declarado una vez por elemento, en orden. Finaliza cuando todos terminan según su política de fallos.",
+    "cap": "Máximo de elementos (1–50)",
+    "bodyEnd": "Última clave de salida del cuerpo",
+    "staticItems": "{count} elementos de origen fijos",
+    "itemsPath": "Campo de la colección de entrada",
+    "importedHint": "Los registros importados y el cuerpo Parser se mantienen al cambiar el límite.",
+    "invalid": "Elige un destino posterior válido y un límite suficiente para la colección.",
+    "formatHint": "Formatea un registro JSON con campos con nombre. El resultado incluye una marca de tiempo UTC.",
+    "pattern": "Patrón de registro",
+    "separator": "Separador (cadena JSON)",
+    "item": "Elemento {index} de la colección"
   }
 }

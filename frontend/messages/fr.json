@@ -7021,5 +7021,21 @@
     "continue": "Terminer avec le résultat de repli",
     "importedHint": "Le Loop v1.2 importé conserve sa cible et sa politique de fin. Modifiez le manifeste natif pour changer la correspondance source.",
     "importedFallback": "Repli source"
+  },
+  "workflowCollections": {
+    "collectionKind": "Collection séquentielle",
+    "title": "Collection séquentielle bornée",
+    "formatKind": "Formatage de données",
+    "serialHint": "Exécute le corps déclaré pour chaque élément, dans l’ordre. Termine lorsque chaque élément est traité selon sa politique d’échec.",
+    "cap": "Nombre maximal d’éléments (1–50)",
+    "bodyEnd": "Dernière clé de sortie du corps",
+    "staticItems": "{count} éléments sources fixes",
+    "itemsPath": "Champ de la collection d’entrée",
+    "importedHint": "Les données importées et le corps Parser restent fixes quand la limite change.",
+    "invalid": "Choisissez une cible suivante valide et une limite suffisante pour la collection.",
+    "formatHint": "Formate un objet JSON avec des champs nommés. Le résultat inclut un horodatage UTC.",
+    "pattern": "Modèle de données",
+    "separator": "Séparateur (chaîne JSON)",
+    "item": "Élément {index} de la collection"
   }
 }

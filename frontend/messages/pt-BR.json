@@ -7018,5 +7018,21 @@
     "continue": "Concluir com o resultado alternativo",
     "importedHint": "O Loop v1.2 importado preserva o destino e a política de conclusão. Edite o manifesto nativo para alterar o mapeamento de origem.",
     "importedFallback": "Alternativa de origem"
+  },
+  "workflowCollections": {
+    "collectionKind": "Coleção sequencial",
+    "title": "Coleção sequencial limitada",
+    "formatKind": "Formatador de registros",
+    "serialHint": "Executa o corpo declarado para cada item, em ordem. Conclui quando todos terminam conforme sua política de falhas.",
+    "cap": "Máximo de itens (1–50)",
+    "bodyEnd": "Última chave de saída do corpo",
+    "staticItems": "{count} itens de origem fixos",
+    "itemsPath": "Campo da coleção de entrada",
+    "importedHint": "Os registros importados e o corpo Parser permanecem fixos ao mudar o limite.",
+    "invalid": "Escolha um destino posterior válido e um limite suficiente para a coleção.",
+    "formatHint": "Formata um registro JSON com campos nomeados. O resultado inclui um horário UTC.",
+    "pattern": "Padrão do registro",
+    "separator": "Separador (string JSON)",
+    "item": "Item {index} da coleção"
   }
 }
