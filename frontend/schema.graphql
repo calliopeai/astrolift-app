@@ -8135,7 +8135,7 @@ type Mutation {
   """
   Add a stage to a writable workflow definition. order=null appends after the definition's last stage.
   """
-  createWorkflowStage(workflowSlug: String!, kind: String!, order: Int = null, role: String = null, onFailure: String! = "fail", timeoutSeconds: Int! = 300, agentDefinitionGuid: String = null, agentRef: String = null, workflowRef: String = null, environmentSpecSlug: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, outputKey: String = null, approvers: JSON = null): CreateWorkflowStageResult!
+  createWorkflowStage(workflowSlug: String!, kind: String!, order: Int = null, role: String = null, onFailure: String! = "fail", timeoutSeconds: Int! = 300, maxAttempts: Int! = 3, agentDefinitionGuid: String = null, agentRef: String = null, workflowRef: String = null, environmentSpecSlug: String = null, skillRefs: JSON = null, fanOutCount: Int = null, prompt: String = null, outputKey: String = null, approvers: JSON = null): CreateWorkflowStageResult!
 
   """
   Create an inbound webhook trigger for a workflow definition (platform operator only).
@@ -10312,6 +10312,7 @@ type WorkflowManifestStageType {
   environmentSpecSlug: String
   skills: [String!]!
   onFailure: String!
+  maxAttempts: Int!
   timeout: Int!
   fanOut: String!
   prompt: String
@@ -10384,6 +10385,7 @@ type WorkflowStageType {
   skillRefs: JSON!
   fanOutCount: Int
   onFailure: String!
+  maxAttempts: Int!
   timeoutSeconds: Int!
   createdAt: DateTime!
   agentDefinitionGuid: String

@@ -249,6 +249,7 @@ def _get_workflow_stages_sync(
                 "order": stage.order,
                 "kind": stage.kind,
                 "on_failure": stage.on_failure,
+                "max_attempts": stage.max_attempts,
                 "timeout_seconds": int(stage.timeout_seconds),
                 "fan_out_count": stage.fan_out_count,
                 "skill_refs": list(skill_refs),
@@ -264,6 +265,10 @@ def _get_workflow_stages_sync(
                 "nested_definition_slug": (nested_definition.slug if nested_definition is not None else ""),
             }
         )
+    from workflows.stage_limits import validate_stage_attempts
+
+    for stage in stages:
+        validate_stage_attempts(stage["max_attempts"])
     output_keys = [stage["output_key"] for stage in stages]
     duplicates = sorted({key for key in output_keys if output_keys.count(key) > 1})
     if duplicates:

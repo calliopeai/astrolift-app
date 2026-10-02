@@ -191,6 +191,7 @@ def _upsert_definition(defn: dict) -> bool:
                 skill_refs=stage["skill_refs"],
                 fan_out_count=stage["fan_out_count"],
                 on_failure=stage["on_failure"],
+                max_attempts=stage["max_attempts"],
                 timeout_seconds=stage["timeout_seconds"],
             )
 

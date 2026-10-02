@@ -47,6 +47,7 @@ from typing import Any
 
 import yaml
 
+from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attempts
 
 # Valid choices mirror WorkflowDefinition.PatternKind and
 # WorkflowStage.StageKind / WorkflowStage.OnFailure. We keep them here
@@ -56,9 +57,7 @@ import yaml
 _VALID_PATTERN_KINDS = frozenset(
     {"single", "chained", "fan_out", "supervisor_worker", "review_loop", "advisor"}
 )
-_VALID_STAGE_KINDS = frozenset(
-    {"agent_dispatch", "human_gate", "checkpoint", "aggregation"}
-)
+_VALID_STAGE_KINDS = frozenset({"agent_dispatch", "human_gate", "checkpoint", "aggregation"})
 _VALID_ON_FAILURE = frozenset({"fail", "retry", "skip", "escalate"})
 
 # Default states/transitions injected when the author omits them. The
@@ -149,10 +148,7 @@ def _parse_workflow_entry(entry: Any, index: int) -> dict:
     if not isinstance(raw_stages, list):
         raise DslParseError(f"{path}.stages: must be a list")
 
-    stages = [
-        _parse_stage_entry(stage, index, stage_idx)
-        for stage_idx, stage in enumerate(raw_stages)
-    ]
+    stages = [_parse_stage_entry(stage, index, stage_idx) for stage_idx, stage in enumerate(raw_stages)]
 
     return {
         "slug": slug,
@@ -184,13 +180,18 @@ def _parse_stage_entry(entry: Any, workflow_index: int, stage_index: int) -> dic
 
     on_failure = str(entry.get("on_failure", "fail")).lower()
 
+    try:
+        max_attempts = validate_stage_attempts(entry.get("max_attempts", DEFAULT_STAGE_ATTEMPTS))
+    except ValueError as exc:
+        raise DslParseError(f"{path}.max_attempts: {exc}") from exc
+
     timeout_seconds_raw = entry.get("timeout_seconds", 300)
     try:
         timeout_seconds = int(timeout_seconds_raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as exc:
         raise DslParseError(
             f"{path}.timeout_seconds: must be an integer, got {timeout_seconds_raw!r}"
-        )
+        ) from exc
 
     return {
         "order": stage_index,
@@ -198,6 +199,7 @@ def _parse_stage_entry(entry: Any, workflow_index: int, stage_index: int) -> dic
         "skill_refs": skill_refs,
         "fan_out_count": fan_out_count,
         "on_failure": on_failure,
+        "max_attempts": max_attempts,
         "timeout_seconds": timeout_seconds,
     }
 
@@ -224,8 +226,7 @@ def validate_workflow_dsl(definition: dict) -> list[str]:
     pattern_kind = definition.get("pattern_kind", "")
     if pattern_kind not in _VALID_PATTERN_KINDS:
         errors.append(
-            f"pattern_kind {pattern_kind!r} is not valid; "
-            f"must be one of {sorted(_VALID_PATTERN_KINDS)}"
+            f"pattern_kind {pattern_kind!r} is not valid; " f"must be one of {sorted(_VALID_PATTERN_KINDS)}"
         )
 
     stages = definition.get("stages", [])
@@ -237,8 +238,7 @@ def validate_workflow_dsl(definition: dict) -> list[str]:
         kind = stage.get("kind", "")
         if kind not in _VALID_STAGE_KINDS:
             errors.append(
-                f"{stage_path}.kind {kind!r} is not valid; "
-                f"must be one of {sorted(_VALID_STAGE_KINDS)}"
+                f"{stage_path}.kind {kind!r} is not valid; " f"must be one of {sorted(_VALID_STAGE_KINDS)}"
             )
         on_failure = stage.get("on_failure", "fail")
         if on_failure not in _VALID_ON_FAILURE:
@@ -246,11 +246,14 @@ def validate_workflow_dsl(definition: dict) -> list[str]:
                 f"{stage_path}.on_failure {on_failure!r} is not valid; "
                 f"must be one of {sorted(_VALID_ON_FAILURE)}"
             )
+        try:
+            validate_stage_attempts(stage.get("max_attempts", DEFAULT_STAGE_ATTEMPTS))
+        except ValueError as exc:
+            errors.append(f"{stage_path}.max_attempts: {exc}")
         timeout_seconds = stage.get("timeout_seconds", 300)
         if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
             errors.append(
-                f"{stage_path}.timeout_seconds must be a positive integer, "
-                f"got {timeout_seconds!r}"
+                f"{stage_path}.timeout_seconds must be a positive integer, " f"got {timeout_seconds!r}"
             )
 
     return errors

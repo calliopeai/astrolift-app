@@ -151,6 +151,7 @@ def reconcile_repository_workflows(
             stage.workflow_ref = spec.workflow or ""
             stage.environment_spec_slug = spec.environment_spec_slug or ""
             stage.skill_refs = list(spec.skills)
+            stage.max_attempts = spec.max_attempts
             stage.on_failure = spec.on_failure
             stage.timeout_seconds = spec.timeout
             stage.fan_out_count = fan_out_count

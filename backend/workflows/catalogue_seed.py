@@ -93,6 +93,13 @@ def seed_workflow_catalogue(WorkflowDefinition, WorkflowStage) -> SeedResult:
                     "agent_definition": None,
                     "skill_refs": list(stage.skills),
                     "on_failure": stage.on_failure,
+                    # Historical models used by the original catalogue migration
+                    # predate this field; live seeding preserves the authored cap.
+                    **(
+                        {"max_attempts": stage.max_attempts}
+                        if any(field.name == "max_attempts" for field in WorkflowStage._meta.fields)
+                        else {}
+                    ),
                     "timeout_seconds": stage.timeout,
                     "fan_out_count": fan_out_count,
                     "fan_out_dynamic": fan_out_dynamic,

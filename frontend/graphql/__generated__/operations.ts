@@ -8092,6 +8092,7 @@ export type MutationCreateWorkflowStageArgs = {
   environmentSpecSlug?: InputMaybe<Scalars['String']['input']>;
   fanOutCount?: InputMaybe<Scalars['Int']['input']>;
   kind: Scalars['String']['input'];
+  maxAttempts?: Scalars['Int']['input'];
   onFailure?: Scalars['String']['input'];
   order?: InputMaybe<Scalars['Int']['input']>;
   outputKey?: InputMaybe<Scalars['String']['input']>;
@@ -13728,6 +13729,7 @@ export type WorkflowManifestStageType = {
   environmentSpecSlug?: Maybe<Scalars['String']['output']>;
   fanOut: Scalars['String']['output'];
   kind: Scalars['String']['output'];
+  maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
   outputKey?: Maybe<Scalars['String']['output']>;
@@ -13795,6 +13797,7 @@ export type WorkflowStageType = {
   fanOutCount?: Maybe<Scalars['Int']['output']>;
   guid: Scalars['ID']['output'];
   kind: Scalars['String']['output'];
+  maxAttempts: Scalars['Int']['output'];
   onFailure: Scalars['String']['output'];
   order: Scalars['Int']['output'];
   outputKey: Scalars['String']['output'];

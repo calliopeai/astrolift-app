@@ -25,6 +25,17 @@ built-in templates and is not the tenant configuration path.
 | `prompt` | `prompt` | Agent instruction overlay, or the approval question on a human gate. |
 | `output_key` | `output_key` | Key used in the run's `named_outputs` map. Defaults to `stage_<order>`. |
 | `workflow` | `workflow_ref` | Visible child definition invoked by a `kind = "workflow"` stage. |
+| `max_attempts` | `max_attempts` | Initial dispatch plus retries for an agent or nested-workflow stage; an integer from 1 to 20, default 3. |
+
+`on_failure = "retry"` uses the stage's `max_attempts` count. A count of 1
+allows the initial dispatch and no retry. Exhausting the count fails the run;
+the stage cannot retry indefinitely. This is a dispatch attempt bound, separate
+from a review loop's rounds. Other failure policies retain their own semantics:
+`skip` proceeds after failure and `escalate` waits for an operator within the
+stage timeout. The attempt count is included in the reviewed definition revision
+and frozen plan, so editing a definition does not change an already reserved run.
+Existing Temporal histories and earlier frozen plans retain their three-attempt
+behavior.
 
 A configured `Workflow.stage_bindings` may override a definition without
 editing it. Bindings are keyed by stage order:

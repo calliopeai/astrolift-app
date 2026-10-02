@@ -100,9 +100,8 @@ STATUS_ESCALATED = "escalated"
 RUN_COMPLETED = "completed"
 RUN_FAILED = "failed"
 
-# Default ceiling on retry attempts for an on_failure=retry stage. The
-# stage model has no per-stage attempt cap, so the executor imposes one to
-# avoid an unbounded retry loop wedging the run.
+# Compatibility ceiling for existing histories and pre-cap frozen plans.
+# New runs use the authored, validated stage max_attempts instead.
 MAX_STAGE_ATTEMPTS = 3
 
 # A human gate that hasn't been overridden to a longer window still gets a
@@ -254,6 +253,7 @@ class WorkflowDefinitionRunWorkflow:
         # execution rows without threading the run id through every call.
         self._workflow_run_id: str = ""
         self._nested_workflows_enabled: bool = False
+        self._stage_attempt_limits_enabled: bool = False
 
     # ---- signals ----------------------------------------------------------
 
@@ -324,6 +324,7 @@ class WorkflowDefinitionRunWorkflow:
         # durable histories. New runs record the marker and may invoke child
         # definitions; old histories replay the exact v2 packet they started.
         self._nested_workflows_enabled = workflow.patched("nested-workflows-v1")
+        self._stage_attempt_limits_enabled = workflow.patched("workflow-stage-attempt-limits-v1")
         plan_params = {
             "workflow_definition_slug": input.workflow_definition_slug,
             "workflow_definition_id": input.workflow_definition_id,
@@ -598,6 +599,16 @@ class WorkflowDefinitionRunWorkflow:
                 data={"execution_id": execution_id, "attempt": attempt},
             )
 
+    def _stage_attempt_limit(self, stage: dict) -> int:
+        if not self._stage_attempt_limits_enabled:
+            return MAX_STAGE_ATTEMPTS
+        # Older frozen reviewed plans lack the additive field. Their explicit
+        # compatible default remains three, never an unbounded retry policy.
+        limit = stage.get("max_attempts", MAX_STAGE_ATTEMPTS)
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
+            raise _WorkflowAbort("invalid stage attempt limit")
+        return limit
+
     async def _run_agent_stage(
         self,
         input: WorkflowDefinitionRunInput,
@@ -648,7 +659,9 @@ class WorkflowDefinitionRunWorkflow:
                 # The dispatch activity itself failed (e.g. spawn error).
                 run_status = "failed"
 
-            decision = decide_after_agent_run(run_status, on_failure, attempt)
+            decision = decide_after_agent_run(
+                run_status, on_failure, attempt, max_attempts=self._stage_attempt_limit(stage)
+            )
 
             if decision.proceed:
                 if agent_run_id is not None:
@@ -847,7 +860,9 @@ class WorkflowDefinitionRunWorkflow:
                 "attempt": attempt,
                 "result": final_output,
             }
-            decision = decide_after_agent_run(run_status, on_failure, attempt)
+            decision = decide_after_agent_run(
+                run_status, on_failure, attempt, max_attempts=self._stage_attempt_limit(stage)
+            )
 
             if decision.proceed:
                 await workflow.execute_activity(

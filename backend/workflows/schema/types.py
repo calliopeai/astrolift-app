@@ -30,6 +30,7 @@ class WorkflowStageType:
     skill_refs: strawberry.scalars.JSON
     fan_out_count: int | None
     on_failure: str
+    max_attempts: int
     timeout_seconds: int
     created_at: datetime
 

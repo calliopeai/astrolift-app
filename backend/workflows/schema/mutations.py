@@ -749,6 +749,7 @@ class Mutation:
         role: str | None = None,
         on_failure: str = "fail",
         timeout_seconds: int = 300,
+        max_attempts: int = 3,
         agent_definition_guid: str | None = None,
         agent_ref: str | None = None,
         workflow_ref: str | None = None,
@@ -797,6 +798,15 @@ class Mutation:
                 ],
             )
 
+        from workflows.stage_limits import validate_stage_attempts
+
+        try:
+            validate_stage_attempts(max_attempts)
+        except ValueError as exc:
+            return CreateWorkflowStageResult(
+                ok=False, errors=[GQLValidationError(field="max_attempts", messages=[str(exc)])]
+            )
+
         # Resolve optional agent definition — scoped to the caller's org
         # (Workload's org lives via registered_app.organization); a foreign
         # org's workload resolves to not-found, never a cross-tenant binding.
@@ -840,6 +850,7 @@ class Mutation:
             role=role or "",
             on_failure=on_failure,
             timeout_seconds=timeout_seconds,
+            max_attempts=max_attempts,
             agent_definition=agent_definition,
             agent_ref=resolved_agent_ref,
             workflow_ref=(workflow_ref or "").strip(),
@@ -998,6 +1009,7 @@ class Mutation:
                     fan_out_dynamic=stage.fan_out_dynamic,
                     on_failure=stage.on_failure,
                     timeout_seconds=stage.timeout_seconds,
+                    max_attempts=stage.max_attempts,
                     prompt=stage.prompt,
                     output_key=stage.output_key,
                     approvers=list(stage.approvers or []),

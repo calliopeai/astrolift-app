@@ -41,6 +41,7 @@ from astrolift_manifest.parser import (
 from astrolift_manifest.types import SkillRef
 from core.run_input_contract import InputContractError, no_input_schema, validate_schema
 from workflows.models import WorkflowDefinition, WorkflowStage
+from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attempts
 
 # Valid value sets are sourced from the models so the serializer stays in
 # lockstep with #966 — a new pattern/kind/on_failure choice needs no edit here.
@@ -83,6 +84,7 @@ class WorkflowStageSpec:
     environment_spec_slug: str | None = None
     skills: list[str] = dataclasses.field(default_factory=list)
     on_failure: str = _DEFAULT_ON_FAILURE
+    max_attempts: int = DEFAULT_STAGE_ATTEMPTS
     timeout: int = _DEFAULT_TIMEOUT
     fan_out: int | str = 0
     prompt: str | None = None
@@ -229,6 +231,11 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
             path=f"{base}.on_failure",
         )
 
+    try:
+        max_attempts = validate_stage_attempts(d.get("max_attempts", DEFAULT_STAGE_ATTEMPTS))
+    except ValueError as exc:
+        raise ManifestError(str(exc), path=f"{base}.max_attempts") from exc
+
     timeout = d.get("timeout", _DEFAULT_TIMEOUT)
     if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout < 0:
         raise ManifestError("timeout must be a non-negative integer (seconds)", path=f"{base}.timeout")
@@ -256,6 +263,7 @@ def _parse_stage(d: Any, index: int) -> WorkflowStageSpec:
         environment_spec_slug=environment_spec_slug,
         skills=skills,
         on_failure=on_failure,
+        max_attempts=max_attempts,
         timeout=timeout,
         fan_out=fan_out,
         prompt=prompt,
@@ -343,6 +351,8 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
             row["skills"] = list(stage.skills)
         if stage.on_failure != _DEFAULT_ON_FAILURE:
             row["on_failure"] = stage.on_failure
+        if stage.max_attempts != DEFAULT_STAGE_ATTEMPTS:
+            row["max_attempts"] = validate_stage_attempts(stage.max_attempts)
         if stage.timeout != _DEFAULT_TIMEOUT:
             row["timeout"] = stage.timeout
         if stage.fan_out != 0:
@@ -399,6 +409,7 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
                 environment_spec_slug=stage.environment_spec_slug or None,
                 skills=list(stage.skill_refs or []),
                 on_failure=stage.on_failure,
+                max_attempts=stage.max_attempts,
                 timeout=stage.timeout_seconds,
                 fan_out=fan_out,
                 prompt=stage.prompt or None,
@@ -495,6 +506,7 @@ def create_definition_from_manifest(
             environment_spec_slug=stage.environment_spec_slug or "",
             skill_refs=list(stage.skills),
             on_failure=stage.on_failure,
+            max_attempts=validate_stage_attempts(stage.max_attempts),
             timeout_seconds=stage.timeout,
             fan_out_count=fan_out_count,
             fan_out_dynamic=fan_out_dynamic,
@@ -589,6 +601,7 @@ def replace_definition_content(
         stage_row.workflow_ref = stage_spec.workflow or ""
         stage_row.environment_spec_slug = stage_spec.environment_spec_slug or ""
         stage_row.skill_refs = list(stage_spec.skills)
+        stage_row.max_attempts = validate_stage_attempts(stage_spec.max_attempts)
         stage_row.on_failure = stage_spec.on_failure
         stage_row.timeout_seconds = stage_spec.timeout
         stage_row.fan_out_count = fan_out_count
@@ -606,6 +619,7 @@ def replace_definition_content(
                 "environment_spec_slug",
                 "skill_refs",
                 "on_failure",
+                "max_attempts",
                 "timeout_seconds",
                 "fan_out_count",
                 "fan_out_dynamic",
