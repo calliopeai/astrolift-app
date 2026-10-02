@@ -413,6 +413,13 @@ cancellation closes the outstanding run and executions. Inputs and collected
 outputs must be finite JSON, with string object keys, at most 32 nesting levels,
 16,384 nodes and 256 KiB encoded size; an oversized aggregate fails explicitly.
 
+An `abort` signal while an item is blocked cancels that item's Temporal child,
+waits for its closure, and then fails the parent with an incomplete collection.
+Its open stage mirrors are failed, matching the parent abort outcome. SDK
+cancellation settles the parent and open stage mirrors as cancelled. Both stop
+later items. Signal acceptance is only an acknowledgement; read the terminal
+run and execution metadata to establish completion.
+
 The Stage editor exposes the maximum item count and forward body end, preserving
 literal source records during cap edits. Dynamic inputs expose `items_path`.
 TOML uses `iteration_json` to preserve JSON `null`; YAML and GraphQL retain the
