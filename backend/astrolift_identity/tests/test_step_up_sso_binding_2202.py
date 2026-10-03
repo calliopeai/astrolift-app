@@ -174,6 +174,9 @@ def ceremony(oidc):
         "/app/auth1/elevate-sso/callback/", {"state": query["state"][0], "code": "native-code"}
     )
     callback.user, callback.session = actor, SessionStore(session_key=session.session_key)
+    from core import mutations
+
+    original_audit_writer = mutations._audit_writer
     audits = []
     register_audit_writer(audits.append)
     try:
@@ -181,7 +184,7 @@ def ceremony(oidc):
             actor=actor, other=other, identity=identity, session=session, request=callback, audits=audits
         )
     finally:
-        register_audit_writer(None)
+        register_audit_writer(original_audit_writer)
 
 
 def test_real_tls_oidc_signature_link_and_database_session_elevate_once(oidc, ceremony):
