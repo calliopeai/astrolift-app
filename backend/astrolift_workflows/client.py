@@ -538,12 +538,20 @@ def describe_workflow_instance(workflow_id: str, *, run_id: str | None = None) -
 
 
 @async_to_sync
-async def _fetch_history_async(workflow_id: str, limit: int) -> list[dict[str, Any]]:
-    client = await _get_client_async()
+async def _fetch_history_async(
+    workflow_id: str, limit: int, *, run_id: str | None = None
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     try:
-        handle = client.get_workflow_handle(workflow_id)
-        async for event in handle.fetch_history_events():
+        client = (
+            await asyncio.wait_for(_get_client_async(), timeout=5)
+            if run_id is not None
+            else await _get_client_async()
+        )
+        handle = client.get_workflow_handle(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
+        async for event in handle.fetch_history_events(
+            **({"rpc_timeout": timedelta(seconds=3)} if run_id is not None else {})
+        ):
             row = _shape_history_event(event)
             if row is not None:
                 rows.append(row)
@@ -620,7 +628,9 @@ def _shape_history_event(event: Any) -> dict[str, Any] | None:
         return None
 
 
-def workflow_history(workflow_id: str, *, limit: int = 200) -> list[dict[str, Any]]:
+def workflow_history(
+    workflow_id: str, *, limit: int = 200, run_id: str | None = None
+) -> list[dict[str, Any]]:
     """Pre-shaped activity feed for the workflow viewer (#437).
 
     Each row maps one Temporal HistoryEvent to a compact UI dict:
@@ -628,9 +638,13 @@ def workflow_history(workflow_id: str, *, limit: int = 200) -> list[dict[str, An
     drill-down panel groups rows by activity and collapses them. Limit
     defaults to 200 — large enough for typical deploys, small enough
     to cap memory."""
+    if run_id is not None and not run_id.strip():
+        return []
     if not _temporal_enabled():
         return []
-    return _fetch_history_async(workflow_id, max(1, min(limit, 500)))
+    return _fetch_history_async(
+        workflow_id, max(1, min(limit, 500)), **({"run_id": run_id} if run_id is not None else {})
+    )
 
 
 @async_to_sync

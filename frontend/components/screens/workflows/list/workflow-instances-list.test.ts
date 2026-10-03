@@ -4,7 +4,6 @@ import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
 import {
   formatInstanceDuration,
-  INSTANCES_LIMIT,
   instancesVariables,
   selectInstances,
   WORKFLOW_INSTANCES_LIST,
@@ -32,63 +31,25 @@ function query(qs = "") {
 }
 
 describe("platform instances list", () => {
-  it("leads with All and Mine, and every view says the browser pages the one read", () => {
-    expect(WORKFLOW_INSTANCES_LIST.views.map((v) => v.key)).toEqual([
-      "all",
-      "mine",
-      "running",
-      "failed",
-    ]);
-    for (const v of WORKFLOW_INSTANCES_LIST.views) {
-      expect(v.note).toContain(`newest ${INSTANCES_LIMIT} matching instances`);
-    }
-  });
-
-  it("sends Type and Status to the server, upper-casing the status, at the page cap", () => {
-    expect(query().variables).toEqual({ workflowType: null, status: null, limit: 200 });
-    expect(query("view=running").variables.status).toBe("RUNNING");
-    expect(query("type=DeployAppWorkflow&status=timed_out").variables).toEqual({
+  it("uses server cursor pages and declares unsupported search truthfully", () => {
+    expect(WORKFLOW_INSTANCES_LIST.paging).toBe("cursor");
+    expect(WORKFLOW_INSTANCES_LIST.searchable).toBe(false);
+    expect(
+      instancesVariables({ type: "DeployAppWorkflow", status: "running" }, 50, "opaque")
+    ).toEqual({
       workflowType: "DeployAppWorkflow",
-      status: "TIMED_OUT",
-      limit: 200,
+      status: "RUNNING",
+      limit: 50,
+      after: "opaque",
     });
+    expect(query().variables).toEqual({ workflowType: null, status: null, limit: 25, after: null });
   });
 
-  it("filters what came back by view, chip and search", () => {
-    expect(query().totalCount).toBe(ALL.length);
-    expect(query("view=failed").rows.map((i) => i.status)).toEqual(["FAILED"]);
-    expect(query("type=ProvisionClusterWorkflow").rows.map((i) => i.workflowType)).toEqual([
-      "ProvisionClusterWorkflow",
-    ]);
-    expect(query("q=drift").rows.map((i) => i.workflowId)).toEqual(["drift-detect-nightly-9e8d"]);
-    // The actor is a display name, not the viewer's account.
-    expect(query("view=mine").totalCount).toBe(0);
-  });
-
-  it("sorts newest first by default, and by duration or type on request", () => {
-    const started = query().rows.map((i) => Date.parse(i.startedAt));
-    expect(started).toEqual([...started].sort((a, b) => b - a));
-    const took = query("sort=-duration").rows.map((i) => i.durationSeconds ?? -1);
-    expect(took).toEqual([...took].sort((a, b) => b - a));
-    const types = query("sort=type").rows.map((i) => i.workflowType.toLowerCase());
-    expect(types).toEqual([...types].sort());
-  });
-
-  it("pages in the browser", () => {
-    const many = Array.from({ length: 30 }, (_, i) => ({
-      ...INSTANCES[0],
-      workflowId: `w-${i}`,
-      runId: `r-${i}`,
-    }));
-    const page2 = selectInstances(many, {
-      filters: {},
-      q: "",
-      sort: WORKFLOW_INSTANCES_LIST.defaultSort,
-      page: 2,
-      pageSize: 25,
-    });
-    expect(page2).toMatchObject({ totalCount: 30 });
-    expect(page2.rows).toHaveLength(5);
+  it("preserves the entire server page and order despite legacy browser paging parameters", () => {
+    const result = query("q=does-not-match&sort=duration&page=9");
+    expect(result.rows).toEqual(ALL);
+    expect(result.totalCount).toBe(ALL.length);
+    expect(query("view=mine").rows).toEqual([]);
   });
 
   it("formats durations", () => {

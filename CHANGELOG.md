@@ -6,6 +6,11 @@
   filters, states and feedback in all eight locales. Preserve API identifiers and
   bound pending control feedback to the selected environment specification (#2145).
 
+- Replace the static platform activity page with the permission-scoped Temporal
+  execution viewer. Bind detail/history and confirmed cancel/terminate requests
+  to the selected run ID, follow server cursor pages including empty authorized
+  pages, and expose refresh and safe action-failure feedback (#2251).
+
 - Collect app-environment ingress metrics from exact managed Envoy routes and
   preserved nginx namespaces. Keep idle latency windows undefined, refuse retired
   or foreign cluster reads, and use complete dedicated-ALB CloudWatch evidence

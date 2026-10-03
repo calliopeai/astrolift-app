@@ -343,7 +343,8 @@ export function ListPage<TRow>({
         />
       )}
 
-      {phase === "ready" &&
+      {(phase === "ready" ||
+        (def.paging === "cursor" && !loading && !error && (nextCursor || list.hasNewer))) &&
         (def.paging === "numbered" ? (
           <ListPagination
             mode="numbered"
