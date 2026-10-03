@@ -16,6 +16,7 @@ controller:
     enabled: true
     serviceMonitor:
       enabled: true
+      honorLabels: true
 ```
 
 The native Kubernetes recipe already includes these values. Previously installed
@@ -24,6 +25,9 @@ on the controller exporter. Confirm the metrics Service and ServiceMonitor exist
 then check Prometheus targets for a healthy controller scrape. Preserve the
 existing controller chart version and other values when adding this overlay.
 The Prometheus operator must select the ServiceMonitor's namespace and labels.
+`honorLabels` preserves each request series' app namespace. Otherwise Prometheus
+renames that label to `exported_namespace` and stamps the controller's namespace
+as `namespace`, so healthy scrapes still cannot satisfy the app's query.
 
 For a cluster registered with `ingress_class: nginx`, Astrolift selects
 `nginx_ingress_controller_requests` by the app environment's namespace and
