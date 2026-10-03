@@ -2014,6 +2014,48 @@ export type AstroliftClusterLiveState = {
   status: Scalars['String']['output'];
 };
 
+export type AstroliftClusterLogCollectorOperation = {
+  activatedAt?: Maybe<Scalars['DateTime']['output']>;
+  activatedClusterVersion?: Maybe<Scalars['Int']['output']>;
+  cleanupPending: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  coverage: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deadline: Scalars['DateTime']['output'];
+  errorCode: Scalars['String']['output'];
+  errorMessage: Scalars['String']['output'];
+  expectedSource: Scalars['String']['output'];
+  expectedVersion: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  postLossVerifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  readerPolicy: Scalars['JSON']['output'];
+  requestId: Scalars['String']['output'];
+  retentionDays: Scalars['Int']['output'];
+  retryable: Scalars['Boolean']['output'];
+  stage: Scalars['String']['output'];
+  status: ClusterLogCollectorStatus;
+  updatedAt: Scalars['DateTime']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
+export type AstroliftClusterLogCollectorOperationMutationResult = {
+  data?: Maybe<AstroliftClusterLogCollectorOperation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterLogCollectorReview = {
+  clusterId: Scalars['GUID']['output'];
+  message: Scalars['String']['output'];
+  policy: Scalars['JSON']['output'];
+  readerPolicy: Scalars['JSON']['output'];
+  refusalCode: Scalars['String']['output'];
+  retentionDays: Scalars['Int']['output'];
+  source: Scalars['String']['output'];
+  supported: Scalars['Boolean']['output'];
+  version: Scalars['Int']['output'];
+};
+
 export type AstroliftClusterPodPhase = {
   count: Scalars['Int']['output'];
   namespace: Scalars['String']['output'];
@@ -6134,6 +6176,19 @@ export type ClusterAuthUserRefInput = {
   username: Scalars['String']['input'];
 };
 
+export type ClusterLogCollectorStatus =
+  | 'ACTIVATED'
+  | 'INGESTION_PENDING'
+  | 'INSTALLING'
+  | 'POST_LOSS_READ_PENDING'
+  | 'PREPARING'
+  | 'PROBE_DELETION_PENDING'
+  | 'QUEUED'
+  | 'READER_GRANT_PENDING'
+  | 'READINESS_PENDING'
+  | 'REFUSED'
+  | 'UNCERTAIN';
+
 export type ClusterModelDensity = {
   capacity: ModelClusterCapacity;
   clusterId: Scalars['GUID']['output'];
@@ -6969,6 +7024,14 @@ export type InstallClusterAgentInput = {
   requestId: Scalars['String']['input'];
 };
 
+export type InstallClusterLogCollectorInput = {
+  clusterId: Scalars['GUID']['input'];
+  expectedSource: Scalars['String']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  requestId: Scalars['String']['input'];
+  retentionDays: Scalars['Int']['input'];
+};
+
 export type InstallClusterPrereqsInputType = {
   clusterId: Scalars['GUID']['input'];
   optionOverrides: Array<BootstrapOptionOverride>;
@@ -7322,6 +7385,7 @@ export type Mutation = {
   astroliftAnonymizeUser: AstroliftAnonymizeUserPayloadMutationResult;
   astroliftConnectUserSourceProvider: AstroliftConnectUserSourceProviderPayloadMutationResult;
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
+  astroliftInstallClusterLogCollector: AstroliftClusterLogCollectorOperationMutationResult;
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
@@ -7834,6 +7898,11 @@ export type MutationAstroliftConnectUserSourceProviderArgs = {
 
 export type MutationAstroliftDisconnectUserSourceProviderArgs = {
   input: DisconnectUserSourceProviderInput;
+};
+
+
+export type MutationAstroliftInstallClusterLogCollectorArgs = {
+  input: InstallClusterLogCollectorInput;
 };
 
 
@@ -10153,6 +10222,8 @@ export type Query = {
   astroliftClusterHealth?: Maybe<AstroliftClusterHealth>;
   astroliftClusterLifecycleAudit: Array<AstroliftClusterLifecycleAuditEntry>;
   astroliftClusterLiveState?: Maybe<AstroliftClusterLiveState>;
+  astroliftClusterLogCollectorOperation: AstroliftClusterLogCollectorOperation;
+  astroliftClusterLogCollectorReview: AstroliftClusterLogCollectorReview;
   astroliftClusterModelDensity?: Maybe<ClusterModelDensity>;
   astroliftClusterPrometheusMetrics: AstroliftClusterPrometheusMetrics;
   astroliftClusterPrometheusRangeMetrics: AstroliftClusterPrometheusRangeMetrics;
@@ -11093,6 +11164,17 @@ export type QueryAstroliftClusterLifecycleAuditArgs = {
 
 export type QueryAstroliftClusterLiveStateArgs = {
   clusterId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftClusterLogCollectorOperationArgs = {
+  operationId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftClusterLogCollectorReviewArgs = {
+  clusterId: Scalars['GUID']['input'];
+  retentionDays?: Scalars['Int']['input'];
 };
 
 

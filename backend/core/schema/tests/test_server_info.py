@@ -82,6 +82,22 @@ class AstroliftServerInfoTest(TestCase):
         self.assertIsNotNone(result.errors)
         self.assertIsNone(result.data["astroliftWorkloadActionTarget"])
 
+    def test_discovery_reports_wired_reviewed_cluster_installers(self) -> None:
+        capabilities = self._execute()["capabilities"]
+        self.assertIn("clusters.reviewed_agent_install", capabilities)
+        self.assertIn("clusters.reviewed_log_collector_install", capabilities)
+        result = schema.execute_sync(
+            '{ __type(name: "Query") { fields { name } } ' "__schema { mutationType { fields { name } } } }",
+            context_value=_anonymous_context(),
+        )
+        self.assertIsNone(result.errors)
+        queries = {field["name"] for field in result.data["__type"]["fields"]}
+        mutations = {field["name"] for field in result.data["__schema"]["mutationType"]["fields"]}
+        self.assertIn("astroliftClusterAgentInstallReview", queries)
+        self.assertIn("astroliftClusterLogCollectorReview", queries)
+        self.assertIn("installClusterAgent", mutations)
+        self.assertIn("astroliftInstallClusterLogCollector", mutations)
+
     # ---- Test 2: version matches settings.VERSION -------------------
 
     def test_version_matches_settings(self) -> None:

@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+
+- Install private-cluster agents from the control-plane worker using an exact
+  reviewed cluster/provider source and durable request identity. Keep the old
+  agent until a verified candidate heartbeat; refuse foreign resource adoption
+  and expose uncertain retirement without losing successful activation (#1696).
+
+- Add reviewed, durable EKS CloudWatch log-collector installation with original
+  request, credential and source fencing. Activate historical reads only after
+  owned probe ingestion, confirmed deletion and verified post-deletion reads.
+  Preserve external backends and IAM policies; report Linux EC2 coverage and
+  explicit pending or uncertain outcomes (#1706).
+
+- Render checksum-verified collector charts with a pinned Helm runtime in backend
+  images and native CI checks. Confine stream discovery and historical reader
+  grants to the exact log-group IAM ARN; retain plain physical/tagging identity
+  and explicit stream-only write grants (#1706).
+
+- Use the registered cluster's AWS role and external ID for historical reads;
+  refuse conflicting overrides or failed assumptions without ambient-credential
+  fallback. Collector installation receipts do not establish ongoing health,
+  tracing, Fargate coverage or production ingestion (#1706).
+
+- Advertise reviewed agent and collector installation API availability through
+  public capability discovery. Operator permission, provider support, required
+  configuration and collector health remain separately checked (#1696, #1706).
+
+- Settle final registered-agent dispatch exhaustion and platform timeouts through
+  the locked task/completion outbox after confirmed cleanup of original placement.
+  Preserve activity retries, original execution provenance, prior terminal results
+  and Temporal replay; uncertain cleanup remains durably pending (#2234).
+
 - Treat generated GraphQL JSON values as untrusted arbitrary JSON, including
   array-valued policy conditions. Narrow event-source records before reading
   fields and display scalar event payloads without object-only assumptions
@@ -12,56 +43,9 @@
   drafts across language changes, raw server diagnostics and committed-write
   recovery feedback (#2145).
 
-- Settle final registered-agent dispatch exhaustion and platform timeouts through
-  the locked task/completion outbox after confirmed cleanup of original placement.
-  Preserve activity retries, original execution provenance, prior terminal results
-  and Temporal replay; uncertain cleanup remains durably pending (#2234).
-
-- Add a dedicated reviewed EKS historical-log collector operation with durable
-  original request/credential/source fencing, pinned archive rendering, owned
-  resource/probe checkpoints, explicit pending/uncertain outcomes, and atomic
-  reader activation after verified post-deletion historical reads (#1706).
-  Preserve external backends and IAM policies; report Linux EC2 coverage without
-  claiming Fargate coverage, ongoing health or live ingestion from local fixtures.
-
-- Execute native collector renderer and HTTP integration checks in their CI
-  jobs with checksum-verified Helm and chart artifacts. Keep the composed
-  registered-reader test in the Django-backed cluster suite (#1706).
-
-- Use the exact log group's IAM ARN with its required suffix for collector
-  stream discovery and historical reads. Keep physical identity and tagging
-  ARNs unchanged, and keep grants confined to the owned group (#1706).
-
-- Render the collector from its reviewed archive checksum and exact prepared
-  profile with a pinned offline Helm runtime. Bundle checksum-verified Linux
-  amd64/arm64 renderer binaries in backend image builds, and refuse altered
-  profiles, missing renderers or unsafe rendered resources (#1706). Rendering
-  does not install a collector or activate historical reads.
-
-- Add an internal guarded EKS collector execution seam with verified chart bytes,
-  conditional resource identities, bounded registered transport and scoped probe
-  reads before and after exact-UID deletion (#1706). Keep public installation,
-  durable operation admission and reader activation separate; local HTTP proof
-  does not establish live ingestion or Fargate coverage.
-
-- Stage a pinned EKS CloudWatch Fluent Bit profile and credential-aware,
-  immutable cluster-owned log-group/IRSA preparation helpers (#1706). Keep the
-  component outside the installable recipe pending guarded orchestration,
-  readiness and verified ingestion. Node DaemonSets do not cover Fargate;
-  preparation does not activate historical reads or install collectors.
-- Honor the registered cluster's AWS role and external ID for CloudWatch historical
-  reads. Refuse conflicting legacy role overrides and failed assumptions without
-  falling back to the control plane's ambient identity (#1706).
-
 - Scope CloudWatch historical logs with exact Kubernetes namespace/app metadata
   and the requested workload label. Exclude foreign, unattributed and ambiguous
   records, preserve server cursors, and sanitize provider failures (#2262).
-
-- Install private-cluster agents from the control-plane worker using an exact
-  reviewed cluster/provider source and durable request identity. Keep the old
-  agent working until a verified candidate heartbeat, refuse foreign object
-  adoption, and report unconfirmed retirement without losing successful
-  activation. Sign EKS authentication with the registered credential (#1696).
 
 - Bind managed GitHub workflow creation and updates to the reviewed absence or
   blob SHA. Refuse concurrent edits, creation and deletion without advancing

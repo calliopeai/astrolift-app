@@ -113,3 +113,9 @@ not configured collectors. Existing legacy trace array fields retain their shape
 permissions but now use the same guarded attribution path. No new CLI trace command,
 cluster-wide search, export, service map, automatic tracing setup, or completed live
 collector verification is claimed by this batch.
+
+Reviewed worker-side installation APIs advertise
+`clusters.reviewed_agent_install` and `clusters.reviewed_log_collector_install`.
+These keys indicate available API contracts; admission still checks current
+operator authority, provider support and required installation configuration.
+An installation receipt does not establish ongoing collector health or tracing.

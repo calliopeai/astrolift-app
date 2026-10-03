@@ -59,6 +59,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "clusters.adopt",
     "clusters.teardown",
     "clusters.capabilities_probe",
+    "clusters.reviewed_agent_install",
+    "clusters.reviewed_log_collector_install",
     "apps.dependency_context",
     "providers.reference_read",
     "workloads.environment_targets",
