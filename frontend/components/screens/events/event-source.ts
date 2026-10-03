@@ -15,13 +15,17 @@
 export function resolveSourceHref(
   resourceKind: string,
   resourceId: string,
-  payload: Record<string, unknown>
+  payload: unknown
 ): string | null {
+  const record =
+    payload !== null && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
   const kind = (resourceKind ?? "").toLowerCase();
   const id = (resourceId ?? "").trim();
   const appSlug =
-    (typeof payload.app_slug === "string" && payload.app_slug) ||
-    (typeof payload.slug === "string" && payload.slug) ||
+    (typeof record.app_slug === "string" && record.app_slug) ||
+    (typeof record.slug === "string" && record.slug) ||
     (kind === "app" ? id : "");
 
   if (!kind && !id) return null;
@@ -33,7 +37,7 @@ export function resolveSourceHref(
     return id ? `/clusters/${encodeURIComponent(id)}` : null;
   }
   if (kind === "workload") {
-    const workloadSlug = (typeof payload.workload_slug === "string" && payload.workload_slug) || id;
+    const workloadSlug = (typeof record.workload_slug === "string" && record.workload_slug) || id;
     if (appSlug && workloadSlug) {
       return `/apps/${encodeURIComponent(appSlug)}/workloads/${encodeURIComponent(workloadSlug)}`;
     }
@@ -41,11 +45,18 @@ export function resolveSourceHref(
   }
   if (kind === "managed_service" || kind === "managedservice") {
     const msvcId =
-      (typeof payload.managed_service_id === "string" && payload.managed_service_id) || id;
+      (typeof record.managed_service_id === "string" && record.managed_service_id) || id;
     if (appSlug && msvcId) {
       return `/apps/${encodeURIComponent(appSlug)}/managed-services/${encodeURIComponent(msvcId)}`;
     }
     return msvcId ? `/services` : null;
   }
   return null;
+}
+
+export function eventPayloadText(payload: unknown): string | null {
+  if (payload == null || (typeof payload === "object" && Object.keys(payload).length === 0)) {
+    return null;
+  }
+  return JSON.stringify(payload) ?? null;
 }

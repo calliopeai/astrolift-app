@@ -8,7 +8,7 @@ import { QueryError } from "@/components/QueryError";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DefinitionListItem } from "@/components/ui/definition-list";
 
-import { resolveSourceHref } from "./event-source";
+import { eventPayloadText, resolveSourceHref } from "./event-source";
 import type { useEventDetail } from "./use-events";
 
 export type EventDetailProps = Omit<ReturnType<typeof useEventDetail>, "error" | "onRetry"> & {
@@ -90,7 +90,7 @@ export function EventDetail({ id, event: e, loading, error, onRetry }: EventDeta
             <CardTitle className="text-base">Payload</CardTitle>
           </CardHeader>
           <CardContent>
-            {Object.keys(e.payload ?? {}).length > 0 ? (
+            {eventPayloadText(e.payload) !== null ? (
               <pre className="bg-muted/40 max-h-[32rem] overflow-auto rounded-md border p-3 font-mono text-xs">
                 {JSON.stringify(e.payload, null, 2)}
               </pre>

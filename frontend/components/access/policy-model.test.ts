@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { AstroliftPolicy } from "@/graphql/__generated__/schema";
+
 import { AFTER_HOURS, INVALID_POLICY, SECRETS_OFFICE } from "./fixtures";
 import {
   conditionError,
@@ -29,7 +31,10 @@ describe("policy model", () => {
         { kind: "geo_fence", countries: ["US"] },
       ],
       actorPattern: { user_in_groups: ["okta:eng"] },
-    };
+    } satisfies Pick<
+      AstroliftPolicy,
+      "effect" | "actionPattern" | "resourcePattern" | "conditions" | "actorPattern"
+    >;
     const out = serializePolicy(parsePolicy(row));
     expect(out.resourcePattern).toEqual(row.resourcePattern);
     expect(out.conditions).toEqual(row.conditions);

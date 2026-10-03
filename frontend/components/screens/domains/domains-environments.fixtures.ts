@@ -12,8 +12,7 @@ import type { ManagedDomainsScreenProps } from "./ManagedDomainsScreen";
 const noop = () => {};
 const noopAsync = async () => {};
 const yes = async () => true;
-/** The generated JSON scalar is Record<string, unknown>; real values are any JSON. */
-const json = (value: unknown) => value as Record<string, unknown>;
+const json = (value: unknown) => value;
 /** provisionNameservers is the same JSON scalar, narrowed to string[] in clusters.types. */
 const nameservers = (value: string[]) => value as AstroliftManagedDomain["provisionNameservers"];
 

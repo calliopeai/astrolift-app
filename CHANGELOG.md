@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Treat generated GraphQL JSON values as untrusted arbitrary JSON, including
+  array-valued policy conditions. Narrow event-source records before reading
+  fields and display scalar event payloads without object-only assumptions
+  (#2148).
+
 - Replace the static platform activity page with the permission-scoped Temporal
   execution viewer. Bind detail/history and confirmed cancel/terminate requests
   to the selected run ID, follow server cursor pages including empty authorized

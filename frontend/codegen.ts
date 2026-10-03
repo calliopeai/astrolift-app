@@ -90,7 +90,8 @@ const config: CodegenConfig = {
         scalars: {
           GUID: "string",
           DateTime: "string",
-          JSON: "Record<string, unknown>",
+          // JSON may contain arrays or scalar values; consumers must narrow its shape.
+          JSON: "unknown",
         },
         // Generated unions stay readable; numeric enums are confusing
         // in TS, prefer string literals.
@@ -118,7 +119,7 @@ const config: CodegenConfig = {
         scalars: {
           GUID: "string",
           DateTime: "string",
-          JSON: "Record<string, unknown>",
+          JSON: "unknown",
         },
         skipTypename: true,
         avoidOptionals: { field: false, inputValue: true },
