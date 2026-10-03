@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Bind browser SSO step-up to the verified issuer/subject, active actor and current
+  persisted authenticated session. Recheck proof freshness after admission locks,
+  preserve concurrent logout and suppress stale response-session writes (#2202).
+- Re-check reviewed workflow-start actors, memberships, bearer ceilings and current
+  operation policies after definition/stage/request lock waits. Refuse withdrawn
+  authority before durable work or Temporal submission, retain read-only recovery
+  and duplicate-request identities, and return complete public refusal envelopes
+  without changing the reviewed-start API (#2236).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old

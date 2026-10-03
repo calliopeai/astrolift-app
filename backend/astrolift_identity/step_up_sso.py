@@ -33,17 +33,25 @@ second IdP round-trip when the login happened seconds ago.
 from __future__ import annotations
 
 import logging
+import math
 import secrets
 import time
+from types import SimpleNamespace
 from urllib.parse import quote_plus, urlparse
 
 from authlib.integrations.django_client import OAuth
+from authlib.oidc.core import UserInfo as VerifiedUserInfo
 from django.conf import settings
+from django.contrib.auth import get_user, get_user_model
+from django.contrib.sessions.backends.db import SessionStore
+from django.contrib.sessions.models import Session
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
 from astrolift_identity.session_elevation import METHOD_SSO, elevate
+from auth1.models import UserInfo
 from core.mutations import AuditEntry, emit_audit
 
 logger = logging.getLogger(__name__)
@@ -72,6 +80,8 @@ attacks. Popped after verification."""
 SESSION_SSO_RETURN_KEY = "astrolift_sso_elevate_return"
 """Validated, safe-relative return URL stashed at start time so the
 callback can redirect the browser back to where the operator was."""
+
+SESSION_SSO_BINDING_KEY = "astrolift_sso_elevate_binding"
 
 
 # ---------------------------------------------------------------- constance
@@ -196,14 +206,14 @@ def elevate_sso_start(request: HttpRequest) -> HttpResponse:
 
     ``GET /auth1/elevate-sso?return=<safe-relative-path>``.
 
-    Authenticated, SSO-method-only. Local-login operators that hit
-    this URL get a 400 explaining the gap so a misconfigured FE
-    doesn't redirect them through a flow they can't satisfy. The
-    actual elevation happens on the callback after the IdP attests a
+    An authenticated browser session is required. The actual
+    elevation happens on the callback after the IdP attests a
     fresh ``auth_time`` — this view just builds the redirect.
     """
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return JsonResponse({"detail": "authentication required"}, status=401)
+    if not isinstance(request.session.session_key, str) or not request.session.session_key:
+        return JsonResponse({"detail": "authenticated browser session required"}, status=400)
 
     return_to = _normalize_return(request.GET.get("return") or request.GET.get("next"))
 
@@ -215,6 +225,10 @@ def elevate_sso_start(request: HttpRequest) -> HttpResponse:
     request.session[SESSION_SSO_STATE_KEY] = state
     request.session[SESSION_SSO_NONCE_KEY] = nonce
     request.session[SESSION_SSO_RETURN_KEY] = return_to
+    request.session[SESSION_SSO_BINDING_KEY] = {
+        "user_id": str(request.user.pk),
+        "session_key": request.session.session_key,
+    }
     request.session.modified = True
     request.session.save()
 
@@ -234,8 +248,62 @@ def elevate_sso_start(request: HttpRequest) -> HttpResponse:
 # ---------------------------------------------------------------- callback
 
 
+class _FinalizedCallbackSession(SessionStore):
+    """The callback persists under a row lock, so response middleware must not repeat it."""
+
+    finalized = False
+
+    @property
+    def key_salt(self):
+        # Changing the response wrapper class must not change Django's signer.
+        return SessionStore().key_salt
+
+    def save(self, must_create=False):
+        if not self.finalized:
+            return super().save(must_create=must_create)
+        return None
+
+
+def _consume_ceremony(session, state):
+    for key in (
+        SESSION_SSO_STATE_KEY,
+        SESSION_SSO_NONCE_KEY,
+        SESSION_SSO_BINDING_KEY,
+        SESSION_SSO_RETURN_KEY,
+    ):
+        session.pop(key, None)
+    if isinstance(state, str):
+        session.pop(f"_state_auth0_stepup_{state}", None)
+
+
+def _fresh_locked_session(session_key):
+    Session.objects.select_for_update().filter(session_key=session_key).first()
+    session = _FinalizedCallbackSession(session_key=session_key)
+    # Force a fresh decode while holding the persistence lock, including expiry.
+    session.items()
+    return session
+
+
 @csrf_exempt
 def elevate_sso_callback(request: HttpRequest) -> HttpResponse:
+    session_key = request.session.session_key
+    state = request.session.get(SESSION_SSO_STATE_KEY)
+    try:
+        return _elevate_sso_callback(request)
+    finally:
+        # Authlib and denial paths mutate the initial bag. Only the latest
+        # persisted bag may reach response middleware; logout must always win.
+        with transaction.atomic():
+            fresh = _fresh_locked_session(session_key)
+            if state and fresh.get(SESSION_SSO_STATE_KEY) == state:
+                _consume_ceremony(fresh, state)
+                fresh.save()
+            fresh.modified = False
+            fresh.finalized = True
+            request.session = fresh
+
+
+def _elevate_sso_callback(request: HttpRequest) -> HttpResponse:
     """Complete the SSO step-up flow.
 
     Validates state + id_token, asserts ``auth_time`` is within
@@ -251,6 +319,7 @@ def elevate_sso_callback(request: HttpRequest) -> HttpResponse:
 
     expected_state = request.session.pop(SESSION_SSO_STATE_KEY, None)
     expected_nonce = request.session.pop(SESSION_SSO_NONCE_KEY, None)
+    binding = request.session.pop(SESSION_SSO_BINDING_KEY, None)
     return_to = request.session.pop(SESSION_SSO_RETURN_KEY, None) or f"{settings.BASE_URL}"
     request.session.modified = True
 
@@ -260,14 +329,18 @@ def elevate_sso_callback(request: HttpRequest) -> HttpResponse:
             decision="DENY",
             user_id=user_id,
             extra={
-                "error": request.GET.get("error"),
-                "error_description": request.GET.get("error_description"),
+                "error": "provider_error",
             },
         )
         return _fail(return_to, "elevation_cancelled")
 
     received_state = request.GET.get("state")
-    if not expected_state or not received_state or not secrets.compare_digest(expected_state, received_state):
+    if (
+        not isinstance(expected_state, str)
+        or not expected_state
+        or not isinstance(received_state, str)
+        or not secrets.compare_digest(expected_state.encode(), received_state.encode())
+    ):
         _emit_audit(
             action="auth.elevate_admin.sso.state_mismatch",
             decision="DENY",
@@ -285,21 +358,52 @@ def elevate_sso_callback(request: HttpRequest) -> HttpResponse:
         )
         return _fail(return_to, "not_authenticated")
 
+    if (
+        not isinstance(binding, dict)
+        or binding.get("user_id") != str(user_id)
+        or not isinstance(binding.get("session_key"), str)
+        or not binding["session_key"]
+        or binding["session_key"] != request.session.session_key
+    ):
+        _emit_audit(
+            action="auth.elevate_admin.sso.session_mismatch",
+            decision="DENY",
+            user_id=user_id,
+        )
+        return _fail(return_to, "session_mismatch")
+
     try:
         token = _oauth.auth0_stepup.authorize_access_token(request)
-    except Exception as exc:  # noqa: BLE001 — IdP rejected or network failed
-        logger.exception("elevate_sso: authorize_access_token failed")
+    except Exception:  # noqa: BLE001 — IdP rejected or network failed
+        logger.warning("elevate_sso: authorize_access_token failed")
         _emit_audit(
             action="auth.elevate_admin.sso.token_exchange_failed",
             decision="DENY",
             user_id=user_id,
-            error_message=str(exc),
+            error_message="Token exchange failed.",
         )
         return _fail(return_to, "token_exchange_failed")
 
-    userinfo = token.get("userinfo") or {}
+    userinfo = token.get("userinfo") if isinstance(token, dict) else None
+    if (
+        not isinstance(token, dict)
+        or not isinstance(token.get("id_token"), str)
+        or not token["id_token"]
+        or not isinstance(userinfo, VerifiedUserInfo)
+    ):
+        _emit_audit(
+            action="auth.elevate_admin.sso.unverified_identity",
+            decision="DENY",
+            user_id=user_id,
+        )
+        return _fail(return_to, "unverified_identity")
     received_nonce = userinfo.get("nonce")
-    if expected_nonce and received_nonce and not secrets.compare_digest(expected_nonce, received_nonce):
+    if (
+        not isinstance(expected_nonce, str)
+        or not expected_nonce
+        or not isinstance(received_nonce, str)
+        or not secrets.compare_digest(expected_nonce.encode(), received_nonce.encode())
+    ):
         _emit_audit(
             action="auth.elevate_admin.sso.nonce_mismatch",
             decision="DENY",
@@ -307,8 +411,8 @@ def elevate_sso_callback(request: HttpRequest) -> HttpResponse:
         )
         return _fail(return_to, "nonce_mismatch")
 
-    auth_time = userinfo.get("auth_time") or token.get("auth_time")
-    if not isinstance(auth_time, (int, float)):
+    auth_time = userinfo.get("auth_time")
+    if type(auth_time) not in (int, float) or isinstance(auth_time, float) and not math.isfinite(auth_time):
         _emit_audit(
             action="auth.elevate_admin.sso.missing_auth_time",
             decision="DENY",
@@ -316,8 +420,9 @@ def elevate_sso_callback(request: HttpRequest) -> HttpResponse:
         )
         return _fail(return_to, "missing_auth_time")
 
-    age = int(time.time() - int(auth_time))
-    if age > freshness_window_seconds() or age < -freshness_window_seconds():
+    now = time.time()
+    window = freshness_window_seconds()
+    if auth_time < now - window or auth_time > now + window:
         # The replay-protection branch: a cached id_token with an old
         # ``auth_time`` lands here. Negative ages (clock skew the wrong
         # way) are equally suspect — fail both.
@@ -326,26 +431,74 @@ def elevate_sso_callback(request: HttpRequest) -> HttpResponse:
             decision="DENY",
             user_id=user_id,
             extra={
-                "auth_time": int(auth_time),
-                "age_seconds": age,
-                "window_seconds": freshness_window_seconds(),
+                "window_seconds": window,
             },
         )
         return _fail(return_to, "stale_auth_time")
 
-    # All checks pass — elevate the session for the standard step-up
-    # window. ``method=sso`` shows up on the audit row and on the
-    # elevation-status query so the FE can render "elevated via SSO".
-    elevate(request.session, method=METHOD_SSO)
-    request.session[SESSION_SSO_AUTH_TIME_KEY] = int(auth_time)
-    request.session.modified = True
-    request.session.save()
+    subject = userinfo.get("sub")
+    issuer = userinfo.get("iss")
+    with transaction.atomic():
+        actor = get_user_model().objects.select_for_update().filter(pk=user_id, is_active=True).first()
+        linked = (
+            actor is not None
+            and isinstance(subject, str)
+            and bool(subject)
+            and isinstance(issuer, str)
+            and bool(issuer)
+            and UserInfo.objects.select_for_update()
+            .filter(pk=subject, iss=issuer, internal_user_id=user_id)
+            .exists()
+        )
+        if not linked:
+            _emit_audit(
+                action="auth.elevate_admin.sso.identity_mismatch",
+                decision="DENY",
+                user_id=user_id,
+            )
+            return _fail(return_to, "identity_mismatch")
+
+        # The login path and anonymization lock the actor before its IdP link.
+        fresh = _fresh_locked_session(binding["session_key"])
+        current_actor = get_user(SimpleNamespace(session=fresh))
+        if (
+            not current_actor.is_authenticated
+            or current_actor.pk != actor.pk
+            or fresh.session_key != binding["session_key"]
+            or fresh.get(SESSION_SSO_STATE_KEY) != expected_state
+            or fresh.get(SESSION_SSO_NONCE_KEY) != expected_nonce
+            or fresh.get(SESSION_SSO_BINDING_KEY) != binding
+        ):
+            _emit_audit(
+                action="auth.elevate_admin.sso.session_mismatch",
+                decision="DENY",
+                user_id=user_id,
+            )
+            return _fail(return_to, "session_mismatch")
+
+        now = time.time()
+        window = freshness_window_seconds()
+        if auth_time < now - window or auth_time > now + window:
+            _emit_audit(
+                action="auth.elevate_admin.sso.stale_auth_time",
+                decision="DENY",
+                user_id=user_id,
+                extra={"window_seconds": window},
+            )
+            return _fail(return_to, "stale_auth_time")
+
+        _consume_ceremony(fresh, expected_state)
+        elevate(fresh, method=METHOD_SSO)
+        fresh[SESSION_SSO_AUTH_TIME_KEY] = int(auth_time)
+        fresh.save()
+        fresh.modified = False
+        request.session = fresh
 
     _emit_audit(
         action="auth.elevate_admin.sso.success",
         decision="ALLOW",
         user_id=user_id,
-        extra={"auth_time": int(auth_time), "age_seconds": age},
+        extra={"auth_time": int(auth_time), "age_seconds": int(now - auth_time)},
     )
     return HttpResponseRedirect(return_to)
 
@@ -365,6 +518,7 @@ def _fail(return_to: str, reason: str) -> HttpResponseRedirect:
 
 __all__ = [
     "SESSION_SSO_AUTH_TIME_KEY",
+    "SESSION_SSO_BINDING_KEY",
     "SESSION_SSO_NONCE_KEY",
     "SESSION_SSO_RETURN_KEY",
     "SESSION_SSO_STATE_KEY",

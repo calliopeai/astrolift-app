@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 
-from astrolift_identity.models import Organization
+from astrolift_identity.models import Member, Organization
 from config.schema import schema
 from core.permissions import Permission
 from core.run_input_contract import digest
@@ -26,6 +26,7 @@ def configuration(settings, monkeypatch):
 def world(permission_resolver):
     org = Organization.objects.create(name="Reviewed API", slug="reviewed-api")
     user = get_user_model().objects.create_user(username="reviewed-api-actor")
+    Member.objects.create(user=user, scope_kind="ORG", scope_id=org.pk)
     definition = WorkflowDefinition.objects.create(
         name="Reviewed API workflow", slug="reviewed-api-workflow", organization=org, model_label=""
     )

@@ -44,6 +44,17 @@ enabled state, input contract and revision are checked inside the reservation an
 again before dispatch. Existing browser elevation requirements remain enforced;
 this contract does not implement the broader mobile consent or proof system.
 
+Reservation, dispatch and read-only recovery refresh the active actor, bearer
+ceiling, organization membership and scoped grants after their database row locks.
+They reload current project/team ownership rather than using a pre-lock joined row.
+After locking the complete definition/stage graph, starts re-evaluate policies
+with an empty request decision cache and the current agent-cluster region before
+creating or submitting work. Retained role bindings do not let a removed member
+start or recover an execution. This preserves the active platform-operator session
+exception. It does not promise that later policy changes cancel an already accepted
+execution. Permission refusals return the complete declared mutation error envelope,
+including nullable version and attestation fields.
+
 A successful envelope means Temporal accepted the exact execution, not that the
 workflow completed. A failed envelope may still contain its reserved execution,
 workflow ID and `dispatchStatus: uncertain`; keep that identity. Recover with

@@ -4,7 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 
-from astrolift_identity.models import Organization
+from astrolift_identity.models import Member, Organization
 from astrolift_operations.models import WorkflowRun
 from core.permissions import Permission, PermissionDenied
 from core.run_input_contract import (
@@ -39,6 +39,7 @@ def local_cache(settings, monkeypatch):
 def world(permission_resolver):
     org = Organization.objects.create(name="Reviewed starts", slug="reviewed-starts")
     user = get_user_model().objects.create_user(username="reviewed-start-actor")
+    Member.objects.create(user=user, scope_kind="ORG", scope_id=org.pk)
     definition = WorkflowDefinition.objects.create(
         name="Reviewed workflow", slug="reviewed-workflow", organization=org, model_label=""
     )

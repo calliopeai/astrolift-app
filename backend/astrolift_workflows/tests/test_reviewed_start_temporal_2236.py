@@ -9,7 +9,7 @@ from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from temporalio import workflow
 
-from astrolift_identity.models import Organization
+from astrolift_identity.models import Member, Organization
 from astrolift_workflows import client
 from astrolift_workflows.activities import workflow_stage_activities as activities
 from astrolift_workflows.workflows.workflow_definition_run import WorkflowDefinitionRunWorkflow
@@ -46,6 +46,7 @@ def local_cache(settings, monkeypatch):
 def world(permission_resolver):
     org = Organization.objects.create(name="Temporal reviewed starts", slug="temporal-reviewed-starts")
     user = get_user_model().objects.create_user(username="temporal-reviewed-actor")
+    Member.objects.create(user=user, scope_kind="ORG", scope_id=org.pk)
     definition = WorkflowDefinition.objects.create(
         name="Disposable reviewed workflow", slug="disposable-reviewed", organization=org, model_label=""
     )
