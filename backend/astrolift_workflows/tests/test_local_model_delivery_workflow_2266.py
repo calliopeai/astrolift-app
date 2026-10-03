@@ -1,6 +1,7 @@
 """Actual worker bridge keeps private delivery outside persisted model state."""
 
 import json
+import logging
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -137,3 +138,58 @@ async def test_actual_temporal_history_does_not_receive_private_delivery(tempora
         assert file["url"].encode() not in raw_history
     assert b"X-Amz-Signature" not in raw_history
     assert "url" not in json.dumps(w.model.config) + json.dumps(w.model.applied_config)
+
+
+async def test_actual_temporal_failure_diagnostics_do_not_receive_private_delivery(
+    temporal_env, local_worker, monkeypatch, caplog, capsys
+):
+    from asgiref.sync import sync_to_async
+    from google.protobuf.json_format import Parse
+    from temporalio.api.history.v1 import History
+
+    from astrolift_workflows.tests.test_shared_model_reconcile_runtime_2213 import run_actual_workflow
+
+    w = local_worker
+    original = w.driver.apply_manifests
+    rejected_urls = []
+
+    def refused(cluster, namespace, manifests, **kwargs):
+        secret = next(row for row in manifests if "delivery.json" in row.get("stringData", {}))
+        urls = [file["url"] for file in json.loads(secret["stringData"]["delivery.json"])["files"]]
+        rejected_urls.extend(urls)
+        original(cluster, namespace, manifests, **kwargs)
+        return SimpleNamespace(ok=False, summary=lambda: urls)
+
+    monkeypatch.setattr(w.driver, "apply_manifests", refused)
+    result = await run_actual_workflow(temporal_env, w)
+    assert not result.ok and rejected_urls
+    history = Parse(w.temporal_history, History())
+    failures = [
+        event.activity_task_failed_event_attributes
+        for event in history.events
+        if event.HasField("activity_task_failed_event_attributes")
+    ]
+    assert failures and failures[-1].failure.message
+    raw_history = history.SerializeToString()
+    output = capsys.readouterr()
+    diagnostics = json.dumps(
+        [
+            result.message,
+            [record.__dict__ for record in caplog.records],
+            [logging.Formatter().format(record) for record in caplog.records],
+            output.out,
+            output.err,
+        ],
+        default=str,
+    )
+    for url in rejected_urls:
+        assert url.encode() not in raw_history and url not in diagnostics
+    assert b"X-Amz-Signature" not in raw_history and "X-Amz-Signature" not in diagnostics
+    await sync_to_async(w.model.refresh_from_db)()
+    assert w.model.status == "failed" and not w.model.backend_ref
+    assert w.model.applied_config is None and w.model.model_ready_observed_at is None
+    assert w.model.applied_subscription_revision == 0
+    statuses = await sync_to_async(
+        lambda: list(w.model.attachments.values_list("subscription_status", flat=True))
+    )()
+    assert statuses and set(statuses) == {"failed"}

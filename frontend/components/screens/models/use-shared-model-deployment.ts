@@ -23,8 +23,10 @@ import {
   sharedModelDraftSchema,
   sharedModelRequest,
   type SharedModelDraft,
+  type SharedModelSource,
 } from "./shared-model-form";
 import { useHfCatalogue } from "./use-hf-catalogue";
+import { useModelHostingSource } from "./use-model-hosting-source";
 import { provisionModelResult } from "./shared-model-write-results";
 import type { SharedModelDeploymentScreenProps } from "./SharedModelDeploymentScreen";
 const initialDraft: SharedModelDraft = {
@@ -40,7 +42,7 @@ export function useSharedModelDeployment() {
   const t = useTranslations("models.shared.placement");
   const { org, loading: orgLoading, error: orgError } = useActiveOrg();
   const organizationId = org?.id ?? "";
-  const [model, setModel] = useState<{ repoId: string; revisionSha: string } | null>(null),
+  const [model, setModel] = useState<SharedModelSource | null>(null),
     [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
   const form = useForm<SharedModelDraft>({
     resolver: zodResolver(sharedModelDraftSchema),
@@ -48,7 +50,26 @@ export function useSharedModelDeployment() {
   });
   const watched = useWatch({ control: form.control });
   const draft: SharedModelDraft = { ...initialDraft, ...watched };
-  const catalogueProps = useHfCatalogue(setModel);
+  const [sourceKind, setSourceKind] = useState<"huggingface" | "local">("huggingface");
+  const hfModel = model && "repoId" in model ? model : null;
+  const hosting = useModelHostingSource(hfModel, setModel);
+  const access =
+    model && "localArtifactId" in model
+      ? { confirmed: true, loading: false, reason: null, license: null, onRetry: () => {} }
+      : hosting.access;
+  const connection = sourceKind === "huggingface" ? hosting.connection : null;
+  const catalogueProps = useHfCatalogue(setModel, hosting.props.allowed);
+  const licenseKey = JSON.stringify([
+    organizationId,
+    hosting.actorId,
+    model,
+    connection,
+    selectedClusterId,
+    access.license,
+  ]);
+  const [licenseReview, setLicenseReview] = useState({ key: licenseKey, reviewed: false });
+  if (licenseReview.key !== licenseKey) setLicenseReview({ key: licenseKey, reviewed: false });
+  const licenseReviewed = licenseReview.key === licenseKey && licenseReview.reviewed;
   const definition = useMemo<ListDefinition>(
     () => ({
       id: "models.shared.placement",
@@ -63,7 +84,13 @@ export function useSharedModelDeployment() {
     [t]
   );
   const list = useLocalListState(definition);
-  const skipped = !organizationId || orgLoading || Boolean(orgError);
+  const skipped =
+    !organizationId ||
+    orgLoading ||
+    Boolean(orgError) ||
+    !model ||
+    !hosting.identityReady ||
+    hosting.props.allowed !== true;
   const clusters = useQuery<
     ListModelPlacementClustersQuery,
     ListModelPlacementClustersQueryVariables
@@ -80,7 +107,7 @@ export function useSharedModelDeployment() {
   });
   const rows = skipped ? [] : (clusters.data?.clusterModelPlacementClustersPage.items ?? []);
   const cluster = rows.find((row) => row.id === selectedClusterId);
-  const request = sharedModelRequest(organizationId, cluster ?? null, model, draft),
+  const request = sharedModelRequest(organizationId, cluster ?? null, model, draft, connection),
     requestKey = JSON.stringify(request);
   const admission = useQuery<
     GetClusterModelRuntimeAdmissionQuery,
@@ -89,6 +116,10 @@ export function useSharedModelDeployment() {
     variables: {
       input: request ?? {
         organizationId: "",
+        connectionId: null,
+        expectedConnectionVersion: null,
+        localArtifactId: null,
+        expectedArtifactVersion: null,
         clusterId: "",
         expectedProviderId: "",
         name: "",
@@ -110,7 +141,13 @@ export function useSharedModelDeployment() {
     ProvisionClusterModelMutation,
     ProvisionClusterModelMutationVariables
   >(PROVISION_CLUSTER_MODEL, { fetchPolicy: "no-cache" });
-  const contextKey = JSON.stringify([requestKey, organizationId, skipped]);
+  const contextKey = JSON.stringify([
+    requestKey,
+    organizationId,
+    skipped,
+    access.confirmed,
+    licenseReviewed,
+  ]);
   const [context, setContext] = useState({ key: contextKey, revision: 0 });
   if (context.key !== contextKey) setContext({ key: contextKey, revision: context.revision + 1 });
   const latest = useRef({ requestKey, organizationId, skipped, revision: context.revision }),
@@ -128,6 +165,12 @@ export function useSharedModelDeployment() {
   }, []);
   const props: Omit<SharedModelDeploymentScreenProps, "catalogue"> = {
     organizationId,
+    sourceControls: null,
+    sourceConnection: connection,
+    sourceAccess: access,
+    hostingAllowed: hosting.props.allowed === true,
+    licenseReviewed,
+    onLicenseReviewed: (reviewed) => setLicenseReview({ key: licenseKey, reviewed }),
     model,
     onClearModel: () => setModel(null),
     selectedClusterId,
@@ -202,11 +245,19 @@ export function useSharedModelDeployment() {
         latest.current.skipped ||
         latest.current.revision !== context.revision ||
         latest.current.organizationId !== candidate.organizationId ||
-        latest.current.requestKey !== JSON.stringify(candidate)
+        latest.current.requestKey !== JSON.stringify(candidate) ||
+        !access.confirmed ||
+        !licenseReviewed
       )
         return { accepted: false, message: t("changed") };
       try {
         const result = await provision({ variables: { input: candidate } });
+        const outcome = provisionModelResult(
+          result.data?.provisionClusterModel,
+          candidate,
+          t("failed")
+        );
+        if (outcome.accepted) return outcome;
         if (
           !mounted.current ||
           lifecycle.current !== epoch ||
@@ -214,11 +265,36 @@ export function useSharedModelDeployment() {
           latest.current.requestKey !== JSON.stringify(candidate)
         )
           return { accepted: false, message: t("changed") };
-        return provisionModelResult(result.data?.provisionClusterModel, candidate, t("failed"));
+        return outcome;
       } catch (error) {
         return { accepted: false, message: error instanceof Error ? error.message : t("failed") };
       }
     },
   };
-  return { ...props, catalogueProps };
+  return {
+    ...props,
+    catalogueProps,
+    hostingProps: hosting.props,
+    sourceKind,
+    onUseLocalArtifact: (artifact: {
+      id: string;
+      version: number;
+      name: string;
+      manifestSha256: string;
+    }) =>
+      setModel({
+        localArtifactId: artifact.id,
+        expectedArtifactVersion: artifact.version,
+        name: artifact.name,
+        manifestSha256: artifact.manifestSha256,
+      }),
+    onSourceKind: (kind: "huggingface" | "local") => {
+      if (kind !== sourceKind) {
+        setSourceKind(kind);
+        setModel(null);
+        setSelectedClusterId(null);
+        form.reset(initialDraft);
+      }
+    },
+  };
 }

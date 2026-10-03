@@ -5,6 +5,14 @@
 - Return the exact public deployment GUID in both legacy and paged timeline
   ownership references, preserving authorization, paging and legacy limits
   without per-row parent lookups (#2265).
+
+- Add an admin-gated model Host wizard with write-only Hugging Face connections,
+  separate access/license/runtime/resource checks and verified local-file source
+  selection. Hash files in bounded worker chunks, stream private uploads with
+  cancellation, and preserve accepted verification when source refresh fails.
+  Keep import verification and queued hosting distinct from observed health,
+  with genuine copy in all eight locales (#2266).
+
 - Assemble verified local artifacts as an explicit alternate cluster-model source,
   pin source versions through native worker delivery, join source migrations and
   audit import transitions with metadata only. Sanitize local delivery failures
