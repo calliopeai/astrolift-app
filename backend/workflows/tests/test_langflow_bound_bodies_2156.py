@@ -18,6 +18,7 @@ from workflows.source_ports import (
     imported_output,
     validate_source_ports,
 )
+from workflows.tests.test_guid_target_references_2156 import targets as targets
 from workflows.tests.test_langflow_collections_2156 import source_collection
 
 
@@ -169,6 +170,44 @@ def test_malformed_source_contract_values_are_typed_refusals(field):
     ports[field] = []
     with pytest.raises(SourcePortContractError):
         validate_source_ports(ports, kind="workflow")
+
+
+@pytest.mark.parametrize("component", ["RunFlow", "Agent"])
+def test_saved_source_contract_refuses_ports_outside_the_importers_supported_semantics(component):
+    mapped = LangflowImporter().import_flow(bound_source(uuid.uuid4(), component=component)).manifest
+    ports = mapped.stages[1].iteration
+    if component == "RunFlow":
+        ports["source_input_port"] = "child-entry~unsupported_input"
+    else:
+        ports.update(source_output_port="structured_response", output_mode="data")
+    with pytest.raises(SourcePortContractError):
+        validate_source_ports(ports, kind=mapped.stages[1].kind)
+    with pytest.raises(ValueError):
+        parse_workflow_manifest(emit_workflow_manifest(mapped))
+
+
+@pytest.mark.django_db
+def test_saved_native_source_agent_binding_cannot_substitute_a_different_live_target(request):
+    from astrolift_workflows.activities.workflow_stage_activities import _get_workflow_stages_sync
+    from workflows.manifest import create_definition_from_manifest
+
+    selected = request.getfixturevalue("targets")
+    mapped = LangflowImporter().import_flow(bound_source(selected.agents[1].guid, component="Agent")).manifest
+    definition = create_definition_from_manifest(mapped, organization=selected.org, is_enabled=True)
+    plan = _get_workflow_stages_sync(definition.slug, review_organization_id=selected.org.pk)
+    assert plan["stages"][1]["agent_definition_id"] == selected.agents[1].pk
+    with pytest.raises(RuntimeError, match="source ports differ from their explicit native target"):
+        _get_workflow_stages_sync(
+            definition.slug,
+            review_organization_id=selected.org.pk,
+            stage_bindings={"1": {"agent_workload_id": str(selected.agents[0].guid)}},
+        )
+
+    stage = definition.stages.get(order=1)
+    stage.iteration = {**stage.iteration, "target_guid": str(selected.agents[0].guid)}
+    stage.save(update_fields=["iteration"])
+    with pytest.raises(RuntimeError, match="source ports differ from their explicit native target"):
+        _get_workflow_stages_sync(definition.slug, review_organization_id=selected.org.pk)
 
 
 @pytest.mark.django_db

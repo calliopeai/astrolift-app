@@ -60,8 +60,8 @@ def validate_source_ports(value: Any, *, kind: str) -> dict:
             raise SourcePortContractError("imported native body requires explicit source ports")
     if component == "Agent" and (
         value["source_input_port"] != "input_value"
-        or value["source_output_port"] not in {"response", "structured_response"}
-        or value["output_mode"] != ("message" if value["source_output_port"] == "response" else "data")
+        or value["source_output_port"] != "response"
+        or value["output_mode"] != "message"
     ):
         raise SourcePortContractError("unsupported Agent input or output port semantics")
     if component == "RunFlow" and any(
@@ -70,6 +70,8 @@ def validate_source_ports(value: Any, *, kind: str) -> dict:
     ):
         raise SourcePortContractError("RunFlow requires exact component~port source identities")
     if component == "RunFlow":
+        if value["source_input_port"].split("~")[-1] != "input_value":
+            raise SourcePortContractError("RunFlow supports only its explicit text input port")
         try:
             flow_guid = str(uuid.UUID(value["source_flow_guid"]))
         except (ValueError, TypeError, AttributeError) as exc:
