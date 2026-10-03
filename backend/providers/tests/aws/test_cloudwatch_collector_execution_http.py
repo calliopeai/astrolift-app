@@ -127,6 +127,7 @@ def wire(tmp_path):
         "lost_create_kind": None,
         "lose_after_delete": False,
         "lost_delete": False,
+        "terminating_delete": False,
         "nodes": [
             {
                 "apiVersion": "v1",
@@ -304,6 +305,9 @@ def wire(tmp_path):
                 return self.failure(404)
             if state["delete_conflict"] or any(obj["metadata"][k] != v for k, v in body["preconditions"].items()):
                 return self.failure(409)
+            if state["terminating_delete"]:
+                obj["metadata"].update(deletionTimestamp="2026-10-03T00:01:00Z", resourceVersion="terminating-rv")
+                return self.send(obj)
             state["deleted_probe"] = state["objects"].pop(path)
             if state["lost_delete"]:
                 state["lost_delete"] = False
@@ -663,3 +667,75 @@ def test_opaque_aws_or_foreign_region_node_ids_do_not_prove_ec2_coverage(wire, a
     with pytest.raises(ExecutionRefused, match="UNSUPPORTED_NODE_COVERAGE"):
         execution(wire, artifact).run()
     assert not any(c[0] in {"POST", "DELETE", "PATCH"} for c in wire["calls"])
+
+
+def test_accepted_terminating_delete_polls_on_retry_without_repeating_original_rv(wire, artifact):
+    wire["terminating_delete"] = True
+    first = execution(wire, artifact).run()
+    assert first.state == "PROBE_DELETION_PENDING" and first.cleanup_pending
+    intent = copy.deepcopy(wire["port"].state["delete_intent"])
+    path = next(k for k in wire["objects"] if "/pods/" in k)
+    assert wire["objects"][path]["metadata"]["uid"] == intent["uid"]
+    assert wire["objects"][path]["metadata"]["resourceVersion"] != intent["resourceVersion"]
+    wire["calls"].clear()
+    polls = []
+
+    def idle():
+        polls.append(wire["last_check"])
+        wire["deleted_probe"] = wire["objects"].pop(path)
+
+    second = execution(wire, artifact, idle=idle).run()
+    assert second.state == "POST_LOSS_READ_VERIFIED" and not second.cleanup_pending
+    assert polls == ["idle.deletion"]
+    assert wire["port"].state["delete_intent"] == intent
+    assert not any(c[0] in {"POST", "DELETE", "PATCH"} and c[1] != "/" for c in wire["calls"])
+
+
+def test_terminating_probe_replacement_refuses_without_delete(wire, artifact):
+    wire["terminating_delete"] = True
+    assert execution(wire, artifact).run().state == "PROBE_DELETION_PENDING"
+    path = next(k for k in wire["objects"] if "/pods/" in k)
+    wire["objects"][path]["metadata"]["uid"] = "replacement"
+    wire["calls"].clear()
+    with pytest.raises(ExecutionRefused, match="PROBE_REPLACED") as refusal:
+        execution(wire, artifact).run()
+    assert refusal.value.cleanup_pending
+    assert not any(c[0] == "DELETE" for c in wire["calls"])
+
+
+def test_source_withdrawal_before_deletion_idle_poll_preserves_exact_probe(wire, artifact):
+    wire["terminating_delete"] = True
+    assert execution(wire, artifact).run().state == "PROBE_DELETION_PENDING"
+    path = next(k for k in wire["objects"] if "/pods/" in k)
+    before = copy.deepcopy(wire["objects"][path])
+    wire["calls"].clear()
+    wire["port"].deny = lambda action: action == "idle.deletion"
+    idle_calls = []
+    with pytest.raises(ExecutionRefused, match="AUTHORITY_REVOKED") as refusal:
+        execution(wire, artifact, idle=lambda: idle_calls.append(True)).run()
+    assert refusal.value.cleanup_pending and not idle_calls
+    assert wire["objects"][path] == before
+    assert not any(c[0] in {"POST", "DELETE", "PATCH"} for c in wire["calls"])
+
+
+def test_lost_accepted_reply_with_terminating_uid_is_observed_without_second_delete(wire, artifact):
+    wire["terminating_delete"] = True
+    executor = execution(wire, artifact)
+    saved = wire["port"].save
+    failed = []
+
+    def save(state):
+        if state.get("delete_accepted") and not failed:
+            failed.append(True)
+            raise RuntimeError("checkpoint outcome unavailable")
+        saved(state)
+
+    wire["port"].save = save
+    first = executor.run()
+    assert first.state == "PROVIDER_OUTCOME_UNCERTAIN" and first.cleanup_pending
+    assert "delete_accepted" not in wire["port"].state
+    wire["calls"].clear()
+    second = execution(wire, artifact).run()
+    assert second.state == "PROBE_DELETION_PENDING" and second.cleanup_pending
+    assert wire["port"].state["delete_accepted"]
+    assert not any(c[0] == "DELETE" for c in wire["calls"])

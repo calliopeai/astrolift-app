@@ -532,22 +532,32 @@ class CollectorExecutor:
                     identity = self.state.get("delete_intent") or self._identity(current)
                     self.state["delete_intent"] = identity
                     self.save()
-                    self.call(
-                        "kubernetes.delete_probe",
-                        self.kube.delete,
-                        kind="v1/Pod",
-                        namespace=NAMESPACE,
-                        name=probe["metadata"]["name"],
-                        uid=identity["uid"],
-                        resource_version=identity["resourceVersion"],
-                    )
+                    if current.get("metadata", {}).get("deletionTimestamp"):
+                        self.state["delete_accepted"] = True
+                        self.save()
+                    if not self.state.get("delete_accepted"):
+                        self.call(
+                            "kubernetes.delete_probe",
+                            self.kube.delete,
+                            kind="v1/Pod",
+                            namespace=NAMESPACE,
+                            name=probe["metadata"]["name"],
+                            uid=identity["uid"],
+                            resource_version=identity["resourceVersion"],
+                        )
+                        self.state["delete_accepted"] = True
+                        self.save()
                 elif not self.state.get("delete_intent"):
                     raise ExecutionRefused("PROBE_DISAPPEARED_BEFORE_DELETE")
-                remaining = self._get(probe)
-                if remaining is not None:
-                    if remaining.get("metadata", {}).get("uid") != record["uid"]:
+                for attempt in range(self.request.max_polls):
+                    remaining = self._get(probe)
+                    if remaining is None:
+                        break
+                    if remaining.get("metadata", {}).get("uid") != record["uid"] or not _contains(remaining, probe):
                         raise ExecutionRefused("PROBE_REPLACED")
-                    return ExecutionResult("PROBE_DELETION_PENDING", coverage, cleanup_pending=True)
+                    if attempt + 1 == self.request.max_polls:
+                        return ExecutionResult("PROBE_DELETION_PENDING", coverage, cleanup_pending=True)
+                    self.call("idle.deletion", self.idle)
                 self.state["probe_deleted"] = True
                 self.save()
                 cleanup = False
