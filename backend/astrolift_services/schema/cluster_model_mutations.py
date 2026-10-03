@@ -354,6 +354,10 @@ class ClusterModelMutations:
                 from astrolift_services.schema.hf_connections import locked_connection, require_host_admin
 
                 require_host_admin(info, cluster)
+                if input.local_artifact_id is not None and (
+                    input.connection_id is not None or input.expected_connection_version is not None
+                ):
+                    return failure("VALIDATION", "A local model source cannot use a Hugging Face connection.")
                 connection = (
                     locked_connection(input.connection_id, input.expected_connection_version)
                     if input.connection_id is not None
@@ -362,18 +366,19 @@ class ClusterModelMutations:
                 if connection is None and input.expected_connection_version is not None:
                     return failure("PRECONDITION", "Select a current Hugging Face connection.")
                 require_host_admin(info, cluster)
-                config, _ = validate_cluster_request(input, cluster)
+                config, _ = validate_cluster_request(input, cluster, lock_source=True)
                 from astrolift_drivers.managed_resolution import resolve_managed_driver
 
                 resolve_managed_driver(
                     cluster_plugin_slug=cluster.provider_plugin.slug, kind="model_endpoint", variant="vllm"
                 )
-                verified_model(
-                    input.model_repo,
-                    input.revision_sha,
-                    token=credential(connection) if connection is not None else None,
-                    checkpoint=lambda: require_host_admin(info, cluster),
-                )
+                if input.local_artifact_id is None:
+                    verified_model(
+                        input.model_repo,
+                        input.revision_sha,
+                        token=credential(connection) if connection is not None else None,
+                        checkpoint=lambda: require_host_admin(info, cluster),
+                    )
                 require_host_admin(info, cluster)
                 tenant = get_current_tenant()
                 service = ManagedService.objects.create(

@@ -5,6 +5,11 @@
 - Return the exact public deployment GUID in both legacy and paged timeline
   ownership references, preserving authorization, paging and legacy limits
   without per-row parent lookups (#2265).
+- Assemble verified local artifacts as an explicit alternate cluster-model source,
+  pin source versions through native worker delivery, join source migrations and
+  audit import transitions with metadata only. Sanitize local delivery failures
+  before returning provider results; verified files remain distinct from runtime
+  health (#2266).
 
 - Exclude signed model-file transfer capabilities from browser error records,
   network breadcrumbs and custom replay events. Preserve span timing without
@@ -34,6 +39,11 @@
   credentials out of public projections and Temporal inputs. Disconnect unused
   connections locally; require model deprovision first and remove only the
   model-owned credential copy after confirmed deprovision (#2266).
+
+- Add admin-scoped, checksum-verified local safetensors file imports into private
+  versioned install storage, with exact cluster-model delivery ownership and
+  read-only runtime mounts. Keep upload/delivery capabilities out of workflow
+  history and public config; verified bytes do not assert runtime health (#2266).
 
 
 - Install private-cluster agents from the control-plane worker using an exact
