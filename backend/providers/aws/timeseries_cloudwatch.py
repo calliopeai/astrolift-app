@@ -1,6 +1,6 @@
 """CloudWatch ALB HTTP metrics for EKS-hosted apps.
 
-Every Astrolift-managed app on AWS gets an ALB ingress. ALBs emit
+Apps with dedicated ALB ingress receive request metrics from CloudWatch. ALBs emit
 RequestCount, TargetResponseTime, and HTTPCode_Target_5XX_Count to
 CloudWatch automatically — no app instrumentation required.
 
@@ -27,7 +27,11 @@ def alb_arn_for_app_namespace(
     elbv2_client: Any,
     namespace: str,
 ) -> str | None:
-    """Return the ALB ARN serving the first Ingress in *namespace*, or None."""
+    """Find the first namespace-owned ALB, or None when none is provisioned.
+
+    Discovery failures and shared/untagged load balancers raise rather than
+    presenting another app's traffic as this namespace's measurements.
+    """
     try:
         ingresses = k8s_client.list_namespaced_ingress(namespace)
         for ingress in ingresses.items:
@@ -39,9 +43,24 @@ def alb_arn_for_app_namespace(
             for page in paginator.paginate():
                 for lb in page.get("LoadBalancers", []):
                     if lb.get("DNSName", "").lower() == hostname.lower():
+                        # An IngressGroup can span apps; its aggregate cannot
+                        # be presented as this namespace's request traffic.
+                        tags = elbv2_client.describe_tags(ResourceArns=[lb["LoadBalancerArn"]])
+                        stack = next(
+                            (
+                                tag.get("Value", "")
+                                for row in tags.get("TagDescriptions", [])
+                                for tag in row.get("Tags", [])
+                                if tag.get("Key") == "ingress.k8s.aws/stack"
+                            ),
+                            "",
+                        )
+                        if not stack.startswith(namespace + "/"):
+                            raise ValueError("ALB is shared or lacks the namespace ownership tag")
                         return lb["LoadBalancerArn"]
     except Exception as exc:
         log.warning("alb_arn_for_app_namespace ns=%s: %s", namespace, exc)
+        raise
     return None
 
 
@@ -99,7 +118,7 @@ def request_rate(
         return _extract_points(resp, "rps", divisor=period)
     except Exception as exc:
         log.warning("cloudwatch.request_rate: %s", exc)
-        return []
+        raise
 
 
 def error_rate(
@@ -154,7 +173,7 @@ def error_rate(
         return out
     except Exception as exc:
         log.warning("cloudwatch.error_rate: %s", exc)
-        return []
+        raise
 
 
 def latency(
@@ -168,7 +187,7 @@ def latency(
 ) -> list[tuple[float, float]]:
     """TargetResponseTime → seconds latency series.
 
-    *stat* is a CloudWatch extended-statistic string: 'p50', 'p95', 'p99'.
+    *stat* accepts CloudWatch statistics, including 'p50', 'p90', 'p95', 'p99'.
     """
     dim = _cw_dimension(alb_arn)
     try:
@@ -180,11 +199,9 @@ def latency(
             },
             "Period": period,
         }
-        # CloudWatch uses ExtendedStatistic for percentiles, Stat for averages.
-        if stat.startswith("p"):
-            metric_stat["ExtendedStatistic"] = stat
-        else:
-            metric_stat["Stat"] = stat
+        # GetMetricData uses Stat for percentiles too; ExtendedStatistic belongs
+        # to GetMetricStatistics and fails botocore validation here.
+        metric_stat["Stat"] = stat
 
         resp = cw.get_metric_data(
             MetricDataQueries=[{"Id": "lat", "MetricStat": metric_stat, "ReturnData": True}],
@@ -194,4 +211,4 @@ def latency(
         return _extract_points(resp, "lat")
     except Exception as exc:
         log.warning("cloudwatch.latency stat=%s: %s", stat, exc)
-        return []
+        raise

@@ -31,6 +31,7 @@ are snappy and long ranges stay stable. The rule lives in
 from __future__ import annotations
 
 import dataclasses
+import json
 
 from astrolift_operations.prometheus_client import sanitize_label_value
 from providers._sdk.edge_metrics import EdgeMetricsMapping
@@ -197,13 +198,15 @@ def _edge_labels(edge: EdgeMetricsMapping, namespace: str) -> dict[str, str]:
     return {edge.namespace_label: value}
 
 
-def _edge_match(edge: EdgeMetricsMapping, namespace: str) -> str:
+def _edge_match(edge: EdgeMetricsMapping, namespace: str, extra: str | None = None) -> str:
     """Render the edge selector — ``=`` for a literal namespace value,
     ``=~`` when the variant's ``namespace_value`` template carries a
     regex tail (e.g. the ALB stack tag's ``<namespace>/<ingress>``)."""
     labels = _edge_labels(edge, namespace)
     op = "=" if edge.namespace_value == "{ns}" else "=~"
-    inner = ",".join(f'{k}{op}"{v}"' for k, v in sorted(labels.items()))
+    inner = ",".join(f"{k}{op}{json.dumps(v)}" for k, v in sorted(labels.items()))
+    if extra:
+        inner += "," + extra
     return "{" + inner + "}"
 
 
@@ -289,9 +292,9 @@ def build_error_rate_query(
             )
             return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
         base_match = _edge_match(edge, namespace)
-        err_match = _render_label_match_with_extra(labels, f'{edge.status_label}=~"5.."')
+        err_match = _edge_match(edge, namespace, f'{edge.status_label}=~"5.."')
         expr = (
-            f"sum(rate({edge.requests_total}{err_match}[{rate_window}])) "
+            f"(sum(rate({edge.requests_total}{err_match}[{rate_window}])) or vector(0)) "
             f"/ clamp_min(sum(rate({edge.requests_total}{base_match}[{rate_window}])), 1e-9)"
         )
         return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
@@ -347,6 +350,8 @@ def build_latency_quantile_query(
                 f"histogram_quantile({quantile:g}, "
                 f"sum by (le)(rate({edge.duration_bucket}{match}[{rate_window}])))"
             )
+            if edge.latency_divisor != 1:
+                expr += f" / {edge.latency_divisor}"
             return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
     labels = _build_labels(
         app_slug=app_slug,
