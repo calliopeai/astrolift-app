@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Show hosted models with source, requested resources, exact deployment links and
+  fresh actor/organization reads. Surface authorized subscription summaries and
+  deployment metric states without claiming per-app traffic or measured cost (#2266).
+
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,
   preserve concurrent logout and suppress stale response-session writes (#2202).

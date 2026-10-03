@@ -102,3 +102,19 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const LocalSourceSettings: Story = {
+  args: {
+    ...sharedModelDetailProps,
+    model: {
+      ...sharedModelDetailProps.model!,
+      sourceKind: "local_artifact",
+      localArtifactId: "00000000-0000-4000-8000-000000000099",
+      localArtifactVersion: 2,
+      localManifestSha256: "c".repeat(64),
+      revisionSha: null,
+      computeMode: "cpu",
+    },
+    management: <section id="model-settings">Local-source resource settings</section>,
+  },
+};

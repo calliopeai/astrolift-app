@@ -5,7 +5,14 @@ import { ModelObservationsClient } from "@/components/screens/models/ModelObserv
 import { SharedModelPromptClient } from "@/components/screens/models/SharedModelPromptClient";
 import { ModelSubscriptionsClient } from "@/components/screens/models/ModelSubscriptionsClient";
 import { SharedModelManagementClient } from "@/components/screens/models/SharedModelManagementClient";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { useMe } from "@/graphql/user/user.hooks";
 export function SharedModelClient({ id }: { id: string }) {
+  const { org } = useActiveOrg();
+  const { user } = useMe();
+  return <DetailContext key={`${org?.id ?? ""}:${user?.id ?? ""}:${id}`} id={id} />;
+}
+function DetailContext({ id }: { id: string }) {
   const props = useSharedModelDetail(id);
   return (
     <SharedModelDetailScreen

@@ -360,7 +360,9 @@ describe("shared model subscription review", () => {
         })
       );
       render(view({ ...subscriptionProps, onSubscribe }, locale));
-      expect(screen.getByRole("heading", { name: messages.title })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: locales[locale].models.shared.inventory.connections })
+      ).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "storefront / staging" }));
       fireEvent.change(screen.getByLabelText(messages.alias), { target: { value: "chat_2" } });
       fireEvent.click(screen.getByRole("button", { name: messages.reviewSubscribe }));

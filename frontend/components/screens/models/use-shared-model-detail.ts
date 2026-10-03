@@ -17,7 +17,12 @@ export function useSharedModelDetail(id: string): SharedModelDetailScreenProps {
   const skipped = !organizationId || !id || orgLoading || Boolean(orgError);
   const query = useQuery<GetClusterModelDeploymentQuery, GetClusterModelDeploymentQueryVariables>(
     GET_CLUSTER_MODEL_DEPLOYMENT,
-    { variables: { organizationId, id }, skip: skipped, fetchPolicy: "cache-and-network" }
+    {
+      variables: { organizationId, id },
+      skip: skipped,
+      fetchPolicy: "no-cache",
+      context: { queryDeduplication: false },
+    }
   );
   const result = skipped ? null : query.data?.clusterModelDeployment;
   const invalidIdentity = Boolean(

@@ -28,6 +28,7 @@ vi.mock("@/graphql/identity/identity.hooks", () => ({
     error: scope.error,
   }),
 }));
+vi.mock("@/graphql/user/user.hooks", () => ({ useMe: () => ({ user: { id: "viewer" } }) }));
 type Request = { operationName: string; variables: Record<string, unknown> };
 let requests: Request[], transport: (request: Request) => Promise<Response>;
 function response(data: Record<string, unknown>) {

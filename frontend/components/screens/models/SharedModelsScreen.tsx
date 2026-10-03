@@ -23,20 +23,27 @@ export type SharedModelListRow = {
   ready: boolean | null;
   readinessObservedAt: string | null;
   subscriptionsEnabled: boolean;
+  sourceKind?: string;
+  localManifestSha256?: string | null;
+  desiredResources?: {
+    cpuRequest: string | null;
+    memoryRequest: string | null;
+    gpuCount: number | null;
+  };
 };
 export type SharedModelsScreenProps = { page: ModelPage<SharedModelListRow> };
 
 export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
   const t = useTranslations("models.shared.deployments");
-  const hosting = useTranslations("models.shared.hosting");
+  const inventory = useTranslations("models.shared.inventory");
   const format = useFormatter();
   return (
     <ListPage
       {...page}
       header={{
-        crumbs: [{ label: t("title") }],
-        title: t("title"),
-        context: t("description"),
+        crumbs: [{ label: inventory("title") }],
+        title: inventory("title"),
+        context: inventory("description"),
         primaryAction: (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" asChild>
@@ -45,7 +52,7 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
             <Button size="sm" asChild>
               <Link href="/models/deploy">
                 <RocketIcon className="size-4" />
-                {hosting("title")}
+                {inventory("addModel")}
               </Link>
             </Button>
           </div>
@@ -59,7 +66,7 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
         title: t("empty"),
         description: t("emptyDescription"),
         actionHref: "/models/deploy",
-        actionLabel: hosting("title"),
+        actionLabel: inventory("addModel"),
       }}
       columns={[
         {
@@ -79,12 +86,38 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
               </span>
               <span
                 className="text-muted-foreground block truncate font-mono text-xs"
-                title={row.revisionSha ?? undefined}
+                title={
+                  (row.sourceKind === "local_artifact"
+                    ? row.localManifestSha256
+                    : row.revisionSha) ?? undefined
+                }
               >
-                {row.revisionSha ?? t("unknownRevision")}
+                {(row.sourceKind === "local_artifact"
+                  ? row.localManifestSha256
+                  : row.revisionSha) ?? t("unknownRevision")}
               </span>
             </span>
           ),
+        },
+        {
+          id: "source",
+          header: inventory("source"),
+          cell: (row) =>
+            row.sourceKind === "local_artifact"
+              ? inventory("local")
+              : row.sourceKind === "huggingface"
+                ? inventory("huggingface")
+                : inventory("unknownSource"),
+        },
+        {
+          id: "resources",
+          header: inventory("resources"),
+          cell: (row) =>
+            inventory("resourceSummary", {
+              cpu: row.desiredResources?.cpuRequest ?? t("unknown"),
+              memory: row.desiredResources?.memoryRequest ?? t("unknown"),
+              gpu: row.desiredResources?.gpuCount ?? t("unknown"),
+            }),
         },
         {
           id: "cluster",

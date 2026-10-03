@@ -141,7 +141,7 @@ describe("actual shared model reads", () => {
       "href",
       "/models/endpoints"
     );
-    expect(screen.getByRole("link", { name: "Host a model" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Add model" })).toHaveAttribute(
       "href",
       "/models/deploy"
     );

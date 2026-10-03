@@ -35,6 +35,7 @@ export function SharedModelDetailScreen({
   management,
 }: SharedModelDetailScreenProps) {
   const local = useTranslations("models.shared.localImport");
+  const inventory = useTranslations("models.shared.inventory");
   const t = useTranslations("models.shared.detail"),
     common = useTranslations("models.shared.deployments"),
     format = useFormatter();
@@ -76,6 +77,21 @@ export function SharedModelDetailScreen({
           <Button variant="outline" asChild>
             <Link href="/models">{t("back")}</Link>
           </Button>
+          {model && subscriptions && (
+            <Button variant="outline" asChild>
+              <a href="#model-connections">{inventory("connections")}</a>
+            </Button>
+          )}
+          {model && observations && (
+            <Button variant="outline" asChild>
+              <a href="#model-metrics">{inventory("metrics")}</a>
+            </Button>
+          )}
+          {model && management && (
+            <Button variant="outline" asChild>
+              <a href="#model-settings">{inventory("settings")}</a>
+            </Button>
+          )}
           <Button variant="outline" onClick={onRetry} disabled={loading || (stale && !error)}>
             {t("refresh")}
           </Button>
@@ -94,7 +110,7 @@ export function SharedModelDetailScreen({
         ) : (
           <>
             {stale && <p role="status">{t(error ? "staleFacts" : "refreshing")}</p>}
-            <Section title={t("identity")}>
+            <Section title={inventory("overview")}>
               <DefinitionList
                 items={[
                   {

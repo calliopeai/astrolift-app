@@ -171,7 +171,7 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
     }
   }
   return (
-    <section aria-labelledby={`${id}-title`} className="space-y-4">
+    <section id="model-settings" aria-labelledby={`${id}-title`} className="scroll-mt-20 space-y-4">
       <h2 id={`${id}-title`} className="text-lg font-semibold">
         {t("title")}
       </h2>
