@@ -26,18 +26,39 @@ class ProviderPlugin(NamedBaseCoreModel):
     is_enabled = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
+        from django.db import transaction
+
         fields = kwargs.get("update_fields")
-        # Partial source writes must persist the revision used by reviewed actions.
-        if fields is not None and set(fields) & {
-            "deleted_at",
-            "config_schema",
-            "plugin_version",
-            "slug",
-            "capabilities_manifest",
-            "is_enabled",
-        }:
+        source_write = fields is None or bool(
+            set(fields)
+            & {
+                "deleted_at",
+                "config_schema",
+                "plugin_version",
+                "slug",
+                "capabilities_manifest",
+                "is_enabled",
+            }
+        )
+        if not source_write:
+            return super().save(*args, **kwargs)
+        if fields is not None:
             kwargs["update_fields"] = set(fields) | {"version", "updated_at"}
-        return super().save(*args, **kwargs)
+        # A reused stale instance must not reuse an observed review counter.
+        # Source writers and reviewed dispatch take the same canonical row lock;
+        # telemetry-only conditional updates intentionally bypass this path.
+        with transaction.atomic():
+            if self.pk is not None:
+                persisted = (
+                    type(self)
+                    .all_objects.select_for_update()
+                    .filter(pk=self.pk)
+                    .values_list("version", flat=True)
+                    .first()
+                )
+                if persisted is not None:
+                    self.version = persisted
+            return super().save(*args, **kwargs)
 
     class Meta:
         constraints = [

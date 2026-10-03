@@ -975,54 +975,66 @@ def _reconcile_agent_deployments_sync() -> AgentReconcileSummary:
     failed_slugs: list[str] = []
 
     for cluster in eligible:
-        # Re-apply through the SAME idempotent SSA path the mutation uses.
-        # Two structured failure shapes are persisted to last_management_error
-        # and counted as failed (mirroring the deployClusterAgent mutation):
-        # the driver couldn't be built / lacks apply_manifests
-        # (ClusterManagementError), or the apply reported per-manifest errors
-        # (ApplyResult.ok is False). Any other unexpected error is treated the
-        # same way so a single bad cluster never aborts the tick.
-        try:
-            result = deploy_agent_dispatch(cluster=cluster)
-        except ClusterManagementError as exc:
-            cluster.last_management_error = str(exc)
-            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
-            log.warning(
-                "agent-reconcile dispatch failed for cluster %s",
-                cluster.slug,
-                exc_info=True,
-            )
-            failed_slugs.append(cluster.slug)
-            continue
-        except Exception as exc:  # noqa: BLE001 — isolate any per-cluster failure
-            # A cluster with no resolvable managed runtime (or any other
-            # unexpected driver error) must skip gracefully, not error the
-            # whole tick. Record it like the structured failures so the
-            # settings card surfaces a reason, and move on.
-            cluster.last_management_error = f"agent reconcile failed: {exc}"
-            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
-            log.warning(
-                "agent-reconcile unexpected error for cluster %s",
-                cluster.slug,
-                exc_info=True,
-            )
-            failed_slugs.append(cluster.slug)
-            continue
+        from django.db import transaction
 
-        if not result.ok:
-            message = "agent deploy failed: " + "; ".join(str(e) for e in result.errors)
-            cluster.last_management_error = message
-            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
-            log.warning("agent-reconcile apply not ok for cluster %s: %s", cluster.slug, message)
-            failed_slugs.append(cluster.slug)
-            continue
+        with transaction.atomic():
+            cluster = TenantCluster.objects.select_for_update().filter(pk=cluster.pk, is_active=True).first()
+            if cluster is None or not cluster.agent_key_hash:
+                skipped_count += 1
+                continue
+            from astrolift_clusters.agent_install import installation_busy
 
-        # Success — clear any stale error the way the mutation does so a
-        # recovered cluster stops surfacing the previous failure.
-        if cluster.last_management_error:
-            cluster.last_management_error = ""
-            cluster.save(update_fields=["last_management_error", "updated_at", "version"])
-        reconciled_slugs.append(cluster.slug)
+            if installation_busy(cluster):
+                skipped_count += 1
+                continue
+            # Re-apply through the SAME idempotent SSA path the mutation uses.
+            # Two structured failure shapes are persisted to last_management_error
+            # and counted as failed (mirroring the deployClusterAgent mutation):
+            # the driver couldn't be built / lacks apply_manifests
+            # (ClusterManagementError), or the apply reported per-manifest errors
+            # (ApplyResult.ok is False). Any other unexpected error is treated the
+            # same way so a single bad cluster never aborts the tick.
+            try:
+                result = deploy_agent_dispatch(cluster=cluster)
+            except ClusterManagementError as exc:
+                cluster.last_management_error = str(exc)
+                cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+                log.warning(
+                    "agent-reconcile dispatch failed for cluster %s",
+                    cluster.slug,
+                    exc_info=True,
+                )
+                failed_slugs.append(cluster.slug)
+                continue
+            except Exception as exc:  # noqa: BLE001 — isolate any per-cluster failure
+                # A cluster with no resolvable managed runtime (or any other
+                # unexpected driver error) must skip gracefully, not error the
+                # whole tick. Record it like the structured failures so the
+                # settings card surfaces a reason, and move on.
+                cluster.last_management_error = f"agent reconcile failed: {exc}"
+                cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+                log.warning(
+                    "agent-reconcile unexpected error for cluster %s",
+                    cluster.slug,
+                    exc_info=True,
+                )
+                failed_slugs.append(cluster.slug)
+                continue
+
+            if not result.ok:
+                message = "agent deploy failed: " + "; ".join(str(e) for e in result.errors)
+                cluster.last_management_error = message
+                cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+                log.warning("agent-reconcile apply not ok for cluster %s: %s", cluster.slug, message)
+                failed_slugs.append(cluster.slug)
+                continue
+
+            # Success — clear any stale error the way the mutation does so a
+            # recovered cluster stops surfacing the previous failure.
+            if cluster.last_management_error:
+                cluster.last_management_error = ""
+                cluster.save(update_fields=["last_management_error", "updated_at", "version"])
+            reconciled_slugs.append(cluster.slug)
 
     return AgentReconcileSummary(
         reconciled_count=len(reconciled_slugs),

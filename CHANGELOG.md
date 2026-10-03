@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Install private-cluster agents from the control-plane worker using an exact
+  reviewed cluster/provider source and durable request identity. Keep the old
+  agent working until a verified candidate heartbeat, refuse foreign object
+  adoption, and report unconfirmed retirement without losing successful
+  activation. Sign EKS authentication with the registered credential (#1696).
+
 - Bind managed GitHub workflow creation and updates to the reviewed absence or
   blob SHA. Refuse concurrent edits, creation and deletion without advancing
   sync receipts; preserve independent edits on reconciliation PR branches.

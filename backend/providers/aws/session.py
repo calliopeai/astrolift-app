@@ -127,6 +127,26 @@ def aws_client(
     )
 
 
+def aws_session(*, region: str, credential: CloudCredential | None = None, build=None, sts=None, clock=_utcnow):
+    """The same registered identity for local SigV4 signing and AWS clients."""
+    import boto3
+
+    factory = build or boto3.Session
+    if credential is None or credential.mode is CredentialMode.AMBIENT:
+        return factory(region_name=region)
+    if credential.mode is not CredentialMode.AWS_ASSUME_ROLE:
+        raise CloudCredentialError(
+            f"aws: no session construction defined for credential mode {credential.mode.value!r}"
+        )
+    creds = _assume(credential, region=region, sts=sts, clock=clock)
+    return factory(
+        region_name=region,
+        aws_access_key_id=creds.access_key_id,
+        aws_secret_access_key=creds.secret_access_key,
+        aws_session_token=creds.session_token,
+    )
+
+
 def caller_account(
     credential: CloudCredential,
     *,

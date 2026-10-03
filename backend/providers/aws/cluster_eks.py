@@ -97,7 +97,7 @@ from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
 from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from aws._naming import iam_role_name
-from aws.session import aws_client
+from aws.session import aws_client, aws_session
 from k8s_native.central_auth import central_auth_component
 from k8s_native.edge_gateway import alb_front, edge_component
 from k8s_native.management import (
@@ -2673,6 +2673,7 @@ class EKSClusterDriver(ClusterDriver):
             return mint_eks_token(
                 cluster_name=self._config.cluster_name,
                 region=self._config.region,
+                session=aws_session(region=self._config.region, credential=self._config.credential),
                 expires_in_seconds=self._config.sts_token_lifetime_seconds,
             )
         except Exception as exc:
