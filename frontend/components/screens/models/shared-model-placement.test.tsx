@@ -64,6 +64,10 @@ describe("shared model placement review", () => {
         gpuCount: 1,
         cpuKvCacheGiB: null,
         allowSubscriptions: true,
+        connectionId: null,
+        expectedConnectionVersion: null,
+        localArtifactId: null,
+        expectedArtifactVersion: null,
       })
     );
     expect(

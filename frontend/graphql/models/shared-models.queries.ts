@@ -11,6 +11,10 @@ export const CLUSTER_MODEL_FIELDS = gql`
     clusterSlug
     clusterName
     modelRepo
+    sourceKind
+    localArtifactId
+    localArtifactVersion
+    localManifestSha256
     revisionSha
     computeMode
     subscriptionsEnabled

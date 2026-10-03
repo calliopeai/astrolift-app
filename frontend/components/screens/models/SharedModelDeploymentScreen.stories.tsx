@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import de from "@/messages/de.json";
 import ko from "@/messages/ko.json";
 import { SharedModelDeploymentScreen } from "./SharedModelDeploymentScreen";
+import { sharedModelRequest } from "./shared-model-form";
 import { sharedDeploymentProps } from "./shared-model.fixtures";
 const meta = {
   title: "Screens/Models/SharedModelDeploymentScreen",
@@ -95,4 +96,39 @@ export const Width768: Story = {
       <SharedModelDeploymentScreen {...args} />
     </div>
   ),
+};
+
+const localModel = {
+  localArtifactId: "artifact-guid",
+  expectedArtifactVersion: 2,
+  name: "Verified local safetensors",
+  manifestSha256: "b".repeat(64),
+};
+export const LocalSourceReview: Story = {
+  args: {
+    ...sharedDeploymentProps,
+    model: localModel,
+    admission: {
+      ...sharedDeploymentProps.admission!,
+      requestKey: JSON.stringify(
+        sharedModelRequest(
+          sharedDeploymentProps.organizationId,
+          sharedDeploymentProps.clusters.rows[0],
+          localModel,
+          sharedDeploymentProps.draft
+        )
+      ),
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Verified local safetensors")).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: "Review access and approvals on Hugging Face" })
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Review deployment" }));
+    const dialog = within(canvasElement.ownerDocument.body).getByRole("alertdialog");
+    await expect(dialog).toHaveTextContent("b".repeat(64));
+    await expect(dialog).toHaveTextContent("Hardware capacity and model fit remain unverified");
+  },
 };
