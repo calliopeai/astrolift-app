@@ -1546,6 +1546,23 @@ class EKSClusterDriver(ClusterDriver):
                 helm_values={
                     "nodeExporter": {"enabled": False},
                     "prometheus": {
+                        "additionalPodMonitors": [
+                            {
+                                "name": "astrolift-envoy-edge",
+                                "namespaceSelector": {"any": True},
+                                "selector": {
+                                    "matchLabels": {
+                                        "app.kubernetes.io/name": "envoy",
+                                        "app.kubernetes.io/component": "proxy",
+                                        "gateway.envoyproxy.io/owning-gateway-namespace": "astrolift-edge",
+                                        "gateway.envoyproxy.io/owning-gateway-name": "edge",
+                                    }
+                                },
+                                "podMetricsEndpoints": [
+                                    {"port": "metrics", "path": "/stats/prometheus", "interval": "15s"}
+                                ],
+                            }
+                        ],
                         "prometheusSpec": {
                             "retention": "24h",
                             "storageSpec": {},
@@ -2038,9 +2055,10 @@ class EKSClusterDriver(ClusterDriver):
     ) -> dict[str, list[tuple[float, float]]]:
         """CloudWatch ALB HTTP metrics for an app namespace.
 
-        Returns a dict with keys 'rps', 'error_rate', 'latency_p50',
-        'latency_p95', 'latency_p99'. Values are (unix_ts, value) lists.
-        All lists are empty on any failure (driver degrades gracefully).
+        Returns 'rps', 'error_rate', and 'latency_p50/p90/p95/p99' as
+        (unix_ts, value) lists. No provisioned ALB returns empty lists;
+        discovery, ownership, and provider failures raise for the caller
+        to distinguish an unavailable measurement from an empty window.
 
         Looks up the ALB by finding the Kubernetes Ingress in the app
         namespace and resolving its load-balancer hostname to an ALB ARN
@@ -2058,6 +2076,7 @@ class EKSClusterDriver(ClusterDriver):
             "rps": [],
             "error_rate": [],
             "latency_p50": [],
+            "latency_p90": [],
             "latency_p95": [],
             "latency_p99": [],
         }
@@ -2066,7 +2085,7 @@ class EKSClusterDriver(ClusterDriver):
             k8s = self._k8s(cluster.slug)
         except Exception as exc:
             log.warning("get_alb_http_metrics: k8s build failed cluster=%s: %s", cluster.slug, exc)
-            return empty
+            raise
 
         region = self._config.region
         _cred = self._config.credential
@@ -2098,6 +2117,7 @@ class EKSClusterDriver(ClusterDriver):
             "rps": request_rate(**kwargs),
             "error_rate": error_rate(**kwargs),
             "latency_p50": latency(**kwargs, stat="p50"),
+            "latency_p90": latency(**kwargs, stat="p90"),
             "latency_p95": latency(**kwargs, stat="p95"),
             "latency_p99": latency(**kwargs, stat="p99"),
         }

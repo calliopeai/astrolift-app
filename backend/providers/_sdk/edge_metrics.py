@@ -18,7 +18,9 @@ license to fall back to app-exposed ``http_*`` metrics.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,17 +80,47 @@ class EdgeMetricsMapping:
     series ("2xx" … "5xx") from these; empty means the variant has no
     breakdown source."""
 
+    latency_divisor: int = 1
 
-# ingress-nginx controller metrics. The controller stamps the ingress
-# resource's namespace on every series; scraped through the
-# kube-prometheus-stack ServiceMonitor (honor_labels=false) the target's
-# own ``namespace`` (the controller's) wins the label and the metric's
-# moves to ``exported_namespace`` — which is therefore the app join key.
+
+def envoy_metrics_for_routes(routes: list[dict[str, Any]], namespace: str) -> EdgeMetricsMapping | None:
+    """Bind shared-edge counters to exact, currently owned HTTPRoute names."""
+    names = []
+    for route in routes:
+        metadata = route.get("metadata") or {}
+        labels = metadata.get("labels") or {}
+        name = str(metadata.get("name") or "")
+        if (
+            metadata.get("namespace") != "astrolift-edge"
+            or labels.get("astrolift.io/managed-by") != "platform"
+            or labels.get("astrolift.dev/namespace") != namespace
+            or not re.fullmatch(r"[a-z0-9][a-z0-9.-]*", name)
+        ):
+            continue
+        backends = [ref for rule in (route.get("spec") or {}).get("rules", []) for ref in rule.get("backendRefs", [])]
+        if not backends or any(ref.get("namespace", "astrolift-edge") != namespace for ref in backends):
+            continue
+        names.append(re.escape(name).replace(r"\-", "-"))
+    if not names:
+        return None
+    return EdgeMetricsMapping(
+        variant="envoy_gateway",
+        requests_total="envoy_cluster_upstream_rq",
+        duration_bucket="envoy_cluster_upstream_rq_time_bucket",
+        namespace_label="envoy_cluster_name",
+        namespace_value="httproute/astrolift-edge/(" + "|".join(sorted(set(names))) + ")/rule/[0-9]+",
+        status_label="envoy_response_code",
+        latency_divisor=1000,
+    )
+
+
+# The nginx ServiceMonitor preserves the ingress resource's namespace with
+# honorLabels=true, so shared controller metadata cannot replace the app key.
 NGINX_INGRESS = EdgeMetricsMapping(
     variant="nginx_ingress",
     requests_total="nginx_ingress_controller_requests",
     duration_bucket="nginx_ingress_controller_request_duration_seconds_bucket",
-    namespace_label="exported_namespace",
+    namespace_label="namespace",
     status_label="status",
 )
 

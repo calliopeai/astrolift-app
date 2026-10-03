@@ -205,7 +205,7 @@ def test_reachable_cloudwatch_with_no_traffic_is_no_data_yet(permission_resolver
     from core import cluster_management
 
     permission_resolver.grant(Permission.APP_READ)
-    org, app = _scaffold(plugin_slug="aws")
+    org, app = _scaffold(plugin_slug="aws", ingress_class="alb")
     monkeypatch.setattr(
         cluster_management,
         "cluster_alb_http_metrics_dispatch",
@@ -215,12 +215,81 @@ def test_reachable_cloudwatch_with_no_traffic_is_no_data_yet(permission_resolver
     signals = _by_kind(_signals(org, app))
 
     for kind in _RED:
-        expected = (
-            ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER
-            if kind == GoldenSignalKind.LATENCY_P90
-            else ObservabilityPanelReason.NO_DATA_YET
-        )
-        assert signals[kind].reason == expected, kind
+        assert signals[kind].reason == ObservabilityPanelReason.NO_DATA_YET, kind
+
+
+def test_cloudwatch_http_without_prometheus_keeps_saturation_unconfigured(permission_resolver, monkeypatch):
+    from core import cluster_management
+
+    permission_resolver.grant(Permission.APP_READ)
+    org, app = _scaffold(plugin_slug="aws", ingress_class="alb")
+    env = AppEnvironment.objects.get(registered_app=app)
+    env.tenant_cluster.provider_config = {}
+    env.tenant_cluster.save(update_fields=["provider_config"])
+    monkeypatch.setattr(
+        cluster_management,
+        "cluster_alb_http_metrics_dispatch",
+        lambda **kw: {
+            "rps": [(1.0, 2.0)],
+            "error_rate": [(1.0, 0.0)],
+            "latency_p90": [(1.0, 0.2)],
+        },
+    )
+    result = _signals(org, app)
+    signals = _by_kind(result)
+    assert result.reason == ObservabilityPanelReason.OK
+    for kind in (GoldenSignalKind.TRAFFIC, GoldenSignalKind.ERRORS, GoldenSignalKind.LATENCY_P90):
+        signal = signals[kind]
+        assert signal.measurement.available
+        assert signal.measurement.source.value == "cloudwatch_alb"
+        assert signal.reason == ObservabilityPanelReason.OK
+    for kind in _SATURATION:
+        assert signals[kind].reason == ObservabilityPanelReason.NOT_CONFIGURED
+
+
+def test_partial_cloudwatch_fallback_preserves_prometheus_source(permission_resolver, monkeypatch):
+    from core import cluster_management
+
+    permission_resolver.grant(Permission.APP_READ)
+    org, app = _scaffold(plugin_slug="aws", ingress_class="alb")
+    monkeypatch.setattr(
+        cluster_management,
+        "cluster_alb_http_metrics_dispatch",
+        lambda **kw: {
+            "rps": [(1.0, 99.0)],
+            "latency_p95": [(1.0, 0.3)],
+        },
+    )
+    calls = []
+
+    def series(**kw):
+        calls.append(kw)
+        return [("", [(1.0, 2.0)])] if "request_count_sum" in kw["promql"] else []
+
+    with patch.object(prom_client, "query_range_series", side_effect=series):
+        with tenant_context(TenantContext(organization_id=org.id)):
+            result = GoldenSignalsQuery().astrolift_app_golden_signals(_info(), app_slug=app.slug)
+    signals = _by_kind(result)
+    traffic = signals[GoldenSignalKind.TRAFFIC]
+    assert [s.value for s in traffic.samples] == [2.0]
+    assert traffic.measurement.source.value == "edge_prometheus"
+    assert signals[GoldenSignalKind.LATENCY_P95].measurement.source.value == "cloudwatch_alb"
+
+
+def test_shared_envoy_never_borrows_load_balancer_totals(permission_resolver, monkeypatch):
+    from core import cluster_management
+
+    permission_resolver.grant(Permission.APP_READ)
+    org, app = _scaffold(plugin_slug="aws", ingress_class="envoy")
+    env = AppEnvironment.objects.get(registered_app=app)
+    env.tenant_cluster.provider_config = {}
+    env.tenant_cluster.save(update_fields=["provider_config"])
+
+    def forbidden(**kw):
+        pytest.fail("Shared Envoy traffic must be scoped by route, not shared ALB totals")
+
+    monkeypatch.setattr(cluster_management, "cluster_alb_http_metrics_dispatch", forbidden)
+    assert not _by_kind(_signals(org, app))[GoldenSignalKind.TRAFFIC].samples
 
 
 def test_cloudwatch_is_not_consulted_when_prometheus_has_http_data(permission_resolver, monkeypatch):

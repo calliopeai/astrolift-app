@@ -196,9 +196,10 @@ def _backfill_from_cloudwatch(
 ) -> tuple[list[AppGoldenSignal], bool]:
     """Replace empty HTTP-kind signals with CloudWatch ALB data.
 
-    Called only when Prometheus has no HTTP series (uninstrumented apps).
-    Falls back silently on any error or non-AWS cluster — the original
-    empty-series list is returned unchanged in those cases.
+    Called when any HTTP signal has no Prometheus series.
+    Non-AWS or non-ALB clusters retain their original signals. Provider
+    failures mark missing HTTP measurements unavailable; successful
+    Prometheus samples are preserved.
 
     Returns the (possibly patched) signals and whether CloudWatch is a
     *source* for this app — the dispatch reached the ALB — which is
@@ -222,6 +223,9 @@ def _backfill_from_cloudwatch(
         return out, False
 
     cluster = env.tenant_cluster
+    # Shared Envoy load-balancer totals cannot identify an individual app.
+    if cluster.ingress_class != "alb":
+        return out, False
     plugin_slug = (
         cluster.provider_plugin.slug if cluster.provider_plugin_id and cluster.provider_plugin else ""
     ).lower()
@@ -265,6 +269,7 @@ def _backfill_from_cloudwatch(
                 ),
             )
             if signal.measurement is not None
+            and not signal.samples
             and signal.name.value.startswith(("traffic", "errors", "latency"))
             else signal
             for signal in out
@@ -285,6 +290,7 @@ def _backfill_from_cloudwatch(
         "rps": GoldenSignalKind.TRAFFIC,
         "error_rate": GoldenSignalKind.ERRORS,
         "latency_p50": GoldenSignalKind.LATENCY_P50,
+        "latency_p90": GoldenSignalKind.LATENCY_P90,
         "latency_p95": GoldenSignalKind.LATENCY_P95,
         "latency_p99": GoldenSignalKind.LATENCY_P99,
     }
@@ -292,6 +298,7 @@ def _backfill_from_cloudwatch(
         "rps": "rps",
         "error_rate": "ratio",
         "latency_p50": "seconds",
+        "latency_p90": "seconds",
         "latency_p95": "seconds",
         "latency_p99": "seconds",
     }
@@ -301,7 +308,7 @@ def _backfill_from_cloudwatch(
         # sig.name is a GoldenSignalKind enum instance
         cw_key = next((k for k, kind_enum in _CW_KIND_MAP.items() if kind_enum == sig.name), None)
         cw_pairs = cw_data.get(cw_key, []) if cw_key else []
-        if cw_pairs:
+        if cw_pairs and not sig.samples:
             pairs = cw_pairs
             patched.append(
                 dataclasses.replace(
@@ -532,7 +539,12 @@ class GoldenSignalsQuery:
         # Edge-sourced when the cluster's ingress variant is mapped (#1224):
         # grouped by the variant's status label, surfaced on
         # ``plan.group_label`` so the series keys resolve either way.
-        edge = prom_client.resolve_edge_metrics(app=app, environment_name=environment_name)
+        try:
+            edge = prom_client.resolve_edge_metrics(app=app, environment_name=environment_name)
+        except Exception:
+            return StatusCodeBreakdown(
+                reason=ObservabilityPanelReason.ERROR, range_seconds=seconds, series=[], promql=""
+            )
         plan = prom_queries.build_status_code_breakdown_query(
             app_slug=app.slug,
             environment_name=environment_name,

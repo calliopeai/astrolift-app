@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Collect app-environment ingress metrics from exact managed Envoy routes and
+  preserved nginx namespaces. Keep idle latency windows undefined, refuse retired
+  or foreign cluster reads, and use complete dedicated-ALB CloudWatch evidence
+  when Prometheus measurements are unavailable (#2250).
+
 - Open live-log providers and discover replicas outside the ASGI event loop,
   including lazy cluster/provider reads. Preserve app-scoped admission and close
   underlying streams on disconnect. Read real urllib3 log lines rather than
