@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
+
+from botocore.session import Session
 
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
@@ -34,7 +37,15 @@ from _sdk.managed_service import (
     VolumeMount,
     VolumeSourceKind,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import (
+    ManagedServiceError,
+    assert_resource_arn,
+    handle_for,
+    live_ownership_refusal,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "filesystem"
@@ -71,6 +82,9 @@ class EFSDriver(ManagedServiceDriver):
         sleep: Any = time.sleep,
     ) -> None:
         self._config = config
+        session = Session()
+        self._partition = session.get_partition_for_region(config.region)
+        self._dns_suffix = session.get_component("endpoint_resolver").get_partition_dns_suffix(self._partition)
         if client is None:
             client = aws_client("efs", region=config.region, credential=config.credential)
         self._efs = client
@@ -87,32 +101,50 @@ class EFSDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_efs_config"])
-        token = self._creation_token(spec)
-        file_system = self._find_by_token(token)
-        file_system_id = str(file_system.get("FileSystemId") or "")
+        file_system_id = ""
         access_point_id = ""
         created = False
         try:
-            if file_system_id:
-                file_system = self._await_file_system(file_system_id, {"available"})
-                if not self._is_managed(file_system) or adoption_refusal(
-                    file_system.get("Tags") or [], spec, resource="EFS filesystem"
-                ):  # platform-made is not enough: it must be this service's (#1961)
-                    raise ManagedServiceError(
-                        f"EFS creation token {token!r} belongs to a filesystem outside this declaration",
-                    )
-                self._efs.tag_resource(ResourceId=file_system_id, Tags=_tag_list(spec))
+            managed_service_identity(spec.managed_service_id)
+            self._identity_config()
+            token = self._creation_token(spec)
+            if spec.recorded_handle:
+                file_system_id, access_point_id = _parse_resource(spec.recorded_handle)
+                file_system = self._describe_file_system(file_system_id)
+                if file_system is None:
+                    raise ManagedServiceError("recorded EFS filesystem is missing; refusing replacement")
             else:
-                response = self._efs.create_file_system(**self._create_file_system_request(token, spec))
+                file_system = self._find_owned(spec.managed_service_id)
+                file_system_id = str(file_system.get("FileSystemId") or "")
+            if not file_system_id:
+                try:
+                    response = self._efs.create_file_system(**self._create_file_system_request(token, spec))
+                except Exception as exc:
+                    if not _already_exists(exc):
+                        raise
+                    response = self._find_by_token(token)
                 file_system_id = str(response.get("FileSystemId") or "")
+                self._validate_file_system(response, file_system_id)
+                self._assert_owner(response, spec.managed_service_id, "EFS filesystem")
+                file_system = response
                 created = True
-                file_system = self._await_file_system(file_system_id, {"available"})
+            self._assert_owner(file_system, spec.managed_service_id, "EFS filesystem")
+            file_system = self._await_file_system(file_system_id, {"available"})
+            self._owned_tree(file_system, spec.managed_service_id, access_point_id)
+            # A legacy root keeps its recorded native token; mutable labels do
+            # not choose a replacement filesystem or access-point incarnation.
+            token = str(file_system.get("CreationToken") or "")
+            if not token:
+                raise ManagedServiceError("EFS filesystem creation identity is unavailable")
             self._reconcile_policies(file_system_id, cfg)
             self._reconcile_replication(file_system_id, cfg)
             self._reconcile_mount_targets(file_system_id, cfg)
             if cfg.get("create_access_point", True):
-                access_point = self._ensure_access_point(file_system_id, token, spec)
+                access_point = self._ensure_access_point(file_system_id, token, spec, access_point_id)
                 access_point_id = str(access_point.get("AccessPointId") or "")
+            self._owned_tree(
+                self._await_file_system(file_system_id, {"available"}), spec.managed_service_id, access_point_id
+            )
         except Exception as exc:
             handle = _handle(file_system_id, access_point_id) if file_system_id else ""
             action = "configure new" if created else "reconcile existing"
@@ -126,17 +158,18 @@ class EFSDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="filesystem_efs")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        file_system_id, _ = _parse_resource(spec.handle)
         cfg = spec.config or {}
         error = self._validate_config(cfg, partial=True)
         if error:
             return UpdateResult(False, spec.handle, error, ["invalid_efs_config"])
         try:
+            managed_service_identity(spec.managed_service_id)
+            self._identity_config()
+            file_system_id, access_point_id = _parse_resource(spec.handle)
             file_system = self._describe_file_system(file_system_id)
             if file_system is None:
-                return UpdateResult(False, spec.handle, "EFS filesystem not found", ["not_found"])
-            if not self._is_managed(file_system):
-                raise ManagedServiceError("EFS filesystem is not owned by Astrolift")
+                return UpdateResult(False, spec.handle, "EFS filesystem not found", ["not_found"], retryable=False)
+            self._owned_tree(file_system, spec.managed_service_id, access_point_id)
             update = dict(cfg.get("file_system_update") or {})
             if update:
                 request = {**update, "FileSystemId": file_system_id}
@@ -148,9 +181,11 @@ class EFSDriver(ManagedServiceDriver):
                 self._reconcile_replication(file_system_id, cfg)
             if "mount_targets" in cfg or "mount_target_security_group_ids" in cfg:
                 self._reconcile_mount_targets(file_system_id, cfg)
+        except (ManagedServiceError, ValueError) as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
-                return UpdateResult(False, spec.handle, "EFS filesystem not found", ["not_found"])
+                return UpdateResult(False, spec.handle, "EFS filesystem not found", ["not_found"], retryable=False)
             return UpdateResult(False, spec.handle, f"update EFS filesystem: {exc}", [str(exc)])
         return UpdateResult(True, spec.handle, "EFS filesystem reconciled")
 
@@ -167,19 +202,24 @@ class EFSDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        file_system_id, _ = _parse_resource(spec.handle)
         cfg = spec.config or {}
-        file_system = self._describe_file_system(file_system_id)
-        if file_system is None:
-            return DeprovisionResult(True, spec.handle, "EFS filesystem already gone")
-        if not self._is_managed(file_system):
-            return DeprovisionResult(
-                False,
-                spec.handle,
-                "EFS filesystem is not owned by Astrolift and will not be deleted",
-                ["external_resource_collision"],
-                retryable=False,
+        try:
+            managed_service_identity(spec.managed_service_id)
+            self._identity_config()
+            file_system_id, recorded_access_point_id = _parse_resource(spec.handle)
+            file_system = self._describe_file_system(file_system_id)
+            if file_system is None:
+                return DeprovisionResult(True, spec.handle, "EFS filesystem already gone")
+            access_points, targets = self._owned_tree(
+                file_system,
+                spec.managed_service_id,
+                recorded_access_point_id,
+                missing_recorded_ok=True,
             )
+        except (ManagedServiceError, ValueError) as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
+        except Exception as exc:
+            return _deprovision_error(spec.handle, "preflight EFS filesystem", exc)
         if bool(cfg.get("deletion_protection", self._config.deletion_protection_default)) and not force_destroy:
             return DeprovisionResult(
                 False,
@@ -199,12 +239,10 @@ class EFSDriver(ManagedServiceDriver):
             )
         try:
             self._delete_replication(file_system_id, cfg)
-            access_points = self._access_points(file_system_id)
             for access_point in access_points:
                 candidate = str(access_point.get("AccessPointId") or "")
                 if candidate and self._is_managed(access_point):
                     self._delete_access_point(candidate)
-            targets = self._mount_targets(file_system_id)
             for target in targets:
                 mount_target_id = str(target.get("MountTargetId") or "")
                 if mount_target_id:
@@ -212,7 +250,7 @@ class EFSDriver(ManagedServiceDriver):
             self._await_no_mount_targets(file_system_id)
             self._efs.delete_file_system(FileSystemId=file_system_id)
         except Exception as exc:
-            if _not_found(exc):
+            if _not_found(exc) and self._describe_file_system(file_system_id) is None:
                 return DeprovisionResult(True, spec.handle, "EFS filesystem deletion converged")
             return _deprovision_error(spec.handle, "delete EFS filesystem", exc)
         return DeprovisionResult(True, spec.handle, "EFS filesystem deletion queued")
@@ -224,6 +262,8 @@ class EFSDriver(ManagedServiceDriver):
             file_system = self._describe_file_system(file_system_id)
             if file_system is None:
                 return ServiceStatus(handle.handle, "deprovisioned", "EFS filesystem does not exist")
+            if handle.managed_service_id:
+                self._owned_tree(file_system, handle.managed_service_id, access_point_id)
             provider_state = str(file_system.get("LifeCycleState") or "error")
             state = _STATE.get(provider_state, "error")
             if state == "available":
@@ -255,6 +295,13 @@ class EFSDriver(ManagedServiceDriver):
             raise ManagedServiceError("EFS filesystem not found")
         if not self._is_managed(file_system):
             raise ManagedServiceError("EFS filesystem is not owned by Astrolift")
+        if handle.managed_service_id:
+            self._owned_tree(file_system, handle.managed_service_id, access_point_id)
+        elif access_point_id:
+            access_point = self._describe_access_point(access_point_id)
+            if access_point is None:
+                raise ManagedServiceError("recorded EFS access point is missing")
+            self._validate_access_point(access_point, access_point_id, file_system_id)
         mount_path = str(cfg.get("mount_path") or "/mnt/shared")
         tls = bool(cfg.get("tls", True))
         options = list(cfg.get("mount_options") or [])
@@ -265,14 +312,8 @@ class EFSDriver(ManagedServiceDriver):
                 options.append(f"accesspoint={access_point_id}")
             if tls and "iam" not in options:
                 options.append("iam")
-        dns_name = f"{file_system_id}.efs.{self._config.region}.amazonaws.com"
-        file_system_arn = str(
-            file_system.get("FileSystemArn")
-            or (
-                f"arn:aws:elasticfilesystem:{self._config.region}:{self._config.account_id}"
-                f":file-system/{file_system_id}"
-            ),
-        )
+        dns_name = self._dns_name(file_system_id)
+        file_system_arn = str(file_system["FileSystemArn"])
         actions = ["elasticfilesystem:ClientMount"]
         if cfg.get("read_only") is not True:
             actions.append("elasticfilesystem:ClientWrite")
@@ -470,6 +511,7 @@ class EFSDriver(ManagedServiceDriver):
         existing = self._mount_targets(file_system_id)
         by_subnet = {str(target.get("SubnetId") or ""): target for target in existing}
         configured = cfg.get("mount_targets")
+        requests: list[dict[str, Any]]
         if configured is None:
             requests = [{"SubnetId": subnet_id} for subnet_id in self._config.subnet_ids]
         else:
@@ -519,13 +561,28 @@ class EFSDriver(ManagedServiceDriver):
         file_system_id: str,
         token: str,
         spec: ProvisionSpec,
+        access_point_id: str = "",
     ) -> dict[str, Any]:
-        access_token = _token(f"{token}-access-point")
+        access_token = physical_name(spec.managed_service_id, prefix="astrolift-ap", max_length=64)
+        candidates = []
         for access_point in self._access_points(file_system_id):
-            if access_point.get("ClientToken") == access_token:
-                if not self._is_managed(access_point):
-                    raise ManagedServiceError("EFS access point collision is not Astrolift-owned")
-                return self._await_access_point(str(access_point["AccessPointId"]), {"available"})
+            self._assert_owner(access_point, spec.managed_service_id, "EFS access point")
+            matches_record = bool(access_point_id and access_point["AccessPointId"] == access_point_id)
+            matches_token = not access_point_id and access_point.get("ClientToken") in {
+                access_token,
+                _token(f"{token}-access-point"),
+            }
+            if matches_record or matches_token:
+                candidates.append(access_point)
+        if len(candidates) > 1:
+            raise ManagedServiceError("multiple EFS access points match this creation identity")
+        if candidates:
+            result = self._await_access_point(str(candidates[0]["AccessPointId"]), {"available"})
+            self._validate_access_point(result, str(candidates[0]["AccessPointId"]), file_system_id)
+            self._assert_owner(result, spec.managed_service_id, "EFS access point")
+            return result
+        if access_point_id:
+            raise ManagedServiceError("recorded EFS access point is missing; refusing replacement")
         cfg = spec.config or {}
         request = dict(cfg.get("access_point") or {})
         uid = int(cfg.get("posix_uid", 1000))
@@ -560,18 +617,66 @@ class EFSDriver(ManagedServiceDriver):
                 (
                     point
                     for point in self._access_points(file_system_id)
-                    if point.get("ClientToken") == access_token and self._is_managed(point)
+                    if point.get("ClientToken") == access_token
+                    and live_ownership_refusal(
+                        point.get("Tags"), managed_service_id=spec.managed_service_id, resource="EFS access point"
+                    )
+                    is None
                 ),
                 None,
             )
             if match is None:
                 raise ManagedServiceError("EFS access point collision is not Astrolift-owned") from exc
             response = match
-        return self._await_access_point(str(response.get("AccessPointId") or ""), {"available"})
+        point_id = str(response.get("AccessPointId") or "")
+        self._validate_access_point(response, point_id, file_system_id)
+        self._assert_owner(response, spec.managed_service_id, "EFS access point")
+        result = self._await_access_point(point_id, {"available"})
+        self._validate_access_point(result, point_id, file_system_id)
+        self._assert_owner(result, spec.managed_service_id, "EFS access point")
+        return result
+
+    def _find_owned(self, service_id: str) -> dict[str, Any]:
+        # One paginated native metadata scan, never a describe/tag query per
+        # filesystem. GUID recovery also survives an operator prefix change.
+        managed_service_identity(service_id)
+        candidates: list[dict[str, Any]] = []
+        marker = ""
+        seen_markers: set[str] = set()
+        seen_ids: set[str] = set()
+        while True:
+            request: dict[str, Any] = {"MaxItems": 100}
+            if marker:
+                request["Marker"] = marker
+            response = self._efs.describe_file_systems(**request)
+            for row in response.get("FileSystems") or []:
+                file_system_id = str(row.get("FileSystemId") or "")
+                self._validate_file_system(row, file_system_id)
+                if file_system_id in seen_ids:
+                    raise ManagedServiceError("EFS filesystem scan repeats a native identity")
+                seen_ids.add(file_system_id)
+                if _tag_map(row.get("Tags") or []).get("astrolift.io/managed_service_id") == service_id:
+                    self._assert_owner(row, service_id, "EFS filesystem")
+                    candidates.append(dict(row))
+            marker = str(response.get("NextMarker") or "")
+            if not marker:
+                break
+            if marker in seen_markers:
+                raise ManagedServiceError("EFS filesystem scan repeats a pagination cursor")
+            seen_markers.add(marker)
+        if len(candidates) > 1:
+            raise ManagedServiceError("multiple EFS filesystems claim this managed-service identity")
+        return candidates[0] if candidates else {}
 
     def _find_by_token(self, token: str) -> dict[str, Any]:
         response = self._efs.describe_file_systems(CreationToken=token)
         systems = response.get("FileSystems") or []
+        if len(systems) > 1:
+            raise ManagedServiceError("EFS creation-token response is ambiguous")
+        if systems:
+            self._validate_file_system(systems[0], str(systems[0].get("FileSystemId") or ""))
+            if systems[0].get("CreationToken") != token:
+                raise ManagedServiceError("EFS creation-token response identity does not match")
         return dict(systems[0]) if systems else {}
 
     def _describe_file_system(self, file_system_id: str) -> dict[str, Any] | None:
@@ -582,20 +687,35 @@ class EFSDriver(ManagedServiceDriver):
                 return None
             raise
         systems = response.get("FileSystems") or []
+        if len(systems) > 1:
+            raise ManagedServiceError("EFS exact filesystem response identity is ambiguous")
+        if systems:
+            self._validate_file_system(systems[0], file_system_id)
         return dict(systems[0]) if systems else None
 
     def _access_points(self, file_system_id: str) -> list[dict[str, Any]]:
         points: list[dict[str, Any]] = []
         token = ""
+        seen_tokens: set[str] = set()
+        seen_ids: set[str] = set()
         while True:
             request: dict[str, Any] = {"FileSystemId": file_system_id, "MaxResults": 100}
             if token:
                 request["NextToken"] = token
             response = self._efs.describe_access_points(**request)
-            points.extend(dict(point) for point in response.get("AccessPoints") or [])
+            for point in response.get("AccessPoints") or []:
+                point_id = str(point.get("AccessPointId") or "")
+                self._validate_access_point(point, point_id, file_system_id)
+                if point_id in seen_ids:
+                    raise ManagedServiceError("EFS access-point list repeats a child identity")
+                seen_ids.add(point_id)
+                points.append(dict(point))
             token = str(response.get("NextToken") or "")
             if not token:
                 return points
+            if token in seen_tokens:
+                raise ManagedServiceError("EFS access-point list repeats a pagination cursor")
+            seen_tokens.add(token)
 
     def _describe_access_point(self, access_point_id: str) -> dict[str, Any] | None:
         try:
@@ -605,24 +725,83 @@ class EFSDriver(ManagedServiceDriver):
                 return None
             raise
         points = response.get("AccessPoints") or []
+        if len(points) > 1:
+            raise ManagedServiceError("EFS exact access-point response identity is ambiguous")
+        if points:
+            self._validate_access_point(points[0], access_point_id)
         return dict(points[0]) if points else None
 
     def _mount_targets(self, file_system_id: str) -> list[dict[str, Any]]:
         targets: list[dict[str, Any]] = []
         marker = ""
+        seen_markers: set[str] = set()
+        seen_ids: set[str] = set()
         while True:
             request: dict[str, Any] = {"FileSystemId": file_system_id, "MaxItems": 100}
             if marker:
                 request["Marker"] = marker
             response = self._efs.describe_mount_targets(**request)
-            targets.extend(dict(target) for target in response.get("MountTargets") or [])
+            for target in response.get("MountTargets") or []:
+                target_id = str(target.get("MountTargetId") or "")
+                if (
+                    re.fullmatch(r"fsmt-[0-9a-f]{8,40}", target_id) is None
+                    or target.get("FileSystemId") != file_system_id
+                    or target.get("OwnerId") != self._config.account_id
+                    or target_id in seen_ids
+                ):
+                    raise ManagedServiceError("EFS mount-target parent/account/identity does not match")
+                seen_ids.add(target_id)
+                targets.append(dict(target))
             marker = str(response.get("NextMarker") or "")
             if not marker:
                 return targets
+            if marker in seen_markers:
+                raise ManagedServiceError("EFS mount-target list repeats a pagination cursor")
+            seen_markers.add(marker)
 
     def _replication_configurations(self, file_system_id: str) -> list[dict[str, Any]]:
-        response = self._efs.describe_replication_configurations(FileSystemId=file_system_id)
-        return [dict(replication) for replication in response.get("Replications") or []]
+        rows: list[dict[str, Any]] = []
+        token = ""
+        seen_tokens: set[str] = set()
+        while True:
+            request: dict[str, Any] = {"FileSystemId": file_system_id}
+            if token:
+                request["NextToken"] = token
+            response = self._efs.describe_replication_configurations(**request)
+            for row in response.get("Replications") or []:
+                arn = str(row.get("SourceFileSystemArn") or "")
+                self._assert_partition(arn)
+                assert_resource_arn(
+                    arn,
+                    service="elasticfilesystem",
+                    region=self._config.region,
+                    account=self._config.account_id,
+                    resource="file-system/" + file_system_id,
+                )
+                if (
+                    row.get("SourceFileSystemId") not in {file_system_id, arn}
+                    or row.get("SourceFileSystemRegion") != self._config.region
+                    or (
+                        row.get("SourceFileSystemOwnerId") and row["SourceFileSystemOwnerId"] != self._config.account_id
+                    )
+                    or len(row.get("Destinations") or []) != 1
+                ):
+                    raise ManagedServiceError("EFS replication source/parent identity does not match")
+                for destination in row["Destinations"]:
+                    if re.fullmatch(
+                        r"fs-[0-9a-f]{8,40}", str(destination.get("FileSystemId") or "")
+                    ) is None or not destination.get("Region"):
+                        raise ManagedServiceError("EFS replication destination identity is unavailable")
+                rows.append(dict(row))
+            token = str(response.get("NextToken") or "")
+            if not token:
+                break
+            if token in seen_tokens:
+                raise ManagedServiceError("EFS replication list repeats a pagination cursor")
+            seen_tokens.add(token)
+        if len(rows) > 1:
+            raise ManagedServiceError("multiple EFS replication configurations claim this source")
+        return rows
 
     def _await_file_system(self, file_system_id: str, desired: set[str]) -> dict[str, Any]:
         last: dict[str, Any] = {}
@@ -705,19 +884,89 @@ class EFSDriver(ManagedServiceDriver):
         return _tag_map(resource.get("Tags") or []).get("astrolift.io/managed-by") == _MANAGED_BY
 
     def _creation_token(self, spec: ProvisionSpec) -> str:
-        return _token(
-            "-".join(
-                part
-                for part in (
-                    self._config.creation_token_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "filesystem",
-                )
-                if part
-            ),
+        return physical_name(spec.managed_service_id, prefix=self._config.creation_token_prefix, max_length=64)
+
+    def _dns_name(self, file_system_id: str) -> str:
+        return f"{file_system_id}.efs.{self._config.region}.{self._dns_suffix}"
+
+    def _assert_partition(self, arn: str) -> None:
+        fields = arn.split(":", 5)
+        if len(fields) != 6 or fields[1] != self._partition:
+            raise ManagedServiceError("EFS native ARN partition does not match the configured region")
+
+    def _identity_config(self) -> None:
+        if (
+            re.fullmatch(r"[0-9]{12}", self._config.account_id) is None
+            or re.fullmatch(r"[a-z]{2,4}(?:-[a-z]+)+-[0-9]+", self._config.region) is None
+        ):
+            raise ManagedServiceError("EFS requires native region and 12-digit consumer account_id")
+
+    def _validate_file_system(self, row: dict[str, Any], file_system_id: str) -> None:
+        self._identity_config()
+        if (
+            re.fullmatch(r"fs-[0-9a-f]{8,40}", file_system_id) is None
+            or row.get("FileSystemId") != file_system_id
+            or row.get("OwnerId") != self._config.account_id
+        ):
+            raise ManagedServiceError("EFS filesystem native identity/account does not match")
+        self._assert_partition(str(row.get("FileSystemArn") or ""))
+        assert_resource_arn(
+            str(row.get("FileSystemArn") or ""),
+            service="elasticfilesystem",
+            region=self._config.region,
+            account=self._config.account_id,
+            resource="file-system/" + file_system_id,
         )
+
+    def _validate_access_point(self, row: dict[str, Any], point_id: str, file_system_id: str = "") -> None:
+        if (
+            re.fullmatch(r"fsap-[0-9a-f]{8,40}", point_id) is None
+            or row.get("AccessPointId") != point_id
+            or row.get("OwnerId") != self._config.account_id
+            or (file_system_id and row.get("FileSystemId") != file_system_id)
+        ):
+            raise ManagedServiceError("EFS access-point native identity/parent/account does not match")
+        self._assert_partition(str(row.get("AccessPointArn") or ""))
+        assert_resource_arn(
+            str(row.get("AccessPointArn") or ""),
+            service="elasticfilesystem",
+            region=self._config.region,
+            account=self._config.account_id,
+            resource="access-point/" + point_id,
+        )
+
+    @staticmethod
+    def _assert_owner(row: dict[str, Any], service_id: str, resource: str) -> None:
+        managed_service_identity(service_id)
+        refusal = live_ownership_refusal(row.get("Tags"), managed_service_id=service_id, resource=resource)
+        if refusal:
+            raise ManagedServiceError(refusal)
+
+    def _owned_tree(
+        self,
+        file_system: dict[str, Any],
+        service_id: str,
+        recorded_point: str = "",
+        *,
+        missing_recorded_ok: bool = False,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        file_system_id = str(file_system.get("FileSystemId") or "")
+        self._validate_file_system(file_system, file_system_id)
+        self._assert_owner(file_system, service_id, "EFS filesystem")
+        points = self._access_points(file_system_id)
+        for point in points:
+            self._assert_owner(point, service_id, "EFS access point")
+        if recorded_point and recorded_point not in {point["AccessPointId"] for point in points}:
+            recorded_metadata = self._describe_access_point(recorded_point)
+            if recorded_metadata is not None:
+                self._validate_access_point(recorded_metadata, recorded_point, file_system_id)
+                self._assert_owner(recorded_metadata, service_id, "EFS access point")
+                raise ManagedServiceError("recorded EFS access point is absent from its parent listing")
+            if not missing_recorded_ok:
+                raise ManagedServiceError("recorded EFS access point is missing; refusing replacement")
+        targets = self._mount_targets(file_system_id)
+        self._replication_configurations(file_system_id)
+        return points, targets
 
     def _validate_config(self, cfg: dict[str, Any], *, partial: bool = False) -> str:
         if self._config.poll_delay_seconds < 0 or self._config.max_poll_attempts < 1:
@@ -891,7 +1140,17 @@ def _tag_list(spec: ProvisionSpec) -> list[dict[str, str]]:
 
 
 def _tag_map(tags: list[dict[str, Any]]) -> dict[str, str]:
-    return {str(tag.get("Key")): str(tag.get("Value")) for tag in tags if tag.get("Key")}
+    values: dict[str, str] = {}
+    for tag in tags:
+        if (
+            not isinstance(tag, dict)
+            or not isinstance(tag.get("Key"), str)
+            or not isinstance(tag.get("Value"), str)
+            or tag["Key"] in values
+        ):
+            raise ManagedServiceError("EFS ownership tags are unavailable or duplicate")
+        values[tag["Key"]] = tag["Value"]
+    return values
 
 
 def _replication_matches(request: dict[str, Any], live: dict[str, Any]) -> bool:
@@ -939,11 +1198,16 @@ def _handle(file_system_id: str, access_point_id: str = "") -> str:
 
 
 def _parse_resource(handle: str) -> tuple[str, str]:
-    _, resource = parse_handle(handle)
-    file_system_id, _, access_point_id = resource.partition("/")
-    if not file_system_id:
-        raise ManagedServiceError("EFS handle is missing the filesystem ID")
-    return file_system_id, access_point_id
+    kind, resource = parse_handle(handle)
+    parts = resource.split("/")
+    if (
+        kind != KIND
+        or len(parts) not in {1, 2}
+        or re.fullmatch(r"fs-[0-9a-f]{8,40}", parts[0]) is None
+        or (len(parts) == 2 and re.fullmatch(r"fsap-[0-9a-f]{8,40}", parts[1]) is None)
+    ):
+        raise ManagedServiceError("invalid recorded EFS filesystem/access-point handle")
+    return parts[0], parts[1] if len(parts) == 2 else ""
 
 
 def _already_exists(exc: Exception) -> bool:

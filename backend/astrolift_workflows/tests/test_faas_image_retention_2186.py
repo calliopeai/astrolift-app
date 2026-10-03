@@ -63,7 +63,9 @@ def world(app, env, cluster, monkeypatch):
     cluster.save(update_fields=["region", "provider_config", "updated_at", "version"])
     lambda_client, iam_client = FakeLambda(), FakeIAM()
     lambda_driver = LambdaDriver(
-        config=LambdaConfig(region="us-east-1"), client=lambda_client, iam_client=iam_client
+        config=LambdaConfig(region="us-east-1", account_id="123456789012"),
+        client=lambda_client,
+        iam_client=iam_client,
     )
     cluster_driver, identity_driver = ClusterFake(), IdentityFake()
     with mock_aws():
