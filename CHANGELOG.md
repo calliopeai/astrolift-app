@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Render the collector from its reviewed archive checksum and exact prepared
+  profile with a pinned offline Helm runtime. Bundle checksum-verified Linux
+  amd64/arm64 renderer binaries in backend image builds, and refuse altered
+  profiles, missing renderers or unsafe rendered resources (#1706). Rendering
+  does not install a collector or activate historical reads.
+
 - Stage a pinned EKS CloudWatch Fluent Bit profile and credential-aware,
   immutable cluster-owned log-group/IRSA preparation helpers (#1706). Keep the
   component outside the installable recipe pending guarded orchestration,
