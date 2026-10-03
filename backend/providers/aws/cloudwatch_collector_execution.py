@@ -327,7 +327,10 @@ class CollectorExecutor:
             labels = node.get("metadata", {}).get("labels", {})
             if labels.get("eks.amazonaws.com/compute-type") == "fargate" or labels.get("kubernetes.io/os") != "linux":
                 unsupported = True
-            elif node.get("spec", {}).get("providerID", "").startswith("aws://"):
+            elif labels.get("eks.amazonaws.com/compute-type") in {None, "ec2"} and re.fullmatch(
+                rf"aws:///{re.escape(self.stage.region)}[-a-z0-9]*/i-(?:[0-9a-f]{{8}}|[0-9a-f]{{17}})",
+                node.get("spec", {}).get("providerID", ""),
+            ):
                 eligible.append(node)
             else:
                 unsupported = True
@@ -469,7 +472,7 @@ class CollectorExecutor:
                 if self._ready(nodes):
                     break
                 if attempt + 1 == self.request.max_polls:
-                    return ExecutionResult("READINESS_PENDING", coverage)
+                    return ExecutionResult("READINESS_PENDING", coverage, cleanup_pending=cleanup)
                 self.call("idle.readiness", self.idle)
                 nodes, coverage = self._coverage()
             binding = self.call("reader.construct", self.reader_factory, self.stage)
@@ -553,7 +556,7 @@ class CollectorExecutor:
                 if digest and digest == self.state.get("event_hash"):
                     nodes, coverage = self._coverage()
                     if not self._ready(nodes):
-                        return ExecutionResult("READINESS_PENDING", coverage)
+                        return ExecutionResult("READINESS_PENDING", coverage, cleanup_pending=cleanup)
                     return ExecutionResult("POST_LOSS_READ_VERIFIED", coverage, event_hash=digest)
                 if attempt + 1 < self.request.max_polls:
                     self.call("idle.post_loss", self.idle)

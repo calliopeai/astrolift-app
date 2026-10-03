@@ -137,7 +137,7 @@ def wire(tmp_path):
                     "resourceVersion": "1",
                     "labels": {"kubernetes.io/os": "linux"},
                 },
-                "spec": {"providerID": "aws:///us-west-2a/i-fixture"},
+                "spec": {"providerID": "aws:///us-west-2a/i-0123456789abcdef0"},
                 "status": {"conditions": [{"type": "Ready", "status": "True"}]},
             }
         ],
@@ -631,3 +631,35 @@ def test_lost_probe_create_reports_pending_cleanup_and_preserves_original_uid(wi
     assert execution(wire, artifact).run().state == "POST_LOSS_READ_VERIFIED"
     assert wire["deleted_probe"]["metadata"]["uid"] == uid
     assert not any(c[0] == "POST" and "/pods" in c[1] for c in wire["calls"])
+
+
+def test_pending_probe_cleanup_remains_truthful_when_later_readiness_is_lost(wire, artifact):
+    wire["ingest"] = False
+    first = execution(wire, artifact).run()
+    assert first.state == "INGESTION_PENDING" and first.cleanup_pending
+    pod = next(o for o in wire["objects"].values() if o["kind"] == "Pod")
+    wire["ready"] = False
+    wire["calls"].clear()
+    second = execution(wire, artifact).run()
+    assert second.state == "READINESS_PENDING" and second.cleanup_pending
+    assert next(o for o in wire["objects"].values() if o["kind"] == "Pod")["metadata"]["uid"] == pod["metadata"]["uid"]
+    assert not any(c[0] in {"POST", "DELETE", "PATCH"} for c in wire["calls"])
+
+
+@pytest.mark.parametrize(
+    "provider_id,compute",
+    [
+        ("aws:///us-west-2a/fargate-192.0.2.1", None),
+        ("aws:///us-west-2a/virtual-node", None),
+        ("aws:///eu-central-1a/i-0123456789abcdef0", "ec2"),
+        ("aws:///us-west-2a/i-0123456789abcdef0", "unknown-runtime"),
+    ],
+)
+def test_opaque_aws_or_foreign_region_node_ids_do_not_prove_ec2_coverage(wire, artifact, provider_id, compute):
+    node = wire["nodes"][0]
+    node["spec"]["providerID"] = provider_id
+    if compute:
+        node["metadata"]["labels"]["eks.amazonaws.com/compute-type"] = compute
+    with pytest.raises(ExecutionRefused, match="UNSUPPORTED_NODE_COVERAGE"):
+        execution(wire, artifact).run()
+    assert not any(c[0] in {"POST", "DELETE", "PATCH"} for c in wire["calls"])
