@@ -3400,7 +3400,7 @@ def list_app_pod_warning_events(
         ) from exc
 
 
-def stream_app_logs(
+async def stream_app_logs(
     *,
     cluster: TenantCluster,
     namespace: str,
@@ -3409,21 +3409,26 @@ def stream_app_logs(
     tail_lines: int = 100,
     follow: bool = True,
 ) -> AsyncIterator[Any]:
-    """Resolver-facing entry for the log subscription. Returns an
-    async iterator that yields ``PodLogLine`` (from the provider
-    SDK). The subscription layer wraps this with an explicit
-    ``aclose()`` finally — see :mod:`astrolift_lifecycle.schema.subscriptions`.
-    """
-    driver = _driver_for_cluster(cluster)
-    auth = _auth_for_cluster(cluster)
-    return driver.stream_logs(
-        auth=auth,
-        namespace=namespace,
-        pod_name=pod_name,
-        container=container,
-        tail_lines=tail_lines,
-        follow=follow,
-    )
+    """Open ORM-backed provider setup off the loop, then stream asynchronously."""
+    from asgiref.sync import sync_to_async
+
+    def _open() -> AsyncIterator[Any]:
+        driver = _driver_for_cluster(cluster)
+        return driver.stream_logs(
+            auth=_auth_for_cluster(cluster),
+            namespace=namespace,
+            pod_name=pod_name,
+            container=container,
+            tail_lines=tail_lines,
+            follow=follow,
+        )
+
+    inner = await sync_to_async(_open, thread_sensitive=True)()
+    try:
+        async for line in inner:
+            yield line
+    finally:
+        await inner.aclose()
 
 
 # Upper bound on a one-shot agent-task log read. Generous enough to drain a
@@ -3672,6 +3677,8 @@ async def stream_app_logs_multi(
     outer generator tears down every child task so kubelet sockets
     release back to the pool.
     """
+    from asgiref.sync import sync_to_async
+
     queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=1024)
     sentinel = object()
     # Track pods we've already subscribed to so the refresh loop only
@@ -3747,14 +3754,13 @@ async def stream_app_logs_multi(
         """Periodically discover new pods + subscribe them."""
         while True:
             await asyncio.sleep(refresh_interval_seconds)
-            new_pods = [p for p in _discover_pods() if p not in subscribed]
+            discovered = await sync_to_async(_discover_pods, thread_sensitive=True)()
+            new_pods = [p for p in discovered if p not in subscribed]
             for pod_name in new_pods:
                 subscribed.add(pod_name)
                 children[pod_name] = asyncio.create_task(_pump_one(pod_name))
 
-    # Open initial subscriptions synchronously so the first lines
-    # arrive promptly.
-    initial_pods = _discover_pods()
+    initial_pods = await sync_to_async(_discover_pods, thread_sensitive=True)()
     if not initial_pods:
         # No pods to tail — yield nothing and finish; the subscription
         # layer surfaces an empty stream rather than an error.
