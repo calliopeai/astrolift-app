@@ -422,3 +422,52 @@ def test_deleted_preview_still_requires_exact_proof(preview_world, kube_transpor
     target = preview_world
     target.preview.soft_delete()
     contracts.refused(target, surface, {}, kube_transport, environment_name=target.environment.name)
+
+
+@pytest.mark.parametrize("replacement", ["missing", "workload", "container"])
+def test_export_revalidates_pod_metadata_at_provider_open_after_admission(
+    preview_world, kube_transport, monkeypatch, replacement
+):
+    from kubernetes import client
+
+    original = client.CoreV1Api.list_namespaced_pod
+    discoveries = 0
+
+    def list_pods(api, **kwargs):
+        nonlocal discoveries
+        response = original(api, **kwargs)
+        discoveries += 1
+        if discoveries > 1:
+            if replacement == "missing":
+                response.items = []
+            elif replacement == "workload":
+                response.items[0].metadata.labels["astrolift.dev/workload"] = "other"
+            else:
+                response.items[0].status.container_statuses[0].name = "other"
+        return response
+
+    monkeypatch.setattr(client.CoreV1Api, "list_namespaced_pod", list_pods)
+    result = invoke(preview_world, "export", proof(preview_world), workload_slug="web", container="web")
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert discoveries == 2  # Current metadata is read again immediately before log-open.
+    assert kube_transport["opens"] == []
+    assert not AppLogExport.objects.exists()
+    assert list(preview_world.media.rglob("*.ndjson")) == []
+
+
+def test_preview_download_is_private_and_normalizes_selected_org_uuid(preview_world, kube_transport):
+    target = preview_world
+    _export, path = export_for(target)
+    client = Client()
+    client.force_login(target.actor)
+    response = client.get(path, HTTP_X_ASTROLIFT_ORGANIZATION=str(target.world.org.guid).upper())
+    assert response.status_code == 200
+    assert response["Cache-Control"] == "private, no-store"
+    assert {"cookie", "authorization", "x-astrolift-organization"} <= set(
+        response["Vary"].lower().split(", ")
+    )
+    assert b"first line" in body(response)
+    refused = download(target, path)
+    assert refused.status_code == 404
+    assert refused["Cache-Control"] == "private, no-store"

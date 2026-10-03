@@ -145,7 +145,9 @@ URL and TTL are necessary but insufficient:
   lifecycle and versions, artifact status and TTL. Browser use never bypasses the
   original token's revocation or scope ceiling.
 
-The download view returns opaque `404` on link, source or access refusal. An
+Preview downloads use `Cache-Control: private, no-store` so shared caches do not
+serve a previous authenticated response as fresh authorization. The download
+view returns opaque `404` on link, source or access refusal. An
 invalid or expired bearer can instead be rejected by the shared authentication
 middleware with generic `401` before the view runs. Each 64-KiB artifact chunk is
 checked before reading under ASGI; mid-transfer refusal closes the file and

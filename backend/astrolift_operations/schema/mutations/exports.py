@@ -364,7 +364,11 @@ class ExportMutations:
                 tail_lines=max_lines,
                 since=input.since,
                 until=input.until,
-                **({"authority": authority} if authority is not None else {}),
+                **(
+                    {"authority": authority, "workload_slug": input.workload_slug}
+                    if authority is not None
+                    else {}
+                ),
             )
         except GraphQLError as exc:
             return gql_failure(exc.extensions["code"], exc.message)

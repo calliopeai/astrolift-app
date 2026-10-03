@@ -113,25 +113,25 @@ def download_app_log_export(request, guid: str, token: str):
     """
     export = AppLogExport.objects.filter(guid=guid).first()
     if export is None:
-        return HttpResponse(status=404)
+        return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
 
     if export.token_hash != app_log_export_helpers.hash_token(token):
-        return HttpResponse(status=404)
+        return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
 
     now = timezone.now()
     if export.expires_at <= now:
-        return HttpResponse(status=404)
+        return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
 
     authority = None
     if export.source_snapshot:
         if export.status != AppLogExport.Status.READY:
-            return HttpResponse(status=404)
+            return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
         from astrolift_operations.preview_log_exports import preview_export_authority
 
         try:
             authority = preview_export_authority(export, request)
         except Exception:  # malformed/unavailable source and access failures are opaque
-            return HttpResponse(status=404)
+            return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
     elif export.environment_name:
         # Old artifacts do not acquire inferred exact proof. If the persisted
         # name identifies a preview, the legacy link is insufficient.
@@ -141,7 +141,7 @@ def download_app_log_export(request, guid: str, token: str):
             registered_app_id=export.registered_app_id,
             app_environment__name=export.environment_name,
         ).exists():
-            return HttpResponse(status=404)
+            return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
 
     from django.conf import settings as dj_settings
 
@@ -155,7 +155,7 @@ def download_app_log_export(request, guid: str, token: str):
                 "relative_path": export.relative_path,
             },
         )
-        return HttpResponse(status=404)
+        return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
 
     # First download stamps consumed_at; subsequent downloads inside
     # the TTL window are still allowed (operator recovery from a
@@ -181,6 +181,11 @@ def download_app_log_export(request, guid: str, token: str):
         )
     else:
         response = FileResponse(open(absolute, "rb"), content_type=content_type)
+    if authority is not None:
+        from django.utils.cache import patch_vary_headers
+
+        response["Cache-Control"] = "private, no-store"
+        patch_vary_headers(response, ("Cookie", "Authorization", "X-Astrolift-Organization"))
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["Content-Length"] = str(export.byte_count)
     if export.sha256:

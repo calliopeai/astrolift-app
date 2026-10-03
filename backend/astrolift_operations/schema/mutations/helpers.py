@@ -79,6 +79,7 @@ def _materialize_app_log_lines(
     since: dt.datetime | None,
     until: dt.datetime | None,
     authority=None,
+    workload_slug: str | None = None,
 ):
     """Drain the cluster driver's async log generator into a list
     bounded by ``tail_lines``.
@@ -108,7 +109,16 @@ def _materialize_app_log_lines(
             container=container,
             tail_lines=tail_lines + 1,
             follow=False,
-            **({"validate": authority.check} if authority is not None else {}),
+            **(
+                {
+                    "validate": authority.check,
+                    "validate_pod": lambda name: authority.check_pod(
+                        name, workload_slug=workload_slug, container=container
+                    ),
+                }
+                if authority is not None
+                else {}
+            ),
         )
         if authority is not None:
             from astrolift_lifecycle.preview_log_access import guarded_log_lines

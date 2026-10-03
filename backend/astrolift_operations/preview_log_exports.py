@@ -6,6 +6,8 @@ Ordinary legacy exports retain their existing capability-link contract.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from astrolift_identity.abac import attributes_from_request
 from astrolift_identity.middleware import get_request_api_token
 from astrolift_lifecycle.preview_log_access import PreviewLogAuthority
@@ -34,6 +36,8 @@ def preview_export_authority(export, request):
     from core.middleware.tenant import ORG_HEADER
 
     selected_org = request.META.get(ORG_HEADER, "")
+    if selected_org and UUID(selected_org) != export.organization.guid:
+        raise ValueError("Preview export access unavailable")
     if (
         user is None
         or not user.is_authenticated
@@ -42,7 +46,6 @@ def preview_export_authority(export, request):
         or tenant.organization_id != export.organization_id
         or str(export.registered_app.guid) != target.app_id
         or (current is not None and current.organization_id not in (None, tenant.organization_id))
-        or (selected_org and str(export.organization.guid) != selected_org)
         or (token is not None and token.pk != token_id)
     ):
         raise ValueError("Preview export access unavailable")
