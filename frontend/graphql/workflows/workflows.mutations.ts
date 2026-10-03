@@ -28,8 +28,8 @@ export const TRANSITION_WORKFLOW = gql`
 // ─── Temporal instance viewer (#437) ────────────────────────────────────
 
 export const CANCEL_WORKFLOW_INSTANCE = gql`
-  mutation CancelWorkflowInstance($workflowId: String!) {
-    cancelWorkflowInstance(workflowId: $workflowId) {
+  mutation CancelWorkflowInstance($workflowId: String!, $runId: String!) {
+    cancelWorkflowInstance(workflowId: $workflowId, runId: $runId) {
       ok
       errors {
         field
@@ -40,8 +40,8 @@ export const CANCEL_WORKFLOW_INSTANCE = gql`
 `;
 
 export const TERMINATE_WORKFLOW_INSTANCE = gql`
-  mutation TerminateWorkflowInstance($workflowId: String!, $reason: String!) {
-    terminateWorkflowInstance(workflowId: $workflowId, reason: $reason) {
+  mutation TerminateWorkflowInstance($workflowId: String!, $runId: String!, $reason: String!) {
+    terminateWorkflowInstance(workflowId: $workflowId, runId: $runId, reason: $reason) {
       ok
       errors {
         field

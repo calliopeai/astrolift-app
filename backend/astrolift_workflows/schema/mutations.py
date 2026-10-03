@@ -181,6 +181,7 @@ class TemporalWorkflowsMutation:
         self,
         info: Info,
         workflow_id: str,
+        run_id: str | None = None,
     ) -> MutationResult:
         """Cooperative cancel — Temporal signals the workflow which can
         run cleanup before exiting. Use this for workflows that own
@@ -192,7 +193,9 @@ class TemporalWorkflowsMutation:
             return gate
         if not workflow_id:
             return _failure("workflow_id", "workflow_id is required")
-        delivered = cancel_workflow(workflow_id)
+        if run_id is not None and not run_id.strip():
+            return _failure("run_id", "run_id must not be empty")
+        delivered = cancel_workflow(workflow_id, **({"run_id": run_id} if run_id is not None else {}))
         if not delivered:
             return _failure("workflow_id", "cancel could not be delivered")
         return MutationResult.success()
@@ -203,6 +206,7 @@ class TemporalWorkflowsMutation:
         info: Info,
         workflow_id: str,
         reason: str,
+        run_id: str | None = None,
     ) -> MutationResult:
         """Hard terminate — Temporal kills the workflow immediately,
         no cleanup runs. Reserve for wedged workflows that the
@@ -213,10 +217,14 @@ class TemporalWorkflowsMutation:
             return gate
         if not workflow_id:
             return _failure("workflow_id", "workflow_id is required")
+        if run_id is not None and not run_id.strip():
+            return _failure("run_id", "run_id must not be empty")
         reason = (reason or "").strip()
         if not reason:
             return _failure("reason", "reason is required")
-        delivered = terminate_workflow(workflow_id, reason)
+        delivered = terminate_workflow(
+            workflow_id, reason, **({"run_id": run_id} if run_id is not None else {})
+        )
         if not delivered:
             return _failure("workflow_id", "terminate could not be delivered")
         return MutationResult.success()
