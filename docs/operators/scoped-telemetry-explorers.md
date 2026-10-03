@@ -29,6 +29,16 @@ platform's namespace/app selector contract. Transport configuration and authenti
 remain operator controlled. A zero-result query does not establish that ingestion or
 retention is configured correctly. This change adds no collector deployment (#1706).
 
+For CloudWatch, set `log_driver: cloudwatch_logs` and `log_config.log_group` plus
+`log_config.region`. The reader uses the registered cluster's `credential` declaration,
+including its assumed role and external ID; that role needs `logs:FilterLogEvents`
+on the exact group ARN. Without an explicit declaration it uses the control plane's
+ambient identity. Legacy `log_config.role_arn` remains supported on ambient registrations.
+Do not combine it with an explicit cluster credential: remove the legacy override
+before enabling the registered identity. Conflicting declarations and failed role
+assumption are refused, with no ambient fallback. A collector's write-only IRSA role
+is not a reader role.
+
 ## Trusted trace attribution
 
 Configure `trace_driver: tempo` and `trace_config.endpoint` only after the collector is

@@ -247,7 +247,7 @@ def test_lazy_client_constructed_once_only_after_exact_selector_admission(transp
             '{ namespace = "owned-ns", app = "same-app" }', **WINDOW, limit=10, cursor=cursor, level=None, search=None
         )
         assert page.next_cursor == "opaque-next"
-    assert constructed == [{"region": "us-west-2", "role_arn": "owned-fixture-role"}]
+    assert constructed == [{"region": "us-west-2", "role_arn": "owned-fixture-role", "credential": None}]
     assert [request[1]["filterPattern"] for request in transport["requests"]] == [PATTERN, PATTERN]
 
 

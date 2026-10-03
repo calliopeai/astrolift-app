@@ -13,6 +13,9 @@
   component outside the installable recipe pending guarded orchestration,
   readiness and verified ingestion. Node DaemonSets do not cover Fargate;
   preparation does not activate historical reads or install collectors.
+- Honor the registered cluster's AWS role and external ID for CloudWatch historical
+  reads. Refuse conflicting legacy role overrides and failed assumptions without
+  falling back to the control plane's ambient identity (#1706).
 
 - Scope CloudWatch historical logs with exact Kubernetes namespace/app metadata
   and the requested workload label. Exclude foreign, unattributed and ambiguous

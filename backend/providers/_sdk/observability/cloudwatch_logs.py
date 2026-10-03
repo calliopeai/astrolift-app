@@ -17,11 +17,12 @@ cluster's ``provider_config`` carries::
       }
     }
 
-Credentials follow the same ambient-IRSA pattern the other AWS drivers
-use (``boto3.client("logs", region_name=...)`` — the control plane's
-role carries ``logs:FilterLogEvents`` on the tenant log group); a
-cross-account ``role_arn`` in the config is assumed via STS when set.
-Never hardcodes credentials.
+The resolver threads the registered cluster credential, including its role
+and external ID, through the shared AWS session factory. Without an explicit
+credential the control plane's ambient role must carry ``logs:FilterLogEvents``
+on the log group. Legacy ``role_arn`` remains supported for ambient registrations;
+combining it with an explicit cluster credential is refused. No credential
+material is stored in this configuration.
 """
 
 from __future__ import annotations
@@ -30,7 +31,10 @@ import datetime as dt
 import json
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from _sdk.cloud_credentials import CloudCredential
 
 from _sdk.log_stream import LogLine, LogPage
 
@@ -54,6 +58,11 @@ class CloudWatchLogsConfig:
     client: Any | None = None
     """Injected boto3 ``logs`` client — tests pass a fake / moto client;
     production builds one from ``region`` (+ ``role_arn``)."""
+
+    credential: CloudCredential | None = None
+    """The registered cluster's credential, including its external ID and
+    account declaration. Explicit credentials cannot be combined with the
+    legacy ``role_arn`` override."""
 
 
 class CloudWatchLogsQueryDriver:
@@ -106,7 +115,11 @@ class CloudWatchLogsQueryDriver:
 
         try:
             if self._logs is None:
-                self._logs = _build_logs_client(region=self._config.region, role_arn=self._config.role_arn)
+                self._logs = _build_logs_client(
+                    region=self._config.region,
+                    role_arn=self._config.role_arn,
+                    credential=self._config.credential,
+                )
             response = self._logs.filter_log_events(**kwargs)
             items = []
             for event in response.get("events", []):
@@ -189,7 +202,9 @@ class CloudWatchLogsRetentionDriver:
         if config.client is not None:
             self._logs = config.client
         else:
-            self._logs = _build_logs_client(region=config.region, role_arn=config.role_arn)
+            self._logs = _build_logs_client(
+                region=config.region, role_arn=config.role_arn, credential=config.credential
+            )
 
     @classmethod
     def snap_days(cls, days: int) -> int:
@@ -237,7 +252,7 @@ class CloudWatchLogsRetentionDriver:
         return {"changed": True, "days": wanted, "previous": current}
 
 
-def _build_logs_client(*, region: str, role_arn: str | None) -> Any:
+def _build_logs_client(*, region: str, role_arn: str | None, credential: CloudCredential | None = None) -> Any:
     """Build a boto3 CloudWatch Logs client using ambient credentials,
     assuming ``role_arn`` first for a cross-account tenant cluster.
 
@@ -250,8 +265,13 @@ def _build_logs_client(*, region: str, role_arn: str | None) -> Any:
     from _sdk.cloud_credentials import CloudCredential, CredentialMode
     from aws.session import aws_client
 
+    if credential is not None and not credential.is_ambient:
+        if role_arn:
+            raise ValueError("CloudWatch logs cannot combine a cluster credential and log_config.role_arn")
+        return aws_client("logs", region=region, credential=credential)
+
     if not role_arn:
-        return aws_client("logs", region=region)
+        return aws_client("logs", region=region, credential=credential)
 
     credential = CloudCredential(
         cloud="aws",
