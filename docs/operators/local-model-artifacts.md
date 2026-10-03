@@ -73,6 +73,21 @@ upload authorization response is a capability; do not log it or save it in workf
 history. Previously issued URLs expire according to their original grant; this
 path does not claim immediate URL revocation or automatic abandoned-object deletion.
 
+## Browser transfer privacy
+
+Keep upload URLs and their required headers inside the transfer controller. Display
+file progress and safe errors; keep private grants out of rendered text, links,
+attributes, log messages and copied diagnostics. Replay's network-event filtering
+does not scrub arbitrary DOM attributes.
+
+Browser telemetry excludes signed transfer URLs from error events, breadcrumbs and
+custom replay network records. Matching spans retain identifiers and timing with
+private descriptions, attributes and links removed. Replay masks inputs/text and
+disables network body capture. SDK tests and an owned Chromium fixture exercise
+successful, rejected and interrupted PUT requests, inspect decoded replay payloads,
+and preserve ordinary requests/events. This proves the configured telemetry path;
+deployment and live storage acceptance remain separate checks.
+
 ## Delivery and lifecycle
 
 The guarded worker generates version-specific GET URLs only after current source
