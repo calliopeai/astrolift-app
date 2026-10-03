@@ -61,7 +61,9 @@ function Screen({ instances = INSTANCES, initial, selected = null, ...props }: P
       stale={false}
       error={null}
       onRetry={() => {}}
-      instanceHref={(i) => `?instance=${encodeURIComponent(i.workflowId)}`}
+      instanceHref={(i) =>
+        `?instance=${encodeURIComponent(i.workflowId)}&instanceRun=${encodeURIComponent(i.runId)}`
+      }
       selectedWorkflowId={open}
       selectedRunId={openInstance?.runId ?? null}
       onCloseInstance={() => setOpen(null)}
