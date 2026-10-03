@@ -36,16 +36,16 @@ export interface WorkflowInstancesListProps {
   onCloseInstance: () => void;
 }
 
-export type WorkflowInstancesScreenProps =
-  /** The permission set is still loading. */
-  | { access: "loading" }
+export type WorkflowInstancesScreenProps = /** The permission set is still loading. */
+(| { access: "loading" }
   /** Without `audit_log.read`: the permission, and no list mounted. */
   | { access: "denied" }
   | ({
       access: "granted";
       /** InstanceDetailView behind its hook, for the open instance. */
       detail: ReactNode;
-    } & WorkflowInstancesListProps);
+    } & WorkflowInstancesListProps)
+) & { title?: string; crumbs?: import("@/components/shell/ShellHeader").Crumb[] };
 
 const CRUMBS = workflowsCrumbs({ label: "Platform instances" });
 const TITLE = "Platform instances";
@@ -67,7 +67,11 @@ export function WorkflowInstancesScreen(props: WorkflowInstancesScreenProps) {
   if (props.access !== "granted") {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
-        <ShellHeader crumbs={CRUMBS} title={TITLE} context={CONTEXT} />
+        <ShellHeader
+          crumbs={props.crumbs ?? CRUMBS}
+          title={props.title ?? TITLE}
+          context={CONTEXT}
+        />
         {props.access === "loading" ? (
           <Skeleton className="h-40 w-full rounded-md" />
         ) : (
@@ -91,7 +95,13 @@ function InstancesList({
   selectedWorkflowId,
   onCloseInstance,
   detail,
-}: WorkflowInstancesListProps & { detail: ReactNode }) {
+  title = TITLE,
+  crumbs = CRUMBS,
+}: WorkflowInstancesListProps & {
+  detail: ReactNode;
+  title?: string;
+  crumbs?: import("@/components/shell/ShellHeader").Crumb[];
+}) {
   const fmt = useFormatters();
 
   const columns: Column<WorkflowInstance>[] = [
@@ -155,7 +165,7 @@ function InstancesList({
   return (
     <>
       <ListPage<WorkflowInstance>
-        header={{ crumbs: CRUMBS, title: TITLE, context: CONTEXT }}
+        header={{ crumbs, title, context: CONTEXT }}
         list={list}
         label="Instances"
         columns={columns}
