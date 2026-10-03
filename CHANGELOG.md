@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Exclude signed model-file transfer capabilities from browser error records,
+  network breadcrumbs and custom replay events. Preserve span timing without
+  private request attributes or descriptions, mask replay inputs/text and disable
+  network body capture (#2266).
+
 - Add organization-scoped encrypted Hugging Face read connections and separate
   fixed-origin account, immutable-revision and repository-access checks. Require
   fresh organization and cluster management grants before model hosting or
