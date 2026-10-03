@@ -530,7 +530,11 @@ TOML and YAML export/re-import preserve the source port contract in `iteration`.
 A configured binding that substitutes a different native GUID is refused.
 
 Native bodies receive the projected text under the declared input key; workflow
-context still records the original previous source record. A `message` projection
+context still records the original previous source record. Their previous record
+must contain an explicit `text` string within the 65,536-byte bound; an explicitly
+empty string is valid, but a missing field is unavailable and does not dispatch
+the native target. A `data` output feeding another native text body must also
+supply this field. A `message` projection
 requires a string at the selected native output path and supplies its execution
 timestamp. A `data` projection requires a bounded finite JSON record. A missing
 or malformed output fails the source body and collection without starting later

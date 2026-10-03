@@ -97,11 +97,11 @@ def validate_source_ports(value: Any, *, kind: str) -> dict:
 def imported_input(value: dict, previous: Any) -> dict:
     if (
         not isinstance(previous, dict)
-        or not isinstance(previous.get("text", ""), str)
-        or len(previous.get("text", "").encode()) > 65536
+        or not isinstance(previous.get("text"), str)
+        or len(previous["text"].encode()) > 65536
     ):
         raise SourcePortContractError("imported text input is unavailable")
-    return {value["native_input_key"]: previous.get("text", "")}
+    return {value["native_input_key"]: previous["text"]}
 
 
 def imported_output(value: dict, result: Any, *, timestamp: str) -> dict:

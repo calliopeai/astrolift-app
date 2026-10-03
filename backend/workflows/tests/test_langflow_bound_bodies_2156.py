@@ -162,6 +162,30 @@ def test_missing_or_invalid_native_message_output_never_becomes_successful_feedb
         imported_output(ports, result, timestamp="fixed")
 
 
+@pytest.mark.parametrize("component", ["RunFlow", "Agent"])
+@pytest.mark.parametrize("previous", [{}, {"payload": "other"}, {"text": None}, {"text": 4}])
+def test_missing_or_malformed_source_text_never_becomes_empty_native_input(component, previous):
+    ports = (
+        LangflowImporter()
+        .import_flow(bound_source(uuid.uuid4(), component=component))
+        .manifest.stages[1]
+        .iteration
+    )
+    with pytest.raises(SourcePortContractError, match="imported text input is unavailable"):
+        imported_input(ports, previous)
+
+
+@pytest.mark.parametrize("component", ["RunFlow", "Agent"])
+def test_explicit_empty_source_text_remains_a_valid_native_input(component):
+    ports = (
+        LangflowImporter()
+        .import_flow(bound_source(uuid.uuid4(), component=component))
+        .manifest.stages[1]
+        .iteration
+    )
+    assert imported_input(ports, {"text": ""}) == {"input_value": ""}
+
+
 @pytest.mark.parametrize(
     "field", ["source_component", "output_mode", "native_input_key", "native_output_path", "target_guid"]
 )
