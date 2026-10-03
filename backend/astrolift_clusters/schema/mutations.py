@@ -744,9 +744,12 @@ class ClustersMutation:
                 field="clusterId",
             )
 
-        from astrolift_clusters.agent_install import _caller_gate, installation_busy
+        from astrolift_clusters.agent_install import AgentInstallError, _caller_gate, installation_busy
 
-        _caller_gate(cluster, _caller(info))
+        try:
+            _caller_gate(cluster, _caller(info))
+        except AgentInstallError as error:
+            return gql_failure(error.code, str(error))
         if installation_busy(cluster):
             return cast(
                 MutationResultType[_ClusterAgentKeyIssuedPayload],
@@ -850,9 +853,12 @@ class ClustersMutation:
                 f"cluster {input.cluster_id!r} not found",
                 field="clusterId",
             )
-        from astrolift_clusters.agent_install import _caller_gate, installation_busy
+        from astrolift_clusters.agent_install import AgentInstallError, _caller_gate, installation_busy
 
-        _caller_gate(cluster, _caller(info))
+        try:
+            _caller_gate(cluster, _caller(info))
+        except AgentInstallError as error:
+            return gql_failure(error.code, str(error))
         if installation_busy(cluster):
             return cast(
                 MutationResultType[TenantClusterType],
