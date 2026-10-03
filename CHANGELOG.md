@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add admin-scoped, checksum-verified local safetensors file imports into private
+  versioned install storage, with exact cluster-model delivery ownership and
+  read-only runtime mounts. Keep upload/delivery capabilities out of workflow
+  history and public config; verified bytes do not assert runtime health (#2266).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old
