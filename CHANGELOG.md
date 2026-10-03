@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Translate connected agent model/session controls and tool-registry navigation,
+  filters, states and feedback in all eight locales. Preserve API identifiers and
+  bound pending control feedback to the selected environment specification (#2145).
+
 - Collect app-environment ingress metrics from exact managed Envoy routes and
   preserved nginx namespaces. Keep idle latency windows undefined, refuse retired
   or foreign cluster reads, and use complete dedicated-ALB CloudWatch evidence
