@@ -8,6 +8,10 @@
   Providers without conditional writes fail closed when that contract is
   requested (#2139).
 
+- Translate connected agent model/session controls and tool-registry navigation,
+  filters, states and feedback in all eight locales. Preserve API identifiers and
+  bound pending control feedback to the selected environment specification (#2145).
+
 - Verify Lambda function and execution-role ownership against the saved service
   GUID before reporting readiness or returning URLs, ARNs and invoke grants.
   Tagged legacy names stay supported; missing or foreign ownership evidence

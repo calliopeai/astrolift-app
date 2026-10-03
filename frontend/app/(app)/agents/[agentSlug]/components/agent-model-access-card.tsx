@@ -29,11 +29,21 @@ export function AgentModelAccessCard({ agentSlug }: { agentSlug: string }) {
       {...access}
       managedModel={
         spec ? (
-          <ManagedModelSection envSpecSlug={spec.slug} managedModel={spec.managedModel} />
+          <ManagedModelSection
+            envSpecSlug={spec.slug}
+            envSpecId={spec.id}
+            managedModel={spec.managedModel}
+          />
         ) : null
       }
       vncSession={
-        spec ? <VncSessionSection envSpecSlug={spec.slug} vncEnabled={spec.vncEnabled} /> : null
+        spec ? (
+          <VncSessionSection
+            envSpecSlug={spec.slug}
+            envSpecId={spec.id}
+            vncEnabled={spec.vncEnabled}
+          />
+        ) : null
       }
     />
   );

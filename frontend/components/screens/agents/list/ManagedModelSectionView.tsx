@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { cn } from "@/lib/utils";
 
 import type { useManagedModel } from "./use-managed-model";
@@ -18,21 +20,19 @@ export function ManagedModelSectionView({
   managedBusy,
   onToggleManagedModel,
 }: ManagedModelSectionViewProps) {
+  const t = useTranslations("agentModelAccess");
   return (
     <div className="flex items-start justify-between gap-4 rounded-md border p-3">
       <div className="space-y-1">
-        <p className="text-sm font-medium">Use cluster-native model (Bedrock / Vertex)</p>
-        <p className="text-muted-foreground text-xs">
-          Run this agent on the cluster&rsquo;s cloud model provider via workload identity instead
-          of an API key.
-        </p>
+        <p className="text-sm font-medium">{t("modelLabel")}</p>
+        <p className="text-muted-foreground text-xs">{t("modelDescription")}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <ManagedModelToggle
           checked={managedOn}
           onChange={() => void onToggleManagedModel()}
           disabled={managedBusy}
-          label={managedOn ? "Disable cluster-native model" : "Enable cluster-native model"}
+          label={t(managedOn ? "modelDisable" : "modelEnable")}
         />
         <span
           className={cn(
@@ -40,7 +40,7 @@ export function ManagedModelSectionView({
             managedOn ? "text-foreground" : "text-muted-foreground"
           )}
         >
-          {managedOn ? "On" : "Off"}
+          {t(managedOn ? "on" : "off")}
         </span>
       </div>
     </div>
