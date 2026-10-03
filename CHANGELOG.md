@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Scope CloudWatch historical logs with exact Kubernetes namespace/app metadata
+  and the requested workload label. Exclude foreign, unattributed and ambiguous
+  records, preserve server cursors, and sanitize provider failures (#2262).
+
 - Bind managed GitHub workflow creation and updates to the reviewed absence or
   blob SHA. Refuse concurrent edits, creation and deletion without advancing
   sync receipts; preserve independent edits on reconciliation PR branches.
@@ -12,10 +16,21 @@
   filters, states and feedback in all eight locales. Preserve API identifiers and
   bound pending control feedback to the selected environment specification (#2145).
 
+- Replace the static logs and traces pages with app/environment-scoped explorers,
+  historical-log filters and cursors, existing live-log navigation, and truthful
+  unavailable/error/empty states in all eight locales. Require verified collector
+  resource attribution for bounded Tempo searches and trace details; refuse retired,
+  foreign or changed placement and discard mixed-trace foreign spans (#2260).
+
 - Verify Lambda function and execution-role ownership against the saved service
   GUID before reporting readiness or returning URLs, ARNs and invoke grants.
   Tagged legacy names stay supported; missing or foreign ownership evidence
   requires verified operator repair rather than automatic adoption (#2032).
+
+- Bind preview live logs and exported artifacts to reviewed preview/environment
+  identities and versions. Recheck source lifecycle, requester membership, grants
+  and original credential ceilings while idle and before artifact chunks;
+  retire stale streams and refuse unavailable downloads without a fallback (#2257).
 
 - Replace the static platform activity page with the permission-scoped Temporal
   execution viewer. Bind detail/history and confirmed cancel/terminate requests

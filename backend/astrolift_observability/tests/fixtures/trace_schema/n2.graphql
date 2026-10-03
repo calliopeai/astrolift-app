@@ -1,0 +1,65 @@
+# Exact observability projection of published schema at 22e3d0deb50590d0f1d6556db9c01f26dce24b71.
+# Source/tag compatibility; these are not two separately released minor artifacts.
+type AstroliftAppLogPage {
+  items: [AstroliftAppLogQueryLine!]!
+  nextCursor: String!
+  reachedRetention: Boolean!
+  historicalAvailable: Boolean!
+  totalCount: Int!
+  reason: AstroliftObservabilityPanelReason!
+}
+
+type AstroliftAppLogQueryLine {
+  podName: String!
+  container: String!
+  timestamp: String!
+  message: String!
+  level: String!
+  stream: String!
+}
+
+type AstroliftAppTrace {
+  traceId: String!
+  rootService: String!
+  rootOperation: String!
+  spanCount: Int!
+  durationMs: Float!
+  statusCode: String!
+}
+
+enum AstroliftObservabilityPanelReason {
+  OK
+  NOT_CONFIGURED
+  NOT_SUPPORTED_BY_PROVIDER
+  NO_DATA_YET
+  ERROR
+}
+
+type AstroliftTraceSpan {
+  traceId: String!
+  spanId: String!
+  parentSpanId: String
+  operation: String!
+  service: String!
+  startTime: String!
+  durationMs: Float!
+  statusCode: String!
+  attributes: JSON!
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+"""UUID v7 — the platform's external identifier."""
+scalar GUID
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+type Query {
+  astroliftAppTraces(appSlug: String!, since: String!, until: String!, environmentName: String = null, service: String = null, operation: String = null, minDurationMs: Float = null, status: String = null, limit: Int = null): [AstroliftAppTrace!]!
+  astroliftTraceSpans(appSlug: String!, traceId: String!, environmentName: String = null): [AstroliftTraceSpan!]!
+  astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogPage!
+}

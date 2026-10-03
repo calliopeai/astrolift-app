@@ -20,6 +20,10 @@ export const ON_APP_LOG = gql`
     $container: String
     $follow: Boolean
     $tailLines: Int
+    $previewId: GUID
+    $expectedEnvironmentId: GUID
+    $ifMatchPreviewVersion: Int
+    $ifMatchEnvironmentVersion: Int
   ) {
     astroliftOnAppLog(
       appSlug: $appSlug
@@ -28,6 +32,10 @@ export const ON_APP_LOG = gql`
       container: $container
       follow: $follow
       tailLines: $tailLines
+      previewId: $previewId
+      expectedEnvironmentId: $expectedEnvironmentId
+      ifMatchPreviewVersion: $ifMatchPreviewVersion
+      ifMatchEnvironmentVersion: $ifMatchEnvironmentVersion
     ) {
       podName
       container
@@ -50,6 +58,10 @@ export const ON_APP_LOGS = gql`
     $container: String
     $follow: Boolean
     $tailLines: Int
+    $previewId: GUID
+    $expectedEnvironmentId: GUID
+    $ifMatchPreviewVersion: Int
+    $ifMatchEnvironmentVersion: Int
   ) {
     astroliftOnAppLogs(
       appSlug: $appSlug
@@ -58,6 +70,10 @@ export const ON_APP_LOGS = gql`
       container: $container
       follow: $follow
       tailLines: $tailLines
+      previewId: $previewId
+      expectedEnvironmentId: $expectedEnvironmentId
+      ifMatchPreviewVersion: $ifMatchPreviewVersion
+      ifMatchEnvironmentVersion: $ifMatchEnvironmentVersion
     ) {
       podName
       container

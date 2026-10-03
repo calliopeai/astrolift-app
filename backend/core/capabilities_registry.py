@@ -50,6 +50,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # Console / cluster exec surfaces.
     "console.exec",
     "console.log_tail",
+    "observability.exact_environment_logs",
+    "observability.scoped_trace_envelopes",
     # Secrets handling surfaces.
     "secrets.reveal",
     "secrets.rotate",
@@ -62,6 +64,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "workloads.environment_targets",
     "previews.exact_identity",
     "previews.reviewed_routes",
+    "previews.reviewed_live_logs",
+    "previews.reviewed_log_exports",
     "previews.explicit_runtime_cost",
     # Deploy pipeline (start/promote/rollback/teardown).
     "deploys.start",

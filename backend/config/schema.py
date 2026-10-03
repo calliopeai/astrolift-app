@@ -55,6 +55,7 @@ _query_bases = [
     SharedModelPromptQuery,
     AstroliftObservabilitySchema.GoldenSignalsQuery,
     AstroliftObservabilitySchema.LogHistoryQuery,
+    AstroliftObservabilitySchema.ScopedTracesQuery,
     AstroliftTemporalWorkflowsSchema.TemporalWorkflowsQuery,
     AstroliftFormsSchema.FormsQuery,
     AstroliftPipelinesSchema.PipelinesQuery,
