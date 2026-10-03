@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add a dedicated reviewed EKS historical-log collector operation with durable
+  original request/credential/source fencing, pinned archive rendering, owned
+  resource/probe checkpoints, explicit pending/uncertain outcomes, and atomic
+  reader activation after verified post-deletion historical reads (#1706).
+  Preserve external backends and IAM policies; report Linux EC2 coverage without
+  claiming Fargate coverage, ongoing health or live ingestion from local fixtures.
+
 - Render the collector from its reviewed archive checksum and exact prepared
   profile with a pinned offline Helm runtime. Bundle checksum-verified Linux
   amd64/arm64 renderer binaries in backend image builds, and refuse altered
