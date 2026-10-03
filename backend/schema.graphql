@@ -8040,8 +8040,8 @@ type Mutation {
   rejectSecretChange(input: RejectSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   withdrawSecretChange(input: WithdrawSecretChangeInput!): AstroliftSecretChangeProposalMutationResult!
   testSharedModelEndpoint(input: TestSharedModelEndpointInput!): AstroliftModelEndpointTestMutationResult!
-  cancelWorkflowInstance(workflowId: String!): MutationResult!
-  terminateWorkflowInstance(workflowId: String!, reason: String!): MutationResult!
+  cancelWorkflowInstance(workflowId: String!, runId: String = null): MutationResult!
+  terminateWorkflowInstance(workflowId: String!, reason: String!, runId: String = null): MutationResult!
   signalWorkflowInstance(workflowId: String!, signalName: String!, payload: JSON = null): MutationResult!
   requestQuotaIncrease(input: RequestQuotaIncreaseInput!): AstroliftQuotaIncreaseRequestMutationResult!
   createFormDefinition(input: FormDefinitionInput!): AstroliftFormDefinitionMutationResult!
@@ -8817,7 +8817,7 @@ type Query {
   astroliftAppEndpointMetrics(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppEndpointMetric!]!
   astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogPage!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
-  astroliftWorkflowInstanceDetail(workflowId: String!): AstroliftWorkflowInstanceDetail
+  astroliftWorkflowInstanceDetail(workflowId: String!, runId: String = null): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
   formDefinitions(status: String = null): [AstroliftFormDefinition!]!
   formDefinition(slug: String!): AstroliftFormDefinition
