@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import jaMessages from "@/messages/ja.json";
 import { expect, userEvent, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
@@ -66,4 +68,22 @@ export const Width768: Story = {
       <PipelineSecretsView {...secretsProps({ secrets: [LONG_SECRET] })} />
     </div>
   ),
+};
+
+/** Locale-specific controls retain the write-only field and literal TOML syntax. */
+export const JapaneseAddForm: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={jaMessages} timeZone="UTC">
+      <PipelineSecretsView {...secretsProps()} />
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: jaMessages.PipelineUI.secrets.add }));
+    await expect(canvas.getByLabelText(jaMessages.PipelineUI.secrets.value)).toHaveAttribute(
+      "type",
+      "password"
+    );
+    await expect(canvas.getByText("${secrets.NAME}")).toBeVisible();
+  },
 };

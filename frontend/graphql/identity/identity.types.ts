@@ -140,11 +140,9 @@ export type AstroliftRoleBinding = Omit<GeneratedRoleBinding, "scopeKind"> & {
   scopeKind: ScopeKind;
 };
 
-export type AstroliftPolicy = Omit<GeneratedPolicy, "scopeLevel" | "effect" | "conditions"> & {
+export type AstroliftPolicy = Omit<GeneratedPolicy, "scopeLevel" | "effect"> & {
   scopeLevel: ScopeKind;
   effect: PolicyEffect;
-  // Keep raw JSON untrusted until the policy parser checks its shape.
-  conditions: unknown;
 };
 
 export type AstroliftIdentityProvider = Omit<GeneratedIdentityProvider, "kind"> & {

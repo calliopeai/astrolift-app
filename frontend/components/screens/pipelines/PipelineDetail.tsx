@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useFormatters } from "@/lib/i18n/formatters";
+import { localizedPipelineToken } from "./pipelines-list";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
@@ -16,19 +18,9 @@ import { PipelineDag } from "@/components/viz";
 
 import {
   PIPELINE_DETAIL_TABS,
-  type PipelineDetailTab,
   type usePipelineDetail,
   type useRunGraph,
 } from "./use-pipeline-detail";
-
-const TAB_LABELS: Record<PipelineDetailTab, string> = {
-  runs: "Runs",
-  logs: "Logs",
-  artifacts: "Artifacts",
-  triggers: "Triggers",
-  runners: "Runners",
-  secrets: "Secrets",
-};
 
 export type PipelineDetailScreenProps = Omit<
   ReturnType<typeof usePipelineDetail>,
@@ -61,22 +53,24 @@ export function PipelineDetailScreen({
   onCancelRun,
   cancellationDialog,
 }: PipelineDetailScreenProps) {
+  const fmt = useFormatters();
   const t = useTranslations("ReviewedPipelineStart");
+  const copy = useTranslations("PipelineUI");
   return (
-    <PageShell
-      title={pipeline?.name ?? "Pipeline"}
-      description="Pipeline run details, logs, and artifacts."
-    >
+    <PageShell title={pipeline?.name ?? copy("pipeline")} description={copy("detail.description")}>
       <div className="space-y-4">
         {cancellationDialog}
-        {pipelineLoading && <Skeleton className="h-5 w-48" aria-label="Loading pipeline name" />}
+        {pipelineLoading && (
+          <Skeleton className="h-5 w-48" aria-label={copy("detail.loadingName")} />
+        )}
         <QueryError
-          title="Could not load pipeline"
+          title={copy("detail.loadFailed")}
+          retryLabel={copy("retry")}
           error={pipelineError}
           onRetry={onRetryPipeline}
         />
         {!pipelineLoading && !pipelineError && !pipeline && (
-          <p className="text-muted-foreground text-sm">Pipeline definition unavailable.</p>
+          <p className="text-muted-foreground text-sm">{copy("detail.unavailable")}</p>
         )}
         {/* Tab bar */}
         <div className="flex gap-1 border-b pb-0">
@@ -88,7 +82,7 @@ export function PipelineDetailScreen({
                 aria-current={tab === t ? "page" : undefined}
                 className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${t === tab ? "border-primary text-foreground" : "text-muted-foreground hover:text-foreground border-transparent"}`}
               >
-                {TAB_LABELS[t]}
+                {copy(`tabs.${t}`)}
               </Link>
             ) : (
               <button
@@ -101,7 +95,7 @@ export function PipelineDetailScreen({
                     : "text-muted-foreground hover:text-foreground border-transparent",
                 ].join(" ")}
               >
-                {TAB_LABELS[t]}
+                {copy(`tabs.${t}`)}
               </button>
             )
           )}
@@ -112,22 +106,23 @@ export function PipelineDetailScreen({
           <div className="space-y-4">
             {runsLoading && runs.length === 0 && <Skeleton className="h-40 w-full" />}
             <QueryError
-              title="Could not load pipeline runs"
+              title={copy("detail.runsFailed")}
+              retryLabel={copy("retry")}
               error={runsError}
               onRetry={onRetryRuns}
             />
             {!runsLoading && !runsError && runs.length === 0 && (
               <EmptyState
                 icon={<ActivityIcon className="size-5" />}
-                title="No runs yet"
-                description="Trigger a run via webhook or manual dispatch."
+                title={copy("detail.noRuns")}
+                description={copy("detail.noRunsDescription")}
               />
             )}
             {runs.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <ActivityIcon className="size-4" />
-                  Latest run · #{runs[0].runNumber}
+                  {copy("detail.latestRun", { number: runs[0].runNumber })}
                 </div>
                 {runGraph}
               </div>
@@ -148,11 +143,11 @@ export function PipelineDetailScreen({
                     }
                     className="shrink-0"
                   >
-                    {run.status}
+                    {localizedPipelineToken(run.status, "status", copy)}
                   </Badge>
                   <span className="font-mono text-xs font-medium">#{run.runNumber}</span>
                   <span className="text-muted-foreground text-xs capitalize">
-                    {run.triggerKind}
+                    {localizedPipelineToken(run.triggerKind, "trigger", copy)}
                   </span>
                   <span className="text-muted-foreground font-mono text-xs">
                     {run.triggerRef?.replace(/^refs\/heads\//, "")}
@@ -163,7 +158,7 @@ export function PipelineDetailScreen({
                     </Button>
                   )}
                   <span className="text-muted-foreground ml-auto text-xs">
-                    {run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}
+                    {run.startedAt ? fmt.formatDateTime(run.startedAt) : "—"}
                   </span>
                 </div>
               ))}
@@ -176,8 +171,8 @@ export function PipelineDetailScreen({
         {tab === "logs" && (
           <EmptyState
             icon={<ScrollIcon className="size-5" />}
-            title="Log streaming — coming soon"
-            description="Step-by-step log streaming for pipeline runs isn't available yet. The latest run's stage graph is on the Runs tab."
+            title={copy("detail.logsTitle")}
+            description={copy("detail.logsDescription")}
           />
         )}
 
@@ -185,8 +180,8 @@ export function PipelineDetailScreen({
         {tab === "artifacts" && (
           <EmptyState
             icon={<DownloadIcon className="size-5" />}
-            title="Artifact browser — coming soon"
-            description="Browsing run artifacts (build outputs, test reports, deployment packages) isn't available yet."
+            title={copy("detail.artifactsTitle")}
+            description={copy("detail.artifactsDescription")}
           />
         )}
 
@@ -194,8 +189,8 @@ export function PipelineDetailScreen({
         {tab === "triggers" && (
           <EmptyState
             icon={<SettingsIcon className="size-5" />}
-            title="Trigger configuration — coming soon"
-            description="Configuring webhook, scheduled, and manual-dispatch triggers from here isn't available yet."
+            title={copy("detail.triggersTitle")}
+            description={copy("detail.triggersDescription")}
           />
         )}
 
@@ -203,8 +198,8 @@ export function PipelineDetailScreen({
         {tab === "runners" && (
           <EmptyState
             icon={<UsersIcon className="size-5" />}
-            title="Runner management — coming soon"
-            description="Registering and managing self-hosted runners for this pipeline isn't available yet."
+            title={copy("detail.runnersTitle")}
+            description={copy("detail.runnersDescription")}
           />
         )}
 
@@ -228,18 +223,19 @@ export function RunGraphView({
   pageError,
 }: RunGraphViewProps) {
   const t = useTranslations("ReviewedPipelineStart");
-  if (loading) return <Skeleton className="h-64 w-full" />;
+  const copy = useTranslations("PipelineUI");
+  if (loading) return <Skeleton className="h-64 w-full" aria-label={copy("detail.graphLoading")} />;
   if (stages.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed px-4 py-6 text-center text-sm">
-        This run has no jobs to graph.
+        {copy("detail.graphEmpty")}
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <PipelineDag stages={stages} height={320} />
+      <PipelineDag stages={stages} height={320} ariaLabel={copy("detail.graphLabel")} />
       {truncated && (
         <>
           <p className="text-muted-foreground text-xs">{t("graphPartial")}</p>

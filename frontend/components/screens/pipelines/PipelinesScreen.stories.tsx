@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NextIntlClientProvider } from "next-intl";
+import { expect, within } from "storybook/test";
+import frMessages from "@/messages/fr.json";
 import type * as React from "react";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
@@ -126,4 +129,20 @@ export const Width768: Story = {
       {runsOn(<Runs rows={[LONG_RUN, ...RUN_ROWS]} />)}
     </div>
   ),
+};
+
+/** Product copy follows the selected locale while repository identities remain literal. */
+export const FrenchList: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={frMessages} timeZone="UTC">
+      {pipelinesOn(<List />)}
+    </NextIntlClientProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("link", { name: frMessages.PipelineUI.newPipeline })
+    ).toBeVisible();
+    await expect(canvas.getByText(frMessages.PipelineUI.repository)).toBeVisible();
+  },
 };

@@ -53,6 +53,50 @@ export function narrowPipelines(rows: Pipeline[], filters: Record<string, string
 const RUN_STATUSES = ["pending", "running", "success", "failure", "cancelled"];
 const TRIGGERS = ["push", "manual", "webhook", "schedule"];
 
+type Translate = (key: string, values?: Record<string, string | number>) => string;
+
+export function localizedPipelineToken(value: string, kind: "status" | "trigger", t: Translate) {
+  return (kind === "status" ? RUN_STATUSES : TRIGGERS).includes(value)
+    ? t(`${kind}.${value}`)
+    : value;
+}
+
+export function localizedPipelineList(definition: ListDefinition, t: Translate): ListDefinition {
+  const kind =
+    definition.id === PIPELINES_LIST.id
+      ? "pipelines"
+      : definition.id === PIPELINE_RUNS_LIST.id
+        ? "runs"
+        : "secrets";
+  return {
+    ...definition,
+    searchPlaceholder: t(`list.${kind}Search`),
+    fields: definition.fields.map((field) => ({
+      ...field,
+      label: t(field.key === "branch" ? "defaultBranch" : `${field.key}Label`),
+      options: field.options?.map((option) => ({
+        ...option,
+        label: localizedPipelineToken(
+          option.value,
+          field.key === "status" ? "status" : "trigger",
+          t
+        ),
+      })),
+    })),
+    views: definition.views.map((view) => ({
+      ...view,
+      label: t(`list.${view.key}`),
+      ...(view.note
+        ? {
+            note: t(`list.${view.key === "mine" ? `${kind}MineNote` : "runsFailedNote"}`, {
+              count: NARROW_LIMIT,
+            }),
+          }
+        : {}),
+    })),
+  };
+}
+
 export const PIPELINE_RUNS_LIST: ListDefinition = {
   id: "pipelines.runs",
   fields: [
