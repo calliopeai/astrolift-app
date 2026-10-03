@@ -29,8 +29,6 @@ import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
-from asgiref.sync import sync_to_async
-
 from astrolift_drivers.registry import DriverNotFound, plugins
 from core.cluster_credentials import (
     CREDENTIAL_REFUSALS,
@@ -3410,6 +3408,7 @@ async def stream_app_logs(
     follow: bool = True,
 ) -> AsyncIterator[Any]:
     """Open ORM-backed provider setup off the loop, then stream asynchronously."""
+    from asgiref.sync import sync_to_async
 
     def _open() -> AsyncIterator[Any]:
         driver = _driver_for_cluster(cluster)
@@ -3483,6 +3482,8 @@ async def fetch_task_pod_logs(
     hung DNS/TCP handshake, so a slow apiserver could otherwise wedge the
     GraphQL worker on a synchronous call it can't cancel.
     """
+    from asgiref.sync import sync_to_async
+
     tail = max(0, int(tail))
     if tail == 0:
         return []
@@ -3674,6 +3675,8 @@ async def stream_app_logs_multi(
     outer generator tears down every child task so kubelet sockets
     release back to the pool.
     """
+    from asgiref.sync import sync_to_async
+
     queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=1024)
     sentinel = object()
     # Track pods we've already subscribed to so the refresh loop only
