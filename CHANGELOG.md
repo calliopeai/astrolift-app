@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Stage a pinned EKS CloudWatch Fluent Bit profile and credential-aware,
+  immutable cluster-owned log-group/IRSA preparation helpers (#1706). Keep the
+  component outside the installable recipe pending guarded orchestration,
+  readiness and verified ingestion. Node DaemonSets do not cover Fargate;
+  preparation does not activate historical reads or install collectors.
+
 - Scope CloudWatch historical logs with exact Kubernetes namespace/app metadata
   and the requested workload label. Exclude foreign, unattributed and ambiguous
   records, preserve server cursors, and sanitize provider failures (#2262).
