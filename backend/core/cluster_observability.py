@@ -3406,11 +3406,17 @@ async def stream_app_logs(
     container: str | None,
     tail_lines: int = 100,
     follow: bool = True,
+    validate=None,
+    validate_pod=None,
 ) -> AsyncIterator[Any]:
     """Open ORM-backed provider setup off the loop, then stream asynchronously."""
     from asgiref.sync import sync_to_async
 
     def _open() -> AsyncIterator[Any]:
+        if validate is not None:
+            validate()
+        if validate_pod is not None:
+            validate_pod(pod_name)
         driver = _driver_for_cluster(cluster)
         return driver.stream_logs(
             auth=_auth_for_cluster(cluster),
@@ -3656,6 +3662,8 @@ async def stream_app_logs_multi(
     follow: bool = True,
     refresh_interval_seconds: float = _REFRESH_INTERVAL_SECONDS_DEFAULT,
     max_pods: int = _MAX_PODS_DEFAULT,
+    validate=None,
+    validate_pod=None,
 ) -> AsyncIterator[Any]:
     """Stream log lines from every pod of ``app_slug`` (filtered to
     ``workload_slug`` when given) as one merged async iterator.
@@ -3695,6 +3703,8 @@ async def stream_app_logs_multi(
                 container=container,
                 tail_lines=tail_lines,
                 follow=follow,
+                validate=validate,
+                validate_pod=validate_pod,
             )
         except Exception:
             logger.exception(
@@ -3707,7 +3717,16 @@ async def stream_app_logs_multi(
                 await queue.put(line)
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
+            if validate is not None:
+                from graphql import GraphQLError
+
+                await queue.put(
+                    exc
+                    if isinstance(exc, GraphQLError)
+                    else ClusterObservabilityError("Preview log backend unavailable")
+                )
+                return
             logger.exception(
                 "stream_app_logs_multi: pod %s stream raised; tearing down its task",
                 pod_name,
@@ -3722,6 +3741,8 @@ async def stream_app_logs_multi(
                 )
 
     def _discover_pods() -> list[str]:
+        if validate is not None:
+            validate()
         try:
             pods = list_app_pods(
                 cluster=cluster,
@@ -3729,6 +3750,8 @@ async def stream_app_logs_multi(
                 app_slug=app_slug,
             )
         except Exception:
+            if validate is not None:
+                raise ClusterObservabilityError("Preview log backend unavailable") from None
             logger.exception(
                 "stream_app_logs_multi: pod discovery failed for app %s",
                 app_slug,
@@ -3752,7 +3775,13 @@ async def stream_app_logs_multi(
         """Periodically discover new pods + subscribe them."""
         while True:
             await asyncio.sleep(refresh_interval_seconds)
-            discovered = await sync_to_async(_discover_pods, thread_sensitive=True)()
+            try:
+                discovered = await sync_to_async(_discover_pods, thread_sensitive=True)()
+            except Exception as exc:
+                if validate is None:
+                    raise
+                await queue.put(exc)
+                return
             new_pods = [p for p in discovered if p not in subscribed]
             for pod_name in new_pods:
                 subscribed.add(pod_name)
@@ -3786,6 +3815,8 @@ async def stream_app_logs_multi(
             item = await queue.get()
             if item is sentinel:
                 return
+            if validate is not None and isinstance(item, Exception):
+                raise item
             yield item
     finally:
         # Tear down every child task + drain the queue so producer

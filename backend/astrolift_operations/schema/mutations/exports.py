@@ -275,6 +275,33 @@ class ExportMutations:
                 field="appSlug",
             )
 
+        from graphql import GraphQLError
+
+        from astrolift_lifecycle.preview_log_access import (
+            PreviewLogAuthority,
+            refuse_unreviewed_preview_route,
+            resolve_preview_log_target,
+        )
+
+        authority = None
+        try:
+            reviewed = resolve_preview_log_target(
+                input.app_slug,
+                permission=Permission.APP_LOG_EXPORT,
+                environment_name=input.environment_name,
+                preview_id=input.preview_id,
+                expected_environment_id=input.expected_environment_id,
+                if_match_preview_version=input.if_match_preview_version,
+                if_match_environment_version=input.if_match_environment_version,
+            )
+            if reviewed is not None:
+                authority = PreviewLogAuthority.capture(reviewed[1], Permission.APP_LOG_EXPORT)
+                authority.check_pod(
+                    input.pod_name, workload_slug=input.workload_slug, container=input.container
+                )
+        except GraphQLError as exc:
+            return gql_failure(exc.extensions["code"], exc.message)
+
         # Environment lookup: when the operator pinned a name, that
         # env's cluster wins; otherwise we fall back to the app's
         # default cluster (matches the subscription's resolution
@@ -282,7 +309,10 @@ class ExportMutations:
         # doesn't silently land logs from the wrong cluster.
         cluster = None
         namespace = namespace_for_app(app)
-        if input.environment_name:
+        if reviewed is not None:
+            cluster = reviewed[0].app_environment.tenant_cluster
+            namespace = reviewed[1].namespace
+        elif input.environment_name:
             env = (
                 AppEnvironment.objects.select_related("tenant_cluster")
                 .filter(
@@ -309,6 +339,12 @@ class ExportMutations:
                 f"app {app.slug!r} has no active cluster wired",
             )
 
+        if authority is None:
+            try:
+                refuse_unreviewed_preview_route(app, cluster, namespace)
+            except GraphQLError as exc:
+                return gql_failure(exc.extensions["code"], exc.message)
+
         assert_provider_cluster(cluster, permission=Permission.APP_LOG_EXPORT)
         max_lines = max(
             1,
@@ -328,16 +364,29 @@ class ExportMutations:
                 tail_lines=max_lines,
                 since=input.since,
                 until=input.until,
+                **({"authority": authority} if authority is not None else {}),
             )
+        except GraphQLError as exc:
+            return gql_failure(exc.extensions["code"], exc.message)
+        except TimeoutError:
+            return gql_failure(ErrorCode.PRECONDITION.value, "Preview log export exceeded its read deadline")
         except ClusterObservabilityError as exc:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                f"cluster log backend unavailable: {exc}",
+                "Preview log backend unavailable"
+                if authority is not None
+                else f"cluster log backend unavailable: {exc}",
             )
 
         from core.fields.uuid_v7 import uuid7
 
         export_guid = uuid7()
+
+        if authority is not None:
+            try:
+                authority.check()
+            except GraphQLError as exc:
+                return gql_failure(exc.extensions["code"], exc.message)
 
         try:
             artifact = app_log_helpers.write_artifact(
@@ -350,6 +399,15 @@ class ExportMutations:
             )
         except ValueError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="format")
+
+        if authority is not None:
+            try:
+                authority.check()
+            except GraphQLError as exc:
+                import os
+
+                os.unlink(artifact.absolute_path)
+                return gql_failure(exc.extensions["code"], exc.message)
 
         plaintext_token, token_hash = app_log_helpers.mint_token()
         ttl_seconds = max(
@@ -369,7 +427,9 @@ class ExportMutations:
             guid=export_guid,
             organization=org,
             registered_app=app,
-            environment_name=input.environment_name or "",
+            environment_name=authority.target.environment_name
+            if authority is not None
+            else input.environment_name or "",
             pod_name=input.pod_name or "",
             workload_name=input.workload_slug or "",
             container=input.container or "",
@@ -381,6 +441,7 @@ class ExportMutations:
             sha256=artifact.sha256,
             relative_path=artifact.relative_path,
             token_hash=token_hash,
+            source_snapshot=authority.snapshot() if authority is not None else {},
             filters_snapshot={
                 "since": (input.since.isoformat() if input.since else ""),
                 "until": (input.until.isoformat() if input.until else ""),

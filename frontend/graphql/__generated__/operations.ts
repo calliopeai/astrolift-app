@@ -6676,9 +6676,13 @@ export type ExportAppLogsInput = {
   appSlug: Scalars['String']['input'];
   container: InputMaybe<Scalars['String']['input']>;
   environmentName: InputMaybe<Scalars['String']['input']>;
+  expectedEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
   format: Scalars['String']['input'];
+  ifMatchEnvironmentVersion: InputMaybe<Scalars['Int']['input']>;
+  ifMatchPreviewVersion: InputMaybe<Scalars['Int']['input']>;
   level: InputMaybe<Scalars['String']['input']>;
   podName: InputMaybe<Scalars['String']['input']>;
+  previewId: InputMaybe<Scalars['GUID']['input']>;
   regex: InputMaybe<Scalars['String']['input']>;
   since: InputMaybe<Scalars['DateTime']['input']>;
   until: InputMaybe<Scalars['DateTime']['input']>;
@@ -13052,8 +13056,12 @@ export type SubscriptionAstroliftDeploymentLifecycleStreamArgs = {
 export type SubscriptionAstroliftOnAppLogArgs = {
   appSlug: Scalars['String']['input'];
   container?: InputMaybe<Scalars['String']['input']>;
+  expectedEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
   follow?: Scalars['Boolean']['input'];
+  ifMatchEnvironmentVersion?: InputMaybe<Scalars['Int']['input']>;
+  ifMatchPreviewVersion?: InputMaybe<Scalars['Int']['input']>;
   podName: Scalars['String']['input'];
+  previewId?: InputMaybe<Scalars['GUID']['input']>;
   tailLines?: Scalars['Int']['input'];
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
@@ -13063,7 +13071,11 @@ export type SubscriptionAstroliftOnAppLogsArgs = {
   appSlug: Scalars['String']['input'];
   container?: InputMaybe<Scalars['String']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
+  expectedEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
   follow?: Scalars['Boolean']['input'];
+  ifMatchEnvironmentVersion?: InputMaybe<Scalars['Int']['input']>;
+  ifMatchPreviewVersion?: InputMaybe<Scalars['Int']['input']>;
+  previewId?: InputMaybe<Scalars['GUID']['input']>;
   tailLines?: Scalars['Int']['input'];
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
@@ -15371,6 +15383,10 @@ export type OnAppLogSubscriptionVariables = Exact<{
   container?: InputMaybe<Scalars['String']['input']>;
   follow?: InputMaybe<Scalars['Boolean']['input']>;
   tailLines?: InputMaybe<Scalars['Int']['input']>;
+  previewId?: InputMaybe<Scalars['GUID']['input']>;
+  expectedEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
+  ifMatchPreviewVersion?: InputMaybe<Scalars['Int']['input']>;
+  ifMatchEnvironmentVersion?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 
@@ -15383,6 +15399,10 @@ export type OnAppLogsSubscriptionVariables = Exact<{
   container?: InputMaybe<Scalars['String']['input']>;
   follow?: InputMaybe<Scalars['Boolean']['input']>;
   tailLines?: InputMaybe<Scalars['Int']['input']>;
+  previewId?: InputMaybe<Scalars['GUID']['input']>;
+  expectedEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
+  ifMatchPreviewVersion?: InputMaybe<Scalars['Int']['input']>;
+  ifMatchEnvironmentVersion?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 

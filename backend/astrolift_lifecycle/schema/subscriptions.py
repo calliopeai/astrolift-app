@@ -19,7 +19,14 @@ from collections.abc import AsyncGenerator
 import strawberry
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_identity.operation_context import OperationContext, environment_context
+from astrolift_lifecycle.preview_log_access import (
+    PreviewLogAuthority,
+    guarded_log_lines,
+    refuse_unreviewed_preview_route,
+    resolve_preview_log_target,
+)
 from astrolift_lifecycle.schema.types import AppLogLineType
 from astrolift_lifecycle.scopes import live_app_scope
 from core.decorators import tenant_scoped
@@ -34,12 +41,24 @@ from core.permissions import (
 from core.schema.ws_auth import ws_identity
 
 
-def _log_target(app_slug, *, plural=False, environment_name=None, workload_slug=None):
+def _log_target(app_slug, *, plural=False, environment_name=None, workload_slug=None, **proof):
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_registry.models import RegisteredApp
     from core.cluster_observability import namespace_for_app, namespace_for_environment
     from core.tenancy import get_current_tenant
 
+    reviewed = resolve_preview_log_target(
+        app_slug, permission=Permission.APP_READ_LOGS, environment_name=environment_name, **proof
+    )
+    if reviewed is not None:
+        preview, target = reviewed
+        return (
+            preview.registered_app,
+            preview.app_environment.tenant_cluster,
+            target.namespace,
+            environment_context(preview.app_environment),
+            target,
+        )
     tenant = get_current_tenant()
     org_id = tenant.organization_id if tenant else None
     app = (
@@ -70,6 +89,7 @@ def _log_target(app_slug, *, plural=False, environment_name=None, workload_slug=
         or cluster.organization_id not in (None, org_id)
     ):
         return None
+    refuse_unreviewed_preview_route(app, cluster, namespace)
     if verified_env is None:
         matches = [
             env
@@ -84,7 +104,7 @@ def _log_target(app_slug, *, plural=False, environment_name=None, workload_slug=
         if verified_env is not None
         else OperationContext(region=cluster.region or None)
     )
-    return app, cluster, namespace, facts
+    return app, cluster, namespace, facts, None
 
 
 def _log_operation(*, plural=False):
@@ -94,6 +114,15 @@ def _log_operation(*, plural=False):
             plural=plural,
             environment_name=args.get("environment_name"),
             workload_slug=args.get("workload_slug"),
+            **{
+                key: args.get(key)
+                for key in (
+                    "preview_id",
+                    "expected_environment_id",
+                    "if_match_preview_version",
+                    "if_match_environment_version",
+                )
+            },
         )
         return (target[3] if target is not None else OperationContext(),)
 
@@ -106,13 +135,13 @@ def _admitted_log_target(app_slug, **kwargs):
     target = _log_target(app_slug, **kwargs)
     if target is None:
         return None
-    app, cluster, namespace, facts = target
+    app, cluster, namespace, facts, reviewed = target
     try:
         with operation_attributes(**facts.attributes()):
             check_permission(Permission.APP_READ_LOGS, scope=PermissionScope(kind=ScopeKind.APP, id=app.pk))
     except PermissionDenied:
         return None
-    return app, cluster, namespace
+    return app, cluster, namespace, reviewed
 
 
 @strawberry.type
@@ -134,6 +163,10 @@ class LifecycleSubscription:
         container: str | None = None,
         follow: bool = True,
         tail_lines: int = 100,
+        preview_id: GUID | None = None,
+        expected_environment_id: GUID | None = None,
+        if_match_preview_version: int | None = None,
+        if_match_environment_version: int | None = None,
     ) -> AsyncGenerator[AppLogLineType, None]:
         """Stream log lines from a single pod (and optional
         container) in the runtime cluster.
@@ -157,12 +190,30 @@ class LifecycleSubscription:
 
         from core.cluster_observability import stream_app_logs
 
-        resolved = await sync_to_async(_admitted_log_target)(app_slug, workload_slug=workload_slug)
+        proof = {
+            "preview_id": preview_id,
+            "expected_environment_id": expected_environment_id,
+            "if_match_preview_version": if_match_preview_version,
+            "if_match_environment_version": if_match_environment_version,
+        }
+        resolved = await sync_to_async(_admitted_log_target)(app_slug, workload_slug=workload_slug, **proof)
         if resolved is None:
             return
-        app, cluster, namespace = resolved
+        app, cluster, namespace, reviewed = resolved
         if app is None or cluster is None:
             return
+
+        authority = (
+            await sync_to_async(PreviewLogAuthority.capture)(reviewed, Permission.APP_READ_LOGS)
+            if reviewed is not None
+            else None
+        )
+        if authority is not None:
+            current = await sync_to_async(authority.check)()
+            cluster, namespace = current.app_environment.tenant_cluster, authority.target.namespace
+            await sync_to_async(authority.check_pod)(
+                pod_name, workload_slug=workload_slug, container=container
+            )
 
         # Explicit iterate + finally so a consumer disconnect
         # (``aclose()`` on this generator throwing GeneratorExit at
@@ -178,7 +229,19 @@ class LifecycleSubscription:
             container=container,
             tail_lines=tail_lines,
             follow=follow,
+            **(
+                {
+                    "validate": authority.check,
+                    "validate_pod": lambda name: authority.check_pod(
+                        name, workload_slug=workload_slug, container=container
+                    ),
+                }
+                if authority is not None
+                else {}
+            ),
         )
+        if authority is not None:
+            inner = guarded_log_lines(inner, authority)
         try:
             async for line in inner:
                 yield AppLogLineType(
@@ -208,6 +271,10 @@ class LifecycleSubscription:
         container: str | None = None,
         follow: bool = True,
         tail_lines: int = 100,
+        preview_id: GUID | None = None,
+        expected_environment_id: GUID | None = None,
+        if_match_preview_version: int | None = None,
+        if_match_environment_version: int | None = None,
     ) -> AsyncGenerator[AppLogLineType, None]:
         """Multi-pod plural log subscription (#482).
 
@@ -229,12 +296,27 @@ class LifecycleSubscription:
 
         from core.cluster_observability import stream_app_logs_multi
 
+        proof = {
+            "preview_id": preview_id,
+            "expected_environment_id": expected_environment_id,
+            "if_match_preview_version": if_match_preview_version,
+            "if_match_environment_version": if_match_environment_version,
+        }
         resolved = await sync_to_async(_admitted_log_target)(
-            app_slug, plural=True, environment_name=environment_name, workload_slug=workload_slug
+            app_slug, plural=True, environment_name=environment_name, workload_slug=workload_slug, **proof
         )
         if resolved is None:
             return
-        app, cluster, namespace = resolved
+        app, cluster, namespace, reviewed = resolved
+
+        authority = (
+            await sync_to_async(PreviewLogAuthority.capture)(reviewed, Permission.APP_READ_LOGS)
+            if reviewed is not None
+            else None
+        )
+        if authority is not None:
+            current = await sync_to_async(authority.check)()
+            cluster, namespace = current.app_environment.tenant_cluster, authority.target.namespace
 
         inner = stream_app_logs_multi(
             cluster=cluster,
@@ -244,7 +326,19 @@ class LifecycleSubscription:
             container=container,
             tail_lines=tail_lines,
             follow=follow,
+            **(
+                {
+                    "validate": authority.check,
+                    "validate_pod": lambda name: authority.check_pod(
+                        name, workload_slug=workload_slug, container=container
+                    ),
+                }
+                if authority is not None
+                else {}
+            ),
         )
+        if authority is not None:
+            inner = guarded_log_lines(inner, authority)
         try:
             async for line in inner:
                 yield AppLogLineType(

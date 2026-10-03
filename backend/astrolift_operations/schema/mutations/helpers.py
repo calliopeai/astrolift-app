@@ -78,6 +78,7 @@ def _materialize_app_log_lines(
     tail_lines: int,
     since: dt.datetime | None,
     until: dt.datetime | None,
+    authority=None,
 ):
     """Drain the cluster driver's async log generator into a list
     bounded by ``tail_lines``.
@@ -107,7 +108,12 @@ def _materialize_app_log_lines(
             container=container,
             tail_lines=tail_lines + 1,
             follow=False,
+            **({"validate": authority.check} if authority is not None else {}),
         )
+        if authority is not None:
+            from astrolift_lifecycle.preview_log_access import guarded_log_lines
+
+            gen = guarded_log_lines(gen, authority)
         try:
             async for line in gen:
                 ts = getattr(line, "timestamp", None)
@@ -130,6 +136,10 @@ def _materialize_app_log_lines(
     try:
         loop = asyncio.new_event_loop()
         try:
+            if authority is not None:
+                from astrolift_lifecycle.preview_log_access import EXPORT_TIMEOUT_SECONDS
+
+                return loop.run_until_complete(asyncio.wait_for(_drain(), EXPORT_TIMEOUT_SECONDS))
             return loop.run_until_complete(_drain())
         finally:
             loop.close()

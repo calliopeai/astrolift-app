@@ -298,6 +298,30 @@ def provider_read_operation(permission, *, metrics=False):
         app = apps().filter(slug=slug).select_related("default_tenant_cluster").first() if slug else None
         if app is None:
             return UNKNOWN
+        if not metrics:
+            from graphql import GraphQLError
+
+            from astrolift_lifecycle.preview_log_access import resolve_preview_log_target
+
+            try:
+                reviewed = resolve_preview_log_target(
+                    slug,
+                    permission=permission,
+                    environment_name=read_arg(args, "input.environment_name"),
+                    **{
+                        key: read_arg(args, f"input.{key}")
+                        for key in (
+                            "preview_id",
+                            "expected_environment_id",
+                            "if_match_preview_version",
+                            "if_match_environment_version",
+                        )
+                    },
+                )
+            except GraphQLError:
+                return UNKNOWN  # The resolver supplies the structured precondition refusal.
+            if reviewed is not None:
+                return (environment_context(reviewed[0].app_environment),)
         name = read_arg(args, "input.environment_name") if not metrics else None
         if metrics or name:
             envs = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).select_related(

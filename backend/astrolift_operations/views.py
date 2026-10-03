@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import os
 
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, HttpResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -122,6 +122,27 @@ def download_app_log_export(request, guid: str, token: str):
     if export.expires_at <= now:
         return HttpResponse(status=404)
 
+    authority = None
+    if export.source_snapshot:
+        if export.status != AppLogExport.Status.READY:
+            return HttpResponse(status=404)
+        from astrolift_operations.preview_log_exports import preview_export_authority
+
+        try:
+            authority = preview_export_authority(export, request)
+        except Exception:  # malformed/unavailable source and access failures are opaque
+            return HttpResponse(status=404)
+    elif export.environment_name:
+        # Old artifacts do not acquire inferred exact proof. If the persisted
+        # name identifies a preview, the legacy link is insufficient.
+        from astrolift_lifecycle.models import PreviewEnvironment
+
+        if PreviewEnvironment.all_objects.filter(
+            registered_app_id=export.registered_app_id,
+            app_environment__name=export.environment_name,
+        ).exists():
+            return HttpResponse(status=404)
+
     from django.conf import settings as dj_settings
 
     media_root = getattr(dj_settings, "MEDIA_ROOT", None) or ""
@@ -152,7 +173,14 @@ def download_app_log_export(request, guid: str, token: str):
         suffix_parts.append(export.pod_name)
     filename = "-".join(suffix_parts) + f"-logs.{extension}"
 
-    response = FileResponse(open(absolute, "rb"), content_type=content_type)
+    if authority is not None:
+        from astrolift_operations.preview_log_exports import guarded_artifact_chunks
+
+        response = StreamingHttpResponse(
+            guarded_artifact_chunks(export, authority, absolute), content_type=content_type
+        )
+    else:
+        response = FileResponse(open(absolute, "rb"), content_type=content_type)
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["Content-Length"] = str(export.byte_count)
     if export.sha256:

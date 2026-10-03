@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Bind preview live logs and exported artifacts to reviewed preview/environment
+  identities and versions. Recheck source lifecycle, requester membership, grants
+  and original credential ceilings while idle and before artifact chunks;
+  retire stale streams and refuse unavailable downloads without a fallback (#2257).
+
 - Replace the static platform activity page with the permission-scoped Temporal
   execution viewer. Bind detail/history and confirmed cancel/terminate requests
   to the selected run ID, follow server cursor pages including empty authorized
