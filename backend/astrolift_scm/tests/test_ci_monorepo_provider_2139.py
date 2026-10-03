@@ -12,7 +12,7 @@ import threading
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import jwt
 import pytest
@@ -23,14 +23,16 @@ from nacl.public import PrivateKey, SealedBox
 
 from astrolift_lifecycle.deploy_tokens import verify_token
 from astrolift_registry.models import Workload
-from astrolift_scm.ci_identity import github_ci_secret_name
+from astrolift_scm.ci_identity import github_ci_identity, github_ci_secret_name
 from astrolift_scm.ci_templates import git_blob_sha
 from astrolift_scm.models import SourceConnection
-from astrolift_scm.providers.github import GithubProviderError, delete_github_file
+from astrolift_scm.providers import ProviderError, put_file
+from astrolift_scm.providers.github import GithubProviderError, delete_github_file, put_github_file
 from astrolift_scm.services.ci_workflow_drift import fetch_repo_ci_workflow
 from astrolift_scm.services.secrets import push_astrolift_ci_secrets, validate_astrolift_ci_secrets
 from astrolift_scm.services.workflow_sync import (
     _remove_superseded_workflow,
+    _side_branch_for,
     github_workflow_path_for,
     render_astrolift_ci_workflow,
     sync_workflow_file_to_repo,
@@ -47,7 +49,18 @@ pytestmark = pytest.mark.django_db
 def host(apps):
     key = PrivateKey.generate()
     signer = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    state = SimpleNamespace(files={}, secrets={}, dispatches=[], deletes=[], requests=[])
+    state = SimpleNamespace(
+        files={},
+        secrets={},
+        dispatches=[],
+        deletes=[],
+        requests=[],
+        branches={},
+        protected=False,
+        pulls=[],
+        after_read=None,
+    )
+    state.branches["main"] = state.files
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -63,7 +76,8 @@ def host(apps):
                 self.wfile.write(payload)
 
         def handle_request(self):
-            path = unquote(urlsplit(self.path).path)
+            parsed = urlsplit(self.path)
+            path = unquote(parsed.path)
             state.requests.append((self.command, path))
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
             if path == "/app/installations/2139/access_tokens":
@@ -108,11 +122,33 @@ def host(apps):
                 state.secrets[route.removeprefix("actions/secrets/")] = body["encrypted_value"]
                 return self.response(204)
             if route == "branches/main/protection":
-                return self.response(404)
+                return self.response(200 if state.protected else 404)
+            if route == "branches/main":
+                return self.response(200, {"commit": {"sha": "b" * 40}})
+            if route == "git/refs" and self.command == "POST":
+                branch = body["ref"].removeprefix("refs/heads/")
+                assert body["sha"] == "b" * 40
+                if branch in state.branches:
+                    return self.response(422, {"message": "Reference already exists"})
+                state.branches[branch] = dict(state.files)
+                return self.response(201)
+            if route == "pulls" and self.command == "POST":
+                state.pulls.append(body)
+                return self.response(201, {"html_url": "https://github.example.test/example/monorepo/pull/1"})
             if route.startswith("contents/"):
                 file = route.removeprefix("contents/")
-                current = state.files.get(file)
+                branch = (
+                    parse_qs(parsed.query).get("ref", ["main"])[0]
+                    if self.command == "GET"
+                    else body["branch"]
+                )
+                if branch not in state.branches:
+                    return self.response(404)
+                files = state.branches[branch]
+                current = files.get(file)
                 if self.command == "GET":
+                    if state.after_read:
+                        state.after_read(branch, file, current)
                     if current is None:
                         return self.response(404)
                     if "raw" in self.headers.get("Accept", ""):
@@ -127,10 +163,11 @@ def host(apps):
                         },
                     )
                 if self.command == "PUT":
-                    assert body["branch"] == "main"
                     if current is not None and body.get("sha") != git_blob_sha(current.encode()):
                         return self.response(409)
-                    state.files[file] = base64.b64decode(body["content"]).decode()
+                    if current is None and "sha" in body:
+                        return self.response(422)
+                    files[file] = base64.b64decode(body["content"]).decode()
                     return self.response(201, {"commit": {"sha": "a" * 40}, "content": {"path": file}})
                 if self.command == "DELETE":
                     if current is None:
@@ -138,7 +175,7 @@ def host(apps):
                     if body.get("sha") != git_blob_sha(current.encode()):
                         return self.response(409)
                     state.deletes.append(file)
-                    del state.files[file]
+                    del files[file]
                     return self.response(200)
             if route.endswith("/dispatches"):
                 state.dispatches.append((route, body))
@@ -270,6 +307,218 @@ def test_conditional_delete_refuses_content_changed_after_review_without_refetch
         ("DELETE", "/repos/example/monorepo/contents/" + path)
     ]
     assert host.files[path].endswith("# concurrent operator edit\n")
+
+
+@pytest.mark.parametrize("initial", ["absent", "existing", "deleted"])
+def test_managed_put_refuses_concurrent_edit_creation_or_deletion_without_new_baseline(apps, host, initial):
+    app = apps[0]
+    path = github_workflow_path_for(app)
+    if initial != "absent":
+        assert sync_workflow_file_to_repo(app).status == "created"
+        app.build_args = {"VERSION": "next"}
+        app.save(update_fields=["build_args"])
+    receipt = dict(app.ci_workflow_state)
+    version = app.ci_workflow_template_version
+    concurrent = "# operator-owned content\nname: independent\n"
+
+    def change_after_review(branch, file, _current):
+        if branch == "main" and file == path:
+            host.after_read = None
+            if initial == "deleted":
+                del host.files[path]
+            else:
+                host.files[path] = concurrent
+
+    host.after_read = change_after_review
+    before = len(host.requests)
+    result = sync_workflow_file_to_repo(app)
+    assert result.status == "fetch_failed" and result.error.startswith("CONFLICT:")
+    assert concurrent not in result.error
+    assert host.files.get(path) == (None if initial == "deleted" else concurrent)
+    assert not host.pulls and not host.deletes
+    assert (
+        sum(
+            method == "GET" and route.endswith("/contents/" + path)
+            for method, route in host.requests[before:]
+        )
+        == 1
+    )
+    app.refresh_from_db()
+    assert app.ci_workflow_state == receipt and app.ci_workflow_template_version == version
+
+
+@pytest.mark.parametrize("forced", [False, True])
+@pytest.mark.parametrize("initial", ["absent", "existing", "deleted"])
+def test_pr_target_put_is_conditional_after_its_own_review(apps, host, forced, initial):
+    app = apps[0]
+    path = github_workflow_path_for(app)
+    if initial != "absent":
+        assert sync_workflow_file_to_repo(app).status == "created"
+        app.build_args = {"VERSION": "next"}
+        app.save(update_fields=["build_args"])
+    receipt = dict(app.ci_workflow_state)
+    host.protected = not forced
+    side_branch = _side_branch_for(github_ci_identity(app))
+    concurrent = "# edited review branch\nname: operator proposal\n"
+
+    def change_after_review(branch, file, _current):
+        if branch == side_branch and file == path:
+            host.after_read = None
+            if initial == "deleted":
+                del host.branches[branch][path]
+            else:
+                host.branches[branch][path] = concurrent
+
+    host.after_read = change_after_review
+    before = len(host.requests)
+    result = sync_workflow_file_to_repo(app, force_pr=forced)
+    assert result.status == "fetch_failed" and result.error.startswith("CONFLICT:")
+    assert host.branches[side_branch].get(path) == (None if initial == "deleted" else concurrent)
+    assert not host.pulls
+    assert (
+        sum(
+            method == "GET" and route.endswith("/contents/" + path)
+            for method, route in host.requests[before:]
+        )
+        == 2
+    )
+    app.refresh_from_db()
+    assert app.ci_workflow_state == receipt
+
+
+@pytest.mark.parametrize("side_kind", ["deleted", "edited", "foreign_owner"])
+def test_existing_review_branch_operator_edit_or_deletion_is_never_overwritten(apps, host, side_kind):
+    app = apps[0]
+    assert sync_workflow_file_to_repo(app).status == "created"
+    path = github_workflow_path_for(app)
+    original = host.files[path]
+    side_content = {
+        "deleted": None,
+        "edited": "# independent PR edit\n",
+        "foreign_owner": render_astrolift_ci_workflow(apps[1]),
+    }[side_kind]
+    side_branch = _side_branch_for(github_ci_identity(app))
+    host.branches[side_branch] = {} if side_content is None else {path: side_content}
+    app.build_args = {"VERSION": "next"}
+    app.save(update_fields=["build_args"])
+    before = len(host.requests)
+    result = sync_workflow_file_to_repo(app, force_pr=True)
+    assert result.status == "fetch_failed" and result.error.startswith("CONFLICT:")
+    assert host.files[path] == original and host.branches[side_branch].get(path) == side_content
+    assert not host.pulls
+    assert not any(method == "PUT" for method, _ in host.requests[before:])
+
+
+def test_pr_branch_created_from_concurrently_edited_base_refuses_unreviewed_content(apps, host):
+    app = apps[0]
+    path = github_workflow_path_for(app)
+    concurrent = "# concurrent base edit\n"
+
+    def change_after_review(branch, file, _current):
+        if branch == "main" and file == path:
+            host.after_read = None
+            host.files[path] = concurrent
+
+    host.after_read = change_after_review
+    result = sync_workflow_file_to_repo(app, force_pr=True)
+    side_branch = _side_branch_for(github_ci_identity(app))
+    assert result.status == "fetch_failed" and result.error.startswith("CONFLICT:")
+    assert host.files[path] == host.branches[side_branch][path] == concurrent
+    assert not host.pulls and not any(method == "PUT" for method, _ in host.requests)
+
+
+def test_deleted_existing_proposal_is_not_recreated_when_base_is_also_absent(apps, host):
+    app = apps[0]
+    side_branch = _side_branch_for(github_ci_identity(app))
+    assert sync_workflow_file_to_repo(app, force_pr=True).status == "pr_opened"
+    host.branches[side_branch].clear()
+    host.pulls.clear()
+    before = len(host.requests)
+    result = sync_workflow_file_to_repo(app, force_pr=True)
+    assert result.status == "fetch_failed" and result.error.startswith("CONFLICT:")
+    assert not host.files and not host.branches[side_branch] and not host.pulls
+    assert not any(method == "PUT" for method, _ in host.requests[before:])
+
+
+def test_unchanged_owned_review_branch_can_refresh_using_its_reviewed_blob(apps, host):
+    app = apps[0]
+    path = github_workflow_path_for(app)
+    for value in ("first", "next"):
+        app.build_args = {"VERSION": value}
+        app.save(update_fields=["build_args"])
+        assert sync_workflow_file_to_repo(app, force_pr=True).status == "pr_opened"
+        side_branch = _side_branch_for(github_ci_identity(app))
+        assert host.branches[side_branch][path] == render_astrolift_ci_workflow(app)
+        assert path not in host.files
+
+
+def test_operator_drift_gets_reviewable_conditional_proposal_without_changing_base(apps, host):
+    app = apps[0]
+    path = github_workflow_path_for(app)
+    assert sync_workflow_file_to_repo(app).status == "created"
+    edited = host.files[path] + "# keep operator edits on main\n"
+    host.files[path] = edited
+    assert sync_workflow_file_to_repo(app).status == "pr_opened"
+    side_branch = _side_branch_for(github_ci_identity(app))
+    assert host.files[path] == edited
+    assert host.branches[side_branch][path] == render_astrolift_ci_workflow(app)
+    assert host.pulls[0]["head"] == side_branch and host.pulls[0]["base"] == "main"
+
+
+def test_put_without_condition_retains_legacy_lookup_and_update_behavior(apps, host):
+    path = github_workflow_path_for(apps[0])
+    host.files[path] = "# legacy content\n"
+    result = put_file(
+        host.connection,
+        repo_full_name=apps[0].source_repo,
+        path=path,
+        branch="main",
+        content="# updated\n",
+        commit_message="legacy update",
+    )
+    assert result.commit_sha == "a" * 40 and host.files[path] == "# updated\n"
+    assert [method for method, route in host.requests if route.endswith("/contents/" + path)] == [
+        "GET",
+        "PUT",
+    ]
+
+
+@pytest.mark.parametrize("kind", ["gitlab_pat", "bitbucket_oauth_user", "gitea_pat", "unknown"])
+@pytest.mark.parametrize("condition", [{"expected_sha": "a" * 40}, {"expected_absent": True}])
+def test_unsupported_conditional_provider_refuses_before_network(apps, host, kind, condition):
+    with pytest.raises(ProviderError, match="conditional file writes") as error:
+        put_file(
+            SimpleNamespace(kind=kind),
+            repo_full_name=apps[0].source_repo,
+            path=github_workflow_path_for(apps[0]),
+            branch="main",
+            content="new",
+            commit_message="conditional update",
+            **condition,
+        )
+    assert error.value.code == "UNSUPPORTED" and not host.requests
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        {"expected_sha": "bad"},
+        {"expected_sha": "A" * 40},
+        {"expected_sha": "a" * 40, "expected_absent": True},
+    ],
+)
+def test_invalid_conditional_write_refuses_before_credential_or_http(apps, host, condition):
+    with pytest.raises(ValueError):
+        put_github_file(
+            SimpleNamespace(kind="github_pat"),
+            repo_full_name=apps[0].source_repo,
+            path=github_workflow_path_for(apps[0]),
+            branch="main",
+            content="new",
+            commit_message="conditional update",
+            **condition,
+        )
+    assert not host.requests
 
 
 @pytest.mark.parametrize("field", ["registry_repo_uri", "dockerfile_path", "build_context"])

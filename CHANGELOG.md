@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Bind managed GitHub workflow creation and updates to the reviewed absence or
+  blob SHA. Refuse concurrent edits, creation and deletion without advancing
+  sync receipts; preserve independent edits on reconciliation PR branches.
+  Providers without conditional writes fail closed when that contract is
+  requested (#2139).
+
 - Read preview details by exact GUID, including older previews beyond the recent
   discovery window. Return the persisted environment identity and reviewed log
   route; retired, replaced or foreign targets never fall back to another

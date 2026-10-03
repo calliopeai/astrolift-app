@@ -923,6 +923,8 @@ def put_github_file(
     commit_message: str,
     operation: str | None = None,
     permission: str | None = None,
+    expected_sha: str | None = None,
+    expected_absent: bool = False,
 ) -> PutFileResult:
     """Create or update a file at ``path`` on ``branch`` via the
     GitHub Contents API.
@@ -938,7 +940,8 @@ def put_github_file(
     endpoint for create and update; the difference is whether you
     include the existing blob ``sha``. We discover that with a GET
     first so the caller doesn't need to know whether the file is
-    already present.
+    already present. Supplying ``expected_sha`` or ``expected_absent`` instead
+    binds the write to the caller's review without a fresh baseline GET.
 
     The auth header follows the connection's mode:
       * ``token <pat-or-oauth-user-token>`` for ``github_pat`` and
@@ -946,21 +949,29 @@ def put_github_file(
         the token).
       * ``Bearer <installation-token>`` for ``github_app_install``
         (commit attribution = the GitHub App as a bot)."""
+    if expected_sha is not None and expected_absent:
+        raise ValueError("file write conditions are mutually exclusive")
+    if expected_sha is not None and (
+        len(expected_sha) != 40 or any(char not in "0123456789abcdef" for char in expected_sha)
+    ):
+        raise ValueError("conditional file write requires an exact git blob SHA")
     token = _token(connection)
     base = _api_base(connection)
     is_app_install = connection.kind == "github_app_install"
     auth_header = f"Bearer {token}" if is_app_install else f"token {token}"
 
-    existing_sha = _github_existing_sha(
-        token=token,
-        base=base,
-        repo_full_name=repo_full_name,
-        path=path,
-        branch=branch,
-        connection_kind=connection.kind,
-        operation=operation,
-        permission=permission,
-    )
+    existing_sha = expected_sha
+    if expected_sha is None and not expected_absent:
+        existing_sha = _github_existing_sha(
+            token=token,
+            base=base,
+            repo_full_name=repo_full_name,
+            path=path,
+            branch=branch,
+            connection_kind=connection.kind,
+            operation=operation,
+            permission=permission,
+        )
 
     body: dict[str, str] = {
         "message": commit_message,
@@ -987,6 +998,12 @@ def put_github_file(
         with urllib.request.urlopen(req, timeout=15) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        if (expected_sha is not None or expected_absent) and exc.code in (409, 422):
+            raise GithubProviderError(
+                "CONFLICT",
+                "GitHub refused the conditional file write; review the current file before retrying.",
+                recoverable=True,
+            ) from exc
         body_text = ""
         try:
             body_text = exc.read().decode("utf-8", "replace")[:300]

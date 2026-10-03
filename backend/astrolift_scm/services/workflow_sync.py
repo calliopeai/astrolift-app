@@ -849,10 +849,11 @@ def _github_create_ref(
     repo_full_name: str,
     new_branch: str,
     from_sha: str,
-) -> None:
-    """POST /repos/{owner}/{repo}/git/refs. Idempotent on 422
-    ("Reference already exists") — the same side-branch name from a
-    previous attempt is fine to reuse."""
+) -> bool:
+    """Create the review branch; return False when it already exists.
+
+    Reuse requires an independent target-file review, not a ref reset.
+    """
     token = _token(connection)
     base = _github_api_base(connection)
     url = f"{base}/repos/{_safe_repo(repo_full_name)}/git/refs"
@@ -872,6 +873,7 @@ def _github_create_ref(
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             _ = resp.read()
+            return True
     except urllib.error.HTTPError as exc:
         body_text = ""
         try:
@@ -879,7 +881,7 @@ def _github_create_ref(
         except Exception:
             pass
         if exc.code == 422 and "already exists" in body_text.lower():
-            return
+            return False
         raise GithubProviderError(
             "API_ERROR",
             f"couldn't create ref {new_branch!r}: {exc.code} {body_text}",
@@ -1494,12 +1496,27 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
                 repo_full_name=app.source_repo,
                 branch=deploy_branch,
             )
-            _github_create_ref(
+            branch_created = _github_create_ref(
                 connection,
                 repo_full_name=app.source_repo,
                 new_branch=side_branch,
                 from_sha=head_sha,
             )
+            side_existing = fetch_file(
+                connection,
+                repo_full_name=app.source_repo,
+                path=workflow_path,
+                ref=side_branch,
+            )
+            if (side_existing is None and not branch_created) or (
+                side_existing != existing
+                and (side_existing is None or not owns_unchanged_github_workflow(app, side_existing))
+            ):
+                raise ProviderError(
+                    "CONFLICT",
+                    "The CI review branch has independent edits; review it before reconciling.",
+                    recoverable=True,
+                )
             put_file(
                 connection,
                 repo_full_name=app.source_repo,
@@ -1509,6 +1526,10 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
                 commit_message=commit_message,
                 operation=CI_WORKFLOW_WRITE_OPERATION,
                 permission=CI_WORKFLOW_WRITE_PERMISSION,
+                expected_sha=git_blob_sha(side_existing.encode("utf-8"))
+                if side_existing is not None
+                else None,
+                expected_absent=side_existing is None,
             )
             pr_url = _github_open_pull_request(
                 connection,
@@ -1548,6 +1569,8 @@ def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncR
             commit_message=commit_message,
             operation=CI_WORKFLOW_WRITE_OPERATION,
             permission=CI_WORKFLOW_WRITE_PERMISSION,
+            expected_sha=git_blob_sha(existing.encode("utf-8")) if existing is not None else None,
+            expected_absent=existing is None,
         )
     except ProviderError as exc:
         return WorkflowSyncResult(

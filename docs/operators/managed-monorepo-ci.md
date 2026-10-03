@@ -54,6 +54,14 @@ publication or deployment success. Merge protected-branch review PRs and inspect
 the actual Actions run, published image and platform deployment for each app.
 Two registrations sharing one repository must each have that proof.
 
+Managed GitHub writes use the reviewed blob SHA, or a create-only condition for
+an absent file. A concurrent edit or creation is refused rather than overwritten;
+review the current repository file before retrying. Reconciliation also reviews
+the app's PR branch and refuses independent edits there. An unchanged owned
+generated file can be refreshed on that branch; the write still uses its reviewed
+SHA. A refusal does not advance the saved sync receipt or open a new PR. Other
+providers that lack conditional writes refuse requests for this contract.
+
 ## Upgrade without removing someone else's workflow
 
 Re-sync and push the new scoped secrets for each app after the platform update.
